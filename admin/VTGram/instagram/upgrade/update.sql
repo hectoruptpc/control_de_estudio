@@ -1,0 +1,1 @@
+ALTER TABLE `tbl_instagram_account` ADD `avatar` TEXT NULL AFTER `password`;

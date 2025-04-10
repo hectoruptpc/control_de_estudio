@@ -1,0 +1,67 @@
+<?php
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+
+
+$titulopag = "Pago Mensualidad";
+include('../funciones/functions.php');
+
+if (!isLoggedIn()) {
+	$_SESSION['msg'] = "Debes iniciar sesión primero";
+	header('location: ../login.php');
+}
+?>
+<?php include("includes/head.php"); ?>
+<div class="container">
+
+<!-- Button trigger modal -->
+<button type="button" class="btn btn-primary mt-5" data-toggle="modal" data-target="#pago_mensualidad">
+  Generar Pago
+</button>
+
+<h2>Pago de Mensualidades</h2>
+
+<!-- notification message -->
+<?php
+	if (isset($_SESSION['successmes'])) {
+	echo '<div class="alert alert-danger" role="alert" >';
+	echo '<h3>';
+	echo $_SESSION['successmes']; 
+	unset($_SESSION['successmes']);
+	echo '</h3>';
+	echo '</div>';
+	} ?>
+
+	<!-- Origen de Tabla -->
+	<?php lista_pagos_mes(); ?>
+	<!-- Fin de Tabla -->
+
+<!-- Modal Generar Pedido -->
+<div class="modal fade" id="pago_mensualidad" tabindex="-1" role="dialog" aria-labelledby="pago_mensualidadLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="generarPedidoLabel">Generar Pedido</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      
+      <div class="modal-body">
+
+<?php pago_mensualidad(); ?>
+        
+     
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+        <!-- <button type="button" class="btn btn-primary">Save changes</button> -->
+      </div>
+    </div>
+  </div>
+</div>
+ <!-- Fin de Modal Generar Pedido -->
+
+</div>
+<?php include("includes/footer.php"); ?>

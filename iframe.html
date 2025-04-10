@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+    <title>iframe</title>
+    <script
+  src="https://code.jquery.com/jquery-3.4.1.js"
+  integrity="sha256-WpOohJOqMqqyKL9FccASB9O0KwACQJpFTUBLTYOVvVU="
+  crossorigin="anonymous"></script>
+
+</head>
+<body>
+
+    <div class="test">
+        iframe
+    </div>
+    <script type="text/javascript" src="http://code.jquery.com/jquery-latest.js"></script>
+    <body>
+    <div id="data">
+    <a href="#" >Opcion 1</a><br>
+    <a href="#" >Opcion 2</a><br>
+    <a href="#" >Opcion 3</a><br>
+    </div>
+
+    <div id="data2">
+       <input type="text" size="20">
+    </div>
+
+    <script>
+
+    $("a").click(function () {
+
+      a = document.getElementsByTagName('a');
+
+      var index = $("a").index(this);
+      jQuery("#data2 input").val(a[index].innerHTML);
+    });
+
+
+    </script>
+
+    
+
+    </body>
+
+</html>

@@ -1,0 +1,4 @@
+1. Update file update.sql to database install VTGRAM
+2. Uplload and override all source code via FTP expect file "index.php" and "app/config.php" 
+
+IMPORTANT: DO NOT OVERRIDE FILE "index.php" AND "app/config.php"

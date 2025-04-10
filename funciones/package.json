@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "@popperjs/core": "^2.11.8",
+    "datatables.net-autofill-bs4": "^2.6.0",
+    "datatables.net-bs4": "^1.13.7",
+    "datatables.net-buttons-bs4": "^2.4.2",
+    "datatables.net-datetime": "^1.5.0",
+    "datatables.net-editor-bs4": "^2.2.0",
+    "datatables.net-responsive-bs4": "^2.5.0",
+    "jquery": "^3.7.1",
+    "pdfmake": "^0.2.7",
+    "slim-js": "^5.0.10",
+    "sweetalert2": "^11.6.13"
+  }
+}

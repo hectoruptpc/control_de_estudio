@@ -1,0 +1,735 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<data>
+    <lang slug="title-section-1">
+      <text>The best way to help your marketing effectiveness on instagram</text>
+    </lang>
+    <lang slug="desc-section-1">
+      <text>Using social media is a fun and sure way to get new friends, customers and fans. Getting your Instagram profile out there for everyone to see is a hard and tedious task and time is very precious for all of us and promoting yourself on Instagram is a time-consuming everyday activity. Let Instagtam Tools help you automate your daily activity and get you the crowd you deserve and desire</text>
+    </lang>
+    <lang slug="login">
+      <text>Login</text>
+    </lang>
+    <lang slug="register">
+      <text>Register</text>
+    </lang>
+    <lang slug="email">
+      <text>Email</text>
+    </lang>
+    <lang slug="password">
+      <text>Password</text>
+    </lang>
+    <lang slug="fullname">
+      <text>Fullname</text>
+    </lang>
+    <lang slug="re-password">
+      <text>Re-Password</text>
+    </lang>
+    <lang slug="or-login-via">
+      <text>OR LOGIN VIA</text>
+    </lang>
+    <lang slug="company-name">
+      <text>4F TEAM</text>
+    </lang>
+    <lang slug="contact-us">
+      <text>Contact us</text>
+    </lang>
+    <lang slug="contact-us-desc">
+      <text>We'd love to hear from you. Inquire today to see how we can help</text>
+    </lang>
+    <lang slug="visit-us">
+      <text>VISIT US AT</text>
+    </lang>
+    <lang slug="company-address">
+      <text>207 Pham Van Hai St, Ward 12, District 10, Ho Chi Minh City, Vietnam</text>
+    </lang>
+    <lang slug="company-fullname">
+      <text>Mr. Pham Duc Tien</text>
+    </lang>
+    <lang slug="company-email">
+      <text>Email: tienpham1606@gmail.com</text>
+    </lang>
+    <lang slug="company-phone">
+      <text>Phone: +(84) 1658 000 000</text>
+    </lang>
+    <lang slug="copyright">
+      <text>All right reserved</text>
+    </lang>
+    <lang slug="share">
+      <text>Share</text>
+    </lang>
+    <lang slug="add-new-account">
+      <text>Add new account</text>
+    </lang>
+    <lang slug="you-can-be-assured">
+      <text>You need to login to get the token and the script will not save your password. You can be assured.</text>
+    </lang>
+    <lang slug="list-instagram-tools">
+      <text>List instagram tool</text>
+    </lang>
+    <lang slug="hi">
+      <text>Hi,</text>
+    </lang>
+    <lang slug="submit">
+      <text>Submit</text>
+    </lang>
+    <lang slug="schedule-direct-messages">
+      <text>Schedule Direct Messages</text>
+    </lang>
+    <lang slug="schedule-posts">
+      <text>Schedule Posts</text>
+    </lang>
+    <lang slug="write-something">
+      <text>Write something...</text>
+    </lang>
+    <lang slug="send-direct-message">
+      <text>Send direct message to user follow you. Leave blank if you do not want to send.</text>
+    </lang>
+    <lang slug="add-photo">
+      <text>+Add Media</text>
+    </lang>
+    <lang slug="post-now">
+      <text>Post now</text>
+    </lang>
+    <lang slug="schedule">
+      <text>Schedule</text>
+    </lang>
+    <lang slug="time-post">
+      <text>Time post</text>
+    </lang>
+    <lang slug="deplay">
+      <text>Delay</text>
+    </lang>
+    <lang slug="random-post-accounts">
+      <text>Random post accounts</text>
+    </lang>
+    <lang slug="delete-schedule-after-finished">
+      <text>Delete schedule after finished</text>
+    </lang>
+    <lang slug="repeat-post">
+      <text>Repeat post</text>
+    </lang>
+    <lang slug="repeat">
+      <text>Repeat</text>
+    </lang>
+    <lang slug="end-day">
+      <text>End day</text>
+    </lang>
+    <lang slug="save-schedule">
+      <text>Save schedule</text>
+    </lang>
+    <lang slug="peview-your-schedule-post">
+      <text>Review your scheduled post</text>
+    </lang>
+    <lang slug="add-new">
+      <text>Add new</text>
+    </lang>
+    <lang slug="delete">
+      <text>Delete</text>
+    </lang>
+    <lang slug="cancel">
+      <text>Cancel</text>
+    </lang>
+    <lang slug="view">
+      <text>View</text>
+    </lang>
+    <lang slug="repost">
+      <text>Repost</text>
+    </lang>
+    <lang slug="action">
+      <text>Action</text>
+    </lang>
+    <lang slug="empty">
+      <text>Empty</text>
+    </lang>
+    <lang slug="save-post">
+      <text>Save post</text>
+    </lang>
+    <lang slug="enter-url-or-upload-image">
+      <text>Enter url or upload media</text>
+    </lang>
+    <lang slug="auto-posts">
+      <text>Auto Posts</text>
+    </lang>
+    <lang slug="auto-comments">
+      <text>Auto Comments</text>
+    </lang>
+    <lang slug="auto-likes">
+      <text>Auto Likes</text>
+    </lang>
+    <lang slug="auto-follow">
+      <text>Auto Follow</text>
+    </lang>
+    <lang slug="auto-follow-back">
+      <text>Auto Follow Back</text>
+    </lang>
+    <lang slug="auto-unfollow">
+      <text>Auto Unfollow</text>
+    </lang>
+    <lang slug="auto-direct-message">
+      <text>Auto Direct Messages</text>
+    </lang>
+    <lang slug="search">
+      <text>Search</text>
+    </lang>
+    <lang slug="search-tool">
+      <text>Search Tool</text>
+    </lang>
+    <lang slug="enter-keyword">
+      <text>Enter keyword</text>
+    </lang>
+    <lang slug="hashtag">
+      <text>Hashtag</text>
+    </lang>
+    <lang slug="user">
+      <text>User</text>
+    </lang>
+    <lang slug="username">
+      <text>Username</text>
+    </lang>
+    <lang slug="media-count">
+      <text>Media Count</text>
+    </lang>
+    <lang slug="no.">
+      <text>No.</text>
+    </lang>
+    <lang slug="avatar">
+      <text>Avatar</text>
+    </lang>
+    <lang slug="follower-count">
+      <text>Follower Count</text>
+    </lang>
+    <lang slug="mutual-followers-count">
+      <text>Mutual Followers Count</text>
+    </lang>
+    <lang slug="follow">
+      <text>Follow</text>
+    </lang>
+    <lang slug="unfollow">
+      <text>Unfollow</text>
+    </lang>
+    <lang slug="schedule-comments">
+      <text>Schedule Comments</text>
+    </lang>
+    <lang slug="time-direct-message">
+      <text>Time direct message</text>
+    </lang>
+    <lang slug="time-comment">
+      <text>Time comment</text>
+    </lang>
+    <lang slug="timeline-feed">
+      <text>Timeline Feed</text>
+    </lang>
+    <lang slug="popular-feed">
+      <text>Popular feed</text>
+    </lang>
+    <lang slug="enter-hashtag">
+      <text>Enter hashtag</text>
+    </lang>
+    <lang slug="reels-tray-feed">
+      <text>Reels Tray Feed</text>
+    </lang>
+    <lang slug="explore-tab">
+      <text>Explore Tab Feed</text>
+    </lang>
+    <lang slug="self-feed">
+      <text>Self Feed</text>
+    </lang>
+    <lang slug="hashtag-feed">
+      <text>Hashtag Feed</text>
+    </lang>
+    <lang slug="review-your-scheduled-direct-message">
+      <text>Review your scheduled direct message</text>
+    </lang>
+    <lang slug="review-your-scheduled-comment">
+      <text>Review your scheduled comment</text>
+    </lang>
+    <lang slug="time-like">
+      <text>Time like</text>
+    </lang>
+    <lang slug="schedule-likes">
+      <text>Schedule Likes</text>
+    </lang>
+    <lang slug="review-your-scheduled-like">
+      <text>Review your scheduled like</text>
+    </lang>
+    <lang slug="schedule-follow">
+      <text>Schedule Follow</text>
+    </lang>
+    <lang slug="minutes">
+      <text>Minutes</text>
+    </lang>
+    <lang slug="maximum-follow">
+      <text>Maximum follow/per cronjob</text>
+    </lang>
+    <lang slug="maximum-unfollow">
+      <text>Maximum follow/per cronjob</text>
+    </lang>
+    <lang slug="maximum-follow-back">
+      <text>Maximum follow-back/per cronjob</text>
+    </lang>
+    <lang slug="review-your-scheduled-follow">
+      <text>Review your scheduled follow</text>
+    </lang>
+    <lang slug="schedule-unfollow">
+      <text>Schedule Unfollow</text>
+    </lang>
+    <lang slug="time-cronjob">
+      <text>Time cronjob/times</text>
+    </lang>
+    <lang slug="review-your-scheduled-unfollow">
+      <text>Review your scheduled follow</text>
+    </lang>
+    <lang slug="schedule-follow-back">
+      <text>Schedule Follow-Back</text>
+    </lang>
+    <lang slug="review-your-scheduled-follow-back">
+      <text>Review your scheduled follow back</text>
+    </lang>
+    <lang slug="status">
+      <text>Status</text>
+    </lang>
+    <lang slug="option">
+      <text>Option</text>
+    </lang>
+    <lang slug="active">
+      <text>Active</text>
+    </lang>
+    <lang slug="disable">
+      <text>Disable</text>
+    </lang>
+    <lang slug="account-manage">
+      <text>Account Manage</text>
+    </lang>
+    <lang slug="instagram-tools">
+      <text>Instagram tool</text>
+    </lang>
+    <lang slug="dashboard">
+      <text>Dashboard</text>
+    </lang>
+    <lang slug="user-manage">
+      <text>User manage</text>
+    </lang>
+    <lang slug="settings">
+      <text>Settings</text>
+    </lang>
+    <lang slug="profile">
+      <text>Profile</text>
+    </lang>
+    <lang slug="logout">
+      <text>Logout</text>
+    </lang>
+    <lang slug="created">
+      <text>Created</text>
+    </lang>
+    <lang slug="confirm-delete">
+      <text>Are you sure you want to delete this item?</text>
+    </lang>
+    <lang slug="successfully">
+      <text>Successfully</text>
+    </lang>
+    <lang slug="admin">
+      <text>Admin</text>
+    </lang>
+    <lang slug="role">
+      <text>Role</text>
+    </lang>
+    <lang slug="timezone">
+      <text>Timezone</text>
+    </lang>
+    <lang slug="active-disable">
+      <text>Active/Disable</text>
+    </lang>
+    <lang slug="system-processing">
+      <text>System processing</text>
+    </lang>
+    <lang slug="fullname-invalid">
+      <text>Fullname invalid</text>
+    </lang>
+    <lang slug="email-invalid">
+      <text>Email is not a valid email address</text>
+    </lang>
+    <lang slug="email-is-required">
+      <text>Email is required</text>
+    </lang>
+    <lang slug="password-is-required">
+      <text>Password is required</text>
+    </lang>
+    <lang slug="password-at-least-5-characters">
+      <text>Password at least 5 characters</text>
+    </lang>
+    <lang slug="password-is-not-matching">
+      <text>Password is not matching</text>
+    </lang>
+    <lang slug="register-successfully">
+      <text>Register successfully</text>
+    </lang>
+    <lang slug="email-already-exists">
+      <text>Email already exists</text>
+    </lang>
+    <lang slug="login-successfully">
+      <text>Login successfully</text>
+    </lang>
+    <lang slug="email-or-password-incorrect">
+      <text>Email or password incorrect</text>
+    </lang>
+    <lang slug="username-or-password-incorrect">
+      <text>Username or password incorrect</text>
+    </lang>
+    <lang slug="add-new-successfully">
+      <text>Add new successfully</text>
+    </lang>
+    <lang slug="select-timezone">
+      <text>Select timezome to start using</text>
+    </lang>
+    <lang slug="yes">
+      <text>Yes</text>
+    </lang>
+    <lang slug="no">
+      <text>No</text>
+    </lang>
+    <lang slug="customization-options">
+      <text>Customization Options</text>
+    </lang>
+    <lang slug="admin-options">
+      <text>Admin Options</text>
+    </lang>
+    <lang slug="posting-options">
+      <text>Posting Options</text>
+    </lang>
+    <lang slug="website-name">
+      <text>Website name</text>
+    </lang>
+    <lang slug="website-description">
+      <text>Website description</text>
+    </lang>
+    <lang slug="website-keywords">
+      <text>Website keywords</text>
+    </lang>
+    <lang slug="logo">
+      <text>Logo</text>
+    </lang>
+    <lang slug="theme">
+      <text>Theme</text>
+    </lang>
+    <lang slug="automatically-active-user">
+      <text>Automatically active user</text>
+    </lang>
+    <lang slug="default-language">
+      <text>Default language</text>
+    </lang>
+    <lang slug="add-new-language">
+      <text>Add new language</text>
+    </lang>
+    <lang slug="default-delay">
+      <text>Default delay</text>
+    </lang>
+    <lang slug="minimum-delay">
+      <text>Minimum delay</text>
+    </lang>
+    <lang slug="view-demo">
+      <text>View demo</text>
+    </lang>
+    <lang slug="login-social-options">
+      <text>Login social options</text>
+    </lang>
+    <lang slug="app-id">
+      <text>App Id</text>
+    </lang>
+    <lang slug="app-secret">
+      <text>App Secret</text>
+    </lang>
+    <lang slug="client-id">
+      <text>Client Id</text>
+    </lang>
+    <lang slug="client-secret">
+      <text>Client Secret</text>
+    </lang>
+    <lang slug="consumer-key">
+      <text>Consumer Key</text>
+    </lang>
+    <lang slug="consumer-secret">
+      <text>Consumer Secret</text>
+    </lang>
+    <lang slug="comments">
+      <text>Comments</text>
+    </lang>
+    <lang slug="likes">
+      <text>Likes</text>
+    </lang>
+    <lang slug="photo">
+      <text>Photo</text>
+    </lang>
+    <lang slug="type">
+      <text>Type</text>
+    </lang>
+    <lang slug="caption">
+      <text>Caption</text>
+    </lang>
+    <lang slug="update-successfully">
+      <text>Update successfully</text>
+    </lang>
+    <lang slug="your-account-is-not-activated">
+      <text>Your account is not activated</text>
+    </lang>
+    <lang slug="image-is-required">
+      <text>Image is required</text>
+    </lang>
+    <lang slug="video-is-required">
+      <text>Video is required</text>
+    </lang>
+    <lang slug="time-post-required">
+      <text>Time post required</text>
+    </lang>
+    <lang slug="please-select-an-account">
+      <text>Please select an account</text>
+    </lang>
+    <lang slug="please-add-hashtags">
+      <text>Please add hashtags</text>
+    </lang>
+    <lang slug="description-is-required">
+      <text>Description is required</text>
+    </lang>
+    <lang slug="select-at-least-a-media">
+      <text>Select at least one media</text>
+    </lang>
+    <lang slug="select-at-least-a-user">
+      <text>Select at least one user</text>
+    </lang>
+    <lang slug="your-account">
+      <text>Your account</text>
+    </lang>
+    <lang slug="follow-back">
+      <text>Follow back</text>
+    </lang>
+    <lang slug="all-type">
+      <text>All Type</text>
+    </lang>
+    <lang slug="all-account">
+      <text>All Account</text>
+    </lang>
+    <lang slug="history">
+      <text>History</text>
+    </lang>
+    <lang slug="history-follow">
+      <text>History Follow/Follow-Back/Unfollow</text>
+    </lang>
+    <lang slug="analytics">
+      <text>Analytics</text>
+    </lang>
+    <lang slug="posts-by-day">
+      <text>Posts by day</text>
+    </lang>
+    <lang slug="posts-by-status">
+      <text>Posts by status</text>
+    </lang>
+    <lang slug="direct-message-by-day">
+      <text>Direct message by day</text>
+    </lang>
+    <lang slug="direct-message-by-status">
+      <text>Direct message by status</text>
+    </lang>
+    <lang slug="comments-by-day">
+      <text>Comments by day</text>
+    </lang>
+    <lang slug="comments-by-status">
+      <text>Comments by status</text>
+    </lang>
+    <lang slug="likes-by-day">
+      <text>Likes by day</text>
+    </lang>
+    <lang slug="likes-by-status">
+      <text>Likes by status</text>
+    </lang>
+    <lang slug="posts">
+      <text>Posts</text>
+    </lang>
+    <lang slug="total">
+      <text>Total</text>
+    </lang>
+    <lang slug="maximum-account-instagram">
+      <text>Maximum Instagram account</text>
+    </lang>
+    <lang slug="default-maximum-account-instagram">
+      <text>Default maximum Instagram account on each user</text>
+    </lang>
+    <lang slug="desc-limit-account">
+      <text>Your account has exceeded the number allowed.</text>
+    </lang>
+    <lang slug="please-enter-keyword">
+      <text>Please enter keyword</text>
+    </lang>
+    <lang slug="saved-successfully">
+      <text>Saved successfully</text>
+    </lang>
+    <lang slug="title">
+      <text>Title</text>
+    </lang>
+    <lang slug="save">
+      <text>Save</text>
+    </lang>
+    <lang slug="post-list-saved">
+      <text>Posts list saved</text>
+    </lang>
+    <lang slug="save-posts-manage">
+      <text>Save posts manage</text>
+    </lang>
+    <lang slug="accounts">
+      <text>Accounts</text>
+    </lang>
+    <lang slug="video">
+      <text>Video</text>
+    </lang>
+    <lang slug="upload-max-size">
+      <text>Upload max size</text>
+    </lang>
+    <lang slug="m">
+      <text>M</text>
+    </lang>
+    <lang slug="get-self-users-following">
+      <text>Get Self Users Following</text>
+    </lang>
+    <lang slug="get-self-users-followers">
+      <text>Get Self Users Followers</text>
+    </lang>
+    <lang slug="seconds">
+      <text>seconds</text>
+    </lang>
+    <lang slug="one-per-day">
+      <text>Once Per Day</text>
+    </lang>
+    <lang slug="every-two-days">
+      <text>Every Two days</text>
+    </lang>
+    <lang slug="every-three-days">
+      <text>Every Three days</text>
+    </lang>
+    <lang slug="every-four-days">
+      <text>Every Four days</text>
+    </lang>
+    <lang slug="every-five-days">
+      <text>Every Five days</text>
+    </lang>
+    <lang slug="every-six-days">
+      <text>Every Six days</text>
+    </lang>
+    <lang slug="add-successfully">
+      <text>Add successfully</text>
+    </lang>
+    <lang slug="the-error-occurred-during-processing">
+      <text>The error occurred during processing</text>
+    </lang>
+    <lang slug="desc-account-limit">
+      <text>You have exceeded the number of accounts allowed, You are only allowed to update your account.</text>
+    </lang>
+    <lang slug="Hi,">
+      <text>Hi,</text>
+    </lang>
+    <lang slug="Auto Post">
+      <text>Auto Post</text>
+    </lang>
+    <lang slug="Add new">
+      <text>Add new</text>
+    </lang>
+    <lang slug="Photo">
+      <text>Photo</text>
+    </lang>
+    <lang slug="Video">
+      <text>Video</text>
+    </lang>
+    <lang slug="Auto Direct Message">
+      <text>Auto Direct Message</text>
+    </lang>
+    <lang slug="Auto Comment">
+      <text>Auto Comment</text>
+    </lang>
+    <lang slug="Auto Like">
+      <text>Auto Like</text>
+    </lang>
+    <lang slug="Auto Follow">
+      <text>Auto Follow</text>
+    </lang>
+    <lang slug="Auto Follow Back">
+      <text>Auto Follow Back</text>
+    </lang>
+    <lang slug="Auto Unfollow">
+      <text>Auto Unfollow</text>
+    </lang>
+    <lang slug="like">
+      <text>Like</text>
+    </lang>
+    <lang slug="comment">
+      <text>Comment</text>
+    </lang>
+    <lang slug="follow">
+      <text>Follow</text>
+    </lang>
+    <lang slug="followback">
+      <text>Follow back</text>
+    </lang>
+    <lang slug="unfollow">
+      <text>Unfollow</text>
+    </lang>
+    <lang slug="History">
+      <text>History</text>
+    </lang>
+    <lang slug="Start All">
+      <text>Start All</text>
+    </lang>
+    <lang slug="Stop All">
+      <text>Stop All</text>
+    </lang>
+    <lang slug="Delete All">
+      <text>Delete All</text>
+    </lang>
+    <lang slug="Started">
+      <text>Started</text>
+    </lang>
+    <lang slug="Stoped">
+      <text>Stoped</text>
+    </lang>
+    <lang slug="Processing">
+      <text>Processing</text>
+    </lang>
+    <lang slug="Published">
+      <text>Published</text>
+    </lang>
+    <lang slug="Failure">
+      <text>Failure</text>
+    </lang>
+    <lang slug="Repost">
+      <text>Repost</text>
+    </lang>
+    <lang slug="Cancel">
+      <text>Cancel</text>
+    </lang>
+    <lang slug="Instagram Search">
+      <text>Instagram Search</text>
+    </lang>
+    <lang slug="License">
+      <text>License</text>
+    </lang>
+    <lang slug="Purchase code">
+      <text>Purchase code</text>
+    </lang>
+    <lang slug="Submit">
+      <text>Submit</text>
+    </lang>
+    <lang slug="Oh sorry! You have exceeded the number of accounts allowed, You are only allowed to update your account">
+      <text>Oh sorry! You have exceeded the number of accounts allowed, You are only allowed to update your account</text>
+    </lang>
+    <lang slug="dm-by-status">
+      <text>Direct message by status</text>
+    </lang>
+    <lang slug="dm-by-day">
+      <text>Direct message by day</text>
+    </lang>
+    <lang slug="story-photo">
+      <text>Story Photo</text>
+    </lang>
+    <lang slug="auto-like">
+      <text>Auto Like</text>
+    </lang>
+    <lang slug="auto-comment">
+      <text>Auto Comment</text>
+    </lang>
+</data>
