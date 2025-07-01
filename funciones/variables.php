@@ -1,7 +1,7 @@
 <?php
 // variable declaration
 
-    $carpeta = '/control_de_estudio';
+    $carpeta = '/CE';
     $logo = '<img src="https://local.jesuministrosymas.com.ve/image/LOGO.png" width="180" height="30"><br><br>';
     $msn_iniciar_sesion = '<i class="fa fa-exclamation-triangle"></i> Debe iniciar Sesion';
     $como_pagar = '<div class="alert alert-primary" role="alert">

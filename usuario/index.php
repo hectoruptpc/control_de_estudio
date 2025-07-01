@@ -53,6 +53,11 @@ $titulopag = "Sistema";
 <hr>
 
 
+<a href="agregar_estudiante.php">
+    <button>Generar Estudiante</button>
+</a>
+
+
 
     <!-- Icon Cards-->
     <div class="row">
