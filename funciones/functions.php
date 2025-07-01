@@ -78,6 +78,3315 @@ if (isset($_GET['logout'])) {
 }
 
 
+// VISUALIZACION DE ESTUDIANTES
+
+
+function obtenerEstudiantes() {
+  global $db;
+  
+  $estudiantes = [];
+  $query = "SELECT 
+              u.id,
+              u.idusuario AS cedula,
+              u.nombre,
+              u.carrera,
+              u.genero,
+              u.tlf AS num_telf,
+              u.email AS correo,
+              u.fecha_ingreso,
+              u.status
+            FROM users u
+            WHERE u.user_type = ?
+            ORDER BY u.fecha_ingreso DESC";
+  
+  if ($stmt = $db->prepare($query)) {
+      $tipoUsuario = 'estudiante';
+      $stmt->bind_param("s", $tipoUsuario);
+      
+      if ($stmt->execute()) {
+          $result = $stmt->get_result();
+          while ($row = $result->fetch_assoc()) {
+              $estudiantes[] = $row;
+          }
+          $stmt->close();
+          return $estudiantes;
+      } else {
+          $stmt->close();
+          return ['error' => "Error al ejecutar la consulta: " . $stmt->error];
+      }
+  } else {
+      return ['error' => "Error al preparar la consulta: " . $db->error];
+  }
+}
+
+/**
+* Obtiene los detalles completos de un estudiante por su ID
+* @param int $id ID del estudiante
+* @return array Array con los detalles del estudiante o mensaje de error
+*/
+function obtenerDetalleEstudiante($id) {
+  global $db;
+  
+  $stmt = $db->prepare("SELECT * FROM estudiantes WHERE id = ?");
+  $stmt->bind_param("i", $id);
+  
+  if ($stmt->execute()) {
+      $result = $stmt->get_result();
+      $estudiante = $result->fetch_assoc();
+      $stmt->close();
+      
+      return $estudiante ?: ['error' => "Estudiante no encontrado"];
+  } else {
+      return ['error' => "Error al obtener detalle del estudiante: " . $stmt->error];
+  }
+}
+
+/**
+ * Funciones para el manejo de estudiantes (users)
+ */
+
+// Función para obtener carreras desde la base de datos
+function obtenerCarreras() {
+  global $db;
+  
+  $carreras = [];
+  $query = "SELECT DISTINCT carrera FROM users WHERE carrera IS NOT NULL ORDER BY carrera ASC";
+  
+  // Versión con sentencia preparada
+  if ($stmt = $db->prepare($query)) {
+      $stmt->execute();
+      $result = $stmt->get_result();
+      
+      while ($row = $result->fetch_row()) {
+          $carreras[] = $row[0];
+      }
+      
+      $stmt->close();
+      return $carreras;
+  } else {
+      // Log del error (opcional)
+      error_log("Error al preparar consulta: " . $db->error);
+      return [];
+  }
+}
+
+/**
+* Muestra el estado del estudiante con icono y color adecuado
+*/
+function mostrarEstadoEstudiante($status) {
+  $estados = [
+      'Activo' => ['icono' => 'fa-circle-check', 'color' => 'text-success'],
+      'Inactivo' => ['icono' => 'fa-circle-pause', 'color' => 'text-danger'],
+      'Egresado' => ['icono' => 'fa-graduation-cap', 'color' => 'text-primary'],
+      'Graduado' => ['icono' => 'fa-award', 'color' => 'text-warning'],
+      'default' => ['icono' => 'fa-circle-question', 'color' => 'text-secondary']
+  ];
+  
+  $config = $estados[$status] ?? $estados['default'];
+  
+  return '<span class="'.$config['color'].'">
+            <i class="fas '.$config['icono'].' me-1"></i>
+            '.htmlspecialchars($status).'
+        </span>';
+}
+
+/**
+* Valida y sanitiza los datos de un estudiante
+*/
+function validarDatosEstudiante($data) {
+  $errors = [];
+  $validados = [];
+  
+  // Validación de cédula
+  if (empty($data['idusuario'])) {
+      $errors['idusuario'] = "La cédula es requerida";
+  } else {
+      $validados['idusuario'] = htmlspecialchars(trim($data['idusuario']));
+  }
+  
+  // Validación de nombre
+  if (empty($data['nombre'])) {
+      $errors['nombre'] = "El nombre es requerido";
+  } else {
+      $validados['nombre'] = htmlspecialchars(trim($data['nombre']));
+  }
+  
+  // Validación de correo
+  if (!empty($data['email']) && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+      $errors['email'] = "Correo electrónico no válido";
+  } else {
+      $validados['email'] = !empty($data['email']) ? htmlspecialchars(trim($data['email'])) : null;
+  }
+  
+  // Validación de teléfono
+  if (!empty($data['tlf']) && !preg_match('/^[0-9\-\+]{10,15}$/', $data['tlf'])) {
+      $errors['tlf'] = "Formato de teléfono no válido";
+  } else {
+      $validados['tlf'] = !empty($data['tlf']) ? htmlspecialchars(trim($data['tlf'])) : null;
+  }
+  
+  // Otros campos
+  $validados['carrera'] = !empty($data['carrera']) ? htmlspecialchars(trim($data['carrera'])) : null;
+  $validados['genero'] = !empty($data['genero']) ? htmlspecialchars(trim($data['genero'])) : null;
+  $validados['status'] = !empty($data['status']) ? htmlspecialchars(trim($data['status'])) : 'Activo';
+  $validados['user_type'] = 'estudiante';
+  
+  return [
+      'data' => $validados,
+      'errors' => $errors
+  ];
+}
+
+function insertarEstudiante($datos) {
+  global $db;
+  
+  try {
+      // 1. Preparación de datos
+      $username = strtolower(str_replace(' ', '.', $datos['nombre']));
+      $cedulaLimpia = substr($datos['idusuario'], 2);
+      $password = md5($cedulaLimpia);
+      $fecha_act = date('Y-m-d H:i:s');
+      $api_key = '';
+
+      // 2. Campos de rol (todos los booleanos)
+      $roles = [
+          'usuario' => 0,
+          'estudiante' => 1,
+          'docente' => 0,
+          'admin' => 0,
+          'super_user' => 0,
+          'editar_user' => 0,
+          'editar_nota' => 0,
+          'editar_acceso' => 0
+      ];
+
+      // 3. Valores por defecto para campos opcionales
+      $defaults = [
+          'cel' => '',
+          'ciudad' => $datos['municipio'] ?? '',
+          'num_telf_opc' => '',
+          'etnia' => '',
+          'casaapto' => 'No especificado',
+          'punto_referencia' => '',
+          'grupo_familiar' => 0,
+          'acargo_usted' => 0,
+          'fuente_ingresos' => '',
+          'tipo_vivienda' => '',
+          'tenencia_vivienda' => '',
+          'enfermedad' => '',
+          'discapacidad' => '',
+          'titulos' => '',
+          'institutos' => '',
+          'api_key' => $api_key
+      ];
+
+      // 4. Combinar todos los valores
+      $valores = array_merge(
+          [
+              'idusuario' => $datos['idusuario'],
+              'nombre' => $datos['nombre'],
+              'username' => $username,
+              'email' => $datos['email'] ?? null,
+              'tlf' => $datos['tlf'] ?? null,
+              'direccion' => $datos['direccion'] ?? null,
+              'estado' => $datos['estado'] ?? null,
+              'municipio' => $datos['municipio'] ?? null,
+              'parroquia' => $datos['parroquia'] ?? null,
+              'fecha_ingreso' => $datos['fecha_ingreso'] ?? null,
+              'status' => $datos['status'] ?? 'Activo',
+              'user_type' => 'estudiante',
+              'password' => $password,
+              'carrera' => $datos['carrera'] ?? null,
+              'genero' => $datos['genero'] ?? null,
+              'edo_civil' => $datos['edo_civil'] ?? null,
+              'fecha_nac' => $datos['fecha_nac'] ?? null,
+              'fecha_act' => $fecha_act
+          ],
+          $defaults,
+          $roles
+      );
+
+      // 5. Construir consulta SQL con placeholders ?
+      $columnas = implode(', ', array_keys($valores));
+      $placeholders = implode(', ', array_fill(0, count($valores), '?'));
+      $sql = "INSERT INTO users ($columnas) VALUES ($placeholders)";
+
+      // 6. Preparar statement
+      $stmt = $db->prepare($sql);
+      if (!$stmt) {
+          throw new Exception("Error en preparación: " . $db->error);
+      }
+
+      // 7. Determinar tipos de parámetros y valores
+      $tipos = '';
+      $valoresBind = [];
+      
+      foreach ($valores as $key => $value) {
+          if (in_array($key, ['grupo_familiar', 'acargo_usted', ...array_keys($roles)])) {
+              $tipos .= 'i'; // Entero
+          } elseif (is_null($value)) {
+              $tipos .= 's'; // MySQLi no tiene tipo NULL específico, se maneja como string
+              $valoresBind[] = null;
+          } else {
+              $tipos .= 's'; // String
+              $valoresBind[] = $value;
+          }
+      }
+
+      // 8. Vincular parámetros dinámicamente
+      $stmt->bind_param($tipos, ...$valoresBind);
+      
+      // 9. Ejecutar
+      if (!$stmt->execute()) {
+          throw new Exception("Error al ejecutar: " . $stmt->error);
+      }
+
+      return [
+          'success' => true,
+          'message' => 'Estudiante registrado exitosamente!',
+          'id' => $stmt->insert_id
+      ];
+
+  } catch(Exception $e) {
+      error_log("Error en insertarEstudiante: " . $e->getMessage());
+      return [
+          'success' => false,
+          'message' => 'Error al registrar estudiante: ' . $e->getMessage()
+      ];
+  }
+}
+
+// Función para validar datos de estudiante
+function validarEstudiante($datos) {
+  $errores = [];
+  
+  // Validar email
+  if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
+      $errores[] = 'Por favor ingrese un correo electrónico válido';
+  }
+  
+  // Validar teléfono (al menos 10 dígitos)
+  if (strlen($datos['tlf']) < 10) {
+      $errores[] = 'El teléfono debe tener al menos 10 dígitos';
+  }
+  
+  // Validar que la fecha de ingreso no sea anterior a la de nacimiento
+  $fechaNac = new DateTime($datos['fecha_nac']);
+  $fechaIngreso = new DateTime($datos['fecha_ingreso']);
+  if ($fechaIngreso < $fechaNac) {
+      $errores[] = 'La fecha de ingreso no puede ser anterior a la fecha de nacimiento';
+  }
+  
+  // Validar campos requeridos
+  $camposRequeridos = [
+      'idusuario', 'nombre', 'carrera', 'genero', 'edo_civil',
+      'estado', 'municipio', 'direccion', 'fecha_nac',
+      'tlf', 'email', 'fecha_ingreso', 'status'
+  ];
+  
+  foreach ($camposRequeridos as $campo) {
+      if (empty($datos[$campo])) {
+          $errores[] = "El campo " . str_replace('_', ' ', $campo) . " es requerido";
+      }
+  }
+  
+  return empty($errores) ? true : $errores;
+}
+
+// Función para obtener estados civiles
+function obtenerEstadosCiviles() {
+  return [
+      'Soltero/a',
+      'Casado/a',
+      'Divorciado/a',
+      'Viudo/a',
+      'Unión Libre'
+  ];
+}
+
+// Función para obtener estados de estudiante
+function obtenerEstadosEstudiante() {
+  return [
+      'Activo',
+      'Inactivo',
+      'Egresado',
+      'Graduado'
+  ];
+}
+
+// Función para obtener estudiante por ID
+function obtenerEstudiantePorId(int $id): ?array {
+  global $db;
+  
+  // Consulta SQL con sentencia preparada
+  $query = "SELECT * FROM users WHERE id = ? LIMIT 1";
+  
+  // Preparar la consulta
+  $stmt = $db->prepare($query);
+  if (!$stmt) {
+      error_log("Error al preparar consulta: " . $db->error);
+      return null;
+  }
+  
+  // Vincular parámetro
+  $stmt->bind_param("i", $id);
+  
+  // Ejecutar consulta
+  if (!$stmt->execute()) {
+      error_log("Error al ejecutar consulta: " . $stmt->error);
+      $stmt->close();
+      return null;
+  }
+  
+  // Obtener resultado
+  $result = $stmt->get_result();
+  
+  // Verificar si hay resultados
+  if ($result->num_rows === 0) {
+      $stmt->close();
+      return null;
+  }
+  
+  // Obtener datos del estudiante
+  $estudiante = $result->fetch_assoc();
+  
+  // Liberar recursos
+  $result->free();
+  $stmt->close();
+  
+  return $estudiante;
+}
+
+// Función para actualizar estudiante
+function actualizarEstudiante(array $datos): array {
+  global $db;
+  
+  try {
+      // Consulta SQL con parámetros preparados
+      $sql = "UPDATE users SET 
+              idusuario = ?,
+              nombre = ?,
+              email = ?,
+              tlf = ?,
+              cel = ?,
+              direccion = ?,
+              ciudad = ?,
+              estado = ?,
+              municipio = ?,
+              parroquia = ?,
+              fecha_ingreso = ?,
+              status = ?,
+              carrera = ?,
+              genero = ?,
+              edo_civil = ?,
+              fecha_nac = ?,
+              num_telf_opc = ?,
+              fecha_act = ?
+              WHERE id = ?";
+
+      // Preparar la sentencia
+      $stmt = $db->prepare($sql);
+      if (!$stmt) {
+          throw new Exception("Error en la preparación: " . $db->error);
+      }
+
+      // Establecer valores por defecto para campos opcionales
+      $valores = [
+          $datos['idusuario'] ?? '',
+          $datos['nombre'] ?? '',
+          $datos['email'] ?? null,
+          $datos['tlf'] ?? null,
+          $datos['cel'] ?? '',
+          $datos['direccion'] ?? '',
+          $datos['municipio'] ?? '', // ciudad se llena con municipio
+          $datos['estado'] ?? '',
+          $datos['municipio'] ?? '',
+          $datos['parroquia'] ?? '',
+          $datos['fecha_ingreso'] ?? null,
+          $datos['status'] ?? 'Activo',
+          $datos['carrera'] ?? null,
+          $datos['genero'] ?? null,
+          $datos['edo_civil'] ?? null,
+          $datos['fecha_nac'] ?? null,
+          $datos['num_telf_opc'] ?? '',
+          date('Y-m-d H:i:s'), // fecha_act actual
+          $datos['id']
+      ];
+
+      // Vincular parámetros
+      $stmt->bind_param(
+          "ssssssssssssssssssi", // Tipos de parámetros
+          ...$valores            // Valores
+      );
+
+      // Ejecutar la actualización
+      if (!$stmt->execute()) {
+          throw new Exception("Error al ejecutar: " . $stmt->error);
+      }
+
+      // Verificar si se realizaron cambios
+      $cambios = $stmt->affected_rows > 0;
+      
+      return [
+          'success' => $cambios,
+          'message' => $cambios 
+              ? 'Estudiante actualizado correctamente' 
+              : 'No se realizaron cambios (posiblemente los datos son iguales)',
+          'affected_rows' => $stmt->affected_rows
+      ];
+
+  } catch(Exception $e) {
+      error_log("Error en actualizarEstudiante: " . $e->getMessage());
+      return [
+          'success' => false,
+          'message' => 'Error al actualizar estudiante: ' . $e->getMessage()
+      ];
+  } finally {
+      if (isset($stmt)) {
+          $stmt->close();
+      }
+  }
+}
+
+function procesarCSVEstudiantes($tmpFilePath, $originalName) {
+  global $db;
+  
+  // Validar extensión del archivo
+  $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+  if ($extension !== 'csv') {
+      return ['success' => false, 'message' => 'El archivo debe tener extensión .csv'];
+  }
+  
+  // Abrir el archivo CSV
+  if (($handle = fopen($tmpFilePath, "r")) === FALSE) {
+      return ['success' => false, 'message' => 'No se pudo abrir el archivo CSV'];
+  }
+  
+  // Leer encabezados
+  $headers = fgetcsv($handle, 1000, ",");
+  if ($headers === FALSE) {
+      fclose($handle);
+      return ['success' => false, 'message' => 'El archivo CSV está vacío o no tiene el formato correcto'];
+  }
+  
+  // Mapeo de campos esperados
+  $camposEsperados = [
+      'idusuario', 'nombre', 'email', 'tlf', 'cel', 'direccion', 'ciudad', 
+      'estado', 'municipio', 'parroquia', 'fecha_ingreso', 'status', 'carrera', 
+      'genero', 'edo_civil', 'fecha_nac', 'num_telf_opc', 'etnia', 'casaapto', 
+      'punto_referencia', 'grupo_familiar', 'acargo_usted', 'fuente_ingresos', 
+      'tipo_vivienda', 'tenencia_vivienda', 'enfermedad', 'discapacidad', 
+      'titulos', 'institutos'
+  ];
+  
+  // Verificar encabezados mínimos requeridos
+  $headersLower = array_map('strtolower', $headers);
+  $requiredFields = ['idusuario', 'nombre', 'email', 'tlf', 'direccion', 'estado', 
+                    'municipio', 'fecha_ingreso', 'status', 'carrera', 'genero', 
+                    'edo_civil', 'fecha_nac'];
+  
+  $missingHeaders = array_diff(array_map('strtolower', $requiredFields), $headersLower);
+  
+  if (!empty($missingHeaders)) {
+      fclose($handle);
+      return ['success' => false, 'message' => 'Faltan los siguientes encabezados requeridos en el CSV: ' . implode(', ', $missingHeaders)];
+  }
+  
+  // Mapear índices de columnas
+  $columnMap = [];
+  foreach ($headers as $index => $header) {
+      $headerLower = strtolower($header);
+      if (in_array($headerLower, $camposEsperados)) {
+          $columnMap[$headerLower] = $index;
+      }
+  }
+  
+  // Procesar cada fila del CSV
+  $lineNumber = 1;
+  $successCount = 0;
+  $errorCount = 0;
+  $errors = [];
+  
+  // Iniciar transacción
+  $db->begin_transaction();
+  
+  try {
+      // Preparar statement para verificar existencia
+      $checkStmt = $db->prepare("SELECT id FROM users WHERE idusuario = ? LIMIT 1");
+      if (!$checkStmt) {
+          throw new Exception("Error al preparar consulta de verificación: " . $db->error);
+      }
+      
+      // Preparar statement para inserción (se preparará dinámicamente por fila)
+      $insertStmt = null;
+      
+      while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
+          $lineNumber++;
+          
+          if (empty(implode('', $data))) {
+              continue;
+          }
+          
+          // Preparar datos del estudiante
+          $estudiante = [
+              'usuario' => 0,
+              'estudiante' => 1,
+              'docente' => 0,
+              'admin' => 0,
+              'super_user' => 0,
+              'editar_user' => 0,
+              'editar_nota' => 0,
+              'editar_acceso' => 0,
+              'user_type' => 'estudiante',
+              'api_key' => '',
+              'fecha_act' => date('Y-m-d H:i:s')
+          ];
+          
+          // Mapear datos del CSV
+          foreach ($columnMap as $field => $index) {
+              if (isset($data[$index])) {
+                  $estudiante[$field] = trim($data[$index]);
+              }
+          }
+          
+          // Validar campos requeridos
+          $missingFields = [];
+          foreach ($requiredFields as $field) {
+              if (empty($estudiante[$field])) {
+                  $missingFields[] = $field;
+              }
+          }
+          
+          if (!empty($missingFields)) {
+              $errors[] = "Línea $lineNumber: Faltan campos requeridos: " . implode(', ', $missingFields);
+              $errorCount++;
+              continue;
+          }
+          
+          // Validar email
+          if (!filter_var($estudiante['email'], FILTER_VALIDATE_EMAIL)) {
+              $errors[] = "Línea $lineNumber: Correo electrónico no válido: " . $estudiante['email'];
+              $errorCount++;
+              continue;
+          }
+          
+          // Verificar si el idusuario ya existe
+          $checkStmt->bind_param("s", $estudiante['idusuario']);
+          $checkStmt->execute();
+          $checkStmt->store_result();
+          
+          if ($checkStmt->num_rows > 0) {
+              $errors[] = "Línea $lineNumber: La cédula ya existe: " . $estudiante['idusuario'];
+              $errorCount++;
+              $checkStmt->free_result();
+              continue;
+          }
+          $checkStmt->free_result();
+          
+          // Valores calculados
+          $estudiante['username'] = strtolower(str_replace(' ', '.', $estudiante['nombre']));
+          $cedulaLimpia = substr($estudiante['idusuario'], 2);
+          $estudiante['password'] = md5($cedulaLimpia);
+          
+          // Preparar consulta de inserción dinámica
+          $fields = array_keys($estudiante);
+          $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+          $types = str_repeat('s', count($fields));
+          
+          $sql = "INSERT INTO users (" . implode(', ', $fields) . ") VALUES ($placeholders)";
+          
+          // Preparar statement si no existe o si cambió la estructura
+          if (!$insertStmt || $insertStmt->query_string !== $sql) {
+              if ($insertStmt) $insertStmt->close();
+              $insertStmt = $db->prepare($sql);
+              if (!$insertStmt) {
+                  throw new Exception("Error en preparación: " . $db->error);
+              }
+          }
+          
+          // Vincular parámetros
+          $params = array_values($estudiante);
+          $insertStmt->bind_param($types, ...$params);
+          
+          // Ejecutar inserción
+          if ($insertStmt->execute()) {
+              $successCount++;
+          } else {
+              $errors[] = "Línea $lineNumber: Error al insertar: " . $insertStmt->error;
+              $errorCount++;
+          }
+      }
+      
+      // Cerrar statements
+      if ($checkStmt) $checkStmt->close();
+      if ($insertStmt) $insertStmt->close();
+      
+      $db->commit();
+  } catch (Exception $e) {
+      $db->rollback();
+      if (isset($checkStmt)) $checkStmt->close();
+      if (isset($insertStmt)) $insertStmt->close();
+      fclose($handle);
+      return ['success' => false, 'message' => 'Error durante la importación: ' . $e->getMessage()];
+  }
+  
+  fclose($handle);
+  
+  // Preparar mensaje de resultado
+  $message = "Proceso completado. ";
+  $message .= "Estudiantes insertados: $successCount. ";
+  $message .= "Errores: $errorCount.";
+  
+  if (!empty($errors)) {
+      $message .= "\nErrores detallados:\n" . implode("\n", array_slice($errors, 0, 10));
+      if (count($errors) > 10) {
+          $message .= "\n... y " . (count($errors) - 10) . " más";
+      }
+  }
+  
+  return [
+      'success' => $errorCount === 0,
+      'message' => $message,
+      'inserted' => $successCount,
+      'errors' => $errorCount,
+      'error_details' => $errors
+  ];
+}
+
+
+
+
+
+
+// FUNCIONES PARA GESTIONAR CARRERAS
+
+// Función para obtener carreras desde la tabla carreras
+function obtenerListaCompletaCarreras(bool $soloActivas = false): array {
+  global $db;
+  
+  try {
+      // Construir consulta base
+      $query = "SELECT id_carrera, nombre_carrera, cod_carrera, activa FROM carreras";
+      
+      // Agregar condición si es necesario
+      if ($soloActivas) {
+          $query .= " WHERE activa = ?";
+      }
+      
+      $query .= " ORDER BY nombre_carrera";
+      
+      // Preparar la consulta
+      $stmt = $db->prepare($query);
+      if (!$stmt) {
+          throw new Exception("Error al preparar consulta: " . $db->error);
+      }
+      
+      // Vincular parámetro si es necesario
+      if ($soloActivas) {
+          $activa = 1;
+          $stmt->bind_param("i", $activa);
+      }
+      
+      // Ejecutar consulta
+      if (!$stmt->execute()) {
+          throw new Exception("Error al ejecutar consulta: " . $stmt->error);
+      }
+      
+      // Obtener resultados
+      $result = $stmt->get_result();
+      $carreras = $result->fetch_all(MYSQLI_ASSOC);
+      
+      // Liberar recursos
+      $result->free();
+      $stmt->close();
+      
+      return $carreras;
+      
+  } catch (Exception $e) {
+      error_log("Error al obtener carreras: " . $e->getMessage());
+      return [];
+  }
+}
+
+// Función para agregar nuevas carreras
+function registrarNuevaCarrera(string $nombre, string $codigo, string $tipo_formacion): array {
+  global $db;
+  
+  try {
+      // Validar tipo de formación
+      $tipos_validos = ['PNF', 'PTF'];
+      if (!in_array($tipo_formacion, $tipos_validos)) {
+          return [
+              'success' => false,
+              'message' => 'Tipo de formación no válido. Debe ser PNF o PTF'
+          ];
+      }
+
+      // Verificar duplicados con transacción
+      $db->begin_transaction();
+      
+      // 1. Verificar si el código ya existe
+      $checkStmt = $db->prepare("SELECT id_carrera FROM carreras WHERE cod_carrera = ? FOR UPDATE");
+      if (!$checkStmt) {
+          throw new Exception("Error al preparar consulta de verificación: " . $db->error);
+      }
+      
+      $checkStmt->bind_param("s", $codigo);
+      if (!$checkStmt->execute()) {
+          throw new Exception("Error al verificar código: " . $checkStmt->error);
+      }
+      
+      $checkStmt->store_result();
+      
+      if ($checkStmt->num_rows > 0) {
+          $checkStmt->close();
+          $db->rollback();
+          return [
+              'success' => false,
+              'message' => 'El código de carrera ya existe'
+          ];
+      }
+      $checkStmt->close();
+      
+      // 2. Insertar nueva carrera
+      $insertStmt = $db->prepare("INSERT INTO carreras (nombre_carrera, cod_carrera, tipo_formacion, activa) VALUES (?, ?, ?, 1)");
+      if (!$insertStmt) {
+          throw new Exception("Error al preparar inserción: " . $db->error);
+      }
+      
+      $insertStmt->bind_param("sss", $nombre, $codigo, $tipo_formacion);
+      if (!$insertStmt->execute()) {
+          throw new Exception("Error al insertar carrera: " . $insertStmt->error);
+      }
+      
+      $insertId = $db->insert_id;
+      $insertStmt->close();
+      
+      $db->commit();
+      
+      return [
+          'success' => true,
+          'message' => 'Carrera registrada exitosamente',
+          'id_carrera' => $insertId
+      ];
+      
+  } catch (Exception $e) {
+      if (isset($db) && method_exists($db, 'rollback')) {
+          $db->rollback();
+      }
+      error_log("Error en registrarNuevaCarrera: " . $e->getMessage());
+      return [
+          'success' => false,
+          'message' => 'Error al registrar carrera: ' . $e->getMessage()
+      ];
+  }
+}
+
+// Función para obtener una carrera específica por ID
+function obtenerCarreraPorId(int $id): ?array {
+  global $db;
+  
+  // Validar que el ID sea positivo
+  if ($id <= 0) {
+      error_log("ID de carrera no válido: $id");
+      return null;
+  }
+
+  try {
+      // Preparar consulta con LIMIT para seguridad adicional
+      $query = "SELECT id_carrera, nombre_carrera, cod_carrera, activa, tipo_formacion 
+               FROM carreras 
+               WHERE id_carrera = ? 
+               LIMIT 1";
+      
+      $stmt = $db->prepare($query);
+      if (!$stmt) {
+          throw new Exception("Error al preparar consulta: " . $db->error);
+      }
+      
+      // Vincular parámetro
+      if (!$stmt->bind_param("i", $id)) {
+          throw new Exception("Error al vincular parámetro: " . $stmt->error);
+      }
+      
+      // Ejecutar consulta
+      if (!$stmt->execute()) {
+          throw new Exception("Error al ejecutar consulta: " . $stmt->error);
+      }
+      
+      // Obtener resultado
+      $result = $stmt->get_result();
+      if (!$result) {
+          throw new Exception("Error al obtener resultados: " . $stmt->error);
+      }
+      
+      // Obtener datos
+      $carrera = $result->fetch_assoc();
+      
+      // Liberar recursos
+      $result->free();
+      $stmt->close();
+      
+      return $carrera ?: null;
+      
+  } catch (Exception $e) {
+      error_log("Error en obtenerCarreraPorId(ID: $id): " . $e->getMessage());
+      
+      // Cerrar statement si está abierto
+      if (isset($stmt) && $stmt instanceof mysqli_stmt) {
+          $stmt->close();
+      }
+      
+      return null;
+  }
+}
+
+
+// Función para actualizar una carrera
+function actualizarCarrera(int $id, string $nombre, string $codigo, int $activa): array {
+  global $db;
+  
+  try {
+      // Validar parámetros
+      if ($id <= 0) {
+          throw new Exception("ID de carrera no válido");
+      }
+      
+      if (empty($nombre)) {
+          throw new Exception("El nombre de la carrera no puede estar vacío");
+      }
+      
+      if (empty($codigo)) {
+          throw new Exception("El código de la carrera no puede estar vacío");
+      }
+      
+      if (!in_array($activa, [0, 1])) {
+          throw new Exception("El estado activo debe ser 0 o 1");
+      }
+      
+      // Iniciar transacción
+      $db->begin_transaction();
+      
+      // 1. Verificar si el código ya existe en otra carrera
+      $checkStmt = $db->prepare("SELECT id_carrera FROM carreras WHERE cod_carrera = ? AND id_carrera != ? LIMIT 1");
+      $checkStmt->bind_param("si", $codigo, $id);
+      $checkStmt->execute();
+      $checkStmt->store_result();
+      
+      if ($checkStmt->num_rows > 0) {
+          $checkStmt->close();
+          $db->rollback();
+          return [
+              'success' => false,
+              'message' => 'El código de carrera ya está en uso por otra carrera'
+          ];
+      }
+      $checkStmt->close();
+      
+      // 2. Actualizar la carrera
+      $updateStmt = $db->prepare("UPDATE carreras SET nombre_carrera = ?, cod_carrera = ?, activa = ? WHERE id_carrera = ?");
+      $updateStmt->bind_param("ssii", $nombre, $codigo, $activa, $id);
+      
+      if (!$updateStmt->execute()) {
+          throw new Exception("Error al ejecutar actualización: " . $updateStmt->error);
+      }
+      
+      // Verificar si se actualizó algún registro
+      $affectedRows = $updateStmt->affected_rows;
+      $updateStmt->close();
+      
+      if ($affectedRows === 0) {
+          $db->rollback();
+          return [
+              'success' => false,
+              'message' => 'No se encontró la carrera para actualizar o los datos son iguales'
+          ];
+      }
+      
+      $db->commit();
+      
+      return [
+          'success' => true,
+          'message' => 'Carrera actualizada exitosamente',
+          'affected_rows' => $affectedRows
+      ];
+      
+  } catch (Exception $e) {
+      if (isset($db) && method_exists($db, 'rollback')) {
+          $db->rollback();
+      }
+      error_log("Error en actualizarCarrera(ID: $id): " . $e->getMessage());
+      return [
+          'success' => false,
+          'message' => 'Error al actualizar carrera: ' . $e->getMessage()
+      ];
+  }
+}
+
+
+//HACER COSAS CON LOS DOCENTES
+
+function insertarDocente(array $datos): array {
+  global $db;
+  
+  try {
+      // Validar campos requeridos
+      $camposRequeridos = ['nombre', 'tipo_documento', 'documento', 'email', 'telefono', 
+                          'direccion', 'estado_residencia', 'municipio', 'genero', 
+                          'estado_civil', 'fecha_nacimiento', 'estado_laboral'];
+      
+      $faltantes = array_diff($camposRequeridos, array_keys($datos));
+      if (!empty($faltantes)) {
+          throw new Exception("Faltan campos requeridos: " . implode(', ', $faltantes));
+      }
+
+      // 1. Preparación de datos
+      $username = strtolower(str_replace(' ', '.', $datos['nombre']));
+      $password = password_hash($datos['documento'], PASSWORD_DEFAULT);
+      $fecha_act = date('Y-m-d H:i:s');
+      $api_key = bin2hex(random_bytes(16)); // API key más segura
+
+      // 2. Conversión de arrays a strings
+      $especialidad = is_array($datos['especialidad'] ?? '') ? 
+                     implode(', ', array_filter($datos['especialidad'])) : 
+                     ($datos['especialidad'] ?? '');
+      
+      $titulos = is_array($datos['titulos'] ?? '') ? 
+                implode(', ', array_filter($datos['titulos'])) : 
+                ($datos['titulos'] ?? '');
+      
+      $institutos = is_array($datos['institutos'] ?? '') ? 
+                   implode(', ', array_filter($datos['institutos'])) : 
+                   ($datos['institutos'] ?? '');
+
+      // 3. Configuración de roles y valores por defecto
+      $config = [
+          'roles' => [
+              'usuario' => 0,
+              'estudiante' => 0,
+              'docente' => 1,
+              'admin' => 0,
+              'super_user' => 0,
+              'editar_user' => 0,
+              'editar_nota' => 0,
+              'editar_acceso' => 0
+          ],
+          'defaults' => [
+              'cel' => $datos['celular'] ?? '',
+              'ciudad' => $datos['municipio'] ?? '',
+              'num_telf_opc' => $datos['telefono_secundario'] ?? '',
+              'etnia' => $datos['etnia'] ?? '',
+              'casaapto' => $datos['casa_apto'] ?? 'No especificado',
+              'punto_referencia' => $datos['punto_referencia'] ?? '',
+              'grupo_familiar' => $datos['grupo_familiar'] ?? 0,
+              'acargo_usted' => $datos['acargo_usted'] ?? 0,
+              'fuente_ingresos' => $datos['fuente_ingresos'] ?? '',
+              'tipo_vivienda' => $datos['tipo_vivienda'] ?? '',
+              'tenencia_vivienda' => $datos['tenencia_vivienda'] ?? '',
+              'enfermedad' => $datos['enfermedad'] ?? '',
+              'discapacidad' => $datos['discapacidad'] ?? '',
+              'titulos' => $titulos,
+              'institutos' => $institutos,
+              'api_key' => $api_key,
+              'fecha_ingreso' => $datos['fecha_ingreso'] ?? date('Y-m-d')
+          ]
+      ];
+
+      // 4. Combinar todos los valores
+      $valores = array_merge(
+          [
+              'idusuario' => $datos['tipo_documento'] . '-' . $datos['documento'],
+              'nombre' => $datos['nombre'],
+              'username' => $username,
+              'email' => $datos['email'],
+              'tlf' => $datos['telefono'],
+              'direccion' => $datos['direccion'],
+              'estado' => $datos['estado_residencia'],
+              'municipio' => $datos['municipio'],
+              'parroquia' => $datos['parroquia'] ?? '',
+              'status' => ($datos['estado_laboral'] == 'Activo') ? 1 : 0,
+              'user_type' => 'docente',
+              'password' => $password,
+              'carrera' => $especialidad,
+              'genero' => $datos['genero'],
+              'edo_civil' => $datos['estado_civil'],
+              'fecha_nac' => $datos['fecha_nacimiento'],
+              'fecha_act' => $fecha_act
+          ],
+          $config['defaults'],
+          $config['roles']
+      );
+
+      // Iniciar transacción
+      $db->begin_transaction();
+
+      // Verificar si el usuario ya existe
+      $checkStmt = $db->prepare("SELECT id FROM users WHERE idusuario = ? LIMIT 1");
+      $checkStmt->bind_param("s", $valores['idusuario']);
+      $checkStmt->execute();
+      $checkStmt->store_result();
+      
+      if ($checkStmt->num_rows > 0) {
+          $checkStmt->close();
+          $db->rollback();
+          return [
+              'success' => false,
+              'message' => 'El docente ya está registrado'
+          ];
+      }
+      $checkStmt->close();
+
+      // 5. Construir e ejecutar consulta de inserción
+      $fields = array_keys($valores);
+      $placeholders = implode(', ', array_fill(0, count($valores), '?'));
+      $types = $this->determinarTiposParametros($valores);
+      
+      $sql = "INSERT INTO users (" . implode(', ', $fields) . ") VALUES ($placeholders)";
+      $stmt = $db->prepare($sql);
+      
+      if (!$stmt) {
+          throw new Exception("Error en preparación: " . $db->error);
+      }
+
+      $params = array_values($valores);
+      $stmt->bind_param($types, ...$params);
+      
+      if (!$stmt->execute()) {
+          throw new Exception("Error al ejecutar: " . $stmt->error);
+      }
+
+      $idInsertado = $stmt->insert_id;
+      $stmt->close();
+      
+      $db->commit();
+
+      return [
+          'success' => true,
+          'message' => 'Docente registrado exitosamente',
+          'id' => $idInsertado,
+          'username' => $username,
+          'password_temp' => $datos['documento'] // Solo para referencia inicial
+      ];
+
+  } catch(Exception $e) {
+      if (isset($db) && method_exists($db, 'rollback')) {
+          $db->rollback();
+      }
+      error_log("Error en insertarDocente: " . $e->getMessage());
+      return [
+          'success' => false,
+          'message' => 'Error al registrar docente: ' . $e->getMessage()
+      ];
+  }
+}
+
+
+
+
+
+function validarDocente($datos) {
+  $errores = [];
+  
+  // Validar email
+  if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
+      $errores[] = 'Por favor ingrese un correo electrónico válido';
+  }
+  
+  // Validar teléfono (al menos 10 dígitos)
+  if (strlen($datos['telefono']) < 10) {
+      $errores[] = 'El teléfono debe tener al menos 10 dígitos';
+  }
+  
+  // Validar documento
+  if (empty($datos['documento']) || !is_numeric($datos['documento'])) {
+      $errores[] = 'El documento debe ser un número válido';
+  }
+  
+  // Validar campos requeridos
+  $camposRequeridos = [
+      'tipo_documento', 'documento', 'nombre', 'especialidad', 'genero', 
+      'estado_civil', 'estado_residencia', 'municipio', 'direccion',
+      'fecha_nacimiento', 'telefono', 'email', 'fecha_contratacion'
+  ];
+  
+  foreach ($camposRequeridos as $campo) {
+      if (empty($datos[$campo])) {
+          $nombreCampo = str_replace('_', ' ', $campo);
+          $errores[] = "El campo $nombreCampo es requerido";
+      }
+  }
+  
+  return empty($errores) ? true : $errores;
+}
+
+
+
+
+/**
+ * Obtiene los datos de un docente según su ID.
+ *
+ * @param int $id ID del docente a buscar
+ * @return array|null Array asociativo con los datos del docente, o null si no se encuentra
+ */
+function obtenerDocentePorId($id) {
+  // Accede a la conexión de la base de datos definida globalmente
+  global $db;
+  
+  // Consulta SQL con un parámetro placeholder (?) para prevenir inyecciones SQL
+  $query = "SELECT * FROM users WHERE id = ? AND docente = 1";
+  
+  // Prepara la sentencia SQL
+  if ($stmt = $db->prepare($query)) {
+      // Asocia el parámetro $id al placeholder, indicando que es un entero ("i")
+      $stmt->bind_param("i", $id);
+      
+      // Ejecuta la consulta preparada
+      $stmt->execute();
+      
+      // Obtiene el resultado de la consulta
+      $result = $stmt->get_result();
+      
+      // Verifica si se encontraron registros
+      if ($result->num_rows > 0) {
+          // Retorna los datos del docente como un array asociativo
+          return $result->fetch_assoc();
+      }
+      
+      // Cierra el statement para liberar recursos
+      $stmt->close();
+  }
+  
+  // Retorna null si no se encuentra el docente o hay un error
+  return null;
+}
+
+/**
+ * Actualiza los datos de un docente en la base de datos.
+ * 
+ * @param array $datos Array asociativo con los datos del docente a actualizar
+ * @return array Array con:
+ *               - 'success': boolean que indica si la operación fue exitosa
+ *               - 'message': string con mensaje descriptivo del resultado
+ */
+function actualizarDocente($datos) {
+  // Accede a la conexión de la base de datos definida globalmente
+  global $db;
+  
+  try {
+      // Consulta SQL con placeholders (?) para todos los valores a actualizar
+      $sql = "UPDATE users SET 
+              nombre = ?,
+              email = ?,
+              tlf = ?,
+              cel = ?,
+              direccion = ?,
+              estado = ?,
+              municipio = ?,
+              parroquia = ?,
+              status = ?,
+              carrera = ?,
+              genero = ?,
+              edo_civil = ?,
+              fecha_nac = ?,
+              num_telf_opc = ?,
+              titulos = ?,
+              institutos = ?,
+              fecha_ingreso = ?
+              WHERE id = ? AND docente = 1";  // Solo actualiza si es docente
+
+      // Prepara la sentencia SQL
+      $stmt = $db->prepare($sql);
+      
+      // Verifica si la preparación fue exitosa
+      if (!$stmt) {
+          throw new Exception("Error en la preparación: " . $db->error);
+      }
+      
+      // Vincula los parámetros a la sentencia preparada
+      // Los tipos de datos se especifican con una cadena:
+      // s = string, i = integer, d = double, b = blob
+      // En este caso: 16 strings (s) y 1 integer (i) al final (el ID)
+      $stmt->bind_param(
+          "ssssssssssssssssi",
+          $datos['nombre'],
+          $datos['email'],
+          $datos['tlf'],
+          $datos['cel'],
+          $datos['direccion'],
+          $datos['estado'],
+          $datos['municipio'],
+          $datos['parroquia'],
+          $datos['status'],
+          $datos['carrera'],
+          $datos['genero'],
+          $datos['edo_civil'],
+          $datos['fecha_nac'],
+          $datos['num_telf_opc'],
+          $datos['titulos'],
+          $datos['institutos'],
+          $datos['fecha_ingreso'],
+          $datos['id']
+      );
+      
+      // Ejecuta la sentencia preparada
+      $stmt->execute();
+      
+      // Retorna un array con el resultado de la operación
+      return [
+          'success' => $stmt->affected_rows > 0,  // True si se actualizó alguna fila
+          'message' => $stmt->affected_rows > 0 
+              ? 'Docente actualizado correctamente' 
+              : 'No se realizaron cambios'  // Puede ocurrir si los datos son iguales
+      ];
+      
+  } catch(Exception $e) {
+      // Manejo de errores: retorna información sobre el error
+      return [
+          'success' => false,
+          'message' => 'Error al actualizar: ' . $e->getMessage()
+      ];
+  } finally {
+      // Asegura que el statement se cierre si existe
+      if (isset($stmt)) {
+          $stmt->close();
+      }
+  }
+}
+
+function obtenerDocentes() {
+  global $db;
+  
+  $docentes = [];
+  
+  // Preparamos la consulta
+  $stmt = $db->prepare("SELECT id, idusuario, nombre, email, tlf, status 
+                       FROM users 
+                       WHERE docente = 1 
+                       ORDER BY nombre ASC");
+  
+  if ($stmt === false) {
+      die('Error en la preparación de la consulta: ' . $db->error);
+  }
+  
+  // Ejecutamos la consulta
+  if (!$stmt->execute()) {
+      die('Error al ejecutar la consulta: ' . $stmt->error);
+  }
+  
+  // Obtenemos el resultado
+  $result = $stmt->get_result();
+  
+  // Obtenemos todos los registros como array asociativo
+  while ($row = $result->fetch_assoc()) {
+      $docentes[] = $row;
+  }
+  
+  // Cerramos el statement
+  $stmt->close();
+  
+  return $docentes;
+}
+
+
+
+
+
+
+
+/**
+ * Obtiene todos los registros de docentes de la base de datos.
+ * 
+ * Utiliza sentencias preparadas para mayor seguridad.
+ * 
+ * @return array Array asociativo con todos los docentes encontrados, ordenados por nombre
+ */
+function getDocentes() {
+  // Accede a la conexión de la base de datos definida globalmente
+  global $db;
+  
+  // Inicializa el array que contendrá los resultados
+  $docentes = array();
+  
+  // Consulta SQL con parámetro para docente (aunque sea fijo, lo preparamos igual)
+  $sql = "SELECT * FROM users WHERE docente = ? ORDER BY nombre ASC";
+  
+  // Prepara la sentencia SQL
+  if ($stmt = $db->prepare($sql)) {
+      // Valor fijo para docente (1 = true)
+      $docente = 1;
+      
+      // Vincula el parámetro (aunque sea fijo, se trata como parámetro)
+      $stmt->bind_param("i", $docente);
+      
+      // Ejecuta la consulta
+      $stmt->execute();
+      
+      // Obtiene el resultado
+      $result = $stmt->get_result();
+      
+      // Recorre los resultados y los agrega al array
+      while ($row = $result->fetch_assoc()) {
+          $docentes[] = $row;
+      }
+      
+      // Cierra el statement y libera memoria
+      $stmt->close();
+      
+      // Libera el resultado (no es estrictamente necesario ya que close() lo hace)
+      if (isset($result)) {
+          $result->free();
+      }
+  }
+  
+  // Retorna el array de docentes (vacío si no hay resultados)
+  return $docentes;
+}
+
+
+
+
+/**
+ * Obtiene usuarios según su tipo (docente o no docente)
+ * 
+ * @param int $tipo 1 para docentes, 0 para no docentes
+ * @return array Lista de usuarios encontrados
+ */
+function getUsersByType($tipo) {
+  // Accedemos a la conexión MySQLi global
+  global $db;
+  
+  // Inicializamos el array que contendrá los resultados
+  $users = [];
+  
+  // Definimos la consulta SQL con parámetro preparado
+  $query = "SELECT * FROM users WHERE docente = ?";
+  
+  // Preparamos la sentencia SQL
+  if ($stmt = $db->prepare($query)) {
+      try {
+          // Vinculamos el parámetro (i = integer)
+          $stmt->bind_param("i", $tipo);
+          
+          // Ejecutamos la consulta
+          $stmt->execute();
+          
+          // Obtenemos el resultado
+          $result = $stmt->get_result();
+          
+          // Recorremos los resultados y los agregamos al array
+          while ($row = $result->fetch_assoc()) {
+              $users[] = $row;
+          }
+          
+          // Liberamos la memoria del resultado
+          $result->free();
+          
+      } catch (Exception $e) {
+          // Registramos el error (opcional)
+          error_log("Error en getUsersByType: " . $e->getMessage());
+      } finally {
+          // Cerramos el statement en cualquier caso
+          $stmt->close();
+      }
+  } else {
+      // Registramos error si falla la preparación
+      error_log("Error preparando consulta: " . $db->error);
+  }
+  
+  // Retornamos el array de usuarios (vacío si no hay resultados)
+  return $users;
+}
+
+
+/**
+ * Actualiza el estado de un usuario en la base de datos
+ * 
+ * @param int $user_id ID del usuario a actualizar
+ * @param string $new_status Nuevo estado del usuario
+ * @return array Resultado de la operación con:
+ *               - 'success': boolean indicando si la actualización fue exitosa
+ *               - 'affected_rows': número de filas afectadas
+ *               - 'message': mensaje descriptivo del resultado
+ */
+function updateUserStatus($user_id, $new_status) {
+  global $db; // Conexión MySQLi global
+  
+  $query = "UPDATE users SET status = ? WHERE id = ?";
+  
+  // Preparamos la sentencia
+  if ($stmt = $db->prepare($query)) {
+      try {
+          // Vinculamos parámetros (s = string, i = integer)
+          $stmt->bind_param("si", $new_status, $user_id);
+          
+          // Ejecutamos la actualización
+          $execute_result = $stmt->execute();
+          
+          // Obtenemos filas afectadas
+          $affected_rows = $stmt->affected_rows;
+          
+          // Retornamos información detallada del resultado
+          return [
+              'success' => $execute_result,
+              'affected_rows' => $affected_rows,
+              'message' => $affected_rows > 0 
+                  ? 'Estado actualizado correctamente' 
+                  : 'No se modificó ningún registro (ID no encontrado o mismo estado)'
+          ];
+          
+      } catch (Exception $e) {
+          // Error durante la ejecución
+          return [
+              'success' => false,
+              'affected_rows' => 0,
+              'message' => 'Error al actualizar: ' . $e->getMessage()
+          ];
+      } finally {
+          // Cerramos el statement siempre
+          $stmt->close();
+      }
+  } else {
+      // Error en preparación de la consulta
+      return [
+          'success' => false,
+          'affected_rows' => 0,
+          'message' => 'Error preparando consulta: ' . $db->error
+      ];
+  }
+}
+
+
+
+/**
+ * Obtiene todas las carreras activas de la base de datos
+ * 
+ * @return array Listado de carreras activas con sus datos básicos
+ *               Cada elemento contiene: id_carrera, nombre_carrera, cod_carrera
+ *               Array vacío si no hay resultados o en caso de error
+ */
+function obtenerCarrerasActivas() {
+  global $db; // Conexión MySQLi global
+  
+  $carreras = []; // Array para almacenar resultados
+  
+  // Consulta SQL con parámetro para estado activo
+  $query = "SELECT id_carrera, nombre_carrera, cod_carrera 
+            FROM carreras 
+            WHERE activa = ? 
+            ORDER BY nombre_carrera";
+  
+  // Preparamos la sentencia
+  if ($stmt = $db->prepare($query)) {
+      try {
+          // Valor para carreras activas (1 = true)
+          $activa = 1;
+          
+          // Vinculamos parámetro (i = integer)
+          $stmt->bind_param("i", $activa);
+          
+          // Ejecutamos la consulta
+          $stmt->execute();
+          
+          // Obtenemos resultados
+          $result = $stmt->get_result();
+          
+          // Procesamos cada fila
+          while ($row = $result->fetch_assoc()) {
+              $carreras[] = $row;
+          }
+          
+          // Liberamos memoria del resultado
+          $result->free();
+          
+      } catch (Exception $e) {
+          // Registramos error sin interrumpir el flujo
+          error_log("Error en obtenerCarrerasActivas: " . $e->getMessage());
+      } finally {
+          // Cerramos el statement siempre
+          $stmt->close();
+      }
+  } else {
+      // Error en preparación de consulta
+      error_log("Error preparando consulta: " . $db->error);
+  }
+  
+  return $carreras;
+}
+
+/**
+ * Obtiene las materias disponibles que no están asignadas a una carrera específica
+ * 
+ * @param int $id_carrera ID de la carrera para filtrar materias no asignadas
+ * @return array Listado de materias disponibles con sus datos básicos
+ *               Cada elemento contiene: id_materia, cod_materia, nombre_materia
+ *               Array vacío si no hay resultados o en caso de error
+ */
+function obtenerMateriasDisponibles($id_carrera) {
+  global $db; // Conexión MySQLi global
+  
+  $materias = []; // Array para almacenar resultados
+  
+  // Consulta SQL con parámetros preparados
+  $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia 
+            FROM materias m
+            WHERE m.activa = 1 
+            AND m.id_materia NOT IN (
+                SELECT cm.id_materia 
+                FROM carrera_materia cm 
+                WHERE cm.id_carrera = ?
+            ) 
+            ORDER BY m.nombre_materia";
+  
+  // Preparamos la sentencia
+  if ($stmt = $db->prepare($query)) {
+      try {
+          // Vinculamos parámetro (i = integer)
+          $stmt->bind_param("i", $id_carrera);
+          
+          // Ejecutamos la consulta
+          $stmt->execute();
+          
+          // Obtenemos resultados
+          $result = $stmt->get_result();
+          
+          // Procesamos cada fila
+          while ($row = $result->fetch_assoc()) {
+              $materias[] = $row;
+          }
+          
+          // Liberamos memoria del resultado
+          $result->free();
+          
+      } catch (Exception $e) {
+          // Registramos error sin interrumpir el flujo
+          error_log("Error en obtenerMateriasDisponibles: " . $e->getMessage());
+      } finally {
+          // Cerramos el statement siempre
+          $stmt->close();
+      }
+  } else {
+      // Error en preparación de consulta
+      error_log("Error preparando consulta: " . $db->error);
+  }
+  
+  return $materias;
+}
+
+/**
+ * Obtiene las materias asignadas a una carrera específica con sus detalles
+ * 
+ * @param int $id_carrera ID de la carrera para filtrar materias asignadas
+ * @return array Listado de materias asignadas con sus datos:
+ *               - id_materia
+ *               - cod_materia
+ *               - nombre_materia
+ *               - semestre
+ *               - id_relacion
+ *               Array vacío si no hay resultados o en caso de error
+ */
+function obtenerMateriasAsignadas($id_carrera) {
+  global $db; // Conexión MySQLi global
+  
+  $materias = []; // Array para almacenar resultados
+  
+  // Consulta SQL con JOIN y parámetro preparado
+  $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia, 
+                   cm.semestre, cm.id_relacion
+            FROM carrera_materia cm
+            JOIN materias m ON cm.id_materia = m.id_materia
+            WHERE cm.id_carrera = ?
+            ORDER BY cm.semestre, m.nombre_materia";
+  
+  // Preparamos la sentencia
+  if ($stmt = $db->prepare($query)) {
+      try {
+          // Vinculamos parámetro (i = integer)
+          $stmt->bind_param("i", $id_carrera);
+          
+          // Ejecutamos la consulta
+          $stmt->execute();
+          
+          // Obtenemos resultados
+          $result = $stmt->get_result();
+          
+          // Procesamos cada fila
+          while ($row = $result->fetch_assoc()) {
+              $materias[] = $row;
+          }
+          
+          // Liberamos memoria del resultado
+          $result->free();
+          
+      } catch (Exception $e) {
+          // Registramos error sin interrumpir el flujo
+          error_log("Error en obtenerMateriasAsignadas: " . $e->getMessage());
+      } finally {
+          // Cerramos el statement siempre
+          $stmt->close();
+      }
+  } else {
+      // Error en preparación de consulta
+      error_log("Error preparando consulta: " . $db->error);
+  }
+  
+  return $materias;
+}
+
+/**
+ * Asigna una materia a una carrera con un semestre específico
+ * 
+ * @param int $id_carrera ID de la carrera
+ * @param int $id_materia ID de la materia
+ * @param int $semestre Número de semestre para la asignación
+ * @return array Resultado de la operación con:
+ *               - 'success': boolean indicando éxito
+ *               - 'message': string descriptivo
+ */
+function asignarMateriaACarrera($id_carrera, $id_materia, $semestre) {
+  global $db;
+
+  // 1. Verificar si ya existe la asignación (con prepared statement)
+  $check_query = "SELECT id_relacion FROM carrera_materia 
+                 WHERE id_carrera = ? AND id_materia = ?";
+  
+  if ($check_stmt = $db->prepare($check_query)) {
+      $check_stmt->bind_param("ii", $id_carrera, $id_materia);
+      $check_stmt->execute();
+      $check_result = $check_stmt->get_result();
+      
+      if ($check_result->num_rows > 0) {
+          $check_stmt->close();
+          return [
+              'success' => false, 
+              'message' => 'La materia ya está asignada a esta carrera'
+          ];
+      }
+      $check_stmt->close();
+  } else {
+      return [
+          'success' => false,
+          'message' => 'Error al verificar asignación: ' . $db->error
+      ];
+  }
+
+  // 2. Insertar nueva asignación (con prepared statement)
+  $insert_query = "INSERT INTO carrera_materia 
+                  (id_carrera, id_materia, semestre) 
+                  VALUES (?, ?, ?)";
+  
+  if ($insert_stmt = $db->prepare($insert_query)) {
+      $insert_stmt->bind_param("iii", $id_carrera, $id_materia, $semestre);
+      $execute_result = $insert_stmt->execute();
+      $insert_stmt->close();
+      
+      if ($execute_result) {
+          return [
+              'success' => true,
+              'message' => 'Materia asignada correctamente',
+              'insert_id' => $db->insert_id
+          ];
+      } else {
+          return [
+              'success' => false,
+              'message' => 'Error al asignar: ' . $db->error
+          ];
+      }
+  } else {
+      return [
+          'success' => false,
+          'message' => 'Error preparando consulta: ' . $db->error
+      ];
+  }
+}
+
+/**
+ * Elimina una asignación de materia a carrera después de validar que no tenga registros académicos asociados
+ * 
+ * @param int $id_relacion ID de la relación materia-carrera a eliminar
+ * @return array Resultado de la operación con:
+ *               - 'success': boolean indicando éxito
+ *               - 'message': string descriptivo
+ */
+function eliminarAsignacionMateria($id_relacion) {
+  global $db;
+
+  // 1. Verificar registros académicos asociados (con prepared statement)
+  $check_query = "SELECT COUNT(*) AS total FROM registros_academicos WHERE id_relacion = ?";
+  
+  if ($check_stmt = $db->prepare($check_query)) {
+      $check_stmt->bind_param("i", $id_relacion);
+      $check_stmt->execute();
+      $check_result = $check_stmt->get_result();
+      $tiene_registros = $check_result->fetch_assoc()['total'] > 0;
+      $check_stmt->close();
+      
+      if ($tiene_registros) {
+          return [
+              'success' => false, 
+              'message' => 'No se puede eliminar: existen registros académicos asociados'
+          ];
+      }
+  } else {
+      return [
+          'success' => false,
+          'message' => 'Error al verificar registros: ' . $db->error
+      ];
+  }
+
+  // 2. Eliminar asignación (con prepared statement)
+  $delete_query = "DELETE FROM carrera_materia WHERE id_relacion = ?";
+  
+  if ($delete_stmt = $db->prepare($delete_query)) {
+      $delete_stmt->bind_param("i", $id_relacion);
+      $execute_result = $delete_stmt->execute();
+      $affected_rows = $delete_stmt->affected_rows;
+      $delete_stmt->close();
+      
+      if ($execute_result && $affected_rows > 0) {
+          return [
+              'success' => true,
+              'message' => 'Asignación eliminada correctamente',
+              'affected_rows' => $affected_rows
+          ];
+      } else {
+          return [
+              'success' => false,
+              'message' => $affected_rows === 0 
+                  ? 'No se encontró la asignación con el ID proporcionado' 
+                  : 'Error al eliminar: ' . $db->error
+          ];
+      }
+  } else {
+      return [
+          'success' => false,
+          'message' => 'Error preparando consulta de eliminación: ' . $db->error
+      ];
+  }
+}
+
+/**
+* Verificación básica de sesión usando $db
+*/
+function verificarSesion() {
+  global $db;
+  
+  if (session_status() === PHP_SESSION_NONE) {
+      session_start();
+  }
+  
+  if (!isset($_SESSION['usuario_id'])) {
+      header('Location: login.php');
+      exit;
+  }
+  
+  // Opcional: verificar usuario en base de datos
+  $usuario_id = $db->real_escape_string($_SESSION['usuario_id']);
+  $query = "SELECT activo FROM usuarios WHERE id = '$usuario_id'";
+  $result = $db->query($query);
+  
+  if ($result->num_rows === 0 || $result->fetch_assoc()['activo'] != 1) {
+      session_destroy();
+      header('Location: login.php');
+      exit;
+  }
+}
+
+
+
+//MATERIA
+
+
+
+/**
+ * Obtiene todas las materias de la base de datos ordenadas por nombre
+ * 
+ * @param mysqli $db Conexión a la base de datos MySQLi
+ * @return array Listado de todas las materias con sus datos completos
+ */
+function obtenerMaterias($db) {
+  // Inicializamos el array de resultados
+  $materias = [];
+  
+  // Definimos la consulta SQL (aunque no tiene parámetros, usamos prepared statement por consistencia)
+  $query = "SELECT * FROM materias ORDER BY nombre_materia";
+  
+  // Preparamos la sentencia
+  if ($stmt = $db->prepare($query)) {
+      try {
+          // Ejecutamos la consulta (no necesita bind_param ya que no tiene parámetros)
+          $stmt->execute();
+          
+          // Obtenemos el resultado
+          $result = $stmt->get_result();
+          
+          // Recorremos los resultados
+          while ($row = $result->fetch_assoc()) {
+              $materias[] = $row;
+          }
+          
+          // Liberamos memoria
+          $result->free();
+          
+      } catch (Exception $e) {
+          // Registramos errores silenciosamente
+          error_log("Error en obtenerMaterias: " . $e->getMessage());
+      } finally {
+          // Cerramos el statement
+          $stmt->close();
+      }
+  } else {
+      error_log("Error preparando consulta: " . $db->error);
+  }
+  
+  return $materias;
+}
+
+/**
+ * Obtiene una materia de la base de datos por su ID usando MySQLi
+ * 
+ * @param mysqli $db Conexión a la base de datos MySQLi
+ * @param int $id ID de la materia a buscar
+ * @return array|null Array asociativo con los datos de la materia o null si no se encuentra
+ */
+function obtenerMateriaPorId($db, $id) {
+  // Preparamos la consulta SQL con un parámetro de sustitución (?)
+  $query = "SELECT * FROM materias WHERE id_materia = ?";
+  
+  // Preparamos la sentencia
+  $stmt = $db->prepare($query);
+  
+  // Verificamos si la preparación fue exitosa
+  if (!$stmt) {
+      // En caso de error, podrías registrar el error o lanzar una excepción
+      return null;
+  }
+  
+  // Vinculamos el parámetro (i = integer)
+  $stmt->bind_param("i", $id);
+  
+  // Ejecutamos la consulta
+  $stmt->execute();
+  
+  // Obtenemos el resultado de la consulta
+  $result = $stmt->get_result();
+  
+  // Cerramos la sentencia para liberar recursos
+  $stmt->close();
+  
+  // Retornamos el resultado como array asociativo o null si no hay resultados
+  return $result->fetch_assoc() ?: null;
+}
+
+/**
+ * Crea una nueva materia en la base de datos con validación y sentencias preparadas
+ * 
+ * @param mysqli $db Conexión a la base de datos MySQLi
+ * @param array $data Datos de la materia a crear
+ * @return bool True si la creación fue exitosa, False en caso de error
+ */
+function crearMateria($db, $data) {
+  // Validación del campo trayecto (1-5)
+  $trayecto = isset($data['trayecto']) ? (int)$data['trayecto'] : 1;
+  if ($trayecto < 1 || $trayecto > 5) {
+      $trayecto = 1; // Valor por defecto si está fuera de rango
+  }
+
+  // Validación de campos booleanos
+  $activa = isset($data['activa']) ? (int)(bool)$data['activa'] : 1;
+
+  // Consulta SQL con sentencia preparada
+  $query = "INSERT INTO materias (
+              cod_materia, 
+              nombre_materia, 
+              pnf_ptf, 
+              duracion_periodo, 
+              trayecto,
+              creditos, 
+              activa, 
+              horas_teoricas, 
+              horas_practicas, 
+              created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+
+  // Preparamos la sentencia
+  $stmt = $db->prepare($query);
+  
+  if (!$stmt) {
+      error_log("Error en preparación de query: " . $db->error);
+      return false;
+  }
+
+  // Validación y asignación de valores
+  $cod_materia = $data['cod_materia'] ?? '';
+  $nombre_materia = $data['nombre_materia'] ?? '';
+  $pnf_ptf = $data['pnf_ptf'] ?? '';
+  $duracion_periodo = isset($data['duracion_periodo']) ? (int)$data['duracion_periodo'] : 0;
+  $creditos = isset($data['creditos']) ? (int)$data['creditos'] : 0;
+  $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
+  $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
+
+  // Vinculamos parámetros (tipos: s=string, i=integer)
+  $stmt->bind_param("sssiiiiii", 
+      $cod_materia,
+      $nombre_materia,
+      $pnf_ptf,
+      $duracion_periodo,
+      $trayecto,
+      $creditos,
+      $activa,
+      $horas_teoricas,
+      $horas_practicas
+  );
+  
+  // Ejecutamos la sentencia
+  $result = $stmt->execute();
+  
+  if (!$result) {
+      error_log("Error al ejecutar query: " . $stmt->error);
+  }
+  
+  // Cerramos la sentencia
+  $stmt->close();
+  
+  return $result;
+}
+
+
+/**
+ * Actualiza una materia existente en la base de datos
+ * 
+ * @param mysqli $db Conexión a la base de datos MySQLi
+ * @param int $id ID de la materia a actualizar
+ * @param array $data Datos a actualizar
+ * @return bool True si la actualización fue exitosa, False en caso de error
+ */
+function actualizarMateria($db, $id, $data) {
+  // Validar que el ID sea numérico
+  if (!is_numeric($id)) {
+      error_log("Error: ID de materia no válido");
+      return false;
+  }
+
+  // Consulta SQL con sentencia preparada
+  $query = "UPDATE materias SET 
+            cod_materia = ?, 
+            nombre_materia = ?, 
+            pnf_ptf = ?,
+            duracion_periodo = ?,
+            creditos = ?, 
+            activa = ?, 
+            horas_teoricas = ?, 
+            horas_practicas = ?,
+            updated_at = NOW() 
+            WHERE id_materia = ?";
+  
+  // Preparamos la sentencia
+  $stmt = $db->prepare($query);
+  
+  if (!$stmt) {
+      error_log("Error en preparación de query: " . $db->error);
+      return false;
+  }
+
+  // Validación y saneamiento de datos
+  $cod_materia = $data['cod_materia'] ?? '';
+  $nombre_materia = $data['nombre_materia'] ?? '';
+  $pnf_ptf = $data['pnf_ptf'] ?? '';
+  $duracion_periodo = isset($data['duracion_periodo']) ? (int)$data['duracion_periodo'] : 0;
+  $creditos = isset($data['creditos']) ? (int)$data['creditos'] : 0;
+  $activa = isset($data['activa']) ? (int)(bool)$data['activa'] : 0;
+  $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
+  $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
+
+  // Vinculamos parámetros (tipos: s=string, i=integer)
+  $stmt->bind_param("sssiiiiii",
+      $cod_materia,
+      $nombre_materia,
+      $pnf_ptf,
+      $duracion_periodo,
+      $creditos,
+      $activa,
+      $horas_teoricas,
+      $horas_practicas,
+      $id
+  );
+  
+  // Ejecutamos la sentencia
+  $result = $stmt->execute();
+  
+  if (!$result) {
+      error_log("Error al actualizar materia: " . $stmt->error);
+  }
+  
+  // Cerramos la sentencia
+  $stmt->close();
+  
+  return $result;
+}
+
+/**
+ * Alterna el estado activo/inactivo de una materia
+ * 
+ * @param mysqli $db Conexión a la base de datos MySQLi
+ * @param int $id ID de la materia a modificar
+ * @return array|false Retorna el nuevo estado y datos básicos, o false en caso de error
+ */
+function toggleMateria($db, $id) {
+  // Validar que el ID sea numérico y positivo
+  if (!is_numeric($id) || $id <= 0) {
+      error_log("Error: ID de materia no válido");
+      return false;
+  }
+
+  // Iniciar transacción para asegurar consistencia
+  $db->begin_transaction();
+  
+  try {
+      // 1. Primero obtenemos el estado actual
+      $query_select = "SELECT activa, nombre_materia FROM materias WHERE id_materia = ? FOR UPDATE";
+      $stmt_select = $db->prepare($query_select);
+      
+      if (!$stmt_select) {
+          error_log("Error en preparación de select: " . $db->error);
+          return false;
+      }
+      
+      $stmt_select->bind_param("i", $id);
+      $stmt_select->execute();
+      $result = $stmt_select->get_result();
+      $materia = $result->fetch_assoc();
+      
+      if (!$materia) {
+          error_log("Error: Materia no encontrada con ID: $id");
+          $db->rollback();
+          return false;
+      }
+      
+      $stmt_select->close();
+      
+      // 2. Actualizamos el estado
+      $query_update = "UPDATE materias SET activa = NOT activa, updated_at = NOW() WHERE id_materia = ?";
+      $stmt_update = $db->prepare($query_update);
+      
+      if (!$stmt_update) {
+          error_log("Error en preparación de update: " . $db->error);
+          $db->rollback();
+          return false;
+      }
+      
+      $stmt_update->bind_param("i", $id);
+      $success = $stmt_update->execute();
+      $stmt_update->close();
+      
+      if (!$success) {
+          $db->rollback();
+          return false;
+      }
+      
+      // 3. Obtenemos el nuevo estado
+      $nuevo_estado = $materia['activa'] ? 0 : 1;
+      
+      // Confirmar transacción
+      $db->commit();
+      
+      return [
+          'id_materia' => $id,
+          'nombre_materia' => $materia['nombre_materia'],
+          'estado_anterior' => $materia['activa'],
+          'nuevo_estado' => $nuevo_estado,
+          'actualizado' => true
+      ];
+      
+  } catch (Exception $e) {
+      $db->rollback();
+      error_log("Excepción al alternar materia: " . $e->getMessage());
+      return false;
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+/* ================================== */
+/* FUNCIONES PARA MANEJO DE MATERIAS */
+/* ================================== */
+
+
+if (!function_exists('getAllMaterias')) {
+  /**
+   * Obtiene todas las materias de la base de datos usando sentencias preparadas
+   * 
+   * @return array Lista de materias o array vacío si hay error
+   */
+  function getAllMaterias() {
+      global $db;
+      
+      // Consulta SQL para obtener todas las materias
+      $query = "SELECT id, cod_materia, nombre_materia, creditos, 
+                       horas_teoricas, horas_practicas, activa 
+                FROM materias 
+                ORDER BY nombre_materia ASC";
+      
+      // Preparamos la sentencia
+      $stmt = $db->prepare($query);
+      
+      // Verificamos si la preparación fue exitosa
+      if (!$stmt) {
+          error_log("Error al preparar la consulta en getAllMaterias: ".$db->error);
+          return [];
+      }
+      
+      // Ejecutamos la sentencia
+      if (!$stmt->execute()) {
+          error_log("Error al ejecutar la consulta en getAllMaterias: ".$stmt->error);
+          $stmt->close();
+          return [];
+      }
+      
+      // Obtenemos el resultado
+      $result = $stmt->get_result();
+      
+      // Verificamos si obtuvimos resultados
+      if (!$result) {
+          error_log("Error al obtener resultados en getAllMaterias: ".$stmt->error);
+          $stmt->close();
+          return [];
+      }
+      
+      // Procesamos los resultados
+      $listaMaterias = [];
+      while ($row = $result->fetch_assoc()) {
+          $listaMaterias[] = $row;
+      }
+      
+      // Cerramos la sentencia
+      $stmt->close();
+      
+      return $listaMaterias;
+  }
+}
+
+if (!function_exists('getMateriaById')) {
+  /**
+   * Obtiene una materia específica por su ID usando sentencias preparadas
+   * 
+   * @param int $id ID de la materia a buscar
+   * @return array|null Array asociativo con los datos de la materia o null si no se encuentra o hay error
+   */
+  function getMateriaById($id) {
+      global $db;
+      
+      // Validación básica del parámetro de entrada
+      if (!is_numeric($id) || $id <= 0) {
+          error_log("Error en getMateriaById: ID inválido");
+          return null;
+      }
+      
+      // Consulta SQL para obtener una materia por ID
+      $query = "SELECT id, cod_materia, nombre_materia, creditos, 
+                       horas_teoricas, horas_practicas, activa 
+                FROM materias 
+                WHERE id = ?";
+      
+      // Preparamos la sentencia
+      $stmt = $db->prepare($query);
+      
+      // Verificamos si la preparación fue exitosa
+      if (!$stmt) {
+          error_log("Error al preparar la consulta en getMateriaById: ".$db->error);
+          return null;
+      }
+      
+      // Vinculamos el parámetro (i = integer)
+      $bindResult = $stmt->bind_param("i", $id);
+      if (!$bindResult) {
+          error_log("Error al vincular parámetros en getMateriaById: ".$stmt->error);
+          $stmt->close();
+          return null;
+      }
+      
+      // Ejecutamos la sentencia
+      if (!$stmt->execute()) {
+          error_log("Error al ejecutar la consulta en getMateriaById: ".$stmt->error);
+          $stmt->close();
+          return null;
+      }
+      
+      // Obtenemos el resultado
+      $result = $stmt->get_result();
+      
+      // Verificamos si obtuvimos resultados
+      if (!$result) {
+          error_log("Error al obtener resultados en getMateriaById: ".$stmt->error);
+          $stmt->close();
+          return null;
+      }
+      
+      // Obtenemos la fila como array asociativo
+      $materia = $result->fetch_assoc();
+      
+      // Cerramos la sentencia
+      $stmt->close();
+      
+      // Retornamos el resultado (puede ser null si no se encontró la materia)
+      return $materia;
+  }
+}
+
+if (!function_exists('toggleMateriaStatus')) {
+  /**
+   * Cambia el estado activo/inactivo de una materia (toggle)
+   * 
+   * @param int $id ID de la materia a modificar
+   * @return array|false Retorna un array con información del resultado o false en caso de error
+   */
+  function toggleMateriaStatus($id) {
+      global $db;
+      
+      // Validación del ID de entrada
+      if (!is_numeric($id) || $id <= 0) {
+          error_log("Error en toggleMateriaStatus: ID inválido ($id)");
+          return false;
+      }
+      
+      // Preparamos la consulta para cambiar el estado
+      $query = "UPDATE materias SET activa = NOT activa WHERE id = ?";
+      $stmt = $db->prepare($query);
+      
+      // Verificamos si la preparación fue exitosa
+      if (!$stmt) {
+          error_log("Error al preparar la consulta en toggleMateriaStatus: ".$db->error);
+          return false;
+      }
+      
+      // Vinculamos el parámetro (i = integer)
+      if (!$stmt->bind_param("i", $id)) {
+          error_log("Error al vincular parámetro en toggleMateriaStatus: ".$stmt->error);
+          $stmt->close();
+          return false;
+      }
+      
+      // Ejecutamos la consulta
+      if (!$stmt->execute()) {
+          error_log("Error al ejecutar consulta en toggleMateriaStatus: ".$stmt->error);
+          $stmt->close();
+          return false;
+      }
+      
+      // Obtenemos el número de filas afectadas
+      $affectedRows = $stmt->affected_rows;
+      
+      // Cerramos la sentencia
+      $stmt->close();
+      
+      // Verificamos si realmente se actualizó algún registro
+      if ($affectedRows === 0) {
+          error_log("Advertencia en toggleMateriaStatus: Ningún registro actualizado (ID: $id)");
+          return [
+              'success' => false,
+              'message' => 'No se encontró la materia con el ID proporcionado',
+              'affected_rows' => 0
+          ];
+      }
+      
+      // Retornamos información sobre la operación exitosa
+      return [
+          'success' => true,
+          'message' => 'Estado de la materia actualizado correctamente',
+          'affected_rows' => $affectedRows
+      ];
+  }
+}
+
+if (!function_exists('guardarMateria')) {
+  /**
+   * Guarda o actualiza una materia en la base de datos
+   * 
+   * @param array $datos Array con los datos de la materia
+   *        Requeridos: cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, activa
+   *        Opcional: id (para actualización)
+   * @return array|false Retorna array con info de la operación o false en error grave
+   */
+  function guardarMateria($datos) {
+      global $db;
+      
+      // Validación de datos requeridos
+      $camposRequeridos = ['cod_materia', 'nombre_materia', 'creditos', 
+                          'horas_teoricas', 'horas_practicas', 'activa'];
+      
+      foreach ($camposRequeridos as $campo) {
+          if (!isset($datos[$campo])) {
+              error_log("Error en guardarMateria: Falta el campo requerido '$campo'");
+              return [
+                  'success' => false,
+                  'message' => "Falta el campo requerido '$campo'"
+              ];
+          }
+      }
+      
+      // Determinar si es inserción o actualización
+      $esNueva = empty($datos['id']);
+      
+      try {
+          if ($esNueva) {
+              // INSERT de nueva materia
+              $query = "INSERT INTO materias 
+                       (cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, activa) 
+                       VALUES (?, ?, ?, ?, ?, ?)";
+              $stmt = $db->prepare($query);
+              
+              if (!$stmt) {
+                  error_log("Error preparando INSERT: ".$db->error);
+                  return false;
+              }
+              
+              $stmt->bind_param("ssiiii", 
+                  $datos['cod_materia'],
+                  $datos['nombre_materia'],
+                  $datos['creditos'],
+                  $datos['horas_teoricas'],
+                  $datos['horas_practicas'],
+                  $datos['activa']);
+          } else {
+              // UPDATE de materia existente
+              $query = "UPDATE materias SET 
+                       cod_materia = ?, 
+                       nombre_materia = ?, 
+                       creditos = ?, 
+                       horas_teoricas = ?, 
+                       horas_practicas = ?, 
+                       activa = ? 
+                       WHERE id = ?";
+              $stmt = $db->prepare($query);
+              
+              if (!$stmt) {
+                  error_log("Error preparando UPDATE: ".$db->error);
+                  return false;
+              }
+              
+              $stmt->bind_param("ssiiiii", 
+                  $datos['cod_materia'],
+                  $datos['nombre_materia'],
+                  $datos['creditos'],
+                  $datos['horas_teoricas'],
+                  $datos['horas_practicas'],
+                  $datos['activa'],
+                  $datos['id']);
+          }
+          
+          // Ejecutar la consulta
+          if (!$stmt->execute()) {
+              error_log("Error ejecutando consulta: ".$stmt->error);
+              $stmt->close();
+              return [
+                  'success' => false,
+                  'message' => "Error al guardar en la base de datos"
+              ];
+          }
+          
+          // Obtener información del resultado
+          $affectedRows = $stmt->affected_rows;
+          $nuevoId = $esNueva ? $stmt->insert_id : null;
+          
+          $stmt->close();
+          
+          // Verificar si realmente se afectaron filas (especialmente en UPDATE)
+          if (!$esNueva && $affectedRows === 0) {
+              return [
+                  'success' => false,
+                  'message' => "No se encontró la materia con ID {$datos['id']} o no hubo cambios",
+                  'affected_rows' => 0
+              ];
+          }
+          
+          // Retornar resultado exitoso
+          return [
+              'success' => true,
+              'message' => $esNueva ? "Materia creada exitosamente" : "Materia actualizada exitosamente",
+              'affected_rows' => $affectedRows,
+              'id' => $esNueva ? $nuevoId : $datos['id']
+          ];
+          
+      } catch (Exception $e) {
+          error_log("Excepción en guardarMateria: ".$e->getMessage());
+          if (isset($stmt) && $stmt instanceof mysqli_stmt) {
+              $stmt->close();
+          }
+          return false;
+      }
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+//CAMBIAR A USERS
+
+/**
+ * Actualiza los datos de un docente en la base de datos
+ * 
+ * @param array $datos Array con los datos del docente:
+ *        Requeridos: id, nombre, apellido, tipo_documento, documento, email, especialidad, estado
+ * @return array Retorna array con:
+ *         - success: boolean indica si la operación fue exitosa
+ *         - message: string mensaje descriptivo del resultado
+ *         - affected_rows: número de filas afectadas
+ *         - changes: boolean indica si hubo cambios reales en los datos
+ */
+function editarDocente($datos) {
+  global $db;
+  
+  // Validación de campos requeridos
+  $camposRequeridos = ['id', 'nombre', 'apellido', 'tipo_documento', 
+                      'documento', 'email', 'especialidad', 'estado'];
+  
+  foreach ($camposRequeridos as $campo) {
+      if (!isset($datos[$campo]) || $datos[$campo] === '') {
+          error_log("Error en editarDocente: Falta el campo requerido '$campo'");
+          return [
+              'success' => false,
+              'message' => "Falta el campo requerido '$campo'",
+              'affected_rows' => 0,
+              'changes' => false
+          ];
+      }
+  }
+  
+  // Validar ID
+  if (!is_numeric($datos['id']) || $datos['id'] <= 0) {
+      error_log("Error en editarDocente: ID inválido");
+      return [
+          'success' => false,
+          'message' => "ID de docente inválido",
+          'affected_rows' => 0,
+          'changes' => false
+      ];
+  }
+  
+  try {
+      // Preparar consulta UPDATE
+      $query = "UPDATE docentes SET 
+               nombre = ?, 
+               apellido = ?, 
+               tipo_documento = ?, 
+               documento = ?, 
+               email = ?, 
+               especialidad = ?, 
+               estado = ? 
+               WHERE id = ?";
+      
+      $stmt = $db->prepare($query);
+      
+      if (!$stmt) {
+          error_log("Error preparando consulta: ".$db->error);
+          return [
+              'success' => false,
+              'message' => "Error al preparar la consulta",
+              'affected_rows' => 0,
+              'changes' => false
+          ];
+      }
+      
+      // Vincular parámetros
+      $bindResult = $stmt->bind_param("sssssssi",
+          $datos['nombre'],
+          $datos['apellido'],
+          $datos['tipo_documento'],
+          $datos['documento'],
+          $datos['email'],
+          $datos['especialidad'],
+          $datos['estado'],
+          $datos['id']
+      );
+      
+      if (!$bindResult) {
+          error_log("Error vinculando parámetros: ".$stmt->error);
+          $stmt->close();
+          return [
+              'success' => false,
+              'message' => "Error al vincular parámetros",
+              'affected_rows' => 0,
+              'changes' => false
+          ];
+      }
+      
+      // Ejecutar consulta
+      $executeResult = $stmt->execute();
+      
+      if (!$executeResult) {
+          error_log("Error ejecutando consulta: ".$stmt->error);
+          $stmt->close();
+          return [
+              'success' => false,
+              'message' => "Error al ejecutar la consulta",
+              'affected_rows' => 0,
+              'changes' => false
+          ];
+      }
+      
+      // Obtener resultados
+      $affectedRows = $stmt->affected_rows;
+      $stmt->close();
+      
+      // Determinar si hubo cambios reales
+      $huboCambios = $affectedRows > 0;
+      
+      return [
+          'success' => true,
+          'message' => $huboCambios ? "Docente actualizado correctamente" : "No se realizaron cambios (los datos eran iguales)",
+          'affected_rows' => $affectedRows,
+          'changes' => $huboCambios
+      ];
+      
+  } catch (Exception $e) {
+      error_log("Excepción en editarDocente: ".$e->getMessage());
+      if (isset($stmt) && $stmt instanceof mysqli_stmt) {
+          $stmt->close();
+      }
+      return [
+          'success' => false,
+          'message' => "Error inesperado al actualizar docente",
+          'affected_rows' => 0,
+          'changes' => false
+      ];
+  }
+}
+
+
+/**
+* Deshabilita un docente cambiando su estado a Inactivo
+* @param int $id ID del docente a deshabilitar
+* @param string $razon Razón por la que se deshabilita
+* @return bool True si se deshabilitó correctamente, False si hubo error
+*/
+function deshabilitarDocente($id, $razon) {
+  global $db;
+  
+  try {
+      // Actualizar estado
+      $stmt = $db->prepare("UPDATE docentes SET estado = 'Inactivo' WHERE id = ?");
+      $stmt->bind_param("i", $id);
+      $stmt->execute();
+      
+      // Registrar en historial (opcional)
+      $stmt = $db->prepare("INSERT INTO historial_deshabilitaciones 
+                          (docente_id, razon, fecha) VALUES (?, ?, NOW())");
+      $stmt->bind_param("is", $id, $razon);
+      $stmt->execute();
+      
+      return true;
+  } catch (Exception $e) {
+      error_log("Error al deshabilitar docente: " . $e->getMessage());
+      return false;
+  }
+}
+
+
+
+
+//LO DE ARRIBA HAY QUE ARREGLARLO
+
+/**
+ * Obtiene el resumen de pagos agrupados por día
+ * 
+ * @param string|null $fecha Fecha específica para filtrar (formato YYYY-MM-DD) o null para todas las fechas
+ * @return array Retorna un array con:
+ *         - success: boolean indica si la operación fue exitosa
+ *         - message: string mensaje descriptivo (en caso de error)
+ *         - data: array con los resultados (vacío si no hay datos)
+ */
+function obtenerPagosPorDia($fecha = null) {
+  global $db;
+  
+  // Validar formato de fecha si se proporciona
+  if ($fecha && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) {
+      error_log("Error en obtenerPagosPorDia: Formato de fecha inválido");
+      return [
+          'success' => false,
+          'message' => "Formato de fecha inválido. Use YYYY-MM-DD",
+          'data' => []
+      ];
+  }
+  
+  // Construir consulta SQL
+  $sql = "SELECT 
+              DATE(fecha_pago) as dia,
+              COUNT(*) as cantidad_pagos,
+              SUM(monto) as total_dia
+          FROM pagos";
+  
+  if ($fecha) {
+      $sql .= " WHERE DATE(fecha_pago) = ?";
+  }
+  
+  $sql .= " GROUP BY DATE(fecha_pago) ORDER BY dia DESC";
+  
+  try {
+      // Preparar sentencia
+      $stmt = $db->prepare($sql);
+      
+      if (!$stmt) {
+          error_log("Error preparando consulta: ".$db->error);
+          return [
+              'success' => false,
+              'message' => "Error al preparar la consulta",
+              'data' => []
+          ];
+      }
+      
+      // Vincular parámetro si hay fecha
+      if ($fecha) {
+          $bindResult = $stmt->bind_param("s", $fecha);
+          if (!$bindResult) {
+              error_log("Error vinculando parámetro: ".$stmt->error);
+              $stmt->close();
+              return [
+                  'success' => false,
+                  'message' => "Error al vincular parámetros",
+                  'data' => []
+              ];
+          }
+      }
+      
+      // Ejecutar consulta
+      if (!$stmt->execute()) {
+          error_log("Error ejecutando consulta: ".$stmt->error);
+          $stmt->close();
+          return [
+              'success' => false,
+              'message' => "Error al ejecutar la consulta",
+              'data' => []
+          ];
+      }
+      
+      // Obtener resultados
+      $result = $stmt->get_result();
+      
+      if (!$result) {
+          error_log("Error obteniendo resultados: ".$stmt->error);
+          $stmt->close();
+          return [
+              'success' => false,
+              'message' => "Error al obtener resultados",
+              'data' => []
+          ];
+      }
+      
+      // Procesar resultados
+      $pagos_por_dia = [];
+      while ($row = $result->fetch_assoc()) {
+          $pagos_por_dia[] = $row;
+      }
+      
+      $stmt->close();
+      
+      return [
+          'success' => true,
+          'message' => count($pagos_por_dia) > 0 ? "Datos obtenidos correctamente" : "No se encontraron registros",
+          'data' => $pagos_por_dia
+      ];
+      
+  } catch (Exception $e) {
+      error_log("Excepción en obtenerPagosPorDia: ".$e->getMessage());
+      if (isset($stmt) && $stmt instanceof mysqli_stmt) {
+          $stmt->close();
+      }
+      return [
+          'success' => false,
+          'message' => "Error inesperado al obtener pagos",
+          'data' => []
+      ];
+  }
+}
+
+
+/**
+ * Obtiene los detalles de los pagos realizados en un día específico
+ * 
+ * @param string $dia Fecha en formato YYYY-MM-DD para filtrar los pagos
+ * @return array Retorna un array estructurado con:
+ *         - success: boolean indica si la operación fue exitosa
+ *         - message: string mensaje descriptivo (en caso de error o si no hay datos)
+ *         - data: array con los detalles de los pagos (vacío si no hay registros)
+ */
+function obtenerDetallesPagos($dia) {
+  global $db;
+  
+  // Validar formato de fecha
+  if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dia)) {
+      error_log("Error en obtenerDetallesPagos: Formato de fecha inválido");
+      return [
+          'success' => false,
+          'message' => "Formato de fecha inválido. Use YYYY-MM-DD",
+          'data' => []
+      ];
+  }
+  
+  try {
+      // Construir consulta SQL con JOINs para obtener información relacionada
+      $sql = "SELECT 
+                  p.*,
+                  p.observaciones AS referencia,
+                  CONCAT(u.nombre, ' ', u.apellido) as estudiante_nombre_completo,
+                  u.username as estudiante_username,
+                  u.idusuario as estudiante_cedula,
+                  CONCAT(ur.nombre, ' ', ur.apellido) as registrado_por_nombre,
+                  ur.username as registrado_por_username
+              FROM pagos p
+              LEFT JOIN users u ON p.estudiante_id = u.id AND u.estudiante = 1
+              LEFT JOIN users ur ON p.registrado_por = ur.id
+              WHERE DATE(p.fecha_pago) = ?
+              ORDER BY p.fecha_pago DESC";
+      
+      // Preparar sentencia
+      $stmt = $db->prepare($sql);
+      
+      if (!$stmt) {
+          error_log("Error preparando consulta: ".$db->error);
+          return [
+              'success' => false,
+              'message' => "Error al preparar la consulta",
+              'data' => []
+          ];
+      }
+      
+      // Vincular parámetro
+      $bindResult = $stmt->bind_param("s", $dia);
+      if (!$bindResult) {
+          error_log("Error vinculando parámetro: ".$stmt->error);
+          $stmt->close();
+          return [
+              'success' => false,
+              'message' => "Error al vincular parámetros",
+              'data' => []
+          ];
+      }
+      
+      // Ejecutar consulta
+      if (!$stmt->execute()) {
+          error_log("Error ejecutando consulta: ".$stmt->error);
+          $stmt->close();
+          return [
+              'success' => false,
+              'message' => "Error al ejecutar la consulta",
+              'data' => []
+          ];
+      }
+      
+      // Obtener resultados
+      $result = $stmt->get_result();
+      
+      if (!$result) {
+          error_log("Error obteniendo resultados: ".$stmt->error);
+          $stmt->close();
+          return [
+              'success' => false,
+              'message' => "Error al obtener resultados",
+              'data' => []
+          ];
+      }
+      
+      // Procesar resultados
+      $pagos = [];
+      while ($row = $result->fetch_assoc()) {
+          // Formatear datos si es necesario
+          $row['monto_formateado'] = number_format($row['monto'], 2);
+          $row['fecha_pago_formateada'] = date('d/m/Y H:i', strtotime($row['fecha_pago']));
+          $pagos[] = $row;
+      }
+      
+      $stmt->close();
+      
+      return [
+          'success' => true,
+          'message' => count($pagos) > 0 ? "Datos obtenidos correctamente" : "No se encontraron pagos para la fecha especificada",
+          'data' => $pagos
+      ];
+      
+  } catch (Exception $e) {
+      error_log("Excepción en obtenerDetallesPagos: ".$e->getMessage());
+      if (isset($stmt) && $stmt instanceof mysqli_stmt) {
+          $stmt->close();
+      }
+      return [
+          'success' => false,
+          'message' => "Error inesperado al obtener detalles de pagos",
+          'data' => []
+      ];
+  }
+}
+
+
+
+/**
+ * Registra un nuevo pago en el sistema con validaciones mejoradas
+ * 
+ * @param array $datos Array con los datos del pago:
+ *        - tipo_pago: string (requerido)
+ *        - monto: float (requerido, positivo)
+ *        - estudiante_id: int (opcional)
+ *        - otro_concepto: string (requerido si tipo_pago es 'otro')
+ *        - referencia: string (opcional)
+ * @return array Retorna array con:
+ *         - success: boolean indica si la operación fue exitosa
+ *         - message: string mensaje descriptivo
+ *         - id: int ID del pago registrado (solo en éxito)
+ *         - validation_errors: array errores de validación (solo si hay)
+ */
+function registrarPago($datos) {
+  global $db;
+  
+  // Validaciones iniciales
+  $validationErrors = [];
+  
+  if (empty($datos['tipo_pago'])) {
+      $validationErrors[] = 'Debe seleccionar un tipo de pago';
+  }
+  
+  if (!isset($datos['monto']) || !is_numeric($datos['monto']) || $datos['monto'] <= 0) {
+      $validationErrors[] = 'El monto debe ser un valor numérico positivo';
+  }
+  
+  if ($datos['tipo_pago'] == 'otro' && empty($datos['otro_concepto'])) {
+      $validationErrors[] = 'Debe especificar el concepto del pago';
+  }
+  
+  if (!empty($validationErrors)) {
+      return [
+          'success' => false,
+          'message' => 'Errores de validación',
+          'validation_errors' => $validationErrors
+      ];
+  }
+  
+  // Preparar datos para la inserción
+  $estudiante_id = !empty($datos['estudiante_id']) ? (int)$datos['estudiante_id'] : NULL;
+  $tipo_pago = $datos['tipo_pago'];
+  $otro_concepto = ($datos['tipo_pago'] == 'otro') ? trim($datos['otro_concepto']) : NULL;
+  $monto = round((float)$datos['monto'], 2); // Redondear a 2 decimales
+  $referencia = !empty($datos['referencia']) ? trim($datos['referencia']) : NULL;
+  $registrado_por = $_SESSION['user_id'] ?? NULL;
+  
+  try {
+      // Query de inserción
+      $sql = "INSERT INTO pagos (
+                  estudiante_id, 
+                  tipo_pago, 
+                  otro_concepto, 
+                  monto, 
+                  observaciones,
+                  registrado_por,
+                  fecha_pago
+              ) VALUES (?, ?, ?, ?, ?, ?, NOW())";
+      
+      $stmt = $db->prepare($sql);
+      
+      if (!$stmt) {
+          error_log("Error preparando consulta: ".$db->error);
+          return [
+              'success' => false,
+              'message' => 'Error al preparar la consulta SQL'
+          ];
+      }
+      
+      // Vincular parámetros
+      $bindResult = $stmt->bind_param(
+          "issdsi", 
+          $estudiante_id, 
+          $tipo_pago, 
+          $otro_concepto, 
+          $monto, 
+          $referencia,
+          $registrado_por
+      );
+      
+      if (!$bindResult) {
+          error_log("Error vinculando parámetros: ".$stmt->error);
+          $stmt->close();
+          return [
+              'success' => false,
+              'message' => 'Error al vincular parámetros'
+          ];
+      }
+      
+      // Ejecutar consulta
+      if (!$stmt->execute()) {
+          error_log("Error ejecutando consulta: ".$stmt->error);
+          $stmt->close();
+          return [
+              'success' => false,
+              'message' => 'Error al registrar el pago en la base de datos'
+          ];
+      }
+      
+      // Obtener ID del nuevo pago
+      $id = $stmt->insert_id;
+      $affectedRows = $stmt->affected_rows;
+      $stmt->close();
+      
+      if ($affectedRows === 0) {
+          return [
+              'success' => false,
+              'message' => 'No se pudo registrar el pago'
+          ];
+      }
+      
+      // Registrar éxito
+      error_log("Pago registrado exitosamente. ID: $id");
+      
+      return [
+          'success' => true,
+          'message' => 'Pago registrado correctamente',
+          'id' => $id,
+          'monto' => $monto,
+          'fecha' => date('Y-m-d H:i:s')
+      ];
+      
+  } catch (Exception $e) {
+      error_log("Excepción en registrarPago: ".$e->getMessage());
+      if (isset($stmt) && $stmt instanceof mysqli_stmt) {
+          $stmt->close();
+      }
+      return [
+          'success' => false,
+          'message' => 'Error inesperado al registrar el pago'
+      ];
+  }
+}
+
+
+
+
+
+/**
+ * Busca estudiantes por cédula o nombre usando sentencias preparadas de MySQLi
+ * 
+ * @param string $cedula El número de cédula o parte del nombre a buscar
+ * @return array Array asociativo con los resultados de la búsqueda
+ */
+function buscarEstudiantePorCedula($cedula) {
+  global $db; // Asume que $db es una conexión MySQLi válida
+  
+  // Preparar la consulta SQL con placeholders (?)
+  $query = "SELECT id, idusuario AS cedula, nombre 
+            FROM users 
+            WHERE (idusuario LIKE ? OR nombre LIKE ?) 
+            AND estudiante = 1
+            LIMIT 10";
+  
+  // Preparar la sentencia
+  $stmt = $db->prepare($query);
+  
+  if (!$stmt) {
+      // Manejar error en la preparación
+      die("Error al preparar la consulta: " . $db->error);
+  }
+  
+  // Añadir comodines % para la búsqueda parcial
+  $cedula_like = "%$cedula%";
+  
+  // Vincular parámetros (dos strings, por eso "ss")
+  $stmt->bind_param("ss", $cedula_like, $cedula_like);
+  
+  // Ejecutar la consulta
+  $stmt->execute();
+  
+  // Obtener el resultado
+  $result = $stmt->get_result();
+  
+  // Verificar si hay resultados
+  if ($result->num_rows === 0) {
+      return []; // Retornar array vacío si no hay coincidencias
+  }
+  
+  // Obtener todos los resultados como array asociativo
+  $estudiantes = $result->fetch_all(MYSQLI_ASSOC);
+  
+  // Cerrar la sentencia
+  $stmt->close();
+  
+  return $estudiantes;
+}
+
+
+//USERS
+
+/**
+ * Obtiene la lista completa de usuarios de la base de datos usando sentencias preparadas
+ * 
+ * @return array Array asociativo con todos los usuarios ordenados por nombre
+ */
+function obtenerListaCompletaUsuarios() {
+  global $db; // Asume que $db es una conexión MySQLi válida
+  
+  // Preparar la consulta SQL
+  $query = "SELECT id, nombre, username, email, status, 
+                   super_user, admin, docente, estudiante, editar_user 
+            FROM users 
+            ORDER BY nombre ASC";
+  
+  // Preparar la sentencia
+  $stmt = $db->prepare($query);
+  
+  if (!$stmt) {
+      // Manejar error en la preparación
+      die("Error al preparar la consulta: " . $db->error);
+  }
+  
+  // Ejecutar la consulta
+  $stmt->execute();
+  
+  // Obtener el resultado
+  $result = $stmt->get_result();
+  
+  // Inicializar array para los usuarios
+  $usuarios = array();
+  
+  // Verificar si hay resultados
+  if ($result && $result->num_rows > 0) {
+      // Recorrer todos los registros
+      while ($row = $result->fetch_assoc()) {
+          $usuarios[] = $row;
+      }
+  }
+  
+  // Cerrar la sentencia
+  $stmt->close();
+  
+  return $usuarios;
+}
+
+
+// OBTENER LOS DATOS SIMPLES
+
+function obtenerTiposCedula($db) {
+    $tipos = [];
+    
+    if (!($db instanceof mysqli)) {
+        throw new InvalidArgumentException("Se esperaba una conexión MySQLi válida");
+    }
+    
+    $query = "SELECT id, tipo FROM tipo_cedula";
+    
+    try {
+        if (!$stmt = $db->prepare($query)) {
+            throw new Exception("Error al preparar la consulta: " . $db->error);
+        }
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error al ejecutar la consulta: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        
+        while ($row = $result->fetch_assoc()) {
+            $tipos[] = $row;
+        }
+        
+        $stmt->close();
+        
+        return $tipos;
+    } catch (Exception $e) {
+        // Registrar el error
+        error_log($e->getMessage());
+        
+        // Opcional: puedes devolver un array vacío o false según tu necesidad
+        return [];
+    }
+}
+
+
+
+function obtenerEstadosCiviless($db) {
+    // Validar conexión
+    if (!($db instanceof mysqli)) {
+        throw new InvalidArgumentException("Se esperaba una conexión MySQLi válida");
+    }
+
+    $estados = [];
+    $query = "SELECT id, estado_civil FROM estado_civil ORDER BY estado_civil ASC";
+    
+    try {
+        // Preparar sentencia
+        if (!$stmt = $db->prepare($query)) {
+            throw new Exception("Error al preparar la consulta: " . $db->error);
+        }
+        
+        // Ejecutar
+        if (!$stmt->execute()) {
+            throw new Exception("Error al ejecutar la consulta: " . $stmt->error);
+        }
+        
+        // Obtener resultados
+        $result = $stmt->get_result();
+        
+        while ($row = $result->fetch_assoc()) {
+            $estados[$row['id']] = $row['estado_civil']; // CORRECCIÓN AQUÍ (faltaba ])
+        }
+        
+        return $estados;
+        
+    } catch (Exception $e) {
+        error_log($e->getMessage());
+        return []; // Devuelve array vacío en caso de error
+    } finally {
+        if (isset($stmt)) {
+            $stmt->close();
+        }
+    }
+}
+
+
+function obtenerTiposVivienda($db) {
+    // Validar conexión
+    if (!($db instanceof mysqli)) {
+        throw new InvalidArgumentException("Se esperaba una conexión MySQLi válida");
+    }
+
+    $viviendas = [];
+    $query = "SELECT id, vivienda FROM tipo_vivienda ORDER BY vivienda ASC";
+    
+    try {
+        // Preparar sentencia
+        if (!$stmt = $db->prepare($query)) {
+            throw new Exception("Error al preparar la consulta: " . $db->error);
+        }
+        
+        // Ejecutar
+        if (!$stmt->execute()) {
+            throw new Exception("Error al ejecutar la consulta: " . $stmt->error);
+        }
+        
+        // Obtener resultados
+        $result = $stmt->get_result();
+        
+        while ($row = $result->fetch_assoc()) {
+            $viviendas[$row['id']] = $row['vivienda'];
+        }
+        
+        return $viviendas;
+        
+    } catch (Exception $e) {
+        error_log($e->getMessage());
+        return []; // Devuelve array vacío en caso de error
+    } finally {
+        if (isset($stmt)) {
+            $stmt->close();
+        }
+    }
+}
+
+
+function obtenerTenenciaViviendas($db) {
+    // Validar conexión
+    if (!($db instanceof mysqli)) {
+        throw new InvalidArgumentException("Se esperaba una conexión MySQLi válida");
+    }
+
+    $tenencias = [];
+    $query = "SELECT id, tenencia FROM tenencia_vivienda ORDER BY tenencia ASC";
+    
+    try {
+        // Preparar sentencia
+        if (!$stmt = $db->prepare($query)) {
+            throw new Exception("Error al preparar la consulta: " . $db->error);
+        }
+        
+        // Ejecutar
+        if (!$stmt->execute()) {
+            throw new Exception("Error al ejecutar la consulta: " . $stmt->error);
+        }
+        
+        // Obtener resultados
+        $result = $stmt->get_result();
+        
+        while ($row = $result->fetch_assoc()) {
+            $tenencias[$row['id']] = $row['tenencia'];
+        }
+        
+        return $tenencias;
+        
+    } catch (Exception $e) {
+        error_log($e->getMessage());
+        return []; // Devuelve array vacío en caso de error
+    } finally {
+        if (isset($stmt)) {
+            $stmt->close();
+        }
+    }
+}
+
+
+
+function obtenerOpcionesStatus($db) {
+    // Validar conexión
+    if (!($db instanceof mysqli)) {
+        throw new InvalidArgumentException("Se esperaba una conexión MySQLi válida");
+    }
+
+    $statusOptions = [
+        '1' => 'Activo',
+        '0' => 'Inactivo'
+    ];
+    
+    // Opcional: Verificar si los datos existen en la tabla status
+    $query = "SELECT id, status FROM status WHERE id IN (0, 1)";
+    
+    try {
+        if ($stmt = $db->prepare($query)) {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            // Si hay registros en la tabla, sobreescribimos las opciones
+            if ($result->num_rows > 0) {
+                $statusOptions = [];
+                while ($row = $result->fetch_assoc()) {
+                    $statusOptions[$row['id']] = ($row['id'] == 1) ? 'Activo' : 'Inactivo';
+                }
+            }
+            
+            $stmt->close();
+        }
+        
+        return $statusOptions;
+        
+    } catch (Exception $e) {
+        error_log($e->getMessage());
+        // Retorna las opciones por defecto en caso de error
+        return [
+            '1' => 'Activo',
+            '0' => 'Inactivo'
+        ];
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // FUNCIONES QUE NO SE VAN A USAR ***********************************************************************
@@ -681,36 +3990,7 @@ function contar_en_espera(){
         $pendiente_pedido, $mes_de_pago_actual, $ganancia_bantecom, $id_usua;
         if (isAdmin())
         {
-//echo 'ADMIN';
-$query = "SELECT sum(monto) AS 'total',
-SUM(CASE WHEN status_pedido = 'ESPERANDO' THEN 1 ELSE 0 END) AS 'esperando',
-SUM(CASE WHEN status_pedido = 'APROBADO' THEN 1 ELSE 0 END) AS 'aprobado',
-SUM(CASE WHEN status_pedido = 'ENTREGADO' THEN 1 ELSE 0 END) AS 'entregado',
-SUM(CASE WHEN status_pedido = 'ENTREGADO' AND DATE_FORMAT(pedidos.fecha_pedido, '%Y%m') = DATE_FORMAT(NOW(), '%Y%m') THEN 1 ELSE 0 END) AS 'entregadomes',
-SUM(CASE WHEN status_pedido = 'ENTREGADO' AND DATE_FORMAT(pedidos.fecha_pedido, '%Y%m') = DATE_FORMAT(NOW(), '%Y%m') THEN monto ELSE 0 END) AS 'entregadomesmonto'
-FROM pedidos";
-		$result = mysqli_query($db, $query);
-    $rows =  mysqli_fetch_assoc($result);
-$esperando = $rows['esperando'];
-$aprobado = $rows['aprobado'];
-$entregado = $rows['entregado'];
-$entregadomes = $rows['entregadomes'];
-$entregadomesmonto = $rows['entregadomesmonto'];
 
-$contar_pedido = $esperando + $aprobado + $entregado .' en Total <br>';
-
-$porentregar = $esperando +
-$aprobado;
-
-// if ($porentregar > 0) {
-$contar_pedido .= $esperando .' Esperando Aprobacion <br>';
-$contar_pedido .= $aprobado .'  Esperando entrega <br>';
-$contar_pedido .= $entregado .' General Entregado <br>';
-$contar_pedido .= "<b>En el Mes " . $mes_de_pago_actual ." </b><br>" ;
-$contar_pedido .= $entregadomes .' Entregado en el Mes <br>';
-$contar_pedido .= number_format($entregadomesmonto, 2, ',', '.') .' Bs. Entregado en el Mes <br>';
-$ganancia_bantecom = $entregadomesmonto*4.9/100;
-$contar_pedido .='Ganancia BANTECOM '.number_format($ganancia_bantecom, 2, ',', '.').' Bs';
 
 
 if ($porentregar>0) {
@@ -4828,21 +8108,215 @@ if (mysqli_query($db, $query_error_fatal)) {
 
 function isLoggedIn()
 {
-	if (isset($_SESSION['user'])) {
-		return true;
-	}else{
-    return false;
-	}
+    return isset($_SESSION['user']);
 }
 
 function isAdmin()
 {
-	if (isset($_SESSION['user']) && $_SESSION['user']['user_type'] == 'admin' ) {
-		return true;
-	}else{
-		return false;
-	}
+    return isset($_SESSION['user']) && $_SESSION['user']['admin'] == 1;
 }
+
+function isSuperUser()
+{
+    return isset($_SESSION['user']) && $_SESSION['user']['super_user'] == 1;
+}
+
+function isDocente()
+{
+    return isset($_SESSION['user']) && $_SESSION['user']['docente'] == 1;
+}
+
+function isEstudiante()
+{
+    return isset($_SESSION['user']) && $_SESSION['user']['estudiante'] == 1;
+}
+
+function isUser()
+{
+    return isset($_SESSION['user']) && $_SESSION['user']['usuario'] == 1;
+}
+
+
+
+
+// Función genérica para verificar múltiples roles
+function hasRole($roles) {
+    if (!isset($_SESSION['user'])) {
+        return false;
+    }
+    
+    $user = $_SESSION['user'];
+    $userRoles = [
+        'usuario' => $user['usuario'] ?? 0,
+        'estudiante' => $user['estudiante'] ?? 0,
+        'docente' => $user['docente'] ?? 0,
+        'admin' => $user['admin'] ?? 0,
+        'super_user' => $user['super_user'] ?? 0
+    ];
+    
+    if (is_array($roles)) {
+        foreach ($roles as $role) {
+            if (isset($userRoles[$role]) && $userRoles[$role] == 1) {
+                return true;
+            }
+        }
+        return false;
+    } else {
+        return isset($userRoles[$roles]) && $userRoles[$roles] == 1;
+    }
+}
+
+function getAvailableProfiles() {
+    if (!isset($_SESSION['user'])) {
+        return [];
+    }
+    
+    $user = $_SESSION['user'];
+    $profiles = [];
+    
+    if ($user['usuario'] == 1) $profiles[] = 'usuario';
+    if ($user['estudiante'] == 1) $profiles[] = 'estudiante';
+    if ($user['docente'] == 1) $profiles[] = 'docente';
+    if ($user['admin'] == 1) $profiles[] = 'admin';
+    if ($user['super_user'] == 1) $profiles[] = 'super_user';
+    
+    return $profiles;
+}
+
+
+
+
+function requireAdmin() {
+  if (!isLoggedIn()) {
+      $_SESSION['msg'] = "Debe iniciar sesión primero";
+      header('location: ../login.php');
+      exit;
+  }
+  
+  if (!isset($_SESSION['current_profile'])) {
+      header('location: ../profile_selector.php');
+      exit;
+  }
+  
+  if ($_SESSION['current_profile'] !== 'admin' || !isAdmin()) {
+      $_SESSION['error'] = "Acceso denegado: Se requieren privilegios de administrador";
+      header('location: ../' . $_SESSION['current_profile'] . '/home.php');
+      exit;
+  }
+}
+
+
+
+function requireSuperUser() {
+  if (!isLoggedIn()) {
+      $_SESSION['msg'] = "Debe iniciar sesión primero";
+      header('location: ../login.php');
+      exit;
+  }
+  
+  if (!isset($_SESSION['current_profile'])) {
+      header('location: ../profile_selector.php');
+      exit;
+  }
+  
+  if (($_SESSION['current_profile'] !== 'super_user' && $_SESSION['current_profile'] !== 'admin') || !isSuperUser()) {
+      $_SESSION['error'] = "Acceso denegado: Se requieren privilegios de superusuario";
+      // Redirige al home correspondiente o al dashboard principal
+      $redirect = isset($_SESSION['current_profile']) ? '../' . $_SESSION['current_profile'] . '/home.php' : '../index.php';
+      header('location: ' . $redirect);
+      exit;
+  }
+}
+
+// Función para verificar acceso de docente
+function requireDocente() {
+  if (!isLoggedIn()) {
+      $_SESSION['msg'] = "Debe iniciar sesión primero";
+      header('location: ../login.php');
+      exit;
+  }
+
+  if (!isset($_SESSION['current_profile'])) {
+      header('location: ../profile_selector.php');
+      exit;
+  }
+
+  if ($_SESSION['current_profile'] !== 'docente' || !isDocente()) {
+      $_SESSION['error'] = "Acceso denegado: Se requieren privilegios de docente";
+      header('location: ../' . $_SESSION['current_profile'] . '/home.php');
+      exit;
+  }
+}
+
+// Función para verificar acceso de estudiante
+function requireEstudiante() {
+  if (!isLoggedIn()) {
+      $_SESSION['msg'] = "Debe iniciar sesión primero";
+      header('location: ../login.php');
+      exit;
+  }
+
+  if (!isset($_SESSION['current_profile'])) {
+      header('location: ../profile_selector.php');
+      exit;
+  }
+
+  if ($_SESSION['current_profile'] !== 'estudiante' || !isEstudiante()) {
+      $_SESSION['error'] = "Acceso denegado: Se requieren privilegios de estudiante";
+      header('location: ../' . $_SESSION['current_profile'] . '/home.php');
+      exit;
+  }
+}
+
+
+
+function verifyProfileAccess() {
+  if (!isLoggedIn()) {
+      header('location: ../login.php');
+      exit;
+  }
+
+  $current_folder = basename(dirname($_SERVER['SCRIPT_FILENAME']));
+  $available_profiles = $_SESSION['user']['available_profiles'] ?? [];
+
+  if (!isset($_SESSION['current_profile'])) {
+      if (count($available_profiles) === 1) {
+          $_SESSION['current_profile'] = $available_profiles[0];
+      } else {
+          header('location: ../profile_selector.php');
+          exit;
+      }
+  }
+
+  if ($_SESSION['current_profile'] !== $current_folder) {
+      header('location: ../' . $_SESSION['current_profile'] . '/home.php');
+      exit;
+  }
+
+  // Verificación con funciones específicas
+  $profile_function = 'is' . ucfirst($_SESSION['current_profile']);
+  if (function_exists($profile_function) && !$profile_function()) {
+      $_SESSION['error'] = "Privilegios insuficientes";
+      header('location: ../profile_selector.php');
+      exit;
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function isActive(){
     global $db, $usua;
@@ -5453,48 +8927,51 @@ function login(){
   global $db, $username, $errors;
   $username = e($_POST['username']);
   $password = e($_POST['password']);
+  
   if (empty($username)) {
-    array_push($errors, "Su Numero de Usuario o Correo Electronico es Requerido<br>");
+      array_push($errors, "Su Numero de Usuario o Correo Electronico es Requerido<br>");
   }
   if (empty($password)) {
-    array_push($errors, "Su Contraseña de Acceso es Requerida<br>");
+      array_push($errors, "Su Contraseña de Acceso es Requerida<br>");
   }
+  
   if (count($errors) == 0) {
-    $password = md5($password);
+      $password = md5($password);
 
-    $query = "SELECT * FROM users WHERE (username='$username' OR email='$username') AND password='$password' LIMIT 1";
-    $results = mysqli_query($db, $query);
+      $query = "SELECT * FROM users WHERE (username='$username' OR email='$username') AND password='$password' LIMIT 1";
+      $results = mysqli_query($db, $query);
 
-    if (mysqli_num_rows($results) == 1) { // user found
-      $logged_in_user = mysqli_fetch_assoc($results);
-      $id_usuario = $logged_in_user['id'];
-
-      if ($logged_in_user['user_type'] == 'admin') {
-        $_SESSION['user'] = $logged_in_user;
-        $_SESSION['success']  = "Favor Espere";
-        $where = $_SESSION['here'];
-        if (!empty($where)) {
-          header ("Location: $where");
-        } else {
-          header('location: admin/home.php');
-        }
+      if (mysqli_num_rows($results) == 1) { // user found
+          $logged_in_user = mysqli_fetch_assoc($results);
+          $_SESSION['user'] = $logged_in_user;
+          $_SESSION['success'] = "Bienvenido/a " . $logged_in_user['username'];
+          
+          // Determinar los perfiles disponibles
+          $available_profiles = [];
+          
+          // Verificar cada perfil usando tus funciones existentes
+          if (isAdmin()) $available_profiles[] = 'admin';
+          if (isDocente()) $available_profiles[] = 'docente';
+          if (isEstudiante()) $available_profiles[] = 'estudiante';
+          if (isUser()) $available_profiles[] = 'user';
+          
+          // Guardar perfiles disponibles en sesión
+          $_SESSION['user']['available_profiles'] = $available_profiles;
+          
+          // Si solo tiene un perfil, redirigir directamente
+          if (count($available_profiles) == 1) {
+              $_SESSION['current_profile'] = $available_profiles[0];
+              $where = $_SESSION['here'] ?? $available_profiles[0] . '/home.php';
+              header("Location: $where");
+          } else {
+              // Mostrar selector de perfiles
+              header('Location: profile_selector.php');
+          }
+          
+          exit();
+      } else {
+          array_push($errors, "Usuario/Correo o contraseña incorrectos");
       }
-      else if ($logged_in_user['user_type'] == 'user'){
-        $_SESSION['user'] = $logged_in_user;
-        $_SESSION['success']  = "Favor Espere";
-        $where = $_SESSION['here'];
-        if (!empty($where)) {
-          header ("Location: $where");
-        } else {
-          header('location: usuario/home.php');
-        }
-      }
-
-      visita();
-
-    }else {
-      array_push($errors, "Combinación incorrecta de nombre de usuario/contraseña");
-    }
   }
 }
 

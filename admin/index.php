@@ -4,7 +4,7 @@ ini_set('display_errors', '1');
 
 $titulopag = "Sistema de Gestion";
 	include('../funciones/functions.php');
-
+	requireAdmin();
 
 
 	//ESTADISTICA DE USUARIOS
@@ -112,6 +112,7 @@ $datos_apa = '';
   <?php include("includes/head.php"); ?>
 
 
+
 	<?php
 echo @$inicio;
 echo @$finaliza;
@@ -130,19 +131,12 @@ echo @$finaliza;
 </style>
 
 
-    <?php
-		echo "<hr>";
-		contenido('bancario');
-		contenido('mens_movilnet');
-		contenido('mens_movistar');
-		contenido('mens_digitel');
-		contenido('mens_inter');
-		contenido('mens_directv');
-		contenido('mens_netflix');
-		echo "<hr>";
-
-		 comentarios(); ?>
+    
     <hr>
+
+
+
+
 
 
 
@@ -156,7 +150,7 @@ echo @$finaliza;
 </div>
 <div class="mr-5">
 <h4>Mensajeria</h4>
-Enviar un Mensaje</div>
+Mensajeria</div>
 </div>
 <a  title="Mensajeria" class="card-footer text-white clearfix small z-1" href="mensajeria.php">
 <span class="float-left"> Ver Detalles</span>
@@ -175,8 +169,7 @@ Enviar un Mensaje</div>
 <div class="card-body-icon">
 <i class="fas fa-fw fa-list"></i>
 </div>
-<div class="mr-5"><h4>Pedidos</h4><?php contar_pedidos();
-echo $contar_pedido; ?></div>
+<div class="mr-5"><h4>Estadistica</h4>estadistica</div>
 </div>
 <a class="card-footer text-white clearfix small z-1" title="Ir a Pedidos" href="pedidos.php">
 <span class="float-left">Ver Detalles</span>
@@ -197,12 +190,9 @@ echo $contar_pedido; ?></div>
 <div class="card-body-icon">
 <i class="fas fa-fw fa-shopping-cart"></i>
 </div>
-<div class="mr-5"><h4>Mensualidad</h4><?php suma_mensualidad();
-echo $suma_mensualidad;
-calculo_sin_plan();
-?></div>
+<div class="mr-5"><h4>Pagos</h4>aqui iran los pagos</div>
 </div>
-<a class="card-footer text-white clearfix small z-1" title="Ir a Mensualidades" href="mensualidades.php">
+<a class="card-footer text-white clearfix small z-1" title="Ir a Mensualidades" href="registro_pagos.php">
 <span class="float-left">Ver Detalles</span>
 <span class="float-right">
 <i class="fa fa-arrow-circle-right"></i>
@@ -214,15 +204,15 @@ calculo_sin_plan();
 
 
 
-  <div class="col-xl-3 col-sm-6 mb-3">
+<div class="col-xl-3 col-sm-6 mb-3">
     <div class="card text-white bg-danger o-hidden h-100">
       <div class="card-body">
         <div class="card-body-icon">
           <i class="fas fa-fw fa-life-ring"></i>
         </div>
         <div class="mr-5"><h4>Soporte</h4>
-Area de Soporte, por errores en el sistema.!</div>          </div>
-      <a class="card-footer text-white clearfix small z-1" title="Soporte Movilnet" target = "_blank" href="http://www.movilnet.com.ve/sitio/minisitios/tarjetaunica/preguntas_frecuentes.html">
+Soporte</div>          </div>
+      <a class="card-footer text-white clearfix small z-1" title="Soporte" href="soporte.php">
         <span class="float-left">Ir a Soporte</span>
         <span class="float-right">
         <i class="fa fa-arrow-circle-right"></i>
@@ -231,14 +221,9 @@ Area de Soporte, por errores en el sistema.!</div>          </div>
     </div>
   </div>
 </div>
-<div class="text-center alert alert-info" role="alert">
+
 <h2>
-<?php
-echo "Ganancias Netas " . $mes_de_pago_actual . ' ';
-$mgb= $ganancia_bantecom;
-$mspc= $monto_sin_plan_calculo *30/100 ;
-echo number_format($mgb + $mspc + $pmes, 2, ',', '.') . ' Bs.';
- ?>
+
 </h2>
 </div>
 
@@ -248,10 +233,7 @@ echo number_format($mgb + $mspc + $pmes, 2, ',', '.') . ' Bs.';
 
 <hr>
 </div>
-            <?php
-            estadistica_usuarios();
-            echo $resultado_estadistica;
-            ?>
+           
 
      <hr>
   
