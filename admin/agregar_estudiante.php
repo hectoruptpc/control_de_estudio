@@ -186,17 +186,61 @@ include("includes/head.php");
                                         </div>
                                     </div>
                                     
+                                    <!-- Títulos Obtenidos -->
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label for="titulos" class="form-label">Títulos Obtenidos</label>
-                                            <input type="text" class="form-control" id="titulos" name="titulos" placeholder="Separados por comas si son varios">
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="titulos" name="titulos_main" 
+                                                       value="<?= htmlspecialchars($_POST['titulos_main'] ?? '') ?>" placeholder="Títulos obtenidos">
+                                                <button type="button" class="btn btn-outline-primary" id="addTitulo">
+                                                    <i class="fas fa-plus"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div id="titulosContainer">
+                                            <?php if(!empty($_POST['titulos'])): ?>
+                                                <?php foreach($_POST['titulos'] as $value): ?>
+                                                    <div class="mb-3">
+                                                        <div class="input-group">
+                                                            <input type="text" class="form-control" name="titulos[]" 
+                                                                   value="<?= htmlspecialchars($value) ?>">
+                                                            <button type="button" class="btn btn-outline-danger remove-field">
+                                                                <i class="fas fa-minus"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                     
+                                    <!-- Instituciones -->
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label for="institutos" class="form-label">Instituciones</label>
-                                            <input type="text" class="form-control" id="institutos" name="institutos" placeholder="Instituciones donde obtuvo los títulos">
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="institutos" name="institutos_main" 
+                                                       value="<?= htmlspecialchars($_POST['institutos_main'] ?? '') ?>" placeholder="Instituciones donde obtuvo los títulos">
+                                                <button type="button" class="btn btn-outline-primary" id="addInstituto">
+                                                    <i class="fas fa-plus"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div id="institutosContainer">
+                                            <?php if(!empty($_POST['institutos'])): ?>
+                                                <?php foreach($_POST['institutos'] as $value): ?>
+                                                    <div class="mb-3">
+                                                        <div class="input-group">
+                                                            <input type="text" class="form-control" name="institutos[]" 
+                                                                   value="<?= htmlspecialchars($value) ?>">
+                                                            <button type="button" class="btn btn-outline-danger remove-field">
+                                                                <i class="fas fa-minus"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 </div>
@@ -464,6 +508,64 @@ $(document).ready(function() {
     if (urlParams.get('tab') === 'masivo') {
         $('#masivo-tab').tab('show');
     }
+});
+
+// Script para manejar la adición de campos
+document.addEventListener('DOMContentLoaded', function() {
+    // Función para añadir nuevos campos
+    function addField(containerId, inputId, namePrefix, placeholder, buttonId) {
+        const container = document.getElementById(containerId);
+        const mainInput = document.getElementById(inputId);
+        const value = mainInput.value.trim();
+        
+        if(value === '') return; // No añadir si está vacío
+        
+        const newField = document.createElement('div');
+        newField.className = 'mb-3';
+        newField.innerHTML = `
+            <div class="input-group">
+                <input type="text" class="form-control" name="${namePrefix}[]" 
+                       value="${value}" placeholder="${placeholder}" readonly>
+                <button type="button" class="btn btn-outline-danger remove-field">
+                    <i class="fas fa-minus"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(newField);
+        
+        // Vaciar el campo principal
+        mainInput.value = '';
+        mainInput.focus();
+        
+        // Añadir evento para eliminar campo
+        newField.querySelector('.remove-field').addEventListener('click', function() {
+            container.removeChild(newField);
+        });
+    }
+    
+    // Eventos para los botones de añadir
+    document.getElementById('addTitulo').addEventListener('click', function() {
+        addField('titulosContainer', 'titulos', 'titulos', 'Título obtenido', 'titulos');
+    });
+    
+    document.getElementById('addInstituto').addEventListener('click', function() {
+        addField('institutosContainer', 'institutos', 'institutos', 'Institución', 'institutos');
+    });
+    
+    // Manejar el evento Enter en los campos principales
+    document.getElementById('titulos').addEventListener('keypress', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('addTitulo').click();
+        }
+    });
+    
+    document.getElementById('institutos').addEventListener('keypress', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('addInstituto').click();
+        }
+    });
 });
 </script>
 
