@@ -55,9 +55,11 @@ if (!isAdmin()) {
     <a title="Ver Todos los Estudiantes" class="dropdown-item" href="estudiantes.php">
       <i class="fa fa-users fa-fw"></i> Ver todos los Estudiantes
     </a>
-    <a title="Agregar Estudiante" class="dropdown-item" href="agregar_estudiante.php">
-      <i class="fa fa-user-plus fa-fw"></i> Agregar Estudiante
-    </a>
+    <?php if ($_SESSION['user']['agregar_estudiante'] == 1): ?>
+      <a title="Agregar Estudiante" class="dropdown-item" href="agregar_estudiante.php">
+        <i class="fa fa-user-plus fa-fw"></i> Agregar Estudiante
+      </a>
+    <?php endif; ?>
     <a title="Historial Académico" class="dropdown-item" href="historial_academico.php">
       <i class="fas fa-history fa-fw"></i> Historial Académico
     </a>
@@ -138,7 +140,7 @@ if (!isAdmin()) {
         <?php if (isset($_SESSION['user']['editar_valores']) && $_SESSION['user']['editar_valores'] == 1): ?>
             <div class="dropdown-divider"></div>
             <a title="Editar Valores del Sistema" class="dropdown-item" href="valores_predefinidos.php">
-                <i class="fas fa-edit fa-fw"></i> Editar Valores
+                <i class="fas fa-edit fa-fw"></i> Valores Predefinidos
             </a>
         <?php endif; ?>
         
