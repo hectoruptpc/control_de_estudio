@@ -5,6 +5,8 @@ ini_set('display_errors', '1');
 $titulopag = "Lista de estudiantes";
 include('../funciones/functions.php');
 
+// Verificar permiso de edición de estudiantes
+$puedeEditar = isset($_SESSION['user']['editar_estudiante']) && $_SESSION['user']['editar_estudiante'] == 1;
 
 // Obtener lista de estudiantes
 $estudiantes = obtenerEstudiantes();
@@ -26,9 +28,11 @@ include("includes/head.php");
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0"><i class="fas fa-users me-2"></i>Listado de Estudiantes</h5>
                         <div>
-                        <button class="btn btn-success btn-sm" onclick="abrirModalNuevoEstudiante()">
-    <i class="fas fa-plus-circle me-1"></i> Nuevo Estudiante
-</button>
+                            <?php if ($puedeEditar): ?>
+                                <button class="btn btn-success btn-sm" onclick="abrirModalNuevoEstudiante()">
+                                    <i class="fas fa-plus-circle me-1"></i> Nuevo Estudiante
+                                </button>
+                            <?php endif; ?>
                             <a href="index.php" class="btn btn-outline-light btn-sm ms-2">
                                 <i class="fas fa-arrow-left me-1"></i> Regresar
                             </a>
@@ -43,53 +47,55 @@ include("includes/head.php");
                         <?php endif; ?>
                         
                         <div class="table-responsive">
-                        <table id="tablaEstudiantes" class="table table-striped table-hover table-bordered" style="width:100%">
-    <thead class="table-dark">
-        <tr>
-        <th>Cédula</th>  <!-- Cambiado de "Código" a "Cédula" -->
-            <th>Nombre</th>
-            <th>Programa</th>
-            <th>Género</th>
-            <th>Teléfono</th>
-            <th>Correo</th>
-            <th>Ingreso</th>
-            <th>Status</th>
-            <th>Acciones</th>
-        </tr>
-    </thead>
-    <tbody>
-        <?php if (isset($estudiantes) && is_array($estudiantes)): ?>
-            <?php foreach ($estudiantes as $estudiante): ?>
-            <tr>
-            <td><?php echo htmlspecialchars($estudiante['cedula'] ?? ''); ?></td>  <!-- Cambiado a cedula -->
-                <td><?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?></td>
-                <td><?php echo htmlspecialchars($estudiante['carrera'] ?? ''); ?></td>
-                <td><?php echo htmlspecialchars($estudiante['genero'] ?? ''); ?></td>
-                <td><?php echo htmlspecialchars($estudiante['num_telf'] ?? ''); ?></td>
-                <td><?php echo htmlspecialchars($estudiante['correo'] ?? ''); ?></td>
-                <td><?php echo !empty($estudiante['fecha_ingreso']) ? date('d/m/Y', strtotime($estudiante['fecha_ingreso'])) : ''; ?></td>
-                <td><?php echo mostrarEstadoEstudiante($estudiante['status'] ?? 0); ?></td>
-                <td>
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-info btn-details btn-sm" 
-                            data-bs-toggle="modal" 
-                            data-bs-target="#detalleModal"
-                            data-id="<?php echo $estudiante['id']; ?>">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button class="btn btn-warning btn-sm btn-edit" 
-                            data-bs-toggle="modal" 
-                            data-bs-target="#editarEstudianteModal"
-                            data-id="<?php echo $estudiante['id']; ?>">
-                            <i class="fas fa-edit"></i> Editar
-                        </button>
-                    </div>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-        <?php endif; ?>
-    </tbody>
-</table>
+                            <table id="tablaEstudiantes" class="table table-striped table-hover table-bordered" style="width:100%">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Cédula</th>
+                                        <th>Nombre</th>
+                                        <th>Programa</th>
+                                        <th>Género</th>
+                                        <th>Teléfono</th>
+                                        <th>Correo</th>
+                                        <th>Ingreso</th>
+                                        <th>Status</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (isset($estudiantes) && is_array($estudiantes)): ?>
+                                        <?php foreach ($estudiantes as $estudiante): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($estudiante['cedula'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($estudiante['carrera'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($estudiante['genero'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($estudiante['num_telf'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($estudiante['correo'] ?? ''); ?></td>
+                                            <td><?php echo !empty($estudiante['fecha_ingreso']) ? date('d/m/Y', strtotime($estudiante['fecha_ingreso'])) : ''; ?></td>
+                                            <td><?php echo mostrarEstadoEstudiante($estudiante['status'] ?? 0); ?></td>
+                                            <td>
+                                                <div class="d-flex gap-2">
+                                                    <button class="btn btn-info btn-details btn-sm" 
+                                                        data-bs-toggle="modal" 
+                                                        data-bs-target="#detalleModal"
+                                                        data-id="<?php echo $estudiante['id']; ?>">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                    <?php if ($puedeEditar): ?>
+                                                        <button class="btn btn-warning btn-sm btn-edit" 
+                                                            data-bs-toggle="modal" 
+                                                            data-bs-target="#editarEstudianteModal"
+                                                            data-id="<?php echo $estudiante['id']; ?>">
+                                                            <i class="fas fa-edit"></i> Editar
+                                                        </button>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
