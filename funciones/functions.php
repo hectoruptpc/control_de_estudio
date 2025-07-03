@@ -415,46 +415,41 @@ function obtenerEstadosEstudiante() {
 }
 
 // Función para obtener estudiante por ID
-function obtenerEstudiantePorId(int $id): ?array {
-  global $db;
-  
-  // Consulta SQL con sentencia preparada
-  $query = "SELECT * FROM users WHERE id = ? LIMIT 1";
-  
-  // Preparar la consulta
-  $stmt = $db->prepare($query);
-  if (!$stmt) {
-      error_log("Error al preparar consulta: " . $db->error);
-      return null;
-  }
-  
-  // Vincular parámetro
-  $stmt->bind_param("i", $id);
-  
-  // Ejecutar consulta
-  if (!$stmt->execute()) {
-      error_log("Error al ejecutar consulta: " . $stmt->error);
-      $stmt->close();
-      return null;
-  }
-  
-  // Obtener resultado
-  $result = $stmt->get_result();
-  
-  // Verificar si hay resultados
-  if ($result->num_rows === 0) {
-      $stmt->close();
-      return null;
-  }
-  
-  // Obtener datos del estudiante
-  $estudiante = $result->fetch_assoc();
-  
-  // Liberar recursos
-  $result->free();
-  $stmt->close();
-  
-  return $estudiante;
+function obtenerEstudiantePorId($id) {
+    global $db; // Asumiendo que $db es tu conexión MySQLi
+    
+    // Validar que el ID sea numérico
+    if (!is_numeric($id)) {
+        return ['error' => 'ID de estudiante no válido'];
+    }
+    
+    // Preparar la consulta
+    $query = "SELECT * FROM users WHERE id = ? AND estudiante = 1";
+    $stmt = $db->prepare($query);
+    
+    if (!$stmt) {
+        return ['error' => 'Error al preparar la consulta: ' . $db->error];
+    }
+    
+    // Vincular parámetro y ejecutar
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    
+    // Obtener resultado
+    $result = $stmt->get_result();
+    
+    if (!$result) {
+        return ['error' => 'Error al obtener resultados: ' . $stmt->error];
+    }
+    
+    $estudiante = $result->fetch_assoc();
+    $stmt->close();
+    
+    if (!$estudiante) {
+        return ['error' => 'Estudiante no encontrado'];
+    }
+    
+    return $estudiante;
 }
 
 // Función para actualizar estudiante

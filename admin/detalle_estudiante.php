@@ -1,88 +1,72 @@
 <?php
-require_once '../config/database.php';
+require_once('../funciones/functions.php');
 
-$id = $_GET['id'] ?? 0;
+// Verificar ID
+$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+if (!$id) {
+    die('<div class="alert alert-danger">ID de estudiante no válido</div>');
+}
 
-try {
-    $query = "SELECT 
-                u.*,
-                c.nombre_carrera 
-              FROM users u
-              LEFT JOIN carreras c ON u.carrera = c.id_carrera
-              WHERE u.id = :id AND u.user_type = 'estudiante'";
-    
-    $stmt = $conn->prepare($query);
-    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-    $stmt->execute();
-    
-    $estudiante = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$estudiante) {
-        echo '<div class="alert alert-danger">Estudiante no encontrado</div>';
-        exit;
-    }
+// Obtener datos
+$estudiante = obtenerEstudiantePorId($id);
+if (isset($estudiante['error'])) {
+    die('<div class="alert alert-danger">'.$estudiante['error'].'</div>');
+}
 ?>
+
 <div class="row">
     <div class="col-md-6">
-        <h6 class="text-muted">Información Personal</h6>
+        <h5>Información Personal</h5>
         <ul class="list-group list-group-flush mb-4">
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span class="fw-bold">Código:</span>
-                <span><?= htmlspecialchars($estudiante['cod_estudiante']) ?></span>
+            <li class="list-group-item">
+                <strong>ID:</strong> <?= htmlspecialchars($estudiante['id'] ?? '') ?>
             </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span class="fw-bold">Nombre:</span>
-                <span><?= htmlspecialchars($estudiante['nombre']) ?></span>
+            <li class="list-group-item">
+                <strong>Nombre:</strong> <?= htmlspecialchars($estudiante['nombre'] ?? '') ?>
             </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span class="fw-bold">Carrera:</span>
-                <span><?= htmlspecialchars($estudiante['nombre_carrera'] ?? 'No especificado') ?></span>
+            <li class="list-group-item">
+                <strong>Usuario:</strong> <?= htmlspecialchars($estudiante['username'] ?? '') ?>
             </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span class="fw-bold">Género:</span>
-                <span><?= htmlspecialchars($estudiante['genero']) ?></span>
+            <li class="list-group-item">
+                <strong>Género:</strong> <?= htmlspecialchars($estudiante['genero'] ?? '') ?>
             </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span class="fw-bold">Fecha Nacimiento:</span>
-                <span><?= !empty($estudiante['fecha_nac']) ? date('d/m/Y', strtotime($estudiante['fecha_nac'])) : 'No especificada' ?></span>
-            </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span class="fw-bold">Edad:</span>
-                <span><?= $estudiante['edad'] ?? 'No especificada' ?></span>
+            <li class="list-group-item">
+                <strong>Fecha Nacimiento:</strong> 
+                <?= !empty($estudiante['fecha_nac']) ? date('d/m/Y', strtotime($estudiante['fecha_nac'])) : 'No especificado' ?>
             </li>
         </ul>
     </div>
+    
     <div class="col-md-6">
-        <h6 class="text-muted">Información de Contacto</h6>
-        <ul class="list-group list-group-flush">
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span class="fw-bold">Teléfono:</span>
-                <span><?= htmlspecialchars($estudiante['tlf']) ?></span>
+        <h5>Información Académica</h5>
+        <ul class="list-group list-group-flush mb-4">
+            <li class="list-group-item">
+                <strong>Carrera:</strong> <?= htmlspecialchars($estudiante['carrera'] ?? '') ?>
             </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span class="fw-bold">Teléfono Opcional:</span>
-                <span><?= htmlspecialchars($estudiante['num_telf_opc'] ?? 'No especificado') ?></span>
+            <li class="list-group-item">
+                <strong>Fecha Ingreso:</strong> 
+                <?= !empty($estudiante['fecha_ingreso']) ? date('d/m/Y', strtotime($estudiante['fecha_ingreso'])) : 'No especificado' ?>
             </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span class="fw-bold">Correo:</span>
-                <span><?= htmlspecialchars($estudiante['email']) ?></span>
-            </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span class="fw-bold">Dirección:</span>
-                <span><?= htmlspecialchars($estudiante['direccion'] ?? 'No especificada') ?></span>
-            </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span class="fw-bold">Estado:</span>
-                <span><?= htmlspecialchars($estudiante['estado'] ?? 'No especificado') ?></span>
-            </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span class="fw-bold">Fecha Ingreso:</span>
-                <span><?= date('d/m/Y', strtotime($estudiante['fecha_ingreso'])) ?></span>
+            <li class="list-group-item">
+                <strong>Estado:</strong> <?= $estudiante['status'] == 1 ? 'Activo' : 'Inactivo' ?>
             </li>
         </ul>
     </div>
 </div>
-<?php
-} catch (PDOException $e) {
-    echo '<div class="alert alert-danger">Error al cargar detalles: ' . $e->getMessage() . '</div>';
-}
+
+<div class="row">
+    <div class="col-md-6">
+        <h5>Contacto</h5>
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+                <strong>Email:</strong> <?= htmlspecialchars($estudiante['email'] ?? 'No especificado') ?>
+            </li>
+            <li class="list-group-item">
+                <strong>Teléfono:</strong> <?= htmlspecialchars($estudiante['tlf'] ?? 'No especificado') ?>
+            </li>
+            <li class="list-group-item">
+                <strong>Celular:</strong> <?= htmlspecialchars($estudiante['cel'] ?? 'No especificado') ?>
+            </li>
+        </ul>
+    </div>
+</div>

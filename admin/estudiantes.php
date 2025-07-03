@@ -647,6 +647,35 @@ document.getElementById('editarEstudianteModal').addEventListener('hidden.bs.mod
 
 
 
+// Calcular edad automáticamente cuando cambia la fecha de nacimiento
+$(document).on('change', '#fecha_nac', function() {
+    var fechaNac = new Date($(this).val());
+    var hoy = new Date();
+    var edad = hoy.getFullYear() - fechaNac.getFullYear();
+    var m = hoy.getMonth() - fechaNac.getMonth();
+    
+    if (m < 0 || (m === 0 && hoy.getDate() < fechaNac.getDate())) {
+        edad--;
+    }
+    
+    // Puedes mostrar la edad en algún campo si lo necesitas
+    console.log('Edad calculada:', edad);
+});
+
+// Validación de email
+$(document).on('blur', '#email', function() {
+    const email = $(this).val();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (!emailRegex.test(email)) {
+        $(this).addClass('is-invalid');
+        // Puedes mostrar un mensaje de error aquí
+    } else {
+        $(this).removeClass('is-invalid');
+    }
+});
+
+
 </script>
 
 <?php include("includes/footer.php"); ?>
