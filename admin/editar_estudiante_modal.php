@@ -10,8 +10,11 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
 
 $id = $_GET['id'];
 
-// Obtener datos del estudiante
-$query = "SELECT * FROM users WHERE id = ? AND estudiante = 1";
+// Consulta modificada para formatear las fechas TIMESTAMP
+$query = "SELECT *, 
+          DATE(fecha_nac) as fecha_nac_format, 
+          DATE(fecha_ingreso) as fecha_ingreso_format 
+          FROM users WHERE id = ? AND estudiante = 1";
 $stmt = $db->prepare($query);
 $stmt->bind_param("i", $id);
 $stmt->execute();
@@ -23,7 +26,7 @@ if ($result->num_rows === 0) {
 
 $estudiante = $result->fetch_assoc();
 
-// Obtener lista de carreras (asumiendo que existe una tabla 'carreras')
+// Obtener lista de carreras
 $carreras = [];
 $carrerasQuery = $db->query("SELECT id_carrera, nombre_carrera FROM carreras ORDER BY nombre_carrera");
 if ($carrerasQuery) {
@@ -37,17 +40,41 @@ if ($carrerasQuery) {
     <div class="row">
         <div class="col-md-6">
             <div class="mb-3">
-                <label for="cedula" class="form-label">Cédula</label>
-                <input type="text" class="form-control" id="cedula" name="cedula" 
-                       value="<?php echo htmlspecialchars($estudiante['username'] ?? ''); ?>" required>
-            </div>
-            
-            <div class="mb-3">
                 <label for="nombre" class="form-label">Nombre Completo</label>
                 <input type="text" class="form-control" id="nombre" name="nombre" 
                        value="<?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?>" required>
             </div>
-            
+        </div>
+        
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="cedula" class="form-label">Cédula</label>
+                <input type="text" class="form-control" id="cedula" name="cedula" 
+                       value="<?php echo htmlspecialchars($estudiante['username'] ?? ''); ?>" required>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="num_telf" class="form-label">Teléfono Principal</label>
+                <input type="tel" class="form-control" id="num_telf" name="num_telf" 
+                       value="<?php echo htmlspecialchars($estudiante['tlf'] ?? ''); ?>">
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="num_telf_opc" class="form-label">Teléfono Opcional</label>
+                <input type="tel" class="form-control" id="num_telf_opc" name="num_telf_opc" 
+                       value="<?php echo htmlspecialchars($estudiante['num_telf_opc'] ?? ''); ?>">
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
             <div class="mb-3">
                 <label for="email" class="form-label">Correo Electrónico</label>
                 <input type="email" class="form-control" id="email" name="email" 
@@ -57,12 +84,12 @@ if ($carrerasQuery) {
             <div class="mb-3">
                 <label for="fecha_nac" class="form-label">Fecha de Nacimiento</label>
                 <input type="date" class="form-control" id="fecha_nac" name="fecha_nac" 
-                       value="<?php echo htmlspecialchars($estudiante['fecha_nac'] ?? ''); ?>">
+                       value="<?php echo htmlspecialchars($estudiante['fecha_nac_format'] ?? ''); ?>">
             </div>
             
             <div class="mb-3">
                 <label for="genero" class="form-label">Género</label>
-                <select class="form-select" id="genero" name="genero" required>
+                <select class="custom-select d-block w-100" id="genero" name="genero" required>
                     <option value="">Seleccionar</option>
                     <option value="Masculino" <?php echo ($estudiante['genero'] ?? '') == 'Masculino' ? 'selected' : ''; ?>>Masculino</option>
                     <option value="Femenino" <?php echo ($estudiante['genero'] ?? '') == 'Femenino' ? 'selected' : ''; ?>>Femenino</option>
@@ -73,20 +100,8 @@ if ($carrerasQuery) {
         
         <div class="col-md-6">
             <div class="mb-3">
-                <label for="num_telf" class="form-label">Teléfono Principal</label>
-                <input type="tel" class="form-control" id="num_telf" name="num_telf" 
-                       value="<?php echo htmlspecialchars($estudiante['tlf'] ?? ''); ?>">
-            </div>
-            
-            <div class="mb-3">
-                <label for="num_telf_opc" class="form-label">Teléfono Opcional</label>
-                <input type="tel" class="form-control" id="num_telf_opc" name="num_telf_opc" 
-                       value="<?php echo htmlspecialchars($estudiante['num_telf_opc'] ?? ''); ?>">
-            </div>
-            
-            <div class="mb-3">
                 <label for="carrera" class="form-label">Programa/Carrera</label>
-                <select class="form-select" id="carrera" name="carrera" required>
+                <select class="custom-select d-block w-100" id="carrera" name="carrera" required>
                     <option value="">Seleccione una carrera</option>
                     <?php foreach ($carreras as $carrera): ?>
                         <option value="<?php echo $carrera['id_carrera']; ?>" 
@@ -100,12 +115,12 @@ if ($carrerasQuery) {
             <div class="mb-3">
                 <label for="fecha_ingreso" class="form-label">Fecha de Ingreso</label>
                 <input type="date" class="form-control" id="fecha_ingreso" name="fecha_ingreso" 
-                       value="<?php echo htmlspecialchars($estudiante['fecha_ingreso'] ?? ''); ?>" required>
+                       value="<?php echo htmlspecialchars($estudiante['fecha_ingreso_format'] ?? ''); ?>">
             </div>
             
             <div class="mb-3">
                 <label for="status" class="form-label">Estado</label>
-                <select class="form-select" id="status" name="status" required>
+                <select class="custom-select d-block w-100" id="status" name="status" required>
                     <option value="1" <?php echo ($estudiante['status'] ?? 1) == 1 ? 'selected' : ''; ?>>Activo</option>
                     <option value="0" <?php echo ($estudiante['status'] ?? 1) == 0 ? 'selected' : ''; ?>>Inactivo</option>
                 </select>
@@ -124,7 +139,6 @@ if ($carrerasQuery) {
 </form>
 
 <script>
-// Script para manejar el formulario de edición
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('formEditarEstudiante');
     
@@ -156,7 +170,6 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.success) {
                     alert(data.message);
-                    // Cerrar el modal y recargar la página
                     const modal = bootstrap.Modal.getInstance(document.getElementById('editarEstudianteModal'));
                     modal.hide();
                     location.reload();
@@ -171,4 +184,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+
+
+
 </script>
