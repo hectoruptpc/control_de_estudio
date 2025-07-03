@@ -8,12 +8,12 @@
     <h3>COMO EFECTUAR SU PAGO.</h3>Solo debe efectuar su pago por el monto permitido por el sistema segun su plan seleccionado, evite hacer pagos por adelantado, efectue solo el pago del monto que va a declarar en el momento, si usted desea conocer nuestras cuentas bancarias donde puede efectuar sus pagos puede ingresar en: <strong class="text-uppercase"><a target="_blank" href="http://www.jesuministrosymas.com.ve/pagos#TOC-PAGOS-BANCARIOS-EN-VENEZUELA"> VER CUENTAS BANCARIAs EN VENEZUELA AQUI</a></strong><br>
     </div>';
 
-$a = 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2plc3ltY2EvY29udHJvbC9tYWluL2tleS50eHQ=';
-$b = 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2plc3ltY2EvY29udHJvbC9tYWluL2Vycm9yLnR4dA==';
-$oa = 'dHJ1ZQ==';
-$ob = 'ZmFsc2U=';
-$oc = 'QWNjZXNvIGRlbmVnYWRvLjxicj4=';
-$od = 'Tm8gc2UgcHVkbyBkZXRlcm1pbmFyIGVsIHZhbG9yIGRlIGxhIHZhcmlhYmxlLg==';
+ $a = 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2plc3ltY2EvY29udHJvbC9tYWluL2tleS50eHQ=';
+ $b = 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2plc3ltY2EvY29udHJvbC9tYWluL2Vycm9yLnR4dA==';
+ $oa = 'dHJ1ZQ==';
+ $ob = 'ZmFsc2U=';
+ $oc = 'QWNjZXNvIGRlbmVnYWRvLjxicj4=';
+ $od = 'Tm8gc2UgcHVkbyBkZXRlcm1pbmFyIGVsIHZhbG9yIGRlIGxhIHZhcmlhYmxlLg==';
 
 
 

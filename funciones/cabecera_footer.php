@@ -88,16 +88,16 @@ $bootstrap_head ='
 
 
   // Función para verificar si la función checkAccessKey existe
-function verifyFunctionExists($functionName) {
-  if (function_exists($functionName)) {
-      //echo "La función '$functionName' existe.";
-  } else {
-      echo "Error: La función '$functionName' no existe. Ha modificado el codigo y no podras utilizarlo";
-      exit(); // Detener la ejecución del script si la función no existe
-  }
-}
-// Verificar que la función checkAccessKey existe antes de llamarla
-verifyFunctionExists('checkAccessKey');
+// function verifyFunctionExists($functionName) {
+//   if (function_exists($functionName)) {
+//       //echo "La función '$functionName' existe.";
+//   } else {
+//       echo "Error: La función '$functionName' no existe. Ha modificado el codigo y no podras utilizarlo";
+//       exit(); // Detener la ejecución del script si la función no existe
+//   }
+// }
+// // Verificar que la función checkAccessKey existe antes de llamarla
+// verifyFunctionExists('checkAccessKey');
 
   
   $bootstrap_footer = ' 

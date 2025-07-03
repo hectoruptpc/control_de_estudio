@@ -28,44 +28,44 @@ $od = g($od);
 
 
 // Función para leer el contenido del archivo
-function readGitHubFile($url) {
-  $options = [
-      "http" => [
-          "method" => "GET",
-          "header" => "User-Agent: PHP" // Necesario para acceder a GitHub
-      ]
-  ];
-
-  $context = stream_context_create($options);
-  $file_content = file_get_contents($url, false, $context);
-
-  if ($file_content === FALSE) {
-      return null;
-  } else {
-      return trim($file_content);
-  }
-}
-
-$qa = readGitHubFile($github_file_url);
-$qe = readGitHubFile($github_sin_acceso);
-
-function checkAccessKey($url) {
-  global $qe, $oa, $ob, $oc, $od;
-  $oe = readGitHubFile($url);
-
-  if ($oe === $oa) { 
-} elseif ($oe === $ob) {
-    echo $oc; 
-    echo $qe;
-    exit(); 
-} else {
-    echo $od; 
-    exit(); 
-}
-
-}
-
-checkAccessKey($github_file_url);
+// function readGitHubFile($url) {
+//   $options = [
+//       "http" => [
+//           "method" => "GET",
+//           "header" => "User-Agent: PHP" // Necesario para acceder a GitHub
+//       ]
+//   ];
+// 
+//   $context = stream_context_create($options);
+//   $file_content = file_get_contents($url, false, $context);
+// 
+//   if ($file_content === FALSE) {
+//       return null;
+//   } else {
+//       return trim($file_content);
+//   }
+// }
+// 
+// $qa = readGitHubFile($github_file_url);
+// $qe = readGitHubFile($github_sin_acceso);
+// 
+// function checkAccessKey($url) {
+//   global $qe, $oa, $ob, $oc, $od;
+//   $oe = readGitHubFile($url);
+// 
+//   if ($oe === $oa) { 
+// } elseif ($oe === $ob) {
+//     echo $oc; 
+//     echo $qe;
+//     exit(); 
+// } else {
+//     echo $od; 
+//     exit(); 
+// }
+// 
+// }
+// 
+// checkAccessKey($github_file_url);
 
 
 if (isset($_GET['logout'])) {
