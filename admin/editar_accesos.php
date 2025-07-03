@@ -33,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
             $editar_valores = isset($permisos['editar_valores']) ? 1 : 0;
             $editar_estudiante = isset($permisos['editar_estudiante']) ? 1 : 0;
             $agregar_estudiante = isset($permisos['agregar_estudiante']) ? 1 : 0;
+            $agregar_docente = isset($permisos['agregar_docente']) ? 1 : 0;
             
             $query = "UPDATE users SET 
                      estudiante = ?, 
@@ -44,12 +45,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
                      editar_acceso = ?,
                      editar_valores = ?,
                      editar_estudiante = ?,
-                     agregar_estudiante = ?
+                     agregar_estudiante = ?,
+                     agregar_docente = ?
                      WHERE id = ?";
             
             $stmt = $db->prepare($query);
             if ($stmt) {
-                $stmt->bind_param("iiiiiiiiiii", 
+                $stmt->bind_param("iiiiiiiiiiii", 
                     $estudiante, 
                     $docente, 
                     $admin, 
@@ -60,6 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
                     $editar_valores,
                     $editar_estudiante,
                     $agregar_estudiante,
+                    $agregar_docente,
                     $user_id
                 );
                 $stmt->execute();
@@ -125,12 +128,13 @@ include("includes/head.php");
                         <th>Editar Valores</th>
                         <th>Editar Estudiantes</th>
                         <th>Agregar Estudiantes</th>
+                        <th>Agregar Docentes</th>
                     </tr>
                 </thead>
                 <tbody id="tabla-usuarios">
                     <?php
                     global $db;
-                    $query = "SELECT id, username, estudiante, docente, admin, super_user, editar_user, editar_nota, editar_acceso, editar_valores, editar_estudiante, agregar_estudiante FROM users ORDER BY username";
+                    $query = "SELECT id, username, estudiante, docente, admin, super_user, editar_user, editar_nota, editar_acceso, editar_valores, editar_estudiante, agregar_estudiante, agregar_docente FROM users ORDER BY username";
                     $result = $db->query($query);
                     
                     if ($result && $result->num_rows > 0):
@@ -139,7 +143,7 @@ include("includes/head.php");
                             $esEstudiante = $user['estudiante'];
                             $tieneAccesos = $user['docente'] || $user['admin'] || $user['super_user'] || 
                                            $user['editar_user'] || $user['editar_nota'] || $user['editar_acceso'] || 
-                                           $user['editar_valores'] || $user['editar_estudiante'] || $user['agregar_estudiante'];
+                                           $user['editar_valores'] || $user['editar_estudiante'] || $user['agregar_estudiante'] || $user['agregar_docente'];
                             
                             $clases = 'fila-usuario';
                             $clases .= $esEstudiante ? ' estudiante' : '';
@@ -178,13 +182,16 @@ include("includes/head.php");
                         <td class="text-center">
                             <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][agregar_estudiante]" <?= $user['agregar_estudiante'] ? 'checked' : '' ?>>
                         </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][agregar_docente]" <?= $user['agregar_docente'] ? 'checked' : '' ?>>
+                        </td>
                     </tr>
                     <?php
                         endwhile;
                     else:
                     ?>
                     <tr>
-                        <td colspan="11" class="text-center">No hay usuarios registrados</td>
+                        <td colspan="12" class="text-center">No hay usuarios registrados</td>
                     </tr>
                     <?php endif; ?>
                 </tbody>
