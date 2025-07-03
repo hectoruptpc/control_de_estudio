@@ -137,7 +137,7 @@ if (!isAdmin()) {
         <!-- Opción exclusiva para usuarios con editar_valores = 1 -->
         <?php if (isset($_SESSION['user']['editar_valores']) && $_SESSION['user']['editar_valores'] == 1): ?>
             <div class="dropdown-divider"></div>
-            <a title="Editar Valores del Sistema" class="dropdown-item" href="editar_valores.php">
+            <a title="Editar Valores del Sistema" class="dropdown-item" href="valores_predefinidos.php">
                 <i class="fas fa-edit fa-fw"></i> Editar Valores
             </a>
         <?php endif; ?>
