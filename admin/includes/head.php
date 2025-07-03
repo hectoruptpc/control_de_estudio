@@ -74,9 +74,11 @@ if (!isAdmin()) {
         <i class="fas fa-book fa-fw"></i> Pensum
     </a>
     <div id="dropdown-pensum-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
-        <a title="Agregar Nueva Carrera" class="dropdown-item" href="agregar_carrera.php">
-            <i class="fas fa-plus-circle fa-fw"></i> Agregar Carrera
-        </a>
+        <?php if ($_SESSION['user']['agregar_carrera'] == 1): ?>
+            <a title="Agregar Nueva Carrera" class="dropdown-item" href="agregar_carrera.php">
+                <i class="fas fa-plus-circle fa-fw"></i> Agregar Carrera
+            </a>
+        <?php endif; ?>
         <a title="Ver Pensum Actual" class="dropdown-item" href="lista_carreras.php">
             <i class="fas fa-graduation-cap fa-fw"></i> Ver Pensum
         </a>
