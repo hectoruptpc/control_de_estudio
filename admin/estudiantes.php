@@ -120,9 +120,7 @@ include("includes/head.php");
                     <p class="mt-3">Cargando información del estudiante...</p>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-            </div>
+            
         </div>
     </div>
 </div>
