@@ -1,3 +1,4 @@
+
 <?php
 
 session_start();
@@ -803,6 +804,31 @@ function obtenerListaCompletaCarreras(bool $soloActivas = false): array {
   }
 }
 
+
+function cambiarEstadoCarrera($id_carrera, $estado) {
+    global $db;
+    
+    $query = "UPDATE carreras SET activa = ? WHERE id_carrera = ?";
+    $stmt = $db->prepare($query);
+    
+    if (!$stmt) {
+        throw new Exception("Error en la preparación de la consulta: " . $conn->error);
+    }
+    
+    $stmt->bind_param("ii", $estado, $id_carrera);
+    $resultado = $stmt->execute();
+    
+    // Verificar si realmente hubo cambios
+    if ($resultado && $stmt->affected_rows > 0) {
+        return true;
+    }
+    
+    return false;
+}
+
+
+
+
 // Función para agregar nuevas carreras
 function registrarNuevaCarrera(string $nombre, string $codigo, string $tipo_formacion): array {
   global $db;
@@ -878,144 +904,52 @@ function registrarNuevaCarrera(string $nombre, string $codigo, string $tipo_form
 }
 
 // Función para obtener una carrera específica por ID
-function obtenerCarreraPorId(int $id): ?array {
-  global $db;
-  
-  // Validar que el ID sea positivo
-  if ($id <= 0) {
-      error_log("ID de carrera no válido: $id");
-      return null;
-  }
+function obtenerCarreraPorId($id_carrera) {
+    global $db;
 
-  try {
-      // Preparar consulta con LIMIT para seguridad adicional
-      $query = "SELECT id_carrera, nombre_carrera, cod_carrera, activa, tipo_formacion 
-               FROM carreras 
-               WHERE id_carrera = ? 
-               LIMIT 1";
-      
-      $stmt = $db->prepare($query);
-      if (!$stmt) {
-          throw new Exception("Error al preparar consulta: " . $db->error);
-      }
-      
-      // Vincular parámetro
-      if (!$stmt->bind_param("i", $id)) {
-          throw new Exception("Error al vincular parámetro: " . $stmt->error);
-      }
-      
-      // Ejecutar consulta
-      if (!$stmt->execute()) {
-          throw new Exception("Error al ejecutar consulta: " . $stmt->error);
-      }
-      
-      // Obtener resultado
-      $result = $stmt->get_result();
-      if (!$result) {
-          throw new Exception("Error al obtener resultados: " . $stmt->error);
-      }
-      
-      // Obtener datos
-      $carrera = $result->fetch_assoc();
-      
-      // Liberar recursos
-      $result->free();
-      $stmt->close();
-      
-      return $carrera ?: null;
-      
-  } catch (Exception $e) {
-      error_log("Error en obtenerCarreraPorId(ID: $id): " . $e->getMessage());
-      
-      // Cerrar statement si está abierto
-      if (isset($stmt) && $stmt instanceof mysqli_stmt) {
-          $stmt->close();
-      }
-      
-      return null;
-  }
+    $stmt = $db->prepare("SELECT * FROM carreras WHERE id_carrera = ?");
+    $stmt->bind_param("i", $id_carrera);
+    $stmt->execute();
+    
+    $resultado = $stmt->get_result();
+    
+    return $resultado->fetch_assoc();
 }
 
 
-// Función para actualizar una carrera
-function actualizarCarrera(int $id, string $nombre, string $codigo, int $activa): array {
-  global $db;
-  
-  try {
-      // Validar parámetros
-      if ($id <= 0) {
-          throw new Exception("ID de carrera no válido");
-      }
-      
-      if (empty($nombre)) {
-          throw new Exception("El nombre de la carrera no puede estar vacío");
-      }
-      
-      if (empty($codigo)) {
-          throw new Exception("El código de la carrera no puede estar vacío");
-      }
-      
-      if (!in_array($activa, [0, 1])) {
-          throw new Exception("El estado activo debe ser 0 o 1");
-      }
-      
-      // Iniciar transacción
-      $db->begin_transaction();
-      
-      // 1. Verificar si el código ya existe en otra carrera
-      $checkStmt = $db->prepare("SELECT id_carrera FROM carreras WHERE cod_carrera = ? AND id_carrera != ? LIMIT 1");
-      $checkStmt->bind_param("si", $codigo, $id);
-      $checkStmt->execute();
-      $checkStmt->store_result();
-      
-      if ($checkStmt->num_rows > 0) {
-          $checkStmt->close();
-          $db->rollback();
-          return [
-              'success' => false,
-              'message' => 'El código de carrera ya está en uso por otra carrera'
-          ];
-      }
-      $checkStmt->close();
-      
-      // 2. Actualizar la carrera
-      $updateStmt = $db->prepare("UPDATE carreras SET nombre_carrera = ?, cod_carrera = ?, activa = ? WHERE id_carrera = ?");
-      $updateStmt->bind_param("ssii", $nombre, $codigo, $activa, $id);
-      
-      if (!$updateStmt->execute()) {
-          throw new Exception("Error al ejecutar actualización: " . $updateStmt->error);
-      }
-      
-      // Verificar si se actualizó algún registro
-      $affectedRows = $updateStmt->affected_rows;
-      $updateStmt->close();
-      
-      if ($affectedRows === 0) {
-          $db->rollback();
-          return [
-              'success' => false,
-              'message' => 'No se encontró la carrera para actualizar o los datos son iguales'
-          ];
-      }
-      
-      $db->commit();
-      
-      return [
-          'success' => true,
-          'message' => 'Carrera actualizada exitosamente',
-          'affected_rows' => $affectedRows
-      ];
-      
-  } catch (Exception $e) {
-      if (isset($db) && method_exists($db, 'rollback')) {
-          $db->rollback();
-      }
-      error_log("Error en actualizarCarrera(ID: $id): " . $e->getMessage());
-      return [
-          'success' => false,
-          'message' => 'Error al actualizar carrera: ' . $e->getMessage()
-      ];
-  }
+function actualizarCarrera($id_carrera, $datos) {
+    global $db;
+    
+    $query = "UPDATE carreras SET 
+              nombre_carrera = ?,
+              cod_carrera = ?,
+              tipo_formacion = ?,
+              duracion_semestres = ?,
+              titulo_otorga = ?,
+              descripcion = ?,
+              updated_at = NOW()
+              WHERE id_carrera = ?";
+    
+    $stmt = $conn->prepare($query);
+    
+    if (!$stmt) {
+        throw new Exception("Error en preparación de consulta: " . $db->error);
+    }
+    
+    $stmt->bind_param(
+        "sssisss",
+        $datos['nombre_carrera'],
+        $datos['cod_carrera'],
+        $datos['tipo_formacion'],
+        $datos['duracion_semestres'],
+        $datos['titulo_otorga'],
+        $datos['descripcion'],
+        $id_carrera
+    );
+    
+    $resultado = $stmt->execute();
+    
+    return $resultado && $stmt->affected_rows > 0;
 }
 
 

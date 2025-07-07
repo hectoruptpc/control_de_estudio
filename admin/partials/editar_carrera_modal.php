@@ -1,53 +1,55 @@
 <?php
 require_once '../../funciones/functions.php';
 
-if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    die("ID de carrera no válido");
-}
-
-$id = (int)$_GET['id'];
-$carrera = obtenerCarreraPorId($id);
+$id_carrera = $_GET['id'] ?? 0;
+$carrera = obtenerCarreraPorId($id_carrera);
 
 if (!$carrera) {
-    die("Carrera no encontrada");
-}
-
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $nombre = trim($_POST['nombre_carrera'] ?? '');
-    $codigo = trim($_POST['cod_carrera'] ?? '');
-    $activa = isset($_POST['activa']) ? 1 : 0;
-    
-    if (!empty($nombre) && !empty($codigo)) {
-        if (actualizarCarrera($id, $nombre, $codigo, $activa)) {
-            echo '<script>
-                    parent.$("#modalEditarCarrera").modal("hide");
-                    parent.$("#tabla-carreras").load("partials/tabla_carreras.php");
-                    parent.mostrarAlerta("success", "Carrera actualizada correctamente");
-                  </script>';
-            exit();
-        } else {
-            echo '<div class="alert alert-danger">Error al actualizar la carrera</div>';
-        }
-    } else {
-        echo '<div class="alert alert-warning">Todos los campos son obligatorios</div>';
-    }
+    echo '<div class="alert alert-danger">Carrera no encontrada</div>';
+    exit;
 }
 ?>
 
-<form method="post" id="form-editar-carrera">
+<form id="form-editar-carrera">
+    <input type="hidden" name="id_carrera" value="<?= $carrera['id_carrera'] ?>">
+    
     <div class="form-group">
-        <label for="nombre_carrera">Nombre de la Carrera:</label>
+        <label for="nombre_carrera">Nombre del Programa:</label>
         <input type="text" class="form-control" id="nombre_carrera" name="nombre_carrera" 
                value="<?= htmlspecialchars($carrera['nombre_carrera']) ?>" required>
     </div>
     
     <div class="form-group">
-        <label for="cod_carrera">Código de la Carrera:</label>
+        <label for="cod_carrera">Código del Programa:</label>
         <input type="text" class="form-control" id="cod_carrera" name="cod_carrera" 
                value="<?= htmlspecialchars($carrera['cod_carrera']) ?>" required>
     </div>
     
+    <div class="form-group">
+        <label for="tipo_formacion">Tipo de Formación:</label>
+        <select class="form-control" id="tipo_formacion" name="tipo_formacion" required>
+            <option value="PNF" <?= $carrera['tipo_formacion'] === 'PNF' ? 'selected' : '' ?>>PNF</option>
+            <option value="PTF" <?= $carrera['tipo_formacion'] === 'PTF' ? 'selected' : '' ?>>PTF</option>
+        </select>
+    </div>
     
+    <div class="form-group">
+        <label for="duracion_semestres">Duración (semestres):</label>
+        <input type="number" class="form-control" id="duracion_semestres" name="duracion_semestres" 
+               value="<?= $carrera['duracion_semestres'] ?>" min="1" max="20">
+    </div>
+    
+    <div class="form-group">
+        <label for="titulo_otorga">Título que otorga:</label>
+        <input type="text" class="form-control" id="titulo_otorga" name="titulo_otorga" 
+               value="<?= htmlspecialchars($carrera['titulo_otorga']) ?>">
+    </div>
+    
+    <div class="form-group">
+        <label for="descripcion">Descripción:</label>
+        <textarea class="form-control" id="descripcion" name="descripcion" rows="3"><?= 
+            htmlspecialchars($carrera['descripcion']) ?></textarea>
+    </div>
     
     <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
@@ -59,9 +61,36 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 $(document).ready(function() {
     $('#form-editar-carrera').on('submit', function(e) {
         e.preventDefault();
+        var form = $(this);
+        var submitBtn = form.find('button[type="submit"]');
         
-        $.post(window.location.href, $(this).serialize(), function(response) {
-            $('#contenido-modal-editar').html(response);
+        // Deshabilitar botón y mostrar spinner
+        submitBtn.prop('disabled', true).html(
+            '<i class="fas fa-spinner fa-spin"></i> Guardando...'
+        );
+        
+        $.ajax({
+            url: 'ajax/actualizar_carrera.php',
+            type: 'POST',
+            dataType: 'json',
+            data: form.serialize(),
+            success: function(response) {
+                if (response.success) {
+                    // Cerrar modal y actualizar tabla
+                    $('#modalEditarCarrera').modal('hide');
+                    $('#tabla-carreras').load('partials/tabla_carreras.php', function() {
+                        mostrarAlerta('success', response.message);
+                    });
+                } else {
+                    mostrarAlerta('danger', response.message);
+                    submitBtn.prop('disabled', false).html('Guardar Cambios');
+                }
+            },
+            error: function(xhr, status, error) {
+                mostrarAlerta('danger', 'Error de conexión: ' + error);
+                submitBtn.prop('disabled', false).html('Guardar Cambios');
+                console.error("Error AJAX:", status, error);
+            }
         });
     });
 });

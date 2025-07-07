@@ -3,26 +3,43 @@ require_once '../../funciones/functions.php';
 
 header('Content-Type: application/json');
 
-if (!isset($_POST['id']) || !is_numeric($_POST['id']) || !isset($_POST['accion'])) {
+// Verificar que sea POST
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    echo json_encode(['success' => false, 'message' => 'Método no permitido']);
+    exit;
+}
+
+// Obtener y validar datos
+$id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+$accion = filter_input(INPUT_POST, 'accion', FILTER_SANITIZE_STRING);
+
+if (!$id || !$accion || !in_array($accion, ['activar', 'desactivar'])) {
     echo json_encode(['success' => false, 'message' => 'Datos inválidos']);
-    exit();
+    exit;
 }
 
-$id = (int)$_POST['id'];
-$accion = $_POST['accion'];
-$activa = ($accion === 'activar') ? 1 : 0;
+// Determinar el nuevo estado
+$nuevoEstado = ($accion === 'activar') ? 1 : 0;
 
-// Primero obtenemos la carrera para verificar que existe
-$carrera = obtenerCarreraPorId($id);
-
-if (!$carrera) {
-    echo json_encode(['success' => false, 'message' => 'Carrera no encontrada']);
-    exit();
-}
-
-// Actualizamos el estado
-if (actualizarCarrera($id, $carrera['nombre_carrera'], $carrera['cod_carrera'], $activa)) {
-    echo json_encode(['success' => true, 'message' => 'Estado de la carrera actualizado correctamente']);
-} else {
-    echo json_encode(['success' => false, 'message' => 'Error al actualizar el estado']);
+// Ejecutar la actualización
+try {
+    $resultado = cambiarEstadoCarrera($id, $nuevoEstado);
+    
+    if ($resultado) {
+        echo json_encode([
+            'success' => true,
+            'message' => 'Estado actualizado correctamente',
+            'nuevoEstado' => $nuevoEstado
+        ]);
+    } else {
+        echo json_encode([
+            'success' => false,
+            'message' => 'No se realizaron cambios en la base de datos'
+        ]);
+    }
+} catch (Exception $e) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Error: ' . $e->getMessage()
+    ]);
 }
