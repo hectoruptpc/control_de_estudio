@@ -927,21 +927,23 @@ function actualizarCarrera($id_carrera, $datos) {
               duracion_semestres = ?,
               titulo_otorga = ?,
               descripcion = ?,
-              updated_at = NOW()
+              
               WHERE id_carrera = ?";
-    
-    $stmt = $conn->prepare($query);
-    
+
+    $stmt = $db->prepare($query);
+
     if (!$stmt) {
         throw new Exception("Error en preparación de consulta: " . $db->error);
     }
     
+    $duracion = $datos['duracion_semestres'] ?? null;
+    
     $stmt->bind_param(
-        "sssisss",
+        "sssissi",
         $datos['nombre_carrera'],
         $datos['cod_carrera'],
         $datos['tipo_formacion'],
-        $datos['duracion_semestres'],
+        $duracion,
         $datos['titulo_otorga'],
         $datos['descripcion'],
         $id_carrera
@@ -8444,63 +8446,7 @@ else {
 $informacion_cuentas = '';
 }
 
-function billetera(){
-  global $db, $disp,$id_usua,$dinero_billetera,$titulopag;
 
-  $query = "SELECT SUM(CASE WHEN monto>0 THEN monto ELSE 0 END) AS 'pos', SUM(CASE WHEN monto<0 THEN monto ELSE 0 END) AS 'neg' FROM billetera WHERE id_usuario = '$id_usua' AND  status = '1'";
-  $result = mysqli_query($db, $query);
-  $rows =  mysqli_fetch_assoc($result);
-
-  $pos = $rows['pos'];
-  $neg = $rows['neg'];
-  $dinero_billetera = $pos+$neg;
-  //echo $disp;
-  $disp = '';
-
-
-if ($titulopag == "Billetera") {
-
-  if ($dinero_billetera < 0) {
-    $disp .= '<div class="alert alert-danger" role="alert">
-    <h2>Usted posee una Deuda de:</h2><br>
-    <h2 class="text-center">-' . number_format(abs($dinero_billetera),2,',','.') .' Bs.</h2></div>';
-  }
-elseif ($dinero_billetera == 0) {
-  // code...
-  $disp .= '<div class="alert alert-warning" role="alert">
-  <h2>No posee dinero disponible en su billetera.</h2><br></div>';
-}
-  else {
-    $disp .= '<div class="alert alert-info" role="alert">
-    <h2>Disponible en su Billetera:</h2><br>
-    <h2 class="text-center">' .number_format($dinero_billetera,2,',','.') .' Bs.</h2></div>';
-  }
-
-} else {
-  if ($dinero_billetera < 0) {
-    $disp .= '<div class="alert alert-danger" role="alert">
-    <h2>Usted posee una Deuda de:</h2><br>
-    <h2 class="text-center">-' . number_format(abs($dinero_billetera),2,',','.') .' Bs.</h2><div class="d-flex justify-content-center"><a class="btn btn-success" href="billetera.php" role="button"><i class="fas fa-money-bill-alt"></i> Recargar Billetera Virtual</a></div></div>';
-  } elseif ($dinero_billetera == 0) {
-    // code...
-    $disp .= '<div class="alert alert-warning" role="alert">
-    <h2>No posee dinero en su billetera.</h2><br>
-    <div class="d-flex justify-content-center"><a class="btn btn-success" href="billetera.php" role="button"><i class="fas fa-money-bill-alt"></i> Recargar Billetera Virtual</a></div></div>';
-  }else {
-    $disp .= '<div class="alert alert-info" role="alert">
-    <h2>Disponible en su Billetera:</h2><br>
-    <h2 class="text-center">' .number_format($dinero_billetera,2,',','.') .' Bs.</h2><div class="d-flex justify-content-center"><a class="btn btn-success" href="billetera.php" role="button"><i class="fas fa-money-bill-alt"></i> Recargar Billetera Virtual</a></div></div>';
-  }
-}
-
-
-
-  $disp .= '';
-
-  return;
-
-
-}
 
 
 
@@ -8730,7 +8676,7 @@ function generar_pago_billetera(){
   }
 }
 
-billetera();
+
 
 // return user array from their id
 function getUserById($id){
