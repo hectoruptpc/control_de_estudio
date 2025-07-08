@@ -904,16 +904,45 @@ function registrarNuevaCarrera(string $nombre, string $codigo, string $tipo_form
 }
 
 // Función para obtener una carrera específica por ID
-function obtenerCarreraPorId($id_carrera) {
+function obtenerCarreraPorId($id) {
     global $db;
-
-    $stmt = $db->prepare("SELECT * FROM carreras WHERE id_carrera = ?");
-    $stmt->bind_param("i", $id_carrera);
-    $stmt->execute();
     
-    $resultado = $stmt->get_result();
+    // Validación adicional por si acaso
+    if (!is_numeric($id) || $id <= 0) {
+        error_log("ID inválido pasado a obtenerCarreraPorId: " . $id);
+        return false;
+    }
     
-    return $resultado->fetch_assoc();
+    $query = "SELECT id_carrera, nombre_carrera, cod_carrera, activa, 
+                     duracion_semestres, titulo_otorga, descripcion, tipo_formacion 
+              FROM carreras 
+              WHERE id_carrera = ? 
+              LIMIT 1";
+    
+    try {
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $id);
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        if (!$result) {
+            throw new Exception("Error al obtener resultados: " . $stmt->error);
+        }
+        
+        $data = $result->fetch_assoc();
+        $stmt->close();
+        
+        return $data;
+    } catch (Exception $e) {
+        error_log("Error en obtenerCarreraPorId: " . $e->getMessage());
+        return false;
+    }
 }
 
 
@@ -926,8 +955,7 @@ function actualizarCarrera($id_carrera, $datos) {
               tipo_formacion = ?,
               duracion_semestres = ?,
               titulo_otorga = ?,
-              descripcion = ?,
-              
+              descripcion = ?
               WHERE id_carrera = ?";
 
     $stmt = $db->prepare($query);
