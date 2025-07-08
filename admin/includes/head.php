@@ -79,9 +79,7 @@ if (!isAdmin()) {
                 <i class="fas fa-plus-circle fa-fw"></i> Agregar Carrera
             </a>
         <?php endif; ?>
-        <a title="Ver Pensum Actual" class="dropdown-item" href="lista_carreras.php">
-            <i class="fas fa-graduation-cap fa-fw"></i> Ver Pensum
-        </a>
+        
         <a title="Asignaturas" class="dropdown-item" href="materia.php">
             <i class="fas fa-book-open fa-fw"></i> Asignaturas
         </a>
@@ -101,9 +99,7 @@ if (!isAdmin()) {
         <i class="fas fa-user-plus fa-fw"></i> Nuevo Docente
     </a>
 <?php endif; ?>
-        <a title="Listado de Docentes" class="dropdown-item" href="list_docentes.php">
-            <i class="fas fa-users fa-fw"></i> Listado Completo
-        </a>
+       
         <a title="Asignación de Cursos" class="dropdown-item" href="asignacion_cursos.php">
             <i class="fas fa-tasks fa-fw"></i> Asignar Cursos
         </a>
