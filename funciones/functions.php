@@ -2460,134 +2460,52 @@ if (!function_exists('guardarMateria')) {
 
 //CAMBIAR A USERS
 
-/**
- * Actualiza los datos de un docente en la base de datos
- * 
- * @param array $datos Array con los datos del docente:
- *        Requeridos: id, nombre, apellido, tipo_documento, documento, email, especialidad, estado
- * @return array Retorna array con:
- *         - success: boolean indica si la operación fue exitosa
- *         - message: string mensaje descriptivo del resultado
- *         - affected_rows: número de filas afectadas
- *         - changes: boolean indica si hubo cambios reales en los datos
- */
 function editarDocente($datos) {
-  global $db;
-  
-  // Validación de campos requeridos
-  $camposRequeridos = ['id', 'nombre', 'apellido', 'tipo_documento', 
-                      'documento', 'email', 'especialidad', 'estado'];
-  
-  foreach ($camposRequeridos as $campo) {
-      if (!isset($datos[$campo]) || $datos[$campo] === '') {
-          error_log("Error en editarDocente: Falta el campo requerido '$campo'");
-          return [
-              'success' => false,
-              'message' => "Falta el campo requerido '$campo'",
-              'affected_rows' => 0,
-              'changes' => false
-          ];
-      }
-  }
-  
-  // Validar ID
-  if (!is_numeric($datos['id']) || $datos['id'] <= 0) {
-      error_log("Error en editarDocente: ID inválido");
-      return [
-          'success' => false,
-          'message' => "ID de docente inválido",
-          'affected_rows' => 0,
-          'changes' => false
-      ];
-  }
-  
-  try {
-      // Preparar consulta UPDATE
-      $query = "UPDATE docentes SET 
-               nombre = ?, 
-               apellido = ?, 
-               tipo_documento = ?, 
-               documento = ?, 
-               email = ?, 
-               especialidad = ?, 
-               estado = ? 
-               WHERE id = ?";
-      
-      $stmt = $db->prepare($query);
-      
-      if (!$stmt) {
-          error_log("Error preparando consulta: ".$db->error);
-          return [
-              'success' => false,
-              'message' => "Error al preparar la consulta",
-              'affected_rows' => 0,
-              'changes' => false
-          ];
-      }
-      
-      // Vincular parámetros
-      $bindResult = $stmt->bind_param("sssssssi",
-          $datos['nombre'],
-          $datos['apellido'],
-          $datos['tipo_documento'],
-          $datos['documento'],
-          $datos['email'],
-          $datos['especialidad'],
-          $datos['estado'],
-          $datos['id']
-      );
-      
-      if (!$bindResult) {
-          error_log("Error vinculando parámetros: ".$stmt->error);
-          $stmt->close();
-          return [
-              'success' => false,
-              'message' => "Error al vincular parámetros",
-              'affected_rows' => 0,
-              'changes' => false
-          ];
-      }
-      
-      // Ejecutar consulta
-      $executeResult = $stmt->execute();
-      
-      if (!$executeResult) {
-          error_log("Error ejecutando consulta: ".$stmt->error);
-          $stmt->close();
-          return [
-              'success' => false,
-              'message' => "Error al ejecutar la consulta",
-              'affected_rows' => 0,
-              'changes' => false
-          ];
-      }
-      
-      // Obtener resultados
-      $affectedRows = $stmt->affected_rows;
-      $stmt->close();
-      
-      // Determinar si hubo cambios reales
-      $huboCambios = $affectedRows > 0;
-      
-      return [
-          'success' => true,
-          'message' => $huboCambios ? "Docente actualizado correctamente" : "No se realizaron cambios (los datos eran iguales)",
-          'affected_rows' => $affectedRows,
-          'changes' => $huboCambios
-      ];
-      
-  } catch (Exception $e) {
-      error_log("Excepción en editarDocente: ".$e->getMessage());
-      if (isset($stmt) && $stmt instanceof mysqli_stmt) {
-          $stmt->close();
-      }
-      return [
-          'success' => false,
-          'message' => "Error inesperado al actualizar docente",
-          'affected_rows' => 0,
-          'changes' => false
-      ];
-  }
+    global $db;
+    
+    try {
+        $stmt = $db->prepare("UPDATE users SET 
+                            nombre = :nombre,
+                            username = :username,
+                            email = :email,
+                            tlf = :tlf,
+                            cel = :cel,
+                            genero = :genero,
+                            direccion = :direccion,
+                            ciudad = :ciudad,
+                            estado = :estado,
+                            fecha_nac = :fecha_nac,
+                            status = :status,
+                            fecha_act = NOW()
+                            WHERE id = :id");
+        
+        $resultado = $stmt->execute([
+            ':nombre' => $datos['nombre'] ?? null,
+            ':username' => $datos['username'] ?? null,
+            ':email' => $datos['email'] ?? null,
+            ':tlf' => $datos['tlf'] ?? null,
+            ':cel' => $datos['cel'] ?? null,
+            ':genero' => $datos['genero'] ?? null,
+            ':direccion' => $datos['direccion'] ?? null,
+            ':ciudad' => $datos['ciudad'] ?? null,
+            ':estado' => $datos['estado'] ?? null,
+            ':fecha_nac' => $datos['fecha_nac'] ?? null,
+            ':status' => $datos['status'] ?? null,
+            ':id' => $datos['id']
+        ]);
+        
+        if (!$resultado) {
+            error_log("Error en la ejecución: " . print_r($stmt->errorInfo(), true));
+            return false;
+        }
+        
+        return true;
+        
+    } catch (PDOException $e) {
+        error_log("Error al actualizar docente: " . $e->getMessage());
+        error_log("Datos recibidos: " . print_r($datos, true));
+        return false;
+    }
 }
 
 
