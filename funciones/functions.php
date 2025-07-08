@@ -986,157 +986,177 @@ function actualizarCarrera($id_carrera, $datos) {
 //HACER COSAS CON LOS DOCENTES
 
 function insertarDocente(array $datos): array {
-  global $db;
-  
-  try {
-      // Validar campos requeridos
-      $camposRequeridos = ['nombre', 'tipo_documento', 'documento', 'email', 'telefono', 
+    global $db;
+    
+    try {
+        // Validar campos requeridos (se mantiene igual)
+        $camposRequeridos = ['nombre', 'tipo_documento', 'documento', 'email', 'telefono', 
                           'direccion', 'estado_residencia', 'municipio', 'genero', 
                           'estado_civil', 'fecha_nacimiento', 'estado_laboral'];
-      
-      $faltantes = array_diff($camposRequeridos, array_keys($datos));
-      if (!empty($faltantes)) {
-          throw new Exception("Faltan campos requeridos: " . implode(', ', $faltantes));
-      }
+        
+        $faltantes = array_diff($camposRequeridos, array_keys($datos));
+        if (!empty($faltantes)) {
+            throw new Exception("Faltan campos requeridos: " . implode(', ', $faltantes));
+        }
 
-      // 1. Preparación de datos
-      $username = strtolower(str_replace(' ', '.', $datos['nombre']));
-      $password = password_hash($datos['documento'], PASSWORD_DEFAULT);
-      $fecha_act = date('Y-m-d H:i:s');
-      $api_key = bin2hex(random_bytes(16)); // API key más segura
+        // 1. Preparación de datos (se mantiene igual)
+        $username = strtolower(str_replace(' ', '.', $datos['nombre']));
+        $password = password_hash($datos['documento'], PASSWORD_DEFAULT);
+        $fecha_act = date('Y-m-d H:i:s');
+        $api_key = bin2hex(random_bytes(16));
 
-      // 2. Conversión de arrays a strings
-      $especialidad = is_array($datos['especialidad'] ?? '') ? 
-                     implode(', ', array_filter($datos['especialidad'])) : 
-                     ($datos['especialidad'] ?? '');
-      
-      $titulos = is_array($datos['titulos'] ?? '') ? 
-                implode(', ', array_filter($datos['titulos'])) : 
-                ($datos['titulos'] ?? '');
-      
-      $institutos = is_array($datos['institutos'] ?? '') ? 
-                   implode(', ', array_filter($datos['institutos'])) : 
-                   ($datos['institutos'] ?? '');
+        // 2. Conversión de arrays a strings (modificado para potencialidades)
+        $potencialidades = isset($datos['potencialidades']) ? 
+                         (is_array($datos['potencialidades']) ? 
+                          implode(', ', array_filter($datos['potencialidades'])) : 
+                          $datos['potencialidades']) : '';
+        
+        $titulos = isset($datos['titulos']) ? 
+                  (is_array($datos['titulos']) ? 
+                   implode(', ', array_filter($datos['titulos'])) : 
+                   $datos['titulos']) : '';
+        
+        $institutos = isset($datos['institutos']) ? 
+                     (is_array($datos['institutos']) ? 
+                      implode(', ', array_filter($datos['institutos'])) : 
+                      $datos['institutos']) : '';
 
-      // 3. Configuración de roles y valores por defecto
-      $config = [
-          'roles' => [
-              'usuario' => 0,
-              'estudiante' => 0,
-              'docente' => 1,
-              'admin' => 0,
-              'super_user' => 0,
-              'editar_user' => 0,
-              'editar_nota' => 0,
-              'editar_acceso' => 0
-          ],
-          'defaults' => [
-              'cel' => $datos['celular'] ?? '',
-              'ciudad' => $datos['municipio'] ?? '',
-              'num_telf_opc' => $datos['telefono_secundario'] ?? '',
-              'etnia' => $datos['etnia'] ?? '',
-              'casaapto' => $datos['casa_apto'] ?? 'No especificado',
-              'punto_referencia' => $datos['punto_referencia'] ?? '',
-              'grupo_familiar' => $datos['grupo_familiar'] ?? 0,
-              'acargo_usted' => $datos['acargo_usted'] ?? 0,
-              'fuente_ingresos' => $datos['fuente_ingresos'] ?? '',
-              'tipo_vivienda' => $datos['tipo_vivienda'] ?? '',
-              'tenencia_vivienda' => $datos['tenencia_vivienda'] ?? '',
-              'enfermedad' => $datos['enfermedad'] ?? '',
-              'discapacidad' => $datos['discapacidad'] ?? '',
-              'titulos' => $titulos,
-              'institutos' => $institutos,
-              'api_key' => $api_key,
-              'fecha_ingreso' => $datos['fecha_ingreso'] ?? date('Y-m-d')
-          ]
-      ];
+        // 3. Configuración de roles y valores por defecto (modificado)
+       $config = [
+    'roles' => [
+        'usuario' => 0,
+        'estudiante' => 0,
+        'docente' => 1,
+        'admin' => 0,
+        'super_user' => 0,
+        'editar_user' => 0,
+        'editar_nota' => 0,
+        'editar_acceso' => 0,
+        'editar_valores' => 0,  // Añade esta línea
+        'editar_estudiante' => 0,
+        'agregar_estudiante' => 0,
+        'agregar_docente' => 0,
+        'editar_docente' => 0,
+        'agregar_carrera' => 0
+    ],
+            'defaults' => [
+                'cel' => $datos['celular'] ?? '',
+                'ciudad' => $datos['municipio'] ?? '',
+                'num_telf_opc' => $datos['telefono_secundario'] ?? '',
+                'etnia' => $datos['etnia'] ?? '',
+                'casaapto' => $datos['casa_apto'] ?? 'No especificado',
+                'punto_referencia' => $datos['punto_referencia'] ?? '',
+                'grupo_familiar' => $datos['grupo_familiar'] ?? 0,
+                'acargo_usted' => $datos['acargo_usted'] ?? 0,
+                'fuente_ingresos' => $datos['fuente_ingresos'] ?? '',
+                'tipo_vivienda' => $datos['tipo_vivienda'] ?? '',
+                'tenencia_vivienda' => $datos['tenencia_vivienda'] ?? '',
+                'enfermedad' => $datos['enfermedad'] ?? '',
+                'discapacidad' => $datos['discapacidad'] ?? '',
+                'titulos' => $titulos,
+                'institutos' => $institutos,
+                'potencialidades' => $potencialidades, // Usamos la columna específica
+                'api_key' => $api_key,
+                'fecha_ingreso' => $datos['fecha_ingreso'] ?? date('Y-m-d')
+            ]
+        ];
 
-      // 4. Combinar todos los valores
-      $valores = array_merge(
-          [
-              'idusuario' => $datos['tipo_documento'] . '-' . $datos['documento'],
-              'nombre' => $datos['nombre'],
-              'username' => $username,
-              'email' => $datos['email'],
-              'tlf' => $datos['telefono'],
-              'direccion' => $datos['direccion'],
-              'estado' => $datos['estado_residencia'],
-              'municipio' => $datos['municipio'],
-              'parroquia' => $datos['parroquia'] ?? '',
-              'status' => ($datos['estado_laboral'] == 'Activo') ? 1 : 0,
-              'user_type' => 'docente',
-              'password' => $password,
-              'carrera' => $especialidad,
-              'genero' => $datos['genero'],
-              'edo_civil' => $datos['estado_civil'],
-              'fecha_nac' => $datos['fecha_nacimiento'],
-              'fecha_act' => $fecha_act
-          ],
-          $config['defaults'],
-          $config['roles']
-      );
+        // 4. Combinar todos los valores (modificado)
+        $valores = array_merge(
+            [
+                'idusuario' => $datos['tipo_documento'] . '-' . $datos['documento'],
+                'nombre' => $datos['nombre'],
+                'username' => $username,
+                'email' => $datos['email'],
+                'tlf' => $datos['telefono'],
+                'direccion' => $datos['direccion'],
+                'estado' => $datos['estado_residencia'],
+                'municipio' => $datos['municipio'],
+                'parroquia' => $datos['parroquia'] ?? '',
+                'status' => ($datos['estado_laboral'] == 'Activo') ? 1 : 0,
+                'user_type' => 'docente',
+                'password' => $password,
+                'carrera' => '', // Dejamos carrera vacía o puedes eliminarla si no se usa
+                'genero' => $datos['genero'],
+                'edo_civil' => $datos['estado_civil'],
+                'fecha_nac' => $datos['fecha_nacimiento'],
+                'fecha_act' => $fecha_act,
+                'potencialidades' => $potencialidades // Añadimos explícitamente
+            ],
+            $config['defaults'],
+            $config['roles']
+        );
 
       // Iniciar transacción
       $db->begin_transaction();
 
-      // Verificar si el usuario ya existe
-      $checkStmt = $db->prepare("SELECT id FROM users WHERE idusuario = ? LIMIT 1");
-      $checkStmt->bind_param("s", $valores['idusuario']);
-      $checkStmt->execute();
-      $checkStmt->store_result();
-      
-      if ($checkStmt->num_rows > 0) {
-          $checkStmt->close();
-          $db->rollback();
-          return [
-              'success' => false,
-              'message' => 'El docente ya está registrado'
-          ];
-      }
-      $checkStmt->close();
+       // Verificar si el usuario ya existe
+        $checkStmt = $db->prepare("SELECT id FROM users WHERE idusuario = ? LIMIT 1");
+        $checkStmt->bind_param("s", $valores['idusuario']);
+        $checkStmt->execute();
+        $checkStmt->store_result();
+        
+        if ($checkStmt->num_rows > 0) {
+            $checkStmt->close();
+            $db->rollback();
+            return [
+                'success' => false,
+                'message' => 'El docente ya está registrado'
+            ];
+        }
+        $checkStmt->close();
 
-      // 5. Construir e ejecutar consulta de inserción
-      $fields = array_keys($valores);
-      $placeholders = implode(', ', array_fill(0, count($valores), '?'));
-      $types = $this->determinarTiposParametros($valores);
-      
-      $sql = "INSERT INTO users (" . implode(', ', $fields) . ") VALUES ($placeholders)";
-      $stmt = $db->prepare($sql);
-      
-      if (!$stmt) {
-          throw new Exception("Error en preparación: " . $db->error);
-      }
+        // 5. Construir e ejecutar consulta de inserción
+        $fields = array_keys($valores);
+        $placeholders = implode(', ', array_fill(0, count($valores), '?'));
+       $types = '';
+foreach ($valores as $valor) {
+    if (is_int($valor)) {
+        $types .= 'i';
+    } elseif (is_double($valor)) {
+        $types .= 'd';
+    } else {
+        $types .= 's';
+    }
+}
+        
+        $sql = "INSERT INTO users (" . implode(', ', $fields) . ") VALUES ($placeholders)";
+        $stmt = $db->prepare($sql);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
 
-      $params = array_values($valores);
-      $stmt->bind_param($types, ...$params);
-      
-      if (!$stmt->execute()) {
-          throw new Exception("Error al ejecutar: " . $stmt->error);
-      }
+        $params = array_values($valores);
+        $stmt->bind_param($types, ...$params);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error al ejecutar: " . $stmt->error);
+        }
 
-      $idInsertado = $stmt->insert_id;
-      $stmt->close();
-      
-      $db->commit();
+        $idInsertado = $stmt->insert_id;
+        $stmt->close();
+        
+        $db->commit();
 
-      return [
-          'success' => true,
-          'message' => 'Docente registrado exitosamente',
-          'id' => $idInsertado,
-          'username' => $username,
-          'password_temp' => $datos['documento'] // Solo para referencia inicial
-      ];
+        return [
+            'success' => true,
+            'message' => 'Docente registrado exitosamente',
+            'id' => $idInsertado,
+            'username' => $username,
+            'password_temp' => $datos['documento'] // Solo para referencia inicial
+        ];
 
-  } catch(Exception $e) {
-      if (isset($db) && method_exists($db, 'rollback')) {
-          $db->rollback();
-      }
-      error_log("Error en insertarDocente: " . $e->getMessage());
-      return [
-          'success' => false,
-          'message' => 'Error al registrar docente: ' . $e->getMessage()
-      ];
-  }
+    } catch(Exception $e) {
+        if (isset($db) && method_exists($db, 'rollback')) {
+            $db->rollback();
+        }
+        error_log("Error en insertarDocente: " . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => 'Error al registrar docente: ' . $e->getMessage()
+        ];
+    }
 }
 
 
@@ -1163,7 +1183,7 @@ function validarDocente($datos) {
   
   // Validar campos requeridos
   $camposRequeridos = [
-      'tipo_documento', 'documento', 'nombre', 'especialidad', 'genero', 
+      'tipo_documento', 'documento', 'nombre', 'potencialidades', 'genero', 
       'estado_civil', 'estado_residencia', 'municipio', 'direccion',
       'fecha_nacimiento', 'telefono', 'email', 'fecha_contratacion'
   ];
@@ -2011,14 +2031,10 @@ function crearMateria($db, $data) {
 }
 
 
-/**
- * Actualiza una materia existente en la base de datos
- * 
- * @param mysqli $db Conexión a la base de datos MySQLi
- * @param int $id ID de la materia a actualizar
- * @param array $data Datos a actualizar
- * @return bool True si la actualización fue exitosa, False en caso de error
- */
+
+
+
+
 function actualizarMateria($db, $id, $data) {
   // Validar que el ID sea numérico
   if (!is_numeric($id)) {
@@ -2036,7 +2052,7 @@ function actualizarMateria($db, $id, $data) {
             activa = ?, 
             horas_teoricas = ?, 
             horas_practicas = ?,
-            updated_at = NOW() 
+            trayecto = ?
             WHERE id_materia = ?";
   
   // Preparamos la sentencia
@@ -2056,9 +2072,10 @@ function actualizarMateria($db, $id, $data) {
   $activa = isset($data['activa']) ? (int)(bool)$data['activa'] : 0;
   $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
   $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
+  $trayecto = isset($data['trayecto']) ? (int)$data['trayecto'] : 0; // Añadido
 
   // Vinculamos parámetros (tipos: s=string, i=integer)
-  $stmt->bind_param("sssiiiiii",
+  $stmt->bind_param("sssiiiiiii", // Ahora son 10 'i's
       $cod_materia,
       $nombre_materia,
       $pnf_ptf,
@@ -2067,6 +2084,7 @@ function actualizarMateria($db, $id, $data) {
       $activa,
       $horas_teoricas,
       $horas_practicas,
+      $trayecto, // Añadido
       $id
   );
   
@@ -2091,78 +2109,25 @@ function actualizarMateria($db, $id, $data) {
  * @return array|false Retorna el nuevo estado y datos básicos, o false en caso de error
  */
 function toggleMateria($db, $id) {
-  // Validar que el ID sea numérico y positivo
-  if (!is_numeric($id) || $id <= 0) {
-      error_log("Error: ID de materia no válido");
-      return false;
-  }
+    // Validación básica del ID
+    if (!is_numeric($id)) {
+        return false;
+    }
 
-  // Iniciar transacción para asegurar consistencia
-  $db->begin_transaction();
-  
-  try {
-      // 1. Primero obtenemos el estado actual
-      $query_select = "SELECT activa, nombre_materia FROM materias WHERE id_materia = ? FOR UPDATE";
-      $stmt_select = $db->prepare($query_select);
-      
-      if (!$stmt_select) {
-          error_log("Error en preparación de select: " . $db->error);
-          return false;
-      }
-      
-      $stmt_select->bind_param("i", $id);
-      $stmt_select->execute();
-      $result = $stmt_select->get_result();
-      $materia = $result->fetch_assoc();
-      
-      if (!$materia) {
-          error_log("Error: Materia no encontrada con ID: $id");
-          $db->rollback();
-          return false;
-      }
-      
-      $stmt_select->close();
-      
-      // 2. Actualizamos el estado
-      $query_update = "UPDATE materias SET activa = NOT activa, updated_at = NOW() WHERE id_materia = ?";
-      $stmt_update = $db->prepare($query_update);
-      
-      if (!$stmt_update) {
-          error_log("Error en preparación de update: " . $db->error);
-          $db->rollback();
-          return false;
-      }
-      
-      $stmt_update->bind_param("i", $id);
-      $success = $stmt_update->execute();
-      $stmt_update->close();
-      
-      if (!$success) {
-          $db->rollback();
-          return false;
-      }
-      
-      // 3. Obtenemos el nuevo estado
-      $nuevo_estado = $materia['activa'] ? 0 : 1;
-      
-      // Confirmar transacción
-      $db->commit();
-      
-      return [
-          'id_materia' => $id,
-          'nombre_materia' => $materia['nombre_materia'],
-          'estado_anterior' => $materia['activa'],
-          'nuevo_estado' => $nuevo_estado,
-          'actualizado' => true
-      ];
-      
-  } catch (Exception $e) {
-      $db->rollback();
-      error_log("Excepción al alternar materia: " . $e->getMessage());
-      return false;
-  }
+    // Consulta directa para alternar el estado
+    $query = "UPDATE materias SET activa = NOT activa WHERE id_materia = ?";
+    $stmt = $db->prepare($query);
+    
+    if (!$stmt) {
+        return false;
+    }
+    
+    $stmt->bind_param("i", $id);
+    $result = $stmt->execute();
+    $stmt->close();
+    
+    return $result;
 }
-
 
 
 

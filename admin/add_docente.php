@@ -125,33 +125,33 @@ $docentes = obtenerDocentes();
 <h5 class="mb-3"><i class="fas fa-briefcase me-2"></i> Datos Profesionales</h5>
 <div class="row g-3 mb-4">
     <!-- Potencialidades -->
-    <div class="col-md-6">
-        <div class="mb-3">
-            <label for="especialidad" class="form-label required">Potencialidades</label>
-            <div class="input-group">
-                <input type="text" class="form-control" id="especialidad" name="especialidad_main" 
-                       value="<?= htmlspecialchars($_POST['especialidad_main'] ?? '') ?>" required>
-                <button type="button" class="btn btn-outline-primary" id="addPotencialidad">
-                    <i class="fas fa-plus"></i>
-                </button>
-            </div>
-        </div>
-        <div id="potencialidadesContainer">
-            <?php if(!empty($_POST['especialidad'])): ?>
-                <?php foreach($_POST['especialidad'] as $value): ?>
-                    <div class="mb-3">
-                        <div class="input-group">
-                            <input type="text" class="form-control" name="especialidad[]" 
-                                   value="<?= htmlspecialchars($value) ?>">
-                            <button type="button" class="btn btn-outline-danger remove-field">
-                                <i class="fas fa-minus"></i>
-                            </button>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
+<div class="col-md-6">
+    <div class="mb-3">
+        <label for="especialidad" class="form-label required">Especialidad / Potencialidades</label>
+        <div class="input-group">
+            <input type="text" class="form-control" id="especialidad" name="potencialidades[]" 
+                   value="<?= htmlspecialchars($_POST['potencialidades'][0] ?? '') ?>" required>
+            <button type="button" class="btn btn-outline-primary" id="addPotencialidad">
+                <i class="fas fa-plus"></i>
+            </button>
         </div>
     </div>
+    <div id="potencialidadesContainer">
+        <?php if(!empty($_POST['potencialidades']) && count($_POST['potencialidades']) > 1): ?>
+            <?php for($i = 1; $i < count($_POST['potencialidades']); $i++): ?>
+                <div class="mb-3">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="potencialidades[]" 
+                               value="<?= htmlspecialchars($_POST['potencialidades'][$i] ?? '') ?>">
+                        <button type="button" class="btn btn-outline-danger remove-field">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                    </div>
+                </div>
+            <?php endfor; ?>
+        <?php endif; ?>
+    </div>
+</div>
     
     <!-- Títulos Obtenidos -->
     <div class="col-md-6">
@@ -519,7 +519,7 @@ document.addEventListener('DOMContentLoaded', function() {
         newField.innerHTML = `
             <div class="input-group">
                 <input type="text" class="form-control" name="${namePrefix}[]" 
-                       value="${value}" placeholder="${placeholder}" readonly>
+                       value="${value}" placeholder="${placeholder}">
                 <button type="button" class="btn btn-outline-danger remove-field">
                     <i class="fas fa-minus"></i>
                 </button>
@@ -537,20 +537,22 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Eventos para los botones de añadir
+    // Evento para añadir potencialidades (especialidades)
     document.getElementById('addPotencialidad').addEventListener('click', function() {
-        addField('potencialidadesContainer', 'especialidad', 'especialidad', 'Potencialidad', 'potencialidades');
+        addField('potencialidadesContainer', 'especialidad', 'potencialidades', 'Especialidad/Potencialidad', 'addPotencialidad');
     });
     
+    // Evento para añadir títulos
     document.getElementById('addTitulo').addEventListener('click', function() {
-        addField('titulosContainer', 'titulos', 'titulos', 'Título obtenido', 'titulos');
+        addField('titulosContainer', 'titulos', 'titulos', 'Título obtenido', 'addTitulo');
     });
     
+    // Evento para añadir institutos
     document.getElementById('addInstituto').addEventListener('click', function() {
-        addField('institutosContainer', 'institutos', 'institutos', 'Institución', 'institutos');
+        addField('institutosContainer', 'institutos', 'institutos', 'Institución', 'addInstituto');
     });
     
-    // Manejar el evento Enter en los campos principales
+    // Manejar el evento Enter en el campo de especialidad
     document.getElementById('especialidad').addEventListener('keypress', function(e) {
         if(e.key === 'Enter') {
             e.preventDefault();
@@ -558,6 +560,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // Manejar el evento Enter en el campo de títulos
     document.getElementById('titulos').addEventListener('keypress', function(e) {
         if(e.key === 'Enter') {
             e.preventDefault();
@@ -565,19 +568,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // Manejar el evento Enter en el campo de institutos
     document.getElementById('institutos').addEventListener('keypress', function(e) {
         if(e.key === 'Enter') {
             e.preventDefault();
             document.getElementById('addInstituto').click();
         }
     });
-});
-
-
-
-
-  // Script para los modales y acciones de la tabla
     
+    // Eliminar campos dinámicos al hacer clic en el botón de eliminar
+    document.addEventListener('click', function(e) {
+        if(e.target && (e.target.classList.contains('remove-field') || 
+           e.target.parentElement.classList.contains('remove-field'))) {
+            const btn = e.target.classList.contains('remove-field') ? 
+                        e.target : e.target.parentElement;
+            btn.closest('.mb-3').remove();
+        }
+    });
+
     // Configurar DataTable
     $('#tablaDocentes').DataTable({
         language: {
@@ -598,6 +606,9 @@ document.addEventListener('DOMContentLoaded', function() {
             data: {id: docenteId},
             success: function(response) {
                 $('#contenidoModalEditar').html(response);
+                
+                // Reconfigurar eventos para los campos dinámicos en el modal de edición
+                setupDynamicFieldsInModal();
             },
             error: function() {
                 $('#contenidoModalEditar').html(
@@ -606,6 +617,22 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // Función para configurar campos dinámicos en el modal de edición
+    function setupDynamicFieldsInModal() {
+        // Configurar eventos para añadir campos en el modal
+        $('#modalEditar').on('click', '#addPotencialidadEdit', function() {
+            addField('potencialidadesContainerEdit', 'especialidadEdit', 'potencialidades', 'Especialidad/Potencialidad', 'addPotencialidadEdit');
+        });
+        
+        $('#modalEditar').on('click', '#addTituloEdit', function() {
+            addField('titulosContainerEdit', 'titulosEdit', 'titulos', 'Título obtenido', 'addTituloEdit');
+        });
+        
+        $('#modalEditar').on('click', '#addInstitutoEdit', function() {
+            addField('institutosContainerEdit', 'institutosEdit', 'institutos', 'Institución', 'addInstitutoEdit');
+        });
+    }
     
     // Guardar cambios en el modal de edición
     $('#guardarCambios').click(function() {
@@ -644,6 +671,8 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#textoConfirmacion').text(
             `¿Está seguro que desea ${accion} este docente?`
         );
+        
+        $('#modalEstado').modal('show');
     });
     
     // Confirmar cambio de estado
@@ -672,5 +701,5 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-
+});
 </script>
