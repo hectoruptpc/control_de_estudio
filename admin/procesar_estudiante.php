@@ -35,9 +35,9 @@ header('Content-Type: application/json');
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Función para registrar errores
+// Función para registrar errores (desactivada para evitar errores de permisos)
 function logError($message) {
-    file_put_contents(__DIR__.'/../logs/php_errors.log', date('[Y-m-d H:i:s]').' '.$message.PHP_EOL, FILE_APPEND);
+    // No hacer nada, ni intentar escribir a disco
 }
 
 // Función para enviar respuesta JSON consistente
@@ -87,6 +87,7 @@ try {
         throw new Exception("No se recibieron datos", 400);
     }
 
+
     // Procesar campos dinámicos
     $titulos = isset($input['titulos']) && is_array($input['titulos']) ? array_filter($input['titulos']) : [];
     $institutos = isset($input['institutos']) && is_array($input['institutos']) ? array_filter($input['institutos']) : [];
@@ -95,6 +96,10 @@ try {
     $datos = $input;
     $datos['titulos'] = !empty($titulos) ? implode('; ', $titulos) : null;
     $datos['institutos'] = !empty($institutos) ? implode('; ', $institutos) : null;
+    // Asegurar que potencialidades tenga valor por defecto si no viene
+    if (!isset($datos['potencialidades']) || $datos['potencialidades'] === null) {
+        $datos['potencialidades'] = '';
+    }
 
     // Validar datos
     $validacion = function_exists('validarEstudiante') ? validarEstudiante($datos) : true;

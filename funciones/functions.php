@@ -250,16 +250,22 @@ function insertarEstudiante($datos) {
       $api_key = '';
 
       // 2. Campos de rol (todos los booleanos)
-      $roles = [
-          'usuario' => 0,
-          'estudiante' => 1,
-          'docente' => 0,
-          'admin' => 0,
-          'super_user' => 0,
-          'editar_user' => 0,
-          'editar_nota' => 0,
-          'editar_acceso' => 0
-      ];
+    $roles = [
+      'usuario' => 0,
+      'estudiante' => 1,
+      'docente' => 0,
+      'admin' => 0,
+      'super_user' => 0,
+      'editar_user' => 0,
+      'editar_nota' => 0,
+      'editar_acceso' => 0,
+      'editar_valores' => 0,
+      'editar_estudiante' => 0,
+      'agregar_estudiante' => 0,
+      'agregar_docente' => 0,
+      'editar_docente' => 0,
+      'agregar_carrera' => 0
+    ];
 
       // 3. Valores por defecto para campos opcionales
       $defaults = [
@@ -281,31 +287,38 @@ function insertarEstudiante($datos) {
           'api_key' => $api_key
       ];
 
-      // 4. Combinar todos los valores
-      $valores = array_merge(
-          [
-              'idusuario' => $datos['idusuario'],
-              'nombre' => $datos['nombre'],
-              'username' => $username,
-              'email' => $datos['email'] ?? null,
-              'tlf' => $datos['tlf'] ?? null,
-              'direccion' => $datos['direccion'] ?? null,
-              'estado' => $datos['estado'] ?? null,
-              'municipio' => $datos['municipio'] ?? null,
-              'parroquia' => $datos['parroquia'] ?? null,
-              'fecha_ingreso' => $datos['fecha_ingreso'] ?? null,
-              'status' => $datos['status'] ?? 'Activo',
-              'user_type' => 'estudiante',
-              'password' => $password,
-              'carrera' => $datos['carrera'] ?? null,
-              'genero' => $datos['genero'] ?? null,
-              'edo_civil' => $datos['edo_civil'] ?? null,
-              'fecha_nac' => $datos['fecha_nac'] ?? null,
-              'fecha_act' => $fecha_act
-          ],
-          $defaults,
-          $roles
-      );
+    // Procesar potencialidades igual que en docentes
+    $potencialidades = isset($datos['potencialidades']) ? 
+    (is_array($datos['potencialidades']) ? 
+      implode(', ', array_filter($datos['potencialidades'])) : 
+      $datos['potencialidades']) : '';
+
+    // 4. Combinar todos los valores
+    $valores = array_merge(
+      [
+        'idusuario' => $datos['idusuario'],
+        'nombre' => $datos['nombre'],
+        'username' => $username,
+        'email' => $datos['email'] ?? null,
+        'tlf' => $datos['tlf'] ?? null,
+        'direccion' => $datos['direccion'] ?? null,
+        'estado' => $datos['estado'] ?? null,
+        'municipio' => $datos['municipio'] ?? null,
+        'parroquia' => $datos['parroquia'] ?? null,
+        'fecha_ingreso' => $datos['fecha_ingreso'] ?? null,
+        'status' => $datos['status'] ?? 'Activo',
+        'user_type' => 'estudiante',
+        'password' => $password,
+        'carrera' => $datos['carrera'] ?? null,
+        'genero' => $datos['genero'] ?? null,
+        'edo_civil' => $datos['edo_civil'] ?? null,
+        'fecha_nac' => $datos['fecha_nac'] ?? null,
+        'fecha_act' => $fecha_act,
+        'potencialidades' => $potencialidades // Añadido para asegurar valor
+      ],
+      $defaults,
+      $roles
+    );
 
       // 5. Construir consulta SQL con placeholders ?
       $columnas = implode(', ', array_keys($valores));
@@ -319,23 +332,19 @@ function insertarEstudiante($datos) {
       }
 
       // 7. Determinar tipos de parámetros y valores
-      $tipos = '';
-      $valoresBind = [];
-      
-      foreach ($valores as $key => $value) {
-          if (in_array($key, ['grupo_familiar', 'acargo_usted', ...array_keys($roles)])) {
-              $tipos .= 'i'; // Entero
-          } elseif (is_null($value)) {
-              $tipos .= 's'; // MySQLi no tiene tipo NULL específico, se maneja como string
-              $valoresBind[] = null;
-          } else {
-              $tipos .= 's'; // String
-              $valoresBind[] = $value;
-          }
+    $tipos = '';
+    $valoresBind = [];
+    foreach ($valores as $key => $value) {
+      if (in_array($key, ['grupo_familiar', 'acargo_usted', 'usuario', 'estudiante', 'docente', 'admin', 'super_user', 'editar_user', 'editar_nota', 'editar_acceso'])) {
+        $tipos .= 'i';
+        $valoresBind[] = (int)$value;
+      } else {
+        $tipos .= 's';
+        $valoresBind[] = $value;
       }
-
-      // 8. Vincular parámetros dinámicamente
-      $stmt->bind_param($tipos, ...$valoresBind);
+    }
+    // 8. Vincular parámetros dinámicamente
+    $stmt->bind_param($tipos, ...$valoresBind);
       
       // 9. Ejecutar
       if (!$stmt->execute()) {
