@@ -83,8 +83,13 @@ $docentes = getUsersByType(1);
                 <td><?= htmlspecialchars($docente['tlf'] ?: $docente['cel']) ?></td>
                 <td><?= htmlspecialchars($docente['titulos']) ?></td>
                 <td>
-                    <span class="badge <?= $docente['status'] == 'Activo' ? 'bg-success' : 'bg-secondary' ?>">
-                        <?= htmlspecialchars($docente['status']) ?>
+                    <?php
+                    $estado = $docente['status'];
+                    $esActivo = ($estado === 'Activo' || $estado === 1 || $estado === '1');
+                    $esInactivo = ($estado === 'Inactivo' || $estado === 0 || $estado === '0');
+                    ?>
+                    <span class="badge <?= $esActivo ? 'bg-success' : 'bg-secondary' ?>">
+                        <?= $esActivo ? 'Activo' : 'Inactivo' ?>
                     </span>
                 </td>
                 <?php if (isset($_SESSION['user']['editar_docente']) && $_SESSION['user']['editar_docente'] == 1): ?>

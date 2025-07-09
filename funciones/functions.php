@@ -2462,49 +2462,82 @@ if (!function_exists('guardarMateria')) {
 
 function editarDocente($datos) {
     global $db;
-    
     try {
+        // Validar campos requeridos (sin status)
+        $required = ['nombre', 'username', 'email', 'tlf', 'genero', 'id'];
+        foreach ($required as $field) {
+            if (empty($datos[$field])) {
+                throw new Exception("El campo $field es requerido");
+            }
+        }
+
+        // Validar formato de email
+        if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
+            throw new Exception("El formato del email es inválido");
+        }
+
+        // Preparar consulta (sin status)
         $stmt = $db->prepare("UPDATE users SET 
-                            nombre = :nombre,
-                            username = :username,
-                            email = :email,
-                            tlf = :tlf,
-                            cel = :cel,
-                            genero = :genero,
-                            direccion = :direccion,
-                            ciudad = :ciudad,
-                            estado = :estado,
-                            fecha_nac = :fecha_nac,
-                            status = :status,
-                            fecha_act = NOW()
-                            WHERE id = :id");
-        
-        $resultado = $stmt->execute([
-            ':nombre' => $datos['nombre'] ?? null,
-            ':username' => $datos['username'] ?? null,
-            ':email' => $datos['email'] ?? null,
-            ':tlf' => $datos['tlf'] ?? null,
-            ':cel' => $datos['cel'] ?? null,
-            ':genero' => $datos['genero'] ?? null,
-            ':direccion' => $datos['direccion'] ?? null,
-            ':ciudad' => $datos['ciudad'] ?? null,
-            ':estado' => $datos['estado'] ?? null,
-            ':fecha_nac' => $datos['fecha_nac'] ?? null,
-            ':status' => $datos['status'] ?? null,
-            ':id' => $datos['id']
-        ]);
+            nombre = ?,
+            username = ?,
+            email = ?,
+            tlf = ?,
+            cel = ?,
+            genero = ?,
+            direccion = ?,
+            ciudad = ?,
+            estado = ?,
+            fecha_nac = ?,
+            fecha_act = NOW()
+            WHERE id = ?");
+
+        if (!$stmt) {
+            throw new Exception("Error en la preparación de la consulta: " . $db->error);
+        }
+
+        // Asignar valores por defecto a campos opcionales
+        $datos['cel'] = $datos['cel'] ?? '';
+        $datos['direccion'] = $datos['direccion'] ?? '';
+        $datos['ciudad'] = $datos['ciudad'] ?? '';
+        $datos['estado'] = $datos['estado'] ?? '';
+        $datos['fecha_nac'] = $datos['fecha_nac'] ?? null;
+
+        // Bind parameters (sin status)
+        $stmt->bind_param(
+            "ssssssssssi", // 10 's' y 1 'i' al final (id)
+            $datos['nombre'],
+            $datos['username'],
+            $datos['email'],
+            $datos['tlf'],
+            $datos['cel'],
+            $datos['genero'],
+            $datos['direccion'],
+            $datos['ciudad'],
+            $datos['estado'],
+            $datos['fecha_nac'],
+            $datos['id']
+        );
+
+        $resultado = $stmt->execute();
         
         if (!$resultado) {
-            error_log("Error en la ejecución: " . print_r($stmt->errorInfo(), true));
-            return false;
+            throw new Exception("Error en la ejecución: " . $stmt->error);
         }
+
+        $stmt->close();
         
-        return true;
-        
-    } catch (PDOException $e) {
-        error_log("Error al actualizar docente: " . $e->getMessage());
-        error_log("Datos recibidos: " . print_r($datos, true));
-        return false;
+        return [
+            'success' => true,
+            'message' => 'Docente actualizado correctamente',
+            'affected_rows' => $db->affected_rows
+        ];
+
+    } catch (Exception $e) {
+        error_log("Error en editarDocente: " . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => $e->getMessage()
+        ];
     }
 }
 

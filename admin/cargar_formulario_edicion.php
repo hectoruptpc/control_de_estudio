@@ -22,6 +22,7 @@ function generarInput($label, $name, $value, $type = 'text', $required = true) {
 <form id="formEditarDocente">
     <input type="hidden" name="id" value="<?= htmlspecialchars($docente['id'] ?? '') ?>">
     <input type="hidden" name="idusuario" value="<?= htmlspecialchars($docente['idusuario'] ?? '') ?>">
+    <input type="hidden" name="status" value="<?= isset($docente['status']) ? htmlspecialchars($docente['status']) : 1 ?>">
     
     <div class="row">
         <div class="col-md-6">
@@ -34,7 +35,7 @@ function generarInput($label, $name, $value, $type = 'text', $required = true) {
             
             <div class="mb-3">
                 <label for="genero" class="form-label">Género</label>
-                <select class="custom-select d-block w-100" id="genero" name="genero" required>
+                <select class="form-select" id="genero" name="genero" required>
                     <option value="masculino" <?= isset($docente['genero']) && $docente['genero'] == 'masculino' ? 'selected' : '' ?>>Masculino</option>
                     <option value="femenino" <?= isset($docente['genero']) && $docente['genero'] == 'femenino' ? 'selected' : '' ?>>Femenino</option>
                     <option value="otro" <?= isset($docente['genero']) && $docente['genero'] == 'otro' ? 'selected' : '' ?>>Otro</option>
@@ -54,45 +55,98 @@ function generarInput($label, $name, $value, $type = 'text', $required = true) {
                        value="<?= htmlspecialchars($docente['fecha_nac'] ?? '') ?>">
             </div>
             
-            <div class="mb-3">
-                <label for="status" class="form-label">Estado</label>
-                <select class="custom-select d-block w-100" id="status" name="status" required>
-                    <option value="activo" <?= isset($docente['status']) && $docente['status'] == 'activo' ? 'selected' : '' ?>>Activo</option>
-                    <option value="inactivo" <?= isset($docente['status']) && $docente['status'] == 'inactivo' ? 'selected' : '' ?>>Inactivo</option>
-                </select>
-            </div>
+         
         </div>
+    </div>
+    
+    <div class="d-flex justify-content-end mt-4">
+        <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar Cambios</button>
     </div>
 </form>
 
 <script>
-.then(response => {
-    if (!response.ok) {
-        return response.text().then(text => { throw new Error(text) });
-    }
-    return response.json();
-})
-.then(data => {
-    if (data.success) {
+$(document).ready(function() {
+    $('#formEditarDocente').on('submit', function(e) {
+        e.preventDefault();
+        
+        // Mostrar loader
         Swal.fire({
-            icon: 'success',
-            title: '¡Éxito!',
-            text: data.message || 'Los datos del docente se actualizaron correctamente.',
-            confirmButtonText: 'Aceptar'
-        }).then(() => {
-            location.reload();
+            title: 'Procesando',
+            html: 'Actualizando datos del docente...',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
         });
-    } else {
-        throw new Error(data.message || 'Error desconocido');
-    }
-})
-.catch(error => {
-    console.error('Error completo:', error);
-    Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: error.message || 'Ocurrió un error al actualizar los datos.',
-        confirmButtonText: 'Aceptar'
+
+        var formData = $(this).serializeArray();
+        var jsonData = {};
+        
+        // Convertir a objeto JSON
+        $.each(formData, function(i, field) {
+            jsonData[field.name] = field.value;
+        });
+
+        // Validar fecha_nac si está vacía
+        if (!jsonData.fecha_nac) {
+            jsonData.fecha_nac = null;
+        }
+
+        $.ajax({
+            url: 'actualizar_docente.php',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(jsonData),
+            dataType: 'json',
+            success: function(response) {
+                Swal.close();
+                
+                if (response.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Éxito!',
+                        text: response.message,
+                        confirmButtonText: 'Aceptar'
+                    }).then(() => {
+                        $('#modalEditarDocente').modal('hide');
+                        // Refrescar la tabla o lista de docentes
+                        if (typeof refreshDocentesTable === 'function') {
+                            refreshDocentesTable();
+                        } else {
+                            location.reload();
+                        }
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: response.message,
+                        confirmButtonText: 'Aceptar'
+                    });
+                }
+            },
+            error: function(xhr, status, error) {
+                Swal.close();
+                let errorMsg = 'Ocurrió un error al enviar los datos';
+                
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    if (response.message) {
+                        errorMsg = response.message;
+                    }
+                } catch (e) {
+                    console.error('Error parsing error response:', e);
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: errorMsg,
+                    confirmButtonText: 'Aceptar'
+                });
+            }
+        });
     });
-})
+});
 </script>
