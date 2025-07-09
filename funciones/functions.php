@@ -642,6 +642,13 @@ function procesarCSVEstudiantes($tmpFilePath, $originalName) {
               'editar_user' => 0,
               'editar_nota' => 0,
               'editar_acceso' => 0,
+              'potencialidades' => 0,
+              'editar_valores' => 0,
+              'editar_estudiante' => 0,
+              'agregar_estudiante' => 0,
+              'agregar_docente' => 0,
+              'editar_docente' => 0,
+              'agregar_carrera' => 0,
               'user_type' => 'estudiante',
               'api_key' => '',
               'fecha_act' => date('Y-m-d H:i:s')
@@ -2841,36 +2848,63 @@ function registrarPago($datos) {
 }
 
 /**
- * Busca estudiantes por cédula o nombre
+ * Busca estudiantes EXCLUSIVAMENTE por cédula (idusuario)
+ * @param string $cedula Cédula a buscar
+ * @return array Datos del estudiante encontrado
+ * @throws Exception Si ocurre un error
  */
 function buscarEstudiantePorCedula($cedula) {
     global $db;
     
-    $query = "SELECT id, idusuario AS cedula, nombre AS nombre 
-              FROM users 
-              WHERE (idusuario LIKE ? OR nombre LIKE ?) 
-              AND estudiante = 1
-              LIMIT 10";
-    
-    $stmt = $db->prepare($query);
-    
-    if (!$stmt) {
-        return [];
+    try {
+        // Consulta mejorada con más campos relevantes
+        $query = "SELECT 
+                    id, 
+                    idusuario AS cedula, 
+                    nombre,
+                    carrera,
+                    email,
+                    tlf,
+                    cel
+                  FROM users 
+                  WHERE idusuario LIKE CONCAT('%', ?, '%')
+                  AND estudiante = 1
+                  ORDER BY idusuario ASC
+                  LIMIT 10";
+        
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error al preparar la consulta: " . $db->error);
+        }
+        
+        $stmt->bind_param("s", $cedula);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error al ejecutar la consulta: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $estudiantes = [];
+        
+        while ($row = $result->fetch_assoc()) {
+            $estudiantes[] = [
+                'id' => (int)$row['id'],
+                'cedula' => $row['cedula'],
+                'nombre' => $row['nombre'],
+                'carrera' => $row['carrera'] ?? 'No especificado',
+                'contacto' => $row['cel'] ?: ($row['tlf'] ?: 'Sin teléfono'),
+                'email' => $row['email'] ?? 'Sin email'
+            ];
+        }
+        
+        $stmt->close();
+        return $estudiantes;
+        
+    } catch (Exception $e) {
+        error_log("Error en buscarEstudiantePorCedula: " . $e->getMessage());
+        throw new Exception("Error al buscar por cédula");
     }
-    
-    $cedula_like = "%$cedula%";
-    $stmt->bind_param("ss", $cedula_like, $cedula_like);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows === 0) {
-        return [];
-    }
-    
-    $estudiantes = $result->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-    
-    return $estudiantes;
 }
 
 
@@ -3721,7 +3755,7 @@ function contar_en_espera(){
 	function contar_pedidos(){
         global $db, $username, $usua, $contar_pedido,
         $pendiente_pedido, $mes_de_pago_actual, $ganancia_bantecom, $id_usua;
-        if (isAdmin())
+        if (minisAd())
         {
 
 

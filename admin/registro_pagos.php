@@ -290,67 +290,157 @@ document.getElementById('buscar_estudiante').addEventListener('keypress', functi
     }
 });
 
+
+// Función optimizada para buscar estudiante
 function buscarEstudiante() {
-    const cedula = document.getElementById('buscar_estudiante').value.trim();
+    const inputBusqueda = document.getElementById('buscar_estudiante');
+    const resultadosDiv = document.getElementById('resultados-busqueda');
+    const listaEstudiantes = document.getElementById('lista-estudiantes');
+    const cedula = inputBusqueda.value.trim();
     
+    // Limpiar resultados anteriores
+    listaEstudiantes.innerHTML = '';
+    resultadosDiv.style.display = 'none';
+    
+    // Validación mínima de caracteres
     if (cedula.length < 2) {
-        alert('Por favor ingrese al menos 2 caracteres para buscar');
+        if (cedula.length > 0) {
+            mostrarMensajeResultado('Ingrese al menos 2 caracteres', 'warning');
+        }
         return;
     }
     
-    // Mostrar indicador de carga
-    const lista = document.getElementById('lista-estudiantes');
-    lista.innerHTML = '<div class="list-group-item">Buscando...</div>';
-    document.getElementById('resultados-busqueda').style.display = 'block';
+    // Mostrar estado de carga
+    mostrarEstadoCarga();
     
-    fetch(`buscar_estudiante.php?cedula=${encodeURIComponent(cedula)}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Error en la respuesta del servidor');
-            }
-            return response.json();
-        })
-        .then(data => {
-            const lista = document.getElementById('lista-estudiantes');
-            lista.innerHTML = '';
-            
-            if (data.length === 0) {
-                lista.innerHTML = '<div class="list-group-item">No se encontraron estudiantes</div>';
-            } else {
-                data.forEach(estudiante => {
-                    const item = document.createElement('button');
-                    item.type = 'button';
-                    item.className = 'list-group-item list-group-item-action';
-                    item.innerHTML = `<strong>${estudiante.cedula}</strong> - ${estudiante.nombre}`;
-                    item.onclick = function() {
-                        seleccionarEstudiante(estudiante);
-                    };
-                    lista.appendChild(item);
-                });
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            const lista = document.getElementById('lista-estudiantes');
-            lista.innerHTML = '<div class="list-group-item text-danger">Error al buscar estudiantes</div>';
-        });
+    // Configurar timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    
+    // Realizar la petición
+    fetch(`buscar_estudiante.php?cedula=${encodeURIComponent(cedula)}`, {
+        signal: controller.signal,
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        clearTimeout(timeout);
+        if (!response.ok) {
+            return response.json().then(err => {
+                throw new Error(err.error || `Error ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (!data.success) {
+            throw new Error(data.error || 'Error en los datos recibidos');
+        }
+        
+        mostrarResultados(data, cedula);
+    })
+    .catch(error => {
+        clearTimeout(timeout);
+        manejarErrorBusqueda(error);
+    });
 }
 
+// Funciones auxiliares para modularizar
+function mostrarMensajeResultado(mensaje, tipo = 'info') {
+    const listaEstudiantes = document.getElementById('lista-estudiantes');
+    const resultadosDiv = document.getElementById('resultados-busqueda');
+    
+    listaEstudiantes.innerHTML = `
+        <div class="list-group-item text-${tipo}">
+            <i class="fas fa-${tipo === 'danger' ? 'exclamation-triangle' : 
+                              tipo === 'warning' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
+            ${mensaje}
+        </div>`;
+    resultadosDiv.style.display = 'block';
+}
+
+function mostrarEstadoCarga() {
+    const listaEstudiantes = document.getElementById('lista-estudiantes');
+    const resultadosDiv = document.getElementById('resultados-busqueda');
+    
+    listaEstudiantes.innerHTML = `
+        <div class="list-group-item">
+            <div class="d-flex justify-content-between align-items-center">
+                <span>Buscando estudiantes...</span>
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+            </div>
+        </div>`;
+    resultadosDiv.style.display = 'block';
+}
+
+function mostrarResultados(data, cedula) {
+    const listaEstudiantes = document.getElementById('lista-estudiantes');
+    const resultadosDiv = document.getElementById('resultados-busqueda');
+    
+    listaEstudiantes.innerHTML = '';
+    
+    if (data.count === 0) {
+        mostrarMensajeResultado(`No se encontraron estudiantes con "${cedula}"`);
+    } else {
+        data.data.forEach(estudiante => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'list-group-item list-group-item-action';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="me-3">
+                        <div class="fw-bold">${estudiante.cedula}</div>
+                        <div>${estudiante.nombre}</div>
+                        <small class="text-muted">${estudiante.carrera}</small>
+                        <small class="d-block text-truncate" style="max-width: 250px;">
+                            <i class="fas fa-phone-alt me-1"></i> ${estudiante.contacto} | 
+                            <i class="fas fa-envelope me-1"></i> ${estudiante.email}
+                        </small>
+                    </div>
+                    <div class="badge bg-primary rounded-pill">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                </div>`;
+            item.onclick = () => {
+                seleccionarEstudiante(estudiante);
+                resultadosDiv.style.display = 'none';
+            };
+            listaEstudiantes.appendChild(item);
+        });
+    }
+}
+
+function manejarErrorBusqueda(error) {
+    console.error('Error en búsqueda:', error);
+    
+    let errorMessage = 'Error al buscar estudiante';
+    if (error.name === 'AbortError') {
+        errorMessage = 'La búsqueda tardó demasiado. Por favor intente con menos caracteres.';
+    } else if (error.message.includes('401')) {
+        errorMessage = 'Sesión expirada. Por favor recargue la página.';
+    }
+    
+    mostrarMensajeResultado(errorMessage, 'danger');
+}
+
+// Función para manejar la selección
 function seleccionarEstudiante(estudiante) {
     document.getElementById('estudiante_id').value = estudiante.id;
-    document.getElementById('estudiante-info').textContent = 
-        `${estudiante.cedula} - ${estudiante.nombre}`;
+    document.getElementById('estudiante-info').innerHTML = `
+        <strong>${estudiante.cedula}</strong> - ${estudiante.nombre}
+        <br><small class="text-muted">${estudiante.carrera}</small>`;
     document.getElementById('estudiante-seleccionado').style.display = 'block';
-    document.getElementById('resultados-busqueda').style.display = 'none';
-    document.getElementById('buscar_estudiante').value = '';
+    
+    // Opcional: Llenar automáticamente la referencia con datos del estudiante
+    const referencia = document.getElementById('referencia');
+    if (referencia.value.trim() === '') {
+        referencia.value = `Pago de ${estudiante.nombre} (C.I. ${estudiante.cedula})`;
+    }
 }
-
-document.getElementById('quitar-estudiante').addEventListener('click', function() {
-    document.getElementById('estudiante_id').value = '';
-    document.getElementById('estudiante-seleccionado').style.display = 'none';
-    document.getElementById('buscar_estudiante').value = '';
-    document.getElementById('buscar_estudiante').focus();
-});
 </script>
 
 <?php include("includes/footer.php"); ?>
