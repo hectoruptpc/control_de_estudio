@@ -72,7 +72,12 @@ include("includes/head.php");
                                             <td><?php echo htmlspecialchars($estudiante['num_telf'] ?? ''); ?></td>
                                             <td><?php echo htmlspecialchars($estudiante['correo'] ?? ''); ?></td>
                                             <td><?php echo !empty($estudiante['fecha_ingreso']) ? date('d/m/Y', strtotime($estudiante['fecha_ingreso'])) : ''; ?></td>
-                                            <td><?php echo mostrarEstadoEstudiante($estudiante['status'] ?? 0); ?></td>
+                                            <td>
+                                                <?php
+                                                    $status = $estudiante['status'] ?? 0;
+                                                    echo ($status == 1) ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-secondary">Inactivo</span>';
+                                                ?>
+                                            </td>
                                             <td>
                                                 <div class="d-flex gap-2">
                                                     <button class="btn btn-info btn-details btn-sm" 
