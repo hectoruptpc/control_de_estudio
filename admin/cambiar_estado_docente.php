@@ -1,11 +1,26 @@
 <?php
 require_once('../funciones/functions.php');
-
 header('Content-Type: application/json');
 
-$docenteId = $_POST['id'] ?? 0;
-$nuevoEstado = $_POST['status'] ?? 0;
+$response = ['success' => false, 'message' => 'Error desconocido'];
 
-$resultado = cambiarEstadoDocente($docenteId, $nuevoEstado);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+	$id = isset($_POST['id']) ? intval($_POST['id']) : 0;
+	$status = isset($_POST['status']) ? intval($_POST['status']) : null;
 
-echo json_encode($resultado);
+	if ($id > 0 && ($status === 0 || $status === 1)) {
+		$result = updateUserStatus($id, $status);
+		if (isset($result['success']) && $result['success']) {
+			$response['success'] = true;
+			$response['message'] = $result['message'] ?? 'Estado actualizado correctamente';
+		} else {
+			$response['message'] = $result['message'] ?? 'No se pudo actualizar el estado.';
+		}
+	} else {
+		$response['message'] = 'Datos inválidos.';
+	}
+} else {
+	$response['message'] = 'Método no permitido.';
+}
+
+echo json_encode($response);

@@ -60,13 +60,21 @@ function generarInput($label, $name, $value, $type = 'text', $required = true) {
     </div>
     
     <div class="d-flex justify-content-end mt-4">
-        <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancelar</button>
+    <button type="button" class="btn btn-secondary me-2" id="btnCancelarDocente">Cancelar</button>
         <button type="submit" class="btn btn-primary">Guardar Cambios</button>
     </div>
 </form>
 
 <script>
+
 $(document).ready(function() {
+    // Forzar cierre de modal al hacer clic en Cancelar
+    $('#btnCancelarDocente').on('click', function() {
+        // Buscar el modal padre y cerrarlo
+        $(this).closest('.modal').modal('hide');
+    });
+
+
     $('#formEditarDocente').on('submit', function(e) {
         e.preventDefault();
         

@@ -472,10 +472,7 @@ $docentes = obtenerDocentes();
                     <p>Cargando información del docente...</p>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="guardarCambios">Guardar Cambios</button>
-            </div>
+            
         </div>
     </div>
 </div>
@@ -494,7 +491,7 @@ $docentes = obtenerDocentes();
                 <input type="hidden" id="nuevoEstado">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-secondary" id="btnCancelarEstado">Cancelar</button>
                 <button type="button" class="btn btn-warning" id="confirmarCambioEstado">Confirmar</button>
             </div>
         </div>
@@ -506,6 +503,11 @@ $docentes = obtenerDocentes();
 <!-- Script para manejar la adición de campos -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Handler para cerrar el modal de cambiar estado con Cancelar
+    $('#btnCancelarEstado').on('click', function() {
+        $(this).closest('.modal').modal('hide');
+    });
+
     // Función para añadir nuevos campos
     function addField(containerId, inputId, namePrefix, placeholder, buttonId) {
         const container = document.getElementById(containerId);
@@ -683,17 +685,17 @@ document.addEventListener('DOMContentLoaded', function() {
         $.ajax({
             url: 'cambiar_estado_docente.php',
             type: 'POST',
+            dataType: 'json',
             data: {
                 id: docenteId,
                 status: nuevoEstado
             },
             success: function(response) {
-                var result = JSON.parse(response);
-                if(result.success) {
+                if(response.success) {
                     $('#modalEstado').modal('hide');
                     location.reload(); // Recargar para ver cambios
                 } else {
-                    alert('Error: ' + result.message);
+                    alert('Error: ' + (response.message || 'No se pudo cambiar el estado.'));
                 }
             },
             error: function() {
