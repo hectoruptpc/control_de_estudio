@@ -3213,40 +3213,22 @@ function obtenerOpcionesStatus($db) {
         throw new InvalidArgumentException("Se esperaba una conexión MySQLi válida");
     }
 
-    $statusOptions = [
-        '1' => 'Activo',
-        '0' => 'Inactivo'
-    ];
-    
-    // Opcional: Verificar si los datos existen en la tabla status
-    $query = "SELECT id, status FROM status WHERE id IN (0, 1)";
-    
-    try {
-        if ($stmt = $db->prepare($query)) {
-            $stmt->execute();
-            $result = $stmt->get_result();
-            
-            // Si hay registros en la tabla, sobreescribimos las opciones
-            if ($result->num_rows > 0) {
-                $statusOptions = [];
-                while ($row = $result->fetch_assoc()) {
-                    $statusOptions[$row['id']] = ($row['id'] == 1) ? 'Activo' : 'Inactivo';
-                }
-            }
-            
-            $stmt->close();
-        }
-        
-        return $statusOptions;
-        
-    } catch (Exception $e) {
-        error_log($e->getMessage());
-        // Retorna las opciones por defecto en caso de error
-        return [
-            '1' => 'Activo',
-            '0' => 'Inactivo'
-        ];
+  $statusOptions = [];
+  $query = "SELECT id, status FROM status ORDER BY id ASC";
+  try {
+    if ($stmt = $db->prepare($query)) {
+      $stmt->execute();
+      $result = $stmt->get_result();
+      while ($row = $result->fetch_assoc()) {
+        $statusOptions[$row['id']] = $row['status'];
+      }
+      $stmt->close();
     }
+    return $statusOptions;
+  } catch (Exception $e) {
+    error_log($e->getMessage());
+    return [];
+  }
 }
 
 
