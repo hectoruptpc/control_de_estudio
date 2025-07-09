@@ -2,6 +2,8 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
+
+
 $titulopag = "Registro de Pagos";
 include('../funciones/functions.php');
 include("includes/head.php");
@@ -14,11 +16,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $mensaje_exito = $resultado['message'];
     } else {
         $mensaje_error = $resultado['message'];
+        if (isset($resultado['validation_errors'])) {
+            $mensaje_error .= "<ul>";
+            foreach ($resultado['validation_errors'] as $error) {
+                $mensaje_error .= "<li>$error</li>";
+            }
+            $mensaje_error .= "</ul>";
+        }
     }
 }
 
 // Obtener pagos agrupados por día
-$pagos_por_dia = obtenerPagosPorDia();
+$result_pagos = obtenerPagosPorDia();
+$pagos_por_dia = $result_pagos['success'] ? $result_pagos['data'] : [];
 ?>
 
 <div class="container-fluid">
@@ -53,7 +63,7 @@ $pagos_por_dia = obtenerPagosPorDia();
                                 <div class="mb-3">
                                     <label for="tipo_pago" class="form-label">Tipo de Pago *</label>
                                     <select class="custom-select d-block w-100" id="tipo_pago" name="tipo_pago" required>
-                                    <option value="">Seleccione...</option>
+                                        <option value="">Seleccione...</option>
                                         <option value="inscripcion">Inscripción</option>
                                         <option value="reincorporacion_estudio_expediente">Reincorporación/Estudio de Expediente</option>
                                         <option value="cambio_programa">Cambio de Programa</option>
@@ -103,36 +113,36 @@ $pagos_por_dia = obtenerPagosPorDia();
                             </div>
                             
                             <div class="col-md-6">
-                            <div class="mb-3">
-    <label for="buscar_estudiante" class="form-label">Buscar Estudiante por Cédula (opcional)</label>
-    <div class="input-group">
-        <input type="text" class="form-control" id="buscar_estudiante" 
-               placeholder="Ingrese cédula del estudiante" autocomplete="off">
-        <button class="btn btn-outline-secondary" type="button" id="btn-buscar-estudiante">
-            <i class="fas fa-search"></i> Buscar
-        </button>
-    </div>
-    <div id="resultados-busqueda" class="mt-2" style="display: none;">
-        <div class="list-group" id="lista-estudiantes"></div>
-    </div>
-    <input type="hidden" id="estudiante_id" name="estudiante_id" value="">
-    <div id="estudiante-seleccionado" class="mt-2" style="display: none;">
-        <div class="alert alert-info p-2 d-flex justify-content-between align-items-center">
-            <div>
-                <i class="fas fa-user-check"></i> 
-                <span id="estudiante-info"></span>
-            </div>
-            <button type="button" class="btn btn-sm btn-outline-danger" id="quitar-estudiante">
-                <i class="fas fa-times"></i> Quitar
-            </button>
-        </div>
-    </div>
-</div>
+                                <div class="mb-3">
+                                    <label for="buscar_estudiante" class="form-label">Buscar Estudiante por Cédula (opcional)</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="buscar_estudiante" 
+                                               placeholder="Ingrese cédula del estudiante" autocomplete="off">
+                                        <button class="btn btn-outline-secondary" type="button" id="btn-buscar-estudiante">
+                                            <i class="fas fa-search"></i> Buscar
+                                        </button>
+                                    </div>
+                                    <div id="resultados-busqueda" class="mt-2" style="display: none;">
+                                        <div class="list-group" id="lista-estudiantes"></div>
+                                    </div>
+                                    <input type="hidden" id="estudiante_id" name="estudiante_id" value="">
+                                    <div id="estudiante-seleccionado" class="mt-2" style="display: none;">
+                                        <div class="alert alert-info p-2 d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <i class="fas fa-user-check"></i> 
+                                                <span id="estudiante-info"></span>
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" id="quitar-estudiante">
+                                                <i class="fas fa-times"></i> Quitar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                                 
-<div class="mb-3">
-    <label for="referencia" class="form-label">Referencia</label>
-    <textarea class="form-control" id="referencia" name="referencia" rows="2"></textarea>
-</div>
+                                <div class="mb-3">
+                                    <label for="referencia" class="form-label">Referencia</label>
+                                    <textarea class="form-control" id="referencia" name="referencia" rows="2"></textarea>
+                                </div>
                             </div>
                         </div>
                         
@@ -144,103 +154,119 @@ $pagos_por_dia = obtenerPagosPorDia();
             </div>
             
             <!-- Listado de pagos por día -->
-            <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="card-title mb-0">
-                        <i class="fas fa-list"></i> Historial de Pagos
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <?php if (!$pagos_por_dia || count($pagos_por_dia) === 0): ?>
-                        <div class="alert alert-info">No hay pagos registrados</div>
+<div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+        <h3 class="card-title mb-0">
+            <i class="fas fa-list"></i> Historial de Pagos
+        </h3>
+    </div>
+    <div class="card-body">
+        <?php if (!$result_pagos['success']): ?>
+            <div class="alert alert-danger"><?php echo $result_pagos['message']; ?></div>
+        <?php elseif (count($pagos_por_dia) === 0): ?>
+            <div class="alert alert-info">No hay pagos registrados</div>
+        <?php else: ?>
+            <?php foreach ($pagos_por_dia as $dia): ?>
+                <div class="mb-4 border-bottom pb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h4 class="mb-0">
+                            <i class="far fa-calendar-alt text-primary"></i> 
+                            <?php echo date('d/m/Y', strtotime($dia['dia'])); ?>
+                        </h4>
+                        <span class="badge bg-primary rounded-pill">
+                            <?php echo $dia['cantidad_pagos']; ?> pago(s) - Total: $<?php echo number_format($dia['total_dia'], 2, ',', '.'); ?>
+                        </span>
+                    </div>
+                    
+                    <?php 
+                    $result_detalles = obtenerDetallesPagos($dia['dia']);
+                    $detalles_pagos = $result_detalles['success'] ? $result_detalles['data'] : [];
+                    ?>
+                    
+                    <?php if (!$result_detalles['success']): ?>
+                        <div class="alert alert-danger"><?php echo $result_detalles['message']; ?></div>
+                    <?php elseif (count($detalles_pagos) === 0): ?>
+                        <div class="alert alert-warning">No hay detalles de pagos para este día</div>
                     <?php else: ?>
-                        <?php foreach ($pagos_por_dia as $dia): ?>
-                            <div class="mb-4 border-bottom pb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h4 class="mb-0">
-                                        <i class="far fa-calendar-alt text-primary"></i> 
-                                        <?php echo date('d/m/Y', strtotime($dia['dia'])); ?>
-                                    </h4>
-                                    <span class="badge bg-primary rounded-pill">
-                                        <?php echo $dia['cantidad_pagos']; ?> pago(s) - Total: $<?php echo number_format($dia['total_dia'], 2, ',', '.'); ?>
-                                    </span>
-                                </div>
-                                
-                                <?php $detalles_pagos = obtenerDetallesPagos($dia['dia']); ?>
-                                <?php if ($detalles_pagos && count($detalles_pagos) > 0): ?>
-                                    <div class="table-responsive">
-                                        <table class="table table-striped table-hover">
-                                            <thead>
-                                                <tr>
-                                                <th>Concepto</th>
-            <th>Estudiante</th>
-            <th>Monto</th>
-            <th>Hora</th>
-            <th>Referencia</th>
-            <th>Registrado por</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ($detalles_pagos as $pago): ?>
-                                                    <tr>
-                                                        <td>
-                                                            <?php 
-                                                             $conceptos = [
-                                                                'inscripcion' => 'Inscripción',
-                                                                'reincorporacion_estudio_expediente' => 'Reincorporación/Estudio de Expediente',
-                                                                'cambio_programa' => 'Cambio de Programa',
-                                                                'cambio_sede' => 'Cambio de Sede',
-                                                                'inscripcion_pasantias_practica_profesional' => 'Inscripción de Pasantías/Práctica Profesional',
-                                                                'expedicion_constancia_certificada_notas' => 'Expedición de Constancia Certificada de Notas',
-                                                                'expedicion_constancia_simple_notas' => 'Expedición de Constancia Simple de Notas',
-                                                                'expedicion_constancia_buena_conducta' => 'Expedición de Constancia de Buena Conducta',
-                                                                'expedicion_constancia_culminacion_academica' => 'Expedición de Constancia de Culminación Académica',
-                                                                'expedicion_constancia_estudios' => 'Expedición de Constancia de Estudios',
-                                                                'expedicion_constancia_inscripcion' => 'Expedición de Constancia de Inscripción',
-                                                                'expedicion_constancia_servicio_comunitario' => 'Expedición de Constancia de Servicio Comunitario',
-                                                                'carnet_estudiantil' => 'Carnet Estudiantil',
-                                                                'uniforme_franela_estudiantil' => 'Uniforme (Franela) Estudiantil',
-                                                                'certificado_titulo' => 'Certificado de Título',
-                                                                'autenticacion_titulo' => 'Autenticación de Título',
-                                                                'pensum_estudios_certificados' => 'Pensum de Estudios Certificados',
-                                                                'programas_analiticos_vigencia_programas' => 'Programas Analíticos/Vigencia de Programas',
-                                                                'expedicion_constancia_modalidad_estudios' => 'Expedición de Constancia de Modalidad de Estudios',
-                                                                'certificacion_acta_grado' => 'Certificación de Acta de Grado',
-                                                                'grado_titulo_medalla_notas_certificadas_ubicacion_rango_buena_conducta_servicio_comunitario' => 'Grado (Título, Medalla, Notas Certificadas, Ubicación y Rango, Buena Conducta, Servicio Comunitario)',
-                                                                'derecho_grado' => 'Derecho a Grado',
-                                                                'certificacion_saberes' => 'Certificación de Saberes',
-                                                                'examen_suficiencia' => 'Examen de Suficiencia',
-                                                                'examen_extraordinario' => 'Examen Extraordinario',
-                                                                'cursos' => 'Cursos',
-                                                                'talleres' => 'Talleres',
-                                                                'diplomado' => 'Diplomado',
-                                                                'especializacion' => 'Especialización',
-                                                                'maestria' => 'Maestría'
-                                                            ];
-                                                            
-                                                            echo $pago['tipo_pago'] == 'otro' ? $pago['otro_concepto'] : ($conceptos[$pago['tipo_pago']] ?? $pago['tipo_pago']);
-                                                            ?>
-                                                        </td>
-                                                        <td>
-                                                            <?php echo $pago['estudiante_id'] ? "{$pago['estudiante_nombre']}" : 'N/A'; ?>
-                                                        </td>
-                                                        <td>$<?php echo number_format($pago['monto'], 2, ',', '.'); ?></td>
-                                                        <td><?php echo date('H:i', strtotime($pago['fecha_pago'])); ?></td>
-                                                        <td><?php echo $pago['referencia'] ?? 'N/A'; ?></td>
-                                                        <td><?php echo $pago['registrado_por_nombre'] ?? 'Sistema'; ?></td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="alert alert-warning">No hay detalles de pagos para este día</div>
-                                <?php endif; ?>
-                            </div>
-                        <?php endforeach; ?>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Concepto</th>
+                                        <th>Estudiante</th>
+                                        <th>Monto</th>
+                                        <th>Hora</th>
+                                        <th>Referencia</th>
+                                        <th>Registrado por</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($detalles_pagos as $pago): ?>
+                                        <tr>
+                                            <td>
+                                                <?php 
+                                                $conceptos = [
+                                                    'inscripcion' => 'Inscripción',
+                                                    'reincorporacion_estudio_expediente' => 'Reincorporación/Estudio de Expediente',
+                                                    'cambio_programa' => 'Cambio de Programa',
+                                                    'cambio_sede' => 'Cambio de Sede',
+                                                    'inscripcion_pasantias_practica_profesional' => 'Inscripción de Pasantías/Práctica Profesional',
+                                                    'expedicion_constancia_certificada_notas' => 'Expedición de Constancia Certificada de Notas',
+                                                    'expedicion_constancia_simple_notas' => 'Expedición de Constancia Simple de Notas',
+                                                    'expedicion_constancia_buena_conducta' => 'Expedición de Constancia de Buena Conducta',
+                                                    'expedicion_constancia_culminacion_academica' => 'Expedición de Constancia de Culminación Académica',
+                                                    'expedicion_constancia_estudios' => 'Expedición de Constancia de Estudios',
+                                                    'expedicion_constancia_inscripcion' => 'Expedición de Constancia de Inscripción',
+                                                    'expedicion_constancia_servicio_comunitario' => 'Expedición de Constancia de Servicio Comunitario',
+                                                    'carnet_estudiantil' => 'Carnet Estudiantil',
+                                                    'uniforme_franela_estudiantil' => 'Uniforme (Franela) Estudiantil',
+                                                    'certificado_titulo' => 'Certificado de Título',
+                                                    'autenticacion_titulo' => 'Autenticación de Título',
+                                                    'pensum_estudios_certificados' => 'Pensum de Estudios Certificados',
+                                                    'programas_analiticos_vigencia_programas' => 'Programas Analíticos/Vigencia de Programas',
+                                                    'expedicion_constancia_modalidad_estudios' => 'Expedición de Constancia de Modalidad de Estudios',
+                                                    'certificacion_acta_grado' => 'Certificación de Acta de Grado',
+                                                    'grado_titulo_medalla_notas_certificadas_ubicacion_rango_buena_conducta_servicio_comunitario' => 'Grado',
+                                                    'derecho_grado' => 'Derecho a Grado',
+                                                    'certificacion_saberes' => 'Certificación de Saberes',
+                                                    'examen_suficiencia' => 'Examen de Suficiencia',
+                                                    'examen_extraordinario' => 'Examen Extraordinario',
+                                                    'cursos' => 'Cursos',
+                                                    'talleres' => 'Talleres',
+                                                    'diplomado' => 'Diplomado',
+                                                    'especializacion' => 'Especialización',
+                                                    'maestria' => 'Maestría',
+                                                    'otro' => 'Otro'
+                                                ];
+                                                
+                                                echo $pago['tipo_pago'] == 'otro' ? 
+                                                    htmlspecialchars($pago['otro_concepto']) : 
+                                                    ($conceptos[$pago['tipo_pago']] ?? htmlspecialchars($pago['tipo_pago']));
+                                                ?>
+                                            </td>
+                                            <td>
+    <?php if ($pago['estudiante_id']): ?>
+        <?php echo htmlspecialchars($pago['estudiante_nombre']) ?>
+        (<?php echo htmlspecialchars($pago['estudiante_cedula']) ?>)
+    <?php else: ?>
+        N/A
+    <?php endif; ?>
+</td>
+                                            <td>$<?php echo number_format($pago['monto'], 2, ',', '.'); ?></td>
+                                            <td><?php echo date('H:i', strtotime($pago['fecha_pago'])); ?></td>
+                                            <td><?php echo $pago['referencia'] ? htmlspecialchars($pago['referencia']) : 'N/A'; ?></td>
+                                            <td><?php echo htmlspecialchars($pago['registrado_por_nombre']); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     <?php endif; ?>
                 </div>
-            </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
+</div>
         </div>
     </div>
 </div>
@@ -255,8 +281,6 @@ document.getElementById('tipo_pago').addEventListener('change', function() {
         document.getElementById('otro_concepto').value = '';
     }
 });
-
-
 
 // Buscar estudiante por cédula
 document.getElementById('btn-buscar-estudiante').addEventListener('click', buscarEstudiante);
@@ -274,8 +298,18 @@ function buscarEstudiante() {
         return;
     }
     
+    // Mostrar indicador de carga
+    const lista = document.getElementById('lista-estudiantes');
+    lista.innerHTML = '<div class="list-group-item">Buscando...</div>';
+    document.getElementById('resultados-busqueda').style.display = 'block';
+    
     fetch(`buscar_estudiante.php?cedula=${encodeURIComponent(cedula)}`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error en la respuesta del servidor');
+            }
+            return response.json();
+        })
         .then(data => {
             const lista = document.getElementById('lista-estudiantes');
             lista.innerHTML = '';
@@ -294,12 +328,11 @@ function buscarEstudiante() {
                     lista.appendChild(item);
                 });
             }
-            
-            document.getElementById('resultados-busqueda').style.display = 'block';
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Ocurrió un error al buscar el estudiante');
+            const lista = document.getElementById('lista-estudiantes');
+            lista.innerHTML = '<div class="list-group-item text-danger">Error al buscar estudiantes</div>';
         });
 }
 
@@ -318,11 +351,6 @@ document.getElementById('quitar-estudiante').addEventListener('click', function(
     document.getElementById('buscar_estudiante').value = '';
     document.getElementById('buscar_estudiante').focus();
 });
-
-
-
-
-
 </script>
 
 <?php include("includes/footer.php"); ?>
