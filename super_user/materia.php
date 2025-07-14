@@ -5,8 +5,9 @@ ini_set('display_errors', '1');
 $titulopag = "Gestión de Asignaturas";
 include('../funciones/functions.php');
 
-// Verificar permisos y autenticación si es necesario
-// check_auth();
+// Verificar permisos
+$permiso_agregar = isset($_SESSION['user']['agregar_materia']) && $_SESSION['user']['agregar_materia'] == 1;
+$permiso_editar = isset($_SESSION['user']['editar_materia']) && $_SESSION['user']['editar_materia'] == 1;
 
 // Procesar formularios
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -15,11 +16,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             'cod_materia' => $_POST['cod_materia'],
             'nombre_materia' => $_POST['nombre_materia'],
             'pnf_ptf' => strtoupper($_POST['pnf_ptf']),
-            'duracion_periodo' => $_POST['duracion_periodo'], // Ahora recibe directamente el número
+            'duracion_periodo' => $_POST['duracion_periodo'],
             'creditos' => $_POST['creditos'],
             'activa' => isset($_POST['activa']) ? 1 : 0,
             'horas_teoricas' => $_POST['horas_teoricas'],
-            'horas_practicas' => $_POST['horas_practicas']
+            'horas_practicas' => $_POST['horas_practicas'],
+            'trayecto' => $_POST['trayecto']
         ];
         
         if (!empty($_POST['id_materia'])) {
@@ -77,6 +79,7 @@ include("includes/head.php");
             <h1 class="mt-4">Gestión de Asignaturas</h1>
             
             <!-- Formulario de Materias -->
+            <?php if ($permiso_agregar): ?>
             <div class="card mt-4">
                 <div class="card-header">
                     <h5>Agregar Nueva Materia</h5>
@@ -142,22 +145,16 @@ include("includes/head.php");
                             </div>
 
                             <div class="form-group col-md-2">
-        <label for="trayecto">Trayecto</label>
-        <select class="form-control" id="trayecto" name="trayecto" required>
-        <option value="0">Trayecto 0</option>
-        <option value="1">Trayecto 1</option>
-            <option value="2">Trayecto 2</option>
-            <option value="3">Trayecto 3</option>
-            <option value="4">Trayecto 4</option>
-            <option value="5">Trayecto 5</option>
-        </select>
-    </div>
-
-
-
-
-
-
+                                <label for="trayecto">Trayecto</label>
+                                <select class="form-control" id="trayecto" name="trayecto" required>
+                                    <option value="0">Trayecto 0</option>
+                                    <option value="1">Trayecto 1</option>
+                                    <option value="2">Trayecto 2</option>
+                                    <option value="3">Trayecto 3</option>
+                                    <option value="4">Trayecto 4</option>
+                                    <option value="5">Trayecto 5</option>
+                                </select>
+                            </div>
                         </div>
                         
                         <button type="submit" name="guardar_materia" class="btn btn-primary">
@@ -166,6 +163,7 @@ include("includes/head.php");
                     </form>
                 </div>
             </div>
+            <?php endif; ?>
             
             <!-- Lista de Materias -->
             <div class="card mt-4">
@@ -183,7 +181,9 @@ include("includes/head.php");
                                     <th>Créditos</th>
                                     <th>Horas T/P</th>
                                     <th>Estado</th>
-                                    <th>Acciones</th>
+                                    <?php if ($permiso_editar): ?>
+                                        <th>Acciones</th>
+                                    <?php endif; ?>
                                 </tr>
                             </thead>
                             <tbody>
@@ -205,30 +205,33 @@ include("includes/head.php");
                                                 <?= $materia['activa'] ? 'Activa' : 'Inactiva' ?>
                                             </span>
                                         </td>
-                                        <td>
-                                            <button type="button" class="btn btn-sm btn-warning" 
-                                                    data-toggle="modal" data-target="#modalEditar" 
-                                                    data-id="<?= $materia['id_materia'] ?>" 
-                                                    data-codigo="<?= htmlspecialchars($materia['cod_materia']) ?>" 
-                                                    data-nombre="<?= htmlspecialchars($materia['nombre_materia']) ?>" 
-                                                    data-pnf="<?= $materia['pnf_ptf'] ?>" 
-                                                    data-creditos="<?= $materia['creditos'] ?>" 
-                                                    data-activa="<?= $materia['activa'] ? '1' : '0' ?>" 
-                                                    data-teoricas="<?= $materia['horas_teoricas'] ?>" 
-                                                    data-practicas="<?= $materia['horas_practicas'] ?>" 
-                                                    data-duracion="<?= isset($materia['duracion_periodo']) ? $materia['duracion_periodo'] : '1' ?>">
-                                                <i class="fas fa-edit"></i> Editar
-                                            </button>
-                                            
-                                            <button type="button" class="btn btn-sm btn-<?= $materia['activa'] ? 'danger' : 'success' ?>" 
-                                                    data-toggle="modal" data-target="#modalDeshabilitar" 
-                                                    data-id="<?= $materia['id_materia'] ?>" 
-                                                    data-nombre="<?= htmlspecialchars($materia['nombre_materia']) ?>" 
-                                                    data-estado="<?= $materia['activa'] ? 'activa' : 'inactiva' ?>">
-                                                <i class="fas fa-<?= $materia['activa'] ? 'times' : 'check' ?>"></i> 
-                                                <?= $materia['activa'] ? 'Deshabilitar' : 'Habilitar' ?>
-                                            </button>
-                                        </td>
+                                        <?php if ($permiso_editar): ?>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-warning" 
+                                                        data-toggle="modal" data-target="#modalEditar" 
+                                                        data-id="<?= $materia['id_materia'] ?>" 
+                                                        data-codigo="<?= htmlspecialchars($materia['cod_materia']) ?>" 
+                                                        data-nombre="<?= htmlspecialchars($materia['nombre_materia']) ?>" 
+                                                        data-pnf="<?= $materia['pnf_ptf'] ?>" 
+                                                        data-creditos="<?= $materia['creditos'] ?>" 
+                                                        data-activa="<?= $materia['activa'] ? '1' : '0' ?>" 
+                                                        data-teoricas="<?= $materia['horas_teoricas'] ?>" 
+                                                        data-practicas="<?= $materia['horas_practicas'] ?>" 
+                                                        data-duracion="<?= isset($materia['duracion_periodo']) ? $materia['duracion_periodo'] : '1' ?>"
+                                                        data-trayecto="<?= isset($materia['trayecto']) ? $materia['trayecto'] : '1' ?>">
+                                                    <i class="fas fa-edit"></i> Editar
+                                                </button>
+                                                
+                                                <button type="button" class="btn btn-sm btn-<?= $materia['activa'] ? 'danger' : 'success' ?>" 
+                                                        data-toggle="modal" data-target="#modalDeshabilitar" 
+                                                        data-id="<?= $materia['id_materia'] ?>" 
+                                                        data-nombre="<?= htmlspecialchars($materia['nombre_materia']) ?>" 
+                                                        data-estado="<?= $materia['activa'] ? 'activa' : 'inactiva' ?>">
+                                                    <i class="fas fa-<?= $materia['activa'] ? 'times' : 'check' ?>"></i> 
+                                                    <?= $materia['activa'] ? 'Deshabilitar' : 'Habilitar' ?>
+                                                </button>
+                                            </td>
+                                        <?php endif; ?>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -241,6 +244,7 @@ include("includes/head.php");
 </div>
 
 <!-- Modal de Edición -->
+<?php if ($permiso_editar): ?>
 <div class="modal fade" id="modalEditar" tabindex="-1" role="dialog" aria-labelledby="modalEditarLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -299,8 +303,6 @@ include("includes/head.php");
                             <input type="number" class="form-control" id="edit-horas_practicas" name="horas_practicas" min="0" required>
                         </div>
 
-                        
-
                         <div class="form-group col-md-3">
                             <label for="edit-duracion_periodo">Duración en Periodos</label>
                             <select class="form-control" id="edit-duracion_periodo" name="duracion_periodo" required>
@@ -313,19 +315,16 @@ include("includes/head.php");
                         </div>
 
                         <div class="form-group col-md-2">
-    <label for="edit-trayecto">Trayecto</label>
-    <select class="form-control" id="edit-trayecto" name="trayecto" required>
-    <option value="0">Trayecto 0</option>
-    <option value="1">Trayecto 1</option>
-        <option value="2">Trayecto 2</option>
-        <option value="3">Trayecto 3</option>
-        <option value="4">Trayecto 4</option>
-        <option value="5">Trayecto 5</option>
-    </select>
-</div>
-
-
-                        
+                            <label for="edit-trayecto">Trayecto</label>
+                            <select class="form-control" id="edit-trayecto" name="trayecto" required>
+                                <option value="0">Trayecto 0</option>
+                                <option value="1">Trayecto 1</option>
+                                <option value="2">Trayecto 2</option>
+                                <option value="3">Trayecto 3</option>
+                                <option value="4">Trayecto 4</option>
+                                <option value="5">Trayecto 5</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -360,6 +359,7 @@ include("includes/head.php");
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
 $(document).ready(function() {

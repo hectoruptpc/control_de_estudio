@@ -263,8 +263,10 @@ function insertarEstudiante($datos) {
       'editar_estudiante' => 0,
       'agregar_estudiante' => 0,
       'agregar_docente' => 0,
+      'agregar_carrera' => 0,
       'editar_docente' => 0,
-      'agregar_carrera' => 0
+      'agregar_materia' => 0,
+      'editar_materia' => 0
     ];
 
       // 3. Valores por defecto para campos opcionales
@@ -649,6 +651,8 @@ function procesarCSVEstudiantes($tmpFilePath, $originalName) {
               'agregar_docente' => 0,
               'editar_docente' => 0,
               'agregar_carrera' => 0,
+              'agregar_materia' => 0,
+              'editar_materia' => 0,
               'user_type' => 'estudiante',
               'api_key' => '',
               'fecha_act' => date('Y-m-d H:i:s')
@@ -1053,6 +1057,8 @@ function insertarDocente(array $datos): array {
         'agregar_estudiante' => 0,
         'agregar_docente' => 0,
         'editar_docente' => 0,
+        'editar_materia' => 0,
+        'agregar_materia' => 0,
         'agregar_carrera' => 0
     ],
             'defaults' => [

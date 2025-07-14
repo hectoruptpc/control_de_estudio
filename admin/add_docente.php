@@ -6,23 +6,32 @@ $titulopag = "Añadir nuevo docente";
 require_once('../funciones/functions.php');
 include("includes/head.php");
 
+// Verificar permisos
+$permiso_agregar = isset($_SESSION['user']['agregar_docente']) && $_SESSION['user']['agregar_docente'] == 1;
+$permiso_editar = isset($_SESSION['user']['editar_docente']) && $_SESSION['user']['editar_docente'] == 1;
+
 // Procesar el formulario cuando se envía
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // Validar datos primero
-    $validacion = validarDocente($_POST);
-    
-    if ($validacion === true) {
-        $resultado = insertarDocente($_POST);
-        
-        if ($resultado['success']) {
-            echo '<div class="alert alert-success">'.$resultado['message'].'</div>';
-            // Limpiar POST para no rellenar el formulario
-            $_POST = [];
-        } else {
-            echo '<div class="alert alert-danger">'.$resultado['message'].'</div>';
-        }
+    // Validar que el usuario tenga permiso para agregar
+    if (!$permiso_agregar) {
+        echo '<div class="alert alert-danger">No tiene permisos para agregar docentes</div>';
     } else {
-        echo '<div class="alert alert-danger">'.implode('<br>', $validacion).'</div>';
+        // Validar datos primero
+        $validacion = validarDocente($_POST);
+        
+        if ($validacion === true) {
+            $resultado = insertarDocente($_POST);
+            
+            if ($resultado['success']) {
+                echo '<div class="alert alert-success">'.$resultado['message'].'</div>';
+                // Limpiar POST para no rellenar el formulario
+                $_POST = [];
+            } else {
+                echo '<div class="alert alert-danger">'.$resultado['message'].'</div>';
+            }
+        } else {
+            echo '<div class="alert alert-danger">'.implode('<br>', $validacion).'</div>';
+        }
     }
 }
 
@@ -33,6 +42,7 @@ $docentes = obtenerDocentes();
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-lg-12">
+            <?php if ($permiso_agregar): ?>
             <div class="card border-0">
                 <div class="card-header bg-white py-3">
                     <h5 class="mb-0"><i class="fas fa-chalkboard-teacher me-2"></i>Agregar Nuevo Docente</h5>
@@ -122,95 +132,94 @@ $docentes = obtenerDocentes();
                         </div>
 
                         <!-- Sección 3: Datos Profesionales -->
-<h5 class="mb-3"><i class="fas fa-briefcase me-2"></i> Datos Profesionales</h5>
-<div class="row g-3 mb-4">
-    <!-- Potencialidades -->
-<div class="col-md-6">
-    <div class="mb-3">
-        <label for="especialidad" class="form-label required">Especialidad / Potencialidades</label>
-        <div class="input-group">
-            <input type="text" class="form-control" id="especialidad" name="potencialidades[]" 
-                   value="<?= htmlspecialchars($_POST['potencialidades'][0] ?? '') ?>" required>
-            <button type="button" class="btn btn-outline-primary" id="addPotencialidad">
-                <i class="fas fa-plus"></i>
-            </button>
-        </div>
-    </div>
-    <div id="potencialidadesContainer">
-        <?php if(!empty($_POST['potencialidades']) && count($_POST['potencialidades']) > 1): ?>
-            <?php for($i = 1; $i < count($_POST['potencialidades']); $i++): ?>
-                <div class="mb-3">
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="potencialidades[]" 
-                               value="<?= htmlspecialchars($_POST['potencialidades'][$i] ?? '') ?>">
-                        <button type="button" class="btn btn-outline-danger remove-field">
-                            <i class="fas fa-minus"></i>
-                        </button>
-                    </div>
-                </div>
-            <?php endfor; ?>
-        <?php endif; ?>
-    </div>
-</div>
-    
-    <!-- Títulos Obtenidos -->
-    <div class="col-md-6">
-        <div class="mb-3">
-            <label for="titulos" class="form-label">Títulos Obtenidos</label>
-            <div class="input-group">
-                <input type="text" class="form-control" id="titulos" name="titulos_main" 
-                       value="<?= htmlspecialchars($_POST['titulos_main'] ?? '') ?>" placeholder="Titulos obtenidos">
-                <button type="button" class="btn btn-outline-primary" id="addTitulo">
-                    <i class="fas fa-plus"></i>
-                </button>
-            </div>
-        </div>
-        <div id="titulosContainer">
-            <?php if(!empty($_POST['titulos'])): ?>
-                <?php foreach($_POST['titulos'] as $value): ?>
-                    <div class="mb-3">
-                        <div class="input-group">
-                            <input type="text" class="form-control" name="titulos[]" 
-                                   value="<?= htmlspecialchars($value) ?>">
-                            <button type="button" class="btn btn-outline-danger remove-field">
-                                <i class="fas fa-minus"></i>
-                            </button>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
-    </div>
-    
-    <!-- Instituciones -->
-    <div class="col-md-6">
-        <div class="mb-3">
-            <label for="institutos" class="form-label">Instituciones</label>
-            <div class="input-group">
-                <input type="text" class="form-control" id="institutos" name="institutos_main" 
-                       value="<?= htmlspecialchars($_POST['institutos_main'] ?? '') ?>" placeholder="Instituciones donde obtuvo los títulos">
-                <button type="button" class="btn btn-outline-primary" id="addInstituto">
-                    <i class="fas fa-plus"></i>
-                </button>
-            </div>
-        </div>
-        <div id="institutosContainer">
-            <?php if(!empty($_POST['institutos'])): ?>
-                <?php foreach($_POST['institutos'] as $value): ?>
-                    <div class="mb-3">
-                        <div class="input-group">
-                            <input type="text" class="form-control" name="institutos[]" 
-                                   value="<?= htmlspecialchars($value) ?>">
-                            <button type="button" class="btn btn-outline-danger remove-field">
-                                <i class="fas fa-minus"></i>
-                            </button>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
-    </div>
-</div>
+                        <h5 class="mb-3"><i class="fas fa-briefcase me-2"></i> Datos Profesionales</h5>
+                        <div class="row g-3 mb-4">
+                            <!-- Potencialidades -->
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="especialidad" class="form-label required">Especialidad / Potencialidades</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="especialidad" name="potencialidades[]" 
+                                               value="<?= htmlspecialchars($_POST['potencialidades'][0] ?? '') ?>" required>
+                                        <button type="button" class="btn btn-outline-primary" id="addPotencialidad">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="potencialidadesContainer">
+                                    <?php if(!empty($_POST['potencialidades']) && count($_POST['potencialidades']) > 1): ?>
+                                        <?php for($i = 1; $i < count($_POST['potencialidades']); $i++): ?>
+                                            <div class="mb-3">
+                                                <div class="input-group">
+                                                    <input type="text" class="form-control" name="potencialidades[]" 
+                                                           value="<?= htmlspecialchars($_POST['potencialidades'][$i] ?? '') ?>">
+                                                    <button type="button" class="btn btn-outline-danger remove-field">
+                                                        <i class="fas fa-minus"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        <?php endfor; ?>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            
+                            <!-- Títulos Obtenidos -->
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="titulos" class="form-label">Títulos Obtenidos</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="titulos" name="titulos_main" 
+                                               value="<?= htmlspecialchars($_POST['titulos_main'] ?? '') ?>" placeholder="Titulos obtenidos">
+                                        <button type="button" class="btn btn-outline-primary" id="addTitulo">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="titulosContainer">
+                                    <?php if(!empty($_POST['titulos'])): ?>
+                                        <?php foreach($_POST['titulos'] as $value): ?>
+                                            <div class="mb-3">
+                                                <div class="input-group">
+                                                    <input type="text" class="form-control" name="titulos[]" 
+                                                           value="<?= htmlspecialchars($value) ?>">
+                                                    <button type="button" class="btn btn-outline-danger remove-field">
+                                                        <i class="fas fa-minus"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            
+                            <!-- Instituciones -->
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="institutos" class="form-label">Instituciones</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="institutos" name="institutos_main" 
+                                               value="<?= htmlspecialchars($_POST['institutos_main'] ?? '') ?>" placeholder="Instituciones donde obtuvo los títulos">
+                                        <button type="button" class="btn btn-outline-primary" id="addInstituto">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="institutosContainer">
+                                    <?php if(!empty($_POST['institutos'])): ?>
+                                        <?php foreach($_POST['institutos'] as $value): ?>
+                                            <div class="mb-3">
+                                                <div class="input-group">
+                                                    <input type="text" class="form-control" name="institutos[]" 
+                                                           value="<?= htmlspecialchars($value) ?>">
+                                                    <button type="button" class="btn btn-outline-danger remove-field">
+                                                        <i class="fas fa-minus"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
                             
                             <div class="col-md-6">
                                 <div class="mb-3">
@@ -226,7 +235,6 @@ $docentes = obtenerDocentes();
                                     <select class="custom-select d-block w-100" id="estado_laboral" name="estado_laboral" required>
                                         <option value="Activo" <?= ($_POST['estado_laboral'] ?? '') == 'Activo' ? 'selected' : '' ?>>Activo</option>
                                         <option value="Inactivo" <?= ($_POST['estado_laboral'] ?? '') == 'Inactivo' ? 'selected' : '' ?>>Inactivo</option>
-                                        
                                     </select>
                                 </div>
                             </div>
@@ -399,62 +407,72 @@ $docentes = obtenerDocentes();
                     </form>
                 </div>
             </div>
+            <?php endif; ?>
+            
+            <!-- Tabla de docentes registrados -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5>Docentes Registrados</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered" id="tablaDocentes">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Documento</th>
+                                    <th>Nombre</th>
+                                    <th>Email</th>
+                                    <th>Contacto</th>
+                                    <th>Estado</th>
+                                    <?php if ($permiso_editar): ?>
+                                    <th>Acciones</th>
+                                    <?php endif; ?>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($docentes as $docente): ?>
+                                <tr>
+                                    <td><?= $docente['id'] ?></td>
+                                    <td><?= $docente['idusuario'] ?></td>
+                                    <td><?= $docente['nombre'] ?></td>
+                                    <td><?= $docente['email'] ?></td>
+                                    <td><?= $docente['tlf'] ?></td>
+                                    <td>
+                                        <span class="badge <?= ($docente['status'] == 1) ? 'bg-success' : 'bg-warning' ?>">
+                                            <?= ($docente['status'] == 1) ? 'Activo' : 'Inactivo' ?>
+                                        </span>
+                                    </td>
+                                    <?php if ($permiso_editar): ?>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary btn-editar" 
+                                                data-id="<?= $docente['id'] ?>" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#modalEditar">
+                                            <i class="fas fa-edit"></i> Editar
+                                        </button>
+                                        <button class="btn btn-sm <?= ($docente['status'] == 1) ? 'btn-warning' : 'btn-success' ?> btn-estado" 
+                                                data-id="<?= $docente['id'] ?>" 
+                                                data-status="<?= $docente['status'] ?>"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#modalEstado">
+                                            <i class="fas <?= ($docente['status'] == 1) ? 'fa-ban' : 'fa-check' ?>"></i> 
+                                            <?= ($docente['status'] == 1) ? 'Deshabilitar' : 'Habilitar' ?>
+                                        </button>
+                                    </td>
+                                    <?php endif; ?>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Tabla de docentes registrados -->
-<div class="container mt-5">
-    <h2>Docentes Registrados</h2>
-    <div class="table-responsive">
-        <table class="table table-striped table-bordered" id="tablaDocentes">
-            <thead class="thead-dark">
-                <tr>
-                    <th>ID</th>
-                    <th>Documento</th>
-                    <th>Nombre</th>
-                    <th>Email</th>
-                    <th>Contacto</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($docentes as $docente): ?>
-                <tr>
-                    <td><?= $docente['id'] ?></td>
-                    <td><?= $docente['idusuario'] ?></td>
-                    <td><?= $docente['nombre'] ?></td>
-                    <td><?= $docente['email'] ?></td>
-                    <td><?= $docente['tlf'] ?></td>
-                    <td>
-                        <span class="badge <?= ($docente['status'] == 1) ? 'bg-success' : 'bg-warning' ?>">
-                            <?= ($docente['status'] == 1) ? 'Activo' : 'Inactivo' ?>
-                        </span>
-                    </td>
-                    <td>
-                        <button class="btn btn-sm btn-primary btn-editar" 
-                                data-id="<?= $docente['id'] ?>" 
-                                data-bs-toggle="modal" 
-                                data-bs-target="#modalEditar">
-                            <i class="fas fa-edit"></i> Editar
-                        </button>
-                        <button class="btn btn-sm <?= ($docente['status'] == 1) ? 'btn-warning' : 'btn-success' ?> btn-estado" 
-                                data-id="<?= $docente['id'] ?>" 
-                                data-status="<?= $docente['status'] ?>"
-                                data-bs-toggle="modal" 
-                                data-bs-target="#modalEstado">
-                            <i class="fas <?= ($docente['status'] == 1) ? 'fa-ban' : 'fa-check' ?>"></i> 
-                            <?= ($docente['status'] == 1) ? 'Deshabilitar' : 'Habilitar' ?>
-                        </button>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
+<?php if ($permiso_editar): ?>
 <!-- Modal para Editar Docente -->
 <div class="modal fade" id="modalEditar" tabindex="-1" aria-labelledby="modalEditarLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -472,7 +490,6 @@ $docentes = obtenerDocentes();
                     <p>Cargando información del docente...</p>
                 </div>
             </div>
-            
         </div>
     </div>
 </div>
@@ -497,6 +514,7 @@ $docentes = obtenerDocentes();
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <?php include("includes/footer.php"); ?>
 
@@ -704,12 +722,4 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
-
-
-
-
-
-
-
-
 </script>

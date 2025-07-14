@@ -1,30 +1,29 @@
-
-
-
 <?php
-// Configuración inicial silenciosa
+// Configuración inicial
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // Desactivamos la visualización de errores
+ini_set('display_errors', 1);
 
-// Manejo de sesión sin errores
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+
 
 // Procesamiento antes de cualquier salida
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
-    require_once('../funciones/functions.php'); // Incluimos solo lo necesario
+    require_once('../funciones/functions.php');
+    requireAdmin();
     
-    if ($_POST['action'] == 'update_status' && isset($_POST['docente_id'])) {
-        $new_status = ($_POST['current_status'] == 'Activo') ? 'Inactivo' : 'Activo';
-        
-        if (updateDocenteEstado($_POST['docente_id'], $new_status)) {
-            $_SESSION['success_message'] = "Estado del docente actualizado correctamente";
+    if ($_POST['action'] == 'update_status' && isset($_POST['user_id'])) {
+        // Verificar permiso antes de ejecutar
+        if (isset($_SESSION['user']['editar_docente']) && $_SESSION['user']['editar_docente'] == 1) {
+            $new_status = ($_POST['current_status'] == 'Activo') ? 'Inactivo' : 'Activo';
+            
+            if (updateUserStatus($_POST['user_id'], $new_status)) {
+                $_SESSION['success_message'] = "Estado del docente actualizado correctamente";
+            } else {
+                $_SESSION['error_message'] = "Error al actualizar el estado del docente";
+            }
         } else {
-            $_SESSION['error_message'] = "Error al actualizar el estado del docente";
+            $_SESSION['error_message'] = "No tienes permisos para realizar esta acción";
         }
         
-        // Redirección con JavaScript para evitar headers
         echo '<script>window.location.href="list_docentes.php";</script>';
         exit();
     }
@@ -35,15 +34,19 @@ $titulopag = "Lista de docentes";
 require_once('../funciones/functions.php');
 require_once("includes/head.php");
 
-$docentes = getDocentes();
+// Obtener solo usuarios que son docentes (docente = 1)
+$docentes = getUsersByType(1);
 ?>
 
 <div class="container">
     <h2>Lista de docentes</h2>
-    <!-- Botón para abrir modal de nuevo docente -->
-    <button type="button" class="btn btn-success mb-3" data-bs-toggle="modal" data-bs-target="#addDocenteModal">
-        <i class="fas fa-plus"></i> Añadir nuevo docente
-    </button>
+    
+    <?php if (isset($_SESSION['user']['agregar_docente']) && $_SESSION['user']['agregar_docente'] == 1): ?>
+        <!-- Botón para abrir modal de nuevo docente -->
+        <button type="button" class="btn btn-success mb-3" data-bs-toggle="modal" data-bs-target="#addDocenteModal">
+            <i class="fas fa-plus"></i> Añadir nuevo docente
+        </button>
+    <?php endif; ?>
     
     <?php if (isset($_SESSION['success_message'])): ?>
         <div class="alert alert-success"><?= $_SESSION['success_message'] ?></div>
@@ -60,49 +63,59 @@ $docentes = getDocentes();
             <tr>
                 <th>ID</th>
                 <th>Nombre</th>
-                <th>Apellido</th>
-                <th>Documento</th>
+                <th>Usuario</th>
                 <th>Email</th>
-                <th>Especialidad</th>
+                <th>Teléfono</th>
+                <th>Títulos</th>
                 <th>Estado</th>
-                <th>Acciones</th>
+                <?php if (isset($_SESSION['user']['editar_docente']) && $_SESSION['user']['editar_docente'] == 1): ?>
+                    <th>Acciones</th>
+                <?php endif; ?>
             </tr>
         </thead>
         <tbody>
             <?php foreach ($docentes as $docente): ?>
             <tr>
                 <td><?= $docente['id'] ?></td>
-                <td><?= $docente['nombre'] ?></td>
-                <td><?= $docente['apellido'] ?></td>
-                <td><?= $docente['tipo_documento'] ?>: <?= $docente['documento'] ?></td>
-                <td><?= $docente['email'] ?></td>
-                <td><?= $docente['especialidad'] ?></td>
+                <td><?= htmlspecialchars($docente['nombre']) ?></td>
+                <td><?= htmlspecialchars($docente['username']) ?></td>
+                <td><?= htmlspecialchars($docente['email']) ?></td>
+                <td><?= htmlspecialchars($docente['tlf'] ?: $docente['cel']) ?></td>
+                <td><?= htmlspecialchars($docente['titulos']) ?></td>
                 <td>
-                    <span class="badge <?= $docente['estado'] == 'Activo' ? 'bg-success' : 'bg-secondary' ?>">
-                        <?= $docente['estado'] ?>
+                    <?php
+                    $estado = $docente['status'];
+                    $esActivo = ($estado === 'Activo' || $estado === 1 || $estado === '1');
+                    $esInactivo = ($estado === 'Inactivo' || $estado === 0 || $estado === '0');
+                    ?>
+                    <span class="badge <?= $esActivo ? 'bg-success' : 'bg-secondary' ?>">
+                        <?= $esActivo ? 'Activo' : 'Inactivo' ?>
                     </span>
                 </td>
-                <td>
-                    <!-- Botón Editar - abre modal -->
-                    <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editModal-<?= $docente['id'] ?>">
-                        <i class="fas fa-edit"></i> Editar
-                    </button>
-                    
-                    <!-- Botón Desactivar/Activar - abre modal -->
-                    <button type="button" class="btn btn-sm <?= $docente['estado'] == 'Activo' ? 'btn-danger' : 'btn-success' ?>" 
-                            data-bs-toggle="modal" 
-                            data-bs-target="#statusModal-<?= $docente['id'] ?>">
-                        <i class="fas <?= $docente['estado'] == 'Activo' ? 'fa-user-slash' : 'fa-user-check' ?>"></i> 
-                        <?= $docente['estado'] == 'Activo' ? 'Desactivar' : 'Activar' ?>
-                    </button>
-                </td>
+                <?php if (isset($_SESSION['user']['editar_docente']) && $_SESSION['user']['editar_docente'] == 1): ?>
+                    <td>
+                        <!-- Botón Editar - abre modal -->
+                        <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editModal-<?= $docente['id'] ?>">
+                            <i class="fas fa-edit"></i> Editar
+                        </button>
+                        
+                        <!-- Botón Desactivar/Activar - abre modal -->
+                        <button type="button" class="btn btn-sm <?= $docente['status'] == 'Activo' ? 'btn-danger' : 'btn-success' ?>" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#statusModal-<?= $docente['id'] ?>">
+                            <i class="fas <?= $docente['status'] == 'Activo' ? 'fa-user-slash' : 'fa-user-check' ?>"></i> 
+                            <?= $docente['status'] == 'Activo' ? 'Desactivar' : 'Activar' ?>
+                        </button>
+                    </td>
+                <?php endif; ?>
             </tr>
             <?php endforeach; ?>
         </tbody>
     </table>
 </div>
 
-<!-- Modal para agregar nuevo docente -->
+<!-- Modal para agregar nuevo docente (solo visible si tiene permiso agregar_docente) -->
+<?php if (isset($_SESSION['user']['agregar_docente']) && $_SESSION['user']['agregar_docente'] == 1): ?>
 <div class="modal fade" id="addDocenteModal" tabindex="-1" aria-labelledby="addDocenteModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -112,7 +125,8 @@ $docentes = getDocentes();
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form method="POST" action="add_docente.php">
+            <form method="POST" action="add_user.php">
+                <input type="hidden" name="docente" value="1">
                 <div class="modal-body">
                     <!-- Información básica -->
                     <h5 class="mb-3">Información Personal</h5>
@@ -131,65 +145,12 @@ $docentes = getDocentes();
                         </div>
                     </div>
 
-                    <!-- Documentación -->
-                    <div class="row mt-3">
-                        <div class="col-md-3">
-                            <div class="form-group">
-                                <label>Tipo de documento</label>
-                                <select name="tipo_documento" class="form-control" required>
-                                    <option value="V-">V- (Venezolano)</option>
-                                    <option value="E-">E- (Extranjero)</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="form-group">
-                                <label>Número de documento</label>
-                                <input type="text" name="documento" class="form-control" 
-                                       pattern="\d{1,8}" title="Máximo 8 dígitos numéricos" 
-                                       maxlength="8" required>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="form-group">
-                                <label>Fecha de nacimiento</label>
-                                <input type="date" name="fecha_nacimiento" class="form-control" required>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="form-group">
-                                <label>Género</label>
-                                <select name="genero" class="form-control" required>
-                                    <option value="Masculino">Masculino</option>
-                                    <option value="Femenino">Femenino</option>
-                                    <option value="Otro">Otro</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Direcciones -->
+                    <!-- Información de usuario -->
                     <div class="row mt-3">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>Dirección actual</label>
-                                <input type="text" name="direccion_actual" class="form-control" placeholder="Ej: Av. Principal, Casa #123">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label>Dirección de nacimiento</label>
-                                <input type="text" name="direccion_nacimiento" class="form-control" placeholder="Ej: Calle 5 con Av. 3, Edif. Las Flores">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Contacto -->
-                    <div class="row mt-3">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label>Teléfono</label>
-                                <input type="text" name="telefono" class="form-control">
+                                <label>Nombre de usuario</label>
+                                <input type="text" name="username" class="form-control" required>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -200,16 +161,26 @@ $docentes = getDocentes();
                         </div>
                     </div>
 
-                    <!-- Información académica -->
-                    <h5 class="mt-4 mb-3">Información Académica</h5>
-                    <div class="row">
+                    <!-- Contacto -->
+                    <div class="row mt-3">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>Especialidad</label>
-                                <input type="text" name="especialidad" class="form-control" required>
+                                <label>Teléfono</label>
+                                <input type="text" name="tlf" class="form-control">
                             </div>
                         </div>
                         <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Celular</label>
+                                <input type="text" name="cel" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Información académica -->
+                    <h5 class="mt-4 mb-3">Información Académica</h5>
+                    <div class="row">
+                        <div class="col-md-12">
                             <div class="form-group">
                                 <label>Títulos académicos</label>
                                 <div id="titulos-container">
@@ -225,22 +196,21 @@ $docentes = getDocentes();
                         </div>
                     </div>
 
-                    <!-- Información laboral -->
-                    <h5 class="mt-4 mb-3">Información Laboral</h5>
+                    <!-- Información de acceso -->
+                    <h5 class="mt-4 mb-3">Información de Acceso</h5>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>Fecha de contratación</label>
-                                <input type="date" name="fecha_contratacion" class="form-control" required>
+                                <label>Contraseña</label>
+                                <input type="password" name="password" class="form-control" required>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label>Estado</label>
-                                <select name="estado" class="form-control" required>
+                                <select name="status" class="form-control" required>
                                     <option value="Activo">Activo</option>
                                     <option value="Inactivo">Inactivo</option>
-                                    <option value="Licencia">Licencia</option>
                                 </select>
                             </div>
                         </div>
@@ -258,105 +228,120 @@ $docentes = getDocentes();
         </div>
     </div>
 </div>
+<?php endif; ?>
 
-<!-- Modales - Fuera de la tabla pero dentro del container -->
-<?php foreach ($docentes as $docente): ?>
-<!-- Modal Editar -->
-<div class="modal fade" id="editModal-<?= $docente['id'] ?>" tabindex="-1" aria-labelledby="editModalLabel-<?= $docente['id'] ?>" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-warning text-white">
-                <h5 class="modal-title" id="editModalLabel-<?= $docente['id'] ?>">
-                    <i class="fas fa-edit"></i> Editar Docente: <?= $docente['nombre'] ?> <?= $docente['apellido'] ?>
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+<!-- Modales - Solo se generan si el usuario tiene permiso editar_docente -->
+<?php if (isset($_SESSION['user']['editar_docente']) && $_SESSION['user']['editar_docente'] == 1): ?>
+    <?php foreach ($docentes as $docente): ?>
+    <!-- Modal Editar -->
+    <div class="modal fade" id="editModal-<?= $docente['id'] ?>" tabindex="-1" aria-labelledby="editModalLabel-<?= $docente['id'] ?>" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-white">
+                    <h5 class="modal-title" id="editModalLabel-<?= $docente['id'] ?>">
+                        <i class="fas fa-edit"></i> Editar Docente: <?= htmlspecialchars($docente['nombre']) ?>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="update_user.php" method="POST">
+                    <div class="modal-body">
+                        <input type="hidden" name="id" value="<?= $docente['id'] ?>">
+                        <input type="hidden" name="docente" value="1">
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre</label>
+                                <input type="text" name="nombre" class="form-control" value="<?= htmlspecialchars($docente['nombre']) ?>" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Apellido</label>
+                                <input type="text" name="apellido" class="form-control" value="<?= htmlspecialchars($docente['apellido'] ?? '') ?>" required>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre de usuario</label>
+                                <input type="text" name="username" class="form-control" value="<?= htmlspecialchars($docente['username']) ?>" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email</label>
+                                <input type="email" name="email" class="form-control" value="<?= htmlspecialchars($docente['email']) ?>" required>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Teléfono</label>
+                                <input type="text" name="tlf" class="form-control" value="<?= htmlspecialchars($docente['tlf']) ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Títulos</label>
+                                <input type="text" name="titulos" class="form-control" value="<?= htmlspecialchars($docente['titulos']) ?>">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label">Estado</label>
+                                <select name="status" class="form-control" required>
+                                    <option value="Activo" <?= $docente['status'] == 'Activo' ? 'selected' : '' ?>>Activo</option>
+                                    <option value="Inactivo" <?= $docente['status'] == 'Inactivo' ? 'selected' : '' ?>>Inactivo</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Guardar cambios
+                        </button>
+                    </div>
+                </form>
             </div>
-            <form action="update_docente.php" method="POST">
-                <div class="modal-body">
-                    <input type="hidden" name="id" value="<?= $docente['id'] ?>">
-                    
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Nombre</label>
-                            <input type="text" name="nombre" class="form-control" value="<?= htmlspecialchars($docente['nombre']) ?>" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Apellido</label>
-                            <input type="text" name="apellido" class="form-control" value="<?= htmlspecialchars($docente['apellido']) ?>" required>
-                        </div>
-                    </div>
-
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Email</label>
-                            <input type="email" name="email" class="form-control" value="<?= htmlspecialchars($docente['email']) ?>" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Especialidad</label>
-                            <input type="text" name="especialidad" class="form-control" value="<?= htmlspecialchars($docente['especialidad']) ?>" required>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <label class="form-label">Estado</label>
-                            <select name="estado"  class="custom-select d-block w-100" required>
-                                <option value="Activo" <?= $docente['estado'] == 'Activo' ? 'selected' : '' ?>>Activo</option>
-                                <option value="Inactivo" <?= $docente['estado'] == 'Inactivo' ? 'selected' : '' ?>>Inactivo</option>
-                                <option value="Licencia" <?= $docente['estado'] == 'Licencia' ? 'selected' : '' ?>>Licencia</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="fas fa-times"></i> Cancelar
-                    </button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Guardar cambios
-                    </button>
-                </div>
-            </form>
         </div>
     </div>
-</div>
 
-<!-- Modal Cambio de Estado -->
-<div class="modal fade" id="statusModal-<?= $docente['id'] ?>" tabindex="-1" aria-labelledby="statusModalLabel-<?= $docente['id'] ?>" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header <?= $docente['estado'] == 'Activo' ? 'bg-danger' : 'bg-success' ?> text-white">
-                <h5 class="modal-title" id="statusModalLabel-<?= $docente['id'] ?>">
-                    <i class="fas <?= $docente['estado'] == 'Activo' ? 'fa-user-slash' : 'fa-user-check' ?>"></i> 
-                    <?= $docente['estado'] == 'Activo' ? 'Desactivar' : 'Activar' ?> Docente
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+    <!-- Modal Cambio de Estado -->
+    <div class="modal fade" id="statusModal-<?= $docente['id'] ?>" tabindex="-1" aria-labelledby="statusModalLabel-<?= $docente['id'] ?>" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header <?= $docente['status'] == 'Activo' ? 'bg-danger' : 'bg-success' ?> text-white">
+                    <h5 class="modal-title" id="statusModalLabel-<?= $docente['id'] ?>">
+                        <i class="fas <?= $docente['status'] == 'Activo' ? 'fa-user-slash' : 'fa-user-check' ?>"></i> 
+                        <?= $docente['status'] == 'Activo' ? 'Desactivar' : 'Activar' ?> Docente
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="POST" action="">
+                    <input type="hidden" name="action" value="update_status">
+                    <input type="hidden" name="user_id" value="<?= $docente['id'] ?>">
+                    <input type="hidden" name="current_status" value="<?= $docente['status'] ?>">
+                    <div class="modal-body">
+                        <p>¿Estás seguro que deseas <?= $docente['status'] == 'Activo' ? 'desactivar' : 'activar' ?> al docente:</p>
+                        <h5 class="text-center"><?= htmlspecialchars($docente['nombre']) ?></h5>
+                        <p class="text-muted text-center">Usuario: <?= htmlspecialchars($docente['username']) ?></p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                        <button type="submit" class="btn <?= $docente['status'] == 'Activo' ? 'btn-danger' : 'btn-success' ?>">
+                            <i class="fas <?= $docente['status'] == 'Activo' ? 'fa-user-slash' : 'fa-user-check' ?>"></i> 
+                            <?= $docente['status'] == 'Activo' ? 'Desactivar' : 'Activar' ?>
+                        </button>
+                    </div>
+                </form>
             </div>
-            <form method="POST" action="">
-                <input type="hidden" name="action" value="update_status">
-                <input type="hidden" name="docente_id" value="<?= $docente['id'] ?>">
-                <input type="hidden" name="current_status" value="<?= $docente['estado'] ?>">
-                <div class="modal-body">
-                    <p>¿Estás seguro que deseas <?= $docente['estado'] == 'Activo' ? 'desactivar' : 'activar' ?> al docente:</p>
-                    <h5 class="text-center"><?= $docente['nombre'] ?> <?= $docente['apellido'] ?>?</h5>
-                    <p class="text-muted text-center">Documento: <?= $docente['tipo_documento'] ?> <?= $docente['documento'] ?></p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="fas fa-times"></i> Cancelar
-                    </button>
-                    <button type="submit" class="btn <?= $docente['estado'] == 'Activo' ? 'btn-danger' : 'btn-success' ?>">
-                        <i class="fas <?= $docente['estado'] == 'Activo' ? 'fa-user-slash' : 'fa-user-check' ?>"></i> 
-                        <?= $docente['estado'] == 'Activo' ? 'Desactivar' : 'Activar' ?>
-                    </button>
-                </div>
-            </form>
         </div>
     </div>
-</div>
+    <?php endforeach; ?>
+<?php endif; ?>
 
-<?php endforeach; ?>
-
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 $(document).ready(function() {
     // Forzar el manejo de los modales
@@ -368,15 +353,12 @@ $(document).ready(function() {
     // Ocultar alertas después de 5 segundos
     $(".alert").delay(5000).fadeOut(300);
 });
-</script>
 
-
-<script>
+// Script para agregar títulos académicos (solo si está presente el modal)
+<?php if (isset($_SESSION['user']['agregar_docente']) && $_SESSION['user']['agregar_docente'] == 1): ?>
 $(document).ready(function() {
-    // Máximo teórico de campos (puedes aumentarlo o quitarlo)
     const MAX_FIELDS = 20;
     
-    // Añadir nuevo campo de título
     $(document).on('click', '.btn-add-more', function() {
         const container = $('#titulos-container');
         const groupCount = container.find('.titulo-group').length;
@@ -392,7 +374,6 @@ $(document).ready(function() {
             `;
             container.append(newGroup);
             
-            // Scroll al nuevo campo si hay muchos
             if(groupCount > 3) {
                 container.animate({
                     scrollTop: container.prop("scrollHeight")
@@ -403,9 +384,7 @@ $(document).ready(function() {
         }
     });
     
-    // Eliminar campo de título
     $(document).on('click', '.btn-remove', function() {
-        // No permitir eliminar si solo queda un campo
         if($('.titulo-group').length > 1) {
             $(this).closest('.titulo-group').remove();
         } else {
@@ -413,10 +392,7 @@ $(document).ready(function() {
         }
     });
 });
+<?php endif; ?>
 </script>
-
-
-
-
 
 <?php include("includes/footer.php"); ?>

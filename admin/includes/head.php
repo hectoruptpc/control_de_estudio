@@ -94,11 +94,11 @@ if (!isAdmin()) {
         <i class="fas fa-chalkboard-teacher fa-fw"></i> Docentes
     </a>
     <div id="dropdown-docentes-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
-       <?php if ($_SESSION['user']['agregar_docente'] == 1): ?>
+      
     <a title="Registrar Nuevo Docente" class="dropdown-item" href="add_docente.php">
-        <i class="fas fa-user-plus fa-fw"></i> Nuevo Docente
+        <i class="fas fa-user-plus fa-fw"></i> Gestionar Docente
     </a>
-<?php endif; ?>
+
        
         <a title="Asignación de Cursos" class="dropdown-item" href="asignacion_cursos.php">
             <i class="fas fa-tasks fa-fw"></i> Asignar Cursos

@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     break;
                     
                 case 'editar':
-                    if (!empty($id) && !empty($valor)) {
+                    if (($id !== '' && $id !== null) && $valor !== '') {
                         if ($nuevo_id != $id) {
                             // Verificar si el nuevo ID ya existe
                             $check = $db->prepare("SELECT id FROM $tabla WHERE id = ? AND id != ?");
@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     break;
                     
                 case 'eliminar':
-                    if (!empty($id)) {
+                    if ($id !== '' && $id !== null) {
                         $stmt = $db->prepare("DELETE FROM $tabla WHERE id = ?");
                         $stmt->bind_param("i", $id);
                         $stmt->execute();
