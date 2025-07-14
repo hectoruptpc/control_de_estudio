@@ -35,7 +35,7 @@ function generarInput($label, $name, $value, $type = 'text', $required = true) {
             
             <div class="mb-3">
                 <label for="genero" class="form-label">Género</label>
-                <select class="form-select" id="genero" name="genero" required>
+                <select class="custom-select d-block w-100" id="genero" name="genero" required>
                     <option value="masculino" <?= isset($docente['genero']) && $docente['genero'] == 'masculino' ? 'selected' : '' ?>>Masculino</option>
                     <option value="femenino" <?= isset($docente['genero']) && $docente['genero'] == 'femenino' ? 'selected' : '' ?>>Femenino</option>
                     <option value="otro" <?= isset($docente['genero']) && $docente['genero'] == 'otro' ? 'selected' : '' ?>>Otro</option>
