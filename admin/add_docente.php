@@ -60,15 +60,29 @@ $docentes = obtenerDocentes();
                                 </div>
                             </div>
                             
-                            <div class="col-md-3">
-                                <div class="mb-3">
-                                    <label for="tipo_documento" class="form-label required">Tipo de Documento</label>
-                                    <select class="custom-select d-block w-100" id="tipo_documento" name="tipo_documento" required>
-                                        <option value="V" <?= ($_POST['tipo_documento'] ?? '') == 'V' ? 'selected' : '' ?>>V- (Venezolano)</option>
-                                        <option value="E" <?= ($_POST['tipo_documento'] ?? '') == 'E' ? 'selected' : '' ?>>E- (Extranjero)</option>
-                                    </select>
-                                </div>
-                            </div>
+                           <div class="col-md-3">
+    <div class="mb-3">
+        <label for="tipo_documento" class="form-label required">Tipo de Documento</label>
+        <select class="custom-select d-block w-100" id="tipo_documento" name="tipo_documento" required>
+            <option value="">Seleccione...</option>
+            <?php
+            $query = "SELECT id, tipo FROM tipo_cedula ORDER BY tipo";
+            if ($stmt = $db->prepare($query)) {
+                $stmt->execute();
+                $result = $stmt->get_result();
+                
+                while ($row = $result->fetch_assoc()) {
+                    $selected = (isset($_POST['tipo_documento']) && $_POST['tipo_documento'] == $row['id']) ? 'selected' : '';
+                    echo '<option value="' . $row['id'] . '" ' . $selected . '>' 
+                         . htmlspecialchars($row['tipo']) . '</option>';
+                }
+                
+                $stmt->close();
+            }
+            ?>
+        </select>
+    </div>
+</div>
                             
                             <div class="col-md-3">
                                 <div class="mb-3">
@@ -109,18 +123,31 @@ $docentes = obtenerDocentes();
                             </div>
                             
                             <div class="col-md-3">
-                                <div class="mb-3">
-                                    <label for="estado_civil" class="form-label required">Estado Civil</label>
-                                    <select class="custom-select d-block w-100" id="estado_civil" name="estado_civil" required>
-                                        <option value="">Seleccione...</option>
-                                        <option value="Soltero/a" <?= ($_POST['estado_civil'] ?? '') == 'Soltero/a' ? 'selected' : '' ?>>Soltero/a</option>
-                                        <option value="Casado/a" <?= ($_POST['estado_civil'] ?? '') == 'Casado/a' ? 'selected' : '' ?>>Casado/a</option>
-                                        <option value="Divorciado/a" <?= ($_POST['estado_civil'] ?? '') == 'Divorciado/a' ? 'selected' : '' ?>>Divorciado/a</option>
-                                        <option value="Viudo/a" <?= ($_POST['estado_civil'] ?? '') == 'Viudo/a' ? 'selected' : '' ?>>Viudo/a</option>
-                                        <option value="Unión Libre" <?= ($_POST['estado_civil'] ?? '') == 'Unión Libre' ? 'selected' : '' ?>>Unión Libre</option>
-                                    </select>
-                                </div>
-                            </div>
+    <div class="mb-3">
+        <label for="estado_civil" class="form-label required">Estado Civil</label>
+        <select class="custom-select d-block w-100" id="estado_civil" name="estado_civil" required>
+            <option value="">Seleccione...</option>
+            <?php
+            // Consulta para obtener los estados civiles desde la base de datos
+            $query = "SELECT id, estado_civil FROM estado_civil ORDER BY estado_civil";
+            $result = $db->query($query);
+            
+            if ($result && $result->num_rows > 0) {
+                while ($row = $result->fetch_assoc()) {
+                    $selected = (isset($_POST['estado_civil']) && $_POST['estado_civil'] == $row['id']) ? 'selected' : '';
+                    echo '<option value="' . $row['id'] . '" ' . $selected . '>' 
+                         . htmlspecialchars($row['estado_civil']) . '</option>';
+                }
+            }
+            
+            // Cerrar el resultado si es necesario (depende de tu configuración)
+            if ($result) {
+                $result->free();
+            }
+            ?>
+        </select>
+    </div>
+</div>
                             
                             <div class="col-md-3">
                                 <div class="mb-3">
@@ -284,30 +311,59 @@ $docentes = obtenerDocentes();
                             </div>
                             
                             <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label for="tipo_vivienda" class="form-label">Tipo de Vivienda</label>
-                                    <select class="custom-select d-block w-100" id="tipo_vivienda" name="tipo_vivienda">
-                                        <option value="">Seleccione...</option>
-                                        <option value="Casa" <?= ($_POST['tipo_vivienda'] ?? '') == 'Casa' ? 'selected' : '' ?>>Casa</option>
-                                        <option value="Apartamento" <?= ($_POST['tipo_vivienda'] ?? '') == 'Apartamento' ? 'selected' : '' ?>>Apartamento</option>
-                                        <option value="Quinta" <?= ($_POST['tipo_vivienda'] ?? '') == 'Quinta' ? 'selected' : '' ?>>Quinta</option>
-                                        <option value="Otro" <?= ($_POST['tipo_vivienda'] ?? '') == 'Otro' ? 'selected' : '' ?>>Otro</option>
-                                    </select>
-                                </div>
-                            </div>
+    <div class="mb-3">
+        <label for="tipo_vivienda" class="form-label">Tipo de Vivienda</label>
+        <select class="custom-select d-block w-100" id="tipo_vivienda" name="tipo_vivienda">
+            <option value="">Seleccione...</option>
+            <?php
+            $query = "SELECT id, vivienda FROM tipo_vivienda ORDER BY vivienda";
+            if ($stmt = $db->prepare($query)) {
+                $stmt->execute();
+                $result = $stmt->get_result();
+                
+                while ($row = $result->fetch_assoc()) {
+                    $selected = (isset($_POST['tipo_vivienda']) && $_POST['tipo_vivienda'] == $row['vivienda']) ? 'selected' : '';
+                    echo '<option value="' . htmlspecialchars($row['vivienda']) . '" ' . $selected . '>' 
+                         . htmlspecialchars($row['vivienda']) . '</option>';
+                }
+                
+                $stmt->close();
+            }
+            ?>
+        </select>
+    </div>
+</div>
                             
                             <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label for="tenencia_vivienda" class="form-label">Tenencia de Vivienda</label>
-                                    <select class="custom-select d-block w-100" id="tenencia_vivienda" name="tenencia_vivienda">
-                                        <option value="">Seleccione...</option>
-                                        <option value="Propia" <?= ($_POST['tenencia_vivienda'] ?? '') == 'Propia' ? 'selected' : '' ?>>Propia</option>
-                                        <option value="Alquilada" <?= ($_POST['tenencia_vivienda'] ?? '') == 'Alquilada' ? 'selected' : '' ?>>Alquilada</option>
-                                        <option value="Familiar" <?= ($_POST['tenencia_vivienda'] ?? '') == 'Familiar' ? 'selected' : '' ?>>Familiar</option>
-                                        <option value="Otro" <?= ($_POST['tenencia_vivienda'] ?? '') == 'Otro' ? 'selected' : '' ?>>Otro</option>
-                                    </select>
-                                </div>
-                            </div>
+    <div class="mb-3">
+        <label for="tenencia_vivienda" class="form-label">Tenencia de Vivienda</label>
+        <select class="custom-select d-block w-100" id="tenencia_vivienda" name="tenencia_vivienda">
+            <option value="">Seleccione...</option>
+            <?php
+            try {
+                $query = "SELECT id, tenencia FROM tenencia_vivienda ORDER BY tenencia";
+                if ($stmt = $db->prepare($query)) {
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    
+                    while ($row = $result->fetch_assoc()) {
+                        $selected = (isset($_POST['tenencia_vivienda']) && $_POST['tenencia_vivienda'] == $row['tenencia']) ? 'selected' : '';
+                        echo '<option value="' . htmlspecialchars($row['tenencia']) . '" ' . $selected . '>' 
+                             . htmlspecialchars($row['tenencia']) . '</option>';
+                    }
+                    
+                    $stmt->close();
+                } else {
+                    echo '<option value="">Error al preparar la consulta</option>';
+                }
+            } catch (Exception $e) {
+                echo '<option value="">Error al cargar opciones</option>';
+                error_log("Error en tenencia_vivienda: " . $e->getMessage());
+            }
+            ?>
+        </select>
+    </div>
+</div>
                         </div>
 
                         <!-- Sección 5: Situación Familiar -->
