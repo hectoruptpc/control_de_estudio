@@ -60,12 +60,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="mb-3">
                     <label for="cedula" class="form-label">Cédula*</label>
                     <div class="input-group">
-                        <select class="form-select" id="tipo_cedula" name="tipo_cedula" style="max-width: 80px;" required>
-                            <option value="V" <?= (($_POST['tipo_cedula'] ?? '') == 'V') ? 'selected' : '' ?>>V</option>
-                            <option value="E" <?= (($_POST['tipo_cedula'] ?? '') == 'E') ? 'selected' : '' ?>>E</option>
-                        </select>
-                        <input type="text" class="form-control" id="numero_cedula" name="numero_cedula" placeholder="Ej: 12345678" required value="<?= htmlspecialchars($_POST['numero_cedula'] ?? '') ?>">
-                        <input type="hidden" id="idusuario" name="idusuario" value="<?= htmlspecialchars($_POST['idusuario'] ?? '') ?>">
+    <select class="form-select" id="tipo_cedula" name="tipo_cedula" style="max-width: 80px;" required>
+        <?php
+        // Consulta preparada para obtener los tipos de cédula
+        $query = "SELECT id, tipo FROM tipo_cedula";
+        $stmt = $db->prepare($query);
+        
+        if ($stmt) {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            $selectedValue = $_POST['tipo_cedula'] ?? '';
+            
+            while ($row = $result->fetch_assoc()) {
+                $id = htmlspecialchars($row['id'], ENT_QUOTES, 'UTF-8');
+                $tipo = htmlspecialchars($row['tipo'], ENT_QUOTES, 'UTF-8');
+                $selected = ($selectedValue === $row['id']) ? 'selected' : '';
+                echo "<option value='{$id}' {$selected}>{$tipo}</option>";
+            }
+            
+            $stmt->close();
+        } else {
+            // Manejo de error (opcional)
+            echo "<option value=''>Error al cargar tipos</option>";
+        }
+        ?>
+    </select>
                     </div>
                     <small class="text-muted">Formato: V-12345678 o E-12345678</small>
                 </div>
