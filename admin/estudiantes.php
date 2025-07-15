@@ -20,6 +20,7 @@ if (isset($estudiantes['error'])) {
 include("includes/head.php");
 ?>
 
+
 <div class="container-fluid">
     <div class="container-fluid py-4">
         <div class="row">
@@ -114,7 +115,9 @@ include("includes/head.php");
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="detalleModalLabel">Detalles del Estudiante</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+  <span aria-hidden="true">&times;</span>
+</button>
             </div>
             <div class="modal-body" id="detalleEstudianteContent">
                 <!-- Contenido cargado dinámicamente -->
@@ -138,8 +141,10 @@ include("includes/head.php");
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-warning text-white">
-                <h5 class="modal-title" id="editarEstudianteModalLabel"><i class="fas fa-user-edit me-2"></i>Editar Estudiante</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="editarEstudianteModalLabel"><i class="fas fa-user-edit me-2"></i>  Editar Estudiante</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+  <span aria-hidden="true">&times;</span>
+</button>
             </div>
             <div class="modal-body" id="editarEstudianteContent">
                 <!-- Contenido cargado dinámicamente -->
@@ -163,8 +168,12 @@ include("includes/head.php");
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
-                <h5 class="modal-title" id="agregarEstudianteModalLabel"><i class="fas fa-user-plus me-2"></i>Agregar Nuevo Estudiante</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="agregarEstudianteModalLabel">
+   <i class="fas fa-user-plus me-2"></i> Agregar Nuevo Estudiante
+</h5>
+               <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+  <span aria-hidden="true">&times;</span>
+</button>
             </div>
             <div class="modal-body">
                 <?php 

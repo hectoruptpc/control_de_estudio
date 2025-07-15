@@ -535,7 +535,9 @@ $docentes = obtenerDocentes();
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="modalEditarLabel">Editar Docente</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+               <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+  <span aria-hidden="true">&times;</span>
+</button>
             </div>
             <div class="modal-body" id="contenidoModalEditar">
                 <!-- El contenido se cargará aquí via AJAX -->
@@ -556,7 +558,9 @@ $docentes = obtenerDocentes();
         <div class="modal-content">
             <div class="modal-header bg-warning text-white">
                 <h5 class="modal-title" id="modalEstadoLabel">Cambiar Estado del Docente</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <div class="modal-body">
                 <p id="textoConfirmacion">¿Está seguro que desea cambiar el estado de este docente?</p>
