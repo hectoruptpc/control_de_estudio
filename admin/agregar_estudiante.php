@@ -186,64 +186,30 @@ include("includes/head.php");
                                         </div>
                                     </div>
                                     
-                                    <!-- Títulos Obtenidos -->
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="titulos" class="form-label">Títulos Obtenidos</label>
-                                            <div class="input-group">
-                                                <input type="text" class="form-control" id="titulos" name="titulos_main" 
-                                                       value="<?= htmlspecialchars($_POST['titulos_main'] ?? '') ?>" placeholder="Títulos obtenidos">
-                                                <button type="button" class="btn btn-outline-primary" id="addTitulo">
-                                                    <i class="fas fa-plus"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div id="titulosContainer">
-                                            <?php if(!empty($_POST['titulos'])): ?>
-                                                <?php foreach($_POST['titulos'] as $value): ?>
-                                                    <div class="mb-3">
-                                                        <div class="input-group">
-                                                            <input type="text" class="form-control" name="titulos[]" 
-                                                                   value="<?= htmlspecialchars($value) ?>">
-                                                            <button type="button" class="btn btn-outline-danger remove-field">
-                                                                <i class="fas fa-minus"></i>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                <?php endforeach; ?>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Instituciones -->
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="institutos" class="form-label">Instituciones</label>
-                                            <div class="input-group">
-                                                <input type="text" class="form-control" id="institutos" name="institutos_main" 
-                                                       value="<?= htmlspecialchars($_POST['institutos_main'] ?? '') ?>" placeholder="Instituciones donde obtuvo los títulos">
-                                                <button type="button" class="btn btn-outline-primary" id="addInstituto">
-                                                    <i class="fas fa-plus"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div id="institutosContainer">
-                                            <?php if(!empty($_POST['institutos'])): ?>
-                                                <?php foreach($_POST['institutos'] as $value): ?>
-                                                    <div class="mb-3">
-                                                        <div class="input-group">
-                                                            <input type="text" class="form-control" name="institutos[]" 
-                                                                   value="<?= htmlspecialchars($value) ?>">
-                                                            <button type="button" class="btn btn-outline-danger remove-field">
-                                                                <i class="fas fa-minus"></i>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                <?php endforeach; ?>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </div>
+                                   <!-- Títulos Obtenidos e Instituciones -->
+<div class="col-md-12">
+    <div class="mb-3">
+        <label class="form-label">Títulos Obtenidos e Instituciones</label>
+        <div class="row g-3 mb-3">
+            <div class="col-md-5">
+                <input type="text" class="form-control" id="titulos" 
+                       placeholder="Título obtenido">
+            </div>
+            <div class="col-md-5">
+                <input type="text" class="form-control" id="institutos" 
+                       placeholder="Institución donde obtuvo el título">
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-primary w-100" id="addTituloInstituto">
+                    <i class="fas fa-plus me-1"></i> Agregar
+                </button>
+            </div>
+        </div>
+        <div id="titulosInstitutosContainer">
+            <!-- Aquí se agregarán los pares de títulos e instituciones -->
+        </div>
+    </div>
+</div>
 
                                 <!-- Sección 4: Ubicación y Vivienda -->
                                 <h5 class="mb-3"><i class="fas fa-home me-2"></i> Vivienda</h5>
@@ -567,6 +533,74 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+
+// Script para manejar la adición de campos
+document.addEventListener('DOMContentLoaded', function() {
+    // Función para añadir nuevos campos de título e institución juntos
+    function addTitleInstitutionPair() {
+        const titulo = document.getElementById('titulos').value.trim();
+        const instituto = document.getElementById('institutos').value.trim();
+        
+        if(titulo === '' || instituto === '') {
+            alert('Por favor complete ambos campos: título e institución');
+            return;
+        }
+        
+        const container = document.getElementById('titulosInstitutosContainer');
+        
+        const newPair = document.createElement('div');
+        newPair.className = 'row g-3 mb-3';
+        newPair.innerHTML = `
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="titulos[]" 
+                       value="${titulo}" placeholder="Título obtenido" readonly>
+            </div>
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="institutos[]" 
+                       value="${instituto}" placeholder="Institución" readonly>
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-danger remove-field w-100">
+                    <i class="fas fa-minus"></i> Eliminar
+                </button>
+            </div>
+        `;
+        container.appendChild(newPair);
+        
+        // Vaciar los campos principales
+        document.getElementById('titulos').value = '';
+        document.getElementById('institutos').value = '';
+        document.getElementById('titulos').focus();
+        
+        // Añadir evento para eliminar el par
+        newPair.querySelector('.remove-field').addEventListener('click', function() {
+            container.removeChild(newPair);
+        });
+    }
+    
+    // Evento para el botón de añadir
+    document.getElementById('addTituloInstituto').addEventListener('click', addTitleInstitutionPair);
+    
+    // Manejar el evento Enter en los campos principales
+    document.getElementById('titulos').addEventListener('keypress', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault();
+            addTitleInstitutionPair();
+        }
+    });
+    
+    document.getElementById('institutos').addEventListener('keypress', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault();
+            addTitleInstitutionPair();
+        }
+    });
+});
+
+
+
+
 </script>
 
 <?php include("includes/footer.php"); ?>

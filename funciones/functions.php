@@ -239,134 +239,165 @@ function validarDatosEstudiante($data) {
 }
 
 function insertarEstudiante($datos) {
-  global $db;
-  
-  try {
-      // 1. Preparación de datos
-      $username = strtolower(str_replace(' ', '.', $datos['nombre']));
-      $cedulaLimpia = substr($datos['idusuario'], 2);
-      $password = md5($cedulaLimpia);
-      $fecha_act = date('Y-m-d H:i:s');
-      $api_key = '';
+    global $db;
+    
+    try {
+        // Iniciar transacción
+        $db->begin_transaction();
 
-      // 2. Campos de rol (todos los booleanos)
-    $roles = [
-      'usuario' => 0,
-      'estudiante' => 1,
-      'docente' => 0,
-      'admin' => 0,
-      'super_user' => 0,
-      'editar_user' => 0,
-      'editar_nota' => 0,
-      'potencialidades' => '',
-      'editar_acceso' => 0,
-      'editar_valores' => 0,
-      'editar_estudiante' => 0,
-      'agregar_estudiante' => 0,
-      'agregar_docente' => 0,
-      'agregar_carrera' => 0,
-      'editar_docente' => 0,
-      'agregar_materia' => 0,
-      'editar_materia' => 0
-    ];
+        // 1. Preparar datos del usuario
+        $username = strtolower(str_replace(' ', '.', $datos['nombre']));
+        $cedulaLimpia = substr($datos['idusuario'], 2);
+        $password = md5($cedulaLimpia);
+        $fecha_act = date('Y-m-d H:i:s');
+        $api_key = '';
 
-      // 3. Valores por defecto para campos opcionales
-      $defaults = [
-          'cel' => '',
-          'ciudad' => $datos['municipio'] ?? '',
-          'num_telf_opc' => '',
-          'etnia' => '',
-          'casaapto' => 'No especificado',
-          'punto_referencia' => '',
-          'grupo_familiar' => 0,
-          'acargo_usted' => 0,
-          'fuente_ingresos' => '',
-          'tipo_vivienda' => '',
-          'tenencia_vivienda' => '',
-          'enfermedad' => '',
-          'discapacidad' => '',
-          'titulos' => '',
-          'institutos' => '',
-          'api_key' => $api_key
-      ];
+        // 2. Configurar roles y valores por defecto
+        $roles = [
+            'usuario' => 0,
+            'estudiante' => 1,
+            'docente' => 0,
+            'admin' => 0,
+            'super_user' => 0,
+            'editar_user' => 0,
+            'editar_nota' => 0,
+            'editar_acceso' => 0,
+            'potencialidades' => '',
+            'editar_valores' => 0,
+            'editar_estudiante' => 0,
+            'agregar_estudiante' => 0,
+            'agregar_docente' => 0,
+            'editar_docente' => 0,
+            'agregar_carrera' => 0,
+            'agregar_materia' => 0,
+            'editar_materia' => 0
+        ];
 
-    // Procesar potencialidades igual que en docentes
-    $potencialidades = isset($datos['potencialidades']) ? 
-    (is_array($datos['potencialidades']) ? 
-      implode(', ', array_filter($datos['potencialidades'])) : 
-      $datos['potencialidades']) : '';
+        $defaults = [
+            'cel' => '',
+            'ciudad' => $datos['municipio'] ?? '',
+            'num_telf_opc' => '',
+            'etnia' => '',
+            'casaapto' => 'No especificado',
+            'punto_referencia' => '',
+            'grupo_familiar' => 0,
+            'acargo_usted' => 0,
+            'fuente_ingresos' => '',
+            'tipo_vivienda' => '',
+            'tenencia_vivienda' => '',
+            'enfermedad' => '',
+            'discapacidad' => '',
+            'titulos' => '',
+            'institutos' => '',
+            'api_key' => $api_key
+        ];
 
-    // 4. Combinar todos los valores
-    $valores = array_merge(
-      [
-        'idusuario' => $datos['idusuario'],
-        'nombre' => $datos['nombre'],
-        'username' => $username,
-        'email' => $datos['email'] ?? null,
-        'tlf' => $datos['tlf'] ?? null,
-        'direccion' => $datos['direccion'] ?? null,
-        'estado' => $datos['estado'] ?? null,
-        'municipio' => $datos['municipio'] ?? null,
-        'parroquia' => $datos['parroquia'] ?? null,
-        'fecha_ingreso' => $datos['fecha_ingreso'] ?? null,
-        'status' => $datos['status'] ?? 'Activo',
-        'user_type' => 'estudiante',
-        'password' => $password,
-        'carrera' => $datos['carrera'] ?? null,
-        'genero' => $datos['genero'] ?? null,
-        'edo_civil' => $datos['edo_civil'] ?? null,
-        'fecha_nac' => $datos['fecha_nac'] ?? null,
-        'fecha_act' => $fecha_act,
-        'potencialidades' => $potencialidades // Añadido para asegurar valor
-      ],
-      $defaults,
-      $roles
-    );
+        // 3. Combinar todos los valores
+        $valores = array_merge(
+            [
+                'idusuario' => $datos['idusuario'],
+                'nombre' => $datos['nombre'],
+                'username' => $username,
+                'email' => $datos['email'] ?? null,
+                'tlf' => $datos['tlf'] ?? null,
+                'direccion' => $datos['direccion'] ?? null,
+                'estado' => $datos['estado'] ?? null,
+                'municipio' => $datos['municipio'] ?? null,
+                'parroquia' => $datos['parroquia'] ?? null,
+                'fecha_ingreso' => $datos['fecha_ingreso'] ?? null,
+                'status' => $datos['status'] ?? 'Activo',
+                'user_type' => 'estudiante',
+                'password' => $password,
+                'carrera' => $datos['carrera'] ?? null,
+                'genero' => $datos['genero'] ?? null,
+                'edo_civil' => $datos['edo_civil'] ?? null,
+                'fecha_nac' => $datos['fecha_nac'] ?? null,
+                'fecha_act' => $fecha_act
+            ],
+            $defaults,
+            $roles
+        );
 
-      // 5. Construir consulta SQL con placeholders ?
-      $columnas = implode(', ', array_keys($valores));
-      $placeholders = implode(', ', array_fill(0, count($valores), '?'));
-      $sql = "INSERT INTO users ($columnas) VALUES ($placeholders)";
+        // 4. Insertar en la tabla users
+        $columnas = implode(', ', array_keys($valores));
+        $placeholders = implode(', ', array_fill(0, count($valores), '?'));
+        $sql = "INSERT INTO users ($columnas) VALUES ($placeholders)";
 
-      // 6. Preparar statement
-      $stmt = $db->prepare($sql);
-      if (!$stmt) {
-          throw new Exception("Error en preparación: " . $db->error);
-      }
+        $stmt = $db->prepare($sql);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
 
-      // 7. Determinar tipos de parámetros y valores
-    $tipos = '';
-    $valoresBind = [];
-    foreach ($valores as $key => $value) {
-      if (in_array($key, ['grupo_familiar', 'acargo_usted', 'usuario', 'estudiante', 'docente', 'admin', 'super_user', 'editar_user', 'editar_nota', 'editar_acceso'])) {
-        $tipos .= 'i';
-        $valoresBind[] = (int)$value;
-      } else {
-        $tipos .= 's';
-        $valoresBind[] = $value;
-      }
+        // 5. Vincular parámetros
+        $tipos = '';
+        $valoresBind = [];
+        foreach ($valores as $key => $value) {
+            if (in_array($key, ['grupo_familiar', 'acargo_usted', 'usuario', 'estudiante', 'docente', 'admin', 'super_user', 'editar_user', 'editar_nota', 'editar_acceso'])) {
+                $tipos .= 'i'; // Entero
+                $valoresBind[] = (int)$value;
+            } else {
+                $tipos .= 's'; // String
+                $valoresBind[] = $value;
+            }
+        }
+
+        $stmt->bind_param($tipos, ...$valoresBind);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error al ejecutar: " . $stmt->error);
+        }
+        
+        $userId = $stmt->insert_id;
+        $stmt->close();
+
+        // 6. Insertar títulos obtenidos si existen
+        if (!empty($datos['titulos']) && !empty($datos['institutos'])) {
+            $titulos = is_array($datos['titulos']) ? $datos['titulos'] : [$datos['titulos']];
+            $institutos = is_array($datos['institutos']) ? $datos['institutos'] : [$datos['institutos']];
+            
+            $count = min(count($titulos), count($institutos));
+            
+            $sqlTitulos = "INSERT INTO titulos_obtenidos (id_usuario, nombre, titulo_obtenido, instituto) VALUES (?, ?, ?, ?)";
+            $stmtTitulos = $db->prepare($sqlTitulos);
+            
+            if (!$stmtTitulos) {
+                throw new Exception("Error al preparar consulta de títulos: " . $db->error);
+            }
+            
+            for ($i = 0; $i < $count; $i++) {
+                $stmtTitulos->bind_param(
+                    "isss", 
+                    $userId,
+                    $datos['nombre'],
+                    $titulos[$i],
+                    $institutos[$i]
+                );
+                if (!$stmtTitulos->execute()) {
+                    throw new Exception("Error al insertar título: " . $stmtTitulos->error);
+                }
+            }
+            
+            $stmtTitulos->close();
+        }
+
+        // Confirmar transacción
+        $db->commit();
+
+        return [
+            'success' => true,
+            'message' => 'Estudiante registrado exitosamente!',
+            'id' => $userId
+        ];
+
+    } catch(Exception $e) {
+        // Revertir transacción en caso de error
+        $db->rollback();
+        error_log("Error en insertarEstudiante: " . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => 'Error al registrar estudiante: ' . $e->getMessage()
+        ];
     }
-    // 8. Vincular parámetros dinámicamente
-    $stmt->bind_param($tipos, ...$valoresBind);
-      
-      // 9. Ejecutar
-      if (!$stmt->execute()) {
-          throw new Exception("Error al ejecutar: " . $stmt->error);
-      }
-
-      return [
-          'success' => true,
-          'message' => 'Estudiante registrado exitosamente!',
-          'id' => $stmt->insert_id
-      ];
-
-  } catch(Exception $e) {
-      error_log("Error en insertarEstudiante: " . $e->getMessage());
-      return [
-          'success' => false,
-          'message' => 'Error al registrar estudiante: ' . $e->getMessage()
-      ];
-  }
 }
 
 // Función para validar datos de estudiante
@@ -557,219 +588,251 @@ function actualizarEstudiante(array $datos): array {
 }
 
 function procesarCSVEstudiantes($tmpFilePath, $originalName) {
-  global $db;
-  
-  // Validar extensión del archivo
-  $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
-  if ($extension !== 'csv') {
-      return ['success' => false, 'message' => 'El archivo debe tener extensión .csv'];
-  }
-  
-  // Abrir el archivo CSV
-  if (($handle = fopen($tmpFilePath, "r")) === FALSE) {
-      return ['success' => false, 'message' => 'No se pudo abrir el archivo CSV'];
-  }
-  
-  // Leer encabezados
-  $headers = fgetcsv($handle, 1000, ",");
-  if ($headers === FALSE) {
-      fclose($handle);
-      return ['success' => false, 'message' => 'El archivo CSV está vacío o no tiene el formato correcto'];
-  }
-  
-  // Mapeo de campos esperados
-  $camposEsperados = [
-      'idusuario', 'nombre', 'email', 'tlf', 'cel', 'direccion', 'ciudad', 
-      'estado', 'municipio', 'parroquia', 'fecha_ingreso', 'status', 'carrera', 
-      'genero', 'edo_civil', 'fecha_nac', 'num_telf_opc', 'etnia', 'casaapto', 
-      'punto_referencia', 'grupo_familiar', 'acargo_usted', 'fuente_ingresos', 
-      'tipo_vivienda', 'tenencia_vivienda', 'enfermedad', 'discapacidad', 
-      'titulos', 'institutos'
-  ];
-  
-  // Verificar encabezados mínimos requeridos
-  $headersLower = array_map('strtolower', $headers);
-  $requiredFields = ['idusuario', 'nombre', 'email', 'tlf', 'direccion', 'estado', 
-                    'municipio', 'fecha_ingreso', 'status', 'carrera', 'genero', 
-                    'edo_civil', 'fecha_nac'];
-  
-  $missingHeaders = array_diff(array_map('strtolower', $requiredFields), $headersLower);
-  
-  if (!empty($missingHeaders)) {
-      fclose($handle);
-      return ['success' => false, 'message' => 'Faltan los siguientes encabezados requeridos en el CSV: ' . implode(', ', $missingHeaders)];
-  }
-  
-  // Mapear índices de columnas
-  $columnMap = [];
-  foreach ($headers as $index => $header) {
-      $headerLower = strtolower($header);
-      if (in_array($headerLower, $camposEsperados)) {
-          $columnMap[$headerLower] = $index;
-      }
-  }
-  
-  // Procesar cada fila del CSV
-  $lineNumber = 1;
-  $successCount = 0;
-  $errorCount = 0;
-  $errors = [];
-  
-  // Iniciar transacción
-  $db->begin_transaction();
-  
-  try {
-      // Preparar statement para verificar existencia
-      $checkStmt = $db->prepare("SELECT id FROM users WHERE idusuario = ? LIMIT 1");
-      if (!$checkStmt) {
-          throw new Exception("Error al preparar consulta de verificación: " . $db->error);
-      }
-      
-      // Preparar statement para inserción (se preparará dinámicamente por fila)
-      $insertStmt = null;
-      
-      while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
-          $lineNumber++;
-          
-          if (empty(implode('', $data))) {
-              continue;
-          }
-          
-          // Preparar datos del estudiante
-          $estudiante = [
-              'usuario' => 0,
-              'estudiante' => 1,
-              'docente' => 0,
-              'admin' => 0,
-              'super_user' => 0,
-              'editar_user' => 0,
-              'editar_nota' => 0,
-              'editar_acceso' => 0,
-              'potencialidades' => 0,
-              'editar_valores' => 0,
-              'editar_estudiante' => 0,
-              'agregar_estudiante' => 0,
-              'agregar_docente' => 0,
-              'editar_docente' => 0,
-              'agregar_carrera' => 0,
-              'agregar_materia' => 0,
-              'editar_materia' => 0,
-              'user_type' => 'estudiante',
-              'api_key' => '',
-              'fecha_act' => date('Y-m-d H:i:s')
-          ];
-          
-          // Mapear datos del CSV
-          foreach ($columnMap as $field => $index) {
-              if (isset($data[$index])) {
-                  $estudiante[$field] = trim($data[$index]);
-              }
-          }
-          
-          // Validar campos requeridos
-          $missingFields = [];
-          foreach ($requiredFields as $field) {
-              if (empty($estudiante[$field])) {
-                  $missingFields[] = $field;
-              }
-          }
-          
-          if (!empty($missingFields)) {
-              $errors[] = "Línea $lineNumber: Faltan campos requeridos: " . implode(', ', $missingFields);
-              $errorCount++;
-              continue;
-          }
-          
-          // Validar email
-          if (!filter_var($estudiante['email'], FILTER_VALIDATE_EMAIL)) {
-              $errors[] = "Línea $lineNumber: Correo electrónico no válido: " . $estudiante['email'];
-              $errorCount++;
-              continue;
-          }
-          
-          // Verificar si el idusuario ya existe
-          $checkStmt->bind_param("s", $estudiante['idusuario']);
-          $checkStmt->execute();
-          $checkStmt->store_result();
-          
-          if ($checkStmt->num_rows > 0) {
-              $errors[] = "Línea $lineNumber: La cédula ya existe: " . $estudiante['idusuario'];
-              $errorCount++;
-              $checkStmt->free_result();
-              continue;
-          }
-          $checkStmt->free_result();
-          
-          // Valores calculados
-          $estudiante['username'] = strtolower(str_replace(' ', '.', $estudiante['nombre']));
-          $cedulaLimpia = substr($estudiante['idusuario'], 2);
-          $estudiante['password'] = md5($cedulaLimpia);
-          
-          // Preparar consulta de inserción dinámica
-          $fields = array_keys($estudiante);
-          $placeholders = implode(', ', array_fill(0, count($fields), '?'));
-          $types = str_repeat('s', count($fields));
-          
-          $sql = "INSERT INTO users (" . implode(', ', $fields) . ") VALUES ($placeholders)";
-          
-          // Preparar statement si no existe o si cambió la estructura
-          if (!$insertStmt || $insertStmt->query_string !== $sql) {
-              if ($insertStmt) $insertStmt->close();
-              $insertStmt = $db->prepare($sql);
-              if (!$insertStmt) {
-                  throw new Exception("Error en preparación: " . $db->error);
-              }
-          }
-          
-          // Vincular parámetros
-          $params = array_values($estudiante);
-          $insertStmt->bind_param($types, ...$params);
-          
-          // Ejecutar inserción
-          if ($insertStmt->execute()) {
-              $successCount++;
-          } else {
-              $errors[] = "Línea $lineNumber: Error al insertar: " . $insertStmt->error;
-              $errorCount++;
-          }
-      }
-      
-      // Cerrar statements
-      if ($checkStmt) $checkStmt->close();
-      if ($insertStmt) $insertStmt->close();
-      
-      $db->commit();
-  } catch (Exception $e) {
-      $db->rollback();
-      if (isset($checkStmt)) $checkStmt->close();
-      if (isset($insertStmt)) $insertStmt->close();
-      fclose($handle);
-      return ['success' => false, 'message' => 'Error durante la importación: ' . $e->getMessage()];
-  }
-  
-  fclose($handle);
-  
-  // Preparar mensaje de resultado
-  $message = "Proceso completado. ";
-  $message .= "Estudiantes insertados: $successCount. ";
-  $message .= "Errores: $errorCount.";
-  
-  if (!empty($errors)) {
-      $message .= "\nErrores detallados:\n" . implode("\n", array_slice($errors, 0, 10));
-      if (count($errors) > 10) {
-          $message .= "\n... y " . (count($errors) - 10) . " más";
-      }
-  }
-  
-  return [
-      'success' => $errorCount === 0,
-      'message' => $message,
-      'inserted' => $successCount,
-      'errors' => $errorCount,
-      'error_details' => $errors
-  ];
+    global $db;
+    
+    // Validar extensión del archivo
+    $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    if ($extension !== 'csv') {
+        return ['success' => false, 'message' => 'El archivo debe tener extensión .csv'];
+    }
+    
+    // Abrir el archivo CSV
+    if (($handle = fopen($tmpFilePath, "r")) === FALSE) {
+        return ['success' => false, 'message' => 'No se pudo abrir el archivo CSV'];
+    }
+    
+    // Leer encabezados
+    $headers = fgetcsv($handle, 1000, ",");
+    if ($headers === FALSE) {
+        fclose($handle);
+        return ['success' => false, 'message' => 'El archivo CSV está vacío o no tiene el formato correcto'];
+    }
+    
+    // Mapeo de campos esperados
+    $camposEsperados = [
+        'idusuario', 'nombre', 'email', 'tlf', 'cel', 'direccion', 'ciudad', 
+        'estado', 'municipio', 'parroquia', 'fecha_ingreso', 'status', 'carrera', 
+        'genero', 'edo_civil', 'fecha_nac', 'num_telf_opc', 'etnia', 'casaapto', 
+        'punto_referencia', 'grupo_familiar', 'acargo_usted', 'fuente_ingresos', 
+        'tipo_vivienda', 'tenencia_vivienda', 'enfermedad', 'discapacidad', 
+        'titulos', 'institutos'
+    ];
+    
+    // Verificar encabezados requeridos
+    $headersLower = array_map('strtolower', $headers);
+    $requiredFields = ['idusuario', 'nombre', 'email', 'tlf', 'direccion', 'estado', 
+                      'municipio', 'fecha_ingreso', 'status', 'carrera', 'genero', 
+                      'edo_civil', 'fecha_nac'];
+    
+    $missingHeaders = array_diff(array_map('strtolower', $requiredFields), $headersLower);
+    
+    if (!empty($missingHeaders)) {
+        fclose($handle);
+        return ['success' => false, 'message' => 'Faltan los siguientes encabezados requeridos en el CSV: ' . implode(', ', $missingHeaders)];
+    }
+    
+    // Mapear índices de columnas
+    $columnMap = [];
+    foreach ($headers as $index => $header) {
+        $headerLower = strtolower($header);
+        if (in_array($headerLower, $camposEsperados)) {
+            $columnMap[$headerLower] = $index;
+        }
+    }
+    
+    // Procesar cada fila del CSV
+    $lineNumber = 1;
+    $successCount = 0;
+    $errorCount = 0;
+    $errors = [];
+    
+    // Iniciar transacción
+    $db->begin_transaction();
+    
+    try {
+        // Preparar statement para verificar existencia
+        $checkStmt = $db->prepare("SELECT id FROM users WHERE idusuario = ? LIMIT 1");
+        if (!$checkStmt) {
+            throw new Exception("Error al preparar consulta de verificación: " . $db->error);
+        }
+        
+        // Preparar statement para inserción (dinámico)
+        $insertStmt = null;
+        
+        // Preparar statement para títulos obtenidos
+        $titulosStmt = $db->prepare("INSERT INTO titulos_obtenidos (id_usuario, nombre, titulo_obtenido, instituto) VALUES (?, ?, ?, ?)");
+        if (!$titulosStmt) {
+            throw new Exception("Error al preparar consulta de títulos: " . $db->error);
+        }
+        
+        while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
+            $lineNumber++;
+            
+            if (empty(implode('', $data))) {
+                continue;
+            }
+            
+            // Preparar datos del estudiante
+            $estudiante = [
+                'usuario' => 0,
+                'estudiante' => 1,
+                'docente' => 0,
+                'admin' => 0,
+                'super_user' => 0,
+                'editar_user' => 0,
+                'editar_nota' => 0,
+                'editar_acceso' => 0,
+                'potencialidades' => '',
+                'editar_valores' => 0,
+                'editar_estudiante' => 0,
+                'agregar_estudiante' => 0,
+                'agregar_docente' => 0,
+                'editar_docente' => 0,
+                'agregar_carrera' => 0,
+                'agregar_materia' => 0,
+                'editar_materia' => 0,
+                'user_type' => 'estudiante',
+                'api_key' => '',
+                'fecha_act' => date('Y-m-d H:i:s')
+            ];
+            
+            // Mapear datos del CSV
+            foreach ($columnMap as $field => $index) {
+                if (isset($data[$index])) {
+                    $estudiante[$field] = trim($data[$index]);
+                }
+            }
+            
+            // Validar campos requeridos
+            $missingFields = [];
+            foreach ($requiredFields as $field) {
+                if (empty($estudiante[$field])) {
+                    $missingFields[] = $field;
+                }
+            }
+            
+            if (!empty($missingFields)) {
+                $errors[] = "Línea $lineNumber: Faltan campos requeridos: " . implode(', ', $missingFields);
+                $errorCount++;
+                continue;
+            }
+            
+            // Validar email
+            if (!filter_var($estudiante['email'], FILTER_VALIDATE_EMAIL)) {
+                $errors[] = "Línea $lineNumber: Correo electrónico no válido: " . $estudiante['email'];
+                $errorCount++;
+                continue;
+            }
+            
+            // Verificar si el idusuario ya existe
+            $checkStmt->bind_param("s", $estudiante['idusuario']);
+            $checkStmt->execute();
+            $checkStmt->store_result();
+            
+            if ($checkStmt->num_rows > 0) {
+                $errors[] = "Línea $lineNumber: La cédula ya existe: " . $estudiante['idusuario'];
+                $errorCount++;
+                $checkStmt->free_result();
+                continue;
+            }
+            $checkStmt->free_result();
+            
+            // Valores calculados
+            $estudiante['username'] = strtolower(str_replace(' ', '.', $estudiante['nombre']));
+            $cedulaLimpia = substr($estudiante['idusuario'], 2);
+            $estudiante['password'] = md5($cedulaLimpia);
+            
+            // Preparar consulta de inserción dinámica
+            $fields = array_keys($estudiante);
+            $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+            $types = str_repeat('s', count($fields));
+            
+            $sql = "INSERT INTO users (" . implode(', ', $fields) . ") VALUES ($placeholders)";
+            
+            // Preparar statement si no existe o si cambió la estructura
+            if (!$insertStmt || $insertStmt->query_string !== $sql) {
+                if ($insertStmt) $insertStmt->close();
+                $insertStmt = $db->prepare($sql);
+                if (!$insertStmt) {
+                    throw new Exception("Error en preparación: " . $db->error);
+                }
+            }
+            
+            // Vincular parámetros
+            $params = array_values($estudiante);
+            $insertStmt->bind_param($types, ...$params);
+            
+            // Ejecutar inserción
+            if ($insertStmt->execute()) {
+                $userId = $insertStmt->insert_id;
+                $successCount++;
+                
+                // Procesar títulos obtenidos si existen
+                if (!empty($estudiante['titulos']) && !empty($estudiante['institutos'])) {
+                    $titulos = explode(',', $estudiante['titulos']);
+                    $institutos = explode(',', $estudiante['institutos']);
+                    
+                    // Limpiar y emparejar títulos e instituciones
+                    $titulos = array_map('trim', $titulos);
+                    $institutos = array_map('trim', $institutos);
+                    $count = min(count($titulos), count($institutos));
+                    
+                    for ($i = 0; $i < $count; $i++) {
+                        $titulosStmt->bind_param(
+                            "isss", 
+                            $userId,
+                            $estudiante['nombre'],
+                            $titulos[$i],
+                            $institutos[$i]
+                        );
+                        if (!$titulosStmt->execute()) {
+                            throw new Exception("Error al insertar título: " . $titulosStmt->error);
+                        }
+                    }
+                }
+            } else {
+                $errors[] = "Línea $lineNumber: Error al insertar: " . $insertStmt->error;
+                $errorCount++;
+            }
+        }
+        
+        // Cerrar statements
+        if ($checkStmt) $checkStmt->close();
+        if ($insertStmt) $insertStmt->close();
+        if ($titulosStmt) $titulosStmt->close();
+        
+        $db->commit();
+    } catch (Exception $e) {
+        $db->rollback();
+        if (isset($checkStmt)) $checkStmt->close();
+        if (isset($insertStmt)) $insertStmt->close();
+        if (isset($titulosStmt)) $titulosStmt->close();
+        fclose($handle);
+        return ['success' => false, 'message' => 'Error durante la importación: ' . $e->getMessage()];
+    }
+    
+    fclose($handle);
+    
+    // Preparar mensaje de resultado
+    $message = "Proceso completado. ";
+    $message .= "Estudiantes insertados: $successCount. ";
+    $message .= "Errores: $errorCount.";
+    
+    if (!empty($errors)) {
+        $message .= "\nErrores detallados:\n" . implode("\n", array_slice($errors, 0, 10));
+        if (count($errors) > 10) {
+            $message .= "\n... y " . (count($errors) - 10) . " más";
+        }
+    }
+    
+    return [
+        'success' => $errorCount === 0,
+        'message' => $message,
+        'inserted' => $successCount,
+        'errors' => $errorCount,
+        'error_details' => $errors
+    ];
 }
-
 
 
 
