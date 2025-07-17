@@ -258,6 +258,7 @@ function insertarEstudiante($datos) {
       'super_user' => 0,
       'editar_user' => 0,
       'editar_nota' => 0,
+      'potencialidades' => '',
       'editar_acceso' => 0,
       'editar_valores' => 0,
       'editar_estudiante' => 0,
