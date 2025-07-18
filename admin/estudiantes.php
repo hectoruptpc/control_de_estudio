@@ -279,57 +279,50 @@ include("includes/head.php");
                                 </div>
                             </div>
 
-                            <!-- Sección 3: Formación Académica -->
-                            <h5 class="mb-3"><i class="fas fa-graduation-cap me-2"></i> Formación Académica</h5>
-                            <div class="row g-3 mb-4">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="carrera_modal" class="form-label required">Programa</label>
-                                        <select class="custom-select d-block w-100" id="carrera_modal" name="carrera" required>
-                                            <option value="" selected disabled>Seleccione un Programa</option>
-                                            <?php foreach ($carreras as $carrera): ?>
-                                                <?php if (!empty($carrera)): ?>
-                                                    <option value="<?php echo htmlspecialchars($carrera); ?>">
-                                                        <?php echo htmlspecialchars($carrera); ?>
-                                                    </option>
-                                                <?php endif; ?>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                </div>
-                                
-                                <!-- Títulos Obtenidos -->
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="titulos_modal" class="form-label">Títulos Obtenidos</label>
-                                        <div class="input-group">
-                                            <input type="text" class="form-control" id="titulos_modal" name="titulos_main" placeholder="Títulos obtenidos">
-                                            <button type="button" class="btn btn-outline-primary" id="addTitulo_modal">
-                                                <i class="fas fa-plus"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div id="titulosContainer_modal">
-                                        <!-- Aquí se agregarán dinámicamente los campos de títulos -->
-                                    </div>
-                                </div>
-                                
-                                <!-- Instituciones -->
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="institutos_modal" class="form-label">Instituciones</label>
-                                        <div class="input-group">
-                                            <input type="text" class="form-control" id="institutos_modal" name="institutos_main" placeholder="Instituciones donde obtuvo los títulos">
-                                            <button type="button" class="btn btn-outline-primary" id="addInstituto_modal">
-                                                <i class="fas fa-plus"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div id="institutosContainer_modal">
-                                        <!-- Aquí se agregarán dinámicamente los campos de instituciones -->
-                                    </div>
-                                </div>
-                            </div>
+                           <!-- Sección 3: Formación Académica -->
+<h5 class="mb-3"><i class="fas fa-graduation-cap me-2"></i> Formación Académica</h5>
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="mb-3">
+            <label for="carrera_modal" class="form-label required">Programa</label>
+            <select class="custom-select d-block w-100" id="carrera_modal" name="carrera" required>
+                <option value="" selected disabled>Seleccione un Programa</option>
+                <?php foreach ($carreras as $carrera): ?>
+                    <?php if (!empty($carrera)): ?>
+                        <option value="<?php echo htmlspecialchars($carrera); ?>">
+                            <?php echo htmlspecialchars($carrera); ?>
+                        </option>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+    
+    <!-- Títulos Obtenidos e Instituciones -->
+    <div class="col-md-12">
+        <div class="mb-3">
+            <label class="form-label">Títulos Obtenidos e Instituciones</label>
+            <div class="row g-3 mb-3">
+                <div class="col-md-5">
+                    <input type="text" class="form-control" id="titulos_modal" 
+                           placeholder="Título obtenido">
+                </div>
+                <div class="col-md-5">
+                    <input type="text" class="form-control" id="institutos_modal" 
+                           placeholder="Institución donde obtuvo el título">
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-outline-primary w-100" id="addTituloInstituto_modal">
+                        <i class="fas fa-plus me-1"></i> Agregar
+                    </button>
+                </div>
+            </div>
+            <div id="titulosInstitutosContainer_modal">
+                <!-- Aquí se agregarán los pares de títulos e instituciones -->
+            </div>
+        </div>
+    </div>
+</div>
 
                             <!-- Sección 4: Ubicación y Vivienda -->
                             <h5 class="mb-3"><i class="fas fa-home me-2"></i> Vivienda</h5>
@@ -694,6 +687,83 @@ document.getElementById('formEstudianteModal').addEventListener('submit', async 
         submitBtn.disabled = false;
     }
 });
+
+
+
+// Script para manejar la adición de campos de título e institución juntos en el modal
+document.addEventListener('DOMContentLoaded', function() {
+    function addTitleInstitutionPairModal() {
+        const titulo = document.getElementById('titulos_modal').value.trim();
+        const instituto = document.getElementById('institutos_modal').value.trim();
+        
+        if(titulo === '' || instituto === '') {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Campos incompletos',
+                text: 'Por favor complete ambos campos: título e institución',
+                confirmButtonText: 'Entendido'
+            });
+            return;
+        }
+        
+        const container = document.getElementById('titulosInstitutosContainer_modal');
+        
+        const newPair = document.createElement('div');
+        newPair.className = 'row g-3 mb-3';
+        newPair.innerHTML = `
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="titulos[]" 
+                       value="${titulo}" placeholder="Título obtenido" readonly>
+            </div>
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="institutos[]" 
+                       value="${instituto}" placeholder="Institución" readonly>
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-danger remove-field w-100">
+                    <i class="fas fa-minus me-1"></i> Eliminar
+                </button>
+            </div>
+        `;
+        container.appendChild(newPair);
+        
+        // Vaciar los campos principales
+        document.getElementById('titulos_modal').value = '';
+        document.getElementById('institutos_modal').value = '';
+        document.getElementById('titulos_modal').focus();
+        
+        // Añadir evento para eliminar el par
+        newPair.querySelector('.remove-field').addEventListener('click', function() {
+            container.removeChild(newPair);
+        });
+    }
+    
+    // Evento para el botón de añadir en el modal
+    document.getElementById('addTituloInstituto_modal').addEventListener('click', addTitleInstitutionPairModal);
+    
+    // Manejar el evento Enter en los campos principales del modal
+    document.getElementById('titulos_modal').addEventListener('keypress', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault();
+            addTitleInstitutionPairModal();
+        }
+    });
+    
+    document.getElementById('institutos_modal').addEventListener('keypress', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault();
+            addTitleInstitutionPairModal();
+        }
+    });
+});
+
+
+
+
+
+
+
+
 </script>
 
 
