@@ -169,11 +169,11 @@ include("includes/head.php");
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title" id="agregarEstudianteModalLabel">
-   <i class="fas fa-user-plus me-2"></i> Agregar Nuevo Estudiante
-</h5>
-               <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-  <span aria-hidden="true">&times;</span>
-</button>
+                    <i class="fas fa-user-plus me-2"></i> Agregar Nuevo Estudiante
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <div class="modal-body">
                 <?php 
@@ -279,50 +279,50 @@ include("includes/head.php");
                                 </div>
                             </div>
 
-                           <!-- Sección 3: Formación Académica -->
-<h5 class="mb-3"><i class="fas fa-graduation-cap me-2"></i> Formación Académica</h5>
-<div class="row g-3 mb-4">
-    <div class="col-md-6">
-        <div class="mb-3">
-            <label for="carrera_modal" class="form-label required">Programa</label>
-            <select class="custom-select d-block w-100" id="carrera_modal" name="carrera" required>
-                <option value="" selected disabled>Seleccione un Programa</option>
-                <?php foreach ($carreras as $carrera): ?>
-                    <?php if (!empty($carrera)): ?>
-                        <option value="<?php echo htmlspecialchars($carrera); ?>">
-                            <?php echo htmlspecialchars($carrera); ?>
-                        </option>
-                    <?php endif; ?>
-                <?php endforeach; ?>
-            </select>
-        </div>
-    </div>
-    
-    <!-- Títulos Obtenidos e Instituciones -->
-    <div class="col-md-12">
-        <div class="mb-3">
-            <label class="form-label">Títulos Obtenidos e Instituciones</label>
-            <div class="row g-3 mb-3">
-                <div class="col-md-5">
-                    <input type="text" class="form-control" id="titulos_modal" 
-                           placeholder="Título obtenido">
-                </div>
-                <div class="col-md-5">
-                    <input type="text" class="form-control" id="institutos_modal" 
-                           placeholder="Institución donde obtuvo el título">
-                </div>
-                <div class="col-md-2">
-                    <button type="button" class="btn btn-outline-primary w-100" id="addTituloInstituto_modal">
-                        <i class="fas fa-plus me-1"></i> Agregar
-                    </button>
-                </div>
-            </div>
-            <div id="titulosInstitutosContainer_modal">
-                <!-- Aquí se agregarán los pares de títulos e instituciones -->
-            </div>
-        </div>
-    </div>
-</div>
+                            <!-- Sección 3: Formación Académica -->
+                            <h5 class="mb-3"><i class="fas fa-graduation-cap me-2"></i> Formación Académica</h5>
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="carrera_modal" class="form-label required">Programa</label>
+                                        <select class="custom-select d-block w-100" id="carrera_modal" name="carrera" required>
+                                            <option value="" selected disabled>Seleccione un Programa</option>
+                                            <?php foreach ($carreras as $carrera): ?>
+                                                <?php if (!empty($carrera)): ?>
+                                                    <option value="<?php echo htmlspecialchars($carrera); ?>">
+                                                        <?php echo htmlspecialchars($carrera); ?>
+                                                    </option>
+                                                <?php endif; ?>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <!-- Títulos Obtenidos e Instituciones -->
+                                <div class="col-md-12">
+                                    <div class="mb-3">
+                                        <label class="form-label">Títulos Obtenidos e Instituciones</label>
+                                        <div class="row g-3 mb-3">
+                                            <div class="col-md-5">
+                                                <input type="text" class="form-control" id="titulos_modal" 
+                                                       placeholder="Título obtenido">
+                                            </div>
+                                            <div class="col-md-5">
+                                                <input type="text" class="form-control" id="institutos_modal" 
+                                                       placeholder="Institución donde obtuvo el título">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <button type="button" class="btn btn-outline-primary w-100" id="addTituloInstituto_modal">
+                                                    <i class="fas fa-plus me-1"></i> Agregar
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div id="titulosInstitutosContainer_modal">
+                                            <!-- Aquí se agregarán los pares de títulos e instituciones -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
                             <!-- Sección 4: Ubicación y Vivienda -->
                             <h5 class="mb-3"><i class="fas fa-home me-2"></i> Vivienda</h5>
@@ -513,183 +513,6 @@ document.addEventListener('DOMContentLoaded', function() {
     actualizarCedulaCompleta();
 });
 
-// Script para manejar la adición de campos en el modal
-document.addEventListener('DOMContentLoaded', function() {
-    // Función para añadir nuevos campos
-    function addField(containerId, inputId, namePrefix, placeholder, buttonId) {
-        const container = document.getElementById(containerId);
-        const mainInput = document.getElementById(inputId);
-        const value = mainInput.value.trim();
-        
-        if(value === '') return; // No añadir si está vacío
-        
-        const newField = document.createElement('div');
-        newField.className = 'mb-3';
-        newField.innerHTML = `
-            <div class="input-group">
-                <input type="text" class="form-control" name="${namePrefix}[]" 
-                       value="${value}" placeholder="${placeholder}" readonly>
-                <button type="button" class="btn btn-outline-danger remove-field">
-                    <i class="fas fa-minus"></i>
-                </button>
-            </div>
-        `;
-        container.appendChild(newField);
-        
-        // Vaciar el campo principal
-        mainInput.value = '';
-        mainInput.focus();
-        
-        // Añadir evento para eliminar campo
-        newField.querySelector('.remove-field').addEventListener('click', function() {
-            container.removeChild(newField);
-        });
-    }
-    
-    // Eventos para los botones de añadir en el modal
-    document.getElementById('addTitulo_modal').addEventListener('click', function() {
-        addField('titulosContainer_modal', 'titulos_modal', 'titulos', 'Título obtenido', 'titulos_modal');
-    });
-    
-    document.getElementById('addInstituto_modal').addEventListener('click', function() {
-        addField('institutosContainer_modal', 'institutos_modal', 'institutos', 'Institución', 'institutos_modal');
-    });
-    
-    // Manejar el evento Enter en los campos principales del modal
-    document.getElementById('titulos_modal').addEventListener('keypress', function(e) {
-        if(e.key === 'Enter') {
-            e.preventDefault();
-            document.getElementById('addTitulo_modal').click();
-        }
-    });
-    
-    document.getElementById('institutos_modal').addEventListener('keypress', function(e) {
-        if(e.key === 'Enter') {
-            e.preventDefault();
-            document.getElementById('addInstituto_modal').click();
-        }
-    });
-});
-
-// Manejar el envío del formulario del modal via AJAX
-document.getElementById('formEstudianteModal').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const form = this;
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const originalBtnText = submitBtn.innerHTML;
-    
-    // Mostrar loading
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Procesando...';
-    submitBtn.disabled = true;
-
-    try {
-        // Validación del cliente
-        const requiredFields = form.querySelectorAll('[required]');
-        let missingFields = [];
-        
-        requiredFields.forEach(field => {
-            if (!field.value.trim()) {
-                field.classList.add('is-invalid');
-                missingFields.push(field.name || field.id);
-            } else {
-                field.classList.remove('is-invalid');
-            }
-        });
-        
-        if (missingFields.length > 0) {
-            throw new Error(`Complete los campos requeridos: ${missingFields.join(', ')}`);
-        }
-
-        // Validar cédula
-        const cedula = document.getElementById('numero_cedula_modal').value;
-        if (cedula.length < 6 || cedula.length > 8 || !/^\d+$/.test(cedula)) {
-            throw new Error('La cédula debe tener entre 6 y 8 dígitos numéricos');
-        }
-
-        // Validar email
-        const email = document.getElementById('email_modal').value;
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            throw new Error('Ingrese un correo electrónico válido');
-        }
-
-        // Validar teléfono
-        const tlf = document.getElementById('tlf_modal').value;
-        if (tlf.length < 10 || !/^\d+$/.test(tlf)) {
-            throw new Error('El teléfono debe tener al menos 10 dígitos');
-        }
-
-        // Validar fechas
-        const fechaNac = new Date(document.getElementById('fecha_nac_modal').value);
-        const fechaIngreso = new Date(document.getElementById('fecha_ingreso_modal').value);
-        if (fechaIngreso < fechaNac) {
-            throw new Error('La fecha de ingreso no puede ser anterior a la fecha de nacimiento');
-        }
-
-        // Recolectar todos los datos del formulario
-        const formData = new FormData(form);
-        
-        // Agregar campos dinámicos
-        const titulos = Array.from(document.querySelectorAll('#titulosContainer_modal input[name="titulos[]"]')).map(input => input.value.trim()).filter(Boolean);
-        const institutos = Array.from(document.querySelectorAll('#institutosContainer_modal input[name="institutos[]"]')).map(input => input.value.trim()).filter(Boolean);
-        
-        // Convertir FormData a objeto para poder modificarlo
-        const data = Object.fromEntries(formData.entries());
-        data.titulos = titulos;
-        data.institutos = institutos;
-
-        // Enviar como JSON
-        const response = await fetch('procesar_estudiante.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify(data)
-        });
-
-        // Verificar respuesta JSON
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await response.text();
-            console.error('Respuesta no JSON:', text);
-            throw new Error('La respuesta del servidor no es válida');
-        }
-
-        const result = await response.json();
-        
-        if (!response.ok || !result.success) {
-            throw new Error(result.message || 'Error en el servidor');
-        }
-
-        // Éxito
-        Swal.fire({
-            icon: 'success',
-            title: 'Éxito',
-            text: result.message,
-            confirmButtonText: 'Aceptar'
-        }).then(() => {
-            const modal = bootstrap.Modal.getInstance(document.getElementById('agregarEstudianteModal'));
-            modal.hide();
-            location.reload();
-        });
-
-    } catch (error) {
-        console.error('Error:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            html: error.message,
-            confirmButtonText: 'Entendido'
-        });
-    } finally {
-        submitBtn.innerHTML = originalBtnText;
-        submitBtn.disabled = false;
-    }
-});
-
-
-
 // Script para manejar la adición de campos de título e institución juntos en el modal
 document.addEventListener('DOMContentLoaded', function() {
     function addTitleInstitutionPairModal() {
@@ -757,13 +580,120 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// Manejar el envío del formulario del modal via AJAX
+document.getElementById('formEstudianteModal').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const form = this;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.innerHTML;
+    
+    // Mostrar loading
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Procesando...';
+    submitBtn.disabled = true;
 
+    try {
+        // Validación del cliente
+        const requiredFields = form.querySelectorAll('[required]');
+        let missingFields = [];
+        
+        requiredFields.forEach(field => {
+            if (!field.value.trim()) {
+                field.classList.add('is-invalid');
+                missingFields.push(field.name || field.id);
+            } else {
+                field.classList.remove('is-invalid');
+            }
+        });
+        
+        if (missingFields.length > 0) {
+            throw new Error(`Complete los campos requeridos: ${missingFields.join(', ')}`);
+        }
 
+        // Validar cédula
+        const cedula = document.getElementById('numero_cedula_modal').value;
+        if (cedula.length < 6 || cedula.length > 8 || !/^\d+$/.test(cedula)) {
+            throw new Error('La cédula debe tener entre 6 y 8 dígitos numéricos');
+        }
 
+        // Validar email
+        const email = document.getElementById('email_modal').value;
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            throw new Error('Ingrese un correo electrónico válido');
+        }
 
+        // Validar teléfono
+        const tlf = document.getElementById('tlf_modal').value;
+        if (tlf.length < 10 || !/^\d+$/.test(tlf)) {
+            throw new Error('El teléfono debe tener al menos 10 dígitos');
+        }
 
+        // Validar fechas
+        const fechaNac = new Date(document.getElementById('fecha_nac_modal').value);
+        const fechaIngreso = new Date(document.getElementById('fecha_ingreso_modal').value);
+        if (fechaIngreso < fechaNac) {
+            throw new Error('La fecha de ingreso no puede ser anterior a la fecha de nacimiento');
+        }
 
+        // Recolectar todos los datos del formulario
+        const formData = new FormData(form);
+        
+        // Convertir FormData a objeto para poder modificarlo
+        const data = Object.fromEntries(formData.entries());
+        
+        // Agregar títulos e instituciones como arrays
+        data.titulos = Array.from(document.querySelectorAll('#titulosInstitutosContainer_modal input[name="titulos[]"]')).map(input => input.value.trim()).filter(Boolean);
+        data.institutos = Array.from(document.querySelectorAll('#titulosInstitutosContainer_modal input[name="institutos[]"]')).map(input => input.value.trim()).filter(Boolean);
 
+        // Enviar como JSON
+        const response = await fetch('procesar_estudiante.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(data)
+        });
+
+        // Verificar respuesta JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Respuesta no JSON:', text);
+            throw new Error('La respuesta del servidor no es válida');
+        }
+
+        const result = await response.json();
+        
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || 'Error en el servidor');
+        }
+
+        // Éxito
+        Swal.fire({
+            icon: 'success',
+            title: 'Éxito',
+            text: result.message,
+            confirmButtonText: 'Aceptar'
+        }).then(() => {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('agregarEstudianteModal'));
+            modal.hide();
+            location.reload();
+        });
+
+    } catch (error) {
+        console.error('Error:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            html: error.message,
+            confirmButtonText: 'Entendido'
+        });
+    } finally {
+        submitBtn.innerHTML = originalBtnText;
+        submitBtn.disabled = false;
+    }
+});
 </script>
 
 
