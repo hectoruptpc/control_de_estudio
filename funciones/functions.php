@@ -146,7 +146,7 @@ function obtenerDetalleEstudiante($id) {
  * Funciones para el manejo de estudiantes (users)
  */
 
-// Función para obtener carreras desde la base de datos
+// Función para obtener carreras en users desde la base de datos
 function obtenerCarreras() {
   global $db;
   
@@ -167,6 +167,35 @@ function obtenerCarreras() {
   } else {
       // Log del error (opcional)
       error_log("Error al preparar consulta: " . $db->error);
+      return [];
+  }
+}
+
+/**
+ * Obtiene carreras para poblar un elemento select HTML incluyendo el código
+ * @return array Array asociativo con id_carrera como clave y "codigo - nombre" como valor
+ */
+function obtenerCarrerasParaSelectConCodigo() {
+  global $db;
+  
+  $carreras = [];
+  $query = "SELECT id_carrera, nombre_carrera, cod_carrera 
+            FROM carreras 
+            WHERE activa = 1 
+            ORDER BY nombre_carrera ASC";
+  
+  if ($stmt = $db->prepare($query)) {
+      $stmt->execute();
+      $result = $stmt->get_result();
+      
+      while ($row = $result->fetch_assoc()) {
+          $carreras[$row['id_carrera']] = $row['cod_carrera'] . " - " . $row['nombre_carrera'];
+      }
+      
+      $stmt->close();
+      return $carreras;
+  } else {
+      error_log("Error al preparar consulta de carreras: " . $db->error);
       return [];
   }
 }
