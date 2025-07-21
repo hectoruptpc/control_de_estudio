@@ -106,17 +106,18 @@ if ($carrerasQuery) {
             
             <div class="col-md-6">
                 <div class="mb-3">
-                    <label for="carrera" class="form-label">Programa/Carrera</label>
-                    <select class="custom-select" id="carrera" name="carrera" required>
-                        <option value="">Seleccione una carrera</option>
-                        <?php foreach ($carreras as $carrera): ?>
-                            <option value="<?php echo $carrera['id_carrera']; ?>" 
-                                <?php echo ($estudiante['carrera'] ?? '') == $carrera['id_carrera'] ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($carrera['nombre_carrera']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
+    <label for="carrera" class="form-label required">Programa</label>
+    <select name="carrera" id="carrera" class="form-control" required>
+        <option value="">-- Seleccione una carrera --</option>
+        <?php 
+        $carreras = obtenerTodasLasCarreras();
+        foreach ($carreras as $nombre): ?>
+            <option value="<?php echo htmlspecialchars($nombre); ?>">
+                <?php echo htmlspecialchars($nombre); ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
+</div>
                 
                 <div class="mb-3">
                     <label for="fecha_ingreso" class="form-label">Fecha de Ingreso</label>
