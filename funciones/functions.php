@@ -146,59 +146,56 @@ function obtenerDetalleEstudiante($id) {
  * Funciones para el manejo de estudiantes (users)
  */
 
-// Función para obtener carreras en users desde la base de datos
-function obtenerCarreras() {
-  global $db;
-  
-  $carreras = [];
-  $query = "SELECT DISTINCT carrera FROM users WHERE carrera IS NOT NULL ORDER BY carrera ASC";
-  
-  // Versión con sentencia preparada
-  if ($stmt = $db->prepare($query)) {
-      $stmt->execute();
-      $result = $stmt->get_result();
-      
-      while ($row = $result->fetch_row()) {
-          $carreras[] = $row[0];
-      }
-      
-      $stmt->close();
-      return $carreras;
-  } else {
-      // Log del error (opcional)
-      error_log("Error al preparar consulta: " . $db->error);
-      return [];
-  }
+function obtenerCarreras($format = 'array') {  // Eliminamos el parámetro $includeOther que ya no necesitamos
+    global $db;
+    
+    $carreras = [];
+    $query = "SELECT DISTINCT carrera FROM users 
+              WHERE carrera IS NOT NULL AND carrera != '' 
+              ORDER BY carrera ASC";
+    
+    if ($stmt = $db->prepare($query)) {
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        while ($row = $result->fetch_assoc()) {
+            $carreras[] = $row['carrera'];
+        }
+        
+        $stmt->close();
+        
+        return $carreras;  // Simplemente retornamos las carreras sin modificar
+    } else {
+        error_log("Error al preparar consulta de carreras: " . $db->error);
+        return [];
+    }
 }
 
-/**
- * Obtiene carreras para poblar un elemento select HTML incluyendo el código
- * @return array Array asociativo con id_carrera como clave y "codigo - nombre" como valor
- */
-function obtenerCarrerasParaSelectConCodigo() {
-  global $db;
-  
-  $carreras = [];
-  $query = "SELECT id_carrera, nombre_carrera, cod_carrera 
-            FROM carreras 
-            WHERE activa = 1 
-            ORDER BY nombre_carrera ASC";
-  
-  if ($stmt = $db->prepare($query)) {
-      $stmt->execute();
-      $result = $stmt->get_result();
-      
-      while ($row = $result->fetch_assoc()) {
-          $carreras[$row['id_carrera']] = $row['cod_carrera'] . " - " . $row['nombre_carrera'];
-      }
-      
-      $stmt->close();
-      return $carreras;
-  } else {
-      error_log("Error al preparar consulta de carreras: " . $db->error);
-      return [];
-  }
+
+function obtenerTodasLasCarreras() {
+    global $db;
+    
+    $carreras = [];
+    $query = "SELECT nombre_carrera FROM carreras WHERE activa = 1 ORDER BY nombre_carrera ASC";
+    
+    if ($stmt = $db->prepare($query)) {
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        while ($row = $result->fetch_assoc()) {
+            $carreras[] = $row['nombre_carrera']; // Solo obtenemos los nombres
+        }
+        
+        $stmt->close();
+        return $carreras;
+    } else {
+        error_log("Error al obtener carreras: " . $db->error);
+        return [];
+    }
 }
+
+
+
 
 /**
 * Muestra el estado del estudiante con icono y color adecuado
@@ -274,6 +271,7 @@ function insertarEstudiante($datos) {
         // Iniciar transacción
         $db->begin_transaction();
 
+           
         // 1. Preparar datos del usuario
         $username = strtolower(str_replace(' ', '.', $datos['nombre']));
         $cedulaLimpia = substr($datos['idusuario'], 2);
@@ -431,40 +429,49 @@ function insertarEstudiante($datos) {
 
 // Función para validar datos de estudiante
 function validarEstudiante($datos) {
-  $errores = [];
-  
-  // Validar email
-  if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
-      $errores[] = 'Por favor ingrese un correo electrónico válido';
-  }
-  
-  // Validar teléfono (al menos 10 dígitos)
-  if (strlen($datos['tlf']) < 10) {
-      $errores[] = 'El teléfono debe tener al menos 10 dígitos';
-  }
-  
-  // Validar que la fecha de ingreso no sea anterior a la de nacimiento
-  $fechaNac = new DateTime($datos['fecha_nac']);
-  $fechaIngreso = new DateTime($datos['fecha_ingreso']);
-  if ($fechaIngreso < $fechaNac) {
-      $errores[] = 'La fecha de ingreso no puede ser anterior a la fecha de nacimiento';
-  }
-  
-  // Validar campos requeridos
-  $camposRequeridos = [
-      'idusuario', 'nombre', 'carrera', 'genero', 'edo_civil',
-      'estado', 'municipio', 'direccion', 'fecha_nac',
-      'tlf', 'email', 'fecha_ingreso', 'status'
-  ];
-  
-  foreach ($camposRequeridos as $campo) {
-      if (empty($datos[$campo])) {
-          $errores[] = "El campo " . str_replace('_', ' ', $campo) . " es requerido";
-      }
-  }
-  
-  return empty($errores) ? true : $errores;
+    $errores = [];
+    
+    // Validar campos requeridos
+    $camposRequeridos = [
+        'idusuario', 'nombre', 'carrera', 'genero', 'edo_civil',
+        'estado', 'municipio', 'direccion', 'fecha_nac',
+        'tlf', 'email', 'fecha_ingreso', 'status'
+    ];
+    
+    foreach ($camposRequeridos as $campo) {
+        if (empty($datos[$campo])) {
+            $errores[] = "El campo " . str_replace('_', ' ', $campo) . " es requerido";
+        }
+    }
+    
+    // Validación especial para carrera cuando se selecciona "OTRA"
+    if (isset($datos['carrera']) && $datos['carrera'] === 'OTRA' && empty($datos['otra_carrera'])) {
+        $errores[] = "Debe especificar el nombre de la carrera cuando selecciona 'OTRA'";
+    }
+    
+    // Validar email
+    if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
+        $errores[] = 'Por favor ingrese un correo electrónico válido';
+    }
+    
+    // Validar teléfono (al menos 10 dígitos)
+    if (strlen($datos['tlf']) < 10) {
+        $errores[] = 'El teléfono debe tener al menos 10 dígitos';
+    }
+    
+    // Validar que la fecha de ingreso no sea anterior a la de nacimiento
+    $fechaNac = new DateTime($datos['fecha_nac']);
+    $fechaIngreso = new DateTime($datos['fecha_ingreso']);
+    if ($fechaIngreso < $fechaNac) {
+        $errores[] = 'La fecha de ingreso no puede ser anterior a la fecha de nacimiento';
+    }
+    
+    return empty($errores) ? true : $errores;
 }
+
+
+
+
 
 // Función para obtener estados civiles
 function obtenerEstadosCiviles() {

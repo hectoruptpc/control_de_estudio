@@ -285,16 +285,16 @@ include("includes/head.php");
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="carrera_modal" class="form-label required">Programa</label>
-                                        <select name="carrera_id" id="carrera_id" class="form-control">
-  <option value="">-- Seleccione una carrera --</option>
-  <?php 
-  $carreras = obtenerCarrerasParaSelectConCodigo();
-  foreach ($carreras as $id => $texto): ?>
-    <option value="<?php echo $id; ?>">
-      <?php echo htmlspecialchars($texto); ?>
-    </option>
-  <?php endforeach; ?>
-</select>
+                                       <select name="carrera" id="carrera" class="form-control" required>
+        <option value="">-- Seleccione una carrera --</option>
+        <?php 
+        $carreras = obtenerTodasLasCarreras();
+        foreach ($carreras as $nombre): ?>
+            <option value="<?php echo htmlspecialchars($nombre); ?>">
+                <?php echo htmlspecialchars($nombre); ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
                                     </div>
                                 </div>
                                 
