@@ -3211,7 +3211,18 @@ function obtenerOpcionesStatus($db) {
   }
 }
 
-
+// Agrega esta función junto con las demás funciones de obtención de datos
+function obtenerIngresos($db) {
+    $ingresos = [];
+    $query = "SELECT id, ingreso FROM ingresos ORDER BY id";
+    $result = $db->query($query);
+    
+    while ($row = $result->fetch_assoc()) {
+        $ingresos[$row['id']] = $row['ingreso'];
+    }
+    
+    return $ingresos;
+}
 
 
 
