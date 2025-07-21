@@ -1109,7 +1109,7 @@ function insertarDocente(array $datos): array {
     global $db;
     
     try {
-        // Validar campos requeridos (se mantiene igual)
+        // Validar campos requeridos
         $camposRequeridos = ['nombre', 'tipo_documento', 'documento', 'email', 'telefono', 
                           'direccion', 'estado_residencia', 'municipio', 'genero', 
                           'estado_civil', 'fecha_nacimiento', 'estado_laboral'];
@@ -1119,48 +1119,57 @@ function insertarDocente(array $datos): array {
             throw new Exception("Faltan campos requeridos: " . implode(', ', $faltantes));
         }
 
-        // 1. Preparación de datos (se mantiene igual)
+        // 1. Preparación de datos
         $username = strtolower(str_replace(' ', '.', $datos['nombre']));
         $password = password_hash($datos['documento'], PASSWORD_DEFAULT);
         $fecha_act = date('Y-m-d H:i:s');
         $api_key = bin2hex(random_bytes(16));
 
-        // 2. Conversión de arrays a strings (modificado para potencialidades)
+        // 2. Conversión de arrays a strings
         $potencialidades = isset($datos['potencialidades']) ? 
                          (is_array($datos['potencialidades']) ? 
                           implode(', ', array_filter($datos['potencialidades'])) : 
                           $datos['potencialidades']) : '';
         
-        $titulos = isset($datos['titulos']) ? 
-                  (is_array($datos['titulos']) ? 
-                   implode(', ', array_filter($datos['titulos'])) : 
-                   $datos['titulos']) : '';
-        
-        $institutos = isset($datos['institutos']) ? 
-                     (is_array($datos['institutos']) ? 
-                      implode(', ', array_filter($datos['institutos'])) : 
-                      $datos['institutos']) : '';
+        // Iniciar transacción
+        $db->begin_transaction();
 
-        // 3. Configuración de roles y valores por defecto (modificado)
-       $config = [
-    'roles' => [
-        'usuario' => 0,
-        'estudiante' => 0,
-        'docente' => 1,
-        'admin' => 0,
-        'super_user' => 0,
-        'editar_user' => 0,
-        'editar_nota' => 0,
-        'editar_acceso' => 0,
-        'editar_valores' => 0,  // Añade esta línea
-        'editar_estudiante' => 0,
-        'agregar_estudiante' => 0,
-        'agregar_docente' => 0,
-        'editar_docente' => 0,
-        'editar_materia' => 0,
-        'agregar_materia' => 0,
-        'agregar_carrera' => 0
-    ],
+        // Verificar si el usuario ya existe
+        $checkStmt = $db->prepare("SELECT id FROM users WHERE idusuario = ? LIMIT 1");
+        $checkStmt->bind_param("s", $valores['idusuario']);
+        $checkStmt->execute();
+        $checkStmt->store_result();
+        
+        if ($checkStmt->num_rows > 0) {
+            $checkStmt->close();
+            $db->rollback();
+            return [
+                'success' => false,
+                'message' => 'El docente ya está registrado'
+            ];
+        }
+        $checkStmt->close();
+
+        // 3. Configuración de roles y valores por defecto
+        $config = [
+            'roles' => [
+                'usuario' => 0,
+                'estudiante' => 0,
+                'docente' => 1,
+                'admin' => 0,
+                'super_user' => 0,
+                'editar_user' => 0,
+                'editar_nota' => 0,
+                'editar_acceso' => 0,
+                'editar_valores' => 0,
+                'editar_estudiante' => 0,
+                'agregar_estudiante' => 0,
+                'agregar_docente' => 0,
+                'editar_docente' => 0,
+                'editar_materia' => 0,
+                'agregar_materia' => 0,
+                'agregar_carrera' => 0
+            ],
             'defaults' => [
                 'cel' => $datos['celular'] ?? '',
                 'ciudad' => $datos['municipio'] ?? '',
@@ -1175,15 +1184,15 @@ function insertarDocente(array $datos): array {
                 'tenencia_vivienda' => $datos['tenencia_vivienda'] ?? '',
                 'enfermedad' => $datos['enfermedad'] ?? '',
                 'discapacidad' => $datos['discapacidad'] ?? '',
-                'titulos' => $titulos,
-                'institutos' => $institutos,
-                'potencialidades' => $potencialidades, // Usamos la columna específica
+                'titulos' => '', // Ya no necesitamos esto aquí
+                'institutos' => '', // Ya no necesitamos esto aquí
+                'potencialidades' => $potencialidades,
                 'api_key' => $api_key,
                 'fecha_ingreso' => $datos['fecha_ingreso'] ?? date('Y-m-d')
             ]
         ];
 
-        // 4. Combinar todos los valores (modificado)
+        // 4. Combinar todos los valores
         $valores = array_merge(
             [
                 'idusuario' => $datos['tipo_documento'] . '-' . $datos['documento'],
@@ -1203,44 +1212,25 @@ function insertarDocente(array $datos): array {
                 'edo_civil' => $datos['estado_civil'],
                 'fecha_nac' => $datos['fecha_nacimiento'],
                 'fecha_act' => $fecha_act,
-                'potencialidades' => $potencialidades // Añadimos explícitamente
+                'potencialidades' => $potencialidades
             ],
             $config['defaults'],
             $config['roles']
         );
 
-      // Iniciar transacción
-      $db->begin_transaction();
-
-       // Verificar si el usuario ya existe
-        $checkStmt = $db->prepare("SELECT id FROM users WHERE idusuario = ? LIMIT 1");
-        $checkStmt->bind_param("s", $valores['idusuario']);
-        $checkStmt->execute();
-        $checkStmt->store_result();
-        
-        if ($checkStmt->num_rows > 0) {
-            $checkStmt->close();
-            $db->rollback();
-            return [
-                'success' => false,
-                'message' => 'El docente ya está registrado'
-            ];
-        }
-        $checkStmt->close();
-
         // 5. Construir e ejecutar consulta de inserción
         $fields = array_keys($valores);
         $placeholders = implode(', ', array_fill(0, count($valores), '?'));
-       $types = '';
-foreach ($valores as $valor) {
-    if (is_int($valor)) {
-        $types .= 'i';
-    } elseif (is_double($valor)) {
-        $types .= 'd';
-    } else {
-        $types .= 's';
-    }
-}
+        $types = '';
+        foreach ($valores as $valor) {
+            if (is_int($valor)) {
+                $types .= 'i';
+            } elseif (is_double($valor)) {
+                $types .= 'd';
+            } else {
+                $types .= 's';
+            }
+        }
         
         $sql = "INSERT INTO users (" . implode(', ', $fields) . ") VALUES ($placeholders)";
         $stmt = $db->prepare($sql);
@@ -1259,6 +1249,56 @@ foreach ($valores as $valor) {
         $idInsertado = $stmt->insert_id;
         $stmt->close();
         
+        // 6. Insertar títulos obtenidos si existen
+        if ((!empty($datos['titulos_main']) && !empty($datos['institutos_main'])) || 
+            (!empty($datos['titulos']) && !empty($datos['institutos']))) {
+            
+            $sqlTitulos = "INSERT INTO titulos_obtenidos (id_usuario, nombre, titulo_obtenido, instituto) VALUES (?, ?, ?, ?)";
+            $stmtTitulos = $db->prepare($sqlTitulos);
+            
+            if (!$stmtTitulos) {
+                throw new Exception("Error al preparar consulta de títulos: " . $db->error);
+            }
+            
+            // Insertar título principal si existe
+            if (!empty($datos['titulos_main']) && !empty($datos['institutos_main'])) {
+                $stmtTitulos->bind_param(
+                    "isss", 
+                    $idInsertado,
+                    $datos['nombre'],
+                    $datos['titulos_main'],
+                    $datos['institutos_main']
+                );
+                if (!$stmtTitulos->execute()) {
+                    throw new Exception("Error al insertar título principal: " . $stmtTitulos->error);
+                }
+            }
+            
+            // Insertar títulos adicionales si existen
+            if (!empty($datos['titulos']) && !empty($datos['institutos'])) {
+                $titulos = is_array($datos['titulos']) ? $datos['titulos'] : [$datos['titulos']];
+                $institutos = is_array($datos['institutos']) ? $datos['institutos'] : [$datos['institutos']];
+                
+                $count = min(count($titulos), count($institutos));
+                
+                for ($i = 0; $i < $count; $i++) {
+                    $stmtTitulos->bind_param(
+                        "isss", 
+                        $idInsertado,
+                        $datos['nombre'],
+                        $titulos[$i],
+                        $institutos[$i]
+                    );
+                    if (!$stmtTitulos->execute()) {
+                        throw new Exception("Error al insertar título adicional: " . $stmtTitulos->error);
+                    }
+                }
+            }
+            
+            $stmtTitulos->close();
+        }
+
+        // Confirmar transacción
         $db->commit();
 
         return [
