@@ -544,8 +544,8 @@ $docentes = obtenerDocentes();
 </div>
 
 <!-- Modal para Cambiar Estado -->
-<div class="modal fade" id="modalEstado" tabindex="-1" aria-labelledby="modalEstadoLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<div class="modal fade" id="modalEstado" tabindex="-1" role="dialog" aria-labelledby="modalEstadoLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header bg-warning text-white">
                 <h5 class="modal-title" id="modalEstadoLabel">Cambiar Estado del Docente</h5>
@@ -559,7 +559,7 @@ $docentes = obtenerDocentes();
                 <input type="hidden" id="nuevoEstado">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" id="btnCancelarEstado">Cancelar</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-warning" id="confirmarCambioEstado">Confirmar</button>
             </div>
         </div>
