@@ -112,6 +112,28 @@ if (!isAdmin()) {
     </div>
 </li>
 
+<li id="dropdown-notas" class="nav-item dropdown">
+    <a title="Gestión de Notas" class="nav-link dropdown-toggle" href="#" id="navbarDropdownNotas" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        <i class="fas fa-graduation-cap fa-fw"></i> Notas
+    </a>
+    <div id="dropdown-notas-menu" class="dropdown-menu" aria-labelledby="navbarDropdownNotas">
+        <a title="Registrar Notas" class="dropdown-item" href="registrar_notas.php">
+            <i class="fas fa-edit fa-fw"></i> Registrar Notas
+        </a>
+        <a title="Consultar Notas" class="dropdown-item" href="consultar_notas.php">
+            <i class="fas fa-search fa-fw"></i> Consultar Notas
+        </a>
+        <a title="Reportes de Notas" class="dropdown-item" href="reportes_notas.php">
+            <i class="fas fa-file-alt fa-fw"></i> Reportes de Notas
+        </a>
+        <a title="Boletines" class="dropdown-item" href="boletines.php">
+            <i class="fas fa-file-pdf fa-fw"></i> Generar Boletines
+        </a>
+        <a title="Historial de Calificaciones" class="dropdown-item" href="historial_calificaciones.php">
+            <i class="fas fa-history fa-fw"></i> Historial de Calificaciones
+        </a>
+    </div>
+</li>
 
       </li>
       <li id="dropdown-ajustes" class="nav-item dropdown">
