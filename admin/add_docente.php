@@ -386,12 +386,18 @@ $docentes = obtenerDocentes();
                             </div>
                             
                             <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="fuente_ingresos" class="form-label">Fuente de Ingresos</label>
-                                    <input type="text" class="form-control" id="fuente_ingresos" name="fuente_ingresos" 
-                                           value="<?= htmlspecialchars($_POST['fuente_ingresos'] ?? '') ?>">
-                                </div>
-                            </div>
+    <div class="mb-3">
+        <label for="fuente_ingresos" class="form-label">Fuente de Ingresos</label>
+        <select class="custom-select d-block w-100" id="fuente_ingresos" name="fuente_ingresos">
+            <option value="">Seleccione una opción</option>
+            <?php 
+            $ingresos = obtenerIngresos($db);
+            foreach ($ingresos as $id => $ingreso): ?>
+                <option value="<?php echo $id; ?>"><?php echo htmlspecialchars($ingreso); ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+</div>
                         </div>
 
                         <!-- Sección 6: Salud -->
