@@ -190,63 +190,48 @@ $docentes = obtenerDocentes();
                                 </div>
                             </div>
                             
-                            <!-- Títulos Obtenidos -->
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="titulos" class="form-label">Títulos Obtenidos</label>
-                                    <div class="input-group">
-                                        <input type="text" class="form-control" id="titulos" name="titulos_main" 
-                                               value="<?= htmlspecialchars($_POST['titulos_main'] ?? '') ?>" placeholder="Titulos obtenidos">
-                                        <button type="button" class="btn btn-outline-primary" id="addTitulo">
-                                            <i class="fas fa-plus"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div id="titulosContainer">
-                                    <?php if(!empty($_POST['titulos'])): ?>
-                                        <?php foreach($_POST['titulos'] as $value): ?>
-                                            <div class="mb-3">
-                                                <div class="input-group">
-                                                    <input type="text" class="form-control" name="titulos[]" 
-                                                           value="<?= htmlspecialchars($value) ?>">
-                                                    <button type="button" class="btn btn-outline-danger remove-field">
-                                                        <i class="fas fa-minus"></i>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                            
-                            <!-- Instituciones -->
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="institutos" class="form-label">Instituciones</label>
-                                    <div class="input-group">
-                                        <input type="text" class="form-control" id="institutos" name="institutos_main" 
-                                               value="<?= htmlspecialchars($_POST['institutos_main'] ?? '') ?>" placeholder="Instituciones donde obtuvo los títulos">
-                                        <button type="button" class="btn btn-outline-primary" id="addInstituto">
-                                            <i class="fas fa-plus"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div id="institutosContainer">
-                                    <?php if(!empty($_POST['institutos'])): ?>
-                                        <?php foreach($_POST['institutos'] as $value): ?>
-                                            <div class="mb-3">
-                                                <div class="input-group">
-                                                    <input type="text" class="form-control" name="institutos[]" 
-                                                           value="<?= htmlspecialchars($value) ?>">
-                                                    <button type="button" class="btn btn-outline-danger remove-field">
-                                                        <i class="fas fa-minus"></i>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
+                           <!-- Títulos Obtenidos e Instituciones -->
+<div class="col-md-12">
+    <div class="mb-3">
+        <label class="form-label">Títulos Obtenidos e Instituciones</label>
+        <div class="row g-3 mb-3">
+            <div class="col-md-5">
+                <input type="text" class="form-control" id="titulos" name="titulos_main" 
+                       value="<?= htmlspecialchars($_POST['titulos_main'] ?? '') ?>" placeholder="Título obtenido">
+            </div>
+            <div class="col-md-5">
+                <input type="text" class="form-control" id="institutos" name="institutos_main" 
+                       value="<?= htmlspecialchars($_POST['institutos_main'] ?? '') ?>" placeholder="Institución donde obtuvo el título">
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-primary w-100" id="addTituloInstituto">
+                    <i class="fas fa-plus mr-1"></i> Agregar
+                </button>
+            </div>
+        </div>
+        <div id="titulosInstitutosContainer">
+            <?php if(!empty($_POST['titulos_institutos'])): ?>
+                <?php foreach($_POST['titulos_institutos'] as $index => $pair): ?>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-5">
+                            <input type="text" class="form-control" name="titulos[]" 
+                                   value="<?= htmlspecialchars($pair['titulo']) ?>">
+                        </div>
+                        <div class="col-md-5">
+                            <input type="text" class="form-control" name="institutos[]" 
+                                   value="<?= htmlspecialchars($pair['instituto']) ?>">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-outline-danger w-100 remove-field">
+                                <i class="fas fa-minus"></i> Eliminar
+                            </button>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
                             
                             <div class="col-md-6">
                                 <div class="mb-3">
@@ -583,6 +568,51 @@ $docentes = obtenerDocentes();
 <?php endif; ?>
 
 <?php include("includes/footer.php"); ?>
+
+
+<script>
+document.getElementById('addTituloInstituto').addEventListener('click', function() {
+    const titulo = document.getElementById('titulos').value;
+    const instituto = document.getElementById('institutos').value;
+    
+    if(titulo.trim() === '' || instituto.trim() === '') {
+        alert('Por favor ingrese tanto el título como la institución');
+        return;
+    }
+    
+    const container = document.getElementById('titulosInstitutosContainer');
+    
+    const newRow = document.createElement('div');
+    newRow.className = 'row g-3 mb-3';
+    newRow.innerHTML = `
+        <div class="col-md-5">
+            <input type="text" class="form-control" name="titulos[]" value="${titulo.replace(/"/g, '&quot;')}">
+        </div>
+        <div class="col-md-5">
+            <input type="text" class="form-control" name="institutos[]" value="${instituto.replace(/"/g, '&quot;')}">
+        </div>
+        <div class="col-md-2">
+            <button type="button" class="btn btn-outline-danger w-100 remove-field">
+                <i class="fas fa-minus"></i> Eliminar
+            </button>
+        </div>
+    `;
+    
+    container.appendChild(newRow);
+    
+    // Limpiar los campos principales
+    document.getElementById('titulos').value = '';
+    document.getElementById('institutos').value = '';
+});
+
+// Delegación de eventos para los botones de eliminar
+document.getElementById('titulosInstitutosContainer').addEventListener('click', function(e) {
+    if(e.target.classList.contains('remove-field') || e.target.closest('.remove-field')) {
+        const button = e.target.classList.contains('remove-field') ? e.target : e.target.closest('.remove-field');
+        button.closest('.row').remove();
+    }
+});
+</script>
 
 <!-- Script para manejar la adición de campos -->
 <script>
