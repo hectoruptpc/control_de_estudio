@@ -571,64 +571,57 @@ $docentes = obtenerDocentes();
 
 
 <script>
-document.getElementById('addTituloInstituto').addEventListener('click', function() {
-    const titulo = document.getElementById('titulos').value;
-    const instituto = document.getElementById('institutos').value;
-    
-    if(titulo.trim() === '' || instituto.trim() === '') {
-        alert('Por favor ingrese tanto el título como la institución');
-        return;
-    }
-    
-    const container = document.getElementById('titulosInstitutosContainer');
-    
-    const newRow = document.createElement('div');
-    newRow.className = 'row g-3 mb-3';
-    newRow.innerHTML = `
-        <div class="col-md-5">
-            <input type="text" class="form-control" name="titulos[]" value="${titulo.replace(/"/g, '&quot;')}">
-        </div>
-        <div class="col-md-5">
-            <input type="text" class="form-control" name="institutos[]" value="${instituto.replace(/"/g, '&quot;')}">
-        </div>
-        <div class="col-md-2">
-            <button type="button" class="btn btn-outline-danger w-100 remove-field">
-                <i class="fas fa-minus"></i> Eliminar
-            </button>
-        </div>
-    `;
-    
-    container.appendChild(newRow);
-    
-    // Limpiar los campos principales
-    document.getElementById('titulos').value = '';
-    document.getElementById('institutos').value = '';
-});
-
-// Delegación de eventos para los botones de eliminar
-document.getElementById('titulosInstitutosContainer').addEventListener('click', function(e) {
-    if(e.target.classList.contains('remove-field') || e.target.closest('.remove-field')) {
-        const button = e.target.classList.contains('remove-field') ? e.target : e.target.closest('.remove-field');
-        button.closest('.row').remove();
-    }
-});
-</script>
-
-<!-- Script para manejar la adición de campos -->
-<script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Handler para cerrar el modal de cambiar estado con Cancelar
-    $('#btnCancelarEstado').on('click', function() {
-        $(this).closest('.modal').modal('hide');
+    // Función para añadir títulos e instituciones juntos
+    document.getElementById('addTituloInstituto').addEventListener('click', function() {
+        const titulo = document.getElementById('titulos').value;
+        const instituto = document.getElementById('institutos').value;
+        
+        if(titulo.trim() === '' || instituto.trim() === '') {
+            alert('Por favor ingrese tanto el título como la institución');
+            return;
+        }
+        
+        const container = document.getElementById('titulosInstitutosContainer');
+        
+        const newRow = document.createElement('div');
+        newRow.className = 'row g-3 mb-3';
+        newRow.innerHTML = `
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="titulos[]" value="${titulo.replace(/"/g, '&quot;')}">
+            </div>
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="institutos[]" value="${instituto.replace(/"/g, '&quot;')}">
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-danger w-100 remove-field">
+                    <i class="fas fa-minus"></i> Eliminar
+                </button>
+            </div>
+        `;
+        
+        container.appendChild(newRow);
+        
+        // Limpiar los campos principales
+        document.getElementById('titulos').value = '';
+        document.getElementById('institutos').value = '';
     });
 
-    // Función para añadir nuevos campos
+    // Delegación de eventos para los botones de eliminar
+    document.getElementById('titulosInstitutosContainer').addEventListener('click', function(e) {
+        if(e.target.classList.contains('remove-field') || e.target.closest('.remove-field')) {
+            const button = e.target.classList.contains('remove-field') ? e.target : e.target.closest('.remove-field');
+            button.closest('.row').remove();
+        }
+    });
+
+    // Función para añadir nuevos campos individuales
     function addField(containerId, inputId, namePrefix, placeholder, buttonId) {
         const container = document.getElementById(containerId);
         const mainInput = document.getElementById(inputId);
         const value = mainInput.value.trim();
         
-        if(value === '') return; // No añadir si está vacío
+        if(value === '') return;
         
         const newField = document.createElement('div');
         newField.className = 'mb-3';
@@ -643,32 +636,16 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         container.appendChild(newField);
         
-        // Vaciar el campo principal
         mainInput.value = '';
         mainInput.focus();
-        
-        // Añadir evento para eliminar campo
-        newField.querySelector('.remove-field').addEventListener('click', function() {
-            container.removeChild(newField);
-        });
     }
     
-    // Evento para añadir potencialidades (especialidades)
+    // Evento para añadir potencialidades
     document.getElementById('addPotencialidad').addEventListener('click', function() {
         addField('potencialidadesContainer', 'especialidad', 'potencialidades', 'Especialidad/Potencialidad', 'addPotencialidad');
     });
     
-    // Evento para añadir títulos
-    document.getElementById('addTitulo').addEventListener('click', function() {
-        addField('titulosContainer', 'titulos', 'titulos', 'Título obtenido', 'addTitulo');
-    });
-    
-    // Evento para añadir institutos
-    document.getElementById('addInstituto').addEventListener('click', function() {
-        addField('institutosContainer', 'institutos', 'institutos', 'Institución', 'addInstituto');
-    });
-    
-    // Manejar el evento Enter en el campo de especialidad
+    // Manejar el evento Enter en los campos
     document.getElementById('especialidad').addEventListener('keypress', function(e) {
         if(e.key === 'Enter') {
             e.preventDefault();
@@ -676,29 +653,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Manejar el evento Enter en el campo de títulos
     document.getElementById('titulos').addEventListener('keypress', function(e) {
         if(e.key === 'Enter') {
             e.preventDefault();
-            document.getElementById('addTitulo').click();
+            document.getElementById('addTituloInstituto').click();
         }
     });
     
-    // Manejar el evento Enter en el campo de institutos
     document.getElementById('institutos').addEventListener('keypress', function(e) {
         if(e.key === 'Enter') {
             e.preventDefault();
-            document.getElementById('addInstituto').click();
-        }
-    });
-    
-    // Eliminar campos dinámicos al hacer clic en el botón de eliminar
-    document.addEventListener('click', function(e) {
-        if(e.target && (e.target.classList.contains('remove-field') || 
-           e.target.parentElement.classList.contains('remove-field'))) {
-            const btn = e.target.classList.contains('remove-field') ? 
-                        e.target : e.target.parentElement;
-            btn.closest('.mb-3').remove();
+            document.getElementById('addTituloInstituto').click();
         }
     });
 
@@ -715,15 +680,12 @@ document.addEventListener('DOMContentLoaded', function() {
         var docenteId = $(this).data('id');
         $('#modalEditar').modal('show');
         
-        // Cargar el formulario de edición via AJAX
         $.ajax({
             url: 'cargar_formulario_edicion.php',
             type: 'GET',
             data: {id: docenteId},
             success: function(response) {
                 $('#contenidoModalEditar').html(response);
-                
-                // Reconfigurar eventos para los campos dinámicos en el modal de edición
                 setupDynamicFieldsInModal();
             },
             error: function() {
@@ -736,17 +698,43 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Función para configurar campos dinámicos en el modal de edición
     function setupDynamicFieldsInModal() {
-        // Configurar eventos para añadir campos en el modal
-        $('#modalEditar').on('click', '#addPotencialidadEdit', function() {
-            addField('potencialidadesContainerEdit', 'especialidadEdit', 'potencialidades', 'Especialidad/Potencialidad', 'addPotencialidadEdit');
+        // Configurar el botón para agregar títulos e institutos juntos en el modal
+        $('#addTituloInstitutoEdit').on('click', function() {
+            const titulo = $('#titulosEdit').val();
+            const instituto = $('#institutosEdit').val();
+            
+            if(titulo.trim() === '' || instituto.trim() === '') {
+                alert('Por favor ingrese tanto el título como la institución');
+                return;
+            }
+            
+            const container = $('#titulosInstitutosContainerEdit');
+            
+            const newRow = $(`
+                <div class="row g-3 mb-3">
+                    <div class="col-md-5">
+                        <input type="text" class="form-control" name="titulos[]" value="${titulo.replace(/"/g, '&quot;')}">
+                    </div>
+                    <div class="col-md-5">
+                        <input type="text" class="form-control" name="institutos[]" value="${instituto.replace(/"/g, '&quot;')}">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-outline-danger w-100 remove-field">
+                            <i class="fas fa-minus"></i> Eliminar
+                        </button>
+                    </div>
+                </div>
+            `);
+            
+            container.append(newRow);
+            
+            $('#titulosEdit').val('');
+            $('#institutosEdit').val('');
         });
         
-        $('#modalEditar').on('click', '#addTituloEdit', function() {
-            addField('titulosContainerEdit', 'titulosEdit', 'titulos', 'Título obtenido', 'addTituloEdit');
-        });
-        
-        $('#modalEditar').on('click', '#addInstitutoEdit', function() {
-            addField('institutosContainerEdit', 'institutosEdit', 'institutos', 'Institución', 'addInstitutoEdit');
+        // Eliminar campos en el modal
+        $(document).on('click', '.remove-field', function() {
+            $(this).closest('.row, .mb-3').remove();
         });
     }
     
@@ -762,7 +750,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 var result = JSON.parse(response);
                 if(result.success) {
                     $('#modalEditar').modal('hide');
-                    location.reload(); // Recargar para ver cambios
+                    location.reload();
                 } else {
                     alert('Error: ' + result.message);
                 }
@@ -782,12 +770,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         $('#docenteId').val(docenteId);
         $('#nuevoEstado').val(nuevoStatus);
-        
-        // Actualizar texto del modal según la acción
-        $('#textoConfirmacion').text(
-            `¿Está seguro que desea ${accion} este docente?`
-        );
-        
+        $('#textoConfirmacion').text(`¿Está seguro que desea ${accion} este docente?`);
         $('#modalEstado').modal('show');
     });
     
@@ -800,14 +783,11 @@ document.addEventListener('DOMContentLoaded', function() {
             url: 'cambiar_estado_docente.php',
             type: 'POST',
             dataType: 'json',
-            data: {
-                id: docenteId,
-                status: nuevoEstado
-            },
+            data: {id: docenteId, status: nuevoEstado},
             success: function(response) {
                 if(response.success) {
                     $('#modalEstado').modal('hide');
-                    location.reload(); // Recargar para ver cambios
+                    location.reload();
                 } else {
                     alert('Error: ' + (response.message || 'No se pudo cambiar el estado.'));
                 }
