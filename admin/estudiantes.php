@@ -284,18 +284,19 @@ include("includes/head.php");
                             <div class="row g-3 mb-4">
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label for="carrera_modal" class="form-label required">Programa</label>
-                                       <select name="carrera" id="carrera" class="form-control" required>
+    <label for="carrera" class="form-label required">Programa</label>
+    <select name="carrera" id="carrera" class="form-control" required>
         <option value="">-- Seleccione una carrera --</option>
         <?php 
         $carreras = obtenerTodasLasCarreras();
-        foreach ($carreras as $nombre): ?>
-            <option value="<?php echo htmlspecialchars($nombre); ?>">
-                <?php echo htmlspecialchars($nombre); ?>
+        foreach ($carreras as $carrera): ?>
+            <option value="<?php echo htmlspecialchars($carrera['id']); ?>">
+                <?php echo htmlspecialchars($carrera['nombre']); ?>
             </option>
         <?php endforeach; ?>
     </select>
-                                    </div>
+</div>
+                                </div>
                                 </div>
                                 
                                 <!-- Títulos Obtenidos e Instituciones -->

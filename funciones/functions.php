@@ -176,14 +176,17 @@ function obtenerTodasLasCarreras() {
     global $db;
     
     $carreras = [];
-    $query = "SELECT nombre_carrera FROM carreras WHERE activa = 1 ORDER BY nombre_carrera ASC";
+    $query = "SELECT id_carrera, nombre_carrera FROM carreras WHERE activa = 1 ORDER BY nombre_carrera ASC";
     
     if ($stmt = $db->prepare($query)) {
         $stmt->execute();
         $result = $stmt->get_result();
         
         while ($row = $result->fetch_assoc()) {
-            $carreras[] = $row['nombre_carrera']; // Solo obtenemos los nombres
+            $carreras[] = [
+                'id' => $row['id_carrera'],
+                'nombre' => $row['nombre_carrera']
+            ];
         }
         
         $stmt->close();
