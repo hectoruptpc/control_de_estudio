@@ -23,7 +23,7 @@ if (!isAdmin()) {
 
 <title><?php echo $titulopag; ?></title>
 
-<?php echo $bootstrap_head; ?>
+<?php echo $bootstrap_head;?>
 </head>
 
 <body>
@@ -60,6 +60,9 @@ if (!isAdmin()) {
         <i class="fa fa-user-plus fa-fw"></i> Agregar Estudiante
       </a>
     <?php endif; ?>
+    <a title="Gestionar Secciones" class="dropdown-item" href="gestion_seccion.php">
+      <i class="fas fa-object-group fa-fw"></i> Gestionar Secciones
+    </a>
     <a title="Historial Académico" class="dropdown-item" href="historial_academico.php">
       <i class="fas fa-history fa-fw"></i> Historial Académico
     </a>
