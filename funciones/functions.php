@@ -83,41 +83,42 @@ if (isset($_GET['logout'])) {
 
 
 function obtenerEstudiantes() {
-  global $db;
-  
-  $estudiantes = [];
-  $query = "SELECT 
-              u.id,
-              u.idusuario AS cedula,
-              u.nombre,
-              u.carrera,
-              u.genero,
-              u.tlf AS num_telf,
-              u.email AS correo,
-              u.fecha_ingreso,
-              u.status
-            FROM users u
-            WHERE u.user_type = ?
-            ORDER BY u.fecha_ingreso DESC";
-  
-  if ($stmt = $db->prepare($query)) {
-      $tipoUsuario = 'estudiante';
-      $stmt->bind_param("s", $tipoUsuario);
-      
-      if ($stmt->execute()) {
-          $result = $stmt->get_result();
-          while ($row = $result->fetch_assoc()) {
-              $estudiantes[] = $row;
-          }
-          $stmt->close();
-          return $estudiantes;
-      } else {
-          $stmt->close();
-          return ['error' => "Error al ejecutar la consulta: " . $stmt->error];
-      }
-  } else {
-      return ['error' => "Error al preparar la consulta: " . $db->error];
-  }
+    global $db;
+    
+    $estudiantes = [];
+    $query = "SELECT 
+                u.id,
+                u.idusuario AS cedula,
+                u.nombre,
+                c.nombre_carrera AS carrera,
+                u.genero,
+                u.tlf AS num_telf,
+                u.email AS correo,
+                u.fecha_ingreso,
+                u.status
+              FROM users u
+              LEFT JOIN carreras c ON u.carrera = c.id_carrera
+              WHERE u.user_type = ?
+              ORDER BY u.fecha_ingreso DESC";
+    
+    if ($stmt = $db->prepare($query)) {
+        $tipoUsuario = 'estudiante';
+        $stmt->bind_param("s", $tipoUsuario);
+        
+        if ($stmt->execute()) {
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $estudiantes[] = $row;
+            }
+            $stmt->close();
+            return $estudiantes;
+        } else {
+            $stmt->close();
+            return ['error' => "Error al ejecutar la consulta: " . $stmt->error];
+        }
+    } else {
+        return ['error' => "Error al preparar la consulta: " . $db->error];
+    }
 }
 
 /**
@@ -126,20 +127,32 @@ function obtenerEstudiantes() {
 * @return array Array con los detalles del estudiante o mensaje de error
 */
 function obtenerDetalleEstudiante($id) {
-  global $db;
-  
-  $stmt = $db->prepare("SELECT * FROM estudiantes WHERE id = ?");
-  $stmt->bind_param("i", $id);
-  
-  if ($stmt->execute()) {
-      $result = $stmt->get_result();
-      $estudiante = $result->fetch_assoc();
-      $stmt->close();
-      
-      return $estudiante ?: ['error' => "Estudiante no encontrado"];
-  } else {
-      return ['error' => "Error al obtener detalle del estudiante: " . $stmt->error];
-  }
+    global $db;
+    
+    $query = "SELECT 
+                e.*,
+                c.nombre_carrera AS carrera_nombre
+              FROM estudiantes e
+              LEFT JOIN carreras c ON e.carrera = c.id_carrera
+              WHERE e.id = ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $id);
+    
+    if ($stmt->execute()) {
+        $result = $stmt->get_result();
+        $estudiante = $result->fetch_assoc();
+        $stmt->close();
+        
+        if ($estudiante) {
+            $estudiante['carrera'] = $estudiante['carrera_nombre'];
+            return $estudiante;
+        } else {
+            return ['error' => "Estudiante no encontrado"];
+        }
+    } else {
+        return ['error' => "Error al obtener detalle del estudiante: " . $stmt->error];
+    }
 }
 
 /**

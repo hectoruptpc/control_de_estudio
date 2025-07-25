@@ -69,30 +69,44 @@ if (isset($estudiante['error'])) {
         </div>
     </div>
 
-    <!-- Segunda fila: Información académica -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-light">
-                    <h6 class="mb-0">Información Académica</h6>
-                </div>
-                <div class="card-body">
-                    <dl class="row mb-0">
-                        <dt class="col-sm-5">Carrera:</dt>
-                        <dd class="col-sm-7"><?= htmlspecialchars($estudiante['carrera'] ?? '') ?></dd>
+   <!-- Segunda fila: Información académica -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h6 class="mb-0">Información Académica</h6>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-5">Carrera:</dt>
+                    <dd class="col-sm-7">
+                        <?php
+                        // Obtener el nombre de la carrera directamente
+                        if(isset($estudiante['carrera']) && !empty($estudiante['carrera'])) {
+                            global $db;
+                            $id_carrera = $estudiante['carrera'];
+                            $query = $db->query("SELECT nombre_carrera FROM carreras WHERE id_carrera = $id_carrera");
+                            $carrera = $query->fetch_assoc();
+                            echo htmlspecialchars($carrera['nombre_carrera'] ?? 'Carrera no encontrada');
+                        } else {
+                            echo 'No especificada';
+                        }
+                        ?>
+                    </dd>
 
-                        <dt class="col-sm-5">Estado:</dt>
-                        <dd class="col-sm-7"><?= $estudiante['status'] == 1 ? 'Activo' : 'Inactivo' ?></dd>
+                    <dt class="col-sm-5">Estado:</dt>
+                    <dd class="col-sm-7"><?= ($estudiante['status'] ?? 0) == 1 ? 'Activo' : 'Inactivo' ?></dd>
 
-                        <dt class="col-sm-5">Fecha Ingreso:</dt>
-                        <dd class="col-sm-7"><?= !empty($estudiante['fecha_ingreso']) ? date('d/m/Y', strtotime($estudiante['fecha_ingreso'])) : 'No especificado' ?></dd>
+                    <dt class="col-sm-5">Fecha Ingreso:</dt>
+                    <dd class="col-sm-7"><?= !empty($estudiante['fecha_ingreso']) ? date('d/m/Y', strtotime($estudiante['fecha_ingreso'])) : 'No especificado' ?></dd>
 
-                        <dt class="col-sm-5">Última Actualización:</dt>
-                        <dd class="col-sm-7"><?= !empty($estudiante['fecha_act']) ? date('d/m/Y', strtotime($estudiante['fecha_act'])) : 'No especificado' ?></dd>
-                    </dl>
-                </div>
+                    <dt class="col-sm-5">Última Actualización:</dt>
+                    <dd class="col-sm-7"><?= !empty($estudiante['fecha_act']) ? date('d/m/Y', strtotime($estudiante['fecha_act'])) : 'No especificado' ?></dd>
+                </dl>
             </div>
         </div>
+    </div>
+</div>
         
         <div class="col-md-6">
             <div class="card">
