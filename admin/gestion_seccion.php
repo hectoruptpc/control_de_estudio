@@ -1,6 +1,4 @@
 <?php
-
-
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
@@ -11,6 +9,9 @@ include('../funciones/functions.php');
 $action = $_POST['action'] ?? 'list';
 $seccion_id = $_POST['id'] ?? 0;
 $periodo_id = $_POST['periodo'] ?? 0;
+
+// Constante para el mínimo de estudiantes requeridos
+define('MINIMO_ESTUDIANTES', 15);
 
 // Procesar formularios antes de cualquier output
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -23,13 +24,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $maximo = (int)$_POST['capacidad_maxima'];
         
         try {
-            $stmt = $db->prepare("INSERT INTO secciones (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima) 
-                                VALUES (?, ?, ?, ?, ?)");
+            // Crear la sección como inactiva por defecto
+            $stmt = $db->prepare("INSERT INTO secciones (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, estatus) 
+                                VALUES (?, ?, ?, ?, ?, 'inactiva')");
             $stmt->bind_param("siiii", $codigo, $carrera, $trayecto, $periodo, $maximo);
             $stmt->execute();
             $stmt->close();
             
-            $_SESSION['success'] = "Sección creada exitosamente!";
+            $_SESSION['success'] = "Sección creada exitosamente! La sección estará inactiva hasta tener al menos ".MINIMO_ESTUDIANTES." estudiantes.";
         } catch (Exception $e) {
             $_SESSION['error'] = "Error al crear sección: " . $e->getMessage();
         }
@@ -79,8 +81,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->close();
             }
             
+            // Verificar si se alcanza el mínimo de estudiantes para activar la sección
+            $stmt = $db->prepare("SELECT COUNT(*) as total FROM estudiante_seccion 
+                                WHERE id_seccion = ? AND estatus = 'activo'");
+            $stmt->bind_param("i", $seccion_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $count = $result->fetch_assoc()['total'];
+            $stmt->close();
+            
+            // Actualizar estado de la sección según el número de estudiantes
+            $nuevo_estatus = ($count >= MINIMO_ESTUDIANTES) ? 'activa' : 'inactiva';
+            $stmt = $db->prepare("UPDATE secciones SET estatus = ? WHERE id_seccion = ?");
+            $stmt->bind_param("si", $nuevo_estatus, $seccion_id);
+            $stmt->execute();
+            $stmt->close();
+            
             $db->commit();
-            $_SESSION['success'] = "Asignación de estudiantes actualizada!";
+            
+            if ($count >= MINIMO_ESTUDIANTES) {
+                $_SESSION['success'] = "Asignación de estudiantes actualizada! La sección ha sido activada al alcanzar el mínimo requerido.";
+            } else {
+                $_SESSION['warning'] = "Asignación de estudiantes actualizada! La sección permanecerá inactiva hasta tener al menos ".MINIMO_ESTUDIANTES." estudiantes (actualmente tiene $count).";
+            }
         } catch (Exception $e) {
             $db->rollback();
             $_SESSION['error'] = "Error al asignar estudiantes: " . $e->getMessage();
@@ -106,6 +129,10 @@ include("includes/head.php");
         echo '<div class="alert alert-success">' . $_SESSION['success'] . '</div>';
         unset($_SESSION['success']);
     }
+    if (isset($_SESSION['warning'])) {
+        echo '<div class="alert alert-warning">' . $_SESSION['warning'] . '</div>';
+        unset($_SESSION['warning']);
+    }
     
     if ($action === 'list'): ?>
         <!-- LISTADO DE SECCIONES -->
@@ -122,6 +149,9 @@ include("includes/head.php");
                 </form>
             </div>
             <div class="card-body">
+                <div class="alert alert-info">
+                    <strong>Nota:</strong> Las secciones requieren al menos <?= MINIMO_ESTUDIANTES ?> estudiantes para activarse.
+                </div>
                 <div class="table-responsive">
                     <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                         <thead>
@@ -157,6 +187,8 @@ include("includes/head.php");
                             foreach ($secciones as $seccion) {
                                 $porcentaje = $seccion['capacidad_maxima'] > 0 ? 
                                     round(($seccion['inscritos'] / $seccion['capacidad_maxima']) * 100) : 0;
+                                $estado_clase = ($seccion['estatus'] == 'activa') ? 'success' : 
+                                               (($seccion['estatus'] == 'completa') ? 'warning' : 'danger');
                             ?>
                             <tr>
                                 <td><?= htmlspecialchars($seccion['codigo_seccion']) ?></td>
@@ -173,11 +205,11 @@ include("includes/head.php");
                                 </td>
                                 <td><?= $seccion['capacidad_maxima'] ?></td>
                                 <td>
-                                    <span class="badge badge-<?= 
-                                        $seccion['estatus'] == 'activa' ? 'success' : 
-                                        ($seccion['estatus'] == 'completa' ? 'warning' : 'danger') 
-                                    ?>">
+                                    <span class="badge badge-<?= $estado_clase ?>">
                                         <?= ucfirst($seccion['estatus']) ?>
+                                        <?php if ($seccion['estatus'] == 'inactiva' && $seccion['inscritos'] > 0): ?>
+                                            <br><small>(Faltan <?= MINIMO_ESTUDIANTES - $seccion['inscritos'] ?> para activar)</small>
+                                        <?php endif; ?>
                                     </span>
                                 </td>
                                 <td>
@@ -252,6 +284,9 @@ include("includes/head.php");
                 <h6 class="m-0 font-weight-bold text-primary">Datos de la Sección</h6>
             </div>
             <div class="card-body">
+                <div class="alert alert-info">
+                    <strong>Importante:</strong> La sección se activará automáticamente cuando tenga al menos <?= MINIMO_ESTUDIANTES ?> estudiantes asignados.
+                </div>
                 <form method="POST">
                     <input type="hidden" name="action" value="<?= $action === 'new' ? 'crear_seccion' : 'editar_seccion' ?>">
                     <?php if ($action === 'edit'): ?>
@@ -309,7 +344,8 @@ include("includes/head.php");
                         <div class="form-group col-md-3">
                             <label for="capacidad_maxima">Capacidad Máxima *</label>
                             <input type="number" class="form-control" id="capacidad_maxima" name="capacidad_maxima" 
-                                   value="<?= $seccion['capacidad_maxima'] ?? 30 ?>" min="1" required>
+                                   value="<?= $seccion['capacidad_maxima'] ?? 30 ?>" min="<?= MINIMO_ESTUDIANTES ?>" required>
+                            <small class="form-text text-muted">Mínimo <?= MINIMO_ESTUDIANTES ?> estudiantes</small>
                         </div>
                     </div>
                     
@@ -361,9 +397,19 @@ include("includes/head.php");
                 <h6 class="m-0 font-weight-bold text-primary">
                     Sección: <?= htmlspecialchars($seccion['codigo_seccion']) ?> - <?= htmlspecialchars($seccion['nombre_carrera']) ?>
                 </h6>
-                <span class="badge badge-info">
-                    Cupos: <?= $seccion['inscritos'] ?>/<?= $seccion['capacidad_maxima'] ?>
-                </span>
+                <div>
+                    <span class="badge badge-<?= $seccion['estatus'] == 'activa' ? 'success' : 'warning' ?>">
+                        <?= ucfirst($seccion['estatus']) ?>
+                    </span>
+                    <span class="badge badge-info ml-2">
+                        Cupos: <?= $seccion['inscritos'] ?>/<?= $seccion['capacidad_maxima'] ?>
+                    </span>
+                    <?php if ($seccion['estatus'] == 'inactiva'): ?>
+                        <span class="badge badge-danger ml-2">
+                            Faltan <?= MINIMO_ESTUDIANTES - $seccion['inscritos'] ?> para activar
+                        </span>
+                    <?php endif; ?>
+                </div>
             </div>
             <div class="card-body">
                 <form method="POST">
@@ -466,6 +512,9 @@ include("includes/head.php");
         $result = $stmt->get_result();
         $estudiantes = $result->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
+        
+        $estudiantes_inscritos = count($estudiantes);
+        $faltan_para_activar = max(0, MINIMO_ESTUDIANTES - $estudiantes_inscritos);
         ?>
         
         <h1 class="h3 mb-4 text-gray-800">Detalles de Sección</h1>
@@ -481,10 +530,13 @@ include("includes/head.php");
                         <p><strong>Carrera:</strong> <?= htmlspecialchars($seccion['nombre_carrera']) ?></p>
                         <p><strong>Trayecto:</strong> <?= $seccion['numero_trayecto'] ?></p>
                         <p><strong>Período:</strong> <?= htmlspecialchars($seccion['nombre_periodo']) ?></p>
-                        <p><strong>Capacidad:</strong> <?= count($estudiantes) ?>/<?= $seccion['capacidad_maxima'] ?></p>
+                        <p><strong>Capacidad:</strong> <?= $estudiantes_inscritos ?>/<?= $seccion['capacidad_maxima'] ?></p>
                         <p><strong>Estado:</strong> 
                             <span class="badge badge-<?= $seccion['estatus'] == 'activa' ? 'success' : 'warning' ?>">
                                 <?= ucfirst($seccion['estatus']) ?>
+                                <?php if ($seccion['estatus'] == 'inactiva'): ?>
+                                    <br><small>(Faltan <?= $faltan_para_activar ?> estudiantes para activar)</small>
+                                <?php endif; ?>
                             </span>
                         </p>
                         
@@ -518,7 +570,12 @@ include("includes/head.php");
                 <div class="card shadow mb-4">
                     <div class="card-header py-3 d-flex justify-content-between align-items-center">
                         <h6 class="m-0 font-weight-bold text-primary">Estudiantes Asignados</h6>
-                        <span class="badge badge-primary"><?= count($estudiantes) ?> estudiantes</span>
+                        <span class="badge badge-primary"><?= $estudiantes_inscritos ?> estudiantes</span>
+                        <?php if ($seccion['estatus'] == 'inactiva'): ?>
+                            <span class="badge badge-danger">
+                                Se requiere <?= MINIMO_ESTUDIANTES ?> para activar (faltan <?= $faltan_para_activar ?>)
+                            </span>
+                        <?php endif; ?>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">

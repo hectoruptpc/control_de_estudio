@@ -708,14 +708,15 @@ function procesarCSVEstudiantes($tmpFilePath, $originalName) {
             throw new Exception("Error al preparar consulta de verificación: " . $db->error);
         }
         
-        // Preparar statement para inserción (dinámico)
-        $insertStmt = null;
-        
         // Preparar statement para títulos obtenidos
         $titulosStmt = $db->prepare("INSERT INTO titulos_obtenidos (id_usuario, nombre, titulo_obtenido, instituto) VALUES (?, ?, ?, ?)");
         if (!$titulosStmt) {
             throw new Exception("Error al preparar consulta de títulos: " . $db->error);
         }
+        
+        // Inicializar statement de inserción
+        $insertStmt = null;
+        $lastFields = null;
         
         while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
             $lineNumber++;
@@ -794,27 +795,30 @@ function procesarCSVEstudiantes($tmpFilePath, $originalName) {
             $cedulaLimpia = substr($estudiante['idusuario'], 2);
             $estudiante['password'] = md5($cedulaLimpia);
             
-            // Preparar consulta de inserción dinámica
-            $fields = array_keys($estudiante);
-            $placeholders = implode(', ', array_fill(0, count($fields), '?'));
-            $types = str_repeat('s', count($fields));
-            
-            $sql = "INSERT INTO users (" . implode(', ', $fields) . ") VALUES ($placeholders)";
-            
-            // Preparar statement si no existe o si cambió la estructura
-            if (!$insertStmt || $insertStmt->query_string !== $sql) {
-                if ($insertStmt) $insertStmt->close();
+            // Preparar consulta de inserción dinámica solo si los campos cambiaron
+            $currentFields = array_keys($estudiante);
+            if (!$insertStmt || $currentFields !== $lastFields) {
+                if ($insertStmt) {
+                    $insertStmt->close();
+                }
+                
+                $fields = $currentFields;
+                $placeholders = implode(', ', array_fill(0, count($fields), '?'));
+                $types = str_repeat('s', count($fields));
+                
+                $sql = "INSERT INTO users (" . implode(', ', $fields) . ") VALUES ($placeholders)";
                 $insertStmt = $db->prepare($sql);
+                $lastFields = $currentFields;
+                
                 if (!$insertStmt) {
                     throw new Exception("Error en preparación: " . $db->error);
                 }
             }
             
-            // Vincular parámetros
+            // Vincular parámetros y ejecutar
             $params = array_values($estudiante);
             $insertStmt->bind_param($types, ...$params);
             
-            // Ejecutar inserción
             if ($insertStmt->execute()) {
                 $userId = $insertStmt->insert_id;
                 $successCount++;
@@ -824,7 +828,6 @@ function procesarCSVEstudiantes($tmpFilePath, $originalName) {
                     $titulos = explode(',', $estudiante['titulos']);
                     $institutos = explode(',', $estudiante['institutos']);
                     
-                    // Limpiar y emparejar títulos e instituciones
                     $titulos = array_map('trim', $titulos);
                     $institutos = array_map('trim', $institutos);
                     $count = min(count($titulos), count($institutos));
@@ -7412,32 +7415,7 @@ $_SESSION['msn_pedidos']  .= '<i class="fa fa-envelope"></i> Se ha enviado un co
 
 
 
-  function nuevo_contenido(){
-    global $db;
-    $seccion = e($_POST['seccion']);
-    $contenido = e($_POST['contenido']);
-
-
-$query = "INSERT INTO contenido (
-  id,
-  seccion,
-  contenido)
-  VALUES(null, '$seccion', '$contenido')";
-    //mysqli_query($db, $query);
-      $resultado_ingreso = mysqli_query($db, $query) or mysqli_error($db);
-      $_SESSION['contenido']  = "Se ha registrado un nuevo contenido de manera Exitosa.<br>";
-
-
-  }
-
-  // FUERA DE FUNCTION SE EJECUTA CREACION DE LAS VARIABLES $seccion
-  $query = "SELECT seccion FROM seccion";
-  $results = mysqli_query($db, $query);
-  //$seccion = mysqli_fetch_array($results);
-
-while($seccion = mysqli_fetch_array($results)) {
-   ${$seccion['seccion']} = $seccion['seccion'];
-}
+  
 
 
 
