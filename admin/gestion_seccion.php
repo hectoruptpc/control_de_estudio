@@ -46,37 +46,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $db->begin_transaction();
             
-            // Eliminar asignaciones no seleccionadas
-            if (!empty($estudiantes)) {
-                $placeholders = implode(',', array_fill(0, count($estudiantes), '?'));
-                $types = str_repeat('i', count($estudiantes));
+            // Primero obtener todos los estudiantes actualmente asignados
+            $stmt = $db->prepare("SELECT id_usuario FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'");
+            $stmt->bind_param("i", $seccion_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $asignados_actuales = [];
+            while ($row = $result->fetch_assoc()) {
+                $asignados_actuales[] = $row['id_usuario'];
+            }
+            $stmt->close();
+            
+            // Estudiantes a desactivar (estaban asignados pero no están en la nueva selección)
+            $desactivar = array_diff($asignados_actuales, $estudiantes);
+            
+            // Estudiantes a activar (nuevos o que ya estaban)
+            $activar = $estudiantes;
+            
+            // Desactivar los que ya no están seleccionados
+            if (!empty($desactivar)) {
+                $placeholders = implode(',', array_fill(0, count($desactivar), '?'));
+                $types = str_repeat('i', count($desactivar));
                 
                 $stmt = $db->prepare("UPDATE estudiante_seccion 
                                     SET estatus = 'retirado'
                                     WHERE id_seccion = ? 
-                                    AND id_usuario NOT IN ($placeholders)");
+                                    AND id_usuario IN ($placeholders)");
                 
-                $params = array_merge([$seccion_id], $estudiantes);
+                $params = array_merge([$seccion_id], $desactivar);
                 $stmt->bind_param(str_repeat('i', count($params)), ...$params);
-                $stmt->execute();
-                $stmt->close();
-            } else {
-                // Si no hay estudiantes seleccionados, marcar todos como retirados
-                $stmt = $db->prepare("UPDATE estudiante_seccion 
-                                    SET estatus = 'retirado'
-                                    WHERE id_seccion = ?");
-                $stmt->bind_param("i", $seccion_id);
                 $stmt->execute();
                 $stmt->close();
             }
             
-            // Insertar nuevas asignaciones
-            foreach ($estudiantes as $est_id) {
-                $est_id = (int)$est_id;
+            // Activar o insertar nuevos estudiantes
+            if (!empty($activar)) {
+                $placeholders = implode(',', array_fill(0, count($activar), '(?,?,CURDATE(),\'activo\')'));
+                
                 $stmt = $db->prepare("INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus)
-                                    VALUES (?, ?, CURDATE(), 'activo')
+                                    VALUES $placeholders
                                     ON DUPLICATE KEY UPDATE estatus = 'activo'");
-                $stmt->bind_param("ii", $est_id, $seccion_id);
+                
+                // Preparar parámetros: para cada estudiante, necesitamos el id_usuario y id_seccion
+                $params = [];
+                foreach ($activar as $est_id) {
+                    $params[] = $est_id;
+                    $params[] = $seccion_id;
+                }
+                
+                $stmt->bind_param(str_repeat('i', count($params)), ...$params);
                 $stmt->execute();
                 $stmt->close();
             }
@@ -377,6 +395,7 @@ include("includes/head.php");
         $seccion = $result->fetch_assoc();
         $stmt->close();
         
+        // Obtener todos los estudiantes de la carrera (sin paginación para asegurar que todos se envíen)
         $stmt = $db->prepare("SELECT u.id, u.nombre, u.username, 
                              (SELECT COUNT(*) FROM estudiante_seccion 
                               WHERE id_usuario = u.id AND id_seccion = ? AND estatus = 'activo') as asignado
@@ -387,6 +406,17 @@ include("includes/head.php");
         $stmt->execute();
         $result = $stmt->get_result();
         $estudiantes = $result->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        
+        // Obtener IDs de estudiantes ya asignados para marcar los checkboxes
+        $stmt = $db->prepare("SELECT id_usuario FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'");
+        $stmt->bind_param("i", $seccion_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $asignados = [];
+        while ($row = $result->fetch_assoc()) {
+            $asignados[] = $row['id_usuario'];
+        }
         $stmt->close();
         ?>
         
@@ -412,7 +442,7 @@ include("includes/head.php");
                 </div>
             </div>
             <div class="card-body">
-                <form method="POST">
+                <form method="POST" id="formAsignarEstudiantes">
                     <input type="hidden" name="action" value="asignar_estudiantes">
                     <input type="hidden" name="seccion_id" value="<?= $seccion_id ?>">
                     
@@ -433,7 +463,7 @@ include("includes/head.php");
                                     <tr>
                                         <td>
                                             <input type="checkbox" name="estudiantes[]" value="<?= $est['id'] ?>"
-                                                <?= $est['asignado'] > 0 ? 'checked' : '' ?>>
+                                                <?= in_array($est['id'], $asignados) ? 'checked' : '' ?>>
                                         </td>
                                         <td><?= htmlspecialchars($est['nombre']) ?></td>
                                         <td><?= htmlspecialchars($est['username']) ?></td>
@@ -466,23 +496,41 @@ include("includes/head.php");
 
         <script>
         $(document).ready(function() {
-            // Inicializar DataTable
-            $('#tablaEstudiantes').DataTable({
+            // Inicializar DataTable con configuración para mantener los checkboxes
+            var table = $('#tablaEstudiantes').DataTable({
                 "language": {
                     "url": "//cdn.datatables.net/plug-ins/1.10.20/i18n/Spanish.json"
+                },
+                "drawCallback": function(settings) {
+                    // Al cambiar de página, mantener los checkboxes marcados según el formulario
+                    $('input[name="estudiantes[]"]').each(function() {
+                        var id = $(this).val();
+                        $(this).prop('checked', $('#formAsignarEstudiantes input[name="estudiantes[]"][value="'+id+'"]').is(':checked'));
+                    });
                 }
             });
             
             // Seleccionar/deseleccionar todos
             $('#seleccionarTodos').change(function() {
-                $('input[name="estudiantes[]"]').prop('checked', this.checked);
+                var isChecked = this.checked;
+                $('input[name="estudiantes[]"]').prop('checked', isChecked).trigger('change');
             });
             
             // Si se deselecciona un estudiante, desmarcar "seleccionar todos"
-            $('input[name="estudiantes[]"]').change(function() {
+            $('tbody').on('change', 'input[name="estudiantes[]"]', function() {
                 if (!this.checked) {
                     $('#seleccionarTodos').prop('checked', false);
+                } else {
+                    // Verificar si todos están marcados
+                    var allChecked = $('input[name="estudiantes[]"]:not(:checked)').length === 0;
+                    $('#seleccionarTodos').prop('checked', allChecked);
                 }
+            });
+            
+            // Manejar el envío del formulario para asegurar que todos los checkboxes se envíen
+            $('#formAsignarEstudiantes').on('submit', function() {
+                // Forzar a DataTables a mostrar todos los registros temporalmente
+                table.page.len(-1).draw();
             });
         });
         </script>
