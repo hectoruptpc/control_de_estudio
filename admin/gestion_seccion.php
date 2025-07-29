@@ -46,7 +46,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $db->begin_transaction();
             
-            // Primero obtener todos los estudiantes actualmente asignados
+            // Obtener información de la sección para verificar capacidad
+            $stmt = $db->prepare("SELECT capacidad_maxima FROM secciones WHERE id_seccion = ?");
+            $stmt->bind_param("i", $seccion_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $seccion = $result->fetch_assoc();
+            $capacidad_maxima = $seccion['capacidad_maxima'];
+            $stmt->close();
+            
+            // Obtener estudiantes actualmente asignados
             $stmt = $db->prepare("SELECT id_usuario FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'");
             $stmt->bind_param("i", $seccion_id);
             $stmt->execute();
@@ -62,6 +71,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             // Estudiantes a activar (nuevos o que ya estaban)
             $activar = $estudiantes;
+            
+            // Verificar si estamos intentando agregar más estudiantes de la capacidad permitida
+            $nuevos_estudiantes = array_diff($activar, $asignados_actuales);
+            $total_estudiantes = count($asignados_actuales) - count($desactivar) + count($nuevos_estudiantes);
+            
+            if ($total_estudiantes > $capacidad_maxima) {
+                throw new Exception("No se pueden asignar más estudiantes. La capacidad máxima es $capacidad_maxima.");
+            }
             
             // Desactivar los que ya no están seleccionados
             if (!empty($desactivar)) {
@@ -79,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->close();
             }
             
-            // Activar o insertar nuevos estudiantes
+            // Activar o insertar nuevos estudiantes (solo si no superamos la capacidad)
             if (!empty($activar)) {
                 $placeholders = implode(',', array_fill(0, count($activar), '(?,?,CURDATE(),\'activo\')'));
                 
@@ -132,13 +149,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Ahora incluimos el head después de cualquier posible redirección
 include("includes/head.php");
 ?>
 
 <div class="container-fluid">
     <?php 
-    // Mostrar mensajes después de incluir el head
     if (isset($_SESSION['error'])) {
         echo '<div class="alert alert-danger">' . $_SESSION['error'] . '</div>';
         unset($_SESSION['error']);
@@ -418,6 +433,9 @@ include("includes/head.php");
             $asignados[] = $row['id_usuario'];
         }
         $stmt->close();
+        
+        // Verificar si la sección está llena
+        $seccion_llena = ($seccion['inscritos'] >= $seccion['capacidad_maxima']);
         ?>
         
         <h1 class="h3 mb-4 text-gray-800">Asignar Estudiantes</h1>
@@ -439,12 +457,25 @@ include("includes/head.php");
                             Faltan <?= MINIMO_ESTUDIANTES - $seccion['inscritos'] ?> para activar
                         </span>
                     <?php endif; ?>
+                    <?php if ($seccion_llena): ?>
+                        <span class="badge badge-warning ml-2">
+                            Sección llena
+                        </span>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="card-body">
+                <?php if ($seccion_llena): ?>
+                    <div class="alert alert-warning">
+                        <strong>Atención:</strong> La sección ha alcanzado su capacidad máxima. Puede desasignar estudiantes marcándolos para retirarlos.
+                    </div>
+                <?php endif; ?>
+                
                 <form method="POST" id="formAsignarEstudiantes">
                     <input type="hidden" name="action" value="asignar_estudiantes">
                     <input type="hidden" name="seccion_id" value="<?= $seccion_id ?>">
+                    <input type="hidden" id="capacidadMaxima" value="<?= $seccion['capacidad_maxima'] ?>">
+                    <input type="hidden" id="inscritosActuales" value="<?= $seccion['inscritos'] ?>">
                     
                     <div class="table-responsive">
                         <table class="table table-bordered" id="tablaEstudiantes" width="100%" cellspacing="0">
@@ -463,7 +494,8 @@ include("includes/head.php");
                                     <tr>
                                         <td>
                                             <input type="checkbox" name="estudiantes[]" value="<?= $est['id'] ?>"
-                                                <?= in_array($est['id'], $asignados) ? 'checked' : '' ?>>
+                                                <?= in_array($est['id'], $asignados) ? 'checked' : '' ?>
+                                                class="checkbox-estudiante">
                                         </td>
                                         <td><?= htmlspecialchars($est['nombre']) ?></td>
                                         <td><?= htmlspecialchars($est['username']) ?></td>
@@ -478,6 +510,10 @@ include("includes/head.php");
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3">
+                        Estudiantes seleccionados: <span id="contador-seleccionados">0</span>/<?= $seccion['capacidad_maxima'] ?>
                     </div>
                     
                     <button type="submit" name="asignar_estudiantes" class="btn btn-primary">
@@ -496,42 +532,99 @@ include("includes/head.php");
 
         <script>
         $(document).ready(function() {
-            // Inicializar DataTable con configuración para mantener los checkboxes
+            // Obtener valores iniciales
+            const capacidadMaxima = parseInt($('#capacidadMaxima').val());
+            const inscritosActuales = parseInt($('#inscritosActuales').val());
+            
+            // Contar checkboxes marcados inicialmente
+            let seleccionados = $('#formAsignarEstudiantes input[name="estudiantes[]"]:checked').length;
+            
+            // Actualizar contador inicial
+            $('#contador-seleccionados').text(seleccionados);
+            
+            // Inicializar DataTable
             var table = $('#tablaEstudiantes').DataTable({
                 "language": {
                     "url": "//cdn.datatables.net/plug-ins/1.10.20/i18n/Spanish.json"
-                },
-                "drawCallback": function(settings) {
-                    // Al cambiar de página, mantener los checkboxes marcados según el formulario
-                    $('input[name="estudiantes[]"]').each(function() {
-                        var id = $(this).val();
-                        $(this).prop('checked', $('#formAsignarEstudiantes input[name="estudiantes[]"][value="'+id+'"]').is(':checked'));
-                    });
                 }
+            });
+            
+            // Función para actualizar el contador y deshabilitar checkboxes si es necesario
+            function actualizarContador() {
+                // Usar la API de DataTables para obtener todos los registros (incluyendo paginación)
+                let totalSeleccionados = 0;
+                table.rows().every(function() {
+                    const row = this.node();
+                    const checkbox = $(row).find('.checkbox-estudiante');
+                    if (checkbox.is(':checked')) {
+                        totalSeleccionados++;
+                    }
+                });
+                
+                seleccionados = totalSeleccionados;
+                $('#contador-seleccionados').text(seleccionados);
+                
+                // Actualizar estado de "Seleccionar todos"
+                const totalEstudiantes = $('#formAsignarEstudiantes input[name="estudiantes[]"]').length;
+                $('#seleccionarTodos').prop('checked', seleccionados === totalEstudiantes);
+                
+                // Deshabilitar checkboxes no seleccionados si se alcanzó la capacidad máxima
+                if (seleccionados >= capacidadMaxima) {
+                    $('.checkbox-estudiante:not(:checked)').prop('disabled', true);
+                } else {
+                    $('.checkbox-estudiante').prop('disabled', false);
+                }
+            }
+            
+            // Manejar cambios en los checkboxes
+            $(document).on('change', '.checkbox-estudiante', function() {
+                // Verificar si estamos intentando marcar un checkbox cuando ya se alcanzó la capacidad máxima
+                if ($(this).is(':checked') && seleccionados >= capacidadMaxima) {
+                    $(this).prop('checked', false);
+                    alert('No puedes seleccionar más estudiantes que la capacidad máxima de la sección.');
+                    return;
+                }
+                
+                actualizarContador();
             });
             
             // Seleccionar/deseleccionar todos
             $('#seleccionarTodos').change(function() {
-                var isChecked = this.checked;
-                $('input[name="estudiantes[]"]').prop('checked', isChecked).trigger('change');
-            });
-            
-            // Si se deselecciona un estudiante, desmarcar "seleccionar todos"
-            $('tbody').on('change', 'input[name="estudiantes[]"]', function() {
-                if (!this.checked) {
-                    $('#seleccionarTodos').prop('checked', false);
-                } else {
-                    // Verificar si todos están marcados
-                    var allChecked = $('input[name="estudiantes[]"]:not(:checked)').length === 0;
-                    $('#seleccionarTodos').prop('checked', allChecked);
+                const seleccionarTodos = $(this).is(':checked');
+                
+                if (seleccionarTodos) {
+                    // Verificar si podemos seleccionar todos
+                    const totalEstudiantes = $('#formAsignarEstudiantes input[name="estudiantes[]"]').length;
+                    if (totalEstudiantes > capacidadMaxima) {
+                        $(this).prop('checked', false);
+                        alert('No puedes seleccionar todos los estudiantes porque superaría la capacidad máxima.');
+                        return;
+                    }
                 }
+                
+                // Marcar/desmarcar todos los checkboxes usando la API de DataTables
+                table.rows().every(function() {
+                    const row = this.node();
+                    const checkbox = $(row).find('.checkbox-estudiante');
+                    checkbox.prop('checked', seleccionarTodos);
+                });
+                
+                actualizarContador();
             });
             
-            // Manejar el envío del formulario para asegurar que todos los checkboxes se envíen
+            // Manejar el envío del formulario
             $('#formAsignarEstudiantes').on('submit', function() {
                 // Forzar a DataTables a mostrar todos los registros temporalmente
                 table.page.len(-1).draw();
+                // Esperar un momento para que se complete el redibujado
+                setTimeout(() => {
+                    // Continuar con el envío del formulario
+                    return true;
+                }, 500);
             });
+            
+            // Actualizar contador y estado inicial
+            actualizarContador();
         });
         </script>
 
@@ -563,6 +656,7 @@ include("includes/head.php");
         
         $estudiantes_inscritos = count($estudiantes);
         $faltan_para_activar = max(0, MINIMO_ESTUDIANTES - $estudiantes_inscritos);
+        $seccion_llena = ($estudiantes_inscritos >= $seccion['capacidad_maxima']);
         ?>
         
         <h1 class="h3 mb-4 text-gray-800">Detalles de Sección</h1>
@@ -584,6 +678,9 @@ include("includes/head.php");
                                 <?= ucfirst($seccion['estatus']) ?>
                                 <?php if ($seccion['estatus'] == 'inactiva'): ?>
                                     <br><small>(Faltan <?= $faltan_para_activar ?> estudiantes para activar)</small>
+                                <?php endif; ?>
+                                <?php if ($seccion_llena): ?>
+                                    <br><small>(Sección llena)</small>
                                 <?php endif; ?>
                             </span>
                         </p>
@@ -622,6 +719,11 @@ include("includes/head.php");
                         <?php if ($seccion['estatus'] == 'inactiva'): ?>
                             <span class="badge badge-danger">
                                 Se requiere <?= MINIMO_ESTUDIANTES ?> para activar (faltan <?= $faltan_para_activar ?>)
+                            </span>
+                        <?php endif; ?>
+                        <?php if ($seccion_llena): ?>
+                            <span class="badge badge-warning">
+                                Sección llena
                             </span>
                         <?php endif; ?>
                     </div>
