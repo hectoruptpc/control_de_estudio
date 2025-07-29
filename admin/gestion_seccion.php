@@ -175,11 +175,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Redirigir con POST
         header("Location: gestion_seccion.php?action=view&id=".$seccion_id);
         exit();
+    } elseif ($action === 'retirar_estudiante') {
+        // Procesar retiro de estudiante
+        $usuario_id = (int)$_POST['id_usuario'];
+        $seccion_id = (int)$_POST['id_seccion'];
+        
+        try {
+            $db->begin_transaction();
+            
+            // Desactivar al estudiante en la sección
+            $stmt = $db->prepare("UPDATE estudiante_seccion 
+                                 SET estatus = 'retirado'
+                                 WHERE id_seccion = ? AND id_usuario = ?");
+            $stmt->bind_param("ii", $seccion_id, $usuario_id);
+            $stmt->execute();
+            $stmt->close();
+            
+            // Verificar si se debe cambiar el estado de la sección
+            $stmt = $db->prepare("SELECT COUNT(*) as total FROM estudiante_seccion 
+                                WHERE id_seccion = ? AND estatus = 'activo'");
+            $stmt->bind_param("i", $seccion_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $count = $result->fetch_assoc()['total'];
+            $stmt->close();
+            
+            // Actualizar estado de la sección según el número de estudiantes
+            $nuevo_estatus = ($count >= MINIMO_ESTUDIANTES) ? 'activa' : 'inactiva';
+            $stmt = $db->prepare("UPDATE secciones SET estatus = ? WHERE id_seccion = ?");
+            $stmt->bind_param("si", $nuevo_estatus, $seccion_id);
+            $stmt->execute();
+            $stmt->close();
+            
+            $db->commit();
+            
+            $_SESSION['success'] = "Estudiante retirado exitosamente de la sección.";
+            
+        } catch (Exception $e) {
+            $db->rollback();
+            $_SESSION['error'] = "Error al retirar estudiante: " . $e->getMessage();
+        }
+        header("Location: gestion_seccion.php?action=view&id=".$seccion_id);
+        exit();
     }
 }
 
 include("includes/head.php");
 ?>
+
+<!-- Modal de Confirmación -->
+<div class="modal fade" id="confirmarRetiroModal" tabindex="-1" role="dialog" aria-labelledby="confirmarRetiroModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmarRetiroModalLabel">Confirmar Retiro de Estudiante</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="modalConfirmacionBody">
+                ¿Está seguro que desea retirar a este estudiante de la sección?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <form id="formRetiroEstudiante" method="post" style="display:inline">
+                    <input type="hidden" name="action" value="retirar_estudiante">
+                    <input type="hidden" name="id_usuario" id="modalIdUsuario" value="">
+                    <input type="hidden" name="id_seccion" id="modalIdSeccion" value="">
+                    <button type="submit" class="btn btn-danger">Confirmar Retiro</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="container-fluid">
     <?php 
@@ -774,14 +842,12 @@ include("includes/head.php");
                                             <td><?= htmlspecialchars($est['username']) ?></td>
                                             <td><?= $est['fecha_inscripcion'] ?></td>
                                             <td>
-                                                <form method="post" style="display:inline">
-                                                    <input type="hidden" name="action" value="retirar_estudiante">
-                                                    <input type="hidden" name="id_usuario" value="<?= $est['id'] ?>">
-                                                    <input type="hidden" name="id_seccion" value="<?= $seccion_id ?>">
-                                                    <button type="submit" class="btn btn-sm btn-danger" title="Retirar">
-                                                        <i class="fas fa-user-minus"></i>
-                                                    </button>
-                                                </form>
+                                                <button type="button" class="btn btn-sm btn-danger btn-retirar" 
+                                                        data-id="<?= $est['id'] ?>" 
+                                                        data-seccion="<?= $seccion_id ?>"
+                                                        data-nombre="<?= htmlspecialchars($est['nombre']) ?>">
+                                                    <i class="fas fa-user-minus"></i> Retirar
+                                                </button>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -792,6 +858,29 @@ include("includes/head.php");
                 </div>
             </div>
         </div>
+
+        <script>
+        $(document).ready(function() {
+            // Manejar clic en botón de retirar
+            $('.btn-retirar').click(function() {
+                var idUsuario = $(this).data('id');
+                var idSeccion = $(this).data('seccion');
+                var nombreEstudiante = $(this).data('nombre');
+                
+                // Actualizar el modal con los datos del estudiante
+                $('#modalConfirmacionBody').html(
+                    '¿Está seguro que desea retirar al estudiante <strong>' + nombreEstudiante + '</strong> de la sección?'
+                );
+                
+                // Setear los valores en el formulario del modal
+                $('#modalIdUsuario').val(idUsuario);
+                $('#modalIdSeccion').val(idSeccion);
+                
+                // Mostrar el modal
+                $('#confirmarRetiroModal').modal('show');
+            });
+        });
+        </script>
     <?php endif; ?>
 </div>
 
