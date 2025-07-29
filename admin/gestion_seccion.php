@@ -38,6 +38,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: gestion_seccion.php");
         exit();
         
+    } elseif (isset($_POST['editar_seccion'])) {
+        // Procesar edición de sección
+        $seccion_id = (int)$_POST['id'];
+        $codigo = trim($_POST['codigo_seccion']);
+        $carrera = (int)$_POST['id_carrera'];
+        $trayecto = (int)$_POST['id_trayecto'];
+        $periodo = (int)$_POST['id_periodo'];
+        $maximo = (int)$_POST['capacidad_maxima'];
+        
+        try {
+            // Actualizar la sección
+            $stmt = $db->prepare("UPDATE secciones 
+                                SET codigo_seccion = ?, 
+                                    id_carrera = ?, 
+                                    id_trayecto = ?, 
+                                    id_periodo = ?, 
+                                    capacidad_maxima = ?
+                                WHERE id_seccion = ?");
+            $stmt->bind_param("siiiii", $codigo, $carrera, $trayecto, $periodo, $maximo, $seccion_id);
+            $stmt->execute();
+            $stmt->close();
+            
+            $_SESSION['success'] = "Sección actualizada exitosamente!";
+        } catch (Exception $e) {
+            $_SESSION['error'] = "Error al actualizar sección: " . $e->getMessage();
+        }
+        header("Location: gestion_seccion.php");
+        exit();
+        
     } elseif (isset($_POST['asignar_estudiantes'])) {
         // Procesar asignación de estudiantes
         $seccion_id = (int)$_POST['seccion_id'];
