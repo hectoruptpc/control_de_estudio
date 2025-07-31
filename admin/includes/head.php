@@ -86,8 +86,11 @@ if (!isAdmin()) {
         <a title="Asignaturas" class="dropdown-item" href="materia.php">
             <i class="fas fa-book-open fa-fw"></i> Asignaturas
         </a>
-        <a title="Plan de Estudio" class="dropdown-item" href="carrera_materias.php">
-            <i class="fas fa-calendar-alt fa-fw"></i> Plan de Estudio
+        <a title="Relacionar Materias con Carreras" class="dropdown-item" href="carrera_materias.php">
+            <i class="fas fa-link fa-fw"></i> Relacionar Materias-Carreras
+        </a>
+        <a title="Periodos Académicos" class="dropdown-item" href="periodos_academicos.php">
+            <i class="fas fa-calendar fa-fw"></i> Periodos Académicos
         </a>
     </div>
 </li>
