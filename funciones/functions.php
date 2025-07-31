@@ -78,6 +78,26 @@ if (isset($_GET['logout'])) {
   exit;
 }
 
+//desactivar periodos vencidos
+
+// ▼ Añade esto al inicio del archivo (después de la conexión a la BD) ▼
+function desactivarPeriodosVencidos($db) {
+    $query = "UPDATE periodos_academicos SET activo = 0 
+              WHERE fecha_fin < CURDATE() AND activo = 1";
+    $stmt = $db->prepare($query);
+    $stmt->execute();
+    return $db->affected_rows; // Retorna cuántos periodos desactivó
+}
+
+// Ejecutar la función cada vez que alguien entre al sistema
+desactivarPeriodosVencidos($db);
+
+
+
+
+
+
+
 
 // VISUALIZACION DE ESTUDIANTES
 
@@ -3825,6 +3845,9 @@ function mostrarAdvertencia($mensaje) {
  * @return array Lista de periodos académicos
  */
 function obtenerPeriodosAcademicos($db) {
+    // Primero desactivamos cualquier periodo vencido (por si acaso)
+    desactivarPeriodosVencidos($db);
+    
     $query = "SELECT * FROM periodos_academicos ORDER BY created_at DESC";
     $stmt = $db->prepare($query);
     $stmt->execute();
@@ -3881,8 +3904,6 @@ function cambiarEstadoPeriodo($db, $id, $estado) {
     $stmt->bind_param("ii", $estado, $id);
     return $stmt->execute();
 }
-
-
 
 
 
