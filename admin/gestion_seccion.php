@@ -317,12 +317,9 @@ include("includes/head.php");
                             class="btn btn-primary">
                         <i class="fas fa-save"></i> Guardar
                     </button>
-                    <form method="post" style="display:inline">
-                        <input type="hidden" name="action" value="list">
-                        <button type="submit" class="btn btn-secondary">
-                            <i class="fas fa-times"></i> Cancelar
-                        </button>
-                    </form>
+                    <a href="gestion_seccion.php" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </a>
                 </form>
             </div>
         </div>
@@ -419,13 +416,9 @@ include("includes/head.php");
                     <button type="submit" name="asignar_estudiantes" class="btn btn-primary">
                         <i class="fas fa-save"></i> Guardar Asignaciones
                     </button>
-                    <form method="post" style="display:inline">
-                        <input type="hidden" name="action" value="view">
-                        <input type="hidden" name="id" value="<?= $seccion_id ?>">
-                        <button type="submit" class="btn btn-secondary">
-                            <i class="fas fa-times"></i> Cancelar
-                        </button>
-                    </form>
+                    <a href="gestion_seccion.php?action=view&id=<?= $seccion_id ?>" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </a>
                 </form>
             </div>
         </div>
@@ -580,12 +573,9 @@ include("includes/head.php");
                                     <i class="fas fa-edit"></i> Editar Sección
                                 </button>
                             </form>
-                            <form method="post" style="display:block;">
-                                <input type="hidden" name="action" value="list">
-                                <button type="submit" class="btn btn-secondary btn-block">
-                                    <i class="fas fa-arrow-left"></i> Volver al listado
-                                </button>
-                            </form>
+                            <a href="gestion_seccion.php" class="btn btn-secondary btn-block">
+                                <i class="fas fa-arrow-left"></i> Volver al listado
+                            </a>
                         </div>
                     </div>
                 </div>

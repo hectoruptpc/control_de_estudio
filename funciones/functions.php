@@ -3675,6 +3675,7 @@ function obtenerDatosSelects($db) {
     ];
 }
 
+
 /**
  * Obtiene información detallada de una sección
  * @param mysqli $db Conexión a la base de datos
@@ -3682,17 +3683,26 @@ function obtenerDatosSelects($db) {
  * @return array Datos detallados de la sección
  */
 function obtenerDetalleSeccion($db, $seccion_id) {
-    $stmt = $db->prepare("SELECT s.*, c.nombre_carrera, t.numero_trayecto, p.nombre_periodo
+    $stmt = $db->prepare("SELECT s.*, c.nombre_carrera, t.numero_trayecto, p.nombre_periodo,
+                         COUNT(es.id_usuario) as inscritos
                   FROM secciones s
                   JOIN carreras c ON s.id_carrera = c.id_carrera
                   JOIN trayectos t ON s.id_trayecto = t.id_trayecto
                   JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
-                  WHERE s.id_seccion = ?");
+                  LEFT JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion AND es.estatus = 'activo'
+                  WHERE s.id_seccion = ?
+                  GROUP BY s.id_seccion");
     $stmt->bind_param("i", $seccion_id);
     $stmt->execute();
     $result = $stmt->get_result();
     $seccion = $result->fetch_assoc();
     $stmt->close();
+    
+    // Asegurarse que siempre tenga el campo inscritos
+    if (!isset($seccion['inscritos'])) {
+        $seccion['inscritos'] = 0;
+    }
+    
     return $seccion;
 }
 
