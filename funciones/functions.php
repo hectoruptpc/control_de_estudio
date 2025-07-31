@@ -3780,6 +3780,85 @@ function mostrarAdvertencia($mensaje) {
 
 
 
+// FUNCIONES DE PERIODOS ESCOLARES***********************************************************************
+
+
+
+/**
+ * Obtiene todos los periodos académicos
+ * @param mysqli $db Conexión a la base de datos
+ * @return array Lista de periodos académicos
+ */
+function obtenerPeriodosAcademicos($db) {
+    $query = "SELECT * FROM periodos_academicos ORDER BY created_at DESC";
+    $stmt = $db->prepare($query);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_all(MYSQLI_ASSOC);
+}
+
+/**
+ * Crea un nuevo periodo académico
+ * @param mysqli $db Conexión a la base de datos
+ * @param string $nombre Nombre del periodo
+ * @param string $fecha_inicio Fecha de inicio (YYYY-MM-DD)
+ * @param string $fecha_fin Fecha de fin (YYYY-MM-DD)
+ * @return bool True si se creó correctamente
+ */
+function crearPeriodoAcademico($db, $nombre, $fecha_inicio, $fecha_fin) {
+    $query = "INSERT INTO periodos_academicos (nombre_periodo, fecha_inicio, fecha_fin, activo, created_at) 
+              VALUES (?, ?, ?, 1, NOW())";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("sss", $nombre, $fecha_inicio, $fecha_fin);
+    return $stmt->execute();
+}
+
+/**
+ * Actualiza un periodo académico existente
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $id ID del periodo
+ * @param string $nombre Nuevo nombre del periodo
+ * @param string $fecha_inicio Nueva fecha de inicio
+ * @param string $fecha_fin Nueva fecha de fin
+ * @return bool True si se actualizó correctamente
+ */
+function actualizarPeriodoAcademico($db, $id, $nombre, $fecha_inicio, $fecha_fin) {
+    $query = "UPDATE periodos_academicos SET 
+              nombre_periodo = ?,
+              fecha_inicio = ?,
+              fecha_fin = ?
+              WHERE id_periodo = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("sssi", $nombre, $fecha_inicio, $fecha_fin, $id);
+    return $stmt->execute();
+}
+
+/**
+ * Cambia el estado (activo/inactivo) de un periodo académico
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $id ID del periodo
+ * @param int $estado Nuevo estado (1 para activo, 0 para inactivo)
+ * @return bool True si se actualizó correctamente
+ */
+function cambiarEstadoPeriodo($db, $id, $estado) {
+    $query = "UPDATE periodos_academicos SET activo = ? WHERE id_periodo = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("ii", $estado, $id);
+    return $stmt->execute();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
