@@ -3321,6 +3321,8 @@ function obtenerIngresos($db) {
 
 //FUNCIONES PARA LAS SECCIONES ***********************************************************************
 
+
+
 // Constante para el mínimo de estudiantes requeridos
 define('MINIMO_ESTUDIANTES', 15);
 
@@ -3358,6 +3360,20 @@ function crearSeccion($db, $datos) {
  */
 function editarSeccion($db, $datos) {
     try {
+        // Verificar si el período está activo
+        $stmt = $db->prepare("SELECT p.activo FROM periodos_academicos p
+                             JOIN secciones s ON s.id_periodo = p.id_periodo
+                             WHERE s.id_seccion = ?");
+        $stmt->bind_param("i", $datos['id_seccion']);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $periodo = $result->fetch_assoc();
+        $stmt->close();
+        
+        if ($periodo['activo'] == 0) {
+            throw new Exception("No se puede editar una sección con período inactivo.");
+        }
+        
         $stmt = $db->prepare("UPDATE secciones 
                             SET codigo_seccion = ?, 
                                 id_carrera = ?, 
@@ -3392,11 +3408,17 @@ function asignarEstudiantes($db, $seccion_id, $estudiantes) {
     try {
         $db->begin_transaction();
         
-        // Obtener información de la sección
-        $seccion = obtenerInfoSeccion($db, $seccion_id);
+        // Obtener información de la sección y período
+        $seccion = obtenerInfoSeccionConPeriodo($db, $seccion_id);
         if (!$seccion) {
             throw new Exception("Sección no encontrada.");
         }
+        
+        // Verificar si el período está activo
+        if ($seccion['periodo_activo'] == 0) {
+            throw new Exception("No se pueden asignar estudiantes a una sección con período inactivo.");
+        }
+        
         $capacidad_maxima = $seccion['capacidad_maxima'];
         
         // Obtener estudiantes actualmente asignados
@@ -3492,13 +3514,16 @@ function retirarEstudiante($db, $seccion_id, $usuario_id) {
 }
 
 /**
- * Obtiene información básica de una sección
+ * Obtiene información de sección con estado de período
  * @param mysqli $db Conexión a la base de datos
  * @param int $seccion_id ID de la sección
  * @return array|null Datos de la sección o null si no se encuentra
  */
-function obtenerInfoSeccion($db, $seccion_id) {
-    $stmt = $db->prepare("SELECT capacidad_maxima FROM secciones WHERE id_seccion = ?");
+function obtenerInfoSeccionConPeriodo($db, $seccion_id) {
+    $stmt = $db->prepare("SELECT s.capacidad_maxima, p.activo as periodo_activo 
+                         FROM secciones s
+                         JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
+                         WHERE s.id_seccion = ?");
     $stmt->bind_param("i", $seccion_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -3595,11 +3620,24 @@ function contarEstudiantesActivos($db, $seccion_id) {
  * @param int $count Número de estudiantes activos
  */
 function actualizarEstadoSeccion($db, $seccion_id, $count) {
-    $nuevo_estatus = ($count >= MINIMO_ESTUDIANTES) ? 'activa' : 'inactiva';
-    $stmt = $db->prepare("UPDATE secciones SET estatus = ? WHERE id_seccion = ?");
-    $stmt->bind_param("si", $nuevo_estatus, $seccion_id);
+    // Primero verificar si el período está activo
+    $stmt = $db->prepare("SELECT p.activo FROM secciones s
+                         JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
+                         WHERE s.id_seccion = ?");
+    $stmt->bind_param("i", $seccion_id);
     $stmt->execute();
+    $result = $stmt->get_result();
+    $periodo = $result->fetch_assoc();
     $stmt->close();
+    
+    // Solo actualizar el estado si el período está activo
+    if ($periodo['activo'] == 1) {
+        $nuevo_estatus = ($count >= MINIMO_ESTUDIANTES) ? 'activa' : 'inactiva';
+        $stmt = $db->prepare("UPDATE secciones SET estatus = ? WHERE id_seccion = ?");
+        $stmt->bind_param("si", $nuevo_estatus, $seccion_id);
+        $stmt->execute();
+        $stmt->close();
+    }
 }
 
 /**
@@ -3609,7 +3647,7 @@ function actualizarEstadoSeccion($db, $seccion_id, $count) {
  */
 function obtenerListadoSecciones($db) {
     $stmt = $db->prepare("SELECT s.id_seccion, s.codigo_seccion, c.nombre_carrera, t.numero_trayecto, 
-             p.nombre_periodo, s.capacidad_maxima, s.estatus,
+             p.nombre_periodo, p.activo as periodo_activo, s.capacidad_maxima, s.estatus,
              COUNT(es.id_usuario) as inscritos
               FROM secciones s
               JOIN carreras c ON s.id_carrera = c.id_carrera
@@ -3675,7 +3713,6 @@ function obtenerDatosSelects($db) {
     ];
 }
 
-
 /**
  * Obtiene información detallada de una sección
  * @param mysqli $db Conexión a la base de datos
@@ -3683,7 +3720,7 @@ function obtenerDatosSelects($db) {
  * @return array Datos detallados de la sección
  */
 function obtenerDetalleSeccion($db, $seccion_id) {
-    $stmt = $db->prepare("SELECT s.*, c.nombre_carrera, t.numero_trayecto, p.nombre_periodo,
+    $stmt = $db->prepare("SELECT s.*, c.nombre_carrera, t.numero_trayecto, p.nombre_periodo, p.activo as periodo_activo,
                          COUNT(es.id_usuario) as inscritos
                   FROM secciones s
                   JOIN carreras c ON s.id_carrera = c.id_carrera
@@ -3698,7 +3735,6 @@ function obtenerDetalleSeccion($db, $seccion_id) {
     $seccion = $result->fetch_assoc();
     $stmt->close();
     
-    // Asegurarse que siempre tenga el campo inscritos
     if (!isset($seccion['inscritos'])) {
         $seccion['inscritos'] = 0;
     }
@@ -3777,7 +3813,6 @@ function mostrarAdvertencia($mensaje) {
         echo '<div class="alert alert-warning">' . htmlspecialchars($mensaje) . '</div>';
     }
 }
-
 
 
 // FUNCIONES DE PERIODOS ESCOLARES***********************************************************************

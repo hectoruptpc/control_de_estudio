@@ -170,8 +170,24 @@ include("includes/head.php");
                             foreach ($secciones as $seccion) {
                                 $porcentaje = $seccion['capacidad_maxima'] > 0 ? 
                                     round(($seccion['inscritos'] / $seccion['capacidad_maxima']) * 100) : 0;
-                                $estado_clase = ($seccion['estatus'] == 'activa') ? 'success' : 
-                                               (($seccion['estatus'] == 'completa') ? 'warning' : 'danger');
+                                
+                                // Determinar clase y texto del estado
+                                if ($seccion['periodo_activo'] == 0) {
+                                    $estado_clase = 'secondary';
+                                    $estado_texto = 'Período Inactivo';
+                                    $mostrar_faltantes = false;
+                                } else {
+                                    // Estado normal de la sección
+                                    if ($seccion['estatus'] == 'activa') {
+                                        $estado_clase = 'success';
+                                        $estado_texto = 'Activa';
+                                        $mostrar_faltantes = false;
+                                    } else {
+                                        $estado_clase = 'danger';
+                                        $estado_texto = 'Inactiva';
+                                        $mostrar_faltantes = true;
+                                    }
+                                }
                             ?>
                             <tr>
                                 <td><?= htmlspecialchars($seccion['codigo_seccion']) ?></td>
@@ -189,8 +205,10 @@ include("includes/head.php");
                                 <td><?= $seccion['capacidad_maxima'] ?></td>
                                 <td>
                                     <span class="badge badge-<?= $estado_clase ?>">
-                                        <?= ucfirst($seccion['estatus']) ?>
-                                        <?php if ($seccion['estatus'] == 'inactiva' && $seccion['inscritos'] > 0): ?>
+                                        <?= $estado_texto ?>
+                                        <?php if ($seccion['periodo_activo'] == 0): ?>
+                                            <br><small>(Período desactivado)</small>
+                                        <?php elseif ($mostrar_faltantes && $seccion['inscritos'] > 0): ?>
                                             <br><small>(Faltan <?= MINIMO_ESTUDIANTES - $seccion['inscritos'] ?> para activar)</small>
                                         <?php endif; ?>
                                     </span>
@@ -203,20 +221,22 @@ include("includes/head.php");
                                             <i class="fas fa-eye"></i>
                                         </button>
                                     </form>
-                                    <form method="post" style="display:inline">
-                                        <input type="hidden" name="action" value="edit">
-                                        <input type="hidden" name="id" value="<?= $seccion['id_seccion'] ?>">
-                                        <button type="submit" class="btn btn-sm btn-primary" title="Editar">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                    </form>
-                                    <form method="post" style="display:inline">
-                                        <input type="hidden" name="action" value="assign">
-                                        <input type="hidden" name="id" value="<?= $seccion['id_seccion'] ?>">
-                                        <button type="submit" class="btn btn-sm btn-warning" title="Asignar Estudiantes">
-                                            <i class="fas fa-users"></i>
-                                        </button>
-                                    </form>
+                                    <?php if ($seccion['periodo_activo'] == 1): ?>
+                                        <form method="post" style="display:inline">
+                                            <input type="hidden" name="action" value="edit">
+                                            <input type="hidden" name="id" value="<?= $seccion['id_seccion'] ?>">
+                                            <button type="submit" class="btn btn-sm btn-primary" title="Editar">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </form>
+                                        <form method="post" style="display:inline">
+                                            <input type="hidden" name="action" value="assign">
+                                            <input type="hidden" name="id" value="<?= $seccion['id_seccion'] ?>">
+                                            <button type="submit" class="btn btn-sm btn-warning" title="Asignar Estudiantes">
+                                                <i class="fas fa-users"></i>
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                             <?php } ?>
@@ -333,6 +353,13 @@ include("includes/head.php");
         
         // Verificar si la sección está llena
         $seccion_llena = ($seccion['inscritos'] >= $seccion['capacidad_maxima']);
+        $periodo_inactivo = ($seccion['periodo_activo'] == 0);
+        
+        if ($periodo_inactivo) {
+            $_SESSION['error'] = "No se pueden asignar estudiantes a una sección con período inactivo.";
+            header("Location: gestion_seccion.php?action=view&id=".$seccion_id);
+            exit();
+        }
         ?>
         
         <h1 class="h3 mb-4 text-gray-800">Asignar Estudiantes</h1>
@@ -343,7 +370,7 @@ include("includes/head.php");
                     Sección: <?= htmlspecialchars($seccion['codigo_seccion']) ?> - <?= htmlspecialchars($seccion['nombre_carrera']) ?>
                 </h6>
                 <div>
-                    <span class="badge badge-<?= $seccion['estatus'] == 'activa' ? 'success' : 'warning' ?>">
+                    <span class="badge badge-<?= $seccion['estatus'] == 'activa' ? 'success' : 'danger' ?>">
                         <?= ucfirst($seccion['estatus']) ?>
                     </span>
                     <span class="badge badge-info ml-2">
@@ -530,6 +557,22 @@ include("includes/head.php");
         $estudiantes_inscritos = count($estudiantes);
         $faltan_para_activar = max(0, MINIMO_ESTUDIANTES - $estudiantes_inscritos);
         $seccion_llena = ($estudiantes_inscritos >= $seccion['capacidad_maxima']);
+        $periodo_inactivo = ($seccion['periodo_activo'] == 0);
+        
+        // Determinar el estado a mostrar
+        if ($periodo_inactivo) {
+            $estado_clase = 'secondary';
+            $estado_texto = 'Período Inactivo';
+        } else {
+            // Estado normal de la sección (basado en estudiantes)
+            if ($seccion['estatus'] == 'activa') {
+                $estado_clase = 'success';
+                $estado_texto = 'Activa';
+            } else {
+                $estado_clase = 'danger';
+                $estado_texto = 'Inactiva';
+            }
+        }
         ?>
         
         <h1 class="h3 mb-4 text-gray-800">Detalles de Sección</h1>
@@ -547,9 +590,11 @@ include("includes/head.php");
                         <p><strong>Período:</strong> <?= htmlspecialchars($seccion['nombre_periodo']) ?></p>
                         <p><strong>Capacidad:</strong> <?= $estudiantes_inscritos ?>/<?= $seccion['capacidad_maxima'] ?></p>
                         <p><strong>Estado:</strong> 
-                            <span class="badge badge-<?= $seccion['estatus'] == 'activa' ? 'success' : 'warning' ?>">
-                                <?= ucfirst($seccion['estatus']) ?>
-                                <?php if ($seccion['estatus'] == 'inactiva'): ?>
+                            <span class="badge badge-<?= $estado_clase ?>">
+                                <?= $estado_texto ?>
+                                <?php if ($periodo_inactivo): ?>
+                                    <br><small>(Período desactivado)</small>
+                                <?php elseif ($seccion['estatus'] == 'inactiva'): ?>
                                     <br><small>(Faltan <?= $faltan_para_activar ?> estudiantes para activar)</small>
                                 <?php endif; ?>
                                 <?php if ($seccion_llena): ?>
@@ -559,20 +604,22 @@ include("includes/head.php");
                         </p>
                         
                         <div class="mt-4">
-                            <form method="post" style="display:block; margin-bottom:10px;">
-                                <input type="hidden" name="action" value="assign">
-                                <input type="hidden" name="id" value="<?= $seccion_id ?>">
-                                <button type="submit" class="btn btn-warning btn-block">
-                                    <i class="fas fa-users"></i> Asignar Estudiantes
-                                </button>
-                            </form>
-                            <form method="post" style="display:block; margin-bottom:10px;">
-                                <input type="hidden" name="action" value="edit">
-                                <input type="hidden" name="id" value="<?= $seccion_id ?>">
-                                <button type="submit" class="btn btn-primary btn-block">
-                                    <i class="fas fa-edit"></i> Editar Sección
-                                </button>
-                            </form>
+                            <?php if (!$periodo_inactivo): ?>
+                                <form method="post" style="display:block; margin-bottom:10px;">
+                                    <input type="hidden" name="action" value="assign">
+                                    <input type="hidden" name="id" value="<?= $seccion_id ?>">
+                                    <button type="submit" class="btn btn-warning btn-block">
+                                        <i class="fas fa-users"></i> Asignar Estudiantes
+                                    </button>
+                                </form>
+                                <form method="post" style="display:block; margin-bottom:10px;">
+                                    <input type="hidden" name="action" value="edit">
+                                    <input type="hidden" name="id" value="<?= $seccion_id ?>">
+                                    <button type="submit" class="btn btn-primary btn-block">
+                                        <i class="fas fa-edit"></i> Editar Sección
+                                    </button>
+                                </form>
+                            <?php endif; ?>
                             <a href="gestion_seccion.php" class="btn btn-secondary btn-block">
                                 <i class="fas fa-arrow-left"></i> Volver al listado
                             </a>
@@ -586,7 +633,11 @@ include("includes/head.php");
                     <div class="card-header py-3 d-flex justify-content-between align-items-center">
                         <h6 class="m-0 font-weight-bold text-primary">Estudiantes Asignados</h6>
                         <span class="badge badge-primary"><?= $estudiantes_inscritos ?> estudiantes</span>
-                        <?php if ($seccion['estatus'] == 'inactiva'): ?>
+                        <?php if ($periodo_inactivo): ?>
+                            <span class="badge badge-secondary">
+                                Período inactivo - No se pueden hacer cambios
+                            </span>
+                        <?php elseif ($seccion['estatus'] == 'inactiva'): ?>
                             <span class="badge badge-danger">
                                 Se requiere <?= MINIMO_ESTUDIANTES ?> para activar (faltan <?= $faltan_para_activar ?>)
                             </span>
@@ -605,7 +656,9 @@ include("includes/head.php");
                                         <th>Nombre</th>
                                         <th>Usuario</th>
                                         <th>Fecha Inscripción</th>
-                                        <th>Acciones</th>
+                                        <?php if (!$periodo_inactivo): ?>
+                                            <th>Acciones</th>
+                                        <?php endif; ?>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -614,14 +667,16 @@ include("includes/head.php");
                                             <td><?= htmlspecialchars($est['nombre']) ?></td>
                                             <td><?= htmlspecialchars($est['username']) ?></td>
                                             <td><?= $est['fecha_inscripcion'] ?></td>
-                                            <td>
-                                                <button type="button" class="btn btn-sm btn-danger btn-retirar" 
-                                                        data-id="<?= $est['id'] ?>" 
-                                                        data-seccion="<?= $seccion_id ?>"
-                                                        data-nombre="<?= htmlspecialchars($est['nombre']) ?>">
-                                                    <i class="fas fa-user-minus"></i> Retirar
-                                                </button>
-                                            </td>
+                                            <?php if (!$periodo_inactivo): ?>
+                                                <td>
+                                                    <button type="button" class="btn btn-sm btn-danger btn-retirar" 
+                                                            data-id="<?= $est['id'] ?>" 
+                                                            data-seccion="<?= $seccion_id ?>"
+                                                            data-nombre="<?= htmlspecialchars($est['nombre']) ?>">
+                                                        <i class="fas fa-user-minus"></i> Retirar
+                                                    </button>
+                                                </td>
+                                            <?php endif; ?>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
