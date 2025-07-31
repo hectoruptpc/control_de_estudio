@@ -3319,9 +3319,454 @@ function obtenerIngresos($db) {
     return $ingresos;
 }
 
+//FUNCIONES PARA LAS SECCIONES ***********************************************************************
 
+// Constante para el mínimo de estudiantes requeridos
+define('MINIMO_ESTUDIANTES', 15);
 
+/**
+ * Crea una nueva sección en la base de datos
+ * @param mysqli $db Conexión a la base de datos
+ * @param array $datos Datos de la sección (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima)
+ * @return array Resultado de la operación (éxito, mensaje)
+ */
+function crearSeccion($db, $datos) {
+    try {
+        $stmt = $db->prepare("INSERT INTO secciones (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, estatus) 
+                            VALUES (?, ?, ?, ?, ?, 'inactiva')");
+        $stmt->bind_param("siiii", $datos['codigo_seccion'], $datos['id_carrera'], $datos['id_trayecto'], $datos['id_periodo'], $datos['capacidad_maxima']);
+        $stmt->execute();
+        $stmt->close();
+        
+        return [
+            'success' => true,
+            'message' => "Sección creada exitosamente! La sección estará inactiva hasta tener al menos ".MINIMO_ESTUDIANTES." estudiantes."
+        ];
+    } catch (Exception $e) {
+        return [
+            'success' => false,
+            'message' => "Error al crear sección: " . $e->getMessage()
+        ];
+    }
+}
 
+/**
+ * Actualiza una sección existente en la base de datos
+ * @param mysqli $db Conexión a la base de datos
+ * @param array $datos Datos de la sección (id_seccion, codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima)
+ * @return array Resultado de la operación (éxito, mensaje)
+ */
+function editarSeccion($db, $datos) {
+    try {
+        $stmt = $db->prepare("UPDATE secciones 
+                            SET codigo_seccion = ?, 
+                                id_carrera = ?, 
+                                id_trayecto = ?, 
+                                id_periodo = ?, 
+                                capacidad_maxima = ?
+                            WHERE id_seccion = ?");
+        $stmt->bind_param("siiiii", $datos['codigo_seccion'], $datos['id_carrera'], $datos['id_trayecto'], $datos['id_periodo'], $datos['capacidad_maxima'], $datos['id_seccion']);
+        $stmt->execute();
+        $stmt->close();
+        
+        return [
+            'success' => true,
+            'message' => "Sección actualizada exitosamente!"
+        ];
+    } catch (Exception $e) {
+        return [
+            'success' => false,
+            'message' => "Error al actualizar sección: " . $e->getMessage()
+        ];
+    }
+}
+
+/**
+ * Asigna estudiantes a una sección
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @param array $estudiantes IDs de estudiantes a asignar
+ * @return array Resultado de la operación (éxito, mensaje, warning)
+ */
+function asignarEstudiantes($db, $seccion_id, $estudiantes) {
+    try {
+        $db->begin_transaction();
+        
+        // Obtener información de la sección
+        $seccion = obtenerInfoSeccion($db, $seccion_id);
+        if (!$seccion) {
+            throw new Exception("Sección no encontrada.");
+        }
+        $capacidad_maxima = $seccion['capacidad_maxima'];
+        
+        // Obtener estudiantes actualmente asignados
+        $asignados_actuales = obtenerEstudiantesAsignados($db, $seccion_id);
+        
+        // Estudiantes a desactivar (estaban asignados pero no están en la nueva selección)
+        $desactivar = array_diff($asignados_actuales, $estudiantes);
+        
+        // Estudiantes a activar (nuevos o que ya estaban)
+        $activar = $estudiantes;
+        
+        // Verificar capacidad
+        $nuevos_estudiantes = array_diff($activar, $asignados_actuales);
+        $total_estudiantes = count($asignados_actuales) - count($desactivar) + count($nuevos_estudiantes);
+        
+        if ($total_estudiantes > $capacidad_maxima) {
+            throw new Exception("No se pueden asignar más estudiantes. La capacidad máxima es $capacidad_maxima.");
+        }
+        
+        // Desactivar los que ya no están seleccionados
+        if (!empty($desactivar)) {
+            desactivarEstudiantes($db, $seccion_id, $desactivar);
+        }
+        
+        // Activar o insertar nuevos estudiantes
+        if (!empty($activar)) {
+            activarEstudiantes($db, $seccion_id, $activar);
+        }
+        
+        // Actualizar estado de la sección según el número de estudiantes
+        $count = contarEstudiantesActivos($db, $seccion_id);
+        actualizarEstadoSeccion($db, $seccion_id, $count);
+        
+        $db->commit();
+        
+        $result = [
+            'success' => true,
+            'message' => "Asignación de estudiantes actualizada!"
+        ];
+        
+        if ($count >= MINIMO_ESTUDIANTES) {
+            $result['message'] .= " La sección ha sido activada al alcanzar el mínimo requerido.";
+        } else {
+            $result['warning'] = "La sección permanecerá inactiva hasta tener al menos ".MINIMO_ESTUDIANTES." estudiantes (actualmente tiene $count).";
+        }
+        
+        return $result;
+    } catch (Exception $e) {
+        $db->rollback();
+        return [
+            'success' => false,
+            'message' => "Error al asignar estudiantes: " . $e->getMessage()
+        ];
+    }
+}
+
+/**
+ * Retira un estudiante de una sección
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @param int $usuario_id ID del usuario (estudiante)
+ * @return array Resultado de la operación (éxito, mensaje)
+ */
+function retirarEstudiante($db, $seccion_id, $usuario_id) {
+    try {
+        $db->begin_transaction();
+        
+        // Desactivar al estudiante en la sección
+        $stmt = $db->prepare("UPDATE estudiante_seccion 
+                             SET estatus = 'retirado'
+                             WHERE id_seccion = ? AND id_usuario = ?");
+        $stmt->bind_param("ii", $seccion_id, $usuario_id);
+        $stmt->execute();
+        $stmt->close();
+        
+        // Verificar si se debe cambiar el estado de la sección
+        $count = contarEstudiantesActivos($db, $seccion_id);
+        actualizarEstadoSeccion($db, $seccion_id, $count);
+        
+        $db->commit();
+        
+        return [
+            'success' => true,
+            'message' => "Estudiante retirado exitosamente de la sección."
+        ];
+    } catch (Exception $e) {
+        $db->rollback();
+        return [
+            'success' => false,
+            'message' => "Error al retirar estudiante: " . $e->getMessage()
+        ];
+    }
+}
+
+/**
+ * Obtiene información básica de una sección
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @return array|null Datos de la sección o null si no se encuentra
+ */
+function obtenerInfoSeccion($db, $seccion_id) {
+    $stmt = $db->prepare("SELECT capacidad_maxima FROM secciones WHERE id_seccion = ?");
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $seccion = $result->fetch_assoc();
+    $stmt->close();
+    return $seccion;
+}
+
+/**
+ * Obtiene los IDs de estudiantes asignados a una sección
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @return array IDs de estudiantes asignados
+ */
+function obtenerEstudiantesAsignados($db, $seccion_id) {
+    $asignados = [];
+    $stmt = $db->prepare("SELECT id_usuario FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'");
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $asignados[] = $row['id_usuario'];
+    }
+    $stmt->close();
+    return $asignados;
+}
+
+/**
+ * Desactiva estudiantes de una sección
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @param array $estudiantes IDs de estudiantes a desactivar
+ */
+function desactivarEstudiantes($db, $seccion_id, $estudiantes) {
+    $placeholders = implode(',', array_fill(0, count($estudiantes), '?'));
+    $types = str_repeat('i', count($estudiantes));
+    
+    $stmt = $db->prepare("UPDATE estudiante_seccion 
+                        SET estatus = 'retirado'
+                        WHERE id_seccion = ? 
+                        AND id_usuario IN ($placeholders)");
+    
+    $params = array_merge([$seccion_id], $estudiantes);
+    $stmt->bind_param(str_repeat('i', count($params)), ...$params);
+    $stmt->execute();
+    $stmt->close();
+}
+
+/**
+ * Activa estudiantes en una sección
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @param array $estudiantes IDs de estudiantes a activar
+ */
+function activarEstudiantes($db, $seccion_id, $estudiantes) {
+    $placeholders = implode(',', array_fill(0, count($estudiantes), '(?,?,CURDATE(),\'activo\')'));
+    
+    $stmt = $db->prepare("INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus)
+                        VALUES $placeholders
+                        ON DUPLICATE KEY UPDATE estatus = 'activo'");
+    
+    $params = [];
+    foreach ($estudiantes as $est_id) {
+        $params[] = $est_id;
+        $params[] = $seccion_id;
+    }
+    
+    $stmt->bind_param(str_repeat('i', count($params)), ...$params);
+    $stmt->execute();
+    $stmt->close();
+}
+
+/**
+ * Cuenta estudiantes activos en una sección
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @return int Número de estudiantes activos
+ */
+function contarEstudiantesActivos($db, $seccion_id) {
+    $stmt = $db->prepare("SELECT COUNT(*) as total FROM estudiante_seccion 
+                        WHERE id_seccion = ? AND estatus = 'activo'");
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $count = $result->fetch_assoc()['total'];
+    $stmt->close();
+    return $count;
+}
+
+/**
+ * Actualiza el estado de una sección según el número de estudiantes
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @param int $count Número de estudiantes activos
+ */
+function actualizarEstadoSeccion($db, $seccion_id, $count) {
+    $nuevo_estatus = ($count >= MINIMO_ESTUDIANTES) ? 'activa' : 'inactiva';
+    $stmt = $db->prepare("UPDATE secciones SET estatus = ? WHERE id_seccion = ?");
+    $stmt->bind_param("si", $nuevo_estatus, $seccion_id);
+    $stmt->execute();
+    $stmt->close();
+}
+
+/**
+ * Obtiene el listado de secciones con información relevante
+ * @param mysqli $db Conexión a la base de datos
+ * @return array Listado de secciones
+ */
+function obtenerListadoSecciones($db) {
+    $stmt = $db->prepare("SELECT s.id_seccion, s.codigo_seccion, c.nombre_carrera, t.numero_trayecto, 
+             p.nombre_periodo, s.capacidad_maxima, s.estatus,
+             COUNT(es.id_usuario) as inscritos
+              FROM secciones s
+              JOIN carreras c ON s.id_carrera = c.id_carrera
+              JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+              JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
+              LEFT JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion AND es.estatus = 'activo'
+              GROUP BY s.id_seccion
+              ORDER BY p.nombre_periodo DESC, s.codigo_seccion");
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $secciones = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $secciones;
+}
+
+/**
+ * Obtiene los datos de una sección para edición
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @return array Datos de la sección
+ */
+function obtenerDatosSeccion($db, $seccion_id) {
+    $stmt = $db->prepare("SELECT * FROM secciones WHERE id_seccion = ?");
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $seccion = $result->fetch_assoc();
+    $stmt->close();
+    return $seccion;
+}
+
+/**
+ * Obtiene los datos para los selects del formulario de sección
+ * @param mysqli $db Conexión a la base de datos
+ * @return array Datos para los selects (carreras, trayectos, periodos)
+ */
+function obtenerDatosSelects($db) {
+    // Carreras
+    $stmt = $db->prepare("SELECT id_carrera, nombre_carrera FROM carreras WHERE activa = 1");
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $carreras = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    
+    // Trayectos
+    $stmt = $db->prepare("SELECT id_trayecto, numero_trayecto FROM trayectos ORDER BY numero_trayecto");
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $trayectos = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    
+    // Periodos
+    $stmt = $db->prepare("SELECT id_periodo, nombre_periodo FROM periodos_academicos WHERE activo = 1");
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $periodos = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    
+    return [
+        'carreras' => $carreras,
+        'trayectos' => $trayectos,
+        'periodos' => $periodos
+    ];
+}
+
+/**
+ * Obtiene información detallada de una sección
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @return array Datos detallados de la sección
+ */
+function obtenerDetalleSeccion($db, $seccion_id) {
+    $stmt = $db->prepare("SELECT s.*, c.nombre_carrera, t.numero_trayecto, p.nombre_periodo
+                  FROM secciones s
+                  JOIN carreras c ON s.id_carrera = c.id_carrera
+                  JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+                  JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
+                  WHERE s.id_seccion = ?");
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $seccion = $result->fetch_assoc();
+    $stmt->close();
+    return $seccion;
+}
+
+/**
+ * Obtiene los estudiantes asignados a una sección
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @return array Estudiantes asignados
+ */
+function obtenerEstudiantesDeSeccion($db, $seccion_id) {
+    $stmt = $db->prepare("SELECT u.id, u.nombre, u.username, es.fecha_inscripcion
+                  FROM users u
+                  JOIN estudiante_seccion es ON u.id = es.id_usuario
+                  WHERE es.id_seccion = ? AND es.estatus = 'activo'
+                  ORDER BY u.nombre");
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $estudiantes = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $estudiantes;
+}
+
+/**
+ * Obtiene los estudiantes disponibles para asignar a una sección
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @param int $carrera_id ID de la carrera
+ * @return array Estudiantes disponibles
+ */
+function obtenerEstudiantesDisponibles($db, $seccion_id, $carrera_id) {
+    $stmt = $db->prepare("SELECT u.id, u.nombre, u.username, 
+                         (SELECT COUNT(*) FROM estudiante_seccion 
+                          WHERE id_usuario = u.id AND id_seccion = ? AND estatus = 'activo') as asignado
+                  FROM users u
+                  WHERE u.estudiante = 1 AND u.status = 1 AND u.carrera = ?
+                  ORDER BY u.nombre");
+    $stmt->bind_param("ii", $seccion_id, $carrera_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $estudiantes = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $estudiantes;
+}
+
+/**
+ * Muestra una alerta de error
+ * @param string $mensaje Mensaje a mostrar
+ */
+function mostrarError($mensaje) {
+    if (!empty($mensaje)) {
+        echo '<div class="alert alert-danger">' . htmlspecialchars($mensaje) . '</div>';
+    }
+}
+
+/**
+ * Muestra una alerta de éxito
+ * @param string $mensaje Mensaje a mostrar
+ */
+function mostrarExito($mensaje) {
+    if (!empty($mensaje)) {
+        echo '<div class="alert alert-success">' . htmlspecialchars($mensaje) . '</div>';
+    }
+}
+
+/**
+ * Muestra una alerta de advertencia
+ * @param string $mensaje Mensaje a mostrar
+ */
+function mostrarAdvertencia($mensaje) {
+    if (!empty($mensaje)) {
+        echo '<div class="alert alert-warning">' . htmlspecialchars($mensaje) . '</div>';
+    }
+}
 
 
 

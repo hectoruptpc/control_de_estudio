@@ -10,59 +10,45 @@ $action = $_POST['action'] ?? 'list';
 $seccion_id = $_POST['id'] ?? 0;
 $periodo_id = $_POST['periodo'] ?? 0;
 
-// Constante para el mínimo de estudiantes requeridos
-define('MINIMO_ESTUDIANTES', 15);
-
 // Procesar formularios antes de cualquier output
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['crear_seccion'])) {
         // Procesar creación de sección
-        $codigo = trim($_POST['codigo_seccion']);
-        $carrera = (int)$_POST['id_carrera'];
-        $trayecto = (int)$_POST['id_trayecto'];
-        $periodo = (int)$_POST['id_periodo'];
-        $maximo = (int)$_POST['capacidad_maxima'];
+        $datos = [
+            'codigo_seccion' => trim($_POST['codigo_seccion']),
+            'id_carrera' => (int)$_POST['id_carrera'],
+            'id_trayecto' => (int)$_POST['id_trayecto'],
+            'id_periodo' => (int)$_POST['id_periodo'],
+            'capacidad_maxima' => (int)$_POST['capacidad_maxima']
+        ];
         
-        try {
-            // Crear la sección como inactiva por defecto
-            $stmt = $db->prepare("INSERT INTO secciones (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, estatus) 
-                                VALUES (?, ?, ?, ?, ?, 'inactiva')");
-            $stmt->bind_param("siiii", $codigo, $carrera, $trayecto, $periodo, $maximo);
-            $stmt->execute();
-            $stmt->close();
-            
-            $_SESSION['success'] = "Sección creada exitosamente! La sección estará inactiva hasta tener al menos ".MINIMO_ESTUDIANTES." estudiantes.";
-        } catch (Exception $e) {
-            $_SESSION['error'] = "Error al crear sección: " . $e->getMessage();
+        $resultado = crearSeccion($db, $datos);
+        
+        if ($resultado['success']) {
+            $_SESSION['success'] = $resultado['message'];
+        } else {
+            $_SESSION['error'] = $resultado['message'];
         }
         header("Location: gestion_seccion.php");
         exit();
         
     } elseif (isset($_POST['editar_seccion'])) {
         // Procesar edición de sección
-        $seccion_id = (int)$_POST['id'];
-        $codigo = trim($_POST['codigo_seccion']);
-        $carrera = (int)$_POST['id_carrera'];
-        $trayecto = (int)$_POST['id_trayecto'];
-        $periodo = (int)$_POST['id_periodo'];
-        $maximo = (int)$_POST['capacidad_maxima'];
+        $datos = [
+            'id_seccion' => (int)$_POST['id'],
+            'codigo_seccion' => trim($_POST['codigo_seccion']),
+            'id_carrera' => (int)$_POST['id_carrera'],
+            'id_trayecto' => (int)$_POST['id_trayecto'],
+            'id_periodo' => (int)$_POST['id_periodo'],
+            'capacidad_maxima' => (int)$_POST['capacidad_maxima']
+        ];
         
-        try {
-            // Actualizar la sección
-            $stmt = $db->prepare("UPDATE secciones 
-                                SET codigo_seccion = ?, 
-                                    id_carrera = ?, 
-                                    id_trayecto = ?, 
-                                    id_periodo = ?, 
-                                    capacidad_maxima = ?
-                                WHERE id_seccion = ?");
-            $stmt->bind_param("siiiii", $codigo, $carrera, $trayecto, $periodo, $maximo, $seccion_id);
-            $stmt->execute();
-            $stmt->close();
-            
-            $_SESSION['success'] = "Sección actualizada exitosamente!";
-        } catch (Exception $e) {
-            $_SESSION['error'] = "Error al actualizar sección: " . $e->getMessage();
+        $resultado = editarSeccion($db, $datos);
+        
+        if ($resultado['success']) {
+            $_SESSION['success'] = $resultado['message'];
+        } else {
+            $_SESSION['error'] = $resultado['message'];
         }
         header("Location: gestion_seccion.php");
         exit();
@@ -72,107 +58,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $seccion_id = (int)$_POST['seccion_id'];
         $estudiantes = $_POST['estudiantes'] ?? [];
         
-        try {
-            $db->begin_transaction();
-            
-            // Obtener información de la sección para verificar capacidad
-            $stmt = $db->prepare("SELECT capacidad_maxima FROM secciones WHERE id_seccion = ?");
-            $stmt->bind_param("i", $seccion_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $seccion = $result->fetch_assoc();
-            $capacidad_maxima = $seccion['capacidad_maxima'];
-            $stmt->close();
-            
-            // Obtener estudiantes actualmente asignados
-            $stmt = $db->prepare("SELECT id_usuario FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'");
-            $stmt->bind_param("i", $seccion_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $asignados_actuales = [];
-            while ($row = $result->fetch_assoc()) {
-                $asignados_actuales[] = $row['id_usuario'];
+        $resultado = asignarEstudiantes($db, $seccion_id, $estudiantes);
+        
+        if ($resultado['success']) {
+            $_SESSION['success'] = $resultado['message'];
+            if (isset($resultado['warning'])) {
+                $_SESSION['warning'] = $resultado['warning'];
             }
-            $stmt->close();
-            
-            // Estudiantes a desactivar (estaban asignados pero no están en la nueva selección)
-            $desactivar = array_diff($asignados_actuales, $estudiantes);
-            
-            // Estudiantes a activar (nuevos o que ya estaban)
-            $activar = $estudiantes;
-            
-            // Verificar si estamos intentando agregar más estudiantes de la capacidad permitida
-            $nuevos_estudiantes = array_diff($activar, $asignados_actuales);
-            $total_estudiantes = count($asignados_actuales) - count($desactivar) + count($nuevos_estudiantes);
-            
-            if ($total_estudiantes > $capacidad_maxima) {
-                throw new Exception("No se pueden asignar más estudiantes. La capacidad máxima es $capacidad_maxima.");
-            }
-            
-            // Desactivar los que ya no están seleccionados
-            if (!empty($desactivar)) {
-                $placeholders = implode(',', array_fill(0, count($desactivar), '?'));
-                $types = str_repeat('i', count($desactivar));
-                
-                $stmt = $db->prepare("UPDATE estudiante_seccion 
-                                    SET estatus = 'retirado'
-                                    WHERE id_seccion = ? 
-                                    AND id_usuario IN ($placeholders)");
-                
-                $params = array_merge([$seccion_id], $desactivar);
-                $stmt->bind_param(str_repeat('i', count($params)), ...$params);
-                $stmt->execute();
-                $stmt->close();
-            }
-            
-            // Activar o insertar nuevos estudiantes (solo si no superamos la capacidad)
-            if (!empty($activar)) {
-                $placeholders = implode(',', array_fill(0, count($activar), '(?,?,CURDATE(),\'activo\')'));
-                
-                $stmt = $db->prepare("INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus)
-                                    VALUES $placeholders
-                                    ON DUPLICATE KEY UPDATE estatus = 'activo'");
-                
-                // Preparar parámetros: para cada estudiante, necesitamos el id_usuario y id_seccion
-                $params = [];
-                foreach ($activar as $est_id) {
-                    $params[] = $est_id;
-                    $params[] = $seccion_id;
-                }
-                
-                $stmt->bind_param(str_repeat('i', count($params)), ...$params);
-                $stmt->execute();
-                $stmt->close();
-            }
-            
-            // Verificar si se alcanza el mínimo de estudiantes para activar la sección
-            $stmt = $db->prepare("SELECT COUNT(*) as total FROM estudiante_seccion 
-                                WHERE id_seccion = ? AND estatus = 'activo'");
-            $stmt->bind_param("i", $seccion_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $count = $result->fetch_assoc()['total'];
-            $stmt->close();
-            
-            // Actualizar estado de la sección según el número de estudiantes
-            $nuevo_estatus = ($count >= MINIMO_ESTUDIANTES) ? 'activa' : 'inactiva';
-            $stmt = $db->prepare("UPDATE secciones SET estatus = ? WHERE id_seccion = ?");
-            $stmt->bind_param("si", $nuevo_estatus, $seccion_id);
-            $stmt->execute();
-            $stmt->close();
-            
-            $db->commit();
-            
-            if ($count >= MINIMO_ESTUDIANTES) {
-                $_SESSION['success'] = "Asignación de estudiantes actualizada! La sección ha sido activada al alcanzar el mínimo requerido.";
-            } else {
-                $_SESSION['warning'] = "Asignación de estudiantes actualizada! La sección permanecerá inactiva hasta tener al menos ".MINIMO_ESTUDIANTES." estudiantes (actualmente tiene $count).";
-            }
-        } catch (Exception $e) {
-            $db->rollback();
-            $_SESSION['error'] = "Error al asignar estudiantes: " . $e->getMessage();
+        } else {
+            $_SESSION['error'] = $resultado['message'];
         }
-        // Redirigir con POST
         header("Location: gestion_seccion.php?action=view&id=".$seccion_id);
         exit();
     } elseif ($action === 'retirar_estudiante') {
@@ -180,40 +75,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $usuario_id = (int)$_POST['id_usuario'];
         $seccion_id = (int)$_POST['id_seccion'];
         
-        try {
-            $db->begin_transaction();
-            
-            // Desactivar al estudiante en la sección
-            $stmt = $db->prepare("UPDATE estudiante_seccion 
-                                 SET estatus = 'retirado'
-                                 WHERE id_seccion = ? AND id_usuario = ?");
-            $stmt->bind_param("ii", $seccion_id, $usuario_id);
-            $stmt->execute();
-            $stmt->close();
-            
-            // Verificar si se debe cambiar el estado de la sección
-            $stmt = $db->prepare("SELECT COUNT(*) as total FROM estudiante_seccion 
-                                WHERE id_seccion = ? AND estatus = 'activo'");
-            $stmt->bind_param("i", $seccion_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $count = $result->fetch_assoc()['total'];
-            $stmt->close();
-            
-            // Actualizar estado de la sección según el número de estudiantes
-            $nuevo_estatus = ($count >= MINIMO_ESTUDIANTES) ? 'activa' : 'inactiva';
-            $stmt = $db->prepare("UPDATE secciones SET estatus = ? WHERE id_seccion = ?");
-            $stmt->bind_param("si", $nuevo_estatus, $seccion_id);
-            $stmt->execute();
-            $stmt->close();
-            
-            $db->commit();
-            
-            $_SESSION['success'] = "Estudiante retirado exitosamente de la sección.";
-            
-        } catch (Exception $e) {
-            $db->rollback();
-            $_SESSION['error'] = "Error al retirar estudiante: " . $e->getMessage();
+        $resultado = retirarEstudiante($db, $seccion_id, $usuario_id);
+        
+        if ($resultado['success']) {
+            $_SESSION['success'] = $resultado['message'];
+        } else {
+            $_SESSION['error'] = $resultado['message'];
         }
         header("Location: gestion_seccion.php?action=view&id=".$seccion_id);
         exit();
@@ -252,15 +119,15 @@ include("includes/head.php");
 <div class="container-fluid">
     <?php 
     if (isset($_SESSION['error'])) {
-        echo '<div class="alert alert-danger">' . $_SESSION['error'] . '</div>';
+        mostrarError($_SESSION['error']);
         unset($_SESSION['error']);
     }
     if (isset($_SESSION['success'])) {
-        echo '<div class="alert alert-success">' . $_SESSION['success'] . '</div>';
+        mostrarExito($_SESSION['success']);
         unset($_SESSION['success']);
     }
     if (isset($_SESSION['warning'])) {
-        echo '<div class="alert alert-warning">' . $_SESSION['warning'] . '</div>';
+        mostrarAdvertencia($_SESSION['warning']);
         unset($_SESSION['warning']);
     }
     
@@ -298,21 +165,7 @@ include("includes/head.php");
                         </thead>
                         <tbody>
                             <?php
-                            $query = "SELECT s.id_seccion, s.codigo_seccion, c.nombre_carrera, t.numero_trayecto, 
-                                     p.nombre_periodo, s.capacidad_maxima, s.estatus,
-                                     COUNT(es.id_usuario) as inscritos
-                              FROM secciones s
-                              JOIN carreras c ON s.id_carrera = c.id_carrera
-                              JOIN trayectos t ON s.id_trayecto = t.id_trayecto
-                              JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
-                              LEFT JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion AND es.estatus = 'activo'
-                              GROUP BY s.id_seccion
-                              ORDER BY p.nombre_periodo DESC, s.codigo_seccion";
-                            $stmt = $db->prepare($query);
-                            $stmt->execute();
-                            $result = $stmt->get_result();
-                            $secciones = $result->fetch_all(MYSQLI_ASSOC);
-                            $stmt->close();
+                            $secciones = obtenerListadoSecciones($db);
                             
                             foreach ($secciones as $seccion) {
                                 $porcentaje = $seccion['capacidad_maxima'] > 0 ? 
@@ -376,34 +229,15 @@ include("includes/head.php");
     <?php elseif ($action === 'new' || $action === 'edit'): ?>
         <!-- FORMULARIO DE EDICIÓN/CREACIÓN -->
         <?php
-        // Obtener datos para selects
-        $stmt = $db->prepare("SELECT id_carrera, nombre_carrera FROM carreras WHERE activa = 1");
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $carreras = $result->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-        
-        $stmt = $db->prepare("SELECT id_trayecto, numero_trayecto FROM trayectos ORDER BY numero_trayecto");
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $trayectos = $result->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-        
-        $stmt = $db->prepare("SELECT id_periodo, nombre_periodo FROM periodos_academicos WHERE activo = 1");
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $periodos = $result->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
+        $datos_selects = obtenerDatosSelects($db);
+        $carreras = $datos_selects['carreras'];
+        $trayectos = $datos_selects['trayectos'];
+        $periodos = $datos_selects['periodos'];
         
         // Datos de la sección si es edición
         $seccion = [];
         if ($action === 'edit' && $seccion_id > 0) {
-            $stmt = $db->prepare("SELECT * FROM secciones WHERE id_seccion = ?");
-            $stmt->bind_param("i", $seccion_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $seccion = $result->fetch_assoc();
-            $stmt->close();
+            $seccion = obtenerDatosSeccion($db, $seccion_id);
         }
         ?>
         
@@ -496,40 +330,9 @@ include("includes/head.php");
     <?php elseif ($action === 'assign' && $seccion_id > 0): ?>
         <!-- ASIGNACIÓN DE ESTUDIANTES -->
         <?php
-        $stmt = $db->prepare("SELECT s.*, c.nombre_carrera, COUNT(es.id_usuario) as inscritos
-                      FROM secciones s
-                      JOIN carreras c ON s.id_carrera = c.id_carrera
-                      LEFT JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion AND es.estatus = 'activo'
-                      WHERE s.id_seccion = ?");
-        $stmt->bind_param("i", $seccion_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $seccion = $result->fetch_assoc();
-        $stmt->close();
-        
-        // Obtener todos los estudiantes de la carrera (sin paginación para asegurar que todos se envíen)
-        $stmt = $db->prepare("SELECT u.id, u.nombre, u.username, 
-                             (SELECT COUNT(*) FROM estudiante_seccion 
-                              WHERE id_usuario = u.id AND id_seccion = ? AND estatus = 'activo') as asignado
-                      FROM users u
-                      WHERE u.estudiante = 1 AND u.status = 1 AND u.carrera = ?
-                      ORDER BY u.nombre");
-        $stmt->bind_param("ii", $seccion_id, $seccion['id_carrera']);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $estudiantes = $result->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-        
-        // Obtener IDs de estudiantes ya asignados para marcar los checkboxes
-        $stmt = $db->prepare("SELECT id_usuario FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'");
-        $stmt->bind_param("i", $seccion_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $asignados = [];
-        while ($row = $result->fetch_assoc()) {
-            $asignados[] = $row['id_usuario'];
-        }
-        $stmt->close();
+        $seccion = obtenerDetalleSeccion($db, $seccion_id);
+        $estudiantes = obtenerEstudiantesDisponibles($db, $seccion_id, $seccion['id_carrera']);
+        $asignados = obtenerEstudiantesAsignados($db, $seccion_id);
         
         // Verificar si la sección está llena
         $seccion_llena = ($seccion['inscritos'] >= $seccion['capacidad_maxima']);
@@ -728,28 +531,8 @@ include("includes/head.php");
     <?php elseif ($action === 'view' && $seccion_id > 0): ?>
         <!-- VISTA DETALLADA DE SECCIÓN -->
         <?php
-        $stmt = $db->prepare("SELECT s.*, c.nombre_carrera, t.numero_trayecto, p.nombre_periodo
-                      FROM secciones s
-                      JOIN carreras c ON s.id_carrera = c.id_carrera
-                      JOIN trayectos t ON s.id_trayecto = t.id_trayecto
-                      JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
-                      WHERE s.id_seccion = ?");
-        $stmt->bind_param("i", $seccion_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $seccion = $result->fetch_assoc();
-        $stmt->close();
-        
-        $stmt = $db->prepare("SELECT u.id, u.nombre, u.username, es.fecha_inscripcion
-                      FROM users u
-                      JOIN estudiante_seccion es ON u.id = es.id_usuario
-                      WHERE es.id_seccion = ? AND es.estatus = 'activo'
-                      ORDER BY u.nombre");
-        $stmt->bind_param("i", $seccion_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $estudiantes = $result->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
+        $seccion = obtenerDetalleSeccion($db, $seccion_id);
+        $estudiantes = obtenerEstudiantesDeSeccion($db, $seccion_id);
         
         $estudiantes_inscritos = count($estudiantes);
         $faltan_para_activar = max(0, MINIMO_ESTUDIANTES - $estudiantes_inscritos);
