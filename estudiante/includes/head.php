@@ -57,8 +57,8 @@ if (!isEstudiante()) {
                 <a title="Horario" class="dropdown-item" href="horario.php">
                   <i class="fas fa-calendar-alt fa-fw"></i> Mi Horario
                 </a>
-                <a title="Materiales" class="dropdown-item" href="materiales.php">
-                  <i class="fas fa-file-download fa-fw"></i> Materiales de Estudio
+                <a title="Secciones" class="dropdown-item" href="mis_secciones.php">
+                  <i class="fas fa-columns fa-fw"></i> Mis Secciones
                 </a>
               </div>
             </li>

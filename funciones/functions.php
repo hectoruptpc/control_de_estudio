@@ -3905,7 +3905,84 @@ function cambiarEstadoPeriodo($db, $id, $estado) {
     return $stmt->execute();
 }
 
+// PANEL DE ESTUDIANTE, SECCIONES ***********************************************************************
 
+
+
+/**
+ * Verifica si un usuario es estudiante (campo estudiante = 1)
+ */
+function esEstudiante($db, $user_id) {
+    $sql = "SELECT estudiante FROM users WHERE id = ?";
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $user = $result->fetch_assoc();
+        return $user['estudiante'] == 1;
+    }
+    
+    return false;
+}
+
+/**
+ * Obtiene las secciones en las que está inscrito un estudiante
+ */
+function obtenerSeccionesEstudiante($db, $estudiante_id) {
+    $sql = "SELECT s.*, c.nombre_carrera, t.numero_trayecto, pa.nombre_periodo 
+            FROM secciones s
+            JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion
+            JOIN carreras c ON s.id_carrera = c.id_carrera
+            JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+            JOIN periodos_academicos pa ON s.id_periodo = pa.id_periodo
+            WHERE es.id_usuario = ? AND s.estatus = 'activa'";
+    
+    try {
+        $stmt = $db->prepare($sql);
+        $stmt->bind_param("i", $estudiante_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (mysqli_sql_exception $e) {
+        error_log("Error al obtener secciones: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Obtiene los compañeros de sección (excluyendo al estudiante actual)
+ */
+function obtenerCompañerosSeccion($db, $seccion_id, $estudiante_id) {
+    $sql = "SELECT u.id, u.nombre, u.username, u.email, u.tlf 
+            FROM users u
+            JOIN estudiante_seccion es ON u.id = es.id_usuario
+            WHERE es.id_seccion = ? AND es.id_usuario != ? AND u.estudiante = 1";
+    
+    try {
+        $stmt = $db->prepare($sql);
+        $stmt->bind_param("ii", $seccion_id, $estudiante_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } catch (mysqli_sql_exception $e) {
+        error_log("Error al obtener compañeros: " . $e->getMessage());
+        return [];
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+// ES ESTUDIANTE *******************************************************************************************************
 
 
 
