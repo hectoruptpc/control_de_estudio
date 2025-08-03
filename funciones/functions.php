@@ -1158,6 +1158,23 @@ function insertarDocente(array $datos): array {
             throw new Exception("Faltan campos requeridos: " . implode(', ', $faltantes));
         }
 
+        // Verificar si existe la carrera especificada o usar "No Especificado" (ID 0)
+        if (isset($datos['carrera']) && $datos['carrera'] !== '') {
+            $stmt = $db->prepare("SELECT id_carrera FROM carreras WHERE id_carrera = ?");
+            $stmt->bind_param("i", $datos['carrera']);
+            $stmt->execute();
+            $stmt->store_result();
+            
+            if ($stmt->num_rows === 0) {
+                $stmt->close();
+                throw new Exception("La carrera especificada no existe");
+            }
+            $stmt->close();
+        } else {
+            // Si no se especifica carrera, usar ID 0 ("No Especificado")
+            $datos['carrera'] = 0;
+        }
+
         // 1. Preparación de datos
         $username = strtolower(str_replace(' ', '.', $datos['nombre']));
         $password = password_hash($datos['documento'], PASSWORD_DEFAULT);
@@ -1174,6 +1191,7 @@ function insertarDocente(array $datos): array {
         $db->begin_transaction();
 
         // Verificar si el usuario ya existe
+        $valores['idusuario'] = $datos['tipo_documento'] . '-' . $datos['documento'];
         $checkStmt = $db->prepare("SELECT id FROM users WHERE idusuario = ? LIMIT 1");
         $checkStmt->bind_param("s", $valores['idusuario']);
         $checkStmt->execute();
@@ -1223,11 +1241,12 @@ function insertarDocente(array $datos): array {
                 'tenencia_vivienda' => $datos['tenencia_vivienda'] ?? '',
                 'enfermedad' => $datos['enfermedad'] ?? '',
                 'discapacidad' => $datos['discapacidad'] ?? '',
-                'titulos' => '', // Ya no necesitamos esto aquí
-                'institutos' => '', // Ya no necesitamos esto aquí
+                'titulos' => '',
+                'institutos' => '',
                 'potencialidades' => $potencialidades,
                 'api_key' => $api_key,
-                'fecha_ingreso' => $datos['fecha_ingreso'] ?? date('Y-m-d')
+                'fecha_ingreso' => $datos['fecha_ingreso'] ?? date('Y-m-d'),
+                'carrera' => $datos['carrera'] // Usamos el valor validado (0 o el ID especificado)
             ]
         ];
 
@@ -1246,7 +1265,6 @@ function insertarDocente(array $datos): array {
                 'status' => ($datos['estado_laboral'] == 'Activo') ? 1 : 0,
                 'user_type' => 'docente',
                 'password' => $password,
-                'carrera' => '', // Dejamos carrera vacía o puedes eliminarla si no se usa
                 'genero' => $datos['genero'],
                 'edo_civil' => $datos['estado_civil'],
                 'fecha_nac' => $datos['fecha_nacimiento'],
