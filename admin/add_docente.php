@@ -37,6 +37,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 // Obtener lista de docentes
 $docentes = obtenerDocentes();
+
+// Obtener lista de títulos desde la base de datos
+$titulos_db = [];
+$query = "SELECT id, nombre FROM titulos ORDER BY nombre";
+if ($stmt = $db->prepare($query)) {
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $titulos_db[] = $row;
+    }
+    $stmt->close();
+}
 ?>
 
 <div class="container py-5">
@@ -196,8 +208,14 @@ $docentes = obtenerDocentes();
         <label class="form-label">Títulos Obtenidos e Instituciones</label>
         <div class="row g-3 mb-3">
             <div class="col-md-5">
-                <input type="text" class="form-control" id="titulos" name="titulos_main" 
-                       value="<?= htmlspecialchars($_POST['titulos_main'] ?? '') ?>" placeholder="Título obtenido">
+                <select class="custom-select d-block w-100" id="titulos" name="titulos_main">
+                    <option value="">Seleccione un título...</option>
+                    <?php foreach ($titulos_db as $titulo): ?>
+                        <option value="<?= htmlspecialchars($titulo['nombre']) ?>" <?= isset($_POST['titulos_main']) && $_POST['titulos_main'] == $titulo['nombre'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($titulo['nombre']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             <div class="col-md-5">
                 <input type="text" class="form-control" id="institutos" name="institutos_main" 
@@ -574,7 +592,8 @@ $docentes = obtenerDocentes();
 document.addEventListener('DOMContentLoaded', function() {
     // Función para añadir títulos e instituciones juntos
     document.getElementById('addTituloInstituto').addEventListener('click', function() {
-        const titulo = document.getElementById('titulos').value;
+        const tituloSelect = document.getElementById('titulos');
+        const titulo = tituloSelect.value;
         const instituto = document.getElementById('institutos').value;
         
         if(titulo.trim() === '' || instituto.trim() === '') {
@@ -603,7 +622,7 @@ document.addEventListener('DOMContentLoaded', function() {
         container.appendChild(newRow);
         
         // Limpiar los campos principales
-        document.getElementById('titulos').value = '';
+        tituloSelect.value = '';
         document.getElementById('institutos').value = '';
     });
 
