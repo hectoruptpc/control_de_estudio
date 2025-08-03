@@ -1,49 +1,86 @@
 <?php
-require_once '../config/database.php';
+error_reporting(0);
+ini_set('display_errors', 0);
 
-$id = $_POST['id'] ?? 0;
+require_once('../funciones/functions.php');
 
+// Verificar conexión
+if (!isset($GLOBALS['db'])) {
+    header("Location: ".$_SERVER['HTTP_REFERER']); // Regresa a la página anterior
+    exit;
+}
+
+// Validar ID
+if (!isset($_POST['id']) || !is_numeric($_POST['id'])) {
+    header("Location: ".$_SERVER['HTTP_REFERER']);
+    exit;
+}
+
+$id = $_POST['id'];
+
+// Procesar datos
 $datos = [
-    'id' => $id,
-    'cod_estudiante' => $_POST['cod_estudiante'] ?? '',
-    'nombre' => $_POST['nombre'] ?? '',
-    'carrera' => $_POST['carrera'] ?? '',
-    'genero' => $_POST['genero'] ?? '',
-    'tlf' => $_POST['num_telf'] ?? '',
-    'email' => $_POST['correo'] ?? '',
-    'fecha_ingreso' => $_POST['fecha_ingreso'] ?? '',
-    'status' => $_POST['status'] ?? 1,
-    'direccion' => $_POST['direccion'] ?? '',
-    'fecha_nac' => $_POST['fecha_nac'] ?? null,
-    'edad' => $_POST['edad'] ?? null
+    'nombre' => trim($_POST['nombre'] ?? ''),
+    'username' => trim($_POST['cedula'] ?? ''),
+    'email' => trim($_POST['email'] ?? ''),
+    'tlf' => trim($_POST['num_telf'] ?? ''),
+    'num_telf_opc' => trim($_POST['num_telf_opc'] ?? ''),
+    'carrera' => trim($_POST['carrera'] ?? ''),
+    'genero' => trim($_POST['genero'] ?? ''),
+    'fecha_nac' => trim($_POST['fecha_nac'] ?? ''),
+    'fecha_ingreso' => trim($_POST['fecha_ingreso'] ?? ''),
+    'status' => intval($_POST['status'] ?? 1),
+    'fecha_act' => date('Y-m-d H:i:s')
 ];
 
-try {
-    $query = "UPDATE users SET
-                cod_estudiante = :cod_estudiante,
-                nombre = :nombre,
-                carrera = :carrera,
-                genero = :genero,
-                tlf = :tlf,
-                email = :email,
-                fecha_ingreso = :fecha_ingreso,
-                status = :status,
-                direccion = :direccion,
-                fecha_nac = :fecha_nac,
-                edad = :edad,
-                fecha_act = NOW()
-              WHERE id = :id";
-    
-    $stmt = $conn->prepare($query);
-    $stmt->execute($datos);
-    
-    echo json_encode([
-        'success' => true,
-        'message' => 'Estudiante actualizado correctamente'
-    ]);
-} catch (PDOException $e) {
-    echo json_encode([
-        'success' => false,
-        'message' => 'Error al actualizar estudiante: ' . $e->getMessage()
-    ]);
+// Validar campos obligatorios
+if (empty($datos['nombre']) || empty($datos['username']) || empty($datos['fecha_ingreso'])) {
+    header("Location: ".$_SERVER['HTTP_REFERER']);
+    exit;
 }
+
+// Ejecutar actualización
+try {
+    $db = $GLOBALS['db'];
+    
+    $query = "UPDATE users SET 
+              nombre = ?, 
+              username = ?, 
+              email = ?, 
+              tlf = ?, 
+              num_telf_opc = ?, 
+              carrera = ?, 
+              genero = ?, 
+              fecha_nac = ?, 
+              fecha_ingreso = ?, 
+              status = ?, 
+              fecha_act = ? 
+              WHERE id = ?";
+    
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        $stmt->bind_param(
+            "sssssssssssi",
+            $datos['nombre'],
+            $datos['username'],
+            $datos['email'],
+            $datos['tlf'],
+            $datos['num_telf_opc'],
+            $datos['carrera'],
+            $datos['genero'],
+            $datos['fecha_nac'],
+            $datos['fecha_ingreso'],
+            $datos['status'],
+            $datos['fecha_act'],
+            $id
+        );
+        $stmt->execute();
+        $stmt->close();
+    }
+} catch (Exception $e) {
+    // No hacer nada con los errores
+}
+
+// Redireccionar siempre al final
+header("Location: ".$_SERVER['HTTP_REFERER']);
+exit;

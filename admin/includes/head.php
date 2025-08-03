@@ -23,7 +23,7 @@ if (!isAdmin()) {
 
 <title><?php echo $titulopag; ?></title>
 
-<?php echo $bootstrap_head; ?>
+<?php echo $bootstrap_head;?>
 </head>
 
 <body>
@@ -55,8 +55,13 @@ if (!isAdmin()) {
     <a title="Ver Todos los Estudiantes" class="dropdown-item" href="estudiantes.php">
       <i class="fa fa-users fa-fw"></i> Ver todos los Estudiantes
     </a>
-    <a title="Agregar Estudiante" class="dropdown-item" href="agregar_estudiante.php">
-      <i class="fa fa-user-plus fa-fw"></i> Agregar Estudiante
+    <?php if ($_SESSION['user']['agregar_estudiante'] == 1): ?>
+      <a title="Agregar Estudiante" class="dropdown-item" href="agregar_estudiante.php">
+        <i class="fa fa-user-plus fa-fw"></i> Agregar Estudiante
+      </a>
+    <?php endif; ?>
+    <a title="Gestionar Secciones" class="dropdown-item" href="gestion_seccion.php">
+      <i class="fas fa-object-group fa-fw"></i> Gestionar Secciones
     </a>
     <a title="Historial Académico" class="dropdown-item" href="historial_academico.php">
       <i class="fas fa-history fa-fw"></i> Historial Académico
@@ -72,17 +77,20 @@ if (!isAdmin()) {
         <i class="fas fa-book fa-fw"></i> Pensum
     </a>
     <div id="dropdown-pensum-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
-        <a title="Agregar Nueva Carrera" class="dropdown-item" href="agregar_carrera.php">
-            <i class="fas fa-plus-circle fa-fw"></i> Agregar Carrera
-        </a>
-        <a title="Ver Pensum Actual" class="dropdown-item" href="lista_carreras.php">
-            <i class="fas fa-graduation-cap fa-fw"></i> Ver Pensum
-        </a>
+        <?php if ($_SESSION['user']['agregar_carrera'] == 1): ?>
+            <a title="Agregar Nueva Carrera" class="dropdown-item" href="agregar_carrera.php">
+                <i class="fas fa-plus-circle fa-fw"></i> Agregar Carrera
+            </a>
+        <?php endif; ?>
+        
         <a title="Asignaturas" class="dropdown-item" href="materia.php">
             <i class="fas fa-book-open fa-fw"></i> Asignaturas
         </a>
-        <a title="Plan de Estudio" class="dropdown-item" href="carrera_materias.php">
-            <i class="fas fa-calendar-alt fa-fw"></i> Plan de Estudio
+        <a title="Relacionar Materias con Carreras" class="dropdown-item" href="carrera_materias.php">
+            <i class="fas fa-link fa-fw"></i> Relacionar Materias-Carreras
+        </a>
+        <a title="Periodos Académicos" class="dropdown-item" href="periodos_academicos.php">
+            <i class="fas fa-calendar fa-fw"></i> Periodos Académicos
         </a>
     </div>
 </li>
@@ -92,12 +100,12 @@ if (!isAdmin()) {
         <i class="fas fa-chalkboard-teacher fa-fw"></i> Docentes
     </a>
     <div id="dropdown-docentes-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
-        <a title="Registrar Nuevo Docente" class="dropdown-item" href="add_docente.php">
-            <i class="fas fa-user-plus fa-fw"></i> Nuevo Docente
-        </a>
-        <a title="Listado de Docentes" class="dropdown-item" href="list_docentes.php">
-            <i class="fas fa-users fa-fw"></i> Listado Completo
-        </a>
+      
+    <a title="Registrar Nuevo Docente" class="dropdown-item" href="add_docente.php">
+        <i class="fas fa-user-plus fa-fw"></i> Gestionar Docente
+    </a>
+
+       
         <a title="Asignación de Cursos" class="dropdown-item" href="asignacion_cursos.php">
             <i class="fas fa-tasks fa-fw"></i> Asignar Cursos
         </a>
@@ -110,6 +118,28 @@ if (!isAdmin()) {
     </div>
 </li>
 
+<li id="dropdown-notas" class="nav-item dropdown">
+    <a title="Gestión de Notas" class="nav-link dropdown-toggle" href="#" id="navbarDropdownNotas" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        <i class="fas fa-graduation-cap fa-fw"></i> Notas
+    </a>
+    <div id="dropdown-notas-menu" class="dropdown-menu" aria-labelledby="navbarDropdownNotas">
+        <a title="Registrar Notas" class="dropdown-item" href="registrar_notas.php">
+            <i class="fas fa-edit fa-fw"></i> Registrar Notas
+        </a>
+        <a title="Consultar Notas" class="dropdown-item" href="consultar_notas.php">
+            <i class="fas fa-search fa-fw"></i> Consultar Notas
+        </a>
+        <a title="Reportes de Notas" class="dropdown-item" href="reportes_notas.php">
+            <i class="fas fa-file-alt fa-fw"></i> Reportes de Notas
+        </a>
+        <a title="Boletines" class="dropdown-item" href="boletines.php">
+            <i class="fas fa-file-pdf fa-fw"></i> Generar Boletines
+        </a>
+        <a title="Historial de Calificaciones" class="dropdown-item" href="historial_calificaciones.php">
+            <i class="fas fa-history fa-fw"></i> Historial de Calificaciones
+        </a>
+    </div>
+</li>
 
       </li>
       <li id="dropdown-ajustes" class="nav-item dropdown">
@@ -131,6 +161,14 @@ if (!isAdmin()) {
             <div class="dropdown-divider"></div>
             <a title="Editar Niveles de Acceso" class="dropdown-item" href="editar_accesos.php">
                 <i class="fas fa-user-lock fa-fw"></i> Niveles de Acceso
+            </a>
+        <?php endif; ?>
+        
+        <!-- Opción exclusiva para usuarios con editar_valores = 1 -->
+        <?php if (isset($_SESSION['user']['editar_valores']) && $_SESSION['user']['editar_valores'] == 1): ?>
+            <div class="dropdown-divider"></div>
+            <a title="Editar Valores del Sistema" class="dropdown-item" href="valores_predefinidos.php">
+                <i class="fas fa-edit fa-fw"></i> Valores Predefinidos
             </a>
         <?php endif; ?>
         

@@ -25,9 +25,11 @@
                         </span>
                     </td>
                     <td>
-                        <button class="btn btn-sm btn-warning btn-editar" data-id="<?= $carrera['id_carrera'] ?>">
-                            <i class="fas fa-edit"></i> Editar
-                        </button>
+                        <button class="btn btn-sm btn-warning btn-editar" 
+        data-id="<?= intval($carrera['id_carrera']) ?>" 
+        onclick="cargarModalEditar(this)">
+    <i class="fas fa-edit"></i> Editar
+</button>
                         
                         <?php if ($carrera['activa']): ?>
                             <button class="btn btn-sm btn-danger btn-cambiar-estado" 
@@ -58,3 +60,36 @@
         </tbody>
     </table>
 </div>
+<script>
+function cargarModalEditar(button) {
+    const idCarrera = $(button).data('id');
+    console.log("ID obtenido del botón:", idCarrera);
+    
+    if (!idCarrera || isNaN(idCarrera) || idCarrera <= 0) {
+        console.error("ID inválido:", idCarrera);
+        alert("Error: ID de carrera inválido");
+        return;
+    }
+
+    $.ajax({
+        url: 'partials/editar_carrera_modal.php',
+        type: 'GET',
+        data: { id: idCarrera },
+        dataType: 'html',
+        beforeSend: function() {
+            console.log("Enviando ID válido:", idCarrera);
+        },
+        success: function(data) {
+            $('#editarCarreraModal .modal-content').html(data);
+        },
+        error: function(xhr, status, error) {
+            console.error("Error en la solicitud:", {
+                status: status,
+                error: error,
+                response: xhr.responseText
+            });
+            alert("Error al cargar los datos. Ver consola para detalles.");
+        }
+    });
+}
+</script>

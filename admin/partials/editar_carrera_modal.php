@@ -1,67 +1,107 @@
 <?php
-require_once '../../funciones/functions.php';
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    die("ID de carrera no válido");
-}
+require_once(__DIR__.'/../../funciones/functions.php');
 
-$id = (int)$_GET['id'];
+$id = $_GET['id'] ?? 0;
 $carrera = obtenerCarreraPorId($id);
-
-if (!$carrera) {
-    die("Carrera no encontrada");
-}
-
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $nombre = trim($_POST['nombre_carrera'] ?? '');
-    $codigo = trim($_POST['cod_carrera'] ?? '');
-    $activa = isset($_POST['activa']) ? 1 : 0;
-    
-    if (!empty($nombre) && !empty($codigo)) {
-        if (actualizarCarrera($id, $nombre, $codigo, $activa)) {
-            echo '<script>
-                    parent.$("#modalEditarCarrera").modal("hide");
-                    parent.$("#tabla-carreras").load("partials/tabla_carreras.php");
-                    parent.mostrarAlerta("success", "Carrera actualizada correctamente");
-                  </script>';
-            exit();
-        } else {
-            echo '<div class="alert alert-danger">Error al actualizar la carrera</div>';
-        }
-    } else {
-        echo '<div class="alert alert-warning">Todos los campos son obligatorios</div>';
-    }
-}
 ?>
 
-<form method="post" id="form-editar-carrera">
-    <div class="form-group">
-        <label for="nombre_carrera">Nombre de la Carrera:</label>
-        <input type="text" class="form-control" id="nombre_carrera" name="nombre_carrera" 
-               value="<?= htmlspecialchars($carrera['nombre_carrera']) ?>" required>
-    </div>
-    
-    <div class="form-group">
-        <label for="cod_carrera">Código de la Carrera:</label>
-        <input type="text" class="form-control" id="cod_carrera" name="cod_carrera" 
-               value="<?= htmlspecialchars($carrera['cod_carrera']) ?>" required>
-    </div>
-    
-    
-    
-    <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Guardar Cambios</button>
-    </div>
-</form>
+
+
+<div class="modal-body">
+    <form id="formEditarCarrera" method="post" action="actualizar_carrera.php">
+        <input type="hidden" name="id_carrera" value="<?= $carrera['id_carrera'] ?>">
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="nombre_carrera">Nombre de la Carrera</label>
+                    <input type="text" class="form-control" id="nombre_carrera" name="nombre_carrera" 
+                           value="<?= $carrera['nombre_carrera'] ?>">
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="cod_carrera">Código de Carrera</label>
+                    <input type="text" class="form-control" id="cod_carrera" name="cod_carrera" 
+                           value="<?= $carrera['cod_carrera'] ?>">
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="tipo_formacion">Tipo de Formación</label>
+                    <select class="form-control" id="tipo_formacion" name="tipo_formacion">
+                        <option value="PNF" <?= $carrera['tipo_formacion'] == 'PNF' ? 'selected' : '' ?>>PNF</option>
+                        <option value="PTF" <?= $carrera['tipo_formacion'] == 'PTF' ? 'selected' : '' ?>>PTF</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="duracion_semestres">Duración (Semestres)</label>
+                    <input type="number" class="form-control" id="duracion_semestres" name="duracion_semestres" 
+                           value="<?= $carrera['duracion_semestres'] ?>">
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="titulo_otorga">Título que Otorga</label>
+                    <input type="text" class="form-control" id="titulo_otorga" name="titulo_otorga" 
+                           value="<?= $carrera['titulo_otorga'] ?>">
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="activa">Estado</label>
+                    <select class="form-control" id="activa" name="activa">
+                        <option value="1" <?= $carrera['activa'] == 1 ? 'selected' : '' ?>>Activa</option>
+                        <option value="0" <?= $carrera['activa'] == 0 ? 'selected' : '' ?>>Inactiva</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="descripcion">Descripción</label>
+            <textarea class="form-control" id="descripcion" name="descripcion" rows="3"><?= $carrera['descripcion'] ?></textarea>
+        </div>
+        
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+        </div>
+    </form>
+</div>
 
 <script>
 $(document).ready(function() {
-    $('#form-editar-carrera').on('submit', function(e) {
+    $('#formEditarCarrera').on('submit', function(e) {
         e.preventDefault();
         
-        $.post(window.location.href, $(this).serialize(), function(response) {
-            $('#contenido-modal-editar').html(response);
+        $.ajax({
+            url: $(this).attr('action'),
+            type: 'POST',
+            data: new FormData(this),
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                $('#editarCarreraModal').modal('hide');
+                location.reload();
+            },
+            error: function() {
+                alert('Ocurrió un error');
+            }
         });
     });
 });

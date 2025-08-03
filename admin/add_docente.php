@@ -6,23 +6,32 @@ $titulopag = "Añadir nuevo docente";
 require_once('../funciones/functions.php');
 include("includes/head.php");
 
+// Verificar permisos
+$permiso_agregar = isset($_SESSION['user']['agregar_docente']) && $_SESSION['user']['agregar_docente'] == 1;
+$permiso_editar = isset($_SESSION['user']['editar_docente']) && $_SESSION['user']['editar_docente'] == 1;
+
 // Procesar el formulario cuando se envía
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // Validar datos primero
-    $validacion = validarDocente($_POST);
-    
-    if ($validacion === true) {
-        $resultado = insertarDocente($_POST);
-        
-        if ($resultado['success']) {
-            echo '<div class="alert alert-success">'.$resultado['message'].'</div>';
-            // Limpiar POST para no rellenar el formulario
-            $_POST = [];
-        } else {
-            echo '<div class="alert alert-danger">'.$resultado['message'].'</div>';
-        }
+    // Validar que el usuario tenga permiso para agregar
+    if (!$permiso_agregar) {
+        echo '<div class="alert alert-danger">No tiene permisos para agregar docentes</div>';
     } else {
-        echo '<div class="alert alert-danger">'.implode('<br>', $validacion).'</div>';
+        // Validar datos primero
+        $validacion = validarDocente($_POST);
+        
+        if ($validacion === true) {
+            $resultado = insertarDocente($_POST);
+            
+            if ($resultado['success']) {
+                echo '<div class="alert alert-success">'.$resultado['message'].'</div>';
+                // Limpiar POST para no rellenar el formulario
+                $_POST = [];
+            } else {
+                echo '<div class="alert alert-danger">'.$resultado['message'].'</div>';
+            }
+        } else {
+            echo '<div class="alert alert-danger">'.implode('<br>', $validacion).'</div>';
+        }
     }
 }
 
@@ -33,6 +42,7 @@ $docentes = obtenerDocentes();
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-lg-12">
+            <?php if ($permiso_agregar): ?>
             <div class="card border-0">
                 <div class="card-header bg-white py-3">
                     <h5 class="mb-0"><i class="fas fa-chalkboard-teacher me-2"></i>Agregar Nuevo Docente</h5>
@@ -50,15 +60,29 @@ $docentes = obtenerDocentes();
                                 </div>
                             </div>
                             
-                            <div class="col-md-3">
-                                <div class="mb-3">
-                                    <label for="tipo_documento" class="form-label required">Tipo de Documento</label>
-                                    <select class="custom-select d-block w-100" id="tipo_documento" name="tipo_documento" required>
-                                        <option value="V" <?= ($_POST['tipo_documento'] ?? '') == 'V' ? 'selected' : '' ?>>V- (Venezolano)</option>
-                                        <option value="E" <?= ($_POST['tipo_documento'] ?? '') == 'E' ? 'selected' : '' ?>>E- (Extranjero)</option>
-                                    </select>
-                                </div>
-                            </div>
+                           <div class="col-md-3">
+    <div class="mb-3">
+        <label for="tipo_documento" class="form-label required">Tipo de Documento</label>
+        <select class="custom-select d-block w-100" id="tipo_documento" name="tipo_documento" required>
+            <option value="">Seleccione...</option>
+            <?php
+            $query = "SELECT id, tipo FROM tipo_cedula ORDER BY tipo";
+            if ($stmt = $db->prepare($query)) {
+                $stmt->execute();
+                $result = $stmt->get_result();
+                
+                while ($row = $result->fetch_assoc()) {
+                    $selected = (isset($_POST['tipo_documento']) && $_POST['tipo_documento'] == $row['id']) ? 'selected' : '';
+                    echo '<option value="' . $row['id'] . '" ' . $selected . '>' 
+                         . htmlspecialchars($row['tipo']) . '</option>';
+                }
+                
+                $stmt->close();
+            }
+            ?>
+        </select>
+    </div>
+</div>
                             
                             <div class="col-md-3">
                                 <div class="mb-3">
@@ -99,18 +123,31 @@ $docentes = obtenerDocentes();
                             </div>
                             
                             <div class="col-md-3">
-                                <div class="mb-3">
-                                    <label for="estado_civil" class="form-label required">Estado Civil</label>
-                                    <select class="custom-select d-block w-100" id="estado_civil" name="estado_civil" required>
-                                        <option value="">Seleccione...</option>
-                                        <option value="Soltero/a" <?= ($_POST['estado_civil'] ?? '') == 'Soltero/a' ? 'selected' : '' ?>>Soltero/a</option>
-                                        <option value="Casado/a" <?= ($_POST['estado_civil'] ?? '') == 'Casado/a' ? 'selected' : '' ?>>Casado/a</option>
-                                        <option value="Divorciado/a" <?= ($_POST['estado_civil'] ?? '') == 'Divorciado/a' ? 'selected' : '' ?>>Divorciado/a</option>
-                                        <option value="Viudo/a" <?= ($_POST['estado_civil'] ?? '') == 'Viudo/a' ? 'selected' : '' ?>>Viudo/a</option>
-                                        <option value="Unión Libre" <?= ($_POST['estado_civil'] ?? '') == 'Unión Libre' ? 'selected' : '' ?>>Unión Libre</option>
-                                    </select>
-                                </div>
-                            </div>
+    <div class="mb-3">
+        <label for="estado_civil" class="form-label required">Estado Civil</label>
+        <select class="custom-select d-block w-100" id="estado_civil" name="estado_civil" required>
+            <option value="">Seleccione...</option>
+            <?php
+            // Consulta para obtener los estados civiles desde la base de datos
+            $query = "SELECT id, estado_civil FROM estado_civil ORDER BY estado_civil";
+            $result = $db->query($query);
+            
+            if ($result && $result->num_rows > 0) {
+                while ($row = $result->fetch_assoc()) {
+                    $selected = (isset($_POST['estado_civil']) && $_POST['estado_civil'] == $row['id']) ? 'selected' : '';
+                    echo '<option value="' . $row['id'] . '" ' . $selected . '>' 
+                         . htmlspecialchars($row['estado_civil']) . '</option>';
+                }
+            }
+            
+            // Cerrar el resultado si es necesario (depende de tu configuración)
+            if ($result) {
+                $result->free();
+            }
+            ?>
+        </select>
+    </div>
+</div>
                             
                             <div class="col-md-3">
                                 <div class="mb-3">
@@ -122,87 +159,71 @@ $docentes = obtenerDocentes();
                         </div>
 
                         <!-- Sección 3: Datos Profesionales -->
-<h5 class="mb-3"><i class="fas fa-briefcase me-2"></i> Datos Profesionales</h5>
-<div class="row g-3 mb-4">
-    <!-- Potencialidades -->
-    <div class="col-md-6">
-        <div class="mb-3">
-            <label for="especialidad" class="form-label required">Potencialidades</label>
-            <div class="input-group">
-                <input type="text" class="form-control" id="especialidad" name="especialidad_main" 
-                       value="<?= htmlspecialchars($_POST['especialidad_main'] ?? '') ?>" required>
-                <button type="button" class="btn btn-outline-primary" id="addPotencialidad">
-                    <i class="fas fa-plus"></i>
-                </button>
-            </div>
-        </div>
-        <div id="potencialidadesContainer">
-            <?php if(!empty($_POST['especialidad'])): ?>
-                <?php foreach($_POST['especialidad'] as $value): ?>
-                    <div class="mb-3">
-                        <div class="input-group">
-                            <input type="text" class="form-control" name="especialidad[]" 
-                                   value="<?= htmlspecialchars($value) ?>">
-                            <button type="button" class="btn btn-outline-danger remove-field">
-                                <i class="fas fa-minus"></i>
-                            </button>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
-    </div>
-    
-    <!-- Títulos Obtenidos -->
-    <div class="col-md-6">
-        <div class="mb-3">
-            <label for="titulos" class="form-label">Títulos Obtenidos</label>
-            <div class="input-group">
+                        <h5 class="mb-3"><i class="fas fa-briefcase me-2"></i> Datos Profesionales</h5>
+                        <div class="row g-3 mb-4">
+                            <!-- Potencialidades -->
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="especialidad" class="form-label required">Especialidad / Potencialidades</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="especialidad" name="potencialidades[]" 
+                                               value="<?= htmlspecialchars($_POST['potencialidades'][0] ?? '') ?>" required>
+                                        <button type="button" class="btn btn-outline-primary" id="addPotencialidad">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="potencialidadesContainer">
+                                    <?php if(!empty($_POST['potencialidades']) && count($_POST['potencialidades']) > 1): ?>
+                                        <?php for($i = 1; $i < count($_POST['potencialidades']); $i++): ?>
+                                            <div class="mb-3">
+                                                <div class="input-group">
+                                                    <input type="text" class="form-control" name="potencialidades[]" 
+                                                           value="<?= htmlspecialchars($_POST['potencialidades'][$i] ?? '') ?>">
+                                                    <button type="button" class="btn btn-outline-danger remove-field">
+                                                        <i class="fas fa-minus"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        <?php endfor; ?>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            
+                           <!-- Títulos Obtenidos e Instituciones -->
+<div class="col-md-12">
+    <div class="mb-3">
+        <label class="form-label">Títulos Obtenidos e Instituciones</label>
+        <div class="row g-3 mb-3">
+            <div class="col-md-5">
                 <input type="text" class="form-control" id="titulos" name="titulos_main" 
-                       value="<?= htmlspecialchars($_POST['titulos_main'] ?? '') ?>" placeholder="Titulos obtenidos">
-                <button type="button" class="btn btn-outline-primary" id="addTitulo">
-                    <i class="fas fa-plus"></i>
-                </button>
+                       value="<?= htmlspecialchars($_POST['titulos_main'] ?? '') ?>" placeholder="Título obtenido">
             </div>
-        </div>
-        <div id="titulosContainer">
-            <?php if(!empty($_POST['titulos'])): ?>
-                <?php foreach($_POST['titulos'] as $value): ?>
-                    <div class="mb-3">
-                        <div class="input-group">
-                            <input type="text" class="form-control" name="titulos[]" 
-                                   value="<?= htmlspecialchars($value) ?>">
-                            <button type="button" class="btn btn-outline-danger remove-field">
-                                <i class="fas fa-minus"></i>
-                            </button>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
-    </div>
-    
-    <!-- Instituciones -->
-    <div class="col-md-6">
-        <div class="mb-3">
-            <label for="institutos" class="form-label">Instituciones</label>
-            <div class="input-group">
+            <div class="col-md-5">
                 <input type="text" class="form-control" id="institutos" name="institutos_main" 
-                       value="<?= htmlspecialchars($_POST['institutos_main'] ?? '') ?>" placeholder="Instituciones donde obtuvo los títulos">
-                <button type="button" class="btn btn-outline-primary" id="addInstituto">
-                    <i class="fas fa-plus"></i>
+                       value="<?= htmlspecialchars($_POST['institutos_main'] ?? '') ?>" placeholder="Institución donde obtuvo el título">
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-primary w-100" id="addTituloInstituto">
+                    <i class="fas fa-plus mr-1"></i> Agregar
                 </button>
             </div>
         </div>
-        <div id="institutosContainer">
-            <?php if(!empty($_POST['institutos'])): ?>
-                <?php foreach($_POST['institutos'] as $value): ?>
-                    <div class="mb-3">
-                        <div class="input-group">
+        <div id="titulosInstitutosContainer">
+            <?php if(!empty($_POST['titulos_institutos'])): ?>
+                <?php foreach($_POST['titulos_institutos'] as $index => $pair): ?>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-5">
+                            <input type="text" class="form-control" name="titulos[]" 
+                                   value="<?= htmlspecialchars($pair['titulo']) ?>">
+                        </div>
+                        <div class="col-md-5">
                             <input type="text" class="form-control" name="institutos[]" 
-                                   value="<?= htmlspecialchars($value) ?>">
-                            <button type="button" class="btn btn-outline-danger remove-field">
-                                <i class="fas fa-minus"></i>
+                                   value="<?= htmlspecialchars($pair['instituto']) ?>">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-outline-danger w-100 remove-field">
+                                <i class="fas fa-minus"></i> Eliminar
                             </button>
                         </div>
                     </div>
@@ -226,7 +247,6 @@ $docentes = obtenerDocentes();
                                     <select class="custom-select d-block w-100" id="estado_laboral" name="estado_laboral" required>
                                         <option value="Activo" <?= ($_POST['estado_laboral'] ?? '') == 'Activo' ? 'selected' : '' ?>>Activo</option>
                                         <option value="Inactivo" <?= ($_POST['estado_laboral'] ?? '') == 'Inactivo' ? 'selected' : '' ?>>Inactivo</option>
-                                        
                                     </select>
                                 </div>
                             </div>
@@ -276,30 +296,59 @@ $docentes = obtenerDocentes();
                             </div>
                             
                             <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label for="tipo_vivienda" class="form-label">Tipo de Vivienda</label>
-                                    <select class="custom-select d-block w-100" id="tipo_vivienda" name="tipo_vivienda">
-                                        <option value="">Seleccione...</option>
-                                        <option value="Casa" <?= ($_POST['tipo_vivienda'] ?? '') == 'Casa' ? 'selected' : '' ?>>Casa</option>
-                                        <option value="Apartamento" <?= ($_POST['tipo_vivienda'] ?? '') == 'Apartamento' ? 'selected' : '' ?>>Apartamento</option>
-                                        <option value="Quinta" <?= ($_POST['tipo_vivienda'] ?? '') == 'Quinta' ? 'selected' : '' ?>>Quinta</option>
-                                        <option value="Otro" <?= ($_POST['tipo_vivienda'] ?? '') == 'Otro' ? 'selected' : '' ?>>Otro</option>
-                                    </select>
-                                </div>
-                            </div>
+    <div class="mb-3">
+        <label for="tipo_vivienda" class="form-label">Tipo de Vivienda</label>
+        <select class="custom-select d-block w-100" id="tipo_vivienda" name="tipo_vivienda">
+            <option value="">Seleccione...</option>
+            <?php
+            $query = "SELECT id, vivienda FROM tipo_vivienda ORDER BY vivienda";
+            if ($stmt = $db->prepare($query)) {
+                $stmt->execute();
+                $result = $stmt->get_result();
+                
+                while ($row = $result->fetch_assoc()) {
+                    $selected = (isset($_POST['tipo_vivienda']) && $_POST['tipo_vivienda'] == $row['vivienda']) ? 'selected' : '';
+                    echo '<option value="' . htmlspecialchars($row['vivienda']) . '" ' . $selected . '>' 
+                         . htmlspecialchars($row['vivienda']) . '</option>';
+                }
+                
+                $stmt->close();
+            }
+            ?>
+        </select>
+    </div>
+</div>
                             
                             <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label for="tenencia_vivienda" class="form-label">Tenencia de Vivienda</label>
-                                    <select class="custom-select d-block w-100" id="tenencia_vivienda" name="tenencia_vivienda">
-                                        <option value="">Seleccione...</option>
-                                        <option value="Propia" <?= ($_POST['tenencia_vivienda'] ?? '') == 'Propia' ? 'selected' : '' ?>>Propia</option>
-                                        <option value="Alquilada" <?= ($_POST['tenencia_vivienda'] ?? '') == 'Alquilada' ? 'selected' : '' ?>>Alquilada</option>
-                                        <option value="Familiar" <?= ($_POST['tenencia_vivienda'] ?? '') == 'Familiar' ? 'selected' : '' ?>>Familiar</option>
-                                        <option value="Otro" <?= ($_POST['tenencia_vivienda'] ?? '') == 'Otro' ? 'selected' : '' ?>>Otro</option>
-                                    </select>
-                                </div>
-                            </div>
+    <div class="mb-3">
+        <label for="tenencia_vivienda" class="form-label">Tenencia de Vivienda</label>
+        <select class="custom-select d-block w-100" id="tenencia_vivienda" name="tenencia_vivienda">
+            <option value="">Seleccione...</option>
+            <?php
+            try {
+                $query = "SELECT id, tenencia FROM tenencia_vivienda ORDER BY tenencia";
+                if ($stmt = $db->prepare($query)) {
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    
+                    while ($row = $result->fetch_assoc()) {
+                        $selected = (isset($_POST['tenencia_vivienda']) && $_POST['tenencia_vivienda'] == $row['tenencia']) ? 'selected' : '';
+                        echo '<option value="' . htmlspecialchars($row['tenencia']) . '" ' . $selected . '>' 
+                             . htmlspecialchars($row['tenencia']) . '</option>';
+                    }
+                    
+                    $stmt->close();
+                } else {
+                    echo '<option value="">Error al preparar la consulta</option>';
+                }
+            } catch (Exception $e) {
+                echo '<option value="">Error al cargar opciones</option>';
+                error_log("Error en tenencia_vivienda: " . $e->getMessage());
+            }
+            ?>
+        </select>
+    </div>
+</div>
                         </div>
 
                         <!-- Sección 5: Situación Familiar -->
@@ -322,12 +371,18 @@ $docentes = obtenerDocentes();
                             </div>
                             
                             <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="fuente_ingresos" class="form-label">Fuente de Ingresos</label>
-                                    <input type="text" class="form-control" id="fuente_ingresos" name="fuente_ingresos" 
-                                           value="<?= htmlspecialchars($_POST['fuente_ingresos'] ?? '') ?>">
-                                </div>
-                            </div>
+    <div class="mb-3">
+        <label for="fuente_ingresos" class="form-label">Fuente de Ingresos</label>
+        <select class="custom-select d-block w-100" id="fuente_ingresos" name="fuente_ingresos">
+            <option value="">Seleccione una opción</option>
+            <?php 
+            $ingresos = obtenerIngresos($db);
+            foreach ($ingresos as $id => $ingreso): ?>
+                <option value="<?php echo $id; ?>"><?php echo htmlspecialchars($ingreso); ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+</div>
                         </div>
 
                         <!-- Sección 6: Salud -->
@@ -399,69 +454,81 @@ $docentes = obtenerDocentes();
                     </form>
                 </div>
             </div>
+            <?php endif; ?>
+            
+            <!-- Tabla de docentes registrados -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5>Docentes Registrados</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered" id="tablaDocentes">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Documento</th>
+                                    <th>Nombre</th>
+                                    <th>Email</th>
+                                    <th>Contacto</th>
+                                    <th>Estado</th>
+                                    <?php if ($permiso_editar): ?>
+                                    <th>Acciones</th>
+                                    <?php endif; ?>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($docentes as $docente): ?>
+                                <tr>
+                                    <td><?= $docente['id'] ?></td>
+                                    <td><?= $docente['idusuario'] ?></td>
+                                    <td><?= $docente['nombre'] ?></td>
+                                    <td><?= $docente['email'] ?></td>
+                                    <td><?= $docente['tlf'] ?></td>
+                                    <td>
+                                        <span class="badge <?= ($docente['status'] == 1) ? 'bg-success' : 'bg-warning' ?>">
+                                            <?= ($docente['status'] == 1) ? 'Activo' : 'Inactivo' ?>
+                                        </span>
+                                    </td>
+                                    <?php if ($permiso_editar): ?>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary btn-editar" 
+                                                data-id="<?= $docente['id'] ?>" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#modalEditar">
+                                            <i class="fas fa-edit"></i> Editar
+                                        </button>
+                                        <button class="btn btn-sm <?= ($docente['status'] == 1) ? 'btn-warning' : 'btn-success' ?> btn-estado" 
+                                                data-id="<?= $docente['id'] ?>" 
+                                                data-status="<?= $docente['status'] ?>"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#modalEstado">
+                                            <i class="fas <?= ($docente['status'] == 1) ? 'fa-ban' : 'fa-check' ?>"></i> 
+                                            <?= ($docente['status'] == 1) ? 'Deshabilitar' : 'Habilitar' ?>
+                                        </button>
+                                    </td>
+                                    <?php endif; ?>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Tabla de docentes registrados -->
-<div class="container mt-5">
-    <h2>Docentes Registrados</h2>
-    <div class="table-responsive">
-        <table class="table table-striped table-bordered" id="tablaDocentes">
-            <thead class="thead-dark">
-                <tr>
-                    <th>ID</th>
-                    <th>Documento</th>
-                    <th>Nombre</th>
-                    <th>Email</th>
-                    <th>Contacto</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($docentes as $docente): ?>
-                <tr>
-                    <td><?= $docente['id'] ?></td>
-                    <td><?= $docente['idusuario'] ?></td>
-                    <td><?= $docente['nombre'] ?></td>
-                    <td><?= $docente['email'] ?></td>
-                    <td><?= $docente['tlf'] ?></td>
-                    <td>
-                        <span class="badge <?= ($docente['status'] == 1) ? 'bg-success' : 'bg-warning' ?>">
-                            <?= ($docente['status'] == 1) ? 'Activo' : 'Inactivo' ?>
-                        </span>
-                    </td>
-                    <td>
-                        <button class="btn btn-sm btn-primary btn-editar" 
-                                data-id="<?= $docente['id'] ?>" 
-                                data-bs-toggle="modal" 
-                                data-bs-target="#modalEditar">
-                            <i class="fas fa-edit"></i> Editar
-                        </button>
-                        <button class="btn btn-sm <?= ($docente['status'] == 1) ? 'btn-warning' : 'btn-success' ?> btn-estado" 
-                                data-id="<?= $docente['id'] ?>" 
-                                data-status="<?= $docente['status'] ?>"
-                                data-bs-toggle="modal" 
-                                data-bs-target="#modalEstado">
-                            <i class="fas <?= ($docente['status'] == 1) ? 'fa-ban' : 'fa-check' ?>"></i> 
-                            <?= ($docente['status'] == 1) ? 'Deshabilitar' : 'Habilitar' ?>
-                        </button>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
+<?php if ($permiso_editar): ?>
 <!-- Modal para Editar Docente -->
 <div class="modal fade" id="modalEditar" tabindex="-1" aria-labelledby="modalEditarLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="modalEditarLabel">Editar Docente</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+               <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+  <span aria-hidden="true">&times;</span>
+</button>
             </div>
             <div class="modal-body" id="contenidoModalEditar">
                 <!-- El contenido se cargará aquí via AJAX -->
@@ -472,21 +539,19 @@ $docentes = obtenerDocentes();
                     <p>Cargando información del docente...</p>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="guardarCambios">Guardar Cambios</button>
-            </div>
         </div>
     </div>
 </div>
 
 <!-- Modal para Cambiar Estado -->
-<div class="modal fade" id="modalEstado" tabindex="-1" aria-labelledby="modalEstadoLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<div class="modal fade" id="modalEstado" tabindex="-1" role="dialog" aria-labelledby="modalEstadoLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header bg-warning text-white">
                 <h5 class="modal-title" id="modalEstadoLabel">Cambiar Estado del Docente</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <div class="modal-body">
                 <p id="textoConfirmacion">¿Está seguro que desea cambiar el estado de este docente?</p>
@@ -494,32 +559,76 @@ $docentes = obtenerDocentes();
                 <input type="hidden" id="nuevoEstado">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-warning" id="confirmarCambioEstado">Confirmar</button>
             </div>
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <?php include("includes/footer.php"); ?>
 
-<!-- Script para manejar la adición de campos -->
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Función para añadir nuevos campos
+    // Función para añadir títulos e instituciones juntos
+    document.getElementById('addTituloInstituto').addEventListener('click', function() {
+        const titulo = document.getElementById('titulos').value;
+        const instituto = document.getElementById('institutos').value;
+        
+        if(titulo.trim() === '' || instituto.trim() === '') {
+            alert('Por favor ingrese tanto el título como la institución');
+            return;
+        }
+        
+        const container = document.getElementById('titulosInstitutosContainer');
+        
+        const newRow = document.createElement('div');
+        newRow.className = 'row g-3 mb-3';
+        newRow.innerHTML = `
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="titulos[]" value="${titulo.replace(/"/g, '&quot;')}">
+            </div>
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="institutos[]" value="${instituto.replace(/"/g, '&quot;')}">
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-danger w-100 remove-field">
+                    <i class="fas fa-minus"></i> Eliminar
+                </button>
+            </div>
+        `;
+        
+        container.appendChild(newRow);
+        
+        // Limpiar los campos principales
+        document.getElementById('titulos').value = '';
+        document.getElementById('institutos').value = '';
+    });
+
+    // Delegación de eventos para los botones de eliminar
+    document.getElementById('titulosInstitutosContainer').addEventListener('click', function(e) {
+        if(e.target.classList.contains('remove-field') || e.target.closest('.remove-field')) {
+            const button = e.target.classList.contains('remove-field') ? e.target : e.target.closest('.remove-field');
+            button.closest('.row').remove();
+        }
+    });
+
+    // Función para añadir nuevos campos individuales
     function addField(containerId, inputId, namePrefix, placeholder, buttonId) {
         const container = document.getElementById(containerId);
         const mainInput = document.getElementById(inputId);
         const value = mainInput.value.trim();
         
-        if(value === '') return; // No añadir si está vacío
+        if(value === '') return;
         
         const newField = document.createElement('div');
         newField.className = 'mb-3';
         newField.innerHTML = `
             <div class="input-group">
                 <input type="text" class="form-control" name="${namePrefix}[]" 
-                       value="${value}" placeholder="${placeholder}" readonly>
+                       value="${value}" placeholder="${placeholder}">
                 <button type="button" class="btn btn-outline-danger remove-field">
                     <i class="fas fa-minus"></i>
                 </button>
@@ -527,30 +636,16 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         container.appendChild(newField);
         
-        // Vaciar el campo principal
         mainInput.value = '';
         mainInput.focus();
-        
-        // Añadir evento para eliminar campo
-        newField.querySelector('.remove-field').addEventListener('click', function() {
-            container.removeChild(newField);
-        });
     }
     
-    // Eventos para los botones de añadir
+    // Evento para añadir potencialidades
     document.getElementById('addPotencialidad').addEventListener('click', function() {
-        addField('potencialidadesContainer', 'especialidad', 'especialidad', 'Potencialidad', 'potencialidades');
+        addField('potencialidadesContainer', 'especialidad', 'potencialidades', 'Especialidad/Potencialidad', 'addPotencialidad');
     });
     
-    document.getElementById('addTitulo').addEventListener('click', function() {
-        addField('titulosContainer', 'titulos', 'titulos', 'Título obtenido', 'titulos');
-    });
-    
-    document.getElementById('addInstituto').addEventListener('click', function() {
-        addField('institutosContainer', 'institutos', 'institutos', 'Institución', 'institutos');
-    });
-    
-    // Manejar el evento Enter en los campos principales
+    // Manejar el evento Enter en los campos
     document.getElementById('especialidad').addEventListener('keypress', function(e) {
         if(e.key === 'Enter') {
             e.preventDefault();
@@ -561,23 +656,17 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('titulos').addEventListener('keypress', function(e) {
         if(e.key === 'Enter') {
             e.preventDefault();
-            document.getElementById('addTitulo').click();
+            document.getElementById('addTituloInstituto').click();
         }
     });
     
     document.getElementById('institutos').addEventListener('keypress', function(e) {
         if(e.key === 'Enter') {
             e.preventDefault();
-            document.getElementById('addInstituto').click();
+            document.getElementById('addTituloInstituto').click();
         }
     });
-});
 
-
-
-
-  // Script para los modales y acciones de la tabla
-    
     // Configurar DataTable
     $('#tablaDocentes').DataTable({
         language: {
@@ -591,13 +680,13 @@ document.addEventListener('DOMContentLoaded', function() {
         var docenteId = $(this).data('id');
         $('#modalEditar').modal('show');
         
-        // Cargar el formulario de edición via AJAX
         $.ajax({
             url: 'cargar_formulario_edicion.php',
             type: 'GET',
             data: {id: docenteId},
             success: function(response) {
                 $('#contenidoModalEditar').html(response);
+                setupDynamicFieldsInModal();
             },
             error: function() {
                 $('#contenidoModalEditar').html(
@@ -606,6 +695,48 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // Función para configurar campos dinámicos en el modal de edición
+    function setupDynamicFieldsInModal() {
+        // Configurar el botón para agregar títulos e institutos juntos en el modal
+        $('#addTituloInstitutoEdit').on('click', function() {
+            const titulo = $('#titulosEdit').val();
+            const instituto = $('#institutosEdit').val();
+            
+            if(titulo.trim() === '' || instituto.trim() === '') {
+                alert('Por favor ingrese tanto el título como la institución');
+                return;
+            }
+            
+            const container = $('#titulosInstitutosContainerEdit');
+            
+            const newRow = $(`
+                <div class="row g-3 mb-3">
+                    <div class="col-md-5">
+                        <input type="text" class="form-control" name="titulos[]" value="${titulo.replace(/"/g, '&quot;')}">
+                    </div>
+                    <div class="col-md-5">
+                        <input type="text" class="form-control" name="institutos[]" value="${instituto.replace(/"/g, '&quot;')}">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-outline-danger w-100 remove-field">
+                            <i class="fas fa-minus"></i> Eliminar
+                        </button>
+                    </div>
+                </div>
+            `);
+            
+            container.append(newRow);
+            
+            $('#titulosEdit').val('');
+            $('#institutosEdit').val('');
+        });
+        
+        // Eliminar campos en el modal
+        $(document).on('click', '.remove-field', function() {
+            $(this).closest('.row, .mb-3').remove();
+        });
+    }
     
     // Guardar cambios en el modal de edición
     $('#guardarCambios').click(function() {
@@ -619,7 +750,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 var result = JSON.parse(response);
                 if(result.success) {
                     $('#modalEditar').modal('hide');
-                    location.reload(); // Recargar para ver cambios
+                    location.reload();
                 } else {
                     alert('Error: ' + result.message);
                 }
@@ -639,11 +770,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         $('#docenteId').val(docenteId);
         $('#nuevoEstado').val(nuevoStatus);
-        
-        // Actualizar texto del modal según la acción
-        $('#textoConfirmacion').text(
-            `¿Está seguro que desea ${accion} este docente?`
-        );
+        $('#textoConfirmacion').text(`¿Está seguro que desea ${accion} este docente?`);
+        $('#modalEstado').modal('show');
     });
     
     // Confirmar cambio de estado
@@ -654,17 +782,14 @@ document.addEventListener('DOMContentLoaded', function() {
         $.ajax({
             url: 'cambiar_estado_docente.php',
             type: 'POST',
-            data: {
-                id: docenteId,
-                status: nuevoEstado
-            },
+            dataType: 'json',
+            data: {id: docenteId, status: nuevoEstado},
             success: function(response) {
-                var result = JSON.parse(response);
-                if(result.success) {
+                if(response.success) {
                     $('#modalEstado').modal('hide');
-                    location.reload(); // Recargar para ver cambios
+                    location.reload();
                 } else {
-                    alert('Error: ' + result.message);
+                    alert('Error: ' + (response.message || 'No se pudo cambiar el estado.'));
                 }
             },
             error: function() {
@@ -672,5 +797,5 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-
+});
 </script>

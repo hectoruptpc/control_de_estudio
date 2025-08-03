@@ -5,6 +5,13 @@ ini_set('display_errors', '1');
 $titulopag = "Agregar Estudiante";
 require_once('../funciones/functions.php');
 
+// Obtener los datos necesarios usando las nuevas funciones
+$tiposCedula = obtenerTiposCedula($db);
+$estadosCiviles = obtenerEstadosCiviless($db);
+$tiposVivienda = obtenerTiposVivienda($db);
+$tenenciasVivienda = obtenerTenenciaViviendas($db);
+$opcionesStatus = obtenerOpcionesStatus($db);
+
 // Procesar el formulario cuando se envía
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Verificar si es una carga masiva de CSV
@@ -84,30 +91,33 @@ include("includes/head.php");
                         <div class="tab-pane fade show active" id="individual" role="tabpanel" aria-labelledby="individual-tab">
                             <form id="formEstudiante" method="post" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
                                 <!-- Sección 1: Identificación -->
-                                <h5 class="mb-3"><i class="fas fa-id-card me-2"></i> Identificación</h5>
-                                <div class="row g-3 mb-4">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="cedula_completa" class="form-label required">Cédula</label>
-                                            <div class="input-group">
-                                                <select class="form-select" id="tipo_cedula" style="max-width: 80px;">
-                                                    <option value="V">V-</option>
-                                                    <option value="E">E-</option>
-                                                </select>
-                                                <input type="text" class="form-control" id="numero_cedula" placeholder="Ej: 30692052" required>
-                                                <input type="hidden" id="idusuario" name="idusuario">
-                                            </div>
-                                            <small class="text-muted">Formato: V-12345678 o E-12345678</small>
-                                        </div>
-                                    </div>
-                                   
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="nombre" class="form-label required">Nombre Completo</label>
-                                            <input type="text" class="form-control" id="nombre" name="nombre" required>
-                                        </div>
-                                    </div>
-                                </div>
+<h5 class="mb-3"><i class="fas fa-id-card me-2"></i> Identificación</h5>
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="mb-3">
+            <label for="nombre" class="form-label required">Nombre Completo</label>
+            <input type="text" class="form-control" id="nombre" name="nombre" required>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="mb-3">
+            <label for="cedula_completa" class="form-label required">Cédula</label>
+            <div class="input-group">
+                <select class="form-select" id="tipo_cedula" name="tipo_cedula" style="max-width: 80px;">
+                    <?php foreach ($tiposCedula as $tipo): ?>
+                        <option value="<?php echo htmlspecialchars($tipo['tipo']); ?>">
+                            <?php echo htmlspecialchars($tipo['tipo']); ?>-
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <input type="text" class="form-control" id="numero_cedula" name="numero_cedula" placeholder="Ej: 12345678" required>
+                <input type="hidden" id="idusuario" name="idusuario">
+            </div>
+            <small class="text-muted">Formato: V-12345678 o E-12345678</small>
+        </div>
+    </div>
+</div>
 
                                 <!-- Sección 2: Datos Personales -->
                                 <h5 class="mb-3"><i class="fas fa-user-tag me-2"></i> Datos Personales</h5>
@@ -116,11 +126,6 @@ include("includes/head.php");
                                         <div class="mb-3">
                                             <label for="fecha_nac" class="form-label required">Fecha de Nacimiento</label>
                                             <input type="date" class="form-control" id="fecha_nac" name="fecha_nac" required>
-                                        </div>
-                                        
-                                        <div class="mb-3">
-                                            <label for="edad" class="form-label required">Edad</label>
-                                            <input type="number" class="form-control" id="edad" name="edad" min="15" max="100" required>
                                         </div>
                                         
                                         <div class="mb-3">
@@ -147,7 +152,7 @@ include("includes/head.php");
                                             <label for="edo_civil" class="form-label required">Estado Civil</label>
                                             <select class="custom-select d-block w-100" id="edo_civil" name="edo_civil" required>
                                                 <option value="" selected disabled>Seleccione una opción</option>
-                                                <?php foreach (obtenerEstadosCiviles() as $estadoCivil): ?>
+                                                <?php foreach ($estadosCiviles as $id => $estadoCivil): ?>
                                                     <option value="<?php echo htmlspecialchars($estadoCivil); ?>"><?php echo htmlspecialchars($estadoCivil); ?></option>
                                                 <?php endforeach; ?>
                                             </select>
@@ -181,17 +186,61 @@ include("includes/head.php");
                                         </div>
                                     </div>
                                     
+                                    <!-- Títulos Obtenidos -->
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label for="titulos" class="form-label">Títulos Obtenidos</label>
-                                            <input type="text" class="form-control" id="titulos" name="titulos" placeholder="Separados por comas si son varios">
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="titulos" name="titulos_main" 
+                                                       value="<?= htmlspecialchars($_POST['titulos_main'] ?? '') ?>" placeholder="Títulos obtenidos">
+                                                <button type="button" class="btn btn-outline-primary" id="addTitulo">
+                                                    <i class="fas fa-plus"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div id="titulosContainer">
+                                            <?php if(!empty($_POST['titulos'])): ?>
+                                                <?php foreach($_POST['titulos'] as $value): ?>
+                                                    <div class="mb-3">
+                                                        <div class="input-group">
+                                                            <input type="text" class="form-control" name="titulos[]" 
+                                                                   value="<?= htmlspecialchars($value) ?>">
+                                                            <button type="button" class="btn btn-outline-danger remove-field">
+                                                                <i class="fas fa-minus"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                     
+                                    <!-- Instituciones -->
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label for="institutos" class="form-label">Instituciones</label>
-                                            <input type="text" class="form-control" id="institutos" name="institutos" placeholder="Instituciones donde obtuvo los títulos">
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="institutos" name="institutos_main" 
+                                                       value="<?= htmlspecialchars($_POST['institutos_main'] ?? '') ?>" placeholder="Instituciones donde obtuvo los títulos">
+                                                <button type="button" class="btn btn-outline-primary" id="addInstituto">
+                                                    <i class="fas fa-plus"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div id="institutosContainer">
+                                            <?php if(!empty($_POST['institutos'])): ?>
+                                                <?php foreach($_POST['institutos'] as $value): ?>
+                                                    <div class="mb-3">
+                                                        <div class="input-group">
+                                                            <input type="text" class="form-control" name="institutos[]" 
+                                                                   value="<?= htmlspecialchars($value) ?>">
+                                                            <button type="button" class="btn btn-outline-danger remove-field">
+                                                                <i class="fas fa-minus"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 </div>
@@ -226,10 +275,9 @@ include("includes/head.php");
                                             <label for="casaapto" class="form-label">Tipo de Vivienda</label>
                                             <select class="form-control" id="casaapto" name="casaapto">
                                                 <option value="">Seleccione...</option>
-                                                <option value="Casa">Casa</option>
-                                                <option value="Apartamento">Apartamento</option>
-                                                <option value="Quinta">Quinta</option>
-                                                <option value="Otro">Otro</option>
+                                                <?php foreach ($tiposVivienda as $id => $vivienda): ?>
+                                                    <option value="<?php echo htmlspecialchars($vivienda); ?>"><?php echo htmlspecialchars($vivienda); ?></option>
+                                                <?php endforeach; ?>
                                             </select>
                                         </div>
                                         
@@ -269,10 +317,9 @@ include("includes/head.php");
                                             <label for="tenencia_vivienda" class="form-label">Tenencia de Vivienda</label>
                                             <select class="form-control" id="tenencia_vivienda" name="tenencia_vivienda">
                                                 <option value="">Seleccione...</option>
-                                                <option value="Propia">Propia</option>
-                                                <option value="Alquilada">Alquilada</option>
-                                                <option value="Familiar">Familiar</option>
-                                                <option value="Otro">Otro</option>
+                                                <?php foreach ($tenenciasVivienda as $id => $tenencia): ?>
+                                                    <option value="<?php echo htmlspecialchars($tenencia); ?>"><?php echo htmlspecialchars($tenencia); ?></option>
+                                                <?php endforeach; ?>
                                             </select>
                                         </div>
                                     </div>
@@ -339,8 +386,9 @@ include("includes/head.php");
                                             <label for="status" class="form-label required">Status</label>
                                             <select class="custom-select d-block w-100" id="status" name="status" required>
                                                 <option value="" selected disabled>Seleccione un status</option>
-                                                <option value="1">Activo</option>
-                                                <option value="0">Inactivo</option>
+                                                <?php foreach ($opcionesStatus as $valor => $texto): ?>
+                                                    <option value="<?php echo htmlspecialchars($valor); ?>"><?php echo htmlspecialchars($texto); ?></option>
+                                                <?php endforeach; ?>
                                             </select>
                                         </div>
                                     </div>
@@ -460,6 +508,64 @@ $(document).ready(function() {
     if (urlParams.get('tab') === 'masivo') {
         $('#masivo-tab').tab('show');
     }
+});
+
+// Script para manejar la adición de campos
+document.addEventListener('DOMContentLoaded', function() {
+    // Función para añadir nuevos campos
+    function addField(containerId, inputId, namePrefix, placeholder, buttonId) {
+        const container = document.getElementById(containerId);
+        const mainInput = document.getElementById(inputId);
+        const value = mainInput.value.trim();
+        
+        if(value === '') return; // No añadir si está vacío
+        
+        const newField = document.createElement('div');
+        newField.className = 'mb-3';
+        newField.innerHTML = `
+            <div class="input-group">
+                <input type="text" class="form-control" name="${namePrefix}[]" 
+                       value="${value}" placeholder="${placeholder}" readonly>
+                <button type="button" class="btn btn-outline-danger remove-field">
+                    <i class="fas fa-minus"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(newField);
+        
+        // Vaciar el campo principal
+        mainInput.value = '';
+        mainInput.focus();
+        
+        // Añadir evento para eliminar campo
+        newField.querySelector('.remove-field').addEventListener('click', function() {
+            container.removeChild(newField);
+        });
+    }
+    
+    // Eventos para los botones de añadir
+    document.getElementById('addTitulo').addEventListener('click', function() {
+        addField('titulosContainer', 'titulos', 'titulos', 'Título obtenido', 'titulos');
+    });
+    
+    document.getElementById('addInstituto').addEventListener('click', function() {
+        addField('institutosContainer', 'institutos', 'institutos', 'Institución', 'institutos');
+    });
+    
+    // Manejar el evento Enter en los campos principales
+    document.getElementById('titulos').addEventListener('keypress', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('addTitulo').click();
+        }
+    });
+    
+    document.getElementById('institutos').addEventListener('keypress', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('addInstituto').click();
+        }
+    });
 });
 </script>
 
