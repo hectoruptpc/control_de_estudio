@@ -114,56 +114,134 @@ if(isset($_POST['ajax_request']) && $_POST['ajax_request'] == 'get_recomendacion
     $recomendaciones_html = '';
     
     if($id_materia > 0) {
-        // Obtener títulos relacionados con la materia ordenados por prioridad
-        $query = "SELECT tm.id_titulo, t.nombre, tm.prioridad 
-                  FROM titulo_materia tm
-                  JOIN titulos t ON tm.id_titulo = t.id
-                  WHERE tm.id_materia = ?
-                  ORDER BY tm.prioridad DESC";
-        $stmt = $db->prepare($query);
+        // Obtener información de la materia
+        $query_materia = "SELECT nombre_materia FROM materias WHERE id_materia = ?";
+        $stmt = $db->prepare($query_materia);
         $stmt->bind_param("i", $id_materia);
         $stmt->execute();
-        $titulos_relacionados = $stmt->get_result();
+        $materia_result = $stmt->get_result();
         
-        if($titulos_relacionados->num_rows > 0) {
-            $recomendaciones_html .= "<h5>Profesores recomendados para esta materia:</h5>";
-            $recomendaciones_html .= "<p>Basado en títulos relacionados:</p>";
-            $recomendaciones_html .= "<ul>";
+        if($materia_result->num_rows > 0) {
+            $materia = $materia_result->fetch_assoc();
+            $nombre_materia = $materia['nombre_materia'];
             
-            while($titulo = $titulos_relacionados->fetch_assoc()) {
-                $recomendaciones_html .= "<li><strong>".htmlspecialchars($titulo['nombre'])."</strong> (Prioridad: ".htmlspecialchars($titulo['prioridad']).")";
+            // Primero: Buscar por títulos relacionados en titulo_materia
+            $query_titulos = "SELECT tm.id_titulo, t.nombre, tm.prioridad 
+                             FROM titulo_materia tm
+                             JOIN titulos t ON tm.id_titulo = t.id
+                             WHERE tm.id_materia = ?
+                             ORDER BY tm.prioridad DESC";
+            $stmt = $db->prepare($query_titulos);
+            $stmt->bind_param("i", $id_materia);
+            $stmt->execute();
+            $titulos_relacionados = $stmt->get_result();
+            
+            if($titulos_relacionados->num_rows > 0) {
+                $recomendaciones_html .= "<div class='recommendation-section'>";
+                $recomendaciones_html .= "<h5><i class='fas fa-graduation-cap'></i> Profesores recomendados para $nombre_materia</h5>";
+                $recomendaciones_html .= "<p class='text-muted'>Basado en títulos académicos relacionados:</p>";
                 
-                // Buscar profesores con este título
-                $query_profesores = "SELECT u.id, u.nombre, u.idusuario 
-                                    FROM users u
-                                    WHERE u.docente = 1 AND u.titulos LIKE ?";
-                $stmt_prof = $db->prepare($query_profesores);
-                $like_param = "%".$titulo['id_titulo']."%";
-                $stmt_prof->bind_param("s", $like_param);
-                $stmt_prof->execute();
-                $result_profesores = $stmt_prof->get_result();
-                
-                if($result_profesores->num_rows > 0) {
-                    $recomendaciones_html .= "<ul>";
-                    while($profesor = $result_profesores->fetch_assoc()) {
-                        $recomendaciones_html .= "<li>".htmlspecialchars($profesor['nombre'])." (".htmlspecialchars($profesor['idusuario']).") - 
-                              <a href='#' class='btn btn-sm btn-success asignar-rapido' data-profesor='".htmlspecialchars($profesor['id'])."' data-materia='".htmlspecialchars($id_materia)."'>Asignar</a></li>";
+                while($titulo = $titulos_relacionados->fetch_assoc()) {
+                    $recomendaciones_html .= "<div class='recommendation-group mb-3'>";
+                    $recomendaciones_html .= "<h6 class='recommendation-title'><strong>".htmlspecialchars($titulo['nombre'])."</strong> <span class='badge badge-primary'>Prioridad: ".$titulo['prioridad']."</span></h6>";
+                    
+                    // Buscar profesores con este título en titulos_obtenidos
+                    $query_profesores = "SELECT u.id, u.nombre, u.idusuario, tit.titulo_obtenido, tit.instituto
+                                        FROM users u
+                                        JOIN titulos_obtenidos tit ON u.id = tit.id_usuario
+                                        WHERE u.docente = 1 AND tit.titulo_obtenido LIKE ?
+                                        ORDER BY u.nombre";
+                    $stmt_prof = $db->prepare($query_profesores);
+                    $like_param = "%".$titulo['nombre']."%";
+                    $stmt_prof->bind_param("s", $like_param);
+                    $stmt_prof->execute();
+                    $profesores = $stmt_prof->get_result();
+                    
+                    if($profesores->num_rows > 0) {
+                        $recomendaciones_html .= "<ul class='professor-list'>";
+                        while($profesor = $profesores->fetch_assoc()) {
+                            $recomendaciones_html .= "<li class='professor-item'>";
+                            $recomendaciones_html .= "<div class='professor-info'>";
+                            $recomendaciones_html .= "<strong>".htmlspecialchars($profesor['nombre'])."</strong> (".htmlspecialchars($profesor['idusuario']).")";
+                            $recomendaciones_html .= "<div class='degree-info'><small>Título: ".htmlspecialchars($profesor['titulo_obtenido'])."</small></div>";
+                            $recomendaciones_html .= "<div class='institute-info'><small>Institución: ".htmlspecialchars($profesor['instituto'])."</small></div>";
+                            $recomendaciones_html .= "</div>";
+                            $recomendaciones_html .= "<a href='#' class='btn btn-sm btn-success asignar-rapido' data-profesor='".$profesor['id']."' data-materia='$id_materia'>";
+                            $recomendaciones_html .= "<i class='fas fa-plus-circle'></i> Asignar";
+                            $recomendaciones_html .= "</a>";
+                            $recomendaciones_html .= "</li>";
+                        }
+                        $recomendaciones_html .= "</ul>";
+                    } else {
+                        $recomendaciones_html .= "<div class='alert alert-light'>No hay profesores con este título específico.</div>";
                     }
-                    $recomendaciones_html .= "</ul>";
-                } else {
-                    $recomendaciones_html .= "<p class='text-muted'>No hay profesores con este título.</p>";
+                    
+                    $recomendaciones_html .= "</div>"; // .recommendation-group
+                }
+                $recomendaciones_html .= "</div>"; // .recommendation-section
+            }
+            
+            // Segundo: Búsqueda por palabras clave en el nombre de la materia
+            $palabras_clave = explode(" ", $nombre_materia);
+            $condiciones = [];
+            $params = [];
+            
+            foreach($palabras_clave as $palabra) {
+                if(strlen(trim($palabra)) > 3) { // Ignorar palabras muy cortas
+                    $condiciones[] = "tit.titulo_obtenido LIKE ?";
+                    $params[] = "%".trim($palabra)."%";
                 }
             }
             
-            $recomendaciones_html .= "</ul>";
+            if(!empty($condiciones)) {
+                $query_palabras = "SELECT DISTINCT u.id, u.nombre, u.idusuario, tit.titulo_obtenido, tit.instituto
+                                 FROM users u
+                                 JOIN titulos_obtenidos tit ON u.id = tit.id_usuario
+                                 WHERE u.docente = 1 AND (".implode(" OR ", $condiciones).")
+                                 ORDER BY u.nombre";
+                
+                $stmt_palabras = $db->prepare($query_palabras);
+                if($stmt_palabras) {
+                    $tipos = str_repeat("s", count($params));
+                    $stmt_palabras->bind_param($tipos, ...$params);
+                    $stmt_palabras->execute();
+                    $profesores_palabras = $stmt_palabras->get_result();
+                    
+                    if($profesores_palabras->num_rows > 0) {
+                        $recomendaciones_html .= "<div class='recommendation-section mt-4'>";
+                        $recomendaciones_html .= "<h5><i class='fas fa-search'></i> Otras coincidencias por título</h5>";
+                        $recomendaciones_html .= "<p class='text-muted'>Profesores con títulos que contienen palabras clave de la materia:</p>";
+                        $recomendaciones_html .= "<ul class='professor-list'>";
+                        
+                        while($profesor = $profesores_palabras->fetch_assoc()) {
+                            $recomendaciones_html .= "<li class='professor-item'>";
+                            $recomendaciones_html .= "<div class='professor-info'>";
+                            $recomendaciones_html .= "<strong>".htmlspecialchars($profesor['nombre'])."</strong> (".htmlspecialchars($profesor['idusuario']).")";
+                            $recomendaciones_html .= "<div class='degree-info'><small>Título: ".htmlspecialchars($profesor['titulo_obtenido'])."</small></div>";
+                            $recomendaciones_html .= "<div class='institute-info'><small>Institución: ".htmlspecialchars($profesor['instituto'])."</small></div>";
+                            $recomendaciones_html .= "</div>";
+                            $recomendaciones_html .= "<a href='#' class='btn btn-sm btn-success asignar-rapido' data-profesor='".$profesor['id']."' data-materia='$id_materia'>";
+                            $recomendaciones_html .= "<i class='fas fa-plus-circle'></i> Asignar";
+                            $recomendaciones_html .= "</a>";
+                            $recomendaciones_html .= "</li>";
+                        }
+                        
+                        $recomendaciones_html .= "</ul>";
+                        $recomendaciones_html .= "</div>"; // .recommendation-section
+                    }
+                }
+            }
+            
+            if(empty($recomendaciones_html)) {
+                $recomendaciones_html .= "<div class='alert alert-info'>No hay recomendaciones específicas para esta materia. Seleccione un profesor manualmente.</div>";
+            }
         } else {
-            $recomendaciones_html .= "<div class='alert alert-info'>No hay títulos relacionados registrados para esta materia.</div>";
+            $recomendaciones_html .= "<div class='alert alert-warning'>Materia no encontrada.</div>";
         }
     } else {
         $recomendaciones_html .= "<div class='alert alert-warning'>ID de materia no válido.</div>";
     }
     
-    // Si es una solicitud AJAX, devolver solo las recomendaciones y terminar
     echo $recomendaciones_html;
     exit();
 }
@@ -180,13 +258,13 @@ include("includes/head.php");
             
             <!-- Sección de Asignaciones Actuales -->
             <div class="card mb-4">
-                <div class="card-header">
+                <div class="card-header bg-primary text-white">
                     <i class="fas fa-list"></i> Asignaciones Actuales
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
-                            <thead>
+                        <table class="table table-bordered table-hover" id="dataTable" width="100%" cellspacing="0">
+                            <thead class="thead-dark">
                                 <tr>
                                     <th>Docente</th>
                                     <th>Materia</th>
@@ -203,18 +281,18 @@ include("includes/head.php");
                                         <td><?php echo htmlspecialchars($asignacion['nombre_materia']); ?></td>
                                         <td><?php echo htmlspecialchars($asignacion['cod_materia']); ?></td>
                                         <td><?php echo date('d/m/Y', strtotime($asignacion['fecha_asignacion'])); ?></td>
-                                        <td>
+                                        <td class="action-buttons">
                                             <button class="btn btn-sm btn-primary editar-asignacion" 
                                                     data-toggle="modal" 
                                                     data-target="#modalEditar"
-                                                    data-id="<?php echo htmlspecialchars($asignacion['id']); ?>"
+                                                    data-id="<?php echo $asignacion['id']; ?>"
                                                     data-profesor="<?php echo htmlspecialchars($asignacion['nombre_profesor']); ?>"
                                                     data-materia="<?php echo htmlspecialchars($asignacion['nombre_materia']); ?>"
-                                                    data-id-materia="<?php echo htmlspecialchars($asignacion['id_materia']); ?>">
-                                                <i class="fas fa-edit"></i> Cambiar Materia
+                                                    data-id-materia="<?php echo $asignacion['id_materia']; ?>">
+                                                <i class="fas fa-edit"></i> Cambiar
                                             </button>
                                             
-                                            <a href="?eliminar=<?php echo htmlspecialchars($asignacion['id']); ?>" 
+                                            <a href="?eliminar=<?php echo $asignacion['id']; ?>" 
                                                class="btn btn-sm btn-danger"
                                                onclick="return confirm('¿Estás seguro de eliminar esta asignación?')">
                                                 <i class="fas fa-trash"></i> Eliminar
@@ -237,9 +315,9 @@ include("includes/head.php");
             <div class="modal fade" id="modalEditar" tabindex="-1" role="dialog" aria-labelledby="modalEditarLabel" aria-hidden="true">
                 <div class="modal-dialog" role="document">
                     <div class="modal-content">
-                        <div class="modal-header">
+                        <div class="modal-header bg-primary text-white">
                             <h5 class="modal-title" id="modalEditarLabel">Editar Asignación</h5>
-                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>
@@ -263,7 +341,7 @@ include("includes/head.php");
                                         
                                         if($result && $result->num_rows > 0) {
                                             while($row = $result->fetch_assoc()) {
-                                                echo "<option value='".htmlspecialchars($row['id_materia'])."'>".htmlspecialchars($row['nombre_materia'])."</option>";
+                                                echo "<option value='".$row['id_materia']."'>".htmlspecialchars($row['nombre_materia'])."</option>";
                                             }
                                         }
                                         ?>
@@ -282,7 +360,7 @@ include("includes/head.php");
 
             <!-- Sección para Asignar Nueva Materia -->
             <div class="card mb-4">
-                <div class="card-header">
+                <div class="card-header bg-success text-white">
                     <i class="fas fa-chalkboard-teacher"></i> Asignar Nueva Materia
                 </div>
                 <div class="card-body">
@@ -298,7 +376,7 @@ include("includes/head.php");
                                     
                                     if($result && $result->num_rows > 0) {
                                         while($row = $result->fetch_assoc()) {
-                                            echo "<option value='".htmlspecialchars($row['id'])."'>".htmlspecialchars($row['nombre'])." (".htmlspecialchars($row['idusuario']).")</option>";
+                                            echo "<option value='".$row['id']."'>".htmlspecialchars($row['nombre'])." (".htmlspecialchars($row['idusuario']).")</option>";
                                         }
                                     }
                                     ?>
@@ -315,7 +393,7 @@ include("includes/head.php");
                                     
                                     if($result && $result->num_rows > 0) {
                                         while($row = $result->fetch_assoc()) {
-                                            echo "<option value='".htmlspecialchars($row['id_materia'])."'>".htmlspecialchars($row['nombre_materia'])." (".htmlspecialchars($row['cod_materia']).")</option>";
+                                            echo "<option value='".$row['id_materia']."'>".htmlspecialchars($row['nombre_materia'])." (".htmlspecialchars($row['cod_materia']).")</option>";
                                         }
                                     }
                                     ?>
@@ -323,15 +401,17 @@ include("includes/head.php");
                             </div>
                         </div>
                         
-                        <button type="submit" name="asignar_materia" class="btn btn-primary">Asignar Materia</button>
+                        <button type="submit" name="asignar_materia" class="btn btn-success">
+                            <i class="fas fa-save"></i> Asignar Materia
+                        </button>
                     </form>
                 </div>
             </div>
             
             <!-- Sección de Recomendaciones -->
             <div class="card mb-4">
-                <div class="card-header">
-                    <i class="fas fa-graduation-cap"></i> Recomendaciones por Títulos
+                <div class="card-header bg-info text-white">
+                    <i class="fas fa-graduation-cap"></i> Recomendaciones por Títulos Académicos
                 </div>
                 <div class="card-body">
                     <div class="form-group">
@@ -344,7 +424,7 @@ include("includes/head.php");
                             
                             if($result && $result->num_rows > 0) {
                                 while($row = $result->fetch_assoc()) {
-                                    echo "<option value='".htmlspecialchars($row['id_materia'])."'>".htmlspecialchars($row['nombre_materia'])."</option>";
+                                    echo "<option value='".$row['id_materia']."'>".htmlspecialchars($row['nombre_materia'])."</option>";
                                 }
                             }
                             ?>
@@ -360,13 +440,70 @@ include("includes/head.php");
     </div>
 </div>
 
-<?php 
-// Asegurarse de incluir jQuery y Bootstrap JS antes del script personalizado
-if(!isset($no_footer_scripts)) {
-    echo '<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>';
-    echo '<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>';
+<style>
+.recommendation-section {
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-left: 4px solid #007bff;
 }
-?>
+
+.recommendation-group {
+    margin-bottom: 15px;
+}
+
+.recommendation-title {
+    color: #0056b3;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.professor-list {
+    list-style: none;
+    padding: 0;
+}
+
+.professor-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.3s;
+}
+
+.professor-item:hover {
+    background-color: #f1f1f1;
+}
+
+.professor-info {
+    flex-grow: 1;
+    margin-right: 15px;
+}
+
+.degree-info, .institute-info {
+    font-size: 0.85em;
+    color: #6c757d;
+}
+
+.action-buttons {
+    white-space: nowrap;
+}
+
+.action-buttons .btn {
+    margin: 0 2px;
+}
+
+.badge-primary {
+    background-color: #007bff;
+}
+
+#resultados-recomendaciones {
+    min-height: 100px;
+}
+</style>
 
 <script>
 $(document).ready(function() {
@@ -383,14 +520,25 @@ $(document).ready(function() {
                     id_materia: id_materia
                 },
                 beforeSend: function() {
-                    $('#resultados-recomendaciones').html('<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Cargando recomendaciones...</div>');
+                    $('#resultados-recomendaciones').html(
+                        '<div class="text-center py-4">'+
+                        '<div class="spinner-border text-primary" role="status">'+
+                        '<span class="sr-only">Cargando...</span>'+
+                        '</div>'+
+                        '<p class="mt-2">Buscando profesores recomendados...</p>'+
+                        '</div>'
+                    );
                 },
                 success: function(response) {
                     $('#resultados-recomendaciones').html(response);
                 },
                 error: function(xhr, status, error) {
                     console.error("Error en AJAX:", status, error);
-                    $('#resultados-recomendaciones').html('<div class="alert alert-danger">Error al cargar recomendaciones. Por favor recarga la página.</div>');
+                    $('#resultados-recomendaciones').html(
+                        '<div class="alert alert-danger">'+
+                        'Error al cargar recomendaciones. Por favor intente nuevamente.'+
+                        '</div>'
+                    );
                 }
             });
         } else {
@@ -409,13 +557,30 @@ $(document).ready(function() {
             $('#id_profesor').val(id_profesor).trigger('change');
             $('#id_materia').val(id_materia).trigger('change');
             
+            // Resaltar el formulario
+            $('.card-header.bg-success').css('background-color', '#ffc107');
+            setTimeout(function() {
+                $('.card-header.bg-success').css('background-color', '#28a745');
+            }, 1000);
+            
             // Hacer scroll al formulario
             $('html, body').animate({
                 scrollTop: $('.card-body form').offset().top - 20
-            }, 500);
+            }, 800);
             
-            // Mostrar mensaje
-            alert('Profesor y materia seleccionados. Por favor confirma la asignación.');
+            // Mostrar notificación
+            var alertDiv = $(
+                '<div class="alert alert-info alert-dismissible fade show" role="alert">'+
+                'Profesor y materia seleccionados. <strong>Por favor confirme la asignación.</strong>'+
+                '<button type="button" class="close" data-dismiss="alert" aria-label="Close">'+
+                '<span aria-hidden="true">&times;</span></button></div>'
+            );
+            
+            $('.card-body form').before(alertDiv);
+            
+            setTimeout(function() {
+                alertDiv.alert('close');
+            }, 5000);
         }
     });
     
@@ -426,15 +591,10 @@ $(document).ready(function() {
         var materia = $(this).data('materia');
         var id_materia = $(this).data('id-materia');
         
-        if(id && profesor && materia && id_materia) {
-            $('#id_asignacion').val(id);
-            $('#nombre_profesor_modal').val(profesor);
-            $('#nombre_materia_modal').val(materia);
-            $('#nueva_materia').val(id_materia).trigger('change');
-        } else {
-            console.error("Datos incompletos para editar asignación");
-            alert("Error al preparar la edición. Por favor recarga la página.");
-        }
+        $('#id_asignacion').val(id);
+        $('#nombre_profesor_modal').val(profesor);
+        $('#nombre_materia_modal').val(materia);
+        $('#nueva_materia').val(id_materia);
     });
 });
 </script>
