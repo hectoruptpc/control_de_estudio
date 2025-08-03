@@ -1158,6 +1158,17 @@ function insertarDocente(array $datos): array {
             throw new Exception("Faltan campos requeridos: " . implode(', ', $faltantes));
         }
 
+        // Obtener el texto del tipo de documento
+        $stmtTipo = $db->prepare("SELECT tipo FROM tipo_cedula WHERE id = ?");
+        $stmtTipo->bind_param("i", $datos['tipo_documento']);
+        $stmtTipo->execute();
+        $stmtTipo->bind_result($tipo_documento_texto);
+        $stmtTipo->fetch();
+        $stmtTipo->close();
+
+        // Concatenar tipo y documento SIN guión
+        $idusuario = $tipo_documento_texto . $datos['documento'];
+
         // Verificar si existe la carrera especificada o usar "No Especificado" (ID 0)
         if (isset($datos['carrera']) && $datos['carrera'] !== '') {
             $stmt = $db->prepare("SELECT id_carrera FROM carreras WHERE id_carrera = ?");
@@ -1191,9 +1202,8 @@ function insertarDocente(array $datos): array {
         $db->begin_transaction();
 
         // Verificar si el usuario ya existe
-        $valores['idusuario'] = $datos['tipo_documento'] . '-' . $datos['documento'];
         $checkStmt = $db->prepare("SELECT id FROM users WHERE idusuario = ? LIMIT 1");
-        $checkStmt->bind_param("s", $valores['idusuario']);
+        $checkStmt->bind_param("s", $idusuario);
         $checkStmt->execute();
         $checkStmt->store_result();
         
@@ -1246,14 +1256,14 @@ function insertarDocente(array $datos): array {
                 'potencialidades' => $potencialidades,
                 'api_key' => $api_key,
                 'fecha_ingreso' => $datos['fecha_ingreso'] ?? date('Y-m-d'),
-                'carrera' => $datos['carrera'] // Usamos el valor validado (0 o el ID especificado)
+                'carrera' => $datos['carrera']
             ]
         ];
 
         // 4. Combinar todos los valores
         $valores = array_merge(
             [
-                'idusuario' => $datos['tipo_documento'] . '-' . $datos['documento'],
+                'idusuario' => $idusuario,
                 'nombre' => $datos['nombre'],
                 'username' => $username,
                 'email' => $datos['email'],
@@ -1363,7 +1373,7 @@ function insertarDocente(array $datos): array {
             'message' => 'Docente registrado exitosamente',
             'id' => $idInsertado,
             'username' => $username,
-            'password_temp' => $datos['documento'] // Solo para referencia inicial
+            'password_temp' => $datos['documento']
         ];
 
     } catch(Exception $e) {
