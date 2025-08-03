@@ -151,6 +151,13 @@ if (!isAdmin()) {
         <a title="Mensajeria" class="dropdown-item" href="mensajeria.php"><i class="fa fa-envelope fa-fw"></i> Mensajeria</a>
         <a title="Gestor de Contenido" class="dropdown-item" href="gestor_contenido.php"><i class="fa fa-file-contract fa-fw"></i> Contenido</a>
         <a title="Google Groups" class="dropdown-item" href="gg.php"><i class="fab fa-google-plus-g"></i> Google Groups</a>
+        
+        <!-- Nuevo apartado de Títulos y Relaciones con Materias -->
+        <div class="dropdown-divider"></div>
+        <a title="Títulos y Relaciones con Materias" class="dropdown-item" href="titulos_relaciones_materias.php">
+            <i class="fas fa-graduation-cap fa-fw"></i> Títulos y Relaciones con Materias
+        </a>
+        
         <a title="Creador 1" class="dropdown-item" href="test2.php"><i class="fa fa-wrench fa-fw"></i> Creador 2</a>
         <a title="Creador Mensajes" class="dropdown-item" href="cm.php"><i class="fa fa-wrench fa-fw"></i> Creador Mensajes</a>
         <a title="Reportes" class="dropdown-item" href="reportes.php"><i class="far fa-flag"></i> Reportes</a>
