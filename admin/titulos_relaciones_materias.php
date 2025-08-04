@@ -22,7 +22,10 @@ if (isset($_GET['ajax_type'])) {
                     <td>'.$title['id'].'</td>
                     <td><strong>'.htmlspecialchars($title['nombre']).'</strong><br><small class="text-muted">'.htmlspecialchars(substr($title['descripcion'], 0, 30)).'...</small></td>
                     <td>
-                        <form method="POST" onsubmit="return confirm(\'¿Eliminar?\')">
+                        <button class="btn btn-sm btn-info edit-title" data-id="'.$title['id'].'" data-nombre="'.htmlspecialchars($title['nombre']).'" data-descripcion="'.htmlspecialchars($title['descripcion']).'">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <form method="POST" onsubmit="return confirm(\'¿Eliminar?\')" style="display: inline;">
                             <input type="hidden" name="id_titulo" value="'.$title['id'].'">
                             <button type="submit" name="delete_title" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
                         </form>
@@ -78,6 +81,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $descripcion = $db->real_escape_string($_POST['descripcion']);
         $db->query("INSERT INTO titulos (nombre, descripcion) VALUES ('$nombre', '$descripcion')");
         $_SESSION['message'] = "Título agregado correctamente";
+        $_SESSION['message_type'] = "success";
+    }
+
+    // **Editar título**
+    if (isset($_POST['edit_title'])) {
+        $id = $db->real_escape_string($_POST['id_titulo']);
+        $nombre = $db->real_escape_string($_POST['nombre']);
+        $descripcion = $db->real_escape_string($_POST['descripcion']);
+        $db->query("UPDATE titulos SET nombre = '$nombre', descripcion = '$descripcion' WHERE id = '$id'");
+        $_SESSION['message'] = "Título actualizado correctamente";
+        $_SESSION['message_type'] = "success";
     }
 
     // **Agregar relación**
@@ -87,6 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $prioridad = $db->real_escape_string($_POST['prioridad']);
         $db->query("INSERT INTO titulo_materia (id_titulo, id_materia, prioridad) VALUES ('$id_titulo', '$id_materia', '$prioridad')");
         $_SESSION['message'] = "Relación creada correctamente";
+        $_SESSION['message_type'] = "success";
     }
 
     // **Eliminar título**
@@ -94,6 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $id = $db->real_escape_string($_POST['id_titulo']);
         $db->query("DELETE FROM titulos WHERE id = '$id'");
         $_SESSION['message'] = "Título eliminado";
+        $_SESSION['message_type'] = "danger";
     }
 
     // **Eliminar relación**
@@ -101,6 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $id = $db->real_escape_string($_POST['id_relacion']);
         $db->query("DELETE FROM titulo_materia WHERE id_relacion = '$id'");
         $_SESSION['message'] = "Relación eliminada";
+        $_SESSION['message_type'] = "danger";
     }
 
     header("Location: ".$_SERVER['PHP_SELF']); // Evitar reenvío de formulario
@@ -118,8 +135,39 @@ include("includes/head.php");
             <?= $_SESSION['message'] ?>
             <button type="button" class="close" data-dismiss="alert">&times;</button>
         </div>
-        <?php unset($_SESSION['message']); ?>
+        <?php unset($_SESSION['message']); unset($_SESSION['message_type']); ?>
     <?php endif; ?>
+
+    <!-- Modal para editar título -->
+    <div class="modal fade" id="editTitleModal" tabindex="-1" role="dialog" aria-labelledby="editTitleModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editTitleModalLabel">Editar Título</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form method="POST">
+                    <div class="modal-body">
+                        <input type="hidden" name="id_titulo" id="editTitleId">
+                        <div class="form-group">
+                            <label for="editTitleName">Nombre del título</label>
+                            <input type="text" name="nombre" class="form-control" id="editTitleName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editTitleDescription">Descripción</label>
+                            <textarea name="descripcion" class="form-control" id="editTitleDescription" rows="3"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                        <button type="submit" name="edit_title" class="btn btn-primary">Guardar cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <!-- **Panel de Títulos** -->
     <div class="row">
@@ -241,7 +289,7 @@ include("includes/head.php");
     </div>
 </div>
 
-<!-- **Script para búsqueda en tiempo real** -->
+<!-- **Script para búsqueda en tiempo real y edición** -->
 <script>
 $(document).ready(function() {
     // Función para buscar títulos
@@ -265,6 +313,19 @@ $(document).ready(function() {
 
     $("#searchRelations").on("input", function() {
         searchRelations($(this).val());
+    });
+
+    // Evento para editar título
+    $(document).on('click', '.edit-title', function() {
+        var id = $(this).data('id');
+        var nombre = $(this).data('nombre');
+        var descripcion = $(this).data('descripcion');
+        
+        $('#editTitleId').val(id);
+        $('#editTitleName').val(nombre);
+        $('#editTitleDescription').val(descripcion);
+        
+        $('#editTitleModal').modal('show');
     });
 
     // Cargar datos iniciales
