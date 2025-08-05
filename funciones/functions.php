@@ -3668,7 +3668,7 @@ function contarEstudiantesActivos($db, $seccion_id) {
  * @param int $count Número de estudiantes activos
  */
 function actualizarEstadoSeccion($db, $seccion_id, $count) {
-    // Primero verificar si el período está activo
+    // Obtener información del período
     $stmt = $db->prepare("SELECT p.activo FROM secciones s
                          JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
                          WHERE s.id_seccion = ?");
@@ -3678,15 +3678,40 @@ function actualizarEstadoSeccion($db, $seccion_id, $count) {
     $periodo = $result->fetch_assoc();
     $stmt->close();
     
-    // Solo actualizar el estado si el período está activo
-    if ($periodo['activo'] == 1) {
+    // Determinar el nuevo estado
+    if ($periodo['activo'] == 0) {
+        $nuevo_estatus = 'inactiva'; // Siempre inactiva si el período está inactivo
+    } else {
         $nuevo_estatus = ($count >= MINIMO_ESTUDIANTES) ? 'activa' : 'inactiva';
-        $stmt = $db->prepare("UPDATE secciones SET estatus = ? WHERE id_seccion = ?");
-        $stmt->bind_param("si", $nuevo_estatus, $seccion_id);
-        $stmt->execute();
-        $stmt->close();
     }
+    
+    // Actualizar el estado de la sección
+    $stmt = $db->prepare("UPDATE secciones SET estatus = ? WHERE id_seccion = ?");
+    $stmt->bind_param("si", $nuevo_estatus, $seccion_id);
+    $stmt->execute();
+    $stmt->close();
 }
+
+
+
+/**
+ * Desactiva todas las secciones de un período académico cuando este se desactiva
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $periodo_id ID del período académico
+ */
+function desactivarSeccionesDePeriodo($db, $periodo_id) {
+    $stmt = $db->prepare("UPDATE secciones SET estatus = 'inactiva' WHERE id_periodo = ?");
+    $stmt->bind_param("i", $periodo_id);
+    $stmt->execute();
+    $stmt->close();
+}
+
+
+
+
+
+
+
 
 /**
  * Obtiene el listado de secciones con información relevante
@@ -3695,7 +3720,8 @@ function actualizarEstadoSeccion($db, $seccion_id, $count) {
  */
 function obtenerListadoSecciones($db) {
     $stmt = $db->prepare("SELECT s.id_seccion, s.codigo_seccion, c.nombre_carrera, t.numero_trayecto, 
-             p.nombre_periodo, p.activo as periodo_activo, s.capacidad_maxima, s.estatus,
+             p.nombre_periodo, p.activo as periodo_activo, s.capacidad_maxima, 
+             CASE WHEN p.activo = 0 THEN 'inactiva' ELSE s.estatus END as estatus,
              COUNT(es.id_usuario) as inscritos
               FROM secciones s
               JOIN carreras c ON s.id_carrera = c.id_carrera
@@ -3769,6 +3795,7 @@ function obtenerDatosSelects($db) {
  */
 function obtenerDetalleSeccion($db, $seccion_id) {
     $stmt = $db->prepare("SELECT s.*, c.nombre_carrera, t.numero_trayecto, p.nombre_periodo, p.activo as periodo_activo,
+                         CASE WHEN p.activo = 0 THEN 'inactiva' ELSE s.estatus END as estatus,
                          COUNT(es.id_usuario) as inscritos
                   FROM secciones s
                   JOIN carreras c ON s.id_carrera = c.id_carrera
@@ -3863,7 +3890,7 @@ function mostrarAdvertencia($mensaje) {
 }
 
 
-// FUNCIONES DE PERIODOS ESCOLARES***********************************************************************
+// FUNCIONES DE PERIODOS ACADEMICOS***********************************************************************
 
 
 
@@ -3920,18 +3947,50 @@ function actualizarPeriodoAcademico($db, $id, $nombre, $fecha_inicio, $fecha_fin
 }
 
 /**
- * Cambia el estado (activo/inactivo) de un periodo académico
+ * Cambia el estado de un período académico
  * @param mysqli $db Conexión a la base de datos
- * @param int $id ID del periodo
- * @param int $estado Nuevo estado (1 para activo, 0 para inactivo)
- * @return bool True si se actualizó correctamente
+ * @param int $periodo_id ID del período
+ * @param int $nuevo_estado Nuevo estado (1 para activo, 0 para inactivo)
+ * @return bool True si la operación fue exitosa
  */
-function cambiarEstadoPeriodo($db, $id, $estado) {
-    $query = "UPDATE periodos_academicos SET activo = ? WHERE id_periodo = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("ii", $estado, $id);
-    return $stmt->execute();
+function cambiarEstadoPeriodo($db, $periodo_id, $nuevo_estado) {
+    try {
+        $stmt = $db->prepare("UPDATE periodos_academicos SET activo = ? WHERE id_periodo = ?");
+        $stmt->bind_param("ii", $nuevo_estado, $periodo_id);
+        $stmt->execute();
+        $stmt->close();
+        return true;
+    } catch (Exception $e) {
+        error_log("Error al cambiar estado del período: " . $e->getMessage());
+        return false;
+    }
 }
+
+
+/**
+ * Actualiza el estado de todas las secciones de un período cuando este se activa
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $periodo_id ID del período académico
+ */
+function actualizarEstadoSeccionesDePeriodo($db, $periodo_id) {
+    // Obtener todas las secciones del período
+    $stmt = $db->prepare("SELECT id_seccion FROM secciones WHERE id_periodo = ?");
+    $stmt->bind_param("i", $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $secciones = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    
+    // Actualizar el estado de cada sección
+    foreach ($secciones as $seccion) {
+        $count = contarEstudiantesActivos($db, $seccion['id_seccion']);
+        actualizarEstadoSeccion($db, $seccion['id_seccion'], $count);
+    }
+}
+
+
+
+
 
 // PANEL DE ESTUDIANTE, SECCIONES ***********************************************************************
 
