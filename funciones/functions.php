@@ -3421,39 +3421,15 @@ function editarSeccion($db, $datos) {
         if ($periodo['activo'] == 0) {
             throw new Exception("No se puede editar una sección con período inactivo.");
         }
-
-        // Verificar si el código de sección ya existe (excluyendo la actual)
-        $stmt = $db->prepare("SELECT id_seccion FROM secciones 
-                             WHERE codigo_seccion = ? 
-                             AND id_seccion != ? 
-                             AND id_periodo = ?");
-        $stmt->bind_param("sii", $datos['codigo_seccion'], $datos['id_seccion'], $datos['id_periodo']);
-        $stmt->execute();
-        $result = $stmt->get_result();
         
-        if ($result->num_rows > 0) {
-            throw new Exception("El código de sección ya existe para este período.");
-        }
-        $stmt->close();
-        
-        // Actualizar la sección (CON EL NUEVO CAMPO ESTATUS)
         $stmt = $db->prepare("UPDATE secciones 
                             SET codigo_seccion = ?, 
                                 id_carrera = ?, 
                                 id_trayecto = ?, 
                                 id_periodo = ?, 
-                                capacidad_maxima = ?,
-                                estatus = ?
+                                capacidad_maxima = ?
                             WHERE id_seccion = ?");
-        $stmt->bind_param("siiiiii", 
-            $datos['codigo_seccion'], 
-            $datos['id_carrera'], 
-            $datos['id_trayecto'], 
-            $datos['id_periodo'], 
-            $datos['capacidad_maxima'],
-            $datos['estatus'],  // NUEVO CAMPO
-            $datos['id_seccion']
-        );
+        $stmt->bind_param("siiiii", $datos['codigo_seccion'], $datos['id_carrera'], $datos['id_trayecto'], $datos['id_periodo'], $datos['capacidad_maxima'], $datos['id_seccion']);
         $stmt->execute();
         $stmt->close();
         

@@ -54,7 +54,7 @@ if ($carrerasQuery) {
             
             <div class="col-md-6">
                 <div class="mb-3">
-                    <label for="cedula" class="form-label">Cédula</label>
+                    <label for="cedula" class="form-label">Usuario</label>
                     <input type="text" class="form-control" id="cedula" name="cedula" 
                            value="<?php echo htmlspecialchars($estudiante['username'] ?? ''); ?>" required>
                 </div>
