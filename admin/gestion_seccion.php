@@ -409,7 +409,7 @@ include("includes/head.php");
                                         <input type="checkbox" id="seleccionarTodos">
                                     </th>
                                     <th>Nombre</th>
-                                    <th>Usuario</th>
+                                    <th>Cedula</th>
                                     <th>Asignado</th>
                                 </tr>
                             </thead>
@@ -422,7 +422,7 @@ include("includes/head.php");
                                                 class="checkbox-estudiante">
                                         </td>
                                         <td><?= htmlspecialchars($est['nombre']) ?></td>
-                                        <td><?= htmlspecialchars($est['username']) ?></td>
+                                        <td><?= htmlspecialchars($est['idusuario']) ?></td>
                                         <td>
                                             <?php if ($est['asignado'] > 0): ?>
                                                 <span class="badge badge-success">Sí</span>
@@ -654,7 +654,7 @@ include("includes/head.php");
                                 <thead>
                                     <tr>
                                         <th>Nombre</th>
-                                        <th>Usuario</th>
+                                        <th>Cedula</th>
                                         <th>Fecha Inscripción</th>
                                         <?php if (!$periodo_inactivo): ?>
                                             <th>Acciones</th>
@@ -665,7 +665,7 @@ include("includes/head.php");
                                     <?php foreach ($estudiantes as $est): ?>
                                         <tr>
                                             <td><?= htmlspecialchars($est['nombre']) ?></td>
-                                            <td><?= htmlspecialchars($est['username']) ?></td>
+                                            <td><?= htmlspecialchars($est['idusuario']) ?></td>
                                             <td><?= $est['fecha_inscripcion'] ?></td>
                                             <?php if (!$periodo_inactivo): ?>
                                                 <td>

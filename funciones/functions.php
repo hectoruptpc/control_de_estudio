@@ -3824,7 +3824,7 @@ function obtenerDetalleSeccion($db, $seccion_id) {
  * @return array Estudiantes asignados
  */
 function obtenerEstudiantesDeSeccion($db, $seccion_id) {
-    $stmt = $db->prepare("SELECT u.id, u.nombre, u.username, es.fecha_inscripcion
+    $stmt = $db->prepare("SELECT u.id, u.nombre, u.idusuario, es.fecha_inscripcion
                   FROM users u
                   JOIN estudiante_seccion es ON u.id = es.id_usuario
                   WHERE es.id_seccion = ? AND es.estatus = 'activo'
@@ -3845,7 +3845,7 @@ function obtenerEstudiantesDeSeccion($db, $seccion_id) {
  * @return array Estudiantes disponibles
  */
 function obtenerEstudiantesDisponibles($db, $seccion_id, $carrera_id) {
-    $stmt = $db->prepare("SELECT u.id, u.nombre, u.username, 
+    $stmt = $db->prepare("SELECT u.id, u.nombre, u.idusuario, 
                          (SELECT COUNT(*) FROM estudiante_seccion 
                           WHERE id_usuario = u.id AND id_seccion = ? AND estatus = 'activo') as asignado
                   FROM users u
