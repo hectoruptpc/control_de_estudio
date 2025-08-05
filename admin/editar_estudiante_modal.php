@@ -26,17 +26,16 @@ if ($result->num_rows === 0) {
 
 $estudiante = $result->fetch_assoc();
 
-// Obtener lista de carreras
-$carreras = [];
-$carrerasQuery = $db->query("SELECT id_carrera, nombre_carrera FROM carreras ORDER BY nombre_carrera");
-if ($carrerasQuery) {
-    $carreras = $carrerasQuery->fetch_all(MYSQLI_ASSOC);
-}
+// Obtener listados necesarios
+$carreras = obtenerTodasLasCarreras();
+$generos = obtenerGeneros($db);
 ?>
 
 <div class="modal-header">
     <h5 class="modal-title">Editar Estudiante</h5>
-    
+    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+    </button>
 </div>
 
 <div class="modal-body">
@@ -95,30 +94,31 @@ if ($carrerasQuery) {
                 
                 <div class="mb-3">
                     <label for="genero" class="form-label">Género</label>
-                    <select class="custom-select" id="genero" name="genero" required>
-                        <option value="">Seleccionar</option>
-                        <option value="Masculino" <?php echo ($estudiante['genero'] ?? '') == 'Masculino' ? 'selected' : ''; ?>>Masculino</option>
-                        <option value="Femenino" <?php echo ($estudiante['genero'] ?? '') == 'Femenino' ? 'selected' : ''; ?>>Femenino</option>
-                        <option value="Otro" <?php echo ($estudiante['genero'] ?? '') == 'Otro' ? 'selected' : ''; ?>>Otro</option>
+                    <select class="custom-select d-block w-100" id="genero" name="genero" required>
+                        <option value="">Seleccionar género</option>
+                        <?php foreach ($generos as $id_genero => $nombre_genero): ?>
+                            <option value="<?php echo $id_genero; ?>"
+                                <?php echo ($estudiante['genero'] == $id_genero) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($nombre_genero); ?>
+                            </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
             </div>
             
             <div class="col-md-6">
                 <div class="mb-3">
-    <label for="carrera" class="form-label required">Programa</label>
-    <select name="carrera" id="carrera" class="form-control" required>
-        <option value="">-- Seleccione una carrera --</option>
-        <?php 
-        $carreras = obtenerTodasLasCarreras();
-        foreach ($carreras as $carrera): ?>
-            <option value="<?php echo htmlspecialchars($carrera['id']); ?>" 
-                <?php echo ($estudiante['carrera'] ?? '') == $carrera['id'] ? 'selected' : ''; ?>>
-                <?php echo htmlspecialchars($carrera['nombre']); ?>
-            </option>
-        <?php endforeach; ?>
-    </select>
-</div>
+                    <label for="carrera" class="form-label required">Programa</label>
+                    <select name="carrera" id="carrera" class="form-control" required>
+                        <option value="">-- Seleccione una carrera --</option>
+                        <?php foreach ($carreras as $carrera): ?>
+                            <option value="<?php echo htmlspecialchars($carrera['id']); ?>" 
+                                <?php echo ($estudiante['carrera'] ?? '') == $carrera['id'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($carrera['nombre']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
                 
                 <div class="mb-3">
                     <label for="fecha_ingreso" class="form-label">Fecha de Ingreso</label>
@@ -128,7 +128,7 @@ if ($carrerasQuery) {
                 
                 <div class="mb-3">
                     <label for="status" class="form-label">Estado</label>
-                    <select class="custom-select" id="status" name="status" required>
+                    <select class="custom-select d-block w-100" id="status" name="status" required>
                         <option value="1" <?php echo ($estudiante['status'] ?? 1) == 1 ? 'selected' : ''; ?>>Activo</option>
                         <option value="0" <?php echo ($estudiante['status'] ?? 1) == 0 ? 'selected' : ''; ?>>Inactivo</option>
                     </select>
