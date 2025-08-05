@@ -111,9 +111,10 @@ if ($carrerasQuery) {
         <option value="">-- Seleccione una carrera --</option>
         <?php 
         $carreras = obtenerTodasLasCarreras();
-        foreach ($carreras as $nombre): ?>
-            <option value="<?php echo htmlspecialchars($nombre); ?>">
-                <?php echo htmlspecialchars($nombre); ?>
+        foreach ($carreras as $carrera): ?>
+            <option value="<?php echo htmlspecialchars($carrera['id']); ?>" 
+                <?php echo ($estudiante['carrera'] ?? '') == $carrera['id'] ? 'selected' : ''; ?>>
+                <?php echo htmlspecialchars($carrera['nombre']); ?>
             </option>
         <?php endforeach; ?>
     </select>

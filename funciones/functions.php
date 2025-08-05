@@ -209,7 +209,9 @@ function obtenerTodasLasCarreras() {
     global $db;
     
     $carreras = [];
-    $query = "SELECT id_carrera, nombre_carrera FROM carreras WHERE activa = 1 ORDER BY nombre_carrera ASC";
+    $query = "SELECT id_carrera, nombre_carrera FROM carreras 
+              WHERE activa = 1 AND id_carrera != 0 
+              ORDER BY nombre_carrera ASC";
     
     if ($stmt = $db->prepare($query)) {
         $stmt->execute();
