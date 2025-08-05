@@ -3759,8 +3759,8 @@ function obtenerDatosSeccion($db, $seccion_id) {
  * @return array Datos para los selects (carreras, trayectos, periodos)
  */
 function obtenerDatosSelects($db) {
-    // Carreras
-    $stmt = $db->prepare("SELECT id_carrera, nombre_carrera FROM carreras WHERE activa = 1");
+    // Carreras - Excluyendo la que tiene id_carrera = 0 (No especificado)
+    $stmt = $db->prepare("SELECT id_carrera, nombre_carrera FROM carreras WHERE activa = 1 AND id_carrera != 0");
     $stmt->execute();
     $result = $stmt->get_result();
     $carreras = $result->fetch_all(MYSQLI_ASSOC);
