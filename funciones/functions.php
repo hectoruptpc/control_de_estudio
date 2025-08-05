@@ -3173,6 +3173,31 @@ function obtenerListaCompletaUsuarios() {
 
 // OBTENER LOS DATOS SIMPLES
 
+
+function obtenerGeneros($db) {
+    $generos = [];
+    $query = "SELECT id, genero FROM genero ORDER BY id";
+    
+    try {
+        $result = $db->query($query);
+        if (!$result) {
+            throw new Exception("Error en la consulta: " . $db->error);
+        }
+        
+        while ($row = $result->fetch_assoc()) {
+            $generos[$row['id']] = $row['genero'];
+        }
+        
+        return $generos;
+    } catch (Exception $e) {
+        error_log("Error en obtenerGeneros: " . $e->getMessage());
+        return [];
+    }
+}
+
+
+
+
 function obtenerTiposCedula($db) {
     $tipos = [];
     

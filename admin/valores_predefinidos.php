@@ -17,7 +17,8 @@ $tablasCampos = [
     'tenencia_vivienda' => 'tenencia',
     'tipo_cedula' => 'tipo',
     'tipo_vivienda' => 'vivienda',
-    'ingresos' => 'ingreso'
+    'ingresos' => 'ingreso',
+    'genero' => 'genero'
 ];
 
 // Procesar formularios
@@ -108,6 +109,7 @@ $tiposVivienda = obtenerTiposVivienda($db);
 $tenenciasVivienda = obtenerTenenciaViviendas($db);
 $opcionesStatus = obtenerOpcionesStatus($db);
 $ingresos = obtenerIngresos($db);
+$generos = obtenerGeneros($db);
 
 include("includes/head.php");
 ?>
@@ -141,6 +143,9 @@ include("includes/head.php");
         </li>
         <li class="nav-item">
             <a class="nav-link" id="ingresos-tab" data-toggle="tab" href="#ingresos" role="tab">Ingresos</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="genero-tab" data-toggle="tab" href="#genero" role="tab">Género</a>
         </li>
     </ul>
     
@@ -390,102 +395,49 @@ include("includes/head.php");
                 </div>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- Modales para Ingresos -->
-<div class="modal fade" id="agregarIngresoModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Agregar Ingreso</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+        
+        <!-- Tabla Género -->
+        <div class="tab-pane fade" id="genero" role="tabpanel">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">Géneros</h6>
+                    <button class="btn btn-primary" data-toggle="modal" data-target="#agregarGeneroModal">
+                        <i class="fas fa-plus"></i> Agregar
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Género</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($generos as $id => $genero): ?>
+                                <tr>
+                                    <td><?php echo $id; ?></td>
+                                    <td><?php echo htmlspecialchars($genero); ?></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-warning" data-toggle="modal" data-target="#editarGeneroModal<?php echo $id; ?>">
+                                            <i class="fas fa-edit"></i> Editar
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" data-toggle="modal" data-target="#eliminarGeneroModal<?php echo $id; ?>">
+                                            <i class="fas fa-trash"></i> Eliminar
+                                        </button>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-            <form method="POST">
-                <div class="modal-body">
-                    <input type="hidden" name="tabla" value="ingresos">
-                    <div class="form-group">
-                        <label for="nuevo_id_ingreso">ID (opcional)</label>
-                        <input type="number" class="form-control" id="nuevo_id_ingreso" name="nuevo_id">
-                    </div>
-                    <div class="form-group">
-                        <label for="valor_ingreso">Ingreso</label>
-                        <input type="text" class="form-control" id="valor_ingreso" name="valor" required>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                    <button type="submit" name="accion" value="agregar" class="btn btn-primary">Guardar</button>
-                </div>
-            </form>
         </div>
     </div>
 </div>
-
-<?php foreach ($ingresos as $id => $ingreso): ?>
-<!-- Modal Editar Ingreso -->
-<div class="modal fade" id="editarIngresoModal<?php echo $id; ?>" tabindex="-1" role="dialog">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Editar Ingreso</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <form method="POST">
-                <div class="modal-body">
-                    <input type="hidden" name="tabla" value="ingresos">
-                    <input type="hidden" name="id" value="<?php echo $id; ?>">
-                    <div class="form-group">
-                        <label for="nuevo_id_ingreso_<?php echo $id; ?>">ID</label>
-                        <input type="number" class="form-control" id="nuevo_id_ingreso_<?php echo $id; ?>" name="nuevo_id" value="<?php echo $id; ?>">
-                    </div>
-                    <div class="form-group">
-                        <label for="valor_ingreso_<?php echo $id; ?>">Ingreso</label>
-                        <input type="text" class="form-control" id="valor_ingreso_<?php echo $id; ?>" name="valor" value="<?php echo $ingreso; ?>" required>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                    <button type="submit" name="accion" value="editar" class="btn btn-primary">Guardar</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Eliminar Ingreso -->
-<div class="modal fade" id="eliminarIngresoModal<?php echo $id; ?>" tabindex="-1" role="dialog">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Eliminar Ingreso</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <form method="POST">
-                <div class="modal-body">
-                    <input type="hidden" name="tabla" value="ingresos">
-                    <input type="hidden" name="id" value="<?php echo $id; ?>">
-                    <p>¿Está seguro que desea eliminar el ingreso "<?php echo $ingreso; ?>"?</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                    <button type="submit" name="accion" value="eliminar" class="btn btn-danger">Eliminar</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-<?php endforeach; ?>
-
-
-
-
 
 <!-- Modales para Status -->
 <div class="modal fade" id="agregarStatusModal" tabindex="-1" role="dialog">
@@ -926,6 +878,186 @@ include("includes/head.php");
                     <input type="hidden" name="tabla" value="tipo_vivienda">
                     <input type="hidden" name="id" value="<?php echo $id; ?>">
                     <p>¿Está seguro que desea eliminar el tipo de vivienda "<?php echo $vivienda; ?>"?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" name="accion" value="eliminar" class="btn btn-danger">Eliminar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endforeach; ?>
+
+<!-- Modales para Ingresos -->
+<div class="modal fade" id="agregarIngresoModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Agregar Ingreso</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="tabla" value="ingresos">
+                    <div class="form-group">
+                        <label for="nuevo_id_ingreso">ID (opcional)</label>
+                        <input type="number" class="form-control" id="nuevo_id_ingreso" name="nuevo_id">
+                    </div>
+                    <div class="form-group">
+                        <label for="valor_ingreso">Ingreso</label>
+                        <input type="text" class="form-control" id="valor_ingreso" name="valor" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" name="accion" value="agregar" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<?php foreach ($ingresos as $id => $ingreso): ?>
+<!-- Modal Editar Ingreso -->
+<div class="modal fade" id="editarIngresoModal<?php echo $id; ?>" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Ingreso</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="tabla" value="ingresos">
+                    <input type="hidden" name="id" value="<?php echo $id; ?>">
+                    <div class="form-group">
+                        <label for="nuevo_id_ingreso_<?php echo $id; ?>">ID</label>
+                        <input type="number" class="form-control" id="nuevo_id_ingreso_<?php echo $id; ?>" name="nuevo_id" value="<?php echo $id; ?>">
+                    </div>
+                    <div class="form-group">
+                        <label for="valor_ingreso_<?php echo $id; ?>">Ingreso</label>
+                        <input type="text" class="form-control" id="valor_ingreso_<?php echo $id; ?>" name="valor" value="<?php echo $ingreso; ?>" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" name="accion" value="editar" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Eliminar Ingreso -->
+<div class="modal fade" id="eliminarIngresoModal<?php echo $id; ?>" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Eliminar Ingreso</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="tabla" value="ingresos">
+                    <input type="hidden" name="id" value="<?php echo $id; ?>">
+                    <p>¿Está seguro que desea eliminar el ingreso "<?php echo $ingreso; ?>"?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" name="accion" value="eliminar" class="btn btn-danger">Eliminar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endforeach; ?>
+
+<!-- Modales para Género -->
+<div class="modal fade" id="agregarGeneroModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Agregar Género</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="tabla" value="genero">
+                    <div class="form-group">
+                        <label for="nuevo_id_genero">ID (opcional)</label>
+                        <input type="number" class="form-control" id="nuevo_id_genero" name="nuevo_id">
+                    </div>
+                    <div class="form-group">
+                        <label for="valor_genero">Género</label>
+                        <input type="text" class="form-control" id="valor_genero" name="valor" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" name="accion" value="agregar" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<?php foreach ($generos as $id => $genero): ?>
+<!-- Modal Editar Género -->
+<div class="modal fade" id="editarGeneroModal<?php echo $id; ?>" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Género</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="tabla" value="genero">
+                    <input type="hidden" name="id" value="<?php echo $id; ?>">
+                    <div class="form-group">
+                        <label for="nuevo_id_genero_<?php echo $id; ?>">ID</label>
+                        <input type="number" class="form-control" id="nuevo_id_genero_<?php echo $id; ?>" name="nuevo_id" value="<?php echo $id; ?>">
+                    </div>
+                    <div class="form-group">
+                        <label for="valor_genero_<?php echo $id; ?>">Género</label>
+                        <input type="text" class="form-control" id="valor_genero_<?php echo $id; ?>" name="valor" value="<?php echo htmlspecialchars($genero); ?>" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" name="accion" value="editar" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Eliminar Género -->
+<div class="modal fade" id="eliminarGeneroModal<?php echo $id; ?>" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Eliminar Género</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="tabla" value="genero">
+                    <input type="hidden" name="id" value="<?php echo $id; ?>">
+                    <p>¿Está seguro que desea eliminar el género "<?php echo htmlspecialchars($genero); ?>"?</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
