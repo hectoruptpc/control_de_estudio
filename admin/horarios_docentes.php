@@ -2,422 +2,726 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
-$titulopag = "Horarios Docentes Individuales";
+$titulopag = "Gestión de Horarios Docentes";
 include('../funciones/functions.php');
+
+// Conexión a la base de datos
+global $db;
+
+// Procesar solicitudes AJAX
+if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
+    switch($_POST['ajax_action']) {
+        case 'get_secciones':
+            $id_carrera = $_POST['id_carrera'];
+            $id_periodo = $_POST['id_periodo'];
+            
+            $query = "SELECT id_seccion, codigo_seccion 
+                      FROM secciones 
+                      WHERE id_carrera = ? AND id_periodo = ? AND estatus = 1
+                      ORDER BY codigo_seccion";
+            $stmt = $db->prepare($query);
+            $stmt->bind_param("ii", $id_carrera, $id_periodo);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            $options = '<option value="">Seleccionar sección...</option>';
+            while($row = $result->fetch_assoc()) {
+                $options .= "<option value='{$row['id_seccion']}'>{$row['codigo_seccion']}</option>";
+            }
+            
+            echo $options;
+            exit();
+            
+        case 'get_docentes_materias':
+            $id_seccion = $_POST['id_seccion'];
+            
+            $query = "SELECT ds.id_docente_seccion, u.nombre as docente, m.nombre_materia as materia
+                       FROM docente_seccion ds
+                       JOIN users u ON ds.id_usuario = u.id
+                       JOIN materias m ON ds.id_materia = m.id_materia
+                       WHERE ds.id_seccion = ? AND ds.estatus = 1
+                       ORDER BY u.nombre, m.nombre_materia";
+            $stmt = $db->prepare($query);
+            $stmt->bind_param("i", $id_seccion);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            $options = '<option value="">Seleccionar docente/materia...</option>';
+            while($row = $result->fetch_assoc()) {
+                $options .= "<option value='{$row['id_docente_seccion']}'>{$row['docente']} - {$row['materia']}</option>";
+            }
+            
+            echo $options;
+            exit();
+            
+        case 'get_horario':
+            $id_seccion = $_POST['id_seccion'];
+            
+            // Obtener horario asignado desde la base de datos
+            $horario = [];
+            $query = "SELECT h.id_horario, h.dia, TIME_FORMAT(h.hora_inicio, '%H:%i') as hora_inicio, 
+                             TIME_FORMAT(h.hora_fin, '%H:%i') as hora_fin, h.aula,
+                             ds.id_docente_seccion, ds.id_materia,
+                             u.nombre as docente, m.nombre_materia as materia
+                      FROM horarios h
+                      JOIN docente_seccion ds ON h.id_docente_seccion = ds.id_docente_seccion
+                      JOIN users u ON ds.id_usuario = u.id
+                      JOIN materias m ON ds.id_materia = m.id_materia
+                      WHERE ds.id_seccion = ?
+                      ORDER BY h.dia, h.hora_inicio";
+            $stmt = $db->prepare($query);
+            $stmt->bind_param("i", $id_seccion);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            // Organizar por día y hora
+            $asignaciones = [];
+            while($row = $result->fetch_assoc()) {
+                $asignaciones[] = $row;
+            }
+            
+            // Obtener docentes/materias disponibles
+            $query_dm = "SELECT ds.id_docente_seccion, u.nombre as docente, m.nombre_materia as materia
+                         FROM docente_seccion ds
+                         JOIN users u ON ds.id_usuario = u.id
+                         JOIN materias m ON ds.id_materia = m.id_materia
+                         WHERE ds.id_seccion = ? AND ds.estatus = 1
+                         ORDER BY u.nombre, m.nombre_materia";
+            $stmt_dm = $db->prepare($query_dm);
+            $stmt_dm->bind_param("i", $id_seccion);
+            $stmt_dm->execute();
+            $result_dm = $stmt_dm->get_result();
+            
+            // Generar tabla de horario
+            $dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+            $horas_disponibles = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
+            
+            $html = '<div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>Hora</th>';
+            
+            foreach($dias_semana as $dia) {
+                $html .= "<th>$dia</th>";
+            }
+            
+            $html .= '</tr></thead><tbody>';
+            
+            // Matriz para controlar celdas ocupadas
+            $celdas_ocupadas = array_fill(0, count($dias_semana), array_fill(0, count($horas_disponibles), false));
+            
+            foreach($horas_disponibles as $hora_index => $hora) {
+                $html .= "<tr><td>$hora</td>";
+                
+                foreach($dias_semana as $dia_index => $dia_nombre) {
+                    $celdaContent = '';
+                    $clasesCelda = 'horario-cell';
+                    $title = '';
+                    $rowspan = 1;
+                    
+                    // Si la celda ya está ocupada, saltar
+                    if(isset($celdas_ocupadas[$dia_index][$hora_index]) && $celdas_ocupadas[$dia_index][$hora_index]) {
+                        $html .= '';
+                        continue;
+                    }
+                    
+                    // Buscar asignación para este día y hora
+                    foreach($asignaciones as $asignacion) {
+                        if($asignacion['dia'] == $dia_index && $asignacion['hora_inicio'] == $hora) {
+                            $title = $asignacion['materia'] . ' - ' . $asignacion['docente'];
+                            $celdaContent = $asignacion['materia'];
+                            
+                            // Calcular cuántas celdas debe abarcar
+                            $hora_fin = $asignacion['hora_fin'];
+                            $hora_fin_index = array_search($hora_fin, $horas_disponibles);
+                            
+                            if($hora_fin_index !== false) {
+                                $rowspan = $hora_fin_index - $hora_index + 1;
+                                
+                                // Marcar celdas como ocupadas
+                                for($i = $hora_index; $i < $hora_fin_index; $i++) {
+                                    $celdas_ocupadas[$dia_index][$i] = true;
+                                }
+                            }
+                            
+                            $clasesCelda .= ' bg-asignada';
+                            break;
+                        }
+                    }
+                    
+                    $html .= '<td class="' . $clasesCelda . '" data-dia="' . $dia_index . '" data-hora="' . $hora . '" title="' . htmlspecialchars($title) . '"';
+                    if($rowspan > 1) {
+                        $html .= ' rowspan="' . $rowspan . '"';
+                    }
+                    $html .= '>' . $celdaContent . '</td>';
+                }
+                
+                $html .= "</tr>";
+            }
+            
+            $html .= '</tbody></table></div>';
+            
+            // Añadir sección de docentes/materias disponibles
+            $html .= '<div id="listaDocentesMaterias" class="mt-4 p-3 border rounded">
+                        <h5>Docentes/Materias Disponibles</h5>
+                        <div class="d-flex flex-wrap">';
+            
+            while($dm = $result_dm->fetch_assoc()) {
+                $html .= '<div class="materia-disponible mr-2 mb-2 p-2" data-id="'.$dm['id_docente_seccion'].'">
+                            '.htmlspecialchars($dm['docente']).' - '.htmlspecialchars($dm['materia']).'
+                         </div>';
+            }
+            
+            $html .= '</div></div>';
+            
+            echo $html;
+            exit();
+            
+        case 'verificar_conflicto':
+            $dia = $_POST['dia'];
+            $hora = $_POST['hora'];
+            $id_docente_seccion = $_POST['id_docente_seccion'];
+            
+            $query = "SELECT id_usuario FROM docente_seccion WHERE id_docente_seccion = ?";
+            $stmt = $db->prepare($query);
+            $stmt->bind_param("i", $id_docente_seccion);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $docente = $result->fetch_assoc();
+            
+            if(!$docente) {
+                echo json_encode(['conflicto' => false]);
+                exit();
+            }
+            
+            $query = "SELECT COUNT(*) as conflicto
+                      FROM horarios h
+                      JOIN docente_seccion ds ON h.id_docente_seccion = ds.id_docente_seccion
+                      WHERE ds.id_usuario = ? AND h.dia = ? AND h.hora_inicio = ?";
+            $stmt = $db->prepare($query);
+            $stmt->bind_param("iis", $docente['id_usuario'], $dia, $hora);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $conflicto = $result->fetch_assoc();
+            
+            echo json_encode(['conflicto' => $conflicto['conflicto'] > 0]);
+            exit();
+            
+        case 'guardar_asignacion':
+            $dia = $_POST['dia'];
+            $hora = $_POST['hora'];
+            $id_docente_seccion = $_POST['id_docente_seccion'];
+            $id_seccion = $_POST['id_seccion'];
+            $aula = $_POST['aula'];
+            
+            // Validar formato de hora
+            if (!preg_match('/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/', $hora)) {
+                echo json_encode(['success' => false, 'message' => 'Formato de hora inválido']);
+                exit();
+            }
+            
+            $hora_fin = date('H:i', strtotime($hora . ' +1 hour'));
+            
+            // Verificar si ya existe una asignación
+            $query = "SELECT id_horario FROM horarios 
+                      WHERE id_docente_seccion IN (SELECT id_docente_seccion FROM docente_seccion WHERE id_seccion = ?)
+                      AND dia = ? AND hora_inicio = ?";
+            $stmt = $db->prepare($query);
+            $stmt->bind_param("iis", $id_seccion, $dia, $hora);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            if($result->num_rows > 0) {
+                // Actualizar asignación existente
+                $row = $result->fetch_assoc();
+                $query = "UPDATE horarios 
+                          SET id_docente_seccion = ?, hora_fin = ?, aula = ?
+                          WHERE id_horario = ?";
+                $stmt = $db->prepare($query);
+                $stmt->bind_param("issi", $id_docente_seccion, $hora_fin, $aula, $row['id_horario']);
+            } else {
+                // Crear nueva asignación
+                $query = "INSERT INTO horarios (id_docente_seccion, dia, hora_inicio, hora_fin, aula)
+                          VALUES (?, ?, ?, ?, ?)";
+                $stmt = $db->prepare($query);
+                $stmt->bind_param("issss", $id_docente_seccion, $dia, $hora, $hora_fin, $aula);
+            }
+            
+            if($stmt->execute()) {
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['success' => false, 'message' => $db->error]);
+            }
+            exit();
+            
+        case 'asignacion_automatica':
+            $id_seccion = $_POST['id_seccion'];
+            
+            // Obtener todas las asignaciones docente-materia
+            $query = "SELECT ds.id_docente_seccion, ds.id_usuario, m.nombre_materia,
+                             m.horas_teoricas + m.horas_practicas as horas_totales
+                      FROM docente_seccion ds
+                      JOIN materias m ON ds.id_materia = m.id_materia
+                      WHERE ds.id_seccion = ? AND ds.estatus = 1
+                      ORDER BY RAND()";
+            $stmt = $db->prepare($query);
+            $stmt->bind_param("i", $id_seccion);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            $asignaciones = [];
+            while($row = $result->fetch_assoc()) {
+                $asignaciones[] = $row;
+            }
+            
+            // Eliminar horarios existentes
+            $db->query("DELETE FROM horarios WHERE id_docente_seccion IN (SELECT id_docente_seccion FROM docente_seccion WHERE id_seccion = $id_seccion)");
+            
+            // Configuración de horarios
+            $dias = range(0, 4); // Lunes a Viernes
+            $horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00'];
+            $asignacionesRealizadas = 0;
+            
+            foreach($asignaciones as $asignacion) {
+                $horasAsignadas = 0;
+                $horasNecesarias = ceil($asignacion['horas_totales'] / 2);
+                $intentos = 0;
+                $maxIntentos = 100;
+                
+                while($horasAsignadas < $horasNecesarias && $intentos < $maxIntentos) {
+                    $intentos++;
+                    $dia = $dias[array_rand($dias)];
+                    $hora = $horas[array_rand($horas)];
+                    $hora_fin = date('H:i', strtotime($hora . ' +2 hours'));
+                    
+                    // Verificar disponibilidad del docente
+                    $query = "SELECT COUNT(*) as disponible
+                              FROM horarios h
+                              JOIN docente_seccion ds ON h.id_docente_seccion = ds.id_docente_seccion
+                              WHERE ds.id_usuario = ? AND h.dia = ? AND h.hora_inicio = ?";
+                    $stmt = $db->prepare($query);
+                    $stmt->bind_param("iis", $asignacion['id_usuario'], $dia, $hora);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    $disponibilidadDocente = $result->fetch_assoc();
+                    
+                    // Verificar disponibilidad en la sección
+                    $query = "SELECT COUNT(*) as disponible
+                              FROM horarios h
+                              JOIN docente_seccion ds ON h.id_docente_seccion = ds.id_docente_seccion
+                              WHERE ds.id_seccion = ? AND h.dia = ? AND h.hora_inicio = ?";
+                    $stmt = $db->prepare($query);
+                    $stmt->bind_param("iis", $id_seccion, $dia, $hora);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    $disponibilidadSeccion = $result->fetch_assoc();
+                    
+                    if($disponibilidadDocente['disponible'] == 0 && $disponibilidadSeccion['disponible'] == 0) {
+                        // Asignar horario
+                        $query = "INSERT INTO horarios (id_docente_seccion, dia, hora_inicio, hora_fin, aula)
+                                  VALUES (?, ?, ?, ?, 'Aula por asignar')";
+                        $stmt = $db->prepare($query);
+                        $stmt->bind_param("isss", $asignacion['id_docente_seccion'], $dia, $hora, $hora_fin);
+                        
+                        if($stmt->execute()) {
+                            $horasAsignadas++;
+                            $asignacionesRealizadas++;
+                        }
+                    }
+                }
+            }
+            
+            echo json_encode([
+                'success' => $asignacionesRealizadas > 0,
+                'message' => $asignacionesRealizadas > 0 
+                    ? "Se asignaron $asignacionesRealizadas bloques horarios." 
+                    : "No se pudo asignar automáticamente. Intente con menos materias."
+            ]);
+            exit();
+    }
+}
 
 include("includes/head.php");
 ?>
 
 <div class="container-fluid">
     <div class="row">
-        <main class="col-md-12 px-md-4">
-            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2"><?php echo $titulopag; ?></h1>
-                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addTeacherModal">
-                    + Nuevo Docente
+        <div class="col-md-12">
+            <h1 class="mt-4">Gestión de Horarios Docentes</h1>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-calendar-alt mr-1"></i>
+                    Seleccionar Período y Sección
+                </div>
+                <div class="card-body">
+                    <form id="filtroHorario">
+                        <div class="form-row">
+                            <div class="form-group col-md-4">
+                                <label for="periodo">Período Académico</label>
+                                <select class="form-control" id="periodo" name="periodo" required>
+                                    <?php
+                                    $periodos = $db->query("SELECT DISTINCT id_periodo FROM secciones WHERE estatus = 1 ORDER BY id_periodo DESC");
+                                    while($p = $periodos->fetch_assoc()) {
+                                        echo "<option value='{$p['id_periodo']}'>{$p['id_periodo']}</option>";
+                                    }
+                                    ?>
+                                </select>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="carrera">Carrera</label>
+                                <select class="form-control" id="carrera" name="carrera" required>
+                                    <option value="">Seleccionar...</option>
+                                    <?php
+                                    $carreras = $db->query("SELECT id_carrera, nombre_carrera FROM carreras WHERE activa = 1");
+                                    while($c = $carreras->fetch_assoc()) {
+                                        echo "<option value='{$c['id_carrera']}'>{$c['nombre_carrera']}</option>";
+                                    }
+                                    ?>
+                                </select>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="seccion">Sección</label>
+                                <select class="form-control" id="seccion" name="seccion" required disabled>
+                                    <option value="">Primero seleccione carrera</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Cargar Horario</button>
+                        <button type="button" id="btnAutoAsignar" class="btn btn-success ml-2" disabled>Asignación Automática</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-table mr-1"></i>
+                    Horario Semanal
+                </div>
+                <div class="card-body">
+                    <div id="horarioContainer">
+                        <p class="text-muted">Seleccione un período, carrera y sección para visualizar el horario.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="asignarMateriaModal" tabindex="-1" role="dialog" aria-labelledby="asignarMateriaModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="asignarMateriaModalLabel">Asignar Materia</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
                 </button>
             </div>
-
-            <ul class="nav nav-tabs mb-4" id="teacherTabs" role="tablist">
-                <!-- Las pestañas de profesores se generarán dinámicamente -->
-            </ul>
-            
-            <div class="tab-content" id="teacherTabsContent">
-                <!-- Los horarios de cada profesor se generarán dinámicamente -->
-            </div>
-        </main>
-    </div>
-</div>
-
-<!-- Modal para agregar docente -->
-<div class="modal fade" id="addTeacherModal" tabindex="-1" aria-labelledby="addTeacherModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addTeacherModalLabel">Agregar Nuevo Docente</h5>
-                <button type="button" class="btn-close" data-bs-close="modal" aria-label="Close"></button>
-            </div>
             <div class="modal-body">
-                <form id="teacher-form">
-                    <div class="mb-3">
-                        <label for="teacher-name" class="form-label">Nombre del Docente</label>
-                        <input type="text" class="form-control" id="teacher-name" required>
+                <form id="formAsignarMateria">
+                    <input type="hidden" name="ajax_action" value="guardar_asignacion">
+                    <input type="hidden" id="celdaDia" name="dia">
+                    <input type="hidden" id="celdaHora" name="hora">
+                    <input type="hidden" id="idSeccionActual" name="id_seccion">
+                    
+                    <div class="form-group">
+                        <label for="selectDocenteMateria">Docente/Materia</label>
+                        <select class="form-control" id="selectDocenteMateria" name="id_docente_seccion" required>
+                            <option value="">Seleccionar...</option>
+                        </select>
                     </div>
-                    <div class="mb-3">
-                        <label for="teacher-code" class="form-label">Código/Número</label>
-                        <input type="text" class="form-control" id="teacher-code">
-                    </div>
-                    <div class="mb-3">
-                        <label for="teacher-email" class="form-label">Email</label>
-                        <input type="email" class="form-control" id="teacher-email">
+                    <div class="form-group">
+                        <label for="aulaAsignada">Aula</label>
+                        <input type="text" class="form-control" id="aulaAsignada" name="aula">
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="save-teacher">Guardar</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnGuardarAsignacion">Guardar</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal para agregar horario -->
-<div class="modal fade" id="addScheduleModal" tabindex="-1" aria-labelledby="addScheduleModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addScheduleModalLabel">Agregar Nueva Clase</h5>
-                <button type="button" class="btn-close" data-bs-close="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="schedule-form">
-                    <input type="hidden" id="current-teacher-id">
-                    <div class="mb-3">
-                        <label for="subject" class="form-label">Asignatura</label>
-                        <input type="text" class="form-control" id="subject" required>
-                    </div>
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="day" class="form-label">Día</label>
-                            <select class="form-select" id="day" required>
-                                <option value="" selected disabled>Seleccionar día</option>
-                                <option value="1">Lunes</option>
-                                <option value="2">Martes</option>
-                                <option value="3">Miércoles</option>
-                                <option value="4">Jueves</option>
-                                <option value="5">Viernes</option>
-                                <option value="6">Sábado</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label for="classroom" class="form-label">Aula</label>
-                            <input type="text" class="form-control" id="classroom" required>
-                        </div>
-                    </div>
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="start-time" class="form-label">Hora Inicio</label>
-                            <select class="form-select" id="start-time" required>
-                                <option value="" selected disabled>Seleccionar hora</option>
-                                <?php for($h=7; $h<=20; $h++): ?>
-                                    <option value="<?php echo str_pad($h, 2, '0', STR_PAD_LEFT); ?>:00"><?php echo str_pad($h, 2, '0', STR_PAD_LEFT); ?>:00</option>
-                                    <?php if($h < 20): ?>
-                                        <option value="<?php echo str_pad($h, 2, '0', STR_PAD_LEFT); ?>:30"><?php echo str_pad($h, 2, '0', STR_PAD_LEFT); ?>:30</option>
-                                    <?php endif; ?>
-                                <?php endfor; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label for="end-time" class="form-label">Hora Fin</label>
-                            <select class="form-select" id="end-time" required>
-                                <option value="" selected disabled>Seleccionar hora</option>
-                                <?php for($h=7; $h<=20; $h++): ?>
-                                    <option value="<?php echo str_pad($h, 2, '0', STR_PAD_LEFT); ?>:00"><?php echo str_pad($h, 2, '0', STR_PAD_LEFT); ?>:00</option>
-                                    <?php if($h < 20): ?>
-                                        <option value="<?php echo str_pad($h, 2, '0', STR_PAD_LEFT); ?>:30"><?php echo str_pad($h, 2, '0', STR_PAD_LEFT); ?>:30</option>
-                                    <?php endif; ?>
-                                <?php endfor; ?>
-                            </select>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="save-schedule">Guardar</button>
-            </div>
-        </div>
-    </div>
-</div>
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+
+<style>
+    .horario-cell {
+        min-height: 60px;
+        border: 1px solid #ddd;
+        padding: 5px;
+        cursor: pointer;
+        position: relative;
+        text-align: center;
+        vertical-align: middle;
+    }
+    .horario-cell:hover {
+        background-color: #f5f5f5;
+    }
+    .bg-asignada {
+        background-color: #d4edda;
+        font-weight: bold;
+    }
+    .materia-disponible {
+        background-color: #cce5ff;
+        border-radius: 4px;
+        padding: 5px;
+        margin: 5px;
+        cursor: move;
+    }
+    #listaDocentesMaterias {
+        min-height: 100px;
+        border: 1px dashed #ccc;
+        padding: 10px;
+        margin-top: 20px;
+    }
+    #listaDocentesMaterias .materia-disponible {
+        display: inline-block;
+    }
+    .hovered-cell {
+        background-color: #e9f7ef !important;
+    }
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(0,0,0,.1);
+        border-radius: 50%;
+        border-top-color: #007bff;
+        animation: spin 1s ease-in-out infinite;
+        margin-right: 10px;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Datos de ejemplo
-    let teachers = [
-        {
-            id: 1,
-            name: "Prof. Martínez",
-            code: "PROF-001",
-            email: "martinez@escuela.edu",
-            schedule: [
-                {
-                    subject: "Matemáticas",
-                    day: 1, // Lunes
-                    startTime: "08:00",
-                    endTime: "10:00",
-                    classroom: "Aula 101"
-                },
-                {
-                    subject: "Física",
-                    day: 3, // Miércoles
-                    startTime: "10:30",
-                    endTime: "12:00",
-                    classroom: "Aula 102"
-                }
-            ]
-        },
-        {
-            id: 2,
-            name: "Prof. González",
-            code: "PROF-002",
-            email: "gonzalez@escuela.edu",
-            schedule: [
-                {
-                    subject: "Literatura",
-                    day: 2, // Martes
-                    startTime: "09:30",
-                    endTime: "11:00",
-                    classroom: "Aula 203"
-                },
-                {
-                    subject: "Historia",
-                    day: 4, // Jueves
-                    startTime: "14:00",
-                    endTime: "16:00",
-                    classroom: "Aula 205"
-                }
-            ]
-        }
-    ];
-
-    // Inicializar la interfaz
-    renderTeacherTabs();
-    renderFirstTeacherSchedule();
-
-    // Renderizar las pestañas de profesores
-    function renderTeacherTabs() {
-        const $teacherTabs = $('#teacherTabs');
-        $teacherTabs.empty();
-
-        teachers.forEach((teacher, index) => {
-            const activeClass = index === 0 ? 'active' : '';
-            const selected = index === 0 ? 'true' : 'false';
+$(document).ready(function() {
+    // Cargar secciones cuando se selecciona una carrera
+    $('#carrera').change(function() {
+        var idCarrera = $(this).val();
+        var idPeriodo = $('#periodo').val();
+        
+        if(idCarrera && idPeriodo) {
+            $('#seccion').prop('disabled', true).html('<option value="">Cargando secciones...</option>');
             
-            $teacherTabs.append(`
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link ${activeClass}" 
-                            id="teacher-${teacher.id}-tab" 
-                            data-bs-toggle="tab" 
-                            data-bs-target="#teacher-${teacher.id}" 
-                            type="button" 
-                            role="tab" 
-                            aria-controls="teacher-${teacher.id}" 
-                            aria-selected="${selected}"
-                            data-teacher-id="${teacher.id}">
-                        ${teacher.name}
-                    </button>
-                </li>
-            `);
-        });
-    }
-
-    // Renderizar los horarios de todos los profesores
-    function renderAllSchedules() {
-        const $teacherTabsContent = $('#teacherTabsContent');
-        $teacherTabsContent.empty();
-
-        teachers.forEach((teacher, index) => {
-            const activeClass = index === 0 ? 'show active' : '';
-            
-            $teacherTabsContent.append(`
-                <div class="tab-pane fade ${activeClass}" 
-                     id="teacher-${teacher.id}" 
-                     role="tabpanel" 
-                     aria-labelledby="teacher-${teacher.id}-tab">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h4>Horario de ${teacher.name}</h4>
-                        <button class="btn btn-sm btn-outline-primary add-schedule-btn" 
-                                data-teacher-id="${teacher.id}">
-                            + Agregar Clase
-                        </button>
-                    </div>
-                    <div class="teacher-schedule" id="teacher-${teacher.id}-schedule"></div>
-                </div>
-            `);
-
-            renderTeacherSchedule(teacher.id);
-        });
-    }
-
-    // Renderizar el horario del primer profesor
-    function renderFirstTeacherSchedule() {
-        if (teachers.length > 0) {
-            renderAllSchedules();
-        }
-    }
-
-    // Renderizar el horario de un profesor específico
-    function renderTeacherSchedule(teacherId) {
-        const teacher = teachers.find(t => t.id == teacherId);
-        if (!teacher) return;
-
-        const $scheduleContainer = $(`#teacher-${teacherId}-schedule`);
-        $scheduleContainer.empty();
-
-        // Crear tabla de horario
-        const $table = $(`
-            <div class="table-responsive">
-                <table class="table table-bordered">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Hora</th>
-                            <th>Lunes</th>
-                            <th>Martes</th>
-                            <th>Miércoles</th>
-                            <th>Jueves</th>
-                            <th>Viernes</th>
-                            <th>Sábado</th>
-                        </tr>
-                    </thead>
-                    <tbody class="schedule-body"></tbody>
-                </table>
-            </div>
-        `);
-
-        const $tbody = $table.find('.schedule-body');
-
-        // Crear franjas horarias de 7:00 a 21:00 en intervalos de 30 minutos
-        for(let h = 7; h < 21; h++) {
-            for(let m = 0; m < 60; m += 30) {
-                const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                const $row = $(`<tr data-time="${time}"></tr>`);
-                
-                // Columna de hora
-                $row.append(`<td class="fw-bold">${time}</td>`);
-                
-                // Columnas para cada día (Lunes a Sábado)
-                for(let day = 1; day <= 6; day++) {
-                    $row.append('<td></td>');
+            $.ajax({
+                url: '',
+                type: 'POST',
+                data: { 
+                    ajax_action: 'get_secciones',
+                    id_carrera: idCarrera,
+                    id_periodo: idPeriodo
+                },
+                success: function(response) {
+                    $('#seccion').html(response).prop('disabled', false);
+                },
+                error: function(xhr, status, error) {
+                    console.error("Error al cargar secciones:", status, error);
+                    $('#seccion').html('<option value="">Error al cargar secciones</option>');
                 }
+            });
+        }
+    });
+    
+    // Cargar horario cuando se selecciona una sección
+    $('#filtroHorario').submit(function(e) {
+        e.preventDefault();
+        cargarHorario();
+    });
+    
+    // Función para cargar el horario
+    function cargarHorario() {
+        var idSeccion = $('#seccion').val();
+        
+        if(!idSeccion) {
+            alert('Por favor seleccione una sección');
+            return;
+        }
+        
+        $('#horarioContainer').html('<div class="text-center py-4"><span class="loading-spinner"></span><p>Cargando horario...</p></div>');
+        
+        $.ajax({
+            url: '',
+            type: 'POST',
+            data: { 
+                ajax_action: 'get_horario',
+                id_seccion: idSeccion 
+            },
+            success: function(response) {
+                $('#horarioContainer').html(response);
+                $('#btnAutoAsignar').prop('disabled', false);
                 
-                $tbody.append($row);
+                // Configurar eventos para las celdas del horario
+                configurarEventosHorario(idSeccion);
+                
+                // Configurar drag and drop
+                configurarDragAndDrop(idSeccion);
+            },
+            error: function(xhr, status, error) {
+                console.error("Error al cargar horario:", status, error);
+                $('#horarioContainer').html('<div class="alert alert-danger">Error al cargar el horario. Intente nuevamente.</div>');
             }
-        }
-
-        // Agregar los horarios del profesor
-        teacher.schedule.forEach(schedule => {
-            addScheduleToTable(teacherId, schedule);
         });
-
-        $scheduleContainer.append($table);
     }
-
-    // Agregar un horario a la tabla de un profesor
-    function addScheduleToTable(teacherId, schedule) {
-        const startParts = schedule.startTime.split(':');
-        const endParts = schedule.endTime.split(':');
-        
-        const startHour = parseInt(startParts[0]);
-        const startMin = parseInt(startParts[1]);
-        const endHour = parseInt(endParts[0]);
-        const endMin = parseInt(endParts[1]);
-        
-        // Calcular filas que ocupará este horario
-        const startRow = (startHour - 7) * 2 + (startMin === 30 ? 1 : 0);
-        const endRow = (endHour - 7) * 2 + (endMin === 30 ? 1 : 0);
-        const rowSpan = endRow - startRow;
-        
-        // Obtener todas las celdas de tiempo
-        const $timeCells = $(`#teacher-${teacherId}-schedule tr[data-time="${schedule.startTime}"] td`);
-        
-        // Celda del día correspondiente (día + 1 porque la columna 0 es la hora)
-        const $dayCell = $timeCells.eq(schedule.day);
-        
-        // Crear elemento del horario
-        const $scheduleItem = $(`
-            <div class="p-2 bg-primary bg-opacity-10 rounded">
-                <div class="fw-bold text-primary">${schedule.subject}</div>
-                <small class="text-muted">${schedule.classroom}</small>
-            </div>
-        `);
-        
-        // Ocupar el espacio necesario
-        $dayCell.attr('rowspan', rowSpan).html($scheduleItem);
-        
-        // Eliminar celdas que ahora están ocupadas
-        for(let i = 1; i < rowSpan; i++) {
-            $(`#teacher-${teacherId}-schedule tr[data-time="${schedule.startTime}"]`).next().find('td').eq(schedule.day).remove();
-        }
+    
+    // Configurar eventos para las celdas del horario
+    function configurarEventosHorario(idSeccion) {
+        // Evento click en celdas del horario
+        $('.horario-cell').click(function() {
+            var dia = $(this).data('dia');
+            var hora = $(this).data('hora');
+            
+            $('#celdaDia').val(dia);
+            $('#celdaHora').val(hora);
+            $('#idSeccionActual').val(idSeccion);
+            
+            // Cargar docentes/materias disponibles
+            $.ajax({
+                url: '',
+                type: 'POST',
+                data: { 
+                    ajax_action: 'get_docentes_materias',
+                    id_seccion: idSeccion 
+                },
+                success: function(response) {
+                    $('#selectDocenteMateria').html(response);
+                    $('#aulaAsignada').val('');
+                    $('#asignarMateriaModal').modal('show');
+                },
+                error: function(xhr, status, error) {
+                    console.error("Error al cargar docentes/materias:", status, error);
+                    alert('Error al cargar docentes/materias disponibles');
+                }
+            });
+        });
     }
-
-    // Guardar nuevo docente
-    $('#save-teacher').click(function() {
-        const name = $('#teacher-name').val();
-        const code = $('#teacher-code').val();
-        const email = $('#teacher-email').val();
-
-        if (!name) {
-            alert('Por favor ingrese el nombre del docente');
-            return;
-        }
-
-        const newTeacher = {
-            id: teachers.length > 0 ? Math.max(...teachers.map(t => t.id)) + 1 : 1,
-            name: name,
-            code: code,
-            email: email,
-            schedule: []
-        };
-
-        teachers.push(newTeacher);
+    
+    // Configurar drag and drop
+    function configurarDragAndDrop(idSeccion) {
+        // Hacer elementos arrastrables
+        $('.materia-disponible').draggable({
+            revert: "invalid",
+            cursor: "move",
+            zIndex: 1000,
+            helper: "clone"
+        });
         
-        // Actualizar la interfaz
-        renderTeacherTabs();
-        renderAllSchedules();
+        // Hacer celdas receptivas
+        $('.horario-cell').droppable({
+            accept: '.materia-disponible',
+            hoverClass: 'hovered-cell',
+            drop: function(event, ui) {
+                var dia = $(this).data('dia');
+                var hora = $(this).data('hora');
+                var idDocenteSeccion = ui.draggable.data('id');
+                
+                verificarConflicto(dia, hora, idDocenteSeccion, function(conflicto) {
+                    if(conflicto) {
+                        alert('¡Conflicto de horario! El docente ya tiene una clase asignada en ese horario.');
+                        return;
+                    }
+                    
+                    $('#celdaDia').val(dia);
+                    $('#celdaHora').val(hora);
+                    $('#idSeccionActual').val(idSeccion);
+                    $('#selectDocenteMateria').val(idDocenteSeccion);
+                    $('#aulaAsignada').val('');
+                    
+                    $('#asignarMateriaModal').modal('show');
+                });
+            }
+        });
+    }
+    
+    // Función para verificar conflictos
+    function verificarConflicto(dia, hora, idDocenteSeccion, callback) {
+        $.ajax({
+            url: '',
+            type: 'POST',
+            data: { 
+                ajax_action: 'verificar_conflicto',
+                dia: dia,
+                hora: hora,
+                id_docente_seccion: idDocenteSeccion
+            },
+            success: function(response) {
+                callback(response.conflicto);
+            },
+            dataType: 'json',
+            error: function(xhr, status, error) {
+                console.error("Error al verificar conflicto:", status, error);
+                callback(false);
+            }
+        });
+    }
+    
+    // Guardar asignación
+    $('#btnGuardarAsignacion').click(function() {
+        var formData = $('#formAsignarMateria').serialize();
+        var $btn = $(this);
+        var originalText = $btn.html();
         
-        // Seleccionar el nuevo profesor
-        $(`#teacher-${newTeacher.id}-tab`).tab('show');
+        $btn.prop('disabled', true).html('<span class="loading-spinner"></span> Guardando...');
         
-        // Cerrar modal y limpiar formulario
-        $('#addTeacherModal').modal('hide');
-        $('#teacher-form')[0].reset();
+        $.ajax({
+            url: '',
+            type: 'POST',
+            data: formData,
+            success: function(response) {
+                $btn.prop('disabled', false).html(originalText);
+                
+                if(response.success) {
+                    $('#asignarMateriaModal').modal('hide');
+                    cargarHorario(); // Recargar todo el horario
+                } else {
+                    alert('Error: ' + (response.message || 'No se pudo guardar'));
+                }
+            },
+            dataType: 'json',
+            error: function(xhr, status, error) {
+                $btn.prop('disabled', false).html(originalText);
+                console.error("Error al guardar asignación:", status, error);
+                alert('Error de conexión al guardar');
+            }
+        });
     });
-
-    // Guardar nuevo horario
-    $('#save-schedule').click(function() {
-        const teacherId = $('#current-teacher-id').val();
-        const subject = $('#subject').val();
-        const day = $('#day').val();
-        const classroom = $('#classroom').val();
-        const startTime = $('#start-time').val();
-        const endTime = $('#end-time').val();
-
-        if (!teacherId || !subject || !day || !classroom || !startTime || !endTime) {
-            alert('Por favor complete todos los campos');
-            return;
+    
+    // Asignación automática
+    $('#btnAutoAsignar').click(function() {
+        if(confirm('¿Está seguro de realizar una asignación automática? Esto reemplazará asignaciones existentes.')) {
+            var idSeccion = $('#seccion').val();
+            var $btn = $(this);
+            var originalText = $btn.html();
+            
+            $btn.prop('disabled', true).html('<span class="loading-spinner"></span> Asignando...');
+            
+            $.ajax({
+                url: '',
+                type: 'POST',
+                data: { 
+                    ajax_action: 'asignacion_automatica',
+                    id_seccion: idSeccion 
+                },
+                success: function(response) {
+                    $btn.prop('disabled', false).html(originalText);
+                    alert(response.message);
+                    if(response.success) {
+                        cargarHorario(); // Recargar todo el horario
+                    }
+                },
+                dataType: 'json',
+                error: function(xhr, status, error) {
+                    $btn.prop('disabled', false).html(originalText);
+                    console.error("Error en asignación automática:", status, error);
+                    alert('Error en asignación automática');
+                }
+            });
         }
-
-        // Validar que la hora de fin sea mayor que la de inicio
-        if (startTime >= endTime) {
-            alert('La hora de fin debe ser posterior a la hora de inicio');
-            return;
-        }
-
-        const newSchedule = {
-            subject: subject,
-            day: parseInt(day),
-            startTime: startTime,
-            endTime: endTime,
-            classroom: classroom
-        };
-
-        // Agregar el horario al profesor correspondiente
-        const teacherIndex = teachers.findIndex(t => t.id == teacherId);
-        if (teacherIndex !== -1) {
-            teachers[teacherIndex].schedule.push(newSchedule);
-            renderTeacherSchedule(teacherId);
-        }
-        
-        // Cerrar modal y limpiar formulario
-        $('#addScheduleModal').modal('hide');
-        $('#schedule-form')[0].reset();
-    });
-
-    // Manejar clic en botón "Agregar Clase"
-    $(document).on('click', '.add-schedule-btn', function() {
-        const teacherId = $(this).data('teacher-id');
-        $('#current-teacher-id').val(teacherId);
-        $('#addScheduleModal').modal('show');
     });
 });
 </script>
