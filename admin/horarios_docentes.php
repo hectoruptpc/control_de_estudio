@@ -440,10 +440,15 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
             $result_conflictos = $db->query($query_conflictos);
             $todos_horarios = $result_conflictos->fetch_all(MYSQLI_ASSOC);
 
+            // Obtener aulas disponibles desde la base de datos
+            $aulas_result = $db->query("SELECT CONCAT(nave, ' - ', aula) as nombre_aula FROM aulas ORDER BY nave, aula");
+            $aulas = [];
+            while($row = $aulas_result->fetch_assoc()) {
+                $aulas[] = $row['nombre_aula'];
+            }
+            
             // Crear matriz de disponibilidad mejorada
             $disponibilidad = [];
-            $aulas = ['Aula 101', 'Aula 102', 'Aula 103', 'Aula 201', 'Aula 202', 'Aula 203'];
-            
             foreach($dias_disponibles as $dia) {
                 foreach($horas_disponibles as $hora) {
                     $disponibilidad[$dia][$hora] = [
@@ -759,12 +764,12 @@ include("includes/head.php");
                         <div class="form-group col-md-6">
                             <label for="aulaAsignada">Aula</label>
                             <select class="form-control" id="aulaAsignada" name="aula" required>
-                                <option value="Aula 101">Aula 101</option>
-                                <option value="Aula 102">Aula 102</option>
-                                <option value="Aula 103">Aula 103</option>
-                                <option value="Aula 201">Aula 201</option>
-                                <option value="Aula 202">Aula 202</option>
-                                <option value="Aula 203">Aula 203</option>
+                                <?php
+                                $aulas = $db->query("SELECT CONCAT(nave, ' - ', aula) as nombre_aula FROM aulas ORDER BY nave, aula");
+                                while($aula = $aulas->fetch_assoc()) {
+                                    echo "<option value='{$aula['nombre_aula']}'>{$aula['nombre_aula']}</option>";
+                                }
+                                ?>
                             </select>
                         </div>
                     </div>
@@ -1025,7 +1030,7 @@ $(document).ready(function() {
             },
             success: function(response) {
                 $('#selectDocenteMateria').html(response);
-                $('#aulaAsignada').val('Aula 101');
+                $('#aulaAsignada').val($('#aulaAsignada option:first').val());
                 $('#asignarMateriaModal').modal('show');
                 
                 // Actualizar duración cuando cambia la materia seleccionada
