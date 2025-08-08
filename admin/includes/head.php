@@ -154,6 +154,12 @@ if (!isAdmin()) {
                         <i class="fas fa-graduation-cap fa-fw"></i> Títulos y Relaciones con Materias
                     </a>
                     
+                    <!-- Nueva opción de Gestión de Aulas -->
+                    <div class="dropdown-divider"></div>
+                    <a title="Gestión de Aulas" class="dropdown-item" href="aulas.php">
+                        <i class="fas fa-door-open fa-fw"></i> Gestión de Aulas
+                    </a>
+                    
                     <a title="Creador 1" class="dropdown-item" href="test2.php"><i class="fa fa-wrench fa-fw"></i> Creador 2</a>
                     <a title="Creador Mensajes" class="dropdown-item" href="cm.php"><i class="fa fa-wrench fa-fw"></i> Creador Mensajes</a>
                     <a title="Reportes" class="dropdown-item" href="reportes.php"><i class="far fa-flag"></i> Reportes</a>
