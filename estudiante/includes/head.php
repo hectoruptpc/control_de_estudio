@@ -60,7 +60,7 @@ if (!isEstudiante()) {
                 <a title="Secciones" class="dropdown-item" href="mis_secciones.php">
                   <i class="fas fa-columns fa-fw"></i> Mis Secciones
                 </a>
-                <a title="Pensum Académico" class="dropdown-item" href="pensum.php">
+                <a title="Pensum Académico" class="dropdown-item" href="mi_pensum.php">
                   <i class="fas fa-graduation-cap fa-fw"></i> Mi Pensum
                 </a>
               </div>

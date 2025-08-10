@@ -1,0 +1,237 @@
+<?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+$titulopag = "Mi Pensum Académico";
+include('../funciones/functions.php');
+
+// 1. Verificar sesión y permisos
+if (!isLoggedIn()) {
+    $_SESSION['msg'] = "Debes iniciar sesión primero";
+    header('location: ../login.php');
+    die();
+}
+
+if (!isEstudiante()) {
+    header('location: ../usuario/home.php');
+    die();
+}
+
+// 2. Obtener información del estudiante y su carrera
+$user_id = (int)$_SESSION['user']['id'];
+$query_estudiante = "SELECT carrera FROM users WHERE id = ? LIMIT 1";
+$stmt = mysqli_prepare($db, $query_estudiante);
+mysqli_stmt_bind_param($stmt, 'i', $user_id);
+mysqli_stmt_execute($stmt);
+$result_estudiante = mysqli_stmt_get_result($stmt);
+
+if (!$result_estudiante || mysqli_num_rows($result_estudiante) === 0) {
+    $_SESSION['error'] = "No se encontró información del estudiante";
+    header('location: index.php');
+    die();
+}
+
+$estudiante = mysqli_fetch_assoc($result_estudiante);
+$id_carrera = (int)$estudiante['carrera'];
+
+if ($id_carrera === 0) {
+    $_SESSION['error'] = "No tienes una carrera asignada";
+    header('location: index.php');
+    die();
+}
+
+// 3. Obtener información detallada de la carrera
+$query_carrera = "SELECT 
+                    nombre_carrera, 
+                    cod_carrera, 
+                    tipo_formacion, 
+                    duracion_semestres, 
+                    titulo_otorga,
+                    descripcion
+                  FROM carreras 
+                  WHERE id_carrera = ?";
+$stmt = mysqli_prepare($db, $query_carrera);
+mysqli_stmt_bind_param($stmt, 'i', $id_carrera);
+mysqli_stmt_execute($stmt);
+$result_carrera = mysqli_stmt_get_result($stmt);
+
+if (!$result_carrera || mysqli_num_rows($result_carrera) === 0) {
+    $_SESSION['error'] = "No se encontró información de tu carrera";
+    header('location: index.php');
+    die();
+}
+
+$carrera = mysqli_fetch_assoc($result_carrera);
+$es_pnf = ($carrera['tipo_formacion'] == 'PNF');
+$texto_periodo = $es_pnf ? 'Trimestre' : 'Semestre';
+$texto_duracion = $es_pnf ? 'trimestres' : 'semestres';
+
+// 4. Obtener materias agrupadas por trayecto y semestre
+$query_materias = "SELECT 
+                    m.id_materia,
+                    m.cod_materia,
+                    m.nombre_materia,
+                    m.creditos,
+                    m.horas_teoricas,
+                    m.horas_practicas,
+                    m.trayecto,
+                    m.duracion_periodo,
+                    m.activa,
+                    cm.semestre
+                  FROM materias m
+                  JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+                  WHERE cm.id_carrera = ?
+                  ORDER BY m.trayecto, cm.semestre, m.nombre_materia";
+$stmt = mysqli_prepare($db, $query_materias);
+mysqli_stmt_bind_param($stmt, 'i', $id_carrera);
+mysqli_stmt_execute($stmt);
+$result_materias = mysqli_stmt_get_result($stmt);
+
+if (!$result_materias) {
+    die("Error en consulta: " . mysqli_error($db));
+}
+
+// 5. Procesar y agrupar las materias
+$materias_agrupadas = [];
+$total_creditos = 0;
+$total_materias = 0;
+
+while ($materia = mysqli_fetch_assoc($result_materias)) {
+    $trayecto = (int)$materia['trayecto'];
+    $semestre = (int)$materia['semestre'];
+    
+    $texto_trayecto = ($trayecto == 0) ? 'Trayecto Inicial' : "Trayecto $trayecto";
+    
+    if (!isset($materias_agrupadas[$texto_trayecto])) {
+        $materias_agrupadas[$texto_trayecto] = [];
+    }
+    
+    if (!isset($materias_agrupadas[$texto_trayecto][$semestre])) {
+        $materias_agrupadas[$texto_trayecto][$semestre] = [];
+    }
+    
+    $materias_agrupadas[$texto_trayecto][$semestre][] = $materia;
+    $total_creditos += (int)$materia['creditos'];
+    $total_materias++;
+}
+
+include("includes/head.php");
+?>
+
+<div class="container-fluid">
+    <!-- Encabezado principal -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Mi Pensum Académico</h1>
+        <a href="index.php" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm">
+            <i class="fas fa-arrow-left fa-sm text-white-50"></i> Volver al Inicio
+        </a>
+    </div>
+
+    <!-- Tarjeta con información de la carrera -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-primary text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="m-0 font-weight-bold"><?= htmlspecialchars($carrera['nombre_carrera']) ?></h4>
+                    <p class="mb-0">Código: <?= htmlspecialchars($carrera['cod_carrera']) ?></p>
+                </div>
+                <span class="badge badge-light">
+                    <?= $es_pnf ? 'PNF' : 'Carrera Tradicional' ?>
+                </span>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Título que otorga:</strong> <?= htmlspecialchars($carrera['titulo_otorga']) ?></p>
+                    <p><strong>Duración:</strong> <?= htmlspecialchars($carrera['duracion_semestres']) ?> semestres</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Total de materias:</strong> <?= $total_materias ?></p>
+                    <p><strong>Total de créditos:</strong> <?= $total_creditos ?></p>
+                </div>
+            </div>
+            <?php if (!empty($carrera['descripcion'])): ?>
+                <div class="mt-3">
+                    <h5>Descripción del Programa</h5>
+                    <p><?= nl2br(htmlspecialchars($carrera['descripcion'])) ?></p>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Tarjeta con el plan de estudios -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-secondary text-white">
+            <h5 class="m-0 font-weight-bold">Plan de Estudios</h5>
+        </div>
+        <div class="card-body">
+            <?php if (empty($materias_agrupadas)): ?>
+                <div class="alert alert-warning">No hay materias asignadas a tu carrera.</div>
+            <?php else: ?>
+                <div class="accordion" id="pensumAccordion">
+                    <?php foreach ($materias_agrupadas as $texto_trayecto => $periodos): ?>
+                        <div class="card mb-3">
+                            <div class="card-header" id="heading<?= md5($texto_trayecto) ?>">
+                                <h5 class="mb-0">
+                                    <button class="btn btn-link" type="button" data-toggle="collapse" 
+                                            data-target="#collapse<?= md5($texto_trayecto) ?>" 
+                                            aria-expanded="true" aria-controls="collapse<?= md5($texto_trayecto) ?>">
+                                        <?= $texto_trayecto ?>
+                                    </button>
+                                </h5>
+                            </div>
+
+                            <div id="collapse<?= md5($texto_trayecto) ?>" class="collapse show" 
+                                 aria-labelledby="heading<?= md5($texto_trayecto) ?>" data-parent="#pensumAccordion">
+                                <div class="card-body">
+                                    <?php foreach ($periodos as $numero_periodo => $materias): ?>
+                                        <div class="mb-4">
+                                            <h5 class="font-weight-bold text-primary">
+                                                <?= $texto_periodo ?> <?= $numero_periodo ?>
+                                            </h5>
+                                            <div class="table-responsive">
+                                                <table class="table table-bordered table-hover table-sm">
+                                                    <thead class="thead-light">
+                                                        <tr>
+                                                            <th width="10%">Código</th>
+                                                            <th width="35%">Nombre</th>
+                                                            <th width="8%">Créditos</th>
+                                                            <th width="12%">Horas T</th>
+                                                            <th width="12%">Horas P</th>
+                                                            <th width="13%">Duración</th>
+                                                            <th width="10%">Estado</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <?php foreach ($materias as $materia): ?>
+                                                            <tr>
+                                                                <td><?= htmlspecialchars($materia['cod_materia']) ?></td>
+                                                                <td><?= htmlspecialchars($materia['nombre_materia']) ?></td>
+                                                                <td class="text-center"><?= htmlspecialchars($materia['creditos']) ?></td>
+                                                                <td class="text-center"><?= htmlspecialchars($materia['horas_teoricas']) ?></td>
+                                                                <td class="text-center"><?= htmlspecialchars($materia['horas_practicas']) ?></td>
+                                                                <td class="text-center"><?= htmlspecialchars($materia['duracion_periodo']) ?> <?= $texto_duracion ?></td>
+                                                                <td class="text-center">
+                                                                    <span class="badge badge-<?= $materia['activa'] ? 'success' : 'secondary' ?>">
+                                                                        <?= $materia['activa'] ? 'Activa' : 'Inactiva' ?>
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        <?php endforeach; ?>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<?php include("includes/footer.php"); ?>
