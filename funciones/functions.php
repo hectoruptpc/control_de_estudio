@@ -1019,7 +1019,7 @@ function registrarNuevaCarrera(
             ];
         }
 
-        // Convertir años a semestres (para mantener compatibilidad)
+        // Convertir años a semestres
         $duracion_semestres = $duracion_anios * 2;
 
         // Verificar duplicados con transacción
@@ -1063,19 +1063,14 @@ function registrarNuevaCarrera(
             $descripcion .= "\nTítulo opcional: $titulo_opcional";
         }
         
-        // El título que aparece como principal
-        $titulo_mostrar = empty($titulo_opcional) 
-            ? $titulo_principal 
-            : "$titulo_principal / $titulo_opcional";
-        
         $insertStmt->bind_param(
             "sssisss", 
             $nombre, 
             $codigo, 
             $tipo_formacion,
             $duracion_semestres,
-            $titulo_mostrar,
-            $titulo_opcional, // Nuevo campo
+            $titulo_principal,  // Solo el título principal
+            $titulo_opcional,   // Título opcional por separado
             $descripcion
         );
         
@@ -1196,11 +1191,6 @@ function actualizarCarrera(
         }
         $checkStmt->close();
         
-        // El título que aparece como principal
-        $titulo_mostrar = empty($titulo_opcional) 
-            ? $titulo_principal 
-            : "$titulo_principal / $titulo_opcional";
-        
         // Actualizar carrera
         $updateStmt = $db->prepare("UPDATE carreras SET 
             nombre_carrera = ?,
@@ -1217,15 +1207,21 @@ function actualizarCarrera(
             throw new Exception("Error al preparar actualización: " . $db->error);
         }
         
+        // Construir descripción actualizada
+        $descripcion_actualizada = "Título principal: $titulo_principal";
+        if (!empty($titulo_opcional)) {
+            $descripcion_actualizada .= "\nTítulo opcional: $titulo_opcional";
+        }
+        
         $updateStmt->bind_param(
             "sssissiii",
             $nombre,
             $codigo,
             $tipo_formacion,
             $duracion_semestres,
-            $titulo_mostrar,
-            $titulo_opcional, // Nuevo campo
-            $descripcion,
+            $titulo_principal,  // Solo el título principal
+            $titulo_opcional,   // Título opcional por separado
+            $descripcion_actualizada,
             $activa,
             $id
         );
