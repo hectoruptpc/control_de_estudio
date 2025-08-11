@@ -74,11 +74,13 @@ include("includes/head.php");
         </div>
 
         <div class="form-group">
-            <label for="tipo_formacion">Tipo de Formación:</label>
-            <input type="text" class="form-control" id="tipo_formacion" name="tipo_formacion" 
-                   value="<?= htmlspecialchars($_POST['tipo_formacion'] ?? '') ?>" required>
-            <small class="form-text text-muted">Ejemplo: PNF, PTF, Carrera Tradicional, etc.</small>
-        </div>
+    <label for="tipo_formacion">Tipo de Formación:</label>
+    <?php 
+    $selected = $_POST['tipo_formacion'] ?? '';
+    echo selectTiposFormacion('tipo_formacion', $selected); 
+    ?>
+    <small class="form-text text-muted">Seleccione el tipo de formación del programa</small>
+</div>
         
         <div class="form-group">
             <label for="duracion_anios">Duración en Años:</label>

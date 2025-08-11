@@ -3285,6 +3285,34 @@ function obtenerListaCompletaUsuarios() {
 // OBTENER LOS DATOS SIMPLES****************************************************************************************
 
 
+/**
+ * Genera el HTML para un select de tipos de formación
+ * @param string $name Nombre del campo select
+ * @param int|null $selected_id ID del tipo seleccionado (opcional)
+ * @param string $class Clases CSS adicionales (opcional)
+ * @return string HTML del select
+ */
+function selectTiposFormacion($name = 'tipo_formacion', $selected_id = null, $class = 'form-control') {
+    global $db;
+    $html = '<select class="'.$class.'" id="'.$name.'" name="'.$name.'" required>';
+    $html .= '<option value="">Seleccione un tipo de formación</option>';
+    
+    $query = "SELECT id, tipo FROM tipo_formacion ORDER BY tipo";
+    $result = $db->query($query);
+    
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $selected = ($selected_id == $row['id']) ? 'selected' : '';
+            $html .= '<option value="'.htmlspecialchars($row['id']).'" '.$selected.'>'
+                   . htmlspecialchars($row['tipo']) . '</option>';
+        }
+        $result->free();
+    }
+    
+    $html .= '</select>';
+    return $html;
+}
+
 function obtenerTiposFormacion($db) {
     $tipos = [];
     $query = "SELECT id, tipo FROM tipo_formacion ORDER BY id";
