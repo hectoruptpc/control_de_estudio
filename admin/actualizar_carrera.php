@@ -2,53 +2,56 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-require_once('../funciones/functions.php');
+require_once '../funciones/functions.php';
 
 header('Content-Type: application/json');
 
-$datos = [
-    'id_carrera' => $_POST['id_carrera'],
-    'nombre_carrera' => $_POST['nombre_carrera'],
-    'cod_carrera' => $_POST['cod_carrera'],
-    'tipo_formacion' => $_POST['tipo_formacion'],
-    'duracion_semestres' => $_POST['duracion_semestres'],
-    'titulo_otorga' => $_POST['titulo_otorga'],
-    'descripcion' => $_POST['descripcion'],
-    'activa' => $_POST['activa']
-];
-
 try {
-    $db = $GLOBALS['db'];
-    
-    $query = "UPDATE carreras SET 
-              nombre_carrera = ?, 
-              cod_carrera = ?, 
-              tipo_formacion = ?, 
-              duracion_semestres = ?, 
-              titulo_otorga = ?, 
-              descripcion = ?, 
-              activa = ? 
-              WHERE id_carrera = ?";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param(
-        "sssissii",
-        $datos['nombre_carrera'],
-        $datos['cod_carrera'],
-        $datos['tipo_formacion'],
-        $datos['duracion_semestres'],
-        $datos['titulo_otorga'],
-        $datos['descripcion'],
-        $datos['activa'],
-        $datos['id_carrera']
+    // Validar datos de entrada
+    $id = $_POST['id_carrera'] ?? 0;
+    $nombre = trim($_POST['nombre_carrera'] ?? '');
+    $codigo = trim($_POST['cod_carrera'] ?? '');
+    $tipo_formacion = trim($_POST['tipo_formacion'] ?? '');
+    $duracion_anios = (int)($_POST['duracion_anios'] ?? 0);
+    $titulo_principal = trim($_POST['titulo_principal'] ?? '');
+    $titulo_opcional = trim($_POST['titulo_opcional'] ?? '');
+    $activa = (int)($_POST['activa'] ?? 0);
+    $descripcion = trim($_POST['descripcion'] ?? '');
+
+    // Validaciones básicas
+    if (empty($nombre) || empty($codigo) || empty($titulo_principal)) {
+        throw new Exception("Todos los campos obligatorios deben completarse");
+    }
+
+    if ($duracion_anios < 1 || $duracion_anios > 6) {
+        throw new Exception("La duración debe estar entre 1 y 6 años");
+    }
+
+    // Convertir años a semestres
+    $duracion_semestres = $duracion_anios * 2;
+
+    // Actualizar en la base de datos
+    $resultado = actualizarCarrera(
+        $id,
+        $nombre,
+        $codigo,
+        $tipo_formacion,
+        $duracion_semestres,
+        $titulo_principal,
+        $titulo_opcional,
+        $descripcion,
+        $activa
     );
-    
-    $stmt->execute();
-    $stmt->close();
-    
-    echo json_encode(['success' => true]);
-    
+
+    if ($resultado['success']) {
+        echo json_encode(['success' => true, 'message' => 'Carrera actualizada correctamente']);
+    } else {
+        throw new Exception($resultado['message'] ?? "Error al actualizar la carrera en la base de datos");
+    }
+
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    echo json_encode([
+        'success' => false,
+        'message' => $e->getMessage()
+    ]);
 }
-?>

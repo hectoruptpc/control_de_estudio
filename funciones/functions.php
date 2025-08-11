@@ -991,77 +991,119 @@ function cambiarEstadoCarrera($id_carrera, $estado) {
 
 
 // Función para agregar nuevas carreras
-function registrarNuevaCarrera(string $nombre, string $codigo, string $tipo_formacion): array {
-  global $db;
-  
-  try {
-      // Validar tipo de formación
-      $tipos_validos = ['PNF', 'PTF'];
-      if (!in_array($tipo_formacion, $tipos_validos)) {
-          return [
-              'success' => false,
-              'message' => 'Tipo de formación no válido. Debe ser PNF o PTF'
-          ];
-      }
+// Función para agregar nuevas carreras
+function registrarNuevaCarrera(
+    string $nombre, 
+    string $codigo, 
+    string $tipo_formacion, 
+    int $duracion_anios,
+    string $titulo_principal,
+    string $titulo_opcional = ''
+): array {
+    global $db;
+    
+    try {
+        // Validar duración
+        if ($duracion_anios < 1 || $duracion_anios > 6) {
+            return [
+                'success' => false,
+                'message' => 'La duración debe estar entre 1 y 6 años'
+            ];
+        }
 
-      // Verificar duplicados con transacción
-      $db->begin_transaction();
-      
-      // 1. Verificar si el código ya existe
-      $checkStmt = $db->prepare("SELECT id_carrera FROM carreras WHERE cod_carrera = ? FOR UPDATE");
-      if (!$checkStmt) {
-          throw new Exception("Error al preparar consulta de verificación: " . $db->error);
-      }
-      
-      $checkStmt->bind_param("s", $codigo);
-      if (!$checkStmt->execute()) {
-          throw new Exception("Error al verificar código: " . $checkStmt->error);
-      }
-      
-      $checkStmt->store_result();
-      
-      if ($checkStmt->num_rows > 0) {
-          $checkStmt->close();
-          $db->rollback();
-          return [
-              'success' => false,
-              'message' => 'El código de carrera ya existe'
-          ];
-      }
-      $checkStmt->close();
-      
-      // 2. Insertar nueva carrera
-      $insertStmt = $db->prepare("INSERT INTO carreras (nombre_carrera, cod_carrera, tipo_formacion, activa) VALUES (?, ?, ?, 1)");
-      if (!$insertStmt) {
-          throw new Exception("Error al preparar inserción: " . $db->error);
-      }
-      
-      $insertStmt->bind_param("sss", $nombre, $codigo, $tipo_formacion);
-      if (!$insertStmt->execute()) {
-          throw new Exception("Error al insertar carrera: " . $insertStmt->error);
-      }
-      
-      $insertId = $db->insert_id;
-      $insertStmt->close();
-      
-      $db->commit();
-      
-      return [
-          'success' => true,
-          'message' => 'Carrera registrada exitosamente',
-          'id_carrera' => $insertId
-      ];
-      
-  } catch (Exception $e) {
-      if (isset($db) && method_exists($db, 'rollback')) {
-          $db->rollback();
-      }
-      error_log("Error en registrarNuevaCarrera: " . $e->getMessage());
-      return [
-          'success' => false,
-          'message' => 'Error al registrar carrera: ' . $e->getMessage()
-      ];
-  }
+        // Validar título principal
+        if (empty($titulo_principal)) {
+            return [
+                'success' => false,
+                'message' => 'El título principal es obligatorio'
+            ];
+        }
+
+        // Convertir años a semestres (para mantener compatibilidad)
+        $duracion_semestres = $duracion_anios * 2;
+
+        // Verificar duplicados con transacción
+        $db->begin_transaction();
+        
+        // 1. Verificar si el código ya existe
+        $checkStmt = $db->prepare("SELECT id_carrera FROM carreras WHERE cod_carrera = ? FOR UPDATE");
+        if (!$checkStmt) {
+            throw new Exception("Error al preparar consulta de verificación: " . $db->error);
+        }
+        
+        $checkStmt->bind_param("s", $codigo);
+        if (!$checkStmt->execute()) {
+            throw new Exception("Error al verificar código: " . $checkStmt->error);
+        }
+        
+        $checkStmt->store_result();
+        
+        if ($checkStmt->num_rows > 0) {
+            $checkStmt->close();
+            $db->rollback();
+            return [
+                'success' => false,
+                'message' => 'El código de carrera ya existe'
+            ];
+        }
+        $checkStmt->close();
+        
+        // 2. Insertar nueva carrera
+        $insertStmt = $db->prepare("INSERT INTO carreras 
+            (nombre_carrera, cod_carrera, tipo_formacion, duracion_semestres, titulo_otorga, otro_titulo, descripcion, activa) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1)");
+        
+        if (!$insertStmt) {
+            throw new Exception("Error al preparar inserción: " . $db->error);
+        }
+        
+        // Construir descripción con los títulos
+        $descripcion = "Título principal: $titulo_principal";
+        if (!empty($titulo_opcional)) {
+            $descripcion .= "\nTítulo opcional: $titulo_opcional";
+        }
+        
+        // El título que aparece como principal
+        $titulo_mostrar = empty($titulo_opcional) 
+            ? $titulo_principal 
+            : "$titulo_principal / $titulo_opcional";
+        
+        $insertStmt->bind_param(
+            "sssisss", 
+            $nombre, 
+            $codigo, 
+            $tipo_formacion,
+            $duracion_semestres,
+            $titulo_mostrar,
+            $titulo_opcional, // Nuevo campo
+            $descripcion
+        );
+        
+        if (!$insertStmt->execute()) {
+            throw new Exception("Error al insertar carrera: " . $insertStmt->error);
+        }
+        
+        $insertId = $db->insert_id;
+        $insertStmt->close();
+        
+        $db->commit();
+        
+        return [
+            'success' => true,
+            'message' => 'Carrera registrada exitosamente',
+            'id_carrera' => $insertId
+        ];
+        
+    } catch (Exception $e) {
+        if (isset($db) && method_exists($db, 'rollback')) {
+            $db->rollback();
+        }
+        error_log("Error en registrarNuevaCarrera: " . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => 'Error al registrar carrera: ' . $e->getMessage()
+        ];
+    }
 }
 
 // Función para obtener una carrera específica por ID
@@ -1075,7 +1117,7 @@ function obtenerCarreraPorId($id) {
     }
     
     $query = "SELECT id_carrera, nombre_carrera, cod_carrera, activa, 
-                     duracion_semestres, titulo_otorga, descripcion, tipo_formacion 
+                     duracion_semestres, titulo_otorga, otro_titulo, descripcion, tipo_formacion 
               FROM carreras 
               WHERE id_carrera = ? 
               LIMIT 1";
@@ -1107,40 +1149,109 @@ function obtenerCarreraPorId($id) {
 }
 
 
-function actualizarCarrera($id_carrera, $datos) {
+function actualizarCarrera(
+    int $id,
+    string $nombre,
+    string $codigo,
+    string $tipo_formacion,
+    int $duracion_semestres,
+    string $titulo_principal,
+    string $titulo_opcional = '',
+    string $descripcion = '',
+    int $activa = 1
+): array {
     global $db;
     
-    $query = "UPDATE carreras SET 
-              nombre_carrera = ?,
-              cod_carrera = ?,
-              tipo_formacion = ?,
-              duracion_semestres = ?,
-              titulo_otorga = ?,
-              descripcion = ?
-              WHERE id_carrera = ?";
+    try {
+        // Validar título principal
+        if (empty($titulo_principal)) {
+            return [
+                'success' => false,
+                'message' => 'El título principal es obligatorio'
+            ];
+        }
 
-    $stmt = $db->prepare($query);
-
-    if (!$stmt) {
-        throw new Exception("Error en preparación de consulta: " . $db->error);
+        // Verificar duplicados (excluyendo el registro actual)
+        $db->begin_transaction();
+        
+        $checkStmt = $db->prepare("SELECT id_carrera FROM carreras WHERE cod_carrera = ? AND id_carrera != ? FOR UPDATE");
+        if (!$checkStmt) {
+            throw new Exception("Error al preparar consulta de verificación: " . $db->error);
+        }
+        
+        $checkStmt->bind_param("si", $codigo, $id);
+        if (!$checkStmt->execute()) {
+            throw new Exception("Error al verificar código: " . $checkStmt->error);
+        }
+        
+        $checkStmt->store_result();
+        
+        if ($checkStmt->num_rows > 0) {
+            $checkStmt->close();
+            $db->rollback();
+            return [
+                'success' => false,
+                'message' => 'El código de carrera ya está en uso por otro programa'
+            ];
+        }
+        $checkStmt->close();
+        
+        // El título que aparece como principal
+        $titulo_mostrar = empty($titulo_opcional) 
+            ? $titulo_principal 
+            : "$titulo_principal / $titulo_opcional";
+        
+        // Actualizar carrera
+        $updateStmt = $db->prepare("UPDATE carreras SET 
+            nombre_carrera = ?,
+            cod_carrera = ?,
+            tipo_formacion = ?,
+            duracion_semestres = ?,
+            titulo_otorga = ?,
+            otro_titulo = ?,
+            descripcion = ?,
+            activa = ?
+            WHERE id_carrera = ?");
+        
+        if (!$updateStmt) {
+            throw new Exception("Error al preparar actualización: " . $db->error);
+        }
+        
+        $updateStmt->bind_param(
+            "sssissiii",
+            $nombre,
+            $codigo,
+            $tipo_formacion,
+            $duracion_semestres,
+            $titulo_mostrar,
+            $titulo_opcional, // Nuevo campo
+            $descripcion,
+            $activa,
+            $id
+        );
+        
+        if (!$updateStmt->execute()) {
+            throw new Exception("Error al actualizar carrera: " . $updateStmt->error);
+        }
+        
+        $updateStmt->close();
+        $db->commit();
+        
+        return [
+            'success' => true,
+            'message' => 'Programa académico actualizado exitosamente'
+        ];
+        
+    } catch (Exception $e) {
+        if (isset($db) && method_exists($db, 'rollback')) {
+            $db->rollback();
+        }
+        error_log("Error en actualizarCarrera: " . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => 'Error al actualizar programa: ' . $e->getMessage()
+        ];
     }
-    
-    $duracion = $datos['duracion_semestres'] ?? null;
-    
-    $stmt->bind_param(
-        "sssissi",
-        $datos['nombre_carrera'],
-        $datos['cod_carrera'],
-        $datos['tipo_formacion'],
-        $duracion,
-        $datos['titulo_otorga'],
-        $datos['descripcion'],
-        $id_carrera
-    );
-    
-    $resultado = $stmt->execute();
-    
-    return $resultado && $stmt->affected_rows > 0;
 }
 
 
@@ -3171,7 +3282,20 @@ function obtenerListaCompletaUsuarios() {
 }
 
 
-// OBTENER LOS DATOS SIMPLES
+// OBTENER LOS DATOS SIMPLES****************************************************************************************
+
+
+function obtenerTiposFormacion($db) {
+    $tipos = [];
+    $query = "SELECT id, tipo FROM tipo_formacion ORDER BY id";
+    $result = $db->query($query);
+    while ($row = $result->fetch_assoc()) {
+        $tipos[$row['id']] = $row['tipo'];
+    }
+    return $tipos;
+}
+
+
 
 
 function obtenerGeneros($db) {

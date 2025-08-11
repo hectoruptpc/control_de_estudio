@@ -18,7 +18,8 @@ $tablasCampos = [
     'tipo_cedula' => 'tipo',
     'tipo_vivienda' => 'vivienda',
     'ingresos' => 'ingreso',
-    'genero' => 'genero'
+    'genero' => 'genero',
+    'tipo_formacion' => 'tipo'
 ];
 
 // Procesar formularios
@@ -110,6 +111,7 @@ $tenenciasVivienda = obtenerTenenciaViviendas($db);
 $opcionesStatus = obtenerOpcionesStatus($db);
 $ingresos = obtenerIngresos($db);
 $generos = obtenerGeneros($db);
+$tiposFormacion = obtenerTiposFormacion($db);
 
 include("includes/head.php");
 ?>
@@ -146,6 +148,9 @@ include("includes/head.php");
         </li>
         <li class="nav-item">
             <a class="nav-link" id="genero-tab" data-toggle="tab" href="#genero" role="tab">Género</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="formacion-tab" data-toggle="tab" href="#formacion" role="tab">Tipo Formación</a>
         </li>
     </ul>
     
@@ -425,6 +430,47 @@ include("includes/head.php");
                                             <i class="fas fa-edit"></i> Editar
                                         </button>
                                         <button class="btn btn-sm btn-danger" data-toggle="modal" data-target="#eliminarGeneroModal<?php echo $id; ?>">
+                                            <i class="fas fa-trash"></i> Eliminar
+                                        </button>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tabla Tipo Formación -->
+        <div class="tab-pane fade" id="formacion" role="tabpanel">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">Tipos de Formación</h6>
+                    <button class="btn btn-primary" data-toggle="modal" data-target="#agregarFormacionModal">
+                        <i class="fas fa-plus"></i> Agregar
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Tipo de Formación</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($tiposFormacion as $id => $formacion): ?>
+                                <tr>
+                                    <td><?php echo $id; ?></td>
+                                    <td><?php echo $formacion; ?></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-warning" data-toggle="modal" data-target="#editarFormacionModal<?php echo $id; ?>">
+                                            <i class="fas fa-edit"></i> Editar
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" data-toggle="modal" data-target="#eliminarFormacionModal<?php echo $id; ?>">
                                             <i class="fas fa-trash"></i> Eliminar
                                         </button>
                                     </td>
@@ -1058,6 +1104,96 @@ include("includes/head.php");
                     <input type="hidden" name="tabla" value="genero">
                     <input type="hidden" name="id" value="<?php echo $id; ?>">
                     <p>¿Está seguro que desea eliminar el género "<?php echo htmlspecialchars($genero); ?>"?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" name="accion" value="eliminar" class="btn btn-danger">Eliminar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endforeach; ?>
+
+<!-- Modales para Tipo Formación -->
+<div class="modal fade" id="agregarFormacionModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Agregar Tipo de Formación</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="tabla" value="tipo_formacion">
+                    <div class="form-group">
+                        <label for="nuevo_id_formacion">ID (opcional)</label>
+                        <input type="number" class="form-control" id="nuevo_id_formacion" name="nuevo_id">
+                    </div>
+                    <div class="form-group">
+                        <label for="valor_formacion">Tipo de Formación</label>
+                        <input type="text" class="form-control" id="valor_formacion" name="valor" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" name="accion" value="agregar" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<?php foreach ($tiposFormacion as $id => $formacion): ?>
+<!-- Modal Editar Tipo Formación -->
+<div class="modal fade" id="editarFormacionModal<?php echo $id; ?>" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Tipo de Formación</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="tabla" value="tipo_formacion">
+                    <input type="hidden" name="id" value="<?php echo $id; ?>">
+                    <div class="form-group">
+                        <label for="nuevo_id_formacion_<?php echo $id; ?>">ID</label>
+                        <input type="number" class="form-control" id="nuevo_id_formacion_<?php echo $id; ?>" name="nuevo_id" value="<?php echo $id; ?>">
+                    </div>
+                    <div class="form-group">
+                        <label for="valor_formacion_<?php echo $id; ?>">Tipo de Formación</label>
+                        <input type="text" class="form-control" id="valor_formacion_<?php echo $id; ?>" name="valor" value="<?php echo $formacion; ?>" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" name="accion" value="editar" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Eliminar Tipo Formación -->
+<div class="modal fade" id="eliminarFormacionModal<?php echo $id; ?>" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Eliminar Tipo de Formación</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="tabla" value="tipo_formacion">
+                    <input type="hidden" name="id" value="<?php echo $id; ?>">
+                    <p>¿Está seguro que desea eliminar el tipo de formación "<?php echo $formacion; ?>"?</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
