@@ -6,8 +6,8 @@ $titulopag = "Gestión de Secciones";
 include('../funciones/functions.php');
 
 // Obtener parámetros de acción
-$action = $_POST['action'] ?? 'list';
-$seccion_id = $_POST['id'] ?? 0;
+$action = $_POST['action'] ?? ($_GET['action'] ?? 'list');
+$seccion_id = $_POST['id'] ?? ($_GET['id'] ?? 0);
 $periodo_id = $_POST['periodo'] ?? 0;
 
 // Procesar formularios antes de cualquier output
@@ -558,11 +558,154 @@ include("includes/head.php");
         });
         </script>
 
+    <?php elseif ($action === 'view_schedule' && $seccion_id > 0): ?>
+    <!-- VISTA DE HORARIO SEMANAL -->
+    <?php
+    $seccion = obtenerDetalleSeccion($db, $seccion_id);
+    $horarios = obtenerHorariosSeccion($db, $seccion_id);
+    
+    // Asegurarnos que $horarios es un array
+    $horarios = is_array($horarios) ? $horarios : [];
+    
+    // Preparar datos para la leyenda
+    $leyenda_materias = [];
+    ?>
+    
+    <h1 class="h3 mb-4 text-gray-800">Horario Semanal - <?= htmlspecialchars($seccion['codigo_seccion']) ?></h1>
+    
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">Horario de Clases</h6>
+            <span class="badge badge-info"><?= count($horarios) ?> bloques horarios</span>
+        </div>
+        <div class="card-body">
+            <?php if (empty($horarios)): ?>
+                <div class="alert alert-info">
+                    No se han definido horarios para esta sección.
+                </div>
+            <?php else: ?>
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered table-hover">
+                        <thead class="thead-dark">
+                            <tr>
+                                <th>Hora</th>
+                                <th>Lunes</th>
+                                <th>Martes</th>
+                                <th>Miércoles</th>
+                                <th>Jueves</th>
+                                <th>Viernes</th>
+                                <th>Sábado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            // Generar horas de 7:00 a 16:00 (4:00 PM)
+                            $horas = [];
+                            for ($h = 7; $h <= 16; $h++) {
+                                $horas[] = sprintf("%02d:00", $h);
+                            }
+                            
+                            // Organizar horarios por día y hora
+                            $horarios_organizados = [];
+                            foreach ($horarios as $horario) {
+                                $dia = (int)$horario['dia'];
+                                $hora_inicio = date('H:i', strtotime($horario['hora_inicio']));
+                                $hora_fin = date('H:i', strtotime($horario['hora_fin']));
+                                
+                                // Agregar a horarios organizados
+                                $horarios_organizados[$dia][$hora_inicio] = [
+                                    'materia' => $horario['nombre_materia'],
+                                    'docente' => $horario['nombre_docente'],
+                                    'aula' => $horario['aula'],
+                                    'hora_fin' => $hora_fin,
+                                    'cod_materia' => $horario['cod_materia'] ?? ''
+                                ];
+                                
+                                // Preparar datos para la leyenda (sin duplicados)
+                                $clave_leyenda = $horario['nombre_materia'].$horario['nombre_docente'].$horario['aula'];
+                                if (!isset($leyenda_materias[$clave_leyenda])) {
+                                    $leyenda_materias[$clave_leyenda] = [
+                                        'materia' => $horario['nombre_materia'],
+                                        'docente' => $horario['nombre_docente'],
+                                        'aula' => $horario['aula']
+                                    ];
+                                }
+                            }
+                            
+                            // Mostrar cada fila de hora
+                            foreach ($horas as $hora_actual) {
+                                echo '<tr>';
+                                echo '<th>' . $hora_actual . '</th>';
+                                
+                                // Mostrar cada día (0=Lunes, 5=Sábado)
+                                for ($dia = 0; $dia <= 5; $dia++) {
+                                    echo '<td>';
+                                    
+                                    // Verificar si hay clase en esta hora y día
+                                    if (isset($horarios_organizados[$dia])) {
+                                        foreach ($horarios_organizados[$dia] as $hora_inicio => $clase) {
+                                            // Si la hora actual está dentro del rango de esta clase
+                                            if ($hora_actual >= $hora_inicio && $hora_actual < $clase['hora_fin']) {
+                                                echo '<div class="horario-block">';
+                                                echo htmlspecialchars($clase['materia']);
+                                                echo '</div>';
+                                            }
+                                        }
+                                    }
+                                    
+                                    echo '</td>';
+                                }
+                                
+                                echo '</tr>';
+                            }
+                            ?>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Leyenda de materias -->
+                <div class="card border-left-primary shadow py-2 mb-4">
+                    <div class="card-body">
+                        <h5 class="font-weight-bold text-primary mb-3">Detalle de Materias</h5>
+                        <div class="row">
+                            <?php foreach ($leyenda_materias as $item): ?>
+                                <div class="col-md-4 mb-2">
+                                    <div class="d-flex align-items-center">
+                                        <div class="mr-2">
+                                            <i class="fas fa-book text-gray-500"></i>
+                                        </div>
+                                        <div>
+                                            <strong><?= htmlspecialchars($item['materia']) ?></strong><br>
+                                            <small class="text-muted">
+                                                Prof: <?= htmlspecialchars($item['docente']) ?> | 
+                                                Aula: <?= htmlspecialchars($item['aula']) ?>
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+            
+            <div class="mt-3">
+                <a href="gestion_seccion.php?action=view&id=<?= $seccion_id ?>" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Volver a la sección
+                </a>
+                <button class="btn btn-success float-right" onclick="window.print()">
+                    <i class="fas fa-print"></i> Imprimir Horario
+                </button>
+            </div>
+        </div>
+    </div>
+
     <?php elseif ($action === 'view' && $seccion_id > 0): ?>
         <!-- VISTA DETALLADA DE SECCIÓN -->
         <?php
         $seccion = obtenerDetalleSeccion($db, $seccion_id);
         $estudiantes = obtenerEstudiantesDeSeccion($db, $seccion_id);
+        $horarios = obtenerHorariosSeccion($db, $seccion_id);
         
         $estudiantes_inscritos = count($estudiantes);
         $faltan_para_activar = max(0, MINIMO_ESTUDIANTES - $estudiantes_inscritos);
@@ -630,11 +773,59 @@ include("includes/head.php");
                                         <i class="fas fa-edit"></i> Editar Sección
                                     </button>
                                 </form>
+                                <form method="post" style="display:block; margin-bottom:10px;">
+                                    <input type="hidden" name="action" value="view_schedule">
+                                    <input type="hidden" name="id" value="<?= $seccion_id ?>">
+                                    <button type="submit" class="btn btn-info btn-block">
+                                        <i class="fas fa-calendar-alt"></i> Ver Horario Semanal
+                                    </button>
+                                </form>
                             <?php endif; ?>
                             <a href="gestion_seccion.php" class="btn btn-secondary btn-block">
                                 <i class="fas fa-arrow-left"></i> Volver al listado
                             </a>
                         </div>
+                    </div>
+                </div>
+                
+                <!-- Card para mostrar los horarios de la sección -->
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Horarios de la Sección</h6>
+                    </div>
+                    <div class="card-body">
+                        <?php if (!empty($horarios)): ?>
+                            <div class="table-responsive">
+                                <table class="table table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Día</th>
+                                            <th>Hora Inicio</th>
+                                            <th>Hora Fin</th>
+                                            <th>Aula</th>
+                                            <th>Materia</th>
+                                            <th>Docente</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($horarios as $horario): ?>
+                                            <tr>
+                                                <td><?= $horario['dia_nombre'] ?></td>
+                                                <td><?= date('H:i', strtotime($horario['hora_inicio'])) ?></td>
+                                                <td><?= date('H:i', strtotime($horario['hora_fin'])) ?></td>
+                                                <td><?= htmlspecialchars($horario['aula']) ?></td>
+                                                <td><?= htmlspecialchars($horario['nombre_materia']) ?></td>
+                                                <td><?= htmlspecialchars($horario['nombre_docente']) ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-info">
+                                No se han definido horarios para esta sección.
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>

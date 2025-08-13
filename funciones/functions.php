@@ -4080,6 +4080,83 @@ function mostrarAdvertencia($mensaje) {
 }
 
 
+
+function obtenerHorariosSeccion($db, $id_seccion) {
+    // Validar entrada
+    if (!is_numeric($id_seccion)) {
+        error_log("ID de sección no válido: " . $id_seccion);
+        return [];
+    }
+
+    $sql = "SELECT 
+                h.id_horario,
+                h.dia, 
+                TIME_FORMAT(h.hora_inicio, '%H:%i') as hora_inicio,
+                TIME_FORMAT(h.hora_fin, '%H:%i') as hora_fin, 
+                h.aula,
+                u.id as id_docente,
+                u.nombre AS nombre_docente,
+                m.id_materia,
+                m.cod_materia,
+                m.nombre_materia,
+                m.creditos,
+                m.trayecto
+            FROM horarios h
+            INNER JOIN docente_seccion ds ON h.id_docente_seccion = ds.id_docente_seccion
+            INNER JOIN users u ON ds.id_usuario = u.id
+            INNER JOIN materias m ON ds.id_materia = m.id_materia
+            WHERE ds.id_seccion = ? AND ds.estatus = 1 AND m.activa = 1
+            ORDER BY 
+                FIELD(h.dia, 0, 1, 2, 3, 4, 5),
+                h.hora_inicio";
+
+    $stmt = $db->prepare($sql);
+    if (!$stmt) {
+        error_log("Error al preparar consulta: " . $db->error);
+        return [];
+    }
+
+    $stmt->bind_param("i", $id_seccion);
+    
+    if (!$stmt->execute()) {
+        error_log("Error al ejecutar consulta: " . $stmt->error);
+        return [];
+    }
+
+    $result = $stmt->get_result();
+    if (!$result) {
+        error_log("Error al obtener resultados: " . $db->error);
+        return [];
+    }
+
+    $horarios = $result->fetch_all(MYSQLI_ASSOC);
+    
+    // Convertir números de días a nombres
+    $dias_semana = [
+        0 => 'Lunes',
+        1 => 'Martes',
+        2 => 'Miércoles',
+        3 => 'Jueves',
+        4 => 'Viernes',
+        5 => 'Sábado'
+    ];
+    
+    foreach ($horarios as &$horario) {
+        $numero_dia = (int)$horario['dia'];
+        $horario['dia_nombre'] = $dias_semana[$numero_dia] ?? 'Desconocido';
+    }
+    
+    return $horarios ?: [];
+}
+
+
+
+
+
+
+
+
+
 // FUNCIONES DE PERIODOS ACADEMICOS***********************************************************************
 
 
