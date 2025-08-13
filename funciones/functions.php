@@ -3557,9 +3557,15 @@ define('MINIMO_ESTUDIANTES', 15);
  */
 function crearSeccion($db, $datos) {
     try {
-        $stmt = $db->prepare("INSERT INTO secciones (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, estatus) 
-                            VALUES (?, ?, ?, ?, ?, 'inactiva')");
-        $stmt->bind_param("siiii", $datos['codigo_seccion'], $datos['id_carrera'], $datos['id_trayecto'], $datos['id_periodo'], $datos['capacidad_maxima']);
+        $stmt = $db->prepare("INSERT INTO secciones (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, inicia, estatus) 
+                            VALUES (?, ?, ?, ?, ?, ?, 'inactiva')");
+        $stmt->bind_param("siiiis", 
+            $datos['codigo_seccion'], 
+            $datos['id_carrera'], 
+            $datos['id_trayecto'], 
+            $datos['id_periodo'], 
+            $datos['capacidad_maxima'],
+            $datos['inicia']);
         $stmt->execute();
         $stmt->close();
         
@@ -3575,12 +3581,6 @@ function crearSeccion($db, $datos) {
     }
 }
 
-/**
- * Actualiza una sección existente en la base de datos
- * @param mysqli $db Conexión a la base de datos
- * @param array $datos Datos de la sección (id_seccion, codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima)
- * @return array Resultado de la operación (éxito, mensaje)
- */
 function editarSeccion($db, $datos) {
     try {
         // Verificar si el período está activo
@@ -3602,9 +3602,17 @@ function editarSeccion($db, $datos) {
                                 id_carrera = ?, 
                                 id_trayecto = ?, 
                                 id_periodo = ?, 
-                                capacidad_maxima = ?
+                                capacidad_maxima = ?,
+                                inicia = ?
                             WHERE id_seccion = ?");
-        $stmt->bind_param("siiiii", $datos['codigo_seccion'], $datos['id_carrera'], $datos['id_trayecto'], $datos['id_periodo'], $datos['capacidad_maxima'], $datos['id_seccion']);
+        $stmt->bind_param("siiiisi", 
+            $datos['codigo_seccion'], 
+            $datos['id_carrera'], 
+            $datos['id_trayecto'], 
+            $datos['id_periodo'], 
+            $datos['capacidad_maxima'],
+            $datos['inicia'],
+            $datos['id_seccion']);
         $stmt->execute();
         $stmt->close();
         
@@ -3894,17 +3902,24 @@ function desactivarSeccionesDePeriodo($db, $periodo_id) {
  * @return array Listado de secciones
  */
 function obtenerListadoSecciones($db) {
-    $stmt = $db->prepare("SELECT s.id_seccion, s.codigo_seccion, c.nombre_carrera, t.numero_trayecto, 
-             p.nombre_periodo, p.activo as periodo_activo, s.capacidad_maxima, 
-             CASE WHEN p.activo = 0 THEN 'inactiva' ELSE s.estatus END as estatus,
-             COUNT(es.id_usuario) as inscritos
-              FROM secciones s
-              JOIN carreras c ON s.id_carrera = c.id_carrera
-              JOIN trayectos t ON s.id_trayecto = t.id_trayecto
-              JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
-              LEFT JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion AND es.estatus = 'activo'
-              GROUP BY s.id_seccion
-              ORDER BY p.nombre_periodo DESC, s.codigo_seccion");
+    $stmt = $db->prepare("SELECT 
+                            s.id_seccion, 
+                            s.codigo_seccion, 
+                            c.nombre_carrera, 
+                            t.numero_trayecto, 
+                            p.nombre_periodo, 
+                            p.activo as periodo_activo, 
+                            s.capacidad_maxima,
+                            s.inicia,  
+                            CASE WHEN p.activo = 0 THEN 'inactiva' ELSE s.estatus END as estatus,
+                            COUNT(es.id_usuario) as inscritos
+                          FROM secciones s
+                          JOIN carreras c ON s.id_carrera = c.id_carrera
+                          JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+                          JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
+                          LEFT JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion AND es.estatus = 'activo'
+                          GROUP BY s.id_seccion
+                          ORDER BY p.nombre_periodo DESC, s.codigo_seccion");
     $stmt->execute();
     $result = $stmt->get_result();
     $secciones = $result->fetch_all(MYSQLI_ASSOC);

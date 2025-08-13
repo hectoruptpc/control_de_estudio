@@ -19,7 +19,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'id_carrera' => (int)$_POST['id_carrera'],
             'id_trayecto' => (int)$_POST['id_trayecto'],
             'id_periodo' => (int)$_POST['id_periodo'],
-            'capacidad_maxima' => (int)$_POST['capacidad_maxima']
+            'capacidad_maxima' => (int)$_POST['capacidad_maxima'],
+            'inicia' => $_POST['inicia']
         ];
         
         $resultado = crearSeccion($db, $datos);
@@ -40,7 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'id_carrera' => (int)$_POST['id_carrera'],
             'id_trayecto' => (int)$_POST['id_trayecto'],
             'id_periodo' => (int)$_POST['id_periodo'],
-            'capacidad_maxima' => (int)$_POST['capacidad_maxima']
+            'capacidad_maxima' => (int)$_POST['capacidad_maxima'],
+            'inicia' => $_POST['inicia']
         ];
         
         $resultado = editarSeccion($db, $datos);
@@ -157,6 +159,7 @@ include("includes/head.php");
                                 <th>Carrera</th>
                                 <th>Trayecto</th>
                                 <th>Período</th>
+                                <th>Inicio</th>
                                 <th>Estudiantes</th>
                                 <th>Capacidad</th>
                                 <th>Estado</th>
@@ -194,6 +197,7 @@ include("includes/head.php");
                                 <td><?= htmlspecialchars($seccion['nombre_carrera']) ?></td>
                                 <td>Trayecto <?= $seccion['numero_trayecto'] ?></td>
                                 <td><?= htmlspecialchars($seccion['nombre_periodo']) ?></td>
+                                <td><?= isset($seccion['inicia']) ? date('d/m/Y H:i', strtotime($seccion['inicia'])) : '--' ?></td>
                                 <td>
                                     <div class="progress">
                                         <div class="progress-bar <?= $porcentaje >= 80 ? 'bg-success' : 'bg-info' ?>" 
@@ -330,6 +334,12 @@ include("includes/head.php");
                             <input type="number" class="form-control" id="capacidad_maxima" name="capacidad_maxima" 
                                    value="<?= $seccion['capacidad_maxima'] ?? 30 ?>" min="<?= MINIMO_ESTUDIANTES ?>" required>
                             <small class="form-text text-muted">Mínimo <?= MINIMO_ESTUDIANTES ?> estudiantes</small>
+                        </div>
+                        
+                        <div class="form-group col-md-3">
+                            <label for="inicia">Fecha y Hora de Inicio *</label>
+                            <input type="datetime-local" class="form-control" id="inicia" name="inicia" 
+                                   value="<?= isset($seccion['inicia']) ? date('Y-m-d\TH:i', strtotime($seccion['inicia'])) : '' ?>" required>
                         </div>
                     </div>
                     
@@ -588,6 +598,7 @@ include("includes/head.php");
                         <p><strong>Carrera:</strong> <?= htmlspecialchars($seccion['nombre_carrera']) ?></p>
                         <p><strong>Trayecto:</strong> <?= $seccion['numero_trayecto'] ?></p>
                         <p><strong>Período:</strong> <?= htmlspecialchars($seccion['nombre_periodo']) ?></p>
+                        <p><strong>Inicio de clases:</strong> <?= isset($seccion['inicia']) ? date('d/m/Y H:i', strtotime($seccion['inicia'])) : 'No definido' ?></p>
                         <p><strong>Capacidad:</strong> <?= $estudiantes_inscritos ?>/<?= $seccion['capacidad_maxima'] ?></p>
                         <p><strong>Estado:</strong> 
                             <span class="badge badge-<?= $estado_clase ?>">
