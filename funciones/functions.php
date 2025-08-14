@@ -4150,6 +4150,21 @@ function obtenerHorariosSeccion($db, $id_seccion) {
 }
 
 
+// Función para calcular cuántas filas debe ocupar una clase
+function calcularRowspan($hora_inicio, $hora_fin, $horas) {
+    $inicio = date('H:i', strtotime($hora_inicio));
+    $fin = date('H:i', strtotime($hora_fin));
+    
+    $inicio_index = array_search($inicio, $horas);
+    $fin_index = array_search($fin, $horas);
+    
+    if ($inicio_index === false || $fin_index === false) {
+        return 1; // Por defecto 1 si no encontramos las horas
+    }
+    
+    return $fin_index - $inicio_index;
+}
+
 
 
 
