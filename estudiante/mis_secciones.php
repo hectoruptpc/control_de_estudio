@@ -37,14 +37,15 @@ $user_id = (int)$_SESSION['user']['id'];
                     <?php
                     global $db;
                     
-                    // Consulta optimizada
+                    // Consulta optimizada con el campo inicia
                     $query = "SELECT 
                                 s.codigo_seccion,
                                 c.nombre_carrera,
                                 t.nombre_trayecto,
                                 t.numero_trayecto,
                                 pa.nombre_periodo,
-                                es.fecha_inscripcion
+                                es.fecha_inscripcion,
+                                s.inicia
                               FROM estudiante_seccion es
                               JOIN secciones s ON es.id_seccion = s.id_seccion
                               JOIN carreras c ON s.id_carrera = c.id_carrera
@@ -72,6 +73,7 @@ $user_id = (int)$_SESSION['user']['id'];
                                                     <th>Trayecto</th>
                                                     <th>Nivel</th>
                                                     <th>Periodo</th>
+                                                    <th>Fecha de Inicio</th>
                                                     <th>Inscrito el</th>
                                                 </tr>
                                             </thead>
@@ -84,6 +86,7 @@ $user_id = (int)$_SESSION['user']['id'];
                                             <td>'.htmlspecialchars($row['nombre_trayecto']).'</td>
                                             <td>'.htmlspecialchars($row['numero_trayecto']).'</td>
                                             <td>'.htmlspecialchars($row['nombre_periodo']).'</td>
+                                            <td>'.date('d/m/Y H:i', strtotime($row['inicia'])).'</td>
                                             <td>'.date('d/m/Y', strtotime($row['fecha_inscripcion'])).'</td>
                                         </tr>';
                                 }

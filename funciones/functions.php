@@ -209,7 +209,9 @@ function obtenerTodasLasCarreras() {
     global $db;
     
     $carreras = [];
-    $query = "SELECT id_carrera, nombre_carrera FROM carreras WHERE activa = 1 ORDER BY nombre_carrera ASC";
+    $query = "SELECT id_carrera, nombre_carrera FROM carreras 
+              WHERE activa = 1 AND id_carrera != 0 
+              ORDER BY nombre_carrera ASC";
     
     if ($stmt = $db->prepare($query)) {
         $stmt->execute();
@@ -989,77 +991,114 @@ function cambiarEstadoCarrera($id_carrera, $estado) {
 
 
 // Función para agregar nuevas carreras
-function registrarNuevaCarrera(string $nombre, string $codigo, string $tipo_formacion): array {
-  global $db;
-  
-  try {
-      // Validar tipo de formación
-      $tipos_validos = ['PNF', 'PTF'];
-      if (!in_array($tipo_formacion, $tipos_validos)) {
-          return [
-              'success' => false,
-              'message' => 'Tipo de formación no válido. Debe ser PNF o PTF'
-          ];
-      }
+// Función para agregar nuevas carreras
+function registrarNuevaCarrera(
+    string $nombre, 
+    string $codigo, 
+    string $tipo_formacion, 
+    int $duracion_anios,
+    string $titulo_principal,
+    string $titulo_opcional = ''
+): array {
+    global $db;
+    
+    try {
+        // Validar duración
+        if ($duracion_anios < 1 || $duracion_anios > 6) {
+            return [
+                'success' => false,
+                'message' => 'La duración debe estar entre 1 y 6 años'
+            ];
+        }
 
-      // Verificar duplicados con transacción
-      $db->begin_transaction();
-      
-      // 1. Verificar si el código ya existe
-      $checkStmt = $db->prepare("SELECT id_carrera FROM carreras WHERE cod_carrera = ? FOR UPDATE");
-      if (!$checkStmt) {
-          throw new Exception("Error al preparar consulta de verificación: " . $db->error);
-      }
-      
-      $checkStmt->bind_param("s", $codigo);
-      if (!$checkStmt->execute()) {
-          throw new Exception("Error al verificar código: " . $checkStmt->error);
-      }
-      
-      $checkStmt->store_result();
-      
-      if ($checkStmt->num_rows > 0) {
-          $checkStmt->close();
-          $db->rollback();
-          return [
-              'success' => false,
-              'message' => 'El código de carrera ya existe'
-          ];
-      }
-      $checkStmt->close();
-      
-      // 2. Insertar nueva carrera
-      $insertStmt = $db->prepare("INSERT INTO carreras (nombre_carrera, cod_carrera, tipo_formacion, activa) VALUES (?, ?, ?, 1)");
-      if (!$insertStmt) {
-          throw new Exception("Error al preparar inserción: " . $db->error);
-      }
-      
-      $insertStmt->bind_param("sss", $nombre, $codigo, $tipo_formacion);
-      if (!$insertStmt->execute()) {
-          throw new Exception("Error al insertar carrera: " . $insertStmt->error);
-      }
-      
-      $insertId = $db->insert_id;
-      $insertStmt->close();
-      
-      $db->commit();
-      
-      return [
-          'success' => true,
-          'message' => 'Carrera registrada exitosamente',
-          'id_carrera' => $insertId
-      ];
-      
-  } catch (Exception $e) {
-      if (isset($db) && method_exists($db, 'rollback')) {
-          $db->rollback();
-      }
-      error_log("Error en registrarNuevaCarrera: " . $e->getMessage());
-      return [
-          'success' => false,
-          'message' => 'Error al registrar carrera: ' . $e->getMessage()
-      ];
-  }
+        // Validar título principal
+        if (empty($titulo_principal)) {
+            return [
+                'success' => false,
+                'message' => 'El título principal es obligatorio'
+            ];
+        }
+
+        // Convertir años a semestres
+        $duracion_semestres = $duracion_anios * 2;
+
+        // Verificar duplicados con transacción
+        $db->begin_transaction();
+        
+        // 1. Verificar si el código ya existe
+        $checkStmt = $db->prepare("SELECT id_carrera FROM carreras WHERE cod_carrera = ? FOR UPDATE");
+        if (!$checkStmt) {
+            throw new Exception("Error al preparar consulta de verificación: " . $db->error);
+        }
+        
+        $checkStmt->bind_param("s", $codigo);
+        if (!$checkStmt->execute()) {
+            throw new Exception("Error al verificar código: " . $checkStmt->error);
+        }
+        
+        $checkStmt->store_result();
+        
+        if ($checkStmt->num_rows > 0) {
+            $checkStmt->close();
+            $db->rollback();
+            return [
+                'success' => false,
+                'message' => 'El código de carrera ya existe'
+            ];
+        }
+        $checkStmt->close();
+        
+        // 2. Insertar nueva carrera
+        $insertStmt = $db->prepare("INSERT INTO carreras 
+            (nombre_carrera, cod_carrera, tipo_formacion, duracion_semestres, titulo_otorga, otro_titulo, descripcion, activa) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1)");
+        
+        if (!$insertStmt) {
+            throw new Exception("Error al preparar inserción: " . $db->error);
+        }
+        
+        // Construir descripción con los títulos
+        $descripcion = "Título principal: $titulo_principal";
+        if (!empty($titulo_opcional)) {
+            $descripcion .= "\nTítulo opcional: $titulo_opcional";
+        }
+        
+        $insertStmt->bind_param(
+            "sssisss", 
+            $nombre, 
+            $codigo, 
+            $tipo_formacion,
+            $duracion_semestres,
+            $titulo_principal,  // Solo el título principal
+            $titulo_opcional,   // Título opcional por separado
+            $descripcion
+        );
+        
+        if (!$insertStmt->execute()) {
+            throw new Exception("Error al insertar carrera: " . $insertStmt->error);
+        }
+        
+        $insertId = $db->insert_id;
+        $insertStmt->close();
+        
+        $db->commit();
+        
+        return [
+            'success' => true,
+            'message' => 'Carrera registrada exitosamente',
+            'id_carrera' => $insertId
+        ];
+        
+    } catch (Exception $e) {
+        if (isset($db) && method_exists($db, 'rollback')) {
+            $db->rollback();
+        }
+        error_log("Error en registrarNuevaCarrera: " . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => 'Error al registrar carrera: ' . $e->getMessage()
+        ];
+    }
 }
 
 // Función para obtener una carrera específica por ID
@@ -1073,7 +1112,7 @@ function obtenerCarreraPorId($id) {
     }
     
     $query = "SELECT id_carrera, nombre_carrera, cod_carrera, activa, 
-                     duracion_semestres, titulo_otorga, descripcion, tipo_formacion 
+                     duracion_semestres, titulo_otorga, otro_titulo, descripcion, tipo_formacion 
               FROM carreras 
               WHERE id_carrera = ? 
               LIMIT 1";
@@ -1105,40 +1144,110 @@ function obtenerCarreraPorId($id) {
 }
 
 
-function actualizarCarrera($id_carrera, $datos) {
+function actualizarCarrera(
+    int $id,
+    string $nombre,
+    string $codigo,
+    string $tipo_formacion,
+    int $duracion_semestres,
+    string $titulo_principal,
+    string $titulo_opcional = '',
+    string $descripcion = '',
+    int $activa = 1
+): array {
     global $db;
     
-    $query = "UPDATE carreras SET 
-              nombre_carrera = ?,
-              cod_carrera = ?,
-              tipo_formacion = ?,
-              duracion_semestres = ?,
-              titulo_otorga = ?,
-              descripcion = ?
-              WHERE id_carrera = ?";
+    try {
+        // Validar título principal
+        if (empty($titulo_principal)) {
+            return [
+                'success' => false,
+                'message' => 'El título principal es obligatorio'
+            ];
+        }
 
-    $stmt = $db->prepare($query);
-
-    if (!$stmt) {
-        throw new Exception("Error en preparación de consulta: " . $db->error);
+        // Verificar duplicados (excluyendo el registro actual)
+        $db->begin_transaction();
+        
+        $checkStmt = $db->prepare("SELECT id_carrera FROM carreras WHERE cod_carrera = ? AND id_carrera != ? FOR UPDATE");
+        if (!$checkStmt) {
+            throw new Exception("Error al preparar consulta de verificación: " . $db->error);
+        }
+        
+        $checkStmt->bind_param("si", $codigo, $id);
+        if (!$checkStmt->execute()) {
+            throw new Exception("Error al verificar código: " . $checkStmt->error);
+        }
+        
+        $checkStmt->store_result();
+        
+        if ($checkStmt->num_rows > 0) {
+            $checkStmt->close();
+            $db->rollback();
+            return [
+                'success' => false,
+                'message' => 'El código de carrera ya está en uso por otro programa'
+            ];
+        }
+        $checkStmt->close();
+        
+        // Actualizar carrera
+        $updateStmt = $db->prepare("UPDATE carreras SET 
+            nombre_carrera = ?,
+            cod_carrera = ?,
+            tipo_formacion = ?,
+            duracion_semestres = ?,
+            titulo_otorga = ?,
+            otro_titulo = ?,
+            descripcion = ?,
+            activa = ?
+            WHERE id_carrera = ?");
+        
+        if (!$updateStmt) {
+            throw new Exception("Error al preparar actualización: " . $db->error);
+        }
+        
+        // Construir descripción actualizada
+        $descripcion_actualizada = "Título principal: $titulo_principal";
+        if (!empty($titulo_opcional)) {
+            $descripcion_actualizada .= "\nTítulo opcional: $titulo_opcional";
+        }
+        
+        $updateStmt->bind_param(
+            "sssissiii",
+            $nombre,
+            $codigo,
+            $tipo_formacion,
+            $duracion_semestres,
+            $titulo_principal,  // Solo el título principal
+            $titulo_opcional,   // Título opcional por separado
+            $descripcion_actualizada,
+            $activa,
+            $id
+        );
+        
+        if (!$updateStmt->execute()) {
+            throw new Exception("Error al actualizar carrera: " . $updateStmt->error);
+        }
+        
+        $updateStmt->close();
+        $db->commit();
+        
+        return [
+            'success' => true,
+            'message' => 'Programa académico actualizado exitosamente'
+        ];
+        
+    } catch (Exception $e) {
+        if (isset($db) && method_exists($db, 'rollback')) {
+            $db->rollback();
+        }
+        error_log("Error en actualizarCarrera: " . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => 'Error al actualizar programa: ' . $e->getMessage()
+        ];
     }
-    
-    $duracion = $datos['duracion_semestres'] ?? null;
-    
-    $stmt->bind_param(
-        "sssissi",
-        $datos['nombre_carrera'],
-        $datos['cod_carrera'],
-        $datos['tipo_formacion'],
-        $duracion,
-        $datos['titulo_otorga'],
-        $datos['descripcion'],
-        $id_carrera
-    );
-    
-    $resultado = $stmt->execute();
-    
-    return $resultado && $stmt->affected_rows > 0;
 }
 
 
@@ -1158,6 +1267,34 @@ function insertarDocente(array $datos): array {
             throw new Exception("Faltan campos requeridos: " . implode(', ', $faltantes));
         }
 
+        // Obtener el texto del tipo de documento
+        $stmtTipo = $db->prepare("SELECT tipo FROM tipo_cedula WHERE id = ?");
+        $stmtTipo->bind_param("i", $datos['tipo_documento']);
+        $stmtTipo->execute();
+        $stmtTipo->bind_result($tipo_documento_texto);
+        $stmtTipo->fetch();
+        $stmtTipo->close();
+
+        // Concatenar tipo y documento SIN guión
+        $idusuario = $tipo_documento_texto . $datos['documento'];
+
+        // Verificar si existe la carrera especificada o usar "No Especificado" (ID 0)
+        if (isset($datos['carrera']) && $datos['carrera'] !== '') {
+            $stmt = $db->prepare("SELECT id_carrera FROM carreras WHERE id_carrera = ?");
+            $stmt->bind_param("i", $datos['carrera']);
+            $stmt->execute();
+            $stmt->store_result();
+            
+            if ($stmt->num_rows === 0) {
+                $stmt->close();
+                throw new Exception("La carrera especificada no existe");
+            }
+            $stmt->close();
+        } else {
+            // Si no se especifica carrera, usar ID 0 ("No Especificado")
+            $datos['carrera'] = 0;
+        }
+
         // 1. Preparación de datos
         $username = strtolower(str_replace(' ', '.', $datos['nombre']));
         $password = password_hash($datos['documento'], PASSWORD_DEFAULT);
@@ -1175,7 +1312,7 @@ function insertarDocente(array $datos): array {
 
         // Verificar si el usuario ya existe
         $checkStmt = $db->prepare("SELECT id FROM users WHERE idusuario = ? LIMIT 1");
-        $checkStmt->bind_param("s", $valores['idusuario']);
+        $checkStmt->bind_param("s", $idusuario);
         $checkStmt->execute();
         $checkStmt->store_result();
         
@@ -1223,18 +1360,19 @@ function insertarDocente(array $datos): array {
                 'tenencia_vivienda' => $datos['tenencia_vivienda'] ?? '',
                 'enfermedad' => $datos['enfermedad'] ?? '',
                 'discapacidad' => $datos['discapacidad'] ?? '',
-                'titulos' => '', // Ya no necesitamos esto aquí
-                'institutos' => '', // Ya no necesitamos esto aquí
+                'titulos' => '',
+                'institutos' => '',
                 'potencialidades' => $potencialidades,
                 'api_key' => $api_key,
-                'fecha_ingreso' => $datos['fecha_ingreso'] ?? date('Y-m-d')
+                'fecha_ingreso' => $datos['fecha_ingreso'] ?? date('Y-m-d'),
+                'carrera' => $datos['carrera']
             ]
         ];
 
         // 4. Combinar todos los valores
         $valores = array_merge(
             [
-                'idusuario' => $datos['tipo_documento'] . '-' . $datos['documento'],
+                'idusuario' => $idusuario,
                 'nombre' => $datos['nombre'],
                 'username' => $username,
                 'email' => $datos['email'],
@@ -1246,7 +1384,6 @@ function insertarDocente(array $datos): array {
                 'status' => ($datos['estado_laboral'] == 'Activo') ? 1 : 0,
                 'user_type' => 'docente',
                 'password' => $password,
-                'carrera' => '', // Dejamos carrera vacía o puedes eliminarla si no se usa
                 'genero' => $datos['genero'],
                 'edo_civil' => $datos['estado_civil'],
                 'fecha_nac' => $datos['fecha_nacimiento'],
@@ -1345,7 +1482,7 @@ function insertarDocente(array $datos): array {
             'message' => 'Docente registrado exitosamente',
             'id' => $idInsertado,
             'username' => $username,
-            'password_temp' => $datos['documento'] // Solo para referencia inicial
+            'password_temp' => $datos['documento']
         ];
 
     } catch(Exception $e) {
@@ -3141,7 +3278,73 @@ function obtenerListaCompletaUsuarios() {
 }
 
 
-// OBTENER LOS DATOS SIMPLES
+// OBTENER LOS DATOS SIMPLES****************************************************************************************
+
+
+/**
+ * Genera el HTML para un select de tipos de formación
+ * @param string $name Nombre del campo select
+ * @param int|null $selected_id ID del tipo seleccionado (opcional)
+ * @param string $class Clases CSS adicionales (opcional)
+ * @return string HTML del select
+ */
+function selectTiposFormacion($name = 'tipo_formacion', $selected_id = null, $class = 'form-control') {
+    global $db;
+    $html = '<select class="'.$class.'" id="'.$name.'" name="'.$name.'" required>';
+    $html .= '<option value="">Seleccione un tipo de formación</option>';
+    
+    $query = "SELECT id, tipo FROM tipo_formacion ORDER BY tipo";
+    $result = $db->query($query);
+    
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $selected = ($selected_id == $row['id']) ? 'selected' : '';
+            $html .= '<option value="'.htmlspecialchars($row['id']).'" '.$selected.'>'
+                   . htmlspecialchars($row['tipo']) . '</option>';
+        }
+        $result->free();
+    }
+    
+    $html .= '</select>';
+    return $html;
+}
+
+function obtenerTiposFormacion($db) {
+    $tipos = [];
+    $query = "SELECT id, tipo FROM tipo_formacion ORDER BY id";
+    $result = $db->query($query);
+    while ($row = $result->fetch_assoc()) {
+        $tipos[$row['id']] = $row['tipo'];
+    }
+    return $tipos;
+}
+
+
+
+
+function obtenerGeneros($db) {
+    $generos = [];
+    $query = "SELECT id, genero FROM genero ORDER BY id";
+    
+    try {
+        $result = $db->query($query);
+        if (!$result) {
+            throw new Exception("Error en la consulta: " . $db->error);
+        }
+        
+        while ($row = $result->fetch_assoc()) {
+            $generos[$row['id']] = $row['genero'];
+        }
+        
+        return $generos;
+    } catch (Exception $e) {
+        error_log("Error en obtenerGeneros: " . $e->getMessage());
+        return [];
+    }
+}
+
+
+
 
 function obtenerTiposCedula($db) {
     $tipos = [];
@@ -3354,9 +3557,15 @@ define('MINIMO_ESTUDIANTES', 15);
  */
 function crearSeccion($db, $datos) {
     try {
-        $stmt = $db->prepare("INSERT INTO secciones (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, estatus) 
-                            VALUES (?, ?, ?, ?, ?, 'inactiva')");
-        $stmt->bind_param("siiii", $datos['codigo_seccion'], $datos['id_carrera'], $datos['id_trayecto'], $datos['id_periodo'], $datos['capacidad_maxima']);
+        $stmt = $db->prepare("INSERT INTO secciones (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, inicia, estatus) 
+                            VALUES (?, ?, ?, ?, ?, ?, 'inactiva')");
+        $stmt->bind_param("siiiis", 
+            $datos['codigo_seccion'], 
+            $datos['id_carrera'], 
+            $datos['id_trayecto'], 
+            $datos['id_periodo'], 
+            $datos['capacidad_maxima'],
+            $datos['inicia']);
         $stmt->execute();
         $stmt->close();
         
@@ -3372,12 +3581,6 @@ function crearSeccion($db, $datos) {
     }
 }
 
-/**
- * Actualiza una sección existente en la base de datos
- * @param mysqli $db Conexión a la base de datos
- * @param array $datos Datos de la sección (id_seccion, codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima)
- * @return array Resultado de la operación (éxito, mensaje)
- */
 function editarSeccion($db, $datos) {
     try {
         // Verificar si el período está activo
@@ -3399,9 +3602,17 @@ function editarSeccion($db, $datos) {
                                 id_carrera = ?, 
                                 id_trayecto = ?, 
                                 id_periodo = ?, 
-                                capacidad_maxima = ?
+                                capacidad_maxima = ?,
+                                inicia = ?
                             WHERE id_seccion = ?");
-        $stmt->bind_param("siiiii", $datos['codigo_seccion'], $datos['id_carrera'], $datos['id_trayecto'], $datos['id_periodo'], $datos['capacidad_maxima'], $datos['id_seccion']);
+        $stmt->bind_param("siiiisi", 
+            $datos['codigo_seccion'], 
+            $datos['id_carrera'], 
+            $datos['id_trayecto'], 
+            $datos['id_periodo'], 
+            $datos['capacidad_maxima'],
+            $datos['inicia'],
+            $datos['id_seccion']);
         $stmt->execute();
         $stmt->close();
         
@@ -3640,7 +3851,7 @@ function contarEstudiantesActivos($db, $seccion_id) {
  * @param int $count Número de estudiantes activos
  */
 function actualizarEstadoSeccion($db, $seccion_id, $count) {
-    // Primero verificar si el período está activo
+    // Obtener información del período
     $stmt = $db->prepare("SELECT p.activo FROM secciones s
                          JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
                          WHERE s.id_seccion = ?");
@@ -3650,15 +3861,40 @@ function actualizarEstadoSeccion($db, $seccion_id, $count) {
     $periodo = $result->fetch_assoc();
     $stmt->close();
     
-    // Solo actualizar el estado si el período está activo
-    if ($periodo['activo'] == 1) {
+    // Determinar el nuevo estado
+    if ($periodo['activo'] == 0) {
+        $nuevo_estatus = 'inactiva'; // Siempre inactiva si el período está inactivo
+    } else {
         $nuevo_estatus = ($count >= MINIMO_ESTUDIANTES) ? 'activa' : 'inactiva';
-        $stmt = $db->prepare("UPDATE secciones SET estatus = ? WHERE id_seccion = ?");
-        $stmt->bind_param("si", $nuevo_estatus, $seccion_id);
-        $stmt->execute();
-        $stmt->close();
     }
+    
+    // Actualizar el estado de la sección
+    $stmt = $db->prepare("UPDATE secciones SET estatus = ? WHERE id_seccion = ?");
+    $stmt->bind_param("si", $nuevo_estatus, $seccion_id);
+    $stmt->execute();
+    $stmt->close();
 }
+
+
+
+/**
+ * Desactiva todas las secciones de un período académico cuando este se desactiva
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $periodo_id ID del período académico
+ */
+function desactivarSeccionesDePeriodo($db, $periodo_id) {
+    $stmt = $db->prepare("UPDATE secciones SET estatus = 'inactiva' WHERE id_periodo = ?");
+    $stmt->bind_param("i", $periodo_id);
+    $stmt->execute();
+    $stmt->close();
+}
+
+
+
+
+
+
+
 
 /**
  * Obtiene el listado de secciones con información relevante
@@ -3666,16 +3902,24 @@ function actualizarEstadoSeccion($db, $seccion_id, $count) {
  * @return array Listado de secciones
  */
 function obtenerListadoSecciones($db) {
-    $stmt = $db->prepare("SELECT s.id_seccion, s.codigo_seccion, c.nombre_carrera, t.numero_trayecto, 
-             p.nombre_periodo, p.activo as periodo_activo, s.capacidad_maxima, s.estatus,
-             COUNT(es.id_usuario) as inscritos
-              FROM secciones s
-              JOIN carreras c ON s.id_carrera = c.id_carrera
-              JOIN trayectos t ON s.id_trayecto = t.id_trayecto
-              JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
-              LEFT JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion AND es.estatus = 'activo'
-              GROUP BY s.id_seccion
-              ORDER BY p.nombre_periodo DESC, s.codigo_seccion");
+    $stmt = $db->prepare("SELECT 
+                            s.id_seccion, 
+                            s.codigo_seccion, 
+                            c.nombre_carrera, 
+                            t.numero_trayecto, 
+                            p.nombre_periodo, 
+                            p.activo as periodo_activo, 
+                            s.capacidad_maxima,
+                            s.inicia,  
+                            CASE WHEN p.activo = 0 THEN 'inactiva' ELSE s.estatus END as estatus,
+                            COUNT(es.id_usuario) as inscritos
+                          FROM secciones s
+                          JOIN carreras c ON s.id_carrera = c.id_carrera
+                          JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+                          JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
+                          LEFT JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion AND es.estatus = 'activo'
+                          GROUP BY s.id_seccion
+                          ORDER BY p.nombre_periodo DESC, s.codigo_seccion");
     $stmt->execute();
     $result = $stmt->get_result();
     $secciones = $result->fetch_all(MYSQLI_ASSOC);
@@ -3705,8 +3949,8 @@ function obtenerDatosSeccion($db, $seccion_id) {
  * @return array Datos para los selects (carreras, trayectos, periodos)
  */
 function obtenerDatosSelects($db) {
-    // Carreras
-    $stmt = $db->prepare("SELECT id_carrera, nombre_carrera FROM carreras WHERE activa = 1");
+    // Carreras - Excluyendo la que tiene id_carrera = 0 (No especificado)
+    $stmt = $db->prepare("SELECT id_carrera, nombre_carrera FROM carreras WHERE activa = 1 AND id_carrera != 0");
     $stmt->execute();
     $result = $stmt->get_result();
     $carreras = $result->fetch_all(MYSQLI_ASSOC);
@@ -3741,6 +3985,7 @@ function obtenerDatosSelects($db) {
  */
 function obtenerDetalleSeccion($db, $seccion_id) {
     $stmt = $db->prepare("SELECT s.*, c.nombre_carrera, t.numero_trayecto, p.nombre_periodo, p.activo as periodo_activo,
+                         CASE WHEN p.activo = 0 THEN 'inactiva' ELSE s.estatus END as estatus,
                          COUNT(es.id_usuario) as inscritos
                   FROM secciones s
                   JOIN carreras c ON s.id_carrera = c.id_carrera
@@ -3769,7 +4014,7 @@ function obtenerDetalleSeccion($db, $seccion_id) {
  * @return array Estudiantes asignados
  */
 function obtenerEstudiantesDeSeccion($db, $seccion_id) {
-    $stmt = $db->prepare("SELECT u.id, u.nombre, u.username, es.fecha_inscripcion
+    $stmt = $db->prepare("SELECT u.id, u.nombre, u.idusuario, es.fecha_inscripcion
                   FROM users u
                   JOIN estudiante_seccion es ON u.id = es.id_usuario
                   WHERE es.id_seccion = ? AND es.estatus = 'activo'
@@ -3790,7 +4035,7 @@ function obtenerEstudiantesDeSeccion($db, $seccion_id) {
  * @return array Estudiantes disponibles
  */
 function obtenerEstudiantesDisponibles($db, $seccion_id, $carrera_id) {
-    $stmt = $db->prepare("SELECT u.id, u.nombre, u.username, 
+    $stmt = $db->prepare("SELECT u.id, u.nombre, u.idusuario, 
                          (SELECT COUNT(*) FROM estudiante_seccion 
                           WHERE id_usuario = u.id AND id_seccion = ? AND estatus = 'activo') as asignado
                   FROM users u
@@ -3835,7 +4080,99 @@ function mostrarAdvertencia($mensaje) {
 }
 
 
-// FUNCIONES DE PERIODOS ESCOLARES***********************************************************************
+
+function obtenerHorariosSeccion($db, $id_seccion) {
+    // Validar entrada
+    if (!is_numeric($id_seccion)) {
+        error_log("ID de sección no válido: " . $id_seccion);
+        return [];
+    }
+
+    $sql = "SELECT 
+                h.id_horario,
+                h.dia, 
+                TIME_FORMAT(h.hora_inicio, '%H:%i') as hora_inicio,
+                TIME_FORMAT(h.hora_fin, '%H:%i') as hora_fin, 
+                h.aula,
+                u.id as id_docente,
+                u.nombre AS nombre_docente,
+                m.id_materia,
+                m.cod_materia,
+                m.nombre_materia,
+                m.creditos,
+                m.trayecto
+            FROM horarios h
+            INNER JOIN docente_seccion ds ON h.id_docente_seccion = ds.id_docente_seccion
+            INNER JOIN users u ON ds.id_usuario = u.id
+            INNER JOIN materias m ON ds.id_materia = m.id_materia
+            WHERE ds.id_seccion = ? AND ds.estatus = 1 AND m.activa = 1
+            ORDER BY 
+                FIELD(h.dia, 0, 1, 2, 3, 4, 5),
+                h.hora_inicio";
+
+    $stmt = $db->prepare($sql);
+    if (!$stmt) {
+        error_log("Error al preparar consulta: " . $db->error);
+        return [];
+    }
+
+    $stmt->bind_param("i", $id_seccion);
+    
+    if (!$stmt->execute()) {
+        error_log("Error al ejecutar consulta: " . $stmt->error);
+        return [];
+    }
+
+    $result = $stmt->get_result();
+    if (!$result) {
+        error_log("Error al obtener resultados: " . $db->error);
+        return [];
+    }
+
+    $horarios = $result->fetch_all(MYSQLI_ASSOC);
+    
+    // Convertir números de días a nombres
+    $dias_semana = [
+        0 => 'Lunes',
+        1 => 'Martes',
+        2 => 'Miércoles',
+        3 => 'Jueves',
+        4 => 'Viernes',
+        5 => 'Sábado'
+    ];
+    
+    foreach ($horarios as &$horario) {
+        $numero_dia = (int)$horario['dia'];
+        $horario['dia_nombre'] = $dias_semana[$numero_dia] ?? 'Desconocido';
+    }
+    
+    return $horarios ?: [];
+}
+
+
+// Función para calcular cuántas filas debe ocupar una clase
+function calcularRowspan($hora_inicio, $hora_fin, $horas) {
+    $inicio = date('H:i', strtotime($hora_inicio));
+    $fin = date('H:i', strtotime($hora_fin));
+    
+    $inicio_index = array_search($inicio, $horas);
+    $fin_index = array_search($fin, $horas);
+    
+    if ($inicio_index === false || $fin_index === false) {
+        return 1; // Por defecto 1 si no encontramos las horas
+    }
+    
+    return $fin_index - $inicio_index;
+}
+
+
+
+
+
+
+
+
+// FUNCIONES DE PERIODOS ACADEMICOS***********************************************************************
 
 
 
@@ -3892,18 +4229,50 @@ function actualizarPeriodoAcademico($db, $id, $nombre, $fecha_inicio, $fecha_fin
 }
 
 /**
- * Cambia el estado (activo/inactivo) de un periodo académico
+ * Cambia el estado de un período académico
  * @param mysqli $db Conexión a la base de datos
- * @param int $id ID del periodo
- * @param int $estado Nuevo estado (1 para activo, 0 para inactivo)
- * @return bool True si se actualizó correctamente
+ * @param int $periodo_id ID del período
+ * @param int $nuevo_estado Nuevo estado (1 para activo, 0 para inactivo)
+ * @return bool True si la operación fue exitosa
  */
-function cambiarEstadoPeriodo($db, $id, $estado) {
-    $query = "UPDATE periodos_academicos SET activo = ? WHERE id_periodo = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("ii", $estado, $id);
-    return $stmt->execute();
+function cambiarEstadoPeriodo($db, $periodo_id, $nuevo_estado) {
+    try {
+        $stmt = $db->prepare("UPDATE periodos_academicos SET activo = ? WHERE id_periodo = ?");
+        $stmt->bind_param("ii", $nuevo_estado, $periodo_id);
+        $stmt->execute();
+        $stmt->close();
+        return true;
+    } catch (Exception $e) {
+        error_log("Error al cambiar estado del período: " . $e->getMessage());
+        return false;
+    }
 }
+
+
+/**
+ * Actualiza el estado de todas las secciones de un período cuando este se activa
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $periodo_id ID del período académico
+ */
+function actualizarEstadoSeccionesDePeriodo($db, $periodo_id) {
+    // Obtener todas las secciones del período
+    $stmt = $db->prepare("SELECT id_seccion FROM secciones WHERE id_periodo = ?");
+    $stmt->bind_param("i", $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $secciones = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    
+    // Actualizar el estado de cada sección
+    foreach ($secciones as $seccion) {
+        $count = contarEstudiantesActivos($db, $seccion['id_seccion']);
+        actualizarEstadoSeccion($db, $seccion['id_seccion'], $count);
+    }
+}
+
+
+
+
 
 // PANEL DE ESTUDIANTE, SECCIONES ***********************************************************************
 
@@ -3982,7 +4351,7 @@ function obtenerCompañerosSeccion($db, $seccion_id, $estudiante_id) {
 
 
 
-// ES ESTUDIANTE *******************************************************************************************************
+
 
 
 

@@ -1,4 +1,17 @@
-<?php $carreras = obtenerListaCompletaCarreras();
+<?php 
+require_once(__DIR__.'/../../funciones/functions.php');
+
+// Obtener lista de carreras con manejo de errores
+try {
+    $carreras = obtenerListaCompletaCarreras();
+    if ($carreras === false) {
+        throw new Exception("Error al obtener la lista de carreras");
+    }
+} catch (Exception $e) {
+    error_log($e->getMessage());
+    $carreras = []; // Array vacío para evitar errores en la vista
+    echo '<div class="alert alert-danger">Error al cargar los datos. Por favor intente nuevamente.</div>';
+}
 ?>
 
 <div class="table-responsive">
@@ -26,10 +39,10 @@
                     </td>
                     <td>
                         <button class="btn btn-sm btn-warning btn-editar" 
-        data-id="<?= intval($carrera['id_carrera']) ?>" 
-        onclick="cargarModalEditar(this)">
-    <i class="fas fa-edit"></i> Editar
-</button>
+                                data-id="<?= intval($carrera['id_carrera']) ?>" 
+                                onclick="cargarModalEditar(this)">
+                            <i class="fas fa-edit"></i> Editar
+                        </button>
                         
                         <?php if ($carrera['activa']): ?>
                             <button class="btn btn-sm btn-danger btn-cambiar-estado" 
@@ -60,6 +73,7 @@
         </tbody>
     </table>
 </div>
+
 <script>
 function cargarModalEditar(button) {
     const idCarrera = $(button).data('id');
@@ -67,7 +81,7 @@ function cargarModalEditar(button) {
     
     if (!idCarrera || isNaN(idCarrera) || idCarrera <= 0) {
         console.error("ID inválido:", idCarrera);
-        alert("Error: ID de carrera inválido");
+        mostrarAlerta('danger', "Error: ID de carrera inválido");
         return;
     }
 
@@ -78,9 +92,19 @@ function cargarModalEditar(button) {
         dataType: 'html',
         beforeSend: function() {
             console.log("Enviando ID válido:", idCarrera);
+            // Mostrar spinner de carga
+            $('#modalEditarCarrera .modal-content').html(`
+                <div class="modal-body text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="sr-only">Cargando...</span>
+                    </div>
+                    <p class="mt-2">Cargando información de la carrera...</p>
+                </div>
+            `);
+            $('#modalEditarCarrera').modal('show');
         },
         success: function(data) {
-            $('#editarCarreraModal .modal-content').html(data);
+            $('#modalEditarCarrera .modal-content').html(data);
         },
         error: function(xhr, status, error) {
             console.error("Error en la solicitud:", {
@@ -88,8 +112,40 @@ function cargarModalEditar(button) {
                 error: error,
                 response: xhr.responseText
             });
-            alert("Error al cargar los datos. Ver consola para detalles.");
+            $('#modalEditarCarrera .modal-content').html(`
+                <div class="modal-body">
+                    <div class="alert alert-danger">
+                        Error al cargar los datos. Por favor intente nuevamente.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+                </div>
+            `);
         }
     });
+}
+
+function mostrarAlerta(tipo, mensaje) {
+    // Cerrar alertas existentes
+    $('.alert-dismissible').alert('close');
+    
+    // Crear nueva alerta
+    var alerta = `
+        <div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
+            ${mensaje}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    `;
+    
+    // Insertar la alerta en el contenedor principal
+    $('.container').prepend(alerta);
+    
+    // Cerrar automáticamente después de 5 segundos
+    setTimeout(function() {
+        $('.alert-dismissible').alert('close');
+    }, 5000);
 }
 </script>

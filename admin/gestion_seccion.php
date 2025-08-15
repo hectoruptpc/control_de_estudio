@@ -6,8 +6,8 @@ $titulopag = "Gestión de Secciones";
 include('../funciones/functions.php');
 
 // Obtener parámetros de acción
-$action = $_POST['action'] ?? 'list';
-$seccion_id = $_POST['id'] ?? 0;
+$action = $_POST['action'] ?? ($_GET['action'] ?? 'list');
+$seccion_id = $_POST['id'] ?? ($_GET['id'] ?? 0);
 $periodo_id = $_POST['periodo'] ?? 0;
 
 // Procesar formularios antes de cualquier output
@@ -19,7 +19,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'id_carrera' => (int)$_POST['id_carrera'],
             'id_trayecto' => (int)$_POST['id_trayecto'],
             'id_periodo' => (int)$_POST['id_periodo'],
-            'capacidad_maxima' => (int)$_POST['capacidad_maxima']
+            'capacidad_maxima' => (int)$_POST['capacidad_maxima'],
+            'inicia' => $_POST['inicia']
         ];
         
         $resultado = crearSeccion($db, $datos);
@@ -40,7 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'id_carrera' => (int)$_POST['id_carrera'],
             'id_trayecto' => (int)$_POST['id_trayecto'],
             'id_periodo' => (int)$_POST['id_periodo'],
-            'capacidad_maxima' => (int)$_POST['capacidad_maxima']
+            'capacidad_maxima' => (int)$_POST['capacidad_maxima'],
+            'inicia' => $_POST['inicia']
         ];
         
         $resultado = editarSeccion($db, $datos);
@@ -157,6 +159,7 @@ include("includes/head.php");
                                 <th>Carrera</th>
                                 <th>Trayecto</th>
                                 <th>Período</th>
+                                <th>Inicio</th>
                                 <th>Estudiantes</th>
                                 <th>Capacidad</th>
                                 <th>Estado</th>
@@ -194,6 +197,7 @@ include("includes/head.php");
                                 <td><?= htmlspecialchars($seccion['nombre_carrera']) ?></td>
                                 <td>Trayecto <?= $seccion['numero_trayecto'] ?></td>
                                 <td><?= htmlspecialchars($seccion['nombre_periodo']) ?></td>
+                                <td><?= isset($seccion['inicia']) ? date('d/m/Y H:i', strtotime($seccion['inicia'])) : '--' ?></td>
                                 <td>
                                     <div class="progress">
                                         <div class="progress-bar <?= $porcentaje >= 80 ? 'bg-success' : 'bg-info' ?>" 
@@ -331,6 +335,12 @@ include("includes/head.php");
                                    value="<?= $seccion['capacidad_maxima'] ?? 30 ?>" min="<?= MINIMO_ESTUDIANTES ?>" required>
                             <small class="form-text text-muted">Mínimo <?= MINIMO_ESTUDIANTES ?> estudiantes</small>
                         </div>
+                        
+                        <div class="form-group col-md-3">
+                            <label for="inicia">Fecha y Hora de Inicio *</label>
+                            <input type="datetime-local" class="form-control" id="inicia" name="inicia" 
+                                   value="<?= isset($seccion['inicia']) ? date('Y-m-d\TH:i', strtotime($seccion['inicia'])) : '' ?>" required>
+                        </div>
                     </div>
                     
                     <button type="submit" name="<?= $action === 'new' ? 'crear_seccion' : 'editar_seccion' ?>" 
@@ -409,7 +419,7 @@ include("includes/head.php");
                                         <input type="checkbox" id="seleccionarTodos">
                                     </th>
                                     <th>Nombre</th>
-                                    <th>Usuario</th>
+                                    <th>Cedula</th>
                                     <th>Asignado</th>
                                 </tr>
                             </thead>
@@ -422,7 +432,7 @@ include("includes/head.php");
                                                 class="checkbox-estudiante">
                                         </td>
                                         <td><?= htmlspecialchars($est['nombre']) ?></td>
-                                        <td><?= htmlspecialchars($est['username']) ?></td>
+                                        <td><?= htmlspecialchars($est['idusuario']) ?></td>
                                         <td>
                                             <?php if ($est['asignado'] > 0): ?>
                                                 <span class="badge badge-success">Sí</span>
@@ -548,11 +558,200 @@ include("includes/head.php");
         });
         </script>
 
+    <?php elseif ($action === 'view_schedule' && $seccion_id > 0): ?>
+<!-- VISTA DE HORARIO SEMANAL -->
+<?php
+$seccion = obtenerDetalleSeccion($db, $seccion_id);
+$horarios = obtenerHorariosSeccion($db, $seccion_id);
+
+// Asegurarnos que $horarios es un array
+$horarios = is_array($horarios) ? $horarios : [];
+
+// Preparar datos para la leyenda
+$leyenda_materias = [];
+?>
+
+<h1 class="h3 mb-4 text-gray-800">Horario Semanal - <?= htmlspecialchars($seccion['codigo_seccion']) ?></h1>
+
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">Horario de Clases</h6>
+        <span class="badge badge-info"><?= count($horarios) ?> bloques horarios</span>
+    </div>
+    <div class="card-body">
+        <?php if (empty($horarios)): ?>
+            <div class="alert alert-info">
+                No se han definido horarios para esta sección.
+            </div>
+        <?php else: ?>
+            <?php
+            // 1. Definir las horas de la tabla (de 7:00 a 16:00)
+            $horas_tabla = [];
+            for ($h = 7; $h <= 16; $h++) {
+                $horas_tabla[] = sprintf("%02d:00", $h);
+            }
+            
+            // 2. Organizar los horarios por día
+            $dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+            $horarios_por_dia = array_fill(0, 6, []);
+            
+            foreach ($horarios as $horario) {
+                $dia = (int)$horario['dia'];
+                $hora_inicio = date('H:i', strtotime($horario['hora_inicio']));
+                $hora_fin = date('H:i', strtotime($horario['hora_fin']));
+                
+                $horarios_por_dia[$dia][] = [
+                    'materia' => $horario['nombre_materia'],
+                    'docente' => $horario['nombre_docente'],
+                    'aula' => $horario['aula'],
+                    'hora_inicio' => $hora_inicio,
+                    'hora_fin' => $hora_fin,
+                    'cod_materia' => $horario['cod_materia'] ?? ''
+                ];
+                
+                // Preparar datos para la leyenda
+                $clave_leyenda = $horario['nombre_materia'].$horario['nombre_docente'].$horario['aula'];
+                if (!isset($leyenda_materias[$clave_leyenda])) {
+                    $leyenda_materias[$clave_leyenda] = [
+                        'materia' => $horario['nombre_materia'],
+                        'docente' => $horario['nombre_docente'],
+                        'aula' => $horario['aula'],
+                        'horario' => $hora_inicio.' - '.$hora_fin
+                    ];
+                }
+            }
+            ?>
+            
+            <div class="table-responsive mb-4">
+                <table class="table table-bordered table-hover">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>Hora</th>
+                            <?php foreach ($dias_semana as $dia): ?>
+                                <th><?= $dia ?></th>
+                            <?php endforeach; ?>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($horas_tabla as $index => $hora): ?>
+                            <tr>
+                                <th><?= $hora ?></th>
+                                <?php for ($dia = 0; $dia <= 5; $dia++): ?>
+                                    <?php
+                                    $contenido_celda = '';
+                                    $clase_css = 'celda-horario';
+                                    $es_continuacion = false;
+                                    
+                                    // Buscar si hay una clase en esta hora y día
+                                    foreach ($horarios_por_dia[$dia] as $clase) {
+                                        if ($hora >= $clase['hora_inicio'] && $hora < $clase['hora_fin']) {
+                                            $contenido_celda = htmlspecialchars($clase['materia']);
+                                            $clase_css = 'horario-block';
+                                            
+                                            // Verificar si es continuación
+                                            if ($hora != $clase['hora_inicio']) {
+                                                $clase_css .= ' continuacion';
+                                                $es_continuacion = true;
+                                            }
+                                            break;
+                                        }
+                                    }
+                                    ?>
+                                    <td class="<?= $clase_css ?>">
+                                        <?php if ($es_continuacion): ?>
+                                            <span class="continuacion-simbolo">↳</span>
+                                        <?php endif; ?>
+                                        <?= $contenido_celda ?>
+                                    </td>
+                                <?php endfor; ?>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Leyenda de materias -->
+            <div class="card border-left-primary shadow py-2 mb-4">
+                <div class="card-body">
+                    <h5 class="font-weight-bold text-primary mb-3">Detalle de Materias</h5>
+                    <div class="row">
+                        <?php foreach ($leyenda_materias as $item): ?>
+                            <div class="col-md-4 mb-2">
+                                <div class="d-flex align-items-center">
+                                    <div class="mr-2">
+                                        <i class="fas fa-book text-gray-500"></i>
+                                    </div>
+                                    <div>
+                                        <strong><?= htmlspecialchars($item['materia']) ?></strong><br>
+                                        <small class="text-muted">
+                                            <?= htmlspecialchars($item['horario']) ?><br>
+                                            Prof: <?= htmlspecialchars($item['docente']) ?> | 
+                                            Aula: <?= htmlspecialchars($item['aula']) ?>
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
+        
+        <div class="mt-3">
+            <a href="gestion_seccion.php?action=view&id=<?= $seccion_id ?>" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Volver a la sección
+            </a>
+            <button class="btn btn-success float-right" onclick="window.print()">
+                <i class="fas fa-print"></i> Imprimir Horario
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+.horario-block {
+    background-color: #f8f9fa;
+    border-left: 4px solid #4e73df;
+    text-align: center;
+    font-weight: bold;
+    vertical-align: middle;
+    position: relative;
+}
+
+.horario-block.continuacion {
+    background-color: #f1f3f9;
+    border-left: 4px solid #a0a7c5;
+    font-weight: normal;
+}
+
+.continuacion-simbolo {
+    color: #6c757d;
+    margin-right: 5px;
+}
+
+.table {
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+
+.table th, .table td {
+    padding: 10px;
+    height: 50px;
+    vertical-align: middle;
+    border: 1px solid #dee2e6;
+}
+
+.celda-horario {
+    background-color: white;
+}
+</style>
+
     <?php elseif ($action === 'view' && $seccion_id > 0): ?>
         <!-- VISTA DETALLADA DE SECCIÓN -->
         <?php
         $seccion = obtenerDetalleSeccion($db, $seccion_id);
         $estudiantes = obtenerEstudiantesDeSeccion($db, $seccion_id);
+        $horarios = obtenerHorariosSeccion($db, $seccion_id);
         
         $estudiantes_inscritos = count($estudiantes);
         $faltan_para_activar = max(0, MINIMO_ESTUDIANTES - $estudiantes_inscritos);
@@ -588,6 +787,7 @@ include("includes/head.php");
                         <p><strong>Carrera:</strong> <?= htmlspecialchars($seccion['nombre_carrera']) ?></p>
                         <p><strong>Trayecto:</strong> <?= $seccion['numero_trayecto'] ?></p>
                         <p><strong>Período:</strong> <?= htmlspecialchars($seccion['nombre_periodo']) ?></p>
+                        <p><strong>Inicio de clases:</strong> <?= isset($seccion['inicia']) ? date('d/m/Y H:i', strtotime($seccion['inicia'])) : 'No definido' ?></p>
                         <p><strong>Capacidad:</strong> <?= $estudiantes_inscritos ?>/<?= $seccion['capacidad_maxima'] ?></p>
                         <p><strong>Estado:</strong> 
                             <span class="badge badge-<?= $estado_clase ?>">
@@ -619,11 +819,59 @@ include("includes/head.php");
                                         <i class="fas fa-edit"></i> Editar Sección
                                     </button>
                                 </form>
+                                <form method="post" style="display:block; margin-bottom:10px;">
+                                    <input type="hidden" name="action" value="view_schedule">
+                                    <input type="hidden" name="id" value="<?= $seccion_id ?>">
+                                    <button type="submit" class="btn btn-info btn-block">
+                                        <i class="fas fa-calendar-alt"></i> Ver Horario Semanal
+                                    </button>
+                                </form>
                             <?php endif; ?>
                             <a href="gestion_seccion.php" class="btn btn-secondary btn-block">
                                 <i class="fas fa-arrow-left"></i> Volver al listado
                             </a>
                         </div>
+                    </div>
+                </div>
+                
+                <!-- Card para mostrar los horarios de la sección -->
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Horarios de la Sección</h6>
+                    </div>
+                    <div class="card-body">
+                        <?php if (!empty($horarios)): ?>
+                            <div class="table-responsive">
+                                <table class="table table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Día</th>
+                                            <th>Hora Inicio</th>
+                                            <th>Hora Fin</th>
+                                            <th>Aula</th>
+                                            <th>Materia</th>
+                                            <th>Docente</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($horarios as $horario): ?>
+                                            <tr>
+                                                <td><?= $horario['dia_nombre'] ?></td>
+                                                <td><?= date('H:i', strtotime($horario['hora_inicio'])) ?></td>
+                                                <td><?= date('H:i', strtotime($horario['hora_fin'])) ?></td>
+                                                <td><?= htmlspecialchars($horario['aula']) ?></td>
+                                                <td><?= htmlspecialchars($horario['nombre_materia']) ?></td>
+                                                <td><?= htmlspecialchars($horario['nombre_docente']) ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-info">
+                                No se han definido horarios para esta sección.
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -654,7 +902,7 @@ include("includes/head.php");
                                 <thead>
                                     <tr>
                                         <th>Nombre</th>
-                                        <th>Usuario</th>
+                                        <th>Cedula</th>
                                         <th>Fecha Inscripción</th>
                                         <?php if (!$periodo_inactivo): ?>
                                             <th>Acciones</th>
@@ -665,7 +913,7 @@ include("includes/head.php");
                                     <?php foreach ($estudiantes as $est): ?>
                                         <tr>
                                             <td><?= htmlspecialchars($est['nombre']) ?></td>
-                                            <td><?= htmlspecialchars($est['username']) ?></td>
+                                            <td><?= htmlspecialchars($est['idusuario']) ?></td>
                                             <td><?= $est['fecha_inscripcion'] ?></td>
                                             <?php if (!$periodo_inactivo): ?>
                                                 <td>
