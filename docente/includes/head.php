@@ -82,11 +82,11 @@ if (!isDocente()) {
 
             <li id="dropdown-evaluaciones" class="nav-item dropdown">
               <a title="Gestión de Evaluaciones" class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                  <i class="fas fa-clipboard-check fa-fw"></i> Evaluaciones
+                  <i class="fas fa-clipboard-check fa-fw"></i> Notas
               </a>
               <div id="dropdown-evaluaciones-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
-                  <a title="Crear Evaluación" class="dropdown-item" href="crear_evaluacion.php">
-                      <i class="fas fa-plus-circle fa-fw"></i> Crear Evaluación
+                  <a title="Crear Evaluación" class="dropdown-item" href="notas.php">
+                      <i class="fas fa-plus-circle fa-fw"></i> Cargar Notas
                   </a>
                   <a title="Lista de Evaluaciones" class="dropdown-item" href="lista_evaluaciones.php">
                       <i class="fas fa-list-ol fa-fw"></i> Lista de Evaluaciones
