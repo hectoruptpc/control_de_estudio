@@ -57,9 +57,23 @@ function obtenerPeriodoSeccion($seccion_id) {
     return $result->fetch_assoc()['id_periodo'];
 }
 
+function obtenerTrayectoSeccion($seccion_id) {
+    global $db;
+    $query = "SELECT t.id_trayecto, t.numero_trayecto 
+              FROM secciones s 
+              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto 
+              WHERE s.id_seccion = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_assoc();
+}
+
 $materia = obtenerInfoMateria($materia_id);
 $estudiantes = obtenerEstudiantesPorSeccion($seccion_id);
 $periodo_id = obtenerPeriodoSeccion($seccion_id);
+$trayecto_seccion = obtenerTrayectoSeccion($seccion_id);
 
 if (!$materia) {
     die('Error: Materia no encontrada');
@@ -69,13 +83,19 @@ if (!$estudiantes) {
     die('No hay estudiantes en esta sección');
 }
 
-$trayecto_actual = $materia['numero_trayecto'];
-$mostrar_trayectos = [];
+// Obtener el trayecto específico de la sección
+$trayecto_actual = $trayecto_seccion['numero_trayecto'];
+$id_trayecto_seccion = $trayecto_seccion['id_trayecto'];
 
-if ($trayecto_actual >= 0 && $trayecto_actual <= 2) {
-    $mostrar_trayectos = [0, 1, 2];
-} elseif ($trayecto_actual >= 3 && $trayecto_actual <= 4) {
-    $mostrar_trayectos = [3, 4];
+// Determinar qué trayecto mostrar según el id_trayecto de la sección
+$trayecto_a_mostrar = '';
+switch ($id_trayecto_seccion) {
+    case 1: $trayecto_a_mostrar = 0; break; // Trayecto Inicial
+    case 2: $trayecto_a_mostrar = 1; break; // Trayecto 1
+    case 3: $trayecto_a_mostrar = 2; break; // Trayecto 2
+    case 4: $trayecto_a_mostrar = 3; break; // Trayecto 3
+    case 5: $trayecto_a_mostrar = 4; break; // Trayecto 4
+    default: $trayecto_a_mostrar = 0;
 }
 
 $notas_aprobadas = false;
@@ -131,6 +151,7 @@ $estudiantes->data_seek(0);
             <input type="hidden" name="seccion_id" value="<?= $seccion_id ?>">
             <input type="hidden" name="periodo_id" value="<?= $periodo_id ?>">
             <input type="hidden" name="trayecto_actual" value="<?= $trayecto_actual ?>">
+            <input type="hidden" name="id_trayecto_seccion" value="<?= $id_trayecto_seccion ?>">
             
             <div class="table-responsive">
                 <table class="table table-bordered">
@@ -138,9 +159,7 @@ $estudiantes->data_seek(0);
                         <tr>
                             <th>Cédula</th>
                             <th>Nombre</th>
-                            <?php foreach ($mostrar_trayectos as $trayecto): ?>
-                                <th>Trayecto <?= $trayecto ?></th>
-                            <?php endforeach; ?>
+                            <th>Nota Trayecto <?= $trayecto_actual ?></th>
                             <th>Estado</th>
                         </tr>
                     </thead>
@@ -154,35 +173,35 @@ $estudiantes->data_seek(0);
                             <tr>
                                 <td><?= htmlspecialchars($estudiante['idusuario']) ?></td>
                                 <td><?= htmlspecialchars($estudiante['nombre']) ?></td>
-                                <?php foreach ($mostrar_trayectos as $trayecto): ?>
-                                    <td>
-                                        <?php
-                                        $valor_nota = '';
-                                        if ($notas && isset($notas['trayecto_' . $trayecto]) && $notas['trayecto_' . $trayecto] !== null) {
-                                            $valor_nota = (int)$notas['trayecto_' . $trayecto];
-                                        }
-                                        ?>
-                                        <?php if ($puede_editar): ?>
-                                            <input type="number" 
-                                                   name="notas[<?= $estudiante['id'] ?>][trayecto_<?= $trayecto ?>]" 
-                                                   class="form-control nota-input" 
-                                                   min="1" 
-                                                   max="20" 
-                                                   oninput="validarNota(this)"
-                                                   value="<?= $valor_nota ?: '01' ?>"
-                                                   required>
-                                        <?php else: ?>
-                                            <input type="number" 
-                                                   class="form-control" 
-                                                   value="<?= $valor_nota ?: '' ?>"
-                                                   readonly
-                                                   style="background-color: #f8f9fa; cursor: not-allowed;">
-                                            <input type="hidden" 
-                                                   name="notas[<?= $estudiante['id'] ?>][trayecto_<?= $trayecto ?>]" 
-                                                   value="<?= $valor_nota ?>">
-                                        <?php endif; ?>
-                                    </td>
-                                <?php endforeach; ?>
+                                <td>
+                                    <?php
+                                    $valor_nota = '';
+                                    $campo_trayecto = 'trayecto_' . $trayecto_a_mostrar;
+                                    
+                                    if ($notas && isset($notas[$campo_trayecto]) && $notas[$campo_trayecto] !== null) {
+                                        $valor_nota = (int)$notas[$campo_trayecto];
+                                    }
+                                    ?>
+                                    <?php if ($puede_editar): ?>
+                                        <input type="number" 
+                                               name="notas[<?= $estudiante['id'] ?>][<?= $campo_trayecto ?>]" 
+                                               class="form-control nota-input" 
+                                               min="1" 
+                                               max="20" 
+                                               oninput="validarNota(this)"
+                                               value="<?= $valor_nota ?: '01' ?>"
+                                               required>
+                                    <?php else: ?>
+                                        <input type="number" 
+                                               class="form-control" 
+                                               value="<?= $valor_nota ?: '' ?>"
+                                               readonly
+                                               style="background-color: #f8f9fa; cursor: not-allowed;">
+                                        <input type="hidden" 
+                                               name="notas[<?= $estudiante['id'] ?>][<?= $campo_trayecto ?>]" 
+                                               value="<?= $valor_nota ?>">
+                                    <?php endif; ?>
+                                </td>
                                 <td>
                                     <?php
                                     $badge_class = 'secondary';

@@ -19,14 +19,15 @@ function obtenerInfoGrupo($docente_id, $materia_id, $periodo_id) {
     global $db;
     
     $query = "SELECT ud.nombre as nombre_docente, m.nombre_materia, m.cod_materia,
-                     pa.nombre_periodo, s.codigo_seccion, c.nombre_carrera, t.nombre_trayecto
+                     pa.nombre_periodo, s.codigo_seccion, c.nombre_carrera, 
+                     t.nombre_trayecto, t.id_trayecto, t.numero_trayecto
               FROM notas_pendientes np
               INNER JOIN users ud ON np.id_docente = ud.id
               INNER JOIN materias m ON np.id_materia = m.id_materia
-              INNER JOIN trayectos t ON m.trayecto = t.id_trayecto
               INNER JOIN periodos_academicos pa ON np.id_periodo = pa.id_periodo
               INNER JOIN secciones s ON np.id_periodo = s.id_periodo
               INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
               WHERE np.id_docente = ? 
               AND np.id_materia = ? 
               AND np.id_periodo = ?
@@ -57,33 +58,125 @@ function obtenerEstudiantesGrupo($docente_id, $materia_id, $periodo_id) {
     return $stmt->get_result();
 }
 
-// Obtener estadísticas del grupo
-function obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id) {
+// Calcular promedio según el id_trayecto de la sección
+function calcularPromedioPorTrayecto($nota, $id_trayecto) {
+    $suma = 0;
+    $count = 0;
+    
+    // Determinar qué trayectos promediar según el id_trayecto de la sección
+    switch ($id_trayecto) {
+        case 1: // Trayecto Inicial - Solo trayecto_0
+            if ($nota['trayecto_0'] !== null) {
+                $suma = $nota['trayecto_0'];
+                $count = 1;
+            }
+            break;
+            
+        case 2: // Trayecto 1 - Solo trayecto_1
+            if ($nota['trayecto_1'] !== null) {
+                $suma = $nota['trayecto_1'];
+                $count = 1;
+            }
+            break;
+            
+        case 3: // Trayecto 2 - Solo trayecto_2
+            if ($nota['trayecto_2'] !== null) {
+                $suma = $nota['trayecto_2'];
+                $count = 1;
+            }
+            break;
+            
+        case 4: // Trayecto 3 - Solo trayecto_3
+            if ($nota['trayecto_3'] !== null) {
+                $suma = $nota['trayecto_3'];
+                $count = 1;
+            }
+            break;
+            
+        case 5: // Trayecto 4 - Solo trayecto_4
+            if ($nota['trayecto_4'] !== null) {
+                $suma = $nota['trayecto_4'];
+                $count = 1;
+            }
+            break;
+            
+        default:
+            // Por defecto, calcular todos los trayectos (no debería pasar)
+            for ($i = 0; $i <= 4; $i++) {
+                if ($nota['trayecto_' . $i] !== null) {
+                    $suma += $nota['trayecto_' . $i];
+                    $count++;
+                }
+            }
+    }
+    
+    return $count > 0 ? round($suma / $count, 1) : 0;
+}
+
+// Obtener estadísticas del grupo según el id_trayecto
+function obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id, $id_trayecto) {
     global $db;
     
-    $query = "SELECT 
-                COUNT(*) as total_estudiantes,
-                AVG((trayecto_0 + trayecto_1 + trayecto_2 + trayecto_3 + trayecto_4)/5) as promedio_general,
-                SUM(CASE WHEN (trayecto_0 + trayecto_1 + trayecto_2 + trayecto_3 + trayecto_4)/5 >= 10 THEN 1 ELSE 0 END) as aprobados,
-                SUM(CASE WHEN (trayecto_0 + trayecto_1 + trayecto_2 + trayecto_3 + trayecto_4)/5 < 10 THEN 1 ELSE 0 END) as reprobados
-              FROM notas_pendientes 
-              WHERE id_docente = ? 
-              AND id_materia = ? 
-              AND id_periodo = ?
-              AND estado = 'pendiente'";
+    $query = "SELECT np.trayecto_0, np.trayecto_1, np.trayecto_2, np.trayecto_3, np.trayecto_4
+              FROM notas_pendientes np
+              WHERE np.id_docente = ? 
+              AND np.id_materia = ? 
+              AND np.id_periodo = ?
+              AND np.estado = 'pendiente'";
     
     $stmt = $db->prepare($query);
     $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
     $stmt->execute();
-    return $stmt->get_result()->fetch_assoc();
+    $result = $stmt->get_result();
+    
+    $total_estudiantes = 0;
+    $suma_total = 0;
+    $aprobados = 0;
+    $reprobados = 0;
+    
+    while ($nota = $result->fetch_assoc()) {
+        $total_estudiantes++;
+        
+        // Calcular promedio según el id_trayecto de la sección
+        $promedio_estudiante = calcularPromedioPorTrayecto($nota, $id_trayecto);
+        $suma_total += $promedio_estudiante;
+        
+        // Aprobados desde 12 puntos
+        if ($promedio_estudiante >= 12) {
+            $aprobados++;
+        } else {
+            $reprobados++;
+        }
+    }
+    
+    $promedio_general = $total_estudiantes > 0 ? round($suma_total / $total_estudiantes, 1) : 0;
+    
+    return [
+        'total_estudiantes' => $total_estudiantes,
+        'promedio_general' => $promedio_general,
+        'aprobados' => $aprobados,
+        'reprobados' => $reprobados,
+        'id_trayecto' => $id_trayecto
+    ];
 }
 
 $info_grupo = obtenerInfoGrupo($docente_id, $materia_id, $periodo_id);
 $estudiantes = obtenerEstudiantesGrupo($docente_id, $materia_id, $periodo_id);
-$estadisticas = obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id);
+$estadisticas = obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id, $info_grupo['id_trayecto']);
 
 if (!$info_grupo) {
     die('Información no encontrada');
+}
+
+// Determinar qué trayecto se está considerando
+$trayecto_considerado = '';
+switch ($info_grupo['id_trayecto']) {
+    case 1: $trayecto_considerado = 'Trayecto 0'; break;
+    case 2: $trayecto_considerado = 'Trayecto 1'; break;
+    case 3: $trayecto_considerado = 'Trayecto 2'; break;
+    case 4: $trayecto_considerado = 'Trayecto 3'; break;
+    case 5: $trayecto_considerado = 'Trayecto 4'; break;
+    default: $trayecto_considerado = 'Todos los trayectos';
 }
 
 switch ($seccion) {
@@ -91,7 +184,9 @@ switch ($seccion) {
         ?>
         <h4>Lista de Estudiantes</h4>
         <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i> Seleccione los estudiantes cuyas notas desea aprobar o rechazar
+            <i class="fas fa-info-circle"></i> 
+            Trayecto considerado: <strong><?= $trayecto_considerado ?></strong><br>
+            Aprobación: ≥12pts
         </div>
         
         <form id="formGestionIndividual">
@@ -104,25 +199,27 @@ switch ($seccion) {
                             </th>
                             <th>Cédula</th>
                             <th>Estudiante</th>
-                            <th>Promedio</th>
-                            <th>Notas</th>
+                            <th>Nota del Trayecto</th>
+                            <th>Estado</th>
                             <th>Acción</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php while ($estudiante = $estudiantes->fetch_assoc()): ?>
                             <?php
-                            $notas = [];
-                            $suma = 0;
-                            $count = 0;
-                            for ($i = 0; $i <= 4; $i++) {
-                                if ($estudiante['trayecto_' . $i] !== null) {
-                                    $notas[] = "T$i: " . $estudiante['trayecto_' . $i];
-                                    $suma += $estudiante['trayecto_' . $i];
-                                    $count++;
-                                }
+                            $promedio = calcularPromedioPorTrayecto($estudiante, $info_grupo['id_trayecto']);
+                            $estado = $promedio >= 12 ? 'Aprobado' : 'Reprobado';
+                            $color_estado = $promedio >= 12 ? 'success' : 'danger';
+                            
+                            // Obtener la nota específica del trayecto
+                            $nota_trayecto = '';
+                            switch ($info_grupo['id_trayecto']) {
+                                case 1: $nota_trayecto = $estudiante['trayecto_0']; break;
+                                case 2: $nota_trayecto = $estudiante['trayecto_1']; break;
+                                case 3: $nota_trayecto = $estudiante['trayecto_2']; break;
+                                case 4: $nota_trayecto = $estudiante['trayecto_3']; break;
+                                case 5: $nota_trayecto = $estudiante['trayecto_4']; break;
                             }
-                            $promedio = $count > 0 ? round($suma / $count, 1) : 0;
                             ?>
                             <tr>
                                 <td>
@@ -133,11 +230,19 @@ switch ($seccion) {
                                 <td><?= htmlspecialchars($estudiante['cedula']) ?></td>
                                 <td><?= htmlspecialchars($estudiante['nombre_estudiante']) ?></td>
                                 <td>
-                                    <span class="badge badge-<?= $promedio >= 10 ? 'success' : 'danger' ?>">
-                                        <?= $promedio ?>
+                                    <?php if ($nota_trayecto !== null): ?>
+                                        <span class="badge badge-info">
+                                            T<?= $info_grupo['id_trayecto'] - 1 ?>: <?= $nota_trayecto ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="badge badge-secondary">Sin nota</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <span class="badge badge-<?= $color_estado ?>">
+                                        <?= $estado ?>
                                     </span>
                                 </td>
-                                <td><?= implode(', ', $notas) ?></td>
                                 <td>
                                     <select class="form-control form-control-sm accion-individual" 
                                             data-nota-id="<?= $estudiante['id'] ?>">
@@ -222,6 +327,11 @@ switch ($seccion) {
     case 'resumen':
         ?>
         <h4>Resumen del Grupo</h4>
+        <div class="alert alert-info">
+            <strong>Trayecto considerado:</strong> <?= $trayecto_considerado ?><br>
+            <strong>Aprobación:</strong> ≥12pts
+        </div>
+        
         <div class="row">
             <div class="col-md-6">
                 <div class="card mb-3">
@@ -230,7 +340,7 @@ switch ($seccion) {
                         <p><strong>Docente:</strong> <?= htmlspecialchars($info_grupo['nombre_docente']) ?></p>
                         <p><strong>Materia:</strong> <?= htmlspecialchars($info_grupo['nombre_materia']) ?></p>
                         <p><strong>Código:</strong> <?= htmlspecialchars($info_grupo['cod_materia']) ?></p>
-                        <p><strong>Trayecto:</strong> <?= htmlspecialchars($info_grupo['nombre_trayecto']) ?></p>
+                        <p><strong>Trayecto:</strong> <?= htmlspecialchars($info_grupo['nombre_trayecto']) ?> (ID: <?= $info_grupo['id_trayecto'] ?>)</p>
                         <p><strong>Periodo:</strong> <?= htmlspecialchars($info_grupo['nombre_periodo']) ?></p>
                         <p><strong>Sección:</strong> <?= htmlspecialchars($info_grupo['codigo_seccion']) ?></p>
                         <p><strong>Carrera:</strong> <?= htmlspecialchars($info_grupo['nombre_carrera']) ?></p>
@@ -242,18 +352,36 @@ switch ($seccion) {
                 <div class="card mb-3">
                     <div class="card-header bg-light">Estadísticas</div>
                     <div class="card-body">
-                        <p><strong>Total Estudiantes:</strong> <?= $estadisticas['total_estudiantes'] ?></p>
+                        <p><strong>Total Estudiantes:</strong> 
+                            <span class="badge badge-primary"><?= $estadisticas['total_estudiantes'] ?></span>
+                        </p>
                         <p><strong>Promedio General:</strong> 
-                            <span class="badge badge-<?= $estadisticas['promedio_general'] >= 10 ? 'success' : 'danger' ?>">
-                                <?= round($estadisticas['promedio_general'], 1) ?>
+                            <span class="badge badge-<?= $estadisticas['promedio_general'] >= 12 ? 'success' : 'warning' ?>">
+                                <?= $estadisticas['promedio_general'] ?>
                             </span>
                         </p>
-                        <p><strong>Aprobados:</strong> 
+                        <p><strong>Aprobados (≥12pts):</strong> 
                             <span class="badge badge-success"><?= $estadisticas['aprobados'] ?></span>
+                            (<?= $estadisticas['total_estudiantes'] > 0 ? round(($estadisticas['aprobados'] / $estadisticas['total_estudiantes']) * 100, 1) : 0 ?>%)
                         </p>
-                        <p><strong>Reprobados:</strong> 
+                        <p><strong>Reprobados (<12pts):</strong> 
                             <span class="badge badge-danger"><?= $estadisticas['reprobados'] ?></span>
+                            (<?= $estadisticas['total_estudiantes'] > 0 ? round(($estadisticas['reprobados'] / $estadisticas['total_estudiantes']) * 100, 1) : 0 ?>%)
                         </p>
+                        
+                        <!-- Gráfico simple de progreso -->
+                        <?php if ($estadisticas['total_estudiantes'] > 0): ?>
+                        <div class="progress mt-3" style="height: 20px;">
+                            <div class="progress-bar bg-success" 
+                                 style="width: <?= ($estadisticas['aprobados'] / $estadisticas['total_estudiantes']) * 100 ?>%">
+                                Aprobados: <?= $estadisticas['aprobados'] ?>
+                            </div>
+                            <div class="progress-bar bg-danger" 
+                                 style="width: <?= ($estadisticas['reprobados'] / $estadisticas['total_estudiantes']) * 100 ?>%">
+                                Reprobados: <?= $estadisticas['reprobados'] ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>

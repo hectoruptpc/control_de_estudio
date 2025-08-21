@@ -5,7 +5,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     die('Acceso no permitido');
 }
 
-$required = ['materia_id', 'seccion_id', 'periodo_id', 'trayecto_actual', 'notas'];
+$required = ['materia_id', 'seccion_id', 'periodo_id', 'trayecto_actual', 'id_trayecto_seccion', 'notas'];
 foreach ($required as $field) {
     if (!isset($_POST[$field])) {
         die("Falta el campo: $field");
@@ -16,6 +16,7 @@ $materia_id = (int)$_POST['materia_id'];
 $seccion_id = (int)$_POST['seccion_id'];
 $periodo_id = (int)$_POST['periodo_id'];
 $trayecto_actual = (int)$_POST['trayecto_actual'];
+$id_trayecto_seccion = (int)$_POST['id_trayecto_seccion'];
 $notas = $_POST['notas'];
 
 if (isset($_SESSION['user']['id'])) {
@@ -24,7 +25,18 @@ if (isset($_SESSION['user']['id'])) {
     die("Error: No se pudo identificar al docente");
 }
 
-$trayectos_a_procesar = $trayecto_actual >= 0 && $trayecto_actual <= 2 ? [0, 1, 2] : [3, 4];
+// Determinar qué trayecto procesar según el id_trayecto de la sección
+$trayecto_a_procesar = '';
+switch ($id_trayecto_seccion) {
+    case 1: $trayecto_a_procesar = 0; break; // Trayecto Inicial
+    case 2: $trayecto_a_procesar = 1; break; // Trayecto 1
+    case 3: $trayecto_a_procesar = 2; break; // Trayecto 2
+    case 4: $trayecto_a_procesar = 3; break; // Trayecto 3
+    case 5: $trayecto_a_procesar = 4; break; // Trayecto 4
+    default: $trayecto_a_procesar = 0;
+}
+
+$campo_trayecto = 'trayecto_' . $trayecto_a_procesar;
 
 $db->begin_transaction();
 
@@ -55,16 +67,32 @@ try {
             }
         }
         
+        // Obtener valores actuales si existe el registro
         $valores_trayectos = array_fill(0, 5, 'NULL');
         
-        foreach ($trayectos_a_procesar as $trayecto) {
-            $campo = "trayecto_$trayecto";
-            if (isset($notas_trayectos[$campo]) && $notas_trayectos[$campo] !== '') {
-                $valor = (int)$notas_trayectos[$campo];
-                $valores_trayectos[$trayecto] = $valor >= 1 && $valor <= 20 ? $valor : 1;
-            } else {
-                $valores_trayectos[$trayecto] = 1;
+        if ($existe_registro) {
+            $query_valores = "SELECT trayecto_0, trayecto_1, trayecto_2, trayecto_3, trayecto_4 
+                             FROM notas_pendientes 
+                             WHERE id_usuario = $estudiante_id 
+                             AND id_materia = $materia_id 
+                             AND id_periodo = $periodo_id";
+            $result_valores = $db->query($query_valores);
+            
+            if ($result_valores->num_rows > 0) {
+                $valores_actuales = $result_valores->fetch_assoc();
+                for ($i = 0; $i <= 4; $i++) {
+                    $campo = 'trayecto_' . $i;
+                    $valores_trayectos[$i] = $valores_actuales[$campo] !== null ? (int)$valores_actuales[$campo] : 'NULL';
+                }
             }
+        }
+        
+        // Actualizar solo el trayecto correspondiente
+        if (isset($notas_trayectos[$campo_trayecto]) && $notas_trayectos[$campo_trayecto] !== '') {
+            $valor = (int)$notas_trayectos[$campo_trayecto];
+            $valores_trayectos[$trayecto_a_procesar] = $valor >= 1 && $valor <= 20 ? $valor : 1;
+        } else {
+            $valores_trayectos[$trayecto_a_procesar] = 1;
         }
         
         $nuevo_estado = 'pendiente';
