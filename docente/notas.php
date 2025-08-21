@@ -1,0 +1,189 @@
+<?php
+// Iniciar sesión PRIMERO
+require_once('../funciones/functions.php');
+
+// Verificar autenticación
+if (!isLoggedIn()) {
+    $_SESSION['msg'] = "Debe iniciar sesión";
+    header('location: ../login.php');
+    exit();
+}
+
+if (!isDocente()) {
+    header('location: ../usuario/home.php');
+    exit();
+}
+
+// Obtener ID del docente directamente de la sesión
+if (isset($_SESSION['user']['id'])) {
+    $docente_id = (int)$_SESSION['user']['id'];
+} elseif (isset($_SESSION['id'])) {
+    $docente_id = (int)$_SESSION['id'];
+} elseif (isset($_SESSION['user_id'])) {
+    $docente_id = (int)$_SESSION['user_id'];
+} else {
+    die("Error: No se pudo identificar al usuario");
+}
+
+// Obtener secciones del docente
+function obtenerSeccionesDocente($docente_id) {
+    global $db;
+    
+    $query = "SELECT s.id_seccion, s.codigo_seccion, c.nombre_carrera, 
+                     t.nombre_trayecto, pa.nombre_periodo,
+                     m.id_materia, m.nombre_materia, m.cod_materia, t.numero_trayecto
+              FROM secciones s
+              INNER JOIN docente_seccion ds ON s.id_seccion = ds.id_seccion
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+              INNER JOIN periodos_academicos pa ON s.id_periodo = pa.id_periodo
+              INNER JOIN materias m ON ds.id_materia = m.id_materia
+              WHERE ds.id_usuario = ? 
+              AND (ds.estatus = 'activo' OR ds.estatus = 1)
+              ORDER BY pa.fecha_inicio DESC, c.nombre_carrera";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $docente_id);
+    $stmt->execute();
+    
+    return $stmt->get_result();
+}
+
+$result_secciones = obtenerSeccionesDocente($docente_id);
+
+// HTML
+$titulopag = "Registro de Notas";
+include("includes/head.php");
+?>
+
+<div class="container-fluid">
+    <h2 class="my-4">Registro de Notas</h2>
+    
+    <!-- Secciones del docente -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5>Secciones y Materias</h5>
+        </div>
+        <div class="card-body">
+            <?php if ($result_secciones->num_rows > 0): ?>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>Sección</th>
+                                <th>Carrera</th>
+                                <th>Trayecto</th>
+                                <th>Periodo</th>
+                                <th>Materia</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php while ($seccion = $result_secciones->fetch_assoc()): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($seccion['codigo_seccion']) ?></td>
+                                    <td><?= htmlspecialchars($seccion['nombre_carrera']) ?></td>
+                                    <td><?= htmlspecialchars($seccion['nombre_trayecto']) ?></td>
+                                    <td><?= htmlspecialchars($seccion['nombre_periodo']) ?></td>
+                                    <td><?= htmlspecialchars($seccion['nombre_materia']) ?></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary btn-cargar" 
+                                                data-seccion="<?= $seccion['id_seccion'] ?>"
+                                                data-materia="<?= $seccion['id_materia'] ?>">
+                                            Cargar Estudiantes
+                                        </button>
+                                    </td>
+                                </tr>
+                            <?php endwhile; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <div class="alert alert-warning">
+                    No tienes secciones asignadas
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+    
+    <!-- Resultados -->
+    <div id="resultados"></div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Cargar estudiantes
+    $('.btn-cargar').click(function() {
+        const seccionId = $(this).data('seccion');
+        const materiaId = $(this).data('materia');
+        
+        $('#resultados').html(`
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary"></div>
+                <p>Cargando estudiantes...</p>
+            </div>
+        `);
+        
+        // Usar FETCH API en lugar de jQuery para mejor control
+        fetch('cargar_estudiantes.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `seccion_id=${seccionId}&materia_id=${materiaId}`
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error en la respuesta del servidor');
+            }
+            return response.text();
+        })
+        .then(html => {
+            $('#resultados').html(html);
+        })
+        .catch(error => {
+            $('#resultados').html(`
+                <div class="alert alert-danger">
+                    Error: ${error.message}
+                </div>
+            `);
+        });
+    });
+    
+    // Guardar notas
+    $(document).on('submit', '#form-notas', function(e) {
+        e.preventDefault();
+        
+        $('#resultados').html(`
+            <div class="text-center py-4">
+                <div class="spinner-border text-success"></div>
+                <p>Guardando notas...</p>
+            </div>
+        `);
+        
+        const formData = new FormData(this);
+        
+        fetch('guardar_notas.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.text())
+        .then(result => {
+            $('#resultados').html(`
+                <div class="alert alert-success">
+                    ${result}
+                </div>
+            `);
+        })
+        .catch(error => {
+            $('#resultados').html(`
+                <div class="alert alert-danger">
+                    Error al guardar: ${error.message}
+                </div>
+            `);
+        });
+    });
+});
+</script>
+
+<?php include("includes/footer.php"); ?>

@@ -120,8 +120,8 @@ if (!isAdmin()) {
                     <i class="fas fa-graduation-cap fa-fw"></i> Notas
                 </a>
                 <div id="dropdown-notas-menu" class="dropdown-menu" aria-labelledby="navbarDropdownNotas">
-                    <a title="Registrar Notas" class="dropdown-item" href="registrar_notas.php">
-                        <i class="fas fa-edit fa-fw"></i> Registrar Notas
+                    <a title="Registrar Notas" class="dropdown-item" href="admin_notas_pendientes.php">
+                        <i class="fas fa-edit fa-fw"></i> Notas Cargadas
                     </a>
                     <a title="Consultar Notas" class="dropdown-item" href="consultar_notas.php">
                         <i class="fas fa-search fa-fw"></i> Consultar Notas
