@@ -123,7 +123,7 @@ if (!isAdmin()) {
                     <a title="Registrar Notas" class="dropdown-item" href="admin_notas_pendientes.php">
                         <i class="fas fa-edit fa-fw"></i> Notas Cargadas
                     </a>
-                    <a title="Consultar Notas" class="dropdown-item" href="consultar_notas.php">
+                    <a title="Consultar Notas" class="dropdown-item" href="consulta_notas.php">
                         <i class="fas fa-search fa-fw"></i> Consultar Notas
                     </a>
                     <a title="Reportes de Notas" class="dropdown-item" href="reportes_notas.php">
