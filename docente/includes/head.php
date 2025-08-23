@@ -1,4 +1,26 @@
 <?php
+// Función para contar mensajes no leídos
+function contarMensajesNoLeidos($user_id) {
+    global $db;
+    
+    $query = "SELECT COUNT(*) as total 
+              FROM mensajeria 
+              WHERE id_usuario_destinatario = ? 
+              AND leido = FALSE 
+              AND eliminado_destinatario = FALSE";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_assoc()['total'];
+}
+
+// Contar mensajes no leídos para el usuario actual
+$mensajes_no_leidos = 0;
+if (isset($_SESSION['user']['id'])) {
+    $mensajes_no_leidos = contarMensajesNoLeidos($_SESSION['user']['id']);
+}
+
 if (!isLoggedIn()) {
     $_SESSION['here'] = $_SERVER['REQUEST_URI'];
     $_SESSION['msg'] = $msn_iniciar_sesion;
@@ -23,6 +45,18 @@ if (!isDocente()) {
 <title><?php echo $titulopag; ?></title>
 
 <?php echo $bootstrap_head; ?>
+<style>
+    .nav-item-mensajes {
+        position: relative;
+    }
+    .badge-notificacion {
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        font-size: 0.6em;
+        padding: 3px 6px;
+    }
+</style>
 </head>
 
 <body>
@@ -43,6 +77,18 @@ if (!isDocente()) {
             <li class="nav-item">
               <a title="Cargar Inicio" class="nav-link" href="index.php"><i class="fas fa-home fa-fw"></i> Inicio
                 <span class="sr-only">(current)</span>
+              </a>
+            </li>
+
+            <!-- Icono de Mensajería con Notificación para Docentes -->
+            <li class="nav-item nav-item-mensajes">
+              <a title="Sistema de Mensajería" class="nav-link position-relative" href="mensajeria.php">
+                <i class="fas fa-envelope fa-fw"></i> Mensajes
+                <?php if ($mensajes_no_leidos > 0): ?>
+                  <span class="badge badge-danger badge-notificacion">
+                    <?= $mensajes_no_leidos ?>
+                  </span>
+                <?php endif; ?>
               </a>
             </li>
 
@@ -103,7 +149,7 @@ if (!isDocente()) {
               </a>
               <div id="dropdown-ajus" class="dropdown-menu" aria-labelledby="navbarDropdown">
                 <a title="Perfil" class="dropdown-item" href="perfil.php"><i class="fa fa-user fa-fw"></i> Mi Perfil</a>
-                <a title="Mensajeria" class="dropdown-item" href="mensajeria.php"><i class="fa fa-envelope fa-fw"></i> Mensajeria</a>
+                
                 <a title="Horario" class="dropdown-item" href="mi_horario.php"><i class="fas fa-calendar-alt fa-fw"></i> Mi Horario</a>
                 <div class="dropdown-divider"></div>
                 <a title="Salir del Sistema" class="nav-link" href="../index.php?logout='1'"><i class="fas fa-sign-out-alt"></i> Salir</a>
@@ -135,3 +181,42 @@ if (!isDocente()) {
 
 </div>
 </div>
+
+<!-- Script para actualizar notificaciones cada 30 segundos -->
+<script>
+function actualizarNotificaciones() {
+    fetch('../funciones/contar_mensajes_no_leidos.php')
+        .then(response => response.json())
+        .then(data => {
+            const link = document.querySelector('.nav-link[href="mensajeria.php"]');
+            const badge = link.querySelector('.badge-notificacion');
+            
+            if (data.mensajes_no_leidos > 0) {
+                if (badge) {
+                    badge.textContent = data.mensajes_no_leidos;
+                } else {
+                    // Crear el badge si no existe
+                    const newBadge = document.createElement('span');
+                    newBadge.className = 'badge badge-danger badge-notificacion';
+                    newBadge.textContent = data.mensajes_no_leidos;
+                    link.appendChild(newBadge);
+                }
+            } else {
+                // Eliminar el badge si no hay mensajes
+                if (badge) {
+                    badge.remove();
+                }
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+// Actualizar cada 30 segundos
+setInterval(actualizarNotificaciones, 30000);
+
+// Actualizar también al cargar la página
+document.addEventListener('DOMContentLoaded', actualizarNotificaciones);
+</script>
+
+</body>
+</html>

@@ -1,4 +1,26 @@
 <?php
+// Función para contar mensajes no leídos
+function contarMensajesNoLeidos($user_id) {
+    global $db;
+    
+    $query = "SELECT COUNT(*) as total 
+              FROM mensajeria 
+              WHERE id_usuario_destinatario = ? 
+              AND leido = FALSE 
+              AND eliminado_destinatario = FALSE";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_assoc()['total'];
+}
+
+// Contar mensajes no leídos para el usuario actual
+$mensajes_no_leidos = 0;
+if (isset($_SESSION['user']['id'])) {
+    $mensajes_no_leidos = contarMensajesNoLeidos($_SESSION['user']['id']);
+}
+
 if (!isLoggedIn()) {
     $_SESSION['here'] = $_SERVER['REQUEST_URI'];
     $_SESSION['msg'] = $msn_iniciar_sesion;
@@ -20,6 +42,18 @@ if (!isAdmin()) {
 <meta name="author" content="Hector Marulanda">
 <title><?php echo $titulopag; ?></title>
 <?php echo $bootstrap_head;?>
+<style>
+    .nav-item-mensajes {
+        position: relative;
+    }
+    .badge-notificacion {
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        font-size: 0.6em;
+        padding: 3px 6px;
+    }
+</style>
 </head>
 <body>
 <div class="container">
@@ -37,6 +71,18 @@ if (!isAdmin()) {
             <li class="nav-item">
               <a title="Cargar Inicio" class="nav-link" href="index.php"><i class="fas fa-home fa-fw"></i> Inicio
                 <span class="sr-only">(current)</span>
+              </a>
+            </li>
+
+            <!-- Icono de Mensajería con Notificación - POSICIÓN CORREGIDA -->
+            <li class="nav-item nav-item-mensajes">
+              <a title="Sistema de Mensajería" class="nav-link position-relative" href="mensajeria.php">
+                <i class="fas fa-envelope fa-fw"></i> Mensajes
+                <?php if ($mensajes_no_leidos > 0): ?>
+                  <span class="badge badge-danger badge-notificacion">
+                    <?= $mensajes_no_leidos ?>
+                  </span>
+                <?php endif; ?>
               </a>
             </li>
 
@@ -143,8 +189,7 @@ if (!isAdmin()) {
                     <i class="fa fa-cogs fa-fw"></i> Ajustes
                 </a>
                 <div id="dropdown-ajus" class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a title="Comentarios" class="dropdown-item" href="comentarios.php"><i class="fa fa-comments fa-fw"></i> Comentarios</a>
-                    <a title="Mensajeria" class="dropdown-item" href="mensajeria.php"><i class="fa fa-envelope fa-fw"></i> Mensajeria</a>
+                    
                     <a title="Gestor de Contenido" class="dropdown-item" href="gestor_contenido.php"><i class="fa fa-file-contract fa-fw"></i> Contenido</a>
                     <a title="Google Groups" class="dropdown-item" href="gg.php"><i class="fab fa-google-plus-g"></i> Google Groups</a>
                     
@@ -209,5 +254,42 @@ if (!isAdmin()) {
     </div>
     </div>
 </div>
+
+<!-- Script para actualizar notificaciones cada 30 segundos -->
+<script>
+function actualizarNotificaciones() {
+    fetch('../funciones/contar_mensajes_no_leidos.php')
+        .then(response => response.json())
+        .then(data => {
+            const link = document.querySelector('.nav-link[href="mensajeria.php"]');
+            const badge = link.querySelector('.badge-notificacion');
+            
+            if (data.mensajes_no_leidos > 0) {
+                if (badge) {
+                    badge.textContent = data.mensajes_no_leidos;
+                } else {
+                    // Crear el badge si no existe
+                    const newBadge = document.createElement('span');
+                    newBadge.className = 'badge badge-danger badge-notificacion';
+                    newBadge.textContent = data.mensajes_no_leidos;
+                    link.appendChild(newBadge);
+                }
+            } else {
+                // Eliminar el badge si no hay mensajes
+                if (badge) {
+                    badge.remove();
+                }
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+// Actualizar cada 30 segundos
+setInterval(actualizarNotificaciones, 30000);
+
+// Actualizar también al cargar la página
+document.addEventListener('DOMContentLoaded', actualizarNotificaciones);
+</script>
+
 </body>
 </html>

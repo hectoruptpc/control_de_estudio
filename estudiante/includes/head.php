@@ -1,4 +1,26 @@
 <?php
+// Función para contar mensajes no leídos
+function contarMensajesNoLeidos($user_id) {
+    global $db;
+    
+    $query = "SELECT COUNT(*) as total 
+              FROM mensajeria 
+              WHERE id_usuario_destinatario = ? 
+              AND leido = FALSE 
+              AND eliminado_destinatario = FALSE";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_assoc()['total'];
+}
+
+// Contar mensajes no leídos para el usuario actual
+$mensajes_no_leidos = 0;
+if (isset($_SESSION['user']['id'])) {
+    $mensajes_no_leidos = contarMensajesNoLeidos($_SESSION['user']['id']);
+}
+
 if (!isLoggedIn()) {
     $_SESSION['here'] = $_SERVER['REQUEST_URI'];
     $_SESSION['msg'] = $msn_iniciar_sesion;
@@ -23,13 +45,25 @@ if (!isEstudiante()) {
 <title><?php echo $titulopag; ?></title>
 
 <?php echo $bootstrap_head; ?>
+<style>
+    .nav-item-mensajes {
+        position: relative;
+    }
+    .badge-notificacion {
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        font-size: 0.6em;
+        padding: 3px 6px;
+    }
+</style>
 </head>
 
 <body>
 
 <div class="container">
 <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-light fixed-top" style="background-color: #2196F3;"> <!-- Cambiado a azul -->
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top" style="background-color: #2196F3;">
       <div class="container">
         <a title="Cargar Inicio" class="navbar-brand" href="index.php">
           <?php echo $logopertenencia; ?>
@@ -46,11 +80,23 @@ if (!isEstudiante()) {
               </a>
             </li>
 
-            <li id="dropdown-clases" class="nav-item dropdown position-relative">
+            <!-- Icono de Mensajería con Notificación para Estudiantes -->
+            <li class="nav-item nav-item-mensajes">
+              <a title="Sistema de Mensajería" class="nav-link position-relative" href="mensajeria_estudiantes.php">
+                <i class="fas fa-envelope fa-fw"></i> Mensajes
+                <?php if ($mensajes_no_leidos > 0): ?>
+                  <span class="badge badge-danger badge-notificacion">
+                    <?= $mensajes_no_leidos ?>
+                  </span>
+                <?php endif; ?>
+              </a>
+            </li>
+
+            <li id="dropdown-clases" class="nav-item dropdown">
               <a title="Mis Clases" class="nav-link dropdown-toggle" href="#" id="navbarDropdownClases" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 <i class="fas fa-book fa-fw"></i> Mis Clases
               </a>
-              <div class="dropdown-menu position-absolute" aria-labelledby="navbarDropdownClases" style="left: 0; top: 100%;">
+              <div class="dropdown-menu" aria-labelledby="navbarDropdownClases">
                 <a title="Ver Mis Clases" class="dropdown-item" href="mis_clases.php">
                   <i class="fas fa-list fa-fw"></i> Ver Mis Clases
                 </a>
@@ -119,22 +165,59 @@ if (!isEstudiante()) {
     </nav>
     <div class="container">
     <div class="row">
-<div class="col-sm-6">
-    <b class="mt-5"><?php echo 'Bienvenido ' .$_SESSION['user']['nombre']; ?></b>
+        <div class="col-sm-6">
+            <b class="mt-5"><?php echo 'Bienvenido ' .$_SESSION['user']['nombre']; ?></b>
+        </div>
+
+        <div class="col-sm-6">
+            <?php
+            echo '<p class="text-right">';
+            echo $fads;
+            echo "<br>";
+            echo $ip;
+            echo "<br>";
+            echo $nombrepag;
+            ?>
+        </div>
     </div>
-
-    <div class="col-sm-6">
-<?php
-  echo '<p class="text-right">';
-  echo $fads;
-  echo "<br>";
-  echo $ip;
-  echo "<br>";
-  echo $nombrepag;
-?>
-
-</div>
+    </div>
 </div>
 
-</div>
-</div>
+<!-- Script para actualizar notificaciones cada 30 segundos -->
+<script>
+function actualizarNotificaciones() {
+    fetch('../funciones/contar_mensajes_no_leidos.php')
+        .then(response => response.json())
+        .then(data => {
+            const link = document.querySelector('.nav-link[href="mensajeria.php"]');
+            const badge = link.querySelector('.badge-notificacion');
+            
+            if (data.mensajes_no_leidos > 0) {
+                if (badge) {
+                    badge.textContent = data.mensajes_no_leidos;
+                } else {
+                    // Crear el badge si no existe
+                    const newBadge = document.createElement('span');
+                    newBadge.className = 'badge badge-danger badge-notificacion';
+                    newBadge.textContent = data.mensajes_no_leidos;
+                    link.appendChild(newBadge);
+                }
+            } else {
+                // Eliminar el badge si no hay mensajes
+                if (badge) {
+                    badge.remove();
+                }
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+// Actualizar cada 30 segundos
+setInterval(actualizarNotificaciones, 30000);
+
+// Actualizar también al cargar la página
+document.addEventListener('DOMContentLoaded', actualizarNotificaciones);
+</script>
+
+</body>
+</html>
