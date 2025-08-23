@@ -14,13 +14,38 @@ $materia_id = (int)$_POST['materia_id'];
 
 function obtenerInfoMateria($materia_id) {
     global $db;
-    $query = "SELECT m.*, t.numero_trayecto FROM materias m 
-              INNER JOIN trayectos t ON m.trayecto = t.id_trayecto 
+    $query = "SELECT m.*, t.numero_trayecto 
+              FROM materias m 
+              LEFT JOIN trayectos t ON m.trayecto = t.id_trayecto 
               WHERE m.id_materia = ?";
     $stmt = $db->prepare($query);
     $stmt->bind_param("i", $materia_id);
     $stmt->execute();
-    return $stmt->get_result()->fetch_assoc();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    // Si no encuentra el trayecto, intentar obtener solo la información de la materia
+    $query = "SELECT * FROM materias WHERE id_materia = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $materia_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $materia = $result->fetch_assoc();
+        
+        // Si el trayecto es 0, establecer manualmente el número de trayecto
+        if ($materia['trayecto'] == 0) {
+            $materia['numero_trayecto'] = 0;
+        }
+        
+        return $materia;
+    }
+    
+    return null;
 }
 
 function obtenerEstudiantesPorSeccion($seccion_id) {
