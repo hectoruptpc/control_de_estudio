@@ -2,285 +2,180 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
-$titulopag = "Sistema de Gestion";
-	include('../funciones/functions.php');
-	requireAdmin();
-
-
-	//ESTADISTICA DE USUARIOS
-	function estadistica_usuarios(){
-	  global $db, $resultado_estadistica, $limit_end, $mes_de_pago_actual;
-
-$datos_apa = '';
-
-
-
-	echo "<h4>ESTADISTICA DE USUARIOS</h4>";
-
-	  $sql="SELECT
-	  SUM(IF( password !='', 1,0)) AS 'ingreso',
-	  SUM(status = 0) AS 'bloqueados',
-	  COUNT(*) AS 'total'
-	  FROM users";
-	  $result = mysqli_query($db, $sql) or mysqli_error($db);
-	  while ($row = mysqli_fetch_assoc($result))
-	  {
-	  if( $row['ingreso'] <1){
-	echo "NO HAY RESULTADOS";
-	  } else {
-	    $sin_password = $row['total'] - $row['ingreso'];
-	    $resta2 = $row['bloqueados'] - $sin_password ;
-	    $resultado_estadistica = 'Total de Usuarios Ingresados: ' . $row['total'].'<br>';
-	    $resultado_estadistica .= 'Total de Usuarios Bloqueados: ' . $row['bloqueados'].'<br>';
-	    $resultado_estadistica .= 'Total que ya han creado Password: ' . $row['ingreso'].'<br>';
-	    $resultado_estadistica .= 'Total que faltan por crear Password Incluido los Bloqueados: ' . $sin_password .'<br>';
-	    $resultado_estadistica .= 'Total que faltan por crear Password No Bloqueados: ' . $resta2 .'<br>';
-	    }
-	}
-
-
-	//$analisis_banesco = "SELECT usuario, users.nombre AS 'nombre', users.email AS 'email', users.tlf AS 'tlf', users.cel AS 'cel', users.fecha_ingreso AS 'fecha_ingreso', SUM(monto) AS 'monto_total', COUNT( usuario ) AS 'num'	FROM pedidos INNER JOIN users ON (pedidos.usuario=users.idusuario) WHERE status_pedido = 'ENTREGADO'	GROUP BY `usuario`,'monto_total', nombre, email, tlf, cel, fecha_ingreso	ORDER BY monto_total DESC	LIMIT 0 , $limit_end";
-
-
-	$analisis_general = "SELECT usuario, users.nombre AS 'nombre', users.email AS 'email', users.tlf AS 'tlf', users.cel AS 'cel', users.fecha_ingreso AS 'fecha_ingreso', SUM(monto) AS 'monto_total', COUNT( usuario ) AS 'num'
-	FROM pedidos INNER JOIN users ON (pedidos.usuario=users.idusuario) WHERE status_pedido = 'ENTREGADO'
-	GROUP BY `usuario`,'monto_total', nombre, email, tlf, cel, fecha_ingreso
-	ORDER BY monto_total DESC
-	LIMIT 0 , $limit_end";
-
-	$analisis_mes = "SELECT usuario, users.nombre AS 'nombre', users.email AS 'email', SUM(monto) AS 'monto_total', COUNT( usuario ) AS 'num'
-	FROM pedidos INNER JOIN users ON (pedidos.usuario=users.idusuario) WHERE status_pedido = 'ENTREGADO'
-	AND DATE_FORMAT(pedidos.fecha_pedido, '%Y%m') = DATE_FORMAT(NOW(), '%Y%m')
-	GROUP BY `usuario`, 'monto_total', nombre, email
-	ORDER BY monto_total DESC
-	LIMIT 0 , $limit_end";
-
-	$resultado_analisis_g = mysqli_query($db,$analisis_general);
-	$resultado_analisis_m = mysqli_query($db,$analisis_mes);
-
-	$sqlq = "SET lc_time_names = 'es_VE'";
-	mysqli_query($db,$sqlq);
-	 //_epe
-
-	$sql_epe = "SELECT DATE_FORMAT(fecha_pedido,'%M %Y') AS dateGroup, SUM(monto) AS 'monto_total' FROM pedidos WHERE status_pedido = 'ENTREGADO' GROUP BY dateGroup ORDER by DATE_FORMAT(dateGroup, '%m/%d') DESC LIMIT 0 , $limit_end";
-	//$sql_epe = "SELECT DATE_FORMAT(fecha_pedido,'%M %Y') AS dateGroup, SUM(monto) AS 'monto_total' FROM pedidos WHERE status_pedido = 'ENTREGADO' GROUP BY dateGroup ORDER by DATE_FORMAT(dateGroup, '%m') DESC LIMIT 0 , $limit_end";
-	$result_epe = mysqli_query($db,$sql_epe);
-
-//MOFIFICAR A QUE MUESTRE SOLO DEL AÑO EN CURSO
-	$sql_apa="SELECT DATE_FORMAT(fecha_pago,'%M %Y') AS dateGroup2, SUM(monto) AS 'monto_total2' FROM pagos WHERE status_pago = 'APROBADO' GROUP BY dateGroup2 ORDER BY DATE_FORMAT(dateGroup2, '%M/%d') DESC LIMIT 0 , $limit_end";
-
-	//$sql_apa="SELECT DATE_FORMAT(fecha_aprobacion,'%M %Y') AS dateGroup2, SUM(monto) AS 'monto_total2' FROM pagos WHERE status_pago = 'APROBADO' GROUP BY dateGroup2 ORDER BY DATE_FORMAT(dateGroup2,'%m') DESC LIMIT 0 , $limit_end";
-
-	    $result_apa = mysqli_query($db, $sql_apa);
-
-	    $datos_apa = array();
-
-	    // ahora guardamos los datos de la consulta apa en nuestro array
-	    while ($j = mysqli_fetch_assoc($result_apa)) {
-	      array_push($datos_apa, $j['monto_total2']);
-	      }
-//var_dump($datos_apa);
-	      $i = 0;
-
-
-
-	  }
-
-	function calculo_sin_plan(){
-			global $db, $monto_sin_plan_calculo, $mes_de_pago_actual;
-
-				$m = date("n");
-				$a = date("Y");
-			$query = "SELECT * FROM pedidos WHERE sin_plan = '1' AND MONTH(fecha_transf) = '$m' AND YEAR(fecha_transf) = '$a'";
-
-			echo '<b>EXTRA</b><br>';
-			$results = mysqli_query($db, $query);
-			$rows =  mysqli_num_rows($results);
-			echo 'Sin Plan '. $rows.' = ';
-			$monto_sin_plan_calculo  = 0;
-			while ($r = mysqli_fetch_assoc($results)){
-				$monto_sin_plan_calculo += $r['monto'];
-
-		}echo number_format($monto_sin_plan_calculo *30/100, 2, ',', '.') . ' Bs.';
-	}
-
+$titulopag = "Sistema de Gestión - Panel de Administración";
+include('../funciones/functions.php');
+requireAdmin();
 ?>
+
 <!DOCTYPE html>
 <html lang="es">
-
-
-  <?php include("includes/head.php"); ?>
-
-
-
-	<?php
-echo @$inicio;
-echo @$finaliza;
-	 ?>
-
-    <!-- Page Content -->
-    <div class="container">
+<head>
+    <?php include("includes/head.php"); ?>
+    <!-- Bootstrap 4.6 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <style>
-.carousel-control-prev-icon {
-    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23f00' viewBox='0 0 8 8'%3E%3Cpath d='M5.25 0l-4 4 4 4 1.5-1.5-2.5-2.5 2.5-2.5-1.5-1.5z'/%3E%3C/svg%3E");
-}
+        body {
+            background-color: #f8f9fc;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .dashboard-header {
+            background: linear-gradient(120deg, #4e73df 0%, #224abe 100%);
+            color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .feature-card {
+            border: none;
+            border-radius: 10px;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            height: 100%;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+        .card-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+        }
+        .pagos-card {
+            border-bottom: 4px solid #28a745;
+        }
+        .pagos-card .card-icon {
+            color: #28a745;
+        }
+        .soporte-card {
+            border-bottom: 4px solid #ffc107;
+        }
+        .soporte-card .card-icon {
+            color: #ffc107;
+        }
+        .mensajeria-card {
+            border-bottom: 4px solid #17a2b8;
+        }
+        .mensajeria-card .card-icon {
+            color: #17a2b8;
+        }
+        .btn-access {
+            border-radius: 50px;
+            padding: 0.5rem 1.5rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-pagos {
+            background-color: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+        .btn-pagos:hover {
+            background-color: #218838;
+            border-color: #1e7e34;
+        }
+        .btn-soporte {
+            background-color: #ffc107;
+            border-color: #ffc107;
+            color: #212529;
+        }
+        .btn-soporte:hover {
+            background-color: #e0a800;
+            border-color: #d39e00;
+        }
+        .btn-mensajeria {
+            background-color: #17a2b8;
+            border-color: #17a2b8;
+            color: white;
+        }
+        .btn-mensajeria:hover {
+            background-color: #138496;
+            border-color: #117a8b;
+        }
+        .welcome-message {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+    </style>
+</head>
 
-.carousel-control-next-icon {
-    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23f00' viewBox='0 0 8 8'%3E%3Cpath d='M2.75 0l-1.5 1.5 2.5 2.5-2.5 2.5 1.5 1.5 4-4-4-4z'/%3E%3C/svg%3E");
-}
-</style>
-
-
-    
-    <hr>
-
-
-
-
-
-
-
-<!-- Icon Cards-->
-<div class="row">
-<div class="col-xl-3 col-sm-6 mb-3">
-<div class="card text-white bg-primary o-hidden h-100">
-<div class="card-body">
-<div class="card-body-icon">
-<i class="fas fa-fw fa-comments"></i>
-</div>
-<div class="mr-5">
-<h4>Mensajeria</h4>
-Mensajeria</div>
-</div>
-<a  title="Mensajeria" class="card-footer text-white clearfix small z-1" href="mensajeria.php">
-<span class="float-left"> Ver Detalles</span>
-<span class="float-right">
-<i class="fa fa-arrow-circle-right"></i>
-</span>
-</a>
-</div>
-</div>
-
-
-
-<div class="col-xl-3 col-sm-6 mb-3">
-<div class="card text-white bg-info o-hidden h-100">
-<div class="card-body">
-<div class="card-body-icon">
-<i class="fas fa-fw fa-list"></i>
-</div>
-<div class="mr-5"><h4>Estadistica</h4>estadistica</div>
-</div>
-<a class="card-footer text-white clearfix small z-1" title="Ir a Pedidos" href="pedidos.php">
-<span class="float-left">Ver Detalles</span>
-<span class="float-right">
-<i class="fa fa-arrow-circle-right"></i>
-</span>
-</a>
-</div>
-</div>
-
-
-
-
-
-<div class="col-xl-3 col-sm-6 mb-3">
-<div class="card text-white bg-success o-hidden h-100">
-<div class="card-body">
-<div class="card-body-icon">
-<i class="fas fa-fw fa-shopping-cart"></i>
-</div>
-<div class="mr-5"><h4>Pagos</h4>aqui iran los pagos</div>
-</div>
-<a class="card-footer text-white clearfix small z-1" title="Ir a Mensualidades" href="registro_pagos.php">
-<span class="float-left">Ver Detalles</span>
-<span class="float-right">
-<i class="fa fa-arrow-circle-right"></i>
-</span>
-</a>
-</div>
-</div>
-
-
-
-
-<div class="col-xl-3 col-sm-6 mb-3">
-    <div class="card text-white bg-danger o-hidden h-100">
-      <div class="card-body">
-        <div class="card-body-icon">
-          <i class="fas fa-fw fa-life-ring"></i>
+<body>
+    <div class="container py-5">
+        <!-- Encabezado -->
+        <div class="dashboard-header p-4 mb-5 text-center">
+            <h1 class="display-4 font-weight-bold"><i class="fas fa-tachometer-alt mr-3"></i>Panel de Administración</h1>
+            <p class="lead mb-0">Bienvenido, <?php echo $_SESSION['user']['nombre'] ?? 'Administrador'; ?></p>
         </div>
-        <div class="mr-5"><h4>Soporte</h4>
-Soporte</div>          </div>
-      <a class="card-footer text-white clearfix small z-1" title="Soporte" href="soporte.php">
-        <span class="float-left">Ir a Soporte</span>
-        <span class="float-right">
-        <i class="fa fa-arrow-circle-right"></i>
-        </span>
-      </a>
+
+        <!-- Tarjetas de acceso -->
+        <div class="row mb-5">
+            <!-- Tarjeta de Pagos -->
+            <div class="col-md-4 mb-4">
+                <div class="card feature-card pagos-card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="card-icon">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </div>
+                        <h3 class="card-title h4 font-weight-bold">Pagos</h3>
+                        <p class="card-text text-muted">Gestionar sistema de pagos y transacciones</p>
+                        <a href="registro_pagos.php" class="btn btn-access btn-pagos mt-3">Acceder</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta de Soporte -->
+            <div class="col-md-4 mb-4">
+                <div class="card feature-card soporte-card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="card-icon">
+                            <i class="fas fa-life-ring"></i>
+                        </div>
+                        <h3 class="card-title h4 font-weight-bold">Soporte</h3>
+                        <p class="card-text text-muted">Información de ayuda y soporte técnico</p>
+                        <a href="soporte.php" class="btn btn-access btn-soporte mt-3">Acceder</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta de Mensajería -->
+            <div class="col-md-4 mb-4">
+                <div class="card feature-card mensajeria-card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="card-icon">
+                            <i class="fas fa-envelope"></i>
+                        </div>
+                        <h3 class="card-title h4 font-weight-bold">Mensajería</h3>
+                        <p class="card-text text-muted">Sistema de mensajes y notificaciones</p>
+                        <a href="mensajeria.php" class="btn btn-access btn-mensajeria mt-3">Acceder</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mensaje de bienvenida -->
+        <div class="welcome-message p-4 text-center">
+            <h4 class="font-weight-bold">Bienvenido al Sistema de Gestión</h4>
+            <p class="text-muted mb-0">Selecciona una de las opciones anteriores para comenzar</p>
+        </div>
     </div>
-  </div>
-</div>
-
-<h2>
-
-</h2>
-</div>
-
-<div class="table-responsive">
-<hr>
-
-
-<hr>
-</div>
-           
-
-     <hr>
-  
-    <hr>
-    </div>
-		<?php
-		if ($pendiente_pedido>0) {
-			echo "<script>
- 	 Push.create('Hay Pedidos Pendientes!', {
- 			 body: 'Hola hay pedidos pendientes por ser atentidos',
- 			 icon: '../images/logo_mini.png',
- 			 timeout: 8000,
- 			 onClick: function () {
- 					 window.focus();
- 					 this.close();
- 			 }
- 	 });
- 	 </script>";
-	 	}
-
-	 if ($pendiente_mensualidad>0) {
-		  echo "<script>
-     Push.create('Hay Mensualidades Pendientes!', {
-         body: 'Hola hay Mensualidades pendientes.',
-         icon: '../images/logo_mini.png',
-         timeout: 8000,
-         onClick: function () {
-             window.focus();
-             this.close();
-         }
-     });
-     </script>";
-	 }
-
-
-		 ?>
-
 
     <?php include("includes/footer.php"); ?>
- <script>
-Push.create('Hola Bienvenido/a!', {
-    body: 'Me estan configurando, pronto estare disponible para avisar cuando alguian efectue un pago de mensualidad o pedidos',
-    icon: '../images/logo_mini.png',
-    timeout: 8000,
-    onClick: function () {
-        window.focus();
-        this.close();
-    }
-});
-</script>
+
+    <!-- jQuery and Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
+
+    <script>
+    // Notificación de bienvenida
+    document.addEventListener('DOMContentLoaded', function() {
+        Push.create('Panel de Administración', {
+            body: 'Bienvenido al sistema de gestión',
+            icon: '../images/logo_mini.png',
+            timeout: 4000
+        });
+    });
+    </script>
+</body>
+</html>
