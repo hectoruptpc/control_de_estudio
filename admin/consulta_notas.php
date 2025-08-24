@@ -363,9 +363,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                         </div>
                         <div class="card-body">
                             <?php if ($total_materias > 0): 
-                            // Calcular porcentajes para las líneas de TSU e Ingeniería
-                            $porcentaje_tsu = 0;
-                            $porcentaje_ingenieria = 0;
+                            // Calcular porcentajes para las metas
+                            $porcentaje_meta_tsu = 0;
                             
                             // Contar materias por trayecto
                             $materias_por_trayecto = [0 => 0, 1 => 0, 2 => 0, 3 => 0, 4 => 0];
@@ -377,58 +376,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                                 }
                             }
                             
-                            // Calcular porcentajes acumulativos
-                            $materias_acumuladas = 0;
-                            for ($i = 0; $i <= 4; $i++) {
-                                $materias_acumuladas += $materias_por_trayecto[$i];
-                                if ($i == 2) { // Fin de TSU (trayecto 0, 1, 2)
-                                    $porcentaje_tsu = ($materias_acumuladas / $total_materias) * 100;
-                                }
-                                if ($i == 4) { // Fin de Ingeniería (trayecto 0, 1, 2, 3, 4)
-                                    $porcentaje_ingenieria = 100;
-                                }
-                            }
+                            // Calcular porcentaje para la meta de TSU (hasta trayecto 2)
+                            $materias_tsu = $materias_por_trayecto[0] + $materias_por_trayecto[1] + $materias_por_trayecto[2];
+                            $porcentaje_meta_tsu = ($materias_tsu / $total_materias) * 100;
                             ?>
                             
-                            <!-- Barra de progreso principal con líneas indicadoras -->
-                            <div class="progress mb-3" style="height: 25px; position: relative;">
+                            <!-- Barra de progreso principal con metas -->
+                            <div class="progress mb-3" style="height: 25px; position: relative; background-color: #f8f9fa;">
                                 <div class="progress-bar bg-success" 
                                      style="width: <?= $porcentaje_completado ?>%"
                                      title="<?= $porcentaje_completado ?>% completado">
                                     <?= $porcentaje_completado ?>% Completado
                                 </div>
                                 
-                                <!-- Línea para TSU -->
-                                <?php if ($porcentaje_tsu > 0 && $porcentaje_tsu < 100): ?>
-                                <div style="position: absolute; left: <?= $porcentaje_tsu ?>%; top: 0; bottom: 0; width: 2px; background-color: #ff6b00; z-index: 10;" 
-                                     title="TSU: <?= round($porcentaje_tsu, 1) ?>%"></div>
-                                <div style="position: absolute; left: <?= $porcentaje_tsu + 1 ?>%; top: 2px; font-size: 10px; color: #ff6b00; font-weight: bold; z-index: 11;">
-                                    TSU
+                                <!-- Línea de meta para TSU -->
+                                <?php if ($porcentaje_meta_tsu > 0 && $porcentaje_meta_tsu < 100): ?>
+                                <div style="position: absolute; left: <?= $porcentaje_meta_tsu ?>%; top: -5px; bottom: -5px; width: 3px; background-color: #ff6b00; z-index: 10;" 
+                                     title="Meta: TSU (<?= round($porcentaje_meta_tsu, 1) ?>%)"></div>
+                                <div style="position: absolute; left: <?= $porcentaje_meta_tsu ?>%; top: -20px; transform: translateX(-50%);">
+                                    <i class="fas fa-flag" style="color: #ff6b00; font-size: 16px;"></i>
                                 </div>
                                 <?php endif; ?>
                                 
-                                <!-- Línea para Ingeniería -->
-                                <?php if ($porcentaje_ingenieria > 0 && $porcentaje_ingenieria < 100): ?>
-                                <div style="position: absolute; left: <?= $porcentaje_ingenieria ?>%; top: 0; bottom: 0; width: 2px; background-color: #007bff; z-index: 10;" 
-                                     title="Ingeniería: <?= round($porcentaje_ingenieria, 1) ?>%"></div>
-                                <div style="position: absolute; left: <?= $porcentaje_ingenieria - 3 ?>%; top: 2px; font-size: 10px; color: #007bff; font-weight: bold; z-index: 11;">
-                                    ING
+                                <!-- Icono de meta final (fin de carrera) -->
+                                <div style="position: absolute; right: 0; top: -20px;">
+                                    <i class="fas fa-graduation-cap" style="color: #28a745; font-size: 18px;"></i>
                                 </div>
-                                <?php endif; ?>
                             </div>
                             
-                            <!-- Leyenda de las líneas -->
+                            <!-- Leyenda de las metas -->
                             <div class="row mb-3">
                                 <div class="col-md-6">
                                     <small>
-                                        <span style="display: inline-block; width: 12px; height: 12px; background-color: #ff6b00; margin-right: 5px;"></span>
-                                        <strong>TSU:</strong> Hasta Trayecto 2
+                                        <i class="fas fa-flag text-warning"></i>
+                                        <strong> Meta TSU:</strong> <?= round($porcentaje_meta_tsu, 1) ?>%
                                     </small>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-6 text-right">
                                     <small>
-                                        <span style="display: inline-block; width: 12px; height: 12px; background-color: #007bff; margin-right: 5px;"></span>
-                                        <strong>Ingeniería:</strong> Hasta Trayecto 4
+                                        <i class="fas fa-graduation-cap text-success"></i>
+                                        <strong> Fin de Carrera:</strong> 100%
                                     </small>
                                 </div>
                             </div>
@@ -458,11 +445,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                                         <div class="col-md-2 col-sm-4 col-4 mb-2">
                                             <small>
                                                 <strong>T<?= $i ?>:</strong> <?= $materias_por_trayecto[$i] ?> mat.
-                                                <?php if ($i == 2): ?>
-                                                    <br><span class="text-warning"><small>TSU</small></span>
-                                                <?php elseif ($i == 4): ?>
-                                                    <br><span class="text-primary"><small>ING</small></span>
-                                                <?php endif; ?>
                                             </small>
                                         </div>
                                         <?php endif; ?>
