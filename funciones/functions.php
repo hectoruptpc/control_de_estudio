@@ -2117,7 +2117,7 @@ function asignarMateriaACarrera($id_carrera, $id_materia, $semestre) {
 }
 
 /**
- * Elimina una asignación de materia a carrera después de validar que no tenga registros académicos asociados
+ * Elimina una asignación de materia a carrera
  * 
  * @param int $id_relacion ID de la relación materia-carrera a eliminar
  * @return array Resultado de la operación con:
@@ -2125,60 +2125,60 @@ function asignarMateriaACarrera($id_carrera, $id_materia, $semestre) {
  *               - 'message': string descriptivo
  */
 function eliminarAsignacionMateria($id_relacion) {
-  global $db;
+    global $db;
 
-  // 1. Verificar registros académicos asociados (con prepared statement)
-  $check_query = "SELECT COUNT(*) AS total FROM registros_academicos WHERE id_relacion = ?";
-  
-  if ($check_stmt = $db->prepare($check_query)) {
-      $check_stmt->bind_param("i", $id_relacion);
-      $check_stmt->execute();
-      $check_result = $check_stmt->get_result();
-      $tiene_registros = $check_result->fetch_assoc()['total'] > 0;
-      $check_stmt->close();
-      
-      if ($tiene_registros) {
-          return [
-              'success' => false, 
-              'message' => 'No se puede eliminar: existen registros académicos asociados'
-          ];
-      }
-  } else {
-      return [
-          'success' => false,
-          'message' => 'Error al verificar registros: ' . $db->error
-      ];
-  }
+    // 1. Verificar si existe la relación
+    $check_query = "SELECT COUNT(*) AS total FROM carrera_materia WHERE id_relacion = ?";
+    
+    if ($check_stmt = $db->prepare($check_query)) {
+        $check_stmt->bind_param("i", $id_relacion);
+        $check_stmt->execute();
+        $check_result = $check_stmt->get_result();
+        $existe_relacion = $check_result->fetch_assoc()['total'] > 0;
+        $check_stmt->close();
+        
+        if (!$existe_relacion) {
+            return [
+                'success' => false, 
+                'message' => 'No se encontró la relación especificada'
+            ];
+        }
+    } else {
+        return [
+            'success' => false,
+            'message' => 'Error al verificar la relación: ' . $db->error
+        ];
+    }
 
-  // 2. Eliminar asignación (con prepared statement)
-  $delete_query = "DELETE FROM carrera_materia WHERE id_relacion = ?";
-  
-  if ($delete_stmt = $db->prepare($delete_query)) {
-      $delete_stmt->bind_param("i", $id_relacion);
-      $execute_result = $delete_stmt->execute();
-      $affected_rows = $delete_stmt->affected_rows;
-      $delete_stmt->close();
-      
-      if ($execute_result && $affected_rows > 0) {
-          return [
-              'success' => true,
-              'message' => 'Asignación eliminada correctamente',
-              'affected_rows' => $affected_rows
-          ];
-      } else {
-          return [
-              'success' => false,
-              'message' => $affected_rows === 0 
-                  ? 'No se encontró la asignación con el ID proporcionado' 
-                  : 'Error al eliminar: ' . $db->error
-          ];
-      }
-  } else {
-      return [
-          'success' => false,
-          'message' => 'Error preparando consulta de eliminación: ' . $db->error
-      ];
-  }
+    // 2. Eliminar asignación (con prepared statement)
+    $delete_query = "DELETE FROM carrera_materia WHERE id_relacion = ?";
+    
+    if ($delete_stmt = $db->prepare($delete_query)) {
+        $delete_stmt->bind_param("i", $id_relacion);
+        $execute_result = $delete_stmt->execute();
+        $affected_rows = $delete_stmt->affected_rows;
+        $delete_stmt->close();
+        
+        if ($execute_result && $affected_rows > 0) {
+            return [
+                'success' => true,
+                'message' => 'Asignación eliminada correctamente',
+                'affected_rows' => $affected_rows
+            ];
+        } else {
+            return [
+                'success' => false,
+                'message' => $affected_rows === 0 
+                    ? 'No se encontró la asignación con el ID proporcionado' 
+                    : 'Error al eliminar: ' . $db->error
+            ];
+        }
+    } else {
+        return [
+            'success' => false,
+            'message' => 'Error preparando consulta de eliminación: ' . $db->error
+        ];
+    }
 }
 
 /**
