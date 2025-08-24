@@ -92,40 +92,6 @@ if (!isDocente()) {
               </a>
             </li>
 
-            <li id="dropdown-estudiantes" class="nav-item dropdown position-relative">
-              <a title="Gestión de Estudiantes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownEstudiantes" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                <i class="fa fa-users fa-fw"></i> Estudiantes
-              </a>
-              <div class="dropdown-menu position-absolute" aria-labelledby="navbarDropdownEstudiantes" style="left: 0; top: 100%;">
-                <a title="Ver Mis Estudiantes" class="dropdown-item" href="mis_estudiantes.php">
-                  <i class="fa fa-users fa-fw"></i> Mis Estudiantes
-                </a>
-                <a title="Calificaciones" class="dropdown-item" href="calificaciones.php">
-                  <i class="fas fa-graduation-cap fa-fw"></i> Calificaciones
-                </a>
-                <a title="Asistencia" class="dropdown-item" href="asistencia.php">
-                  <i class="fas fa-calendar-check fa-fw"></i> Asistencia
-                </a>
-              </div>
-            </li>
-
-            <li id="dropdown-cursos" class="nav-item dropdown">
-              <a title="Gestión de Cursos" class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                  <i class="fas fa-book fa-fw"></i> Mis Cursos
-              </a>
-              <div id="dropdown-cursos-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
-                  <a title="Ver Mis Cursos" class="dropdown-item" href="mis_cursos.php">
-                      <i class="fas fa-list fa-fw"></i> Ver Mis Cursos
-                  </a>
-                  <a title="Material Didáctico" class="dropdown-item" href="material_didactico.php">
-                      <i class="fas fa-file-alt fa-fw"></i> Material Didáctico
-                  </a>
-                  <a title="Planificación" class="dropdown-item" href="planificacion.php">
-                      <i class="fas fa-tasks fa-fw"></i> Planificación
-                  </a>
-              </div>
-            </li>
-
             <li id="dropdown-evaluaciones" class="nav-item dropdown">
               <a title="Gestión de Evaluaciones" class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                   <i class="fas fa-clipboard-check fa-fw"></i> Notas
@@ -134,12 +100,7 @@ if (!isDocente()) {
                   <a title="Crear Evaluación" class="dropdown-item" href="notas.php">
                       <i class="fas fa-plus-circle fa-fw"></i> Cargar Notas
                   </a>
-                  <a title="Lista de Evaluaciones" class="dropdown-item" href="lista_evaluaciones.php">
-                      <i class="fas fa-list-ol fa-fw"></i> Lista de Evaluaciones
-                  </a>
-                  <a title="Resultados" class="dropdown-item" href="resultados_evaluaciones.php">
-                      <i class="fas fa-chart-bar fa-fw"></i> Resultados
-                  </a>
+                  
               </div>
             </li>
 

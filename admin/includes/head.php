@@ -102,12 +102,7 @@ if (!isAdmin()) {
                 <a title="Gestionar Secciones" class="dropdown-item" href="gestion_seccion.php">
                   <i class="fas fa-object-group fa-fw"></i> Gestionar Secciones
                 </a>
-                <a title="Historial Académico" class="dropdown-item" href="historial_academico.php">
-                  <i class="fas fa-history fa-fw"></i> Historial Académico
-                </a>
-                <a title="Constancia de Estudio" class="dropdown-item" href="constancia_estudio.php">
-                  <i class="fas fa-file-certificate fa-fw"></i> Constancia de Estudio
-                </a>
+                
               </div>
             </li>
 
@@ -155,9 +150,7 @@ if (!isAdmin()) {
                 <a title="Horarios Docentes" class="dropdown-item" href="horarios_docentes.php">
                     <i class="fas fa-calendar-alt fa-fw"></i> Horarios
                 </a>
-                <a title="Evaluaciones Docentes" class="dropdown-item" href="evaluaciones_docentes.php">
-                    <i class="fas fa-star-half-alt fa-fw"></i> Evaluaciones
-                </a>
+                
                 </div>
             </li>
 
@@ -172,15 +165,7 @@ if (!isAdmin()) {
                     <a title="Consultar Notas" class="dropdown-item" href="consulta_notas.php">
                         <i class="fas fa-search fa-fw"></i> Consultar Notas
                     </a>
-                    <a title="Reportes de Notas" class="dropdown-item" href="reportes_notas.php">
-                        <i class="fas fa-file-alt fa-fw"></i> Reportes de Notas
-                    </a>
-                    <a title="Boletines" class="dropdown-item" href="boletines.php">
-                        <i class="fas fa-file-pdf fa-fw"></i> Generar Boletines
-                    </a>
-                    <a title="Historial de Calificaciones" class="dropdown-item" href="historial_calificaciones.php">
-                        <i class="fas fa-history fa-fw"></i> Historial de Calificaciones
-                    </a>
+                    
                 </div>
             </li>
 
@@ -190,8 +175,6 @@ if (!isAdmin()) {
                 </a>
                 <div id="dropdown-ajus" class="dropdown-menu" aria-labelledby="navbarDropdown">
                     
-                    <a title="Gestor de Contenido" class="dropdown-item" href="gestor_contenido.php"><i class="fa fa-file-contract fa-fw"></i> Contenido</a>
-                    <a title="Google Groups" class="dropdown-item" href="gg.php"><i class="fab fa-google-plus-g"></i> Google Groups</a>
                     
                     <!-- Nuevo apartado de Títulos y Relaciones con Materias -->
                     <div class="dropdown-divider"></div>
@@ -199,16 +182,7 @@ if (!isAdmin()) {
                         <i class="fas fa-graduation-cap fa-fw"></i> Títulos y Relaciones con Materias
                     </a>
                     
-                    <!-- Nueva opción de Gestión de Aulas -->
-                    <div class="dropdown-divider"></div>
-                    <a title="Gestión de Aulas" class="dropdown-item" href="aulas.php">
-                        <i class="fas fa-door-open fa-fw"></i> Gestión de Aulas
-                    </a>
-                    
-                    <a title="Creador 1" class="dropdown-item" href="test2.php"><i class="fa fa-wrench fa-fw"></i> Creador 2</a>
-                    <a title="Creador Mensajes" class="dropdown-item" href="cm.php"><i class="fa fa-wrench fa-fw"></i> Creador Mensajes</a>
-                    <a title="Reportes" class="dropdown-item" href="reportes.php"><i class="far fa-flag"></i> Reportes</a>
-                    <a title="Mantenimiento" class="dropdown-item" href="mantenimiento.php"><i class="fas fa-wrench"></i> Mantenimiento</a>
+                   
                     
                     <!-- Opción exclusiva para usuarios con editar_acceso = 1 -->
                     <?php if ($_SESSION['user']['editar_acceso'] == 1): ?>

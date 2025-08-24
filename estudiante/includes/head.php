@@ -97,10 +97,8 @@ if (!isEstudiante()) {
                 <i class="fas fa-book fa-fw"></i> Mis Clases
               </a>
               <div class="dropdown-menu" aria-labelledby="navbarDropdownClases">
-                <a title="Ver Mis Clases" class="dropdown-item" href="mis_clases.php">
-                  <i class="fas fa-list fa-fw"></i> Ver Mis Clases
-                </a>
-                <a title="Horario" class="dropdown-item" href="horario.php">
+                
+                <a title="Horario" class="dropdown-item" href="../pagina_en_construccion.php">
                   <i class="fas fa-calendar-alt fa-fw"></i> Mi Horario
                 </a>
                 <a title="Secciones" class="dropdown-item" href="mis_secciones.php">
@@ -117,34 +115,14 @@ if (!isEstudiante()) {
                   <i class="fas fa-graduation-cap fa-fw"></i> Mis Calificaciones
               </a>
               <div id="dropdown-calificaciones-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
-                  <a title="Ver Calificaciones" class="dropdown-item" href="mis_notas.php">
+                  <a title="Ver Calificaciones" class="dropdown-item" href="../pagina_en_construccion.php">
                       <i class="fas fa-list-ol fa-fw"></i> Ver Mis Notas
                   </a>
-                  <a title="Progreso Académico" class="dropdown-item" href="progreso.php">
-                      <i class="fas fa-chart-line fa-fw"></i> Progreso Académico
-                  </a>
-                  <a title="Reportes" class="dropdown-item" href="reportes.php">
-                      <i class="fas fa-file-alt fa-fw"></i> Reportes
-                  </a>
+                  
               </div>
             </li>
 
-            <li id="dropdown-actividades" class="nav-item dropdown">
-              <a title="Mis Actividades" class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                  <i class="fas fa-tasks fa-fw"></i> Mis Actividades
-              </a>
-              <div id="dropdown-actividades-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
-                  <a title="Tareas Pendientes" class="dropdown-item" href="tareas.php">
-                      <i class="fas fa-clipboard-list fa-fw"></i> Tareas Pendientes
-                  </a>
-                  <a title="Exámenes Programados" class="dropdown-item" href="examenes.php">
-                      <i class="fas fa-edit fa-fw"></i> Exámenes Programados
-                  </a>
-                  <a title="Entregas" class="dropdown-item" href="entregas.php">
-                      <i class="fas fa-file-upload fa-fw"></i> Mis Entregas
-                  </a>
-              </div>
-            </li>
+           
 
             <li id="dropdown-ajustes" class="nav-item dropdown">
               <a title="Ir a Ajustes" class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -152,8 +130,7 @@ if (!isEstudiante()) {
               </a>
               <div id="dropdown-ajus" class="dropdown-menu" aria-labelledby="navbarDropdown">
                 <a title="Perfil" class="dropdown-item" href="mi_perfil.php"><i class="fa fa-user fa-fw"></i> Mi Perfil</a>
-                <a title="Mensajeria" class="dropdown-item" href="mensajeria.php"><i class="fa fa-envelope fa-fw"></i> Mensajería</a>
-                <a title="Asistencias" class="dropdown-item" href="mis_asistencias.php"><i class="fas fa-calendar-check fa-fw"></i> Mis Asistencias</a>
+                
                 <div class="dropdown-divider"></div>
                 <a title="Salir del Sistema" class="nav-link" href="../index.php?logout='1'"><i class="fas fa-sign-out-alt"></i> Salir</a>
               </div>

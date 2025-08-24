@@ -63,10 +63,9 @@ if (!$result_carrera || mysqli_num_rows($result_carrera) === 0) {
 
 $carrera = mysqli_fetch_assoc($result_carrera);
 $es_pnf = ($carrera['tipo_formacion'] == 'PNF');
-$texto_periodo = $es_pnf ? 'Trimestre' : 'Semestre';
 $texto_duracion = $es_pnf ? 'trimestres' : 'semestres';
 
-// 4. Obtener materias agrupadas por trayecto y semestre
+// 4. Obtener materias agrupadas por trayecto y ordenadas por duración
 $query_materias = "SELECT 
                     m.id_materia,
                     m.cod_materia,
@@ -81,7 +80,7 @@ $query_materias = "SELECT
                   FROM materias m
                   JOIN carrera_materia cm ON m.id_materia = cm.id_materia
                   WHERE cm.id_carrera = ?
-                  ORDER BY m.trayecto, cm.semestre, m.nombre_materia";
+                  ORDER BY m.trayecto, m.duracion_periodo, m.nombre_materia";
 $stmt = mysqli_prepare($db, $query_materias);
 mysqli_stmt_bind_param($stmt, 'i', $id_carrera);
 mysqli_stmt_execute($stmt);
@@ -91,14 +90,13 @@ if (!$result_materias) {
     die("Error en consulta: " . mysqli_error($db));
 }
 
-// 5. Procesar y agrupar las materias
+// 5. Procesar y agrupar las materias solo por trayecto
 $materias_agrupadas = [];
 $total_creditos = 0;
 $total_materias = 0;
 
 while ($materia = mysqli_fetch_assoc($result_materias)) {
     $trayecto = (int)$materia['trayecto'];
-    $semestre = (int)$materia['semestre'];
     
     $texto_trayecto = ($trayecto == 0) ? 'Trayecto Inicial' : "Trayecto $trayecto";
     
@@ -106,11 +104,7 @@ while ($materia = mysqli_fetch_assoc($result_materias)) {
         $materias_agrupadas[$texto_trayecto] = [];
     }
     
-    if (!isset($materias_agrupadas[$texto_trayecto][$semestre])) {
-        $materias_agrupadas[$texto_trayecto][$semestre] = [];
-    }
-    
-    $materias_agrupadas[$texto_trayecto][$semestre][] = $materia;
+    $materias_agrupadas[$texto_trayecto][] = $materia;
     $total_creditos += (int)$materia['creditos'];
     $total_materias++;
 }
@@ -118,13 +112,55 @@ while ($materia = mysqli_fetch_assoc($result_materias)) {
 include("includes/head.php");
 ?>
 
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #printable-area, #printable-area * {
+            visibility: visible;
+        }
+        #printable-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .no-print {
+            display: none !important;
+        }
+        .card {
+            border: none;
+            box-shadow: none;
+        }
+        .table {
+            font-size: 12px;
+        }
+        h4 {
+            page-break-after: avoid;
+        }
+        .card-body {
+            padding: 0;
+        }
+        .accordion .collapse {
+            display: block !important;
+            opacity: 1;
+        }
+    }
+</style>
+
 <div class="container-fluid">
     <!-- Encabezado principal -->
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800">Mi Pensum Académico</h1>
-        <a href="index.php" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm">
-            <i class="fas fa-arrow-left fa-sm text-white-50"></i> Volver al Inicio
-        </a>
+        <div>
+            <a href="index.php" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm no-print">
+                <i class="fas fa-arrow-left fa-sm text-white-50"></i> Volver al Inicio
+            </a>
+            <button onclick="window.print()" class="d-none d-sm-inline-block btn btn-sm btn-success shadow-sm no-print ml-2">
+                <i class="fas fa-print fa-sm text-white-50"></i> Imprimir Pensum
+            </button>
+        </div>
     </div>
 
     <!-- Tarjeta con información de la carrera -->
@@ -161,16 +197,17 @@ include("includes/head.php");
     </div>
 
     <!-- Tarjeta con el plan de estudios -->
-    <div class="card shadow mb-4">
-        <div class="card-header py-3 bg-secondary text-white">
+    <div class="card shadow mb-4" id="printable-area">
+        <div class="card-header py-3 bg-secondary text-white d-flex justify-content-between align-items-center">
             <h5 class="m-0 font-weight-bold">Plan de Estudios</h5>
+            <span class="no-print"><?php echo date('d/m/Y'); ?></span>
         </div>
         <div class="card-body">
             <?php if (empty($materias_agrupadas)): ?>
                 <div class="alert alert-warning">No hay materias asignadas a tu carrera.</div>
             <?php else: ?>
                 <div class="accordion" id="pensumAccordion">
-                    <?php foreach ($materias_agrupadas as $texto_trayecto => $periodos): ?>
+                    <?php foreach ($materias_agrupadas as $texto_trayecto => $materias): ?>
                         <div class="card mb-3">
                             <div class="card-header" id="heading<?= md5($texto_trayecto) ?>">
                                 <h5 class="mb-0">
@@ -185,45 +222,38 @@ include("includes/head.php");
                             <div id="collapse<?= md5($texto_trayecto) ?>" class="collapse show" 
                                  aria-labelledby="heading<?= md5($texto_trayecto) ?>" data-parent="#pensumAccordion">
                                 <div class="card-body">
-                                    <?php foreach ($periodos as $numero_periodo => $materias): ?>
-                                        <div class="mb-4">
-                                            <h5 class="font-weight-bold text-primary">
-                                                <?= $texto_periodo ?> <?= $numero_periodo ?>
-                                            </h5>
-                                            <div class="table-responsive">
-                                                <table class="table table-bordered table-hover table-sm">
-                                                    <thead class="thead-light">
-                                                        <tr>
-                                                            <th width="10%">Código</th>
-                                                            <th width="35%">Nombre</th>
-                                                            <th width="8%">Créditos</th>
-                                                            <th width="12%">Horas T</th>
-                                                            <th width="12%">Horas P</th>
-                                                            <th width="13%">Duración</th>
-                                                            <th width="10%">Estado</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        <?php foreach ($materias as $materia): ?>
-                                                            <tr>
-                                                                <td><?= htmlspecialchars($materia['cod_materia']) ?></td>
-                                                                <td><?= htmlspecialchars($materia['nombre_materia']) ?></td>
-                                                                <td class="text-center"><?= htmlspecialchars($materia['creditos']) ?></td>
-                                                                <td class="text-center"><?= htmlspecialchars($materia['horas_teoricas']) ?></td>
-                                                                <td class="text-center"><?= htmlspecialchars($materia['horas_practicas']) ?></td>
-                                                                <td class="text-center"><?= htmlspecialchars($materia['duracion_periodo']) ?> <?= $texto_duracion ?></td>
-                                                                <td class="text-center">
-                                                                    <span class="badge badge-<?= $materia['activa'] ? 'success' : 'secondary' ?>">
-                                                                        <?= $materia['activa'] ? 'Activa' : 'Inactiva' ?>
-                                                                    </span>
-                                                                </td>
-                                                            </tr>
-                                                        <?php endforeach; ?>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-hover table-sm">
+                                            <thead class="thead-light">
+                                                <tr>
+                                                    <th width="10%">Código</th>
+                                                    <th width="35%">Nombre</th>
+                                                    <th width="8%">Créditos</th>
+                                                    <th width="12%">Horas T</th>
+                                                    <th width="12%">Horas P</th>
+                                                    <th width="13%">Duración</th>
+                                                    <th width="10%">Estado</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($materias as $materia): ?>
+                                                    <tr>
+                                                        <td><?= htmlspecialchars($materia['cod_materia']) ?></td>
+                                                        <td><?= htmlspecialchars($materia['nombre_materia']) ?></td>
+                                                        <td class="text-center"><?= htmlspecialchars($materia['creditos']) ?></td>
+                                                        <td class="text-center"><?= htmlspecialchars($materia['horas_teoricas']) ?></td>
+                                                        <td class="text-center"><?= htmlspecialchars($materia['horas_practicas']) ?></td>
+                                                        <td class="text-center"><?= htmlspecialchars($materia['duracion_periodo']) ?> <?= $texto_duracion ?></td>
+                                                        <td class="text-center">
+                                                            <span class="badge badge-<?= $materia['activa'] ? 'success' : 'secondary' ?>">
+                                                                <?= $materia['activa'] ? 'Activa' : 'Inactiva' ?>
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
