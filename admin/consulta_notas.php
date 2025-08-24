@@ -362,16 +362,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                             <h6>Progreso de la Carrera</h6>
                         </div>
                         <div class="card-body">
-                            <?php if ($total_materias > 0): ?>
-                            <div class="progress mb-3" style="height: 20px;">
+                            <?php if ($total_materias > 0): 
+                            // Calcular porcentajes para las líneas de TSU e Ingeniería
+                            $porcentaje_tsu = 0;
+                            $porcentaje_ingenieria = 0;
+                            
+                            // Contar materias por trayecto
+                            $materias_por_trayecto = [0 => 0, 1 => 0, 2 => 0, 3 => 0, 4 => 0];
+                            $materias_carrera->data_seek(0); // Reiniciar el puntero
+                            while ($materia = $materias_carrera->fetch_assoc()) {
+                                $trayecto = (int)$materia['trayecto'];
+                                if (isset($materias_por_trayecto[$trayecto])) {
+                                    $materias_por_trayecto[$trayecto]++;
+                                }
+                            }
+                            
+                            // Calcular porcentajes acumulativos
+                            $materias_acumuladas = 0;
+                            for ($i = 0; $i <= 4; $i++) {
+                                $materias_acumuladas += $materias_por_trayecto[$i];
+                                if ($i == 2) { // Fin de TSU (trayecto 0, 1, 2)
+                                    $porcentaje_tsu = ($materias_acumuladas / $total_materias) * 100;
+                                }
+                                if ($i == 4) { // Fin de Ingeniería (trayecto 0, 1, 2, 3, 4)
+                                    $porcentaje_ingenieria = 100;
+                                }
+                            }
+                            ?>
+                            
+                            <!-- Barra de progreso principal con líneas indicadoras -->
+                            <div class="progress mb-3" style="height: 25px; position: relative;">
                                 <div class="progress-bar bg-success" 
                                      style="width: <?= $porcentaje_completado ?>%"
                                      title="<?= $porcentaje_completado ?>% completado">
                                     <?= $porcentaje_completado ?>% Completado
                                 </div>
+                                
+                                <!-- Línea para TSU -->
+                                <?php if ($porcentaje_tsu > 0 && $porcentaje_tsu < 100): ?>
+                                <div style="position: absolute; left: <?= $porcentaje_tsu ?>%; top: 0; bottom: 0; width: 2px; background-color: #ff6b00; z-index: 10;" 
+                                     title="TSU: <?= round($porcentaje_tsu, 1) ?>%"></div>
+                                <div style="position: absolute; left: <?= $porcentaje_tsu + 1 ?>%; top: 2px; font-size: 10px; color: #ff6b00; font-weight: bold; z-index: 11;">
+                                    TSU
+                                </div>
+                                <?php endif; ?>
+                                
+                                <!-- Línea para Ingeniería -->
+                                <?php if ($porcentaje_ingenieria > 0 && $porcentaje_ingenieria < 100): ?>
+                                <div style="position: absolute; left: <?= $porcentaje_ingenieria ?>%; top: 0; bottom: 0; width: 2px; background-color: #007bff; z-index: 10;" 
+                                     title="Ingeniería: <?= round($porcentaje_ingenieria, 1) ?>%"></div>
+                                <div style="position: absolute; left: <?= $porcentaje_ingenieria - 3 ?>%; top: 2px; font-size: 10px; color: #007bff; font-weight: bold; z-index: 11;">
+                                    ING
+                                </div>
+                                <?php endif; ?>
                             </div>
                             
-                            <div class="progress" style="height: 20px;">
+                            <!-- Leyenda de las líneas -->
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <small>
+                                        <span style="display: inline-block; width: 12px; height: 12px; background-color: #ff6b00; margin-right: 5px;"></span>
+                                        <strong>TSU:</strong> Hasta Trayecto 2
+                                    </small>
+                                </div>
+                                <div class="col-md-6">
+                                    <small>
+                                        <span style="display: inline-block; width: 12px; height: 12px; background-color: #007bff; margin-right: 5px;"></span>
+                                        <strong>Ingeniería:</strong> Hasta Trayecto 4
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <!-- Barra de progreso por estados -->
+                            <div class="progress mb-3" style="height: 20px;">
                                 <div class="progress-bar bg-success" 
                                      style="width: <?= ($materias_aprobadas / $total_materias) * 100 ?>%">
                                     Aprobadas: <?= $materias_aprobadas ?>
@@ -385,6 +448,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                                     Pendientes: <?= $materias_sin_notas ?>
                                 </div>
                             </div>
+                            
+                            <!-- Información adicional sobre los trayectos -->
+                            <div class="mt-3">
+                                <h6>Distribución por Trayectos:</h6>
+                                <div class="row">
+                                    <?php for ($i = 0; $i <= 4; $i++): 
+                                        if ($materias_por_trayecto[$i] > 0): ?>
+                                        <div class="col-md-2 col-sm-4 col-4 mb-2">
+                                            <small>
+                                                <strong>T<?= $i ?>:</strong> <?= $materias_por_trayecto[$i] ?> mat.
+                                                <?php if ($i == 2): ?>
+                                                    <br><span class="text-warning"><small>TSU</small></span>
+                                                <?php elseif ($i == 4): ?>
+                                                    <br><span class="text-primary"><small>ING</small></span>
+                                                <?php endif; ?>
+                                            </small>
+                                        </div>
+                                        <?php endif; ?>
+                                    <?php endfor; ?>
+                                </div>
+                            </div>
+                            
                             <?php else: ?>
                                 <p class="text-muted">No hay materias en esta carrera</p>
                             <?php endif; ?>
