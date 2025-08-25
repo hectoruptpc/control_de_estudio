@@ -198,6 +198,9 @@ if (!isAdmin()) {
                         <a title="Editar Valores del Sistema" class="dropdown-item" href="valores_predefinidos.php">
                             <i class="fas fa-edit fa-fw"></i> Valores Predefinidos
                         </a>
+                        <a title="Editar tipos de pago" class="dropdown-item" href="tipo_pago.php">
+                            <i class="fas fa-edit fa-fw"></i> tipos de pago
+                        </a>
                     <?php endif; ?>
                     
                     <div class="dropdown-divider"></div>

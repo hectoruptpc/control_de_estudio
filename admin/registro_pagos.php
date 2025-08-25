@@ -8,9 +8,6 @@ $titulopag = "Registro de Pagos";
 
 include("includes/head.php");
 
-
-
-
 isAdmin(); // Verificar permisos
 
 // Procesar formulario de pago
@@ -119,7 +116,7 @@ $pagos_por_dia = $result_pagos['success'] ? $result_pagos['data'] : [];
                             
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="buscar_estudiante" class="form-label">Buscar Estudiante por Cédula (opcional)</label>
+                                    <label for="buscar_estudiante" class="form-label">Buscar Estudiante por Cédula</label>
                                     <div class="input-group">
                                         <input type="text" class="form-control" id="buscar_estudiante" 
                                                placeholder="Ingrese cédula del estudiante" autocomplete="off">
@@ -144,9 +141,10 @@ $pagos_por_dia = $result_pagos['success'] ? $result_pagos['data'] : [];
                                     </div>
                                 </div>
                                 
+                                <!-- CORREGIDO: Cambiado de "referencia" a "observaciones" -->
                                 <div class="mb-3">
-                                    <label for="referencia" class="form-label">Referencia</label>
-                                    <textarea class="form-control" id="referencia" name="referencia" rows="2"></textarea>
+                                    <label for="observaciones" class="form-label">Observaciones</label>
+                                    <textarea class="form-control" id="observaciones" name="observaciones" rows="2"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -201,7 +199,8 @@ $pagos_por_dia = $result_pagos['success'] ? $result_pagos['data'] : [];
                                                     <th>Estudiante</th>
                                                     <th>Monto</th>
                                                     <th>Hora</th>
-                                                    <th>Referencia</th>
+                                                    <!-- CORREGIDO: Cambiado de "Referencia" a "Observaciones" -->
+                                                    <th>Observaciones</th>
                                                     <th>Registrado por</th>
                                                 </tr>
                                             </thead>
@@ -259,8 +258,17 @@ $pagos_por_dia = $result_pagos['success'] ? $result_pagos['data'] : [];
                                                         </td>
                                                         <td>$<?php echo number_format($pago['monto'], 2, ',', '.'); ?></td>
                                                         <td><?php echo date('H:i', strtotime($pago['fecha_pago'])); ?></td>
-                                                        <td><?php echo $pago['referencia'] ? htmlspecialchars($pago['referencia']) : 'N/A'; ?></td>
-                                                        <td><?php echo htmlspecialchars($pago['registrado_por_nombre'] ?? 'Sistema'); ?></td>
+                                                        <!-- CORREGIDO: Cambiado de referencia a observaciones -->
+                                                        <td><?php echo $pago['observaciones'] ? htmlspecialchars($pago['observaciones']) : 'N/A'; ?></td>
+                                                        <td>
+    <?php 
+    if (!empty($pago['registrado_por']) && $pago['registrado_por'] !== '0') {
+        echo htmlspecialchars($pago['registrado_por']);
+    } else {
+        echo 'Sistema';
+    }
+    ?>
+</td>
                                                     </tr>
                                                 <?php endforeach; ?>
                                             </tbody>
@@ -291,6 +299,7 @@ document.getElementById('tipo_pago').addEventListener('change', function() {
 document.getElementById('btn-buscar-estudiante').addEventListener('click', buscarEstudiante);
 document.getElementById('buscar_estudiante').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
+        e.preventDefault();
         buscarEstudiante();
     }
 });
@@ -301,7 +310,6 @@ function buscarEstudiante() {
     const listaEstudiantes = document.getElementById('lista-estudiantes');
     const cedula = inputBusqueda.value.trim();
     
-    // Limpiar resultados anteriores
     listaEstudiantes.innerHTML = '';
     resultadosDiv.style.display = 'none';
     
@@ -314,35 +322,18 @@ function buscarEstudiante() {
     
     mostrarEstadoCarga();
     
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    
-    fetch(`buscar_estudiante.php?cedula=${encodeURIComponent(cedula)}`, {
-        signal: controller.signal,
-        headers: {
-            'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-    .then(response => {
-        clearTimeout(timeout);
-        if (!response.ok) {
-            return response.json().then(err => {
-                throw new Error(err.error || `Error ${response.status}`);
-            });
-        }
-        return response.json();
-    })
+    fetch(`buscar_estudiante.php?cedula=${encodeURIComponent(cedula)}`)
+    .then(response => response.json())
     .then(data => {
-        if (!data.success) {
-            throw new Error(data.error || 'Error en los datos recibidos');
+        if (data.success) {
+            mostrarResultados(data, cedula);
+        } else {
+            mostrarMensajeResultado(data.error || 'Error en la búsqueda', 'danger');
         }
-        
-        mostrarResultados(data, cedula);
     })
     .catch(error => {
-        clearTimeout(timeout);
-        manejarErrorBusqueda(error);
+        console.error('Error:', error);
+        mostrarMensajeResultado('Error al conectar con el servidor', 'danger');
     });
 }
 
@@ -394,10 +385,6 @@ function mostrarResultados(data, cedula) {
                         <div class="fw-bold">${estudiante.cedula}</div>
                         <div>${estudiante.nombre}</div>
                         <small class="text-muted">${estudiante.carrera}</small>
-                        <small class="d-block text-truncate" style="max-width: 250px;">
-                            <i class="fas fa-phone-alt me-1"></i> ${estudiante.contacto} | 
-                            <i class="fas fa-envelope me-1"></i> ${estudiante.email}
-                        </small>
                     </div>
                     <div class="badge bg-primary rounded-pill">
                         <i class="fas fa-user-plus"></i>
@@ -412,19 +399,6 @@ function mostrarResultados(data, cedula) {
     }
 }
 
-function manejarErrorBusqueda(error) {
-    console.error('Error en búsqueda:', error);
-    
-    let errorMessage = 'Error al buscar estudiante';
-    if (error.name === 'AbortError') {
-        errorMessage = 'La búsqueda tardó demasiado. Por favor intente con menos caracteres.';
-    } else if (error.message.includes('401')) {
-        errorMessage = 'Sesión expirada. Por favor recargue la página.';
-    }
-    
-    mostrarMensajeResultado(errorMessage, 'danger');
-}
-
 function seleccionarEstudiante(estudiante) {
     document.getElementById('estudiante_id').value = estudiante.id;
     document.getElementById('estudiante-info').innerHTML = `
@@ -432,9 +406,10 @@ function seleccionarEstudiante(estudiante) {
         <br><small class="text-muted">${estudiante.carrera}</small>`;
     document.getElementById('estudiante-seleccionado').style.display = 'block';
     
-    const referencia = document.getElementById('referencia');
-    if (referencia.value.trim() === '') {
-        referencia.value = `Pago de ${estudiante.nombre} (C.I. ${estudiante.cedula})`;
+    // CORREGIDO: Cambiado de referencia a observaciones
+    const observaciones = document.getElementById('observaciones');
+    if (observaciones.value.trim() === '') {
+        observaciones.value = `Pago de ${estudiante.nombre} (C.I. ${estudiante.cedula})`;
     }
 }
 

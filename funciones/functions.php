@@ -2913,260 +2913,108 @@ function deshabilitarDocente($id, $razon) {
 
 //LO DE ARRIBA HAY QUE ARREGLARLO
 
-function obtenerPagosPorDia($fecha = null) {
+// Función para obtener pagos por día
+function obtenerPagosPorDia() {
     global $db;
     
-    if ($fecha && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) {
-        return [
-            'success' => false,
-            'message' => "Formato de fecha inválido",
-            'data' => []
-        ];
+    $sql = "SELECT DATE(fecha_pago) as dia, 
+                   COUNT(*) as cantidad_pagos, 
+                   SUM(monto) as total_dia 
+            FROM pagos 
+            GROUP BY DATE(fecha_pago) 
+            ORDER BY dia DESC 
+            LIMIT 30";
+    
+    $result = mysqli_query($db, $sql);
+    
+    if (!$result) {
+        return ['success' => false, 'message' => 'Error al obtener pagos: ' . mysqli_error($db)];
     }
     
-    $sql = "SELECT 
-                DATE(fecha_pago) as dia,
-                COUNT(*) as cantidad_pagos,
-                SUM(monto) as total_dia
-            FROM pagos";
-    
-    if ($fecha) {
-        $sql .= " WHERE DATE(fecha_pago) = ?";
+    $pagos = [];
+    while ($row = mysqli_fetch_assoc($result)) {
+        $pagos[] = $row;
     }
     
-    $sql .= " GROUP BY DATE(fecha_pago) ORDER BY dia DESC";
-    
-    try {
-        $stmt = $db->prepare($sql);
-        
-        if (!$stmt) {
-            return [
-                'success' => false,
-                'message' => "Error al preparar la consulta",
-                'data' => []
-            ];
-        }
-        
-        if ($fecha) {
-            $stmt->bind_param("s", $fecha);
-        }
-        
-        if (!$stmt->execute()) {
-            return [
-                'success' => false,
-                'message' => "Error al ejecutar la consulta",
-                'data' => []
-            ];
-        }
-        
-        $result = $stmt->get_result();
-        $pagos_por_dia = [];
-        
-        while ($row = $result->fetch_assoc()) {
-            $pagos_por_dia[] = $row;
-        }
-        
-        $stmt->close();
-        
-        return [
-            'success' => true,
-            'message' => "Datos obtenidos correctamente",
-            'data' => $pagos_por_dia
-        ];
-        
-    } catch (Exception $e) {
-        return [
-            'success' => false,
-            'message' => "Error inesperado",
-            'data' => []
-        ];
-    }
+    return ['success' => true, 'data' => $pagos];
 }
 
-/**
- * Obtiene detalles de pagos para un día específico
- */
-function obtenerDetallesPagos($dia) {
-    global $db;
-    
-    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dia)) {
-        return [
-            'success' => false,
-            'message' => "Formato de fecha inválido. Use YYYY-MM-DD",
-            'data' => []
-        ];
-    }
-    
-    try {
-        $sql = "SELECT 
-                    p.id,
-                    p.estudiante_id,
-                    p.tipo_pago,
-                    p.otro_concepto,
-                    p.monto,
-                    p.fecha_pago,
-                    p.observaciones AS referencia,
-                    p.registrado_por,
-                    u.nombre AS estudiante_nombre,
-                    u.idusuario AS estudiante_cedula,
-                    ur.nombre AS registrado_por_nombre
-                FROM pagos p
-                LEFT JOIN users u ON p.estudiante_id = u.id
-                LEFT JOIN users ur ON p.registrado_por = ur.id
-                WHERE DATE(p.fecha_pago) = ?
-                ORDER BY p.fecha_pago DESC";
-        
-        $stmt = $db->prepare($sql);
-        
-        if (!$stmt) {
-            error_log("Error preparando consulta: ".$db->error);
-            return [
-                'success' => false,
-                'message' => "Error al preparar la consulta SQL",
-                'data' => []
-            ];
-        }
-        
-        $stmt->bind_param("s", $dia);
-        
-        if (!$stmt->execute()) {
-            error_log("Error ejecutando consulta: ".$stmt->error);
-            $stmt->close();
-            return [
-                'success' => false,
-                'message' => "Error al ejecutar la consulta",
-                'data' => []
-            ];
-        }
-        
-        $result = $stmt->get_result();
-        $pagos = [];
-        
-        while ($row = $result->fetch_assoc()) {
-            $pago = [
-                'id' => $row['id'],
-                'tipo_pago' => $row['tipo_pago'],
-                'otro_concepto' => $row['otro_concepto'],
-                'monto' => $row['monto'],
-                'fecha_pago' => $row['fecha_pago'],
-                'referencia' => $row['referencia'],
-                'estudiante_id' => $row['estudiante_id'],
-                'estudiante_nombre' => $row['estudiante_nombre'] ?? null,
-                'estudiante_cedula' => $row['estudiante_cedula'] ?? null,
-                'registrado_por_nombre' => $row['registrado_por_nombre'] ?? 'Sistema'
-            ];
-            $pagos[] = $pago;
-        }
-        
-        $stmt->close();
-        
-        return [
-            'success' => true,
-            'message' => count($pagos) > 0 ? "Datos obtenidos correctamente" : "No hay pagos para esta fecha",
-            'data' => $pagos
-        ];
-        
-    } catch (Exception $e) {
-        error_log("Excepción en obtenerDetallesPagos: ".$e->getMessage());
-        if (isset($stmt) && $stmt instanceof mysqli_stmt) {
-            $stmt->close();
-        }
-        return [
-            'success' => false,
-            'message' => "Error inesperado al obtener detalles de pagos",
-            'data' => []
-        ];
-    }
-}
-
-/**
- * Registra un nuevo pago
- */
+// Función para registrar pago (CORREGIDA)
+// Función para registrar pago (CORREGIDA - asegurar que se guarde el nombre)
 function registrarPago($datos) {
     global $db;
     
-    $validationErrors = [];
+    $errores = [];
     
+    // Validaciones
     if (empty($datos['tipo_pago'])) {
-        $validationErrors[] = 'Debe seleccionar un tipo de pago';
+        $errores[] = 'El tipo de pago es obligatorio';
     }
     
-    if (!isset($datos['monto']) || !is_numeric($datos['monto']) || $datos['monto'] <= 0) {
-        $validationErrors[] = 'El monto debe ser un valor numérico positivo';
+    if ($datos['tipo_pago'] === 'otro' && empty($datos['otro_concepto'])) {
+        $errores[] = 'Debe especificar el concepto cuando selecciona "Otro"';
     }
     
-    if ($datos['tipo_pago'] == 'otro' && empty($datos['otro_concepto'])) {
-        $validationErrors[] = 'Debe especificar el concepto del pago';
+    if (empty($datos['monto']) || $datos['monto'] <= 0) {
+        $errores[] = 'El monto debe ser mayor a cero';
     }
     
-    if (!empty($validationErrors)) {
-        return [
-            'success' => false,
-            'message' => 'Errores de validación',
-            'validation_errors' => $validationErrors
-        ];
+    if (!empty($errores)) {
+        return ['success' => false, 'message' => 'Error en los datos del formulario', 'validation_errors' => $errores];
     }
     
-    $estudiante_id = !empty($datos['estudiante_id']) ? (int)$datos['estudiante_id'] : NULL;
-    $tipo_pago = $datos['tipo_pago'];
-    $otro_concepto = ($datos['tipo_pago'] == 'otro') ? trim($datos['otro_concepto']) : NULL;
-    $monto = round((float)$datos['monto'], 2);
-    $referencia = !empty($datos['referencia']) ? trim($datos['referencia']) : NULL;
-    $registrado_por = $_SESSION['user_id'] ?? NULL;
+    // Obtener nombre del usuario que registra (CORREGIDO)
+    $registrado_por = $_SESSION['user']['nombre'] ?? ($_SESSION['user']['username'] ?? 'Sistema');
     
-    try {
-        $sql = "INSERT INTO pagos (
-                    estudiante_id, 
-                    tipo_pago, 
-                    otro_concepto, 
-                    monto, 
-                    observaciones,
-                    registrado_por,
-                    fecha_pago
-                ) VALUES (?, ?, ?, ?, ?, ?, NOW())";
-        
-        $stmt = $db->prepare($sql);
-        
-        if (!$stmt) {
-            return [
-                'success' => false,
-                'message' => 'Error al preparar la consulta SQL'
-            ];
-        }
-        
-        $stmt->bind_param(
-            "issdsi", 
-            $estudiante_id, 
-            $tipo_pago, 
-            $otro_concepto, 
-            $monto, 
-            $referencia,
-            $registrado_por
-        );
-        
-        if (!$stmt->execute()) {
-            return [
-                'success' => false,
-                'message' => 'Error al registrar el pago en la base de datos'
-            ];
-        }
-        
-        $id = $stmt->insert_id;
-        $stmt->close();
-        
-        return [
-            'success' => true,
-            'message' => 'Pago registrado correctamente',
-            'id' => $id,
-            'monto' => $monto
-        ];
-        
-    } catch (Exception $e) {
-        return [
-            'success' => false,
-            'message' => 'Error inesperado al registrar el pago'
-        ];
+    // Preparar datos para inserción
+    $estudiante_id = !empty($datos['estudiante_id']) ? intval($datos['estudiante_id']) : NULL;
+    $tipo_pago = mysqli_real_escape_string($db, $datos['tipo_pago']);
+    $otro_concepto = ($datos['tipo_pago'] === 'otro' && !empty($datos['otro_concepto'])) ? 
+                     mysqli_real_escape_string($db, $datos['otro_concepto']) : NULL;
+    $monto = floatval($datos['monto']);
+    $observaciones = !empty($datos['observaciones']) ? mysqli_real_escape_string($db, $datos['observaciones']) : NULL;
+    
+    // Insertar pago
+    $sql = "INSERT INTO pagos (estudiante_id, tipo_pago, otro_concepto, monto, fecha_pago, observaciones, registrado_por)
+            VALUES (?, ?, ?, ?, NOW(), ?, ?)";
+    
+    $stmt = mysqli_prepare($db, $sql);
+    mysqli_stmt_bind_param($stmt, "issdss", $estudiante_id, $tipo_pago, $otro_concepto, $monto, $observaciones, $registrado_por);
+    
+    if (mysqli_stmt_execute($stmt)) {
+        return ['success' => true, 'message' => 'Pago registrado exitosamente'];
+    } else {
+        return ['success' => false, 'message' => 'Error al registrar el pago: ' . mysqli_error($db)];
     }
+}
+
+// Función para obtener detalles de pagos por día (CORREGIDA)
+function obtenerDetallesPagos($dia) {
+    global $db;
+    
+    $sql = "SELECT p.*, 
+                   u.nombre as estudiante_nombre, 
+                   u.idusuario as estudiante_cedula
+            FROM pagos p 
+            LEFT JOIN users u ON p.estudiante_id = u.id 
+            WHERE DATE(p.fecha_pago) = ? 
+            ORDER BY p.fecha_pago DESC";
+    
+    $stmt = mysqli_prepare($db, $sql);
+    mysqli_stmt_bind_param($stmt, "s", $dia);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    
+    if (!$result) {
+        return ['success' => false, 'message' => 'Error al obtener detalles: ' . mysqli_error($db)];
+    }
+    
+    $detalles = [];
+    while ($row = mysqli_fetch_assoc($result)) {
+        $detalles[] = $row;
+    }
+    
+    return ['success' => true, 'data' => $detalles];
 }
 
 /**
