@@ -2939,54 +2939,7 @@ function obtenerPagosPorDia() {
     return ['success' => true, 'data' => $pagos];
 }
 
-// Función para registrar pago (CORREGIDA)
-// Función para registrar pago (CORREGIDA - asegurar que se guarde el nombre)
-function registrarPago($datos) {
-    global $db;
-    
-    $errores = [];
-    
-    // Validaciones
-    if (empty($datos['tipo_pago'])) {
-        $errores[] = 'El tipo de pago es obligatorio';
-    }
-    
-    if ($datos['tipo_pago'] === 'otro' && empty($datos['otro_concepto'])) {
-        $errores[] = 'Debe especificar el concepto cuando selecciona "Otro"';
-    }
-    
-    if (empty($datos['monto']) || $datos['monto'] <= 0) {
-        $errores[] = 'El monto debe ser mayor a cero';
-    }
-    
-    if (!empty($errores)) {
-        return ['success' => false, 'message' => 'Error en los datos del formulario', 'validation_errors' => $errores];
-    }
-    
-    // Obtener nombre del usuario que registra (CORREGIDO)
-    $registrado_por = $_SESSION['user']['nombre'] ?? ($_SESSION['user']['username'] ?? 'Sistema');
-    
-    // Preparar datos para inserción
-    $estudiante_id = !empty($datos['estudiante_id']) ? intval($datos['estudiante_id']) : NULL;
-    $tipo_pago = mysqli_real_escape_string($db, $datos['tipo_pago']);
-    $otro_concepto = ($datos['tipo_pago'] === 'otro' && !empty($datos['otro_concepto'])) ? 
-                     mysqli_real_escape_string($db, $datos['otro_concepto']) : NULL;
-    $monto = floatval($datos['monto']);
-    $observaciones = !empty($datos['observaciones']) ? mysqli_real_escape_string($db, $datos['observaciones']) : NULL;
-    
-    // Insertar pago
-    $sql = "INSERT INTO pagos (estudiante_id, tipo_pago, otro_concepto, monto, fecha_pago, observaciones, registrado_por)
-            VALUES (?, ?, ?, ?, NOW(), ?, ?)";
-    
-    $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, "issdss", $estudiante_id, $tipo_pago, $otro_concepto, $monto, $observaciones, $registrado_por);
-    
-    if (mysqli_stmt_execute($stmt)) {
-        return ['success' => true, 'message' => 'Pago registrado exitosamente'];
-    } else {
-        return ['success' => false, 'message' => 'Error al registrar el pago: ' . mysqli_error($db)];
-    }
-}
+
 
 // Función para obtener detalles de pagos por día (CORREGIDA)
 function obtenerDetallesPagos($dia) {
