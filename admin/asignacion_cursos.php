@@ -284,6 +284,27 @@ include("includes/head.php");
             
             <?php if(isset($mensaje)) echo $mensaje; ?>
             
+            <!-- Modal de Confirmación para Eliminar -->
+            <div class="modal fade" id="confirmDeleteModal" tabindex="-1" role="dialog" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title" id="confirmDeleteModalLabel">Confirmar Eliminación</h5>
+                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <p>¿Estás seguro de eliminar esta asignación?</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                            <a id="confirmDeleteButton" href="#" class="btn btn-danger">Eliminar</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Sección de Asignaciones Actuales -->
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white">
@@ -322,11 +343,12 @@ include("includes/head.php");
                                                 <i class="fas fa-edit"></i> Cambiar
                                             </button>
                                             
-                                            <a href="?eliminar=<?php echo $asignacion['id']; ?>" 
-                                               class="btn btn-sm btn-danger"
-                                               onclick="return confirm('¿Estás seguro de eliminar esta asignación?')">
+                                            <button class="btn btn-sm btn-danger eliminar-asignacion" 
+                                                    data-toggle="modal" 
+                                                    data-target="#confirmDeleteModal"
+                                                    data-id="<?php echo $asignacion['id']; ?>">
                                                 <i class="fas fa-trash"></i> Eliminar
-                                            </a>
+                                            </button>
                                         </td>
                                     </tr>
                                     <?php endwhile; ?>
@@ -461,7 +483,7 @@ include("includes/head.php");
                                         <?php echo htmlspecialchars($carrera['nombre']); ?>
                                     </option>
                                 <?php endforeach; ?>
-                            </select>
+                                </select>
                         </div>
                         <div class="form-group col-md-6">
                             <label for="materia_recomendacion">Materia:</label>
@@ -695,6 +717,12 @@ $(document).ready(function() {
         $('#nombre_profesor_modal').val(profesor);
         $('#nombre_materia_modal').val(materia);
         $('#nueva_materia').val(id_materia);
+    });
+    
+    // Configurar modal de eliminación
+    $(document).on('click', '.eliminar-asignacion', function() {
+        var id = $(this).data('id');
+        $('#confirmDeleteButton').attr('href', '?eliminar=' + id);
     });
     
     // Cargar recomendaciones al cambiar la materia
