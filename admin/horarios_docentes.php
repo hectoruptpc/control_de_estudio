@@ -886,6 +886,47 @@ include("includes/head.php");
     </div>
 </div>
 
+<!-- Modal de confirmación para eliminar asignación -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Confirmar Eliminación</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está seguro de eliminar esta asignación?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteButton">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para mensajes de resultado -->
+<div class="modal fade" id="resultModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resultModalTitle">Resultado</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="resultModalBody">
+                <!-- El contenido se llenará dinámicamente -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-dismiss="modal">Aceptar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
     .horario-cell {
         min-height: 80px;
@@ -959,7 +1000,7 @@ $(document).ready(function() {
         var idDocente = $('#docente').val();
         
         if(!idDocente) {
-            alert('Por favor seleccione un docente');
+            showResultModal('Error', 'Por favor seleccione un docente', 'danger');
             return;
         }
         
@@ -978,24 +1019,7 @@ $(document).ready(function() {
                 // Configurar eventos para eliminar asignaciones
                 $('.btn-eliminar').click(function() {
                     var idHorario = $(this).data('id');
-                    if(confirm('¿Está seguro de eliminar esta asignación?')) {
-                        $.ajax({
-                            url: '',
-                            type: 'POST',
-                            data: { 
-                                ajax_action: 'eliminar_asignacion',
-                                id_horario: idHorario
-                            },
-                            success: function(response) {
-                                if(response.success) {
-                                    $('#filtroHorarioDocente').submit();
-                                } else {
-                                    alert('Error al eliminar: ' + (response.message || ''));
-                                }
-                            },
-                            dataType: 'json'
-                        });
-                    }
+                    $('#confirmDeleteModal').data('idHorario', idHorario).modal('show');
                 });
             },
             error: function(xhr, status, error) {
@@ -1053,7 +1077,7 @@ $(document).ready(function() {
             },
             error: function(xhr, status, error) {
                 console.error("Error al cargar materias:", status, error);
-                alert('Error al cargar materias disponibles');
+                showResultModal('Error', 'Error al cargar materias disponibles', 'danger');
             }
         });
     });
@@ -1100,20 +1124,21 @@ $(document).ready(function() {
                 
                 if(response.success) {
                     $('#asignarMateriaModal').modal('hide');
+                    showResultModal('Éxito', 'Asignación guardada correctamente', 'success');
                     $('#filtroHorarioDocente').submit(); // Recargar horario
                 } else {
                     var mensaje = 'Error: ' + (response.message || 'No se pudo guardar');
                     if(response.conflictos) {
                         mensaje += '\nConflictos con: ' + response.conflictos.join(', ');
                     }
-                    alert(mensaje);
+                    showResultModal('Error', mensaje, 'danger');
                 }
             },
             dataType: 'json',
             error: function(xhr, status, error) {
                 $btn.prop('disabled', false).html(originalText);
                 console.error("Error al guardar asignación:", status, error);
-                alert('Error de conexión al guardar');
+                showResultModal('Error', 'Error de conexión al guardar', 'danger');
             }
         });
     });
@@ -1151,20 +1176,58 @@ $(document).ready(function() {
                 $('#confirmAutoAsignacion').modal('hide');
                 
                 if(response.success) {
-                    alert(response.message + (response.conflictos_evitados ? '\nConflictos evitados: ' + response.conflictos_evitados : ''));
+                    var mensaje = response.message + (response.conflictos_evitados ? '\nConflictos evitados: ' + response.conflictos_evitados : '');
+                    showResultModal('Asignación Automática', mensaje, 'success');
                     $('#filtroHorarioDocente').submit(); // Recargar horario
                 } else {
-                    alert('Error: ' + response.message);
+                    showResultModal('Error', 'Error: ' + response.message, 'danger');
                 }
             },
             dataType: 'json',
             error: function(xhr, status, error) {
                 $btn.prop('disabled', false).html(originalText);
                 console.error("Error en asignación automática:", status, error);
-                alert('Error en asignación automática');
+                showResultModal('Error', 'Error en asignación automática', 'danger');
             }
         });
     });
+    
+    // Confirmar eliminación de asignación
+    $('#confirmDeleteButton').click(function() {
+        var idHorario = $('#confirmDeleteModal').data('idHorario');
+        var $btn = $(this);
+        var originalText = $btn.html();
+        
+        $btn.prop('disabled', true).html('<span class="loading-spinner"></span> Eliminando...');
+        
+        $.ajax({
+            url: '',
+            type: 'POST',
+            data: { 
+                ajax_action: 'eliminar_asignacion',
+                id_horario: idHorario
+            },
+            success: function(response) {
+                $btn.prop('disabled', false).html(originalText);
+                $('#confirmDeleteModal').modal('hide');
+                
+                if(response.success) {
+                    showResultModal('Éxito', 'Asignación eliminada correctamente', 'success');
+                    $('#filtroHorarioDocente').submit();
+                } else {
+                    showResultModal('Error', 'Error al eliminar: ' + (response.message || ''), 'danger');
+                }
+            },
+            dataType: 'json'
+        });
+    });
+    
+    // Función para mostrar modales de resultado
+    function showResultModal(title, message, type) {
+        $('#resultModalTitle').text(title);
+        $('#resultModalBody').html('<div class="alert alert-' + type + '">' + message.replace(/\n/g, '<br>') + '</div>');
+        $('#resultModal').modal('show');
+    }
 });
 </script>
 
