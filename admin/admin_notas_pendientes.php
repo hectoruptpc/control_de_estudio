@@ -26,10 +26,12 @@ function obtenerGruposNotasPendientes() {
               INNER JOIN users ud ON np.id_docente = ud.id
               INNER JOIN materias m ON np.id_materia = m.id_materia
               INNER JOIN periodos_academicos pa ON np.id_periodo = pa.id_periodo
-              INNER JOIN secciones s ON np.id_periodo = s.id_periodo
+              INNER JOIN docente_seccion ds ON np.id_docente = ds.id_usuario 
+                                           AND np.id_materia = ds.id_materia
+              INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
               INNER JOIN carreras c ON s.id_carrera = c.id_carrera
               WHERE np.estado = 'pendiente'
-              GROUP BY np.id_docente, np.id_materia, np.id_periodo
+              GROUP BY np.id_docente, np.id_materia, np.id_periodo, s.codigo_seccion, c.nombre_carrera
               ORDER BY ultima_fecha DESC";
     
     $result = $db->query($query);
@@ -197,7 +199,7 @@ $grupos_notas = obtenerGruposNotasPendientes();
                         </div>
                     </div>
                 </div>
-            </div>
+</div>
         </div>
     </div>
 </div>

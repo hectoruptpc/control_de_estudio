@@ -573,7 +573,17 @@ $leyenda_materias = [];
 
 <h1 class="h3 mb-4 text-gray-800">Horario Semanal - <?= htmlspecialchars($seccion['codigo_seccion']) ?></h1>
 
-<div class="card shadow mb-4">
+<!-- Botones fuera de la caja del horario -->
+<div class="mb-3">
+    <a href="gestion_seccion.php?action=view&id=<?= $seccion_id ?>" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> Volver a la sección
+    </a>
+    <button class="btn btn-success float-right" onclick="imprimirHorario()">
+        <i class="fas fa-print"></i> Imprimir Horario
+    </button>
+</div>
+
+<div class="card shadow mb-4" id="horario-clases">
     <div class="card-header py-3 d-flex justify-content-between align-items-center">
         <h6 class="m-0 font-weight-bold text-primary">Horario de Clases</h6>
         <span class="badge badge-info"><?= count($horarios) ?> bloques horarios</span>
@@ -696,15 +706,6 @@ $leyenda_materias = [];
                 </div>
             </div>
         <?php endif; ?>
-        
-        <div class="mt-3">
-            <a href="gestion_seccion.php?action=view&id=<?= $seccion_id ?>" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Volver a la sección
-            </a>
-            <button class="btn btn-success float-right" onclick="window.print()">
-                <i class="fas fa-print"></i> Imprimir Horario
-            </button>
-        </div>
     </div>
 </div>
 
@@ -744,7 +745,32 @@ $leyenda_materias = [];
 .celda-horario {
     background-color: white;
 }
+
+/* Estilos para impresión */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #horario-clases, #horario-clases * {
+        visibility: visible;
+    }
+    #horario-clases {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+    .btn, .mb-3 {
+        display: none !important;
+    }
+}
 </style>
+
+<script>
+function imprimirHorario() {
+    window.print();
+}
+</script>
 
     <?php elseif ($action === 'view' && $seccion_id > 0): ?>
         <!-- VISTA DETALLADA DE SECCIÓN -->

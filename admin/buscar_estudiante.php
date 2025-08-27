@@ -1,41 +1,55 @@
 <?php
-// buscar_estudiante.php
-isAdmin();
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
 
-include('../funciones/functions.php');
+require_once '../funciones/functions.php';
 
-header('Content-Type: application/json');
-
-// Validar sesión
-if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'error' => 'Sesión no válida']);
+// Verificar si es una solicitud AJAX
+if (!isset($_SERVER['HTTP_X_REQUESTED_WITH']) || strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) !== 'xmlhttprequest') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Acceso no permitido']);
     exit;
 }
 
-// Solo aceptar método GET
-if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    echo json_encode(['success' => false, 'error' => 'Método no permitido']);
-    exit;
-}
+// Verificar permisos - USAR requireAdmin() en lugar de isAdmin()
+requireAdmin(); // Esto redirigirá automáticamente si no tiene permisos
 
-// Obtener y validar cédula
+// Obtener término de búsqueda
 $cedula = isset($_GET['cedula']) ? trim($_GET['cedula']) : '';
 
-if (strlen($cedula) < 2) {
-    echo json_encode(['success' => false, 'error' => 'Mínimo 2 caracteres']);
+if (empty($cedula)) {
+    echo json_encode(['success' => false, 'error' => 'Ingrese una cédula para buscar']);
     exit;
 }
 
-try {
-    $resultados = buscarEstudiantePorCedula($cedula);
-    echo json_encode([
-        'success' => true,
-        'data' => $resultados,
-        'count' => count($resultados)
-    ]);
-} catch (Exception $e) {
-    echo json_encode([
-        'success' => false,
-        'error' => $e->getMessage()
-    ]);
+// Buscar estudiantes por cédula (idusuario)
+$sql = "SELECT id, idusuario, nombre, tlf, cel, email, carrera 
+        FROM users 
+        WHERE idusuario LIKE ? AND estudiante = 1 
+        ORDER BY nombre 
+        LIMIT 10";
+
+$stmt = mysqli_prepare($db, $sql);
+$searchTerm = "%$cedula%";
+mysqli_stmt_bind_param($stmt, "s", $searchTerm);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+
+$estudiantes = [];
+while ($row = mysqli_fetch_assoc($result)) {
+    $estudiantes[] = [
+        'id' => $row['id'],
+        'cedula' => $row['idusuario'],
+        'nombre' => $row['nombre'],
+        'contacto' => $row['tlf'] ?: $row['cel'],
+        'email' => $row['email'],
+        'carrera' => $row['carrera'] ?: 'No especificado'
+    ];
 }
+
+echo json_encode([
+    'success' => true,
+    'count' => count($estudiantes),
+    'data' => $estudiantes
+]);
+exit;

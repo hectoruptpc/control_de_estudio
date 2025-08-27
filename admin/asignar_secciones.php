@@ -75,6 +75,27 @@ include("includes/head.php");
             
             <?php if(isset($mensaje)) echo $mensaje; ?>
             
+            <!-- Modal de Confirmación para Eliminar -->
+            <div class="modal fade" id="confirmDeleteModal" tabindex="-1" role="dialog" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title" id="confirmDeleteModalLabel">Confirmar Eliminación</h5>
+                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <p>¿Está seguro de eliminar esta asignación?</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                            <a id="confirmDeleteButton" href="#" class="btn btn-danger">Eliminar</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="card mb-4">
                 <div class="card-header">
                     <i class="fas fa-table mr-1"></i>
@@ -173,7 +194,12 @@ include("includes/head.php");
                                                 <td>".$row['nombre_materia']." (".$row['cod_materia'].")</td>
                                                 <td>".$row['fecha_asignacion']."</td>
                                                 <td>
-                                                    <a href='?eliminar=".$row['id_docente_seccion']."' class='btn btn-sm btn-danger' onclick='return confirm(\"¿Está seguro de eliminar esta asignación?\")'>Eliminar</a>
+                                                    <button class='btn btn-sm btn-danger eliminar-asignacion' 
+                                                            data-toggle='modal' 
+                                                            data-target='#confirmDeleteModal'
+                                                            data-id='".$row['id_docente_seccion']."'>
+                                                        Eliminar
+                                                    </button>
                                                 </td>
                                               </tr>";
                                     }
@@ -240,6 +266,14 @@ function cargarMateriasDocente() {
     
     xhr.send();
 }
+
+// Configurar modal de eliminación
+$(document).ready(function() {
+    $(document).on('click', '.eliminar-asignacion', function() {
+        var id = $(this).data('id');
+        $('#confirmDeleteButton').attr('href', '?eliminar=' + id);
+    });
+});
 </script>
 
 <?php include("includes/footer.php"); ?>

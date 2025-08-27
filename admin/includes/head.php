@@ -1,4 +1,26 @@
 <?php
+// Función para contar mensajes no leídos
+function contarMensajesNoLeidos($user_id) {
+    global $db;
+    
+    $query = "SELECT COUNT(*) as total 
+              FROM mensajeria 
+              WHERE id_usuario_destinatario = ? 
+              AND leido = FALSE 
+              AND eliminado_destinatario = FALSE";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_assoc()['total'];
+}
+
+// Contar mensajes no leídos para el usuario actual
+$mensajes_no_leidos = 0;
+if (isset($_SESSION['user']['id'])) {
+    $mensajes_no_leidos = contarMensajesNoLeidos($_SESSION['user']['id']);
+}
+
 if (!isLoggedIn()) {
     $_SESSION['here'] = $_SERVER['REQUEST_URI'];
     $_SESSION['msg'] = $msn_iniciar_sesion;
@@ -20,6 +42,18 @@ if (!isAdmin()) {
 <meta name="author" content="Hector Marulanda">
 <title><?php echo $titulopag; ?></title>
 <?php echo $bootstrap_head;?>
+<style>
+    .nav-item-mensajes {
+        position: relative;
+    }
+    .badge-notificacion {
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        font-size: 0.6em;
+        padding: 3px 6px;
+    }
+</style>
 </head>
 <body>
 <div class="container">
@@ -40,6 +74,18 @@ if (!isAdmin()) {
               </a>
             </li>
 
+            <!-- Icono de Mensajería con Notificación - POSICIÓN CORREGIDA -->
+            <li class="nav-item nav-item-mensajes">
+              <a title="Sistema de Mensajería" class="nav-link position-relative" href="mensajeria.php">
+                <i class="fas fa-envelope fa-fw"></i> Mensajes
+                <?php if ($mensajes_no_leidos > 0): ?>
+                  <span class="badge badge-danger badge-notificacion">
+                    <?= $mensajes_no_leidos ?>
+                  </span>
+                <?php endif; ?>
+              </a>
+            </li>
+
             <li id="dropdown-estudiantes" class="nav-item dropdown position-relative">
               <a title="Gestión de Estudiantes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownEstudiantes" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 <i class="fa fa-users fa-fw"></i> Estudiantes
@@ -56,12 +102,7 @@ if (!isAdmin()) {
                 <a title="Gestionar Secciones" class="dropdown-item" href="gestion_seccion.php">
                   <i class="fas fa-object-group fa-fw"></i> Gestionar Secciones
                 </a>
-                <a title="Historial Académico" class="dropdown-item" href="historial_academico.php">
-                  <i class="fas fa-history fa-fw"></i> Historial Académico
-                </a>
-                <a title="Constancia de Estudio" class="dropdown-item" href="constancia_estudio.php">
-                  <i class="fas fa-file-certificate fa-fw"></i> Constancia de Estudio
-                </a>
+                
               </div>
             </li>
 
@@ -109,9 +150,7 @@ if (!isAdmin()) {
                 <a title="Horarios Docentes" class="dropdown-item" href="horarios_docentes.php">
                     <i class="fas fa-calendar-alt fa-fw"></i> Horarios
                 </a>
-                <a title="Evaluaciones Docentes" class="dropdown-item" href="evaluaciones_docentes.php">
-                    <i class="fas fa-star-half-alt fa-fw"></i> Evaluaciones
-                </a>
+                
                 </div>
             </li>
 
@@ -123,18 +162,10 @@ if (!isAdmin()) {
                     <a title="Registrar Notas" class="dropdown-item" href="admin_notas_pendientes.php">
                         <i class="fas fa-edit fa-fw"></i> Notas Cargadas
                     </a>
-                    <a title="Consultar Notas" class="dropdown-item" href="consultar_notas.php">
+                    <a title="Consultar Notas" class="dropdown-item" href="consulta_notas.php">
                         <i class="fas fa-search fa-fw"></i> Consultar Notas
                     </a>
-                    <a title="Reportes de Notas" class="dropdown-item" href="reportes_notas.php">
-                        <i class="fas fa-file-alt fa-fw"></i> Reportes de Notas
-                    </a>
-                    <a title="Boletines" class="dropdown-item" href="boletines.php">
-                        <i class="fas fa-file-pdf fa-fw"></i> Generar Boletines
-                    </a>
-                    <a title="Historial de Calificaciones" class="dropdown-item" href="historial_calificaciones.php">
-                        <i class="fas fa-history fa-fw"></i> Historial de Calificaciones
-                    </a>
+                    
                 </div>
             </li>
 
@@ -143,10 +174,7 @@ if (!isAdmin()) {
                     <i class="fa fa-cogs fa-fw"></i> Ajustes
                 </a>
                 <div id="dropdown-ajus" class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a title="Comentarios" class="dropdown-item" href="comentarios.php"><i class="fa fa-comments fa-fw"></i> Comentarios</a>
-                    <a title="Mensajeria" class="dropdown-item" href="mensajeria.php"><i class="fa fa-envelope fa-fw"></i> Mensajeria</a>
-                    <a title="Gestor de Contenido" class="dropdown-item" href="gestor_contenido.php"><i class="fa fa-file-contract fa-fw"></i> Contenido</a>
-                    <a title="Google Groups" class="dropdown-item" href="gg.php"><i class="fab fa-google-plus-g"></i> Google Groups</a>
+                    
                     
                     <!-- Nuevo apartado de Títulos y Relaciones con Materias -->
                     <div class="dropdown-divider"></div>
@@ -154,16 +182,7 @@ if (!isAdmin()) {
                         <i class="fas fa-graduation-cap fa-fw"></i> Títulos y Relaciones con Materias
                     </a>
                     
-                    <!-- Nueva opción de Gestión de Aulas -->
-                    <div class="dropdown-divider"></div>
-                    <a title="Gestión de Aulas" class="dropdown-item" href="aulas.php">
-                        <i class="fas fa-door-open fa-fw"></i> Gestión de Aulas
-                    </a>
-                    
-                    <a title="Creador 1" class="dropdown-item" href="test2.php"><i class="fa fa-wrench fa-fw"></i> Creador 2</a>
-                    <a title="Creador Mensajes" class="dropdown-item" href="cm.php"><i class="fa fa-wrench fa-fw"></i> Creador Mensajes</a>
-                    <a title="Reportes" class="dropdown-item" href="reportes.php"><i class="far fa-flag"></i> Reportes</a>
-                    <a title="Mantenimiento" class="dropdown-item" href="mantenimiento.php"><i class="fas fa-wrench"></i> Mantenimiento</a>
+                   
                     
                     <!-- Opción exclusiva para usuarios con editar_acceso = 1 -->
                     <?php if ($_SESSION['user']['editar_acceso'] == 1): ?>
@@ -178,6 +197,9 @@ if (!isAdmin()) {
                         <div class="dropdown-divider"></div>
                         <a title="Editar Valores del Sistema" class="dropdown-item" href="valores_predefinidos.php">
                             <i class="fas fa-edit fa-fw"></i> Valores Predefinidos
+                        </a>
+                        <a title="Editar tipos de pago" class="dropdown-item" href="tipo_pago.php">
+                            <i class="fas fa-edit fa-fw"></i> tipos de pago
                         </a>
                     <?php endif; ?>
                     
@@ -209,5 +231,42 @@ if (!isAdmin()) {
     </div>
     </div>
 </div>
+
+<!-- Script para actualizar notificaciones cada 30 segundos -->
+<script>
+function actualizarNotificaciones() {
+    fetch('../funciones/contar_mensajes_no_leidos.php')
+        .then(response => response.json())
+        .then(data => {
+            const link = document.querySelector('.nav-link[href="mensajeria.php"]');
+            const badge = link.querySelector('.badge-notificacion');
+            
+            if (data.mensajes_no_leidos > 0) {
+                if (badge) {
+                    badge.textContent = data.mensajes_no_leidos;
+                } else {
+                    // Crear el badge si no existe
+                    const newBadge = document.createElement('span');
+                    newBadge.className = 'badge badge-danger badge-notificacion';
+                    newBadge.textContent = data.mensajes_no_leidos;
+                    link.appendChild(newBadge);
+                }
+            } else {
+                // Eliminar el badge si no hay mensajes
+                if (badge) {
+                    badge.remove();
+                }
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+// Actualizar cada 30 segundos
+setInterval(actualizarNotificaciones, 30000);
+
+// Actualizar también al cargar la página
+document.addEventListener('DOMContentLoaded', actualizarNotificaciones);
+</script>
+
 </body>
 </html>

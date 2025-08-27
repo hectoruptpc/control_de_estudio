@@ -25,7 +25,9 @@ function obtenerInfoGrupo($docente_id, $materia_id, $periodo_id) {
               INNER JOIN users ud ON np.id_docente = ud.id
               INNER JOIN materias m ON np.id_materia = m.id_materia
               INNER JOIN periodos_academicos pa ON np.id_periodo = pa.id_periodo
-              INNER JOIN secciones s ON np.id_periodo = s.id_periodo
+              INNER JOIN docente_seccion ds ON np.id_docente = ds.id_usuario 
+                                           AND np.id_materia = ds.id_materia
+              INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
               INNER JOIN carreras c ON s.id_carrera = c.id_carrera
               INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
               WHERE np.id_docente = ? 
@@ -162,11 +164,12 @@ function obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id, $id_tra
 
 $info_grupo = obtenerInfoGrupo($docente_id, $materia_id, $periodo_id);
 $estudiantes = obtenerEstudiantesGrupo($docente_id, $materia_id, $periodo_id);
-$estadisticas = obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id, $info_grupo['id_trayecto']);
 
 if (!$info_grupo) {
     die('Información no encontrada');
 }
+
+$estadisticas = obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id, $info_grupo['id_trayecto']);
 
 // Determinar qué trayecto se está considerando
 $trayecto_considerado = '';
