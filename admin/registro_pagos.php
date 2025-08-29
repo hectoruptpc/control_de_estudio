@@ -52,8 +52,8 @@ function registrarPago($estudiante_id, $tipo_pago, $otro_concepto, $monto, $obse
     return $stmt->execute();
 }
 
-// Función para obtener pagos del día actual
-function obtenerPagosDelDia() {
+// Función para obtener todos los pagos
+function obtenerTodosLosPagos() {
     global $db;
     
     $query = "SELECT p.*, u.nombre as nombre_estudiante, u.idusuario as cedula, 
@@ -63,7 +63,6 @@ function obtenerPagosDelDia() {
               INNER JOIN users u ON p.estudiante_id = u.id
               INNER JOIN tipo_pago tp ON p.tipo_pago = tp.id
               INNER JOIN users ur ON p.registrado_por = ur.id
-              WHERE DATE(p.fecha_pago) = CURDATE()
               ORDER BY p.fecha_pago DESC";
     
     $result = $db->query($query);
@@ -76,12 +75,52 @@ function obtenerPagosDelDia() {
     return $pagos;
 }
 
-// Función para obtener total de pagos del día
+// Función para obtener el total de pagos del día actual
 function obtenerTotalPagosDelDia() {
     global $db;
     
     $query = "SELECT SUM(monto) as total FROM pagos WHERE DATE(fecha_pago) = CURDATE()";
     $result = $db->query($query);
+    
+    return $result->fetch_assoc()['total'] ?? 0;
+}
+
+// Función para obtener los pagos por rango de fechas
+function obtenerPagosPorRangoFechas($fecha_inicio, $fecha_fin) {
+    global $db;
+    
+    $query = "SELECT p.*, u.nombre as nombre_estudiante, u.idusuario as cedula, 
+                     tp.tipopago as nombre_tipo_pago,
+                     ur.nombre as nombre_registrador
+              FROM pagos p
+              INNER JOIN users u ON p.estudiante_id = u.id
+              INNER JOIN tipo_pago tp ON p.tipo_pago = tp.id
+              INNER JOIN users ur ON p.registrado_por = ur.id
+              WHERE DATE(p.fecha_pago) BETWEEN ? AND ?
+              ORDER BY p.fecha_pago DESC";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("ss", $fecha_inicio, $fecha_fin);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $pagos = [];
+    while ($row = $result->fetch_assoc()) {
+        $pagos[] = $row;
+    }
+    
+    return $pagos;
+}
+
+// Función para obtener el total de pagos por rango de fechas
+function obtenerTotalPagosPorRangoFechas($fecha_inicio, $fecha_fin) {
+    global $db;
+    
+    $query = "SELECT SUM(monto) as total FROM pagos WHERE DATE(fecha_pago) BETWEEN ? AND ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("ss", $fecha_inicio, $fecha_fin);
+    $stmt->execute();
+    $result = $stmt->get_result();
     
     return $result->fetch_assoc()['total'] ?? 0;
 }
@@ -132,9 +171,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Obtener tipos de pago
 $tipos_pago = obtenerTiposPago();
 
-// Obtener pagos del día
-$pagos_del_dia = obtenerPagosDelDia();
-$total_pagos_dia = obtenerTotalPagosDelDia();
+// Obtener todos los pagos
+$todos_los_pagos = obtenerTodosLosPagos();
+$total_pagos_hoy = obtenerTotalPagosDelDia();
+
+// Fechas por defecto (hoy)
+$fecha_inicio = date('Y-m-d');
+$fecha_fin = date('Y-m-d');
 ?>
 
 <div class="container-fluid">
@@ -229,56 +272,126 @@ $total_pagos_dia = obtenerTotalPagosDelDia();
             </div>
         </div>
         
-        <!-- Lista de pagos del día -->
+        <!-- Lista de todos los pagos -->
         <div class="col-md-6">
             <div class="card">
                 <div class="card-header bg-info text-white">
-                    <h5>Pagos Registrados Hoy - <?= date('d/m/Y') ?></h5>
+                    <h5>Todos los Pagos Registrados</h5>
                 </div>
                 <div class="card-body">
                     <div class="alert alert-primary">
-                        <strong>Total del día: $<?= number_format($total_pagos_dia, 2, ',', '.') ?></strong>
+                        <strong>Total del día de hoy: $<?= number_format($total_pagos_hoy, 2, ',', '.') ?></strong>
                     </div>
                     
-                    <?php if (!empty($pagos_del_dia)): ?>
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-striped table-sm">
-                            <thead class="thead-dark">
-                                <tr>
-                                    <th>Hora</th>
-                                    <th>Estudiante</th>
-                                    <th>Cédula</th>
-                                    <th>Concepto</th>
-                                    <th>Monto</th>
-                                    <th>Referencia</th>
-                                    <th>Registrado por</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($pagos_del_dia as $pago): ?>
-                                <tr>
-                                    <td><?= date('H:i', strtotime($pago['fecha_pago'])) ?></td>
-                                    <td><?= htmlspecialchars($pago['nombre_estudiante']) ?></td>
-                                    <td><?= htmlspecialchars($pago['cedula']) ?></td>
-                                    <td>
-                                        <?= htmlspecialchars($pago['nombre_tipo_pago']) ?>
-                                        <?php if (!empty($pago['otro_concepto'])): ?>
-                                            <br><small>(<?= htmlspecialchars($pago['otro_concepto']) ?>)</small>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="text-right">$<?= number_format($pago['monto'], 2, ',', '.') ?></td>
-                                    <td><?= !empty($pago['observaciones']) ? htmlspecialchars($pago['observaciones']) : 'N/A' ?></td>
-                                    <td><?= htmlspecialchars($pago['nombre_registrador']) ?></td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    <?php else: ?>
-                        <div class="alert alert-warning">
-                            No se han registrado pagos hoy.
+                    <!-- Buscador por fechas -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-secondary text-white">
+                            <h6>Buscar por rango de fechas</h6>
                         </div>
-                    <?php endif; ?>
+                        <div class="card-body">
+                            <form id="form-buscar-fechas">
+                                <div class="form-row">
+                                    <div class="col-md-5">
+                                        <label for="fecha_inicio">Fecha inicio:</label>
+                                        <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio" value="<?= $fecha_inicio ?>">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label for="fecha_fin">Fecha fin:</label>
+                                        <input type="date" class="form-control" id="fecha_fin" name="fecha_fin" value="<?= $fecha_fin ?>">
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary btn-block">
+                                            <i class="fas fa-search"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <div id="resultados-pagos">
+                        <?php if (!empty($todos_los_pagos)): ?>
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-bordered table-striped table-sm">
+                                <thead class="thead-dark">
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Hora</th>
+                                        <th>Estudiante</th>
+                                        <th>Cédula</th>
+                                        <th>Concepto</th>
+                                        <th>Monto</th>
+                                        <th>Referencia</th>
+                                        <th>Registrado por</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php 
+                                    $current_date = null;
+                                    $daily_total = 0;
+                                    $first_row = true;
+                                    
+                                    foreach ($todos_los_pagos as $pago): 
+                                        $pago_date = date('Y-m-d', strtotime($pago['fecha_pago']));
+                                        
+                                        // Mostrar total del día anterior si cambió la fecha
+                                        if ($current_date !== null && $current_date !== $pago_date): ?>
+                                            <tr class="table-success">
+                                                <td colspan="5" class="text-right"><strong>Total del día <?= date('d/m/Y', strtotime($current_date)) ?>:</strong></td>
+                                                <td class="text-right"><strong>$<?= number_format($daily_total, 2, ',', '.') ?></strong></td>
+                                                <td colspan="2"></td>
+                                            </tr>
+                                            <?php 
+                                            $daily_total = 0;
+                                        endif;
+                                        
+                                        // Iniciar nuevo día
+                                        if ($current_date !== $pago_date): 
+                                            $current_date = $pago_date;
+                                            if (!$first_row): ?>
+                                                <tr>
+                                                    <td colspan="8" class="bg-light"></td>
+                                                </tr>
+                                            <?php endif;
+                                            $first_row = false;
+                                        endif;
+                                        
+                                        $daily_total += $pago['monto'];
+                                    ?>
+                                    <tr>
+                                        <td><?= date('d/m/Y', strtotime($pago['fecha_pago'])) ?></td>
+                                        <td><?= date('H:i', strtotime($pago['fecha_pago'])) ?></td>
+                                        <td><?= htmlspecialchars($pago['nombre_estudiante']) ?></td>
+                                        <td><?= htmlspecialchars($pago['cedula']) ?></td>
+                                        <td>
+                                            <?= htmlspecialchars($pago['nombre_tipo_pago']) ?>
+                                            <?php if (!empty($pago['otro_concepto'])): ?>
+                                                <br><small>(<?= htmlspecialchars($pago['otro_concepto']) ?>)</small>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="text-right">$<?= number_format($pago['monto'], 2, ',', '.') ?></td>
+                                        <td><?= !empty($pago['observaciones']) ? htmlspecialchars($pago['observaciones']) : 'N/A' ?></td>
+                                        <td><?= htmlspecialchars($pago['nombre_registrador']) ?></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                    
+                                    <!-- Mostrar total del último día -->
+                                    <?php if ($current_date !== null): ?>
+                                    <tr class="table-success">
+                                        <td colspan="5" class="text-right"><strong>Total del día <?= date('d/m/Y', strtotime($current_date)) ?>:</strong></td>
+                                        <td class="text-right"><strong>$<?= number_format($daily_total, 2, ',', '.') ?></strong></td>
+                                        <td colspan="2"></td>
+                                    </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <?php else: ?>
+                            <div class="alert alert-warning">
+                                No se han registrado pagos.
+                            </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
         </div>
@@ -306,6 +419,54 @@ document.getElementById('monto').addEventListener('blur', function() {
     if (this.value) {
         this.value = parseFloat(this.value).toFixed(2);
     }
+});
+
+// Buscar pagos por rango de fechas (AJAX)
+document.getElementById('form-buscar-fechas').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const fechaInicio = document.getElementById('fecha_inicio').value;
+    const fechaFin = document.getElementById('fecha_fin').value;
+    
+    // Validar fechas
+    if (!fechaInicio || !fechaFin) {
+        alert('Por favor, seleccione ambas fechas.');
+        return;
+    }
+    
+    if (fechaInicio > fechaFin) {
+        alert('La fecha de inicio no puede ser mayor a la fecha final.');
+        return;
+    }
+    
+    // Mostrar indicador de carga
+    document.getElementById('resultados-pagos').innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="sr-only">Cargando...</span>
+            </div>
+            <p class="mt-2">Buscando pagos...</p>
+        </div>
+    `;
+    
+    // Realizar petición AJAX
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', 'buscar_pagos_fechas.php', true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
+                document.getElementById('resultados-pagos').innerHTML = xhr.responseText;
+            } else {
+                document.getElementById('resultados-pagos').innerHTML = `
+                    <div class="alert alert-danger">
+                        Error al cargar los pagos. Por favor, intente nuevamente.
+                    </div>
+                `;
+            }
+        }
+    };
+    xhr.send('fecha_inicio=' + encodeURIComponent(fechaInicio) + '&fecha_fin=' + encodeURIComponent(fechaFin));
 });
 </script>
 
