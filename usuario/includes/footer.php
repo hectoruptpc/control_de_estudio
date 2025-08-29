@@ -13,7 +13,7 @@
 
           <!-- Content -->
 
-          <?php comentarios(); ?>
+          
 
         </div>
         <!-- Grid column -->
@@ -57,7 +57,7 @@
   <div class="container">
     <div class="row">
       <div class="col-12">
-        <p>Copyright © 2007 Jose Herrera</p>
+        <p>Copyright © 2025 Hector Marulanda</p>
 
         <p>
           Licenciado bajo la 
@@ -94,7 +94,7 @@ limitations under the License.</p>
 </footer>
 
     <!-- Copyright -->
-    <div class="footer-copyright text-center py-3">&copy <?php echo date('Y');?> - Jose Herrera
+    <div class="footer-copyright text-center py-3">&copy <?php echo date('Y');?> - Hector Marulanda
 <a href="http://www.jesuministrosymas.com.ve" target="_blank" style="color: #0027ff">Acceda a Nuestro Sitio</a>
     </div>
     <!-- Copyright -->

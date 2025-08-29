@@ -8496,77 +8496,7 @@ function breadcrumbs($sep = ' » ', $home = 'Inicio') {
     }
 
 
-    function comentarios() {
-      global $db;
-      $comentario ="";
-      $query = "SELECT *, users.nombre AS 'nombre'
-      FROM comentario
-      INNER JOIN users ON (comentario.user=users.idusuario)
-      WHERE visible = '1'
-      ORDER BY RAND() LIMIT 15 ";
-      $result = mysqli_query($db,$query);
-  $rows = mysqli_num_rows($result);
-  if ($rows){
-    $comentario = '<h5>Comentarios de nuestros usuarios</h5><div id="carouselExampleIndicators" class="carousel slide" data-ride="carousel">
-
-  <ol class="carousel-indicators">
-   <li data-target="#carouselExampleIndicators" data-slide-to="0" class="active"></li>
-   <li data-target="#carouselExampleIndicators" data-slide-to="1"></li>
-   <li data-target="#carouselExampleIndicators" data-slide-to="2"></li>
-  </ol>
-  <div class="carousel-inner">
-   ';
-   $counter = 1;
-   while($row = mysqli_fetch_array($result)){
-
-        $date = date_create($row['fecha']);
-   $fecha = date_format($date, 'd/m/Y');
-   $fecha_comentario = $fecha;
-
-       $comentario .= '<div class="carousel-item ';
-       if($counter <= 1){$comentario .= 'active'; }
-
-       $comentario .=  '">
-
-       <div class="shadow p-3 mb-5 bg-white rounded">
-               <blockquote class="blockquote text-center">
-         <p class="mb-0">'.strtoupper($row['comentario']).'</p>
-         <footer class="blockquote-footer">'.$row['nombre'].' <cite title="fecha">'.$fecha_comentario.'</cite></footer>
-       </blockquote>
-       </div>
-
-       </div>';
-
-
-   $counter++;
-   }
-  //<i class="fa fa-angle-left" aria-hidden="true"></i>
-  //<i class="fa fa-angle-right" aria-hidden="true"></i>
-   $comentario .= '</div>
-
-   <a class="carousel-control-prev" href="#carouselExampleIndicators" role="button" data-slide="prev">
-   <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-   <span class="sr-only">Anterior</span>
-  </a>
-
-  <a class="carousel-control-next" href="#carouselExampleIndicators" role="button" data-slide="next">
-   <span class="carousel-control-next-icon" aria-hidden="true"></span>
-   <span class="sr-only">Siguiente</span>
-  </a>
-
-  </div>';
-
-  } else {
- $comentario ='No hay comentarios que mostrar';
-  }
-  echo $comentario;
-
-  }
-
-
-if (isset($_POST['enviar_comentario_btn'])) {
-    procesar_enviar_comentario();
-}
+    
 
 
 
