@@ -89,7 +89,7 @@ isUser();
                         </div>
                         <h3 class="card-title h4 font-weight-bold">Asignar Docente al Programa</h3>
                         <p class="card-text text-muted">Gestione la asignación de profesores a programas académicos</p>
-                        <a href="asignar_docente.php" class="btn btn-access btn-asignacion mt-3">Acceder</a>
+                        <a href="asignacion_cursos.php" class="btn btn-access btn-asignacion mt-3">Acceder</a>
                     </div>
                 </div>
             </div>

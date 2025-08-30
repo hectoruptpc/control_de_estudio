@@ -53,10 +53,12 @@ if (!isUser()) {
         font-size: 0.6em;
         padding: 3px 6px;
     }
-    .navbar {
+    /* SOLUCIÓN: Especificar que solo afecte a la navbar superior */
+    .navbar:not(.fixed-bottom) {
         background-color: #fd7e14 !important;
     }
-    .navbar-brand, .nav-link {
+    .navbar:not(.fixed-bottom) .navbar-brand, 
+    .navbar:not(.fixed-bottom) .nav-link {
         color: white !important;
     }
     .dropdown-menu {
@@ -102,39 +104,9 @@ if (!isUser()) {
 
             <!-- Menú de Asignación de Docentes -->
             <li class="nav-item">
-              <a title="Asignar Docente al Programa" class="nav-link" href="asignar_docente.php">
+              <a title="Asignar Docente al Programa" class="nav-link" href="asignacion_cursos.php">
                 <i class="fas fa-chalkboard-teacher fa-fw"></i> Asignar Docente
               </a>
-            </li>
-
-            <!-- Menú de Gestión Académica -->
-            <li id="dropdown-academico" class="nav-item dropdown">
-                <a title="Gestión Académica" class="nav-link dropdown-toggle" href="#" id="navbarDropdownAcademico" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    <i class="fas fa-book fa-fw"></i> Académico
-                </a>
-                <div id="dropdown-academico-menu" class="dropdown-menu" aria-labelledby="navbarDropdownAcademico">
-                    <a title="Programas Académicos" class="dropdown-item" href="programas_academicos.php">
-                        <i class="fas fa-graduation-cap fa-fw"></i> Programas
-                    </a>
-                    <a title="Planificación Curricular" class="dropdown-item" href="planificacion_curricular.php">
-                        <i class="fas fa-calendar-alt fa-fw"></i> Planificación
-                    </a>
-                </div>
-            </li>
-
-            <!-- Menú de Reportes -->
-            <li id="dropdown-reportes" class="nav-item dropdown">
-                <a title="Reportes y Estadísticas" class="nav-link dropdown-toggle" href="#" id="navbarDropdownReportes" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    <i class="fas fa-chart-line fa-fw"></i> Reportes
-                </a>
-                <div id="dropdown-reportes-menu" class="dropdown-menu" aria-labelledby="navbarDropdownReportes">
-                    <a title="Estadísticas de Estudiantes" class="dropdown-item" href="estadisticas_estudiantes.php">
-                        <i class="fas fa-user-graduate fa-fw"></i> Estadísticas Estudiantiles
-                    </a>
-                    <a title="Rendimiento Académico" class="dropdown-item" href="rendimiento_academico.php">
-                        <i class="fas fa-chart-bar fa-fw"></i> Rendimiento Académico
-                    </a>
-                </div>
             </li>
 
             <!-- Menú de Ajustes -->
@@ -143,9 +115,7 @@ if (!isUser()) {
                     <i class="fa fa-cogs fa-fw"></i> Ajustes
                 </a>
                 <div id="dropdown-ajustes-menu" class="dropdown-menu" aria-labelledby="navbarDropdownAjustes">
-                    <a title="Mi Perfil" class="dropdown-item" href="mi_perfil.php">
-                        <i class="fas fa-user fa-fw"></i> Mi Perfil
-                    </a>
+                    
                     <div class="dropdown-divider"></div>
                     <a title="Salir del Sistema" class="dropdown-item" href="../index.php?logout='1'">
                         <i class="fas fa-sign-out-alt fa-fw"></i> Salir
@@ -210,6 +180,3 @@ setInterval(actualizarNotificaciones, 30000);
 // Actualizar también al cargar la página
 document.addEventListener('DOMContentLoaded', actualizarNotificaciones);
 </script>
-
-</body>
-</html>
