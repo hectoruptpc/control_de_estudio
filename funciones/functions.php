@@ -8859,7 +8859,7 @@ function getAvailableProfiles() {
     $user = $_SESSION['user'];
     $profiles = [];
     
-    if ($user['usuario'] == 1) $profiles[] = 'usuario';
+    if ($user['usuario'] == 1) $profiles[] = 'director_de_carrera';
     if ($user['estudiante'] == 1) $profiles[] = 'estudiante';
     if ($user['docente'] == 1) $profiles[] = 'docente';
     if ($user['admin'] == 1) $profiles[] = 'admin';
