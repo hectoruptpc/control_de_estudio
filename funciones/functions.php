@@ -2913,6 +2913,130 @@ function deshabilitarDocente($id, $razon) {
 
 //LO DE ARRIBA HAY QUE ARREGLARLO
 
+
+
+//PAGOS 
+
+
+// ==============================================
+// ARCHIVO: funciones/functions.php
+// Funciones para edición y eliminación de pagos
+// ==============================================
+
+/**
+ * Obtener un pago específico por ID
+ */
+function obtenerPagoPorId($pago_id) {
+    global $db;
+    
+    $query = "SELECT p.*, u.nombre as nombre_estudiante, u.idusuario as cedula, 
+                     tp.tipopago as nombre_tipo_pago,
+                     ur.nombre as nombre_registrador
+              FROM pagos p
+              INNER JOIN users u ON p.estudiante_id = u.id
+              INNER JOIN tipo_pago tp ON p.tipo_pago = tp.id
+              INNER JOIN users ur ON p.registrado_por = ur.id
+              WHERE p.id = ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $pago_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Actualizar un pago existente
+ */
+function actualizarPago($pago_id, $tipo_pago, $otro_concepto, $monto, $observaciones) {
+    global $db;
+    
+    // Primero obtener los valores antiguos para auditoría
+    $pago_antiguo = obtenerPagoPorId($pago_id);
+    
+    $query = "UPDATE pagos 
+              SET tipo_pago = ?, otro_concepto = ?, monto = ?, observaciones = ?
+              WHERE id = ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("isdsi", $tipo_pago, $otro_concepto, $monto, $observaciones, $pago_id);
+    
+    if ($stmt->execute()) {
+        // Registrar en auditoría
+        $valores_antiguos = [
+            'tipo_pago' => $pago_antiguo['tipo_pago'],
+            'otro_concepto' => $pago_antiguo['otro_concepto'],
+            'monto' => $pago_antiguo['monto'],
+            'observaciones' => $pago_antiguo['observaciones']
+        ];
+        
+        $valores_nuevos = [
+            'tipo_pago' => $tipo_pago,
+            'otro_concepto' => $otro_concepto,
+            'monto' => $monto,
+            'observaciones' => $observaciones
+        ];
+        
+        registrarAuditoria(
+            "UPDATE", 
+            "pagos", 
+            $pago_id, 
+            $valores_antiguos, 
+            $valores_nuevos, 
+            "Pagos", 
+            "Actualización de pago"
+        );
+        
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * Eliminar un pago
+ */
+function eliminarPago($pago_id) {
+    global $db;
+    
+    // Primero obtener los valores para auditoría
+    $pago = obtenerPagoPorId($pago_id);
+    
+    $query = "DELETE FROM pagos WHERE id = ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $pago_id);
+    
+    if ($stmt->execute()) {
+        // Registrar en auditoría
+        $valores_antiguos = [
+            'estudiante_id' => $pago['estudiante_id'],
+            'tipo_pago' => $pago['tipo_pago'],
+            'otro_concepto' => $pago['otro_concepto'],
+            'monto' => $pago['monto'],
+            'observaciones' => $pago['observaciones'],
+            'fecha_pago' => $pago['fecha_pago'],
+            'registrado_por' => $pago['registrado_por']
+        ];
+        
+        registrarAuditoria(
+            "DELETE", 
+            "pagos", 
+            $pago_id, 
+            $valores_antiguos, 
+            null, 
+            "Pagos", 
+            "Eliminación de pago"
+        );
+        
+        return true;
+    }
+    
+    return false;
+}
+
+
 // Función para obtener pagos por día
 function obtenerPagosPorDia() {
     global $db;

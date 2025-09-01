@@ -39,7 +39,7 @@ function obtenerTiposPago() {
     return $tipos;
 }
 
-// Función para registrar un pago (MODIFICADA PARA AUDITORÍA)
+// Función para registrar un pago
 function registrarPago($estudiante_id, $tipo_pago, $otro_concepto, $monto, $observaciones, $registrado_por) {
     global $db;
     
@@ -229,6 +229,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $mensaje_error = "El monto debe ser mayor a cero.";
         }
     }
+    elseif (isset($_POST['editar_pago'])) {
+        // Edición de pago
+        $pago_id = (int)$_POST['pago_id'];
+        $tipo_pago = (int)$_POST['tipo_pago_edit'];
+        $otro_concepto = trim($_POST['otro_concepto_edit']);
+        $monto = (float)$_POST['monto_edit'];
+        $observaciones = trim($_POST['observaciones_edit']);
+        
+        if ($monto > 0) {
+            if (actualizarPago($pago_id, $tipo_pago, $otro_concepto, $monto, $observaciones)) {
+                $mensaje_exito = "Pago actualizado exitosamente.";
+            } else {
+                $mensaje_error = "Error al actualizar el pago. Por favor, intente nuevamente.";
+            }
+        } else {
+            $mensaje_error = "El monto debe ser mayor a cero.";
+        }
+    }
+}
+
+// Procesar eliminación de pago (vía GET por seguridad)
+if (isset($_GET['eliminar_pago'])) {
+    $pago_id = (int)$_GET['eliminar_pago'];
+    
+    if (eliminarPago($pago_id)) {
+        $mensaje_exito = "Pago eliminado exitosamente.";
+    } else {
+        $mensaje_error = "Error al eliminar el pago. Por favor, intente nuevamente.";
+    }
 }
 
 // Obtener tipos de pago
@@ -386,6 +415,7 @@ $fecha_fin = date('Y-m-d');
                                         <th>Monto</th>
                                         <th>Referencia</th>
                                         <th>Registrado por</th>
+                                        <th>Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -402,7 +432,7 @@ $fecha_fin = date('Y-m-d');
                                             <tr class="table-success">
                                                 <td colspan="5" class="text-right"><strong>Total del día <?= date('d/m/Y', strtotime($current_date)) ?>:</strong></td>
                                                 <td class="text-right"><strong>$<?= number_format($daily_total, 2, ',', '.') ?></strong></td>
-                                                <td colspan="2"></td>
+                                                <td colspan="3"></td>
                                             </tr>
                                             <?php 
                                             $daily_total = 0;
@@ -413,7 +443,7 @@ $fecha_fin = date('Y-m-d');
                                             $current_date = $pago_date;
                                             if (!$first_row): ?>
                                                 <tr>
-                                                    <td colspan="8" class="bg-light"></td>
+                                                    <td colspan="9" class="bg-light"></td>
                                                 </tr>
                                             <?php endif;
                                             $first_row = false;
@@ -435,6 +465,110 @@ $fecha_fin = date('Y-m-d');
                                         <td class="text-right">$<?= number_format($pago['monto'], 2, ',', '.') ?></td>
                                         <td><?= !empty($pago['observaciones']) ? htmlspecialchars($pago['observaciones']) : 'N/A' ?></td>
                                         <td><?= htmlspecialchars($pago['nombre_registrador']) ?></td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button type="button" class="btn btn-warning" data-toggle="modal" data-target="#editarPagoModal<?= $pago['id'] ?>">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#eliminarPagoModal<?= $pago['id'] ?>">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                            
+                                            <!-- Modal para editar pago -->
+                                            <div class="modal fade" id="editarPagoModal<?= $pago['id'] ?>" tabindex="-1" role="dialog">
+                                                <div class="modal-dialog" role="document">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title">Editar Pago</h5>
+                                                            <button type="button" class="close" data-dismiss="modal">
+                                                                <span>&times;</span>
+                                                            </button>
+                                                        </div>
+                                                        <form method="POST">
+                                                            <div class="modal-body">
+                                                                <input type="hidden" name="pago_id" value="<?= $pago['id'] ?>">
+                                                                
+                                                                <div class="form-group">
+                                                                    <label>Estudiante:</label>
+                                                                    <div class="alert alert-info p-2">
+                                                                        <strong><?= htmlspecialchars($pago['nombre_estudiante']) ?></strong><br>
+                                                                        Cédula: <?= htmlspecialchars($pago['cedula']) ?>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <div class="form-group">
+                                                                    <label for="tipo_pago_edit<?= $pago['id'] ?>">Tipo de Pago:</label>
+                                                                    <select class="form-control" id="tipo_pago_edit<?= $pago['id'] ?>" name="tipo_pago_edit" required>
+                                                                        <option value="">-- Seleccionar Tipo de Pago --</option>
+                                                                        <?php foreach ($tipos_pago as $tipo): ?>
+                                                                            <option value="<?= $tipo['id'] ?>" <?= ($tipo['id'] == $pago['tipo_pago']) ? 'selected' : '' ?>>
+                                                                                <?= htmlspecialchars($tipo['tipopago']) ?>
+                                                                            </option>
+                                                                        <?php endforeach; ?>
+                                                                        <option value="0" <?= ($pago['tipo_pago'] == 0) ? 'selected' : '' ?>>Otro concepto</option>
+                                                                    </select>
+                                                                </div>
+                                                                
+                                                                <div class="form-group" id="otro_concepto_group_edit<?= $pago['id'] ?>" style="<?= ($pago['tipo_pago'] == 0) ? 'display: block;' : 'display: none;' ?>">
+                                                                    <label for="otro_concepto_edit<?= $pago['id'] ?>">Especificar Otro Concepto:</label>
+                                                                    <input type="text" class="form-control" id="otro_concepto_edit<?= $pago['id'] ?>" name="otro_concepto_edit" 
+                                                                           value="<?= htmlspecialchars($pago['otro_concepto']) ?>" placeholder="Especifique el concepto de pago">
+                                                                </div>
+                                                                
+                                                                <div class="form-group">
+                                                                    <label for="monto_edit<?= $pago['id'] ?>">Monto:</label>
+                                                                    <div class="input-group">
+                                                                        <div class="input-group-prepend">
+                                                                            <span class="input-group-text">$</span>
+                                                                        </div>
+                                                                        <input type="number" class="form-control" id="monto_edit<?= $pago['id'] ?>" name="monto_edit" 
+                                                                               step="0.01" min="0.01" required value="<?= $pago['monto'] ?>">
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <div class="form-group">
+                                                                    <label for="observaciones_edit<?= $pago['id'] ?>">Referencia:</label>
+                                                                    <textarea class="form-control" id="observaciones_edit<?= $pago['id'] ?>" name="observaciones_edit" 
+                                                                              rows="3"><?= htmlspecialchars($pago['observaciones']) ?></textarea>
+                                                                </div>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                                                                <button type="submit" name="editar_pago" class="btn btn-primary">Guardar Cambios</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Modal para eliminar pago -->
+                                            <div class="modal fade" id="eliminarPagoModal<?= $pago['id'] ?>" tabindex="-1" role="dialog">
+                                                <div class="modal-dialog" role="document">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title">Eliminar Pago</h5>
+                                                            <button type="button" class="close" data-dismiss="modal">
+                                                                <span>&times;</span>
+                                                            </button>
+                                                        </div>
+                                                        <div class="modal-body">
+                                                            <p>¿Está seguro de que desea eliminar este pago?</p>
+                                                            <div class="alert alert-warning">
+                                                                <strong>Estudiante:</strong> <?= htmlspecialchars($pago['nombre_estudiante']) ?><br>
+                                                                <strong>Monto:</strong> $<?= number_format($pago['monto'], 2, ',', '.') ?><br>
+                                                                <strong>Fecha:</strong> <?= date('d/m/Y H:i', strtotime($pago['fecha_pago'])) ?>
+                                                            </div>
+                                                            <p class="text-danger"><strong>Esta acción no se puede deshacer.</strong></p>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                                                            <a href="?eliminar_pago=<?= $pago['id'] ?>" class="btn btn-danger">Eliminar</a>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
                                     </tr>
                                     <?php endforeach; ?>
                                     
@@ -443,7 +577,7 @@ $fecha_fin = date('Y-m-d');
                                     <tr class="table-success">
                                         <td colspan="5" class="text-right"><strong>Total del día <?= date('d/m/Y', strtotime($current_date)) ?>:</strong></td>
                                         <td class="text-right"><strong>$<?= number_format($daily_total, 2, ',', '.') ?></strong></td>
-                                        <td colspan="2"></td>
+                                        <td colspan="3"></td>
                                     </tr>
                                     <?php endif; ?>
                                 </tbody>
@@ -477,11 +611,38 @@ document.getElementById('tipo_pago').addEventListener('change', function() {
     }
 });
 
+// Mostrar/ocultar campo "Otro concepto" en modales de edición
+document.querySelectorAll('[id^="tipo_pago_edit"]').forEach(select => {
+    select.addEventListener('change', function() {
+        const id = this.id.replace('tipo_pago_edit', '');
+        const otroConceptoGroup = document.getElementById('otro_concepto_group_edit' + id);
+        const otroConceptoInput = document.getElementById('otro_concepto_edit' + id);
+        
+        if (this.value === '0') {
+            otroConceptoGroup.style.display = 'block';
+            otroConceptoInput.setAttribute('required', 'required');
+        } else {
+            otroConceptoGroup.style.display = 'none';
+            otroConceptoInput.removeAttribute('required');
+            otroConceptoInput.value = '';
+        }
+    });
+});
+
 // Formatear monto automáticamente
 document.getElementById('monto').addEventListener('blur', function() {
     if (this.value) {
         this.value = parseFloat(this.value).toFixed(2);
     }
+});
+
+// Formatear monto automáticamente en modales de edición
+document.querySelectorAll('[id^="monto_edit"]').forEach(input => {
+    input.addEventListener('blur', function() {
+        if (this.value) {
+            this.value = parseFloat(this.value).toFixed(2);
+        }
+    });
 });
 
 // Buscar pagos por rango de fechas (AJAX)
@@ -520,6 +681,9 @@ document.getElementById('form-buscar-fechas').addEventListener('submit', functio
         if (xhr.readyState === 4) {
             if (xhr.status === 200) {
                 document.getElementById('resultados-pagos').innerHTML = xhr.responseText;
+                
+                // Re-inicializar los event listeners para los nuevos elementos
+                reinicializarEventListeners();
             } else {
                 document.getElementById('resultados-pagos').innerHTML = `
                     <div class="alert alert-danger">
@@ -531,6 +695,36 @@ document.getElementById('form-buscar-fechas').addEventListener('submit', functio
     };
     xhr.send('fecha_inicio=' + encodeURIComponent(fechaInicio) + '&fecha_fin=' + encodeURIComponent(fechaFin));
 });
+
+// Función para reinicializar event listeners después de cargar contenido AJAX
+function reinicializarEventListeners() {
+    // Mostrar/ocultar campo "Otro concepto" en modales de edición
+    document.querySelectorAll('[id^="tipo_pago_edit"]').forEach(select => {
+        select.addEventListener('change', function() {
+            const id = this.id.replace('tipo_pago_edit', '');
+            const otroConceptoGroup = document.getElementById('otro_concepto_group_edit' + id);
+            const otroConceptoInput = document.getElementById('otro_concepto_edit' + id);
+            
+            if (this.value === '0') {
+                otroConceptoGroup.style.display = 'block';
+                otroConceptoInput.setAttribute('required', 'required');
+            } else {
+                otroConceptoGroup.style.display = 'none';
+                otroConceptoInput.removeAttribute('required');
+                otroConceptoInput.value = '';
+            }
+        });
+    });
+    
+    // Formatear monto automáticamente en modales de edición
+    document.querySelectorAll('[id^="monto_edit"]').forEach(input => {
+        input.addEventListener('blur', function() {
+            if (this.value) {
+                this.value = parseFloat(this.value).toFixed(2);
+            }
+        });
+    });
+}
 </script>
 
 <?php include("includes/footer.php"); ?>
