@@ -59,6 +59,12 @@ requireAdmin();
         .mensajeria-card .card-icon {
             color: #17a2b8;
         }
+        .auditoria-card {
+            border-bottom: 4px solid #6f42c1;
+        }
+        .auditoria-card .card-icon {
+            color: #6f42c1;
+        }
         .btn-access {
             border-radius: 50px;
             padding: 0.5rem 1.5rem;
@@ -92,6 +98,15 @@ requireAdmin();
             background-color: #138496;
             border-color: #117a8b;
         }
+        .btn-auditoria {
+            background-color: #6f42c1;
+            border-color: #6f42c1;
+            color: white;
+        }
+        .btn-auditoria:hover {
+            background-color: #5a359c;
+            border-color: #523091;
+        }
         .welcome-message {
             background-color: white;
             border-radius: 10px;
@@ -111,7 +126,7 @@ requireAdmin();
         <!-- Tarjetas de acceso -->
         <div class="row mb-5">
             <!-- Tarjeta de Pagos -->
-            <div class="col-md-4 mb-4">
+            <div class="col-md-3 mb-4">
                 <div class="card feature-card pagos-card h-100">
                     <div class="card-body text-center p-4">
                         <div class="card-icon">
@@ -125,7 +140,7 @@ requireAdmin();
             </div>
 
             <!-- Tarjeta de Soporte -->
-            <div class="col-md-4 mb-4">
+            <div class="col-md-3 mb-4">
                 <div class="card feature-card soporte-card h-100">
                     <div class="card-body text-center p-4">
                         <div class="card-icon">
@@ -139,7 +154,7 @@ requireAdmin();
             </div>
 
             <!-- Tarjeta de Mensajería -->
-            <div class="col-md-4 mb-4">
+            <div class="col-md-3 mb-4">
                 <div class="card feature-card mensajeria-card h-100">
                     <div class="card-body text-center p-4">
                         <div class="card-icon">
@@ -148,6 +163,20 @@ requireAdmin();
                         <h3 class="card-title h4 font-weight-bold">Mensajería</h3>
                         <p class="card-text text-muted">Sistema de mensajes y notificaciones</p>
                         <a href="mensajeria.php" class="btn btn-access btn-mensajeria mt-3">Acceder</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta de Auditoría (NUEVA) -->
+            <div class="col-md-3 mb-4">
+                <div class="card feature-card auditoria-card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="card-icon">
+                            <i class="fas fa-clipboard-list"></i>
+                        </div>
+                        <h3 class="card-title h4 font-weight-bold">Auditoría</h3>
+                        <p class="card-text text-muted">Registro de actividades del sistema</p>
+                        <a href="auditoria.php" class="btn btn-access btn-auditoria mt-3">Acceder</a>
                     </div>
                 </div>
             </div>
@@ -170,11 +199,14 @@ requireAdmin();
     <script>
     // Notificación de bienvenida
     document.addEventListener('DOMContentLoaded', function() {
-        Push.create('Panel de Administración', {
-            body: 'Bienvenido al sistema de gestión',
-            icon: '../images/logo_mini.png',
-            timeout: 4000
-        });
+        // Verificar si Push está disponible antes de usarlo
+        if (typeof Push !== 'undefined') {
+            Push.create('Panel de Administración', {
+                body: 'Bienvenido al sistema de gestión',
+                icon: '../images/logo_mini.png',
+                timeout: 4000
+            });
+        }
     });
     </script>
 </body>
