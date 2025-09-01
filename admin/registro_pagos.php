@@ -39,7 +39,7 @@ function obtenerTiposPago() {
     return $tipos;
 }
 
-// Función para registrar un pago
+// Función para registrar un pago (MODIFICADA PARA AUDITORÍA)
 function registrarPago($estudiante_id, $tipo_pago, $otro_concepto, $monto, $observaciones, $registrado_por) {
     global $db;
     
@@ -49,7 +49,33 @@ function registrarPago($estudiante_id, $tipo_pago, $otro_concepto, $monto, $obse
     $stmt = $db->prepare($query);
     $stmt->bind_param("iisdsi", $estudiante_id, $tipo_pago, $otro_concepto, $monto, $observaciones, $registrado_por);
     
-    return $stmt->execute();
+    if ($stmt->execute()) {
+        $pago_id = $stmt->insert_id;
+        
+        // Registrar en auditoría
+        $valores_nuevos = [
+            'estudiante_id' => $estudiante_id,
+            'tipo_pago' => $tipo_pago,
+            'otro_concepto' => $otro_concepto,
+            'monto' => $monto,
+            'observaciones' => $observaciones,
+            'registrado_por' => $registrado_por
+        ];
+        
+        registrarAuditoria(
+            "INSERT", 
+            "pagos", 
+            $pago_id, 
+            null, 
+            $valores_nuevos, 
+            "Pagos", 
+            "Registro de nuevo pago"
+        );
+        
+        return true;
+    }
+    
+    return false;
 }
 
 // Función para obtener todos los pagos
@@ -141,6 +167,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if (!$estudiante) {
                 $mensaje_error = "No se encontró ningún estudiante con la cédula: " . htmlspecialchars($cedula);
+                
+                // Registrar en auditoría - Búsqueda fallida
+                registrarAuditoria(
+                    "SEARCH", 
+                    "users", 
+                    null, 
+                    null, 
+                    ['cedula' => $cedula], 
+                    "Pagos", 
+                    "Búsqueda fallida de estudiante por cédula"
+                );
+            } else {
+                // Registrar en auditoría - Búsqueda exitosa
+                registrarAuditoria(
+                    "SEARCH", 
+                    "users", 
+                    $estudiante['id'], 
+                    null, 
+                    ['cedula' => $cedula, 'estudiante' => $estudiante['nombre']], 
+                    "Pagos", 
+                    "Búsqueda exitosa de estudiante por cédula"
+                );
             }
         } else {
             $mensaje_error = "Por favor, ingrese una cédula para buscar.";
@@ -161,6 +209,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $estudiante = null; // Limpiar formulario después de registro exitoso
             } else {
                 $mensaje_error = "Error al registrar el pago. Por favor, intente nuevamente.";
+                
+                // Registrar en auditoría - Error al registrar pago
+                registrarAuditoria(
+                    "ERROR", 
+                    "pagos", 
+                    null, 
+                    null, 
+                    [
+                        'estudiante_id' => $estudiante_id,
+                        'tipo_pago' => $tipo_pago,
+                        'monto' => $monto
+                    ], 
+                    "Pagos", 
+                    "Error al intentar registrar pago"
+                );
             }
         } else {
             $mensaje_error = "El monto debe ser mayor a cero.";

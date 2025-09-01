@@ -4143,8 +4143,251 @@ function obtenerCompañerosSeccion($db, $seccion_id, $estudiante_id) {
 }
 
 
+//AUDITORIA ***********************************************************************
 
 
+// ==============================================
+// ARCHIVO: funciones/functions.php
+// Sistema de Auditoría - Funciones adicionales
+// ==============================================
+
+/**
+ * Registrar acción en el sistema de auditoría
+ */
+function registrarAuditoria($accion, $tabla_afectada = null, $registro_id = null, 
+                           $valores_antiguos = null, $valores_nuevos = null, 
+                           $modulo_sistema = null, $descripcion = null) {
+    global $db;
+    
+    // Solo registrar si hay un usuario logueado
+    if (!isset($_SESSION['user']['id'])) {
+        return false;
+    }
+    
+    $usuario_id = $_SESSION['user']['id'];
+    $ip_origen = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+    $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    
+    // Convertir arrays a JSON para almacenamiento
+    $valores_antiguos_json = $valores_antiguos ? json_encode($valores_antiguos) : null;
+    $valores_nuevos_json = $valores_nuevos ? json_encode($valores_nuevos) : null;
+    
+    $query = "INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id, 
+              fecha_hora, valores_antiguos, valores_nuevos, ip_origen, user_agent, 
+              modulo_sistema, descripcion)
+              VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("ississssss", $usuario_id, $accion, $tabla_afectada, $registro_id,
+                     $valores_antiguos_json, $valores_nuevos_json, $ip_origen, 
+                     $user_agent, $modulo_sistema, $descripcion);
+    
+    return $stmt->execute();
+}
+
+
+
+/**
+ * Función para registrar el inicio de sesión
+ */
+function registrarLoginAuditoria($usuario_id, $exitoso = true) {
+    $descripcion = $exitoso ? "Inicio de sesión exitoso" : "Intento de inicio de sesión fallido";
+    
+    registrarAuditoria(
+        "LOGIN", 
+        "users", 
+        $usuario_id, 
+        null, 
+        null, 
+        "Autenticación", 
+        $descripcion
+    );
+}
+
+/**
+ * Función para registrar el cierre de sesión
+ */
+function registrarLogoutAuditoria($usuario_id) {
+    registrarAuditoria(
+        "LOGOUT", 
+        "users", 
+        $usuario_id, 
+        null, 
+        null, 
+        "Autenticación", 
+        "Cierre de sesión"
+    );
+}
+
+/**
+ * Obtener usuarios para el filtro de auditoría
+ */
+function obtenerUsuariosParaFiltro() {
+    global $db;
+    
+    $query = "SELECT id, nombre, idusuario FROM users ORDER BY nombre";
+    $result = $db->query($query);
+    
+    $usuarios = [];
+    while ($row = $result->fetch_assoc()) {
+        $usuarios[] = $row;
+    }
+    
+    return $usuarios;
+}
+
+/**
+ * Verificar si el usuario actual es administrador
+ */
+function esAdministrador() {
+    if (!isset($_SESSION['user']['tipo_usuario'])) {
+        return false;
+    }
+    
+    // Asumiendo que el tipo_usuario 1 es administrador
+    return $_SESSION['user']['tipo_usuario'] == 1;
+}
+
+//VISTA AUDITORIA ***********************************************************************
+
+
+// ==============================================
+// ARCHIVO: funciones/functions.php
+// Funciones adicionales para el sistema de auditoría
+// ==============================================
+
+/**
+ * Obtener registros de auditoría con filtros opcionales (versión mejorada)
+ */
+function obtenerRegistrosAuditoria($limite = 100, $fecha_inicio = null, $fecha_fin = null, $usuario_id = null, $accion = null, $modulo = null) {
+    global $db;
+    
+    $query = "SELECT a.*, u.nombre as usuario_nombre, u.idusuario as usuario_cedula
+              FROM auditoria a
+              INNER JOIN users u ON a.usuario_id = u.id
+              WHERE 1=1";
+    
+    $params = [];
+    $types = "";
+    
+    if ($fecha_inicio) {
+        $query .= " AND DATE(a.fecha_hora) >= ?";
+        $params[] = $fecha_inicio;
+        $types .= "s";
+    }
+    
+    if ($fecha_fin) {
+        $query .= " AND DATE(a.fecha_hora) <= ?";
+        $params[] = $fecha_fin;
+        $types .= "s";
+    }
+    
+    if ($usuario_id) {
+        $query .= " AND a.usuario_id = ?";
+        $params[] = $usuario_id;
+        $types .= "i";
+    }
+    
+    if ($accion) {
+        $query .= " AND a.accion = ?";
+        $params[] = $accion;
+        $types .= "s";
+    }
+    
+    if ($modulo) {
+        $query .= " AND a.modulo_sistema = ?";
+        $params[] = $modulo;
+        $types .= "s";
+    }
+    
+    $query .= " ORDER BY a.fecha_hora DESC LIMIT ?";
+    $params[] = $limite;
+    $types .= "i";
+    
+    $stmt = $db->prepare($query);
+    
+    if (!empty($params)) {
+        $stmt->bind_param($types, ...$params);
+    }
+    
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $registros = [];
+    while ($row = $result->fetch_assoc()) {
+        // Decodificar los JSON si existen
+        if ($row['valores_antiguos']) {
+            $row['valores_antiguos'] = json_decode($row['valores_antiguos'], true);
+        }
+        if ($row['valores_nuevos']) {
+            $row['valores_nuevos'] = json_decode($row['valores_nuevos'], true);
+        }
+        $registros[] = $row;
+    }
+    
+    return $registros;
+}
+
+/**
+ * Obtener acciones únicas para filtros
+ */
+function obtenerAccionesUnicas() {
+    global $db;
+    
+    $query = "SELECT DISTINCT accion FROM auditoria ORDER BY accion";
+    $result = $db->query($query);
+    
+    $acciones = [];
+    while ($row = $result->fetch_assoc()) {
+        $acciones[] = $row['accion'];
+    }
+    
+    return $acciones;
+}
+
+/**
+ * Obtener módulos únicos para filtros
+ */
+function obtenerModulosUnicos() {
+    global $db;
+    
+    $query = "SELECT DISTINCT modulo_sistema FROM auditoria WHERE modulo_sistema IS NOT NULL ORDER BY modulo_sistema";
+    $result = $db->query($query);
+    
+    $modulos = [];
+    while ($row = $result->fetch_assoc()) {
+        $modulos[] = $row['modulo_sistema'];
+    }
+    
+    return $modulos;
+}
+
+/**
+ * Contar registros de hoy
+ */
+function contarRegistrosHoy() {
+    global $db;
+    
+    $query = "SELECT COUNT(*) as total FROM auditoria WHERE DATE(fecha_hora) = CURDATE()";
+    $result = $db->query($query);
+    
+    return $result->fetch_assoc()['total'] ?? 0;
+}
+
+/**
+ * Contar acciones por tipo
+ */
+function contarAccionesPorTipo($tipo) {
+    global $db;
+    
+    $query = "SELECT COUNT(*) as total FROM auditoria WHERE accion = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("s", $tipo);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc()['total'] ?? 0;
+}
 
 
 
