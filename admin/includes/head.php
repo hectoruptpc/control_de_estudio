@@ -256,7 +256,7 @@ if (!isAdmin()) {
                 <p>Será redirigido a la página de inicio de sesión.</p>
                 <div class="user-info bg-light p-3 rounded">
                     <p class="mb-1"><strong>Usuario:</strong> <?php echo $_SESSION['user']['nombre'] ?? 'Usuario'; ?></p>
-                    <p class="mb-0"><strong>Rol:</strong> <?php echo $_SESSION['user']['tipo_usuario'] ?? 'No definido'; ?></p>
+                   
                 </div>
             </div>
             <div class="modal-footer">
