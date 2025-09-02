@@ -48,7 +48,7 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
                     <select class="custom-select" id="tipo_cedula<?php echo $prefijo; ?>" name="tipo_cedula" style="max-width: 80px;">
                         <?php foreach ($tiposCedula as $tipo): ?>
                             <option value="<?php echo htmlspecialchars($tipo['tipo']); ?>">
-                                <?php echo htmlspecialchars($tipo['tipo']); ?>-
+                                <?php echo htmlspecialchars($tipo['tipo']); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>

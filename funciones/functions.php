@@ -309,7 +309,6 @@ function insertarEstudiante($datos) {
         // Iniciar transacción
         $db->begin_transaction();
 
-           
         // 1. Preparar datos del usuario
         $username = strtolower(str_replace(' ', '.', $datos['nombre']));
         $cedulaLimpia = substr($datos['idusuario'], 2);
@@ -445,6 +444,25 @@ function insertarEstudiante($datos) {
             $stmtTitulos->close();
         }
 
+        // 7. REGISTRAR EN AUDITORÍA - NUEVO ESTUDIANTE
+        $valores_nuevos = [
+            'idusuario' => $datos['idusuario'],
+            'nombre' => $datos['nombre'],
+            'email' => $datos['email'] ?? '',
+            'carrera' => $datos['carrera'] ?? '',
+            'status' => $datos['status'] ?? 'Activo'
+        ];
+        
+        registrarAuditoria(
+            "INSERT", 
+            "users", 
+            $userId, 
+            null, 
+            $valores_nuevos, 
+            "Estudiantes", 
+            "Registro de nuevo estudiante"
+        );
+
         // Confirmar transacción
         $db->commit();
 
@@ -457,6 +475,22 @@ function insertarEstudiante($datos) {
     } catch(Exception $e) {
         // Revertir transacción en caso de error
         $db->rollback();
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL REGISTRAR ESTUDIANTE
+        registrarAuditoria(
+            "ERROR", 
+            "users", 
+            null, 
+            null, 
+            [
+                'nombre' => $datos['nombre'] ?? '',
+                'idusuario' => $datos['idusuario'] ?? '',
+                'error' => $e->getMessage()
+            ], 
+            "Estudiantes", 
+            "Error al registrar estudiante"
+        );
+        
         error_log("Error en insertarEstudiante: " . $e->getMessage());
         return [
             'success' => false,
