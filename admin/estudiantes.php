@@ -42,7 +42,7 @@ include("includes/head.php");
                         <?php if (isset($error_message)): ?>
                             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                                 <?php echo $error_message; ?>
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                <button type="button" class="btn-close" data-dismiss="alert" aria-label="Close"></button>
                             </div>
                         <?php endif; ?>
                         
@@ -81,15 +81,15 @@ include("includes/head.php");
                                             <td>
                                                 <div class="d-flex gap-2">
                                                     <button class="btn btn-info btn-details btn-sm" 
-                                                        data-bs-toggle="modal" 
-                                                        data-bs-target="#detalleModal"
+                                                        data-toggle="modal" 
+                                                        data-target="#detalleModal"
                                                         data-id="<?php echo $estudiante['id']; ?>">
                                                         <i class="fas fa-eye"></i>
                                                     </button>
                                                     <?php if ($puedeEditar): ?>
                                                         <button class="btn btn-warning btn-sm btn-edit" 
-                                                            data-bs-toggle="modal" 
-                                                            data-bs-target="#editarEstudianteModal"
+                                                            data-toggle="modal" 
+                                                            data-target="#editarEstudianteModal"
                                                             data-id="<?php echo $estudiante['id']; ?>">
                                                             <i class="fas fa-edit"></i> Editar
                                                         </button>
@@ -114,7 +114,7 @@ include("includes/head.php");
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title" id="detalleModalLabel">Detalles del Estudiante</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -137,7 +137,7 @@ include("includes/head.php");
             <div class="modal-content">
                 <div class="modal-header bg-warning text-white">
                     <h5 class="modal-title" id="editarEstudianteModalLabel"><i class="fas fa-user-edit me-2"></i> Editar Estudiante</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -162,7 +162,7 @@ include("includes/head.php");
                     <h5 class="modal-title" id="agregarEstudianteModalLabel">
                         <i class="fas fa-user-plus me-2"></i> Agregar Nuevo Estudiante
                     </h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -179,31 +179,84 @@ include("includes/head.php");
                     $esModal = true;
                     ?>
                     
-                    <?php if (isset($success_message)): ?>
-                        <div class="alert alert-success alert-dismissible fade show" role="alert">
-                            <?php echo $success_message; ?>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <?php if (isset($error_message)): ?>
-                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                            <?php echo $error_message; ?>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    <?php endif; ?>
-                    
                     <div class="tab-content" id="myTabContent">
                         <!-- Formulario individual -->
                         <div class="tab-pane fade show active" id="individual" role="tabpanel" aria-labelledby="individual-tab">
-                            <?php include('_formulario_estudiante.php'); ?>
+                            <form id="formEstudianteModal" method="post" enctype="multipart/form-data">
+                                <?php 
+                                // Incluir el formulario reutilizable pero forzando modo modal
+                                $esModal = true;
+                                include('_formulario_estudiante.php'); 
+                                ?>
+                            </form>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Modal para Mensajes de Resultado -->
+    <div class="modal fade" id="resultadoModal" tabindex="-1" aria-labelledby="resultadoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header" id="resultadoModalHeader">
+                    <h5 class="modal-title" id="resultadoModalLabel">Resultado</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" id="resultadoModalBody">
+                    <!-- Contenido dinámico -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-dismiss="modal">Aceptar</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<style>
+.close {
+    font-size: 1.5rem;
+    font-weight: bold;
+    opacity: 0.8;
+    padding: 0.5rem;
+    line-height: 1;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+.close:hover {
+    opacity: 1;
+}
+
+/* Estilos para mejorar la apariencia de los modales */
+.modal-header {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-content {
+    border-radius: 0.5rem;
+    border: none;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+}
+</style>
 
 <script>
 // JavaScript para manejar el modal y DataTable
@@ -226,6 +279,46 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // Función para mostrar mensaje en modal
+    function mostrarMensaje(titulo, mensaje, esExito = true) {
+        const header = document.getElementById('resultadoModalHeader');
+        const body = document.getElementById('resultadoModalBody');
+        const label = document.getElementById('resultadoModalLabel');
+        
+        // Configurar colores según el tipo de mensaje
+        if (esExito) {
+            header.className = 'modal-header bg-success text-white';
+            body.innerHTML = `
+                <div class="text-center">
+                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                    <h4>${titulo}</h4>
+                    <p>${mensaje}</p>
+                </div>
+            `;
+        } else {
+            header.className = 'modal-header bg-danger text-white';
+            body.innerHTML = `
+                <div class="text-center">
+                    <i class="fas fa-exclamation-circle fa-3x text-danger mb-3"></i>
+                    <h4>${titulo}</h4>
+                    <p>${mensaje}</p>
+                </div>
+            `;
+        }
+        
+        label.textContent = titulo;
+        
+        // Mostrar el modal
+        $('#resultadoModal').modal('show');
+        
+        // Recargar la página cuando se cierra el modal de resultado (solo en éxito)
+        if (esExito) {
+            $('#resultadoModal').on('hidden.bs.modal', function() {
+                location.reload();
+            });
+        }
+    }
+    
     // Función para cargar detalles del estudiante
     function loadStudentDetails(studentId) {
         const modalContent = document.getElementById('detalleEstudianteContent');
@@ -241,8 +334,7 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         
         // Mostrar el modal
-        const modal = new bootstrap.Modal(document.getElementById('detalleModal'));
-        modal.show();
+        $('#detalleModal').modal('show');
         
         // Cargar contenido via AJAX
         fetch(`detalle_estudiante.php?id=${studentId}`)
@@ -274,14 +366,22 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         
         // Mostrar el modal
-        const modal = new bootstrap.Modal(document.getElementById('editarEstudianteModal'));
-        modal.show();
+        $('#editarEstudianteModal').modal('show');
         
         // Cargar contenido via AJAX
         fetch(`editar_estudiante_modal.php?id=${studentId}`)
             .then(response => response.text())
             .then(data => {
                 modalContent.innerHTML = data;
+                
+                // Configurar el envío del formulario de edición
+                const editForm = document.getElementById('formEditarEstudiante');
+                if (editForm) {
+                    editForm.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        submitEditForm(this);
+                    });
+                }
             })
             .catch(error => {
                 modalContent.innerHTML = `
@@ -292,26 +392,152 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     
+    // Función para enviar el formulario de edición
+    function submitEditForm(form) {
+        const formData = new FormData(form);
+        const submitButton = form.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton.innerHTML;
+        
+        // Mostrar loading en el botón
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+        submitButton.disabled = true;
+        
+        fetch('procesar_edicion_estudiante.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error en la respuesta del servidor');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Cerrar modal de edición
+                $('#editarEstudianteModal').modal('hide');
+                
+                // Mostrar mensaje de éxito
+                mostrarMensaje(
+                    '¡Éxito!', 
+                    data.message || 'Estudiante actualizado exitosamente',
+                    true
+                );
+            } else {
+                // Mostrar mensaje de error
+                mostrarMensaje(
+                    'Error', 
+                    data.message || 'Error al actualizar el estudiante',
+                    false
+                );
+                
+                // Reactivar el botón
+                submitButton.innerHTML = originalButtonText;
+                submitButton.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            
+            // Mostrar mensaje de error
+                mostrarMensaje(
+                'Error', 
+                'Error de conexión: ' + error.message,
+                false
+            );
+            
+            // Reactivar el botón
+            submitButton.innerHTML = originalButtonText;
+            submitButton.disabled = false;
+        });
+    }
+    
     // Limpiar modales al cerrar
-    document.getElementById('detalleModal').addEventListener('hidden.bs.modal', function() {
+    $('#detalleModal').on('hidden.bs.modal', function() {
         document.getElementById('detalleEstudianteContent').innerHTML = '';
     });
     
-    document.getElementById('editarEstudianteModal').addEventListener('hidden.bs.modal', function() {
+    $('#editarEstudianteModal').on('hidden.bs.modal', function() {
         document.getElementById('editarEstudianteContent').innerHTML = '';
+    });
+    
+    $('#agregarEstudianteModal').on('hidden.bs.modal', function() {
+        // Limpiar el formulario al cerrar el modal
+        document.getElementById('formEstudianteModal').reset();
     });
 
     // Inicializar tooltips
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-toggle="tooltip"]'));
     tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Manejar el envío del formulario de nuevo estudiante con AJAX
+    document.getElementById('formEstudianteModal').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const submitButton = this.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton.innerHTML;
+        
+        // Mostrar loading en el botón
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+        submitButton.disabled = true;
+        
+        fetch('procesar_estudiante.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error en la respuesta del servidor');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Cerrar modal de formulario
+                $('#agregarEstudianteModal').modal('hide');
+                
+                // Mostrar mensaje de éxito
+                mostrarMensaje(
+                    '¡Éxito!', 
+                    data.message || 'Estudiante registrado exitosamente',
+                    true
+                );
+            } else {
+                // Mostrar mensaje de error
+                mostrarMensaje(
+                    'Error', 
+                    data.message || 'Error al guardar el estudiante',
+                    false
+                );
+                
+                // Reactivar el botón
+                submitButton.innerHTML = originalButtonText;
+                submitButton.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            
+            // Mostrar mensaje de error
+            mostrarMensaje(
+                'Error', 
+                'Error de conexión: ' + error.message,
+                false
+            );
+            
+            // Reactivar el botón
+            submitButton.innerHTML = originalButtonText;
+            submitButton.disabled = false;
+        });
     });
 });
 
 // Función para abrir el modal de nuevo estudiante
 function abrirModalNuevoEstudiante() {
-    var modal = new bootstrap.Modal(document.getElementById('agregarEstudianteModal'));
-    modal.show();
+    $('#agregarEstudianteModal').modal('show');
 }
 </script>
 
