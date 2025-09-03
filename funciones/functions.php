@@ -606,93 +606,73 @@ function obtenerEstudiantePorId($id) {
 
 // Función para actualizar estudiante
 function actualizarEstudiante(array $datos): array {
-  global $db;
-  
-  try {
-      // Consulta SQL con parámetros preparados
-      $sql = "UPDATE users SET 
-              idusuario = ?,
-              nombre = ?,
-              email = ?,
-              tlf = ?,
-              cel = ?,
-              direccion = ?,
-              ciudad = ?,
-              estado = ?,
-              municipio = ?,
-              parroquia = ?,
-              fecha_ingreso = ?,
-              status = ?,
-              carrera = ?,
-              genero = ?,
-              edo_civil = ?,
-              fecha_nac = ?,
-              num_telf_opc = ?,
-              fecha_act = ?
-              WHERE id = ?";
+    global $db;
+    
+    try {
+        // Consulta SQL con los campos correctos que estás usando
+        $sql = "UPDATE users SET 
+                nombre = ?,
+                username = ?,
+                email = ?,
+                tlf = ?,
+                num_telf_opc = ?,
+                carrera = ?,
+                genero = ?,
+                fecha_nac = ?,
+                fecha_ingreso = ?,
+                status = ?,
+                fecha_act = NOW()
+                WHERE id = ?";
 
-      // Preparar la sentencia
-      $stmt = $db->prepare($sql);
-      if (!$stmt) {
-          throw new Exception("Error en la preparación: " . $db->error);
-      }
+        // Preparar la sentencia
+        $stmt = $db->prepare($sql);
+        if (!$stmt) {
+            throw new Exception("Error en la preparación: " . $db->error);
+        }
 
-      // Establecer valores por defecto para campos opcionales
-      $valores = [
-          $datos['idusuario'] ?? '',
-          $datos['nombre'] ?? '',
-          $datos['email'] ?? null,
-          $datos['tlf'] ?? null,
-          $datos['cel'] ?? '',
-          $datos['direccion'] ?? '',
-          $datos['municipio'] ?? '', // ciudad se llena con municipio
-          $datos['estado'] ?? '',
-          $datos['municipio'] ?? '',
-          $datos['parroquia'] ?? '',
-          $datos['fecha_ingreso'] ?? null,
-          $datos['status'] ?? 'Activo',
-          $datos['carrera'] ?? null,
-          $datos['genero'] ?? null,
-          $datos['edo_civil'] ?? null,
-          $datos['fecha_nac'] ?? null,
-          $datos['num_telf_opc'] ?? '',
-          date('Y-m-d H:i:s'), // fecha_act actual
-          $datos['id']
-      ];
+        // Vincular parámetros
+        $stmt->bind_param(
+            "sssssssssii", // Tipos de parámetros
+            $datos['nombre'],
+            $datos['username'],
+            $datos['email'],
+            $datos['tlf'],
+            $datos['num_telf_opc'],
+            $datos['carrera'],
+            $datos['genero'],
+            $datos['fecha_nac'],
+            $datos['fecha_ingreso'],
+            $datos['status'],
+            $datos['id']
+        );
 
-      // Vincular parámetros
-      $stmt->bind_param(
-          "ssssssssssssssssssi", // Tipos de parámetros
-          ...$valores            // Valores
-      );
+        // Ejecutar la actualización
+        if (!$stmt->execute()) {
+            throw new Exception("Error al ejecutar: " . $stmt->error);
+        }
 
-      // Ejecutar la actualización
-      if (!$stmt->execute()) {
-          throw new Exception("Error al ejecutar: " . $stmt->error);
-      }
+        // Verificar si se realizaron cambios
+        $cambios = $stmt->affected_rows > 0;
+        
+        return [
+            'success' => $cambios,
+            'message' => $cambios 
+                ? 'Estudiante actualizado correctamente' 
+                : 'No se realizaron cambios (posiblemente los datos son iguales)',
+            'affected_rows' => $stmt->affected_rows
+        ];
 
-      // Verificar si se realizaron cambios
-      $cambios = $stmt->affected_rows > 0;
-      
-      return [
-          'success' => $cambios,
-          'message' => $cambios 
-              ? 'Estudiante actualizado correctamente' 
-              : 'No se realizaron cambios (posiblemente los datos son iguales)',
-          'affected_rows' => $stmt->affected_rows
-      ];
-
-  } catch(Exception $e) {
-      error_log("Error en actualizarEstudiante: " . $e->getMessage());
-      return [
-          'success' => false,
-          'message' => 'Error al actualizar estudiante: ' . $e->getMessage()
-      ];
-  } finally {
-      if (isset($stmt)) {
-          $stmt->close();
-      }
-  }
+    } catch(Exception $e) {
+        error_log("Error en actualizarEstudiante: " . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => 'Error al actualizar estudiante: ' . $e->getMessage()
+        ];
+    } finally {
+        if (isset($stmt)) {
+            $stmt->close();
+        }
+    }
 }
 
 function procesarCSVEstudiantes($tmpFilePath, $originalName) {
@@ -4405,6 +4385,140 @@ function esAdministrador() {
     // Asumiendo que el tipo_usuario 1 es administrador
     return $_SESSION['user']['tipo_usuario'] == 1;
 }
+
+
+/**
+ * Obtener datos completos del estudiante para auditoría
+ */
+function obtenerDatosEstudianteCompletos($id) {
+    global $db;
+    
+    $query = "SELECT u.*, c.nombre as nombre_carrera, g.nombre as nombre_genero
+              FROM users u 
+              LEFT JOIN carreras c ON u.carrera = c.id 
+              LEFT JOIN generos g ON u.genero = g.id 
+              WHERE u.id = ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows === 0) {
+        return false;
+    }
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Detectar cambios detallados para auditoría
+ */
+function detectarCambiosDetallados($datos_antiguos, $datos_nuevos) {
+    $campos_modificados = [];
+    $valores_antiguos = [];
+    $valores_nuevos = [];
+    
+    $nombres_campos = [
+        'nombre' => 'Nombre completo',
+        'username' => 'Cédula/Usuario',
+        'email' => 'Correo electrónico',
+        'tlf' => 'Teléfono principal',
+        'num_telf_opc' => 'Teléfono opcional',
+        'carrera' => 'Programa/Carrera',
+        'genero' => 'Género',
+        'fecha_nac' => 'Fecha de nacimiento',
+        'fecha_ingreso' => 'Fecha de ingreso',
+        'status' => 'Estado'
+    ];
+    
+    foreach ($nombres_campos as $campo => $nombre_legible) {
+        $valor_antiguo = $datos_antiguos[$campo] ?? null;
+        $valor_nuevo = $datos_nuevos[$campo] ?? null;
+        
+        if (normalizarValor($valor_antiguo, $campo) !== normalizarValor($valor_nuevo, $campo)) {
+            $campos_modificados[$campo] = $nombre_legible;
+            $valores_antiguos[$nombre_legible] = formatearValorParaAuditoria($valor_antiguo, $campo, $datos_antiguos);
+            $valores_nuevos[$nombre_legible] = formatearValorParaAuditoria($valor_nuevo, $campo, $datos_nuevos);
+        }
+    }
+    
+    return [
+        'campos_modificados' => $campos_modificados,
+        'valores_antiguos' => $valores_antiguos,
+        'valores_nuevos' => $valores_nuevos
+    ];
+}
+
+/**
+ * Normalizar valor para comparación
+ */
+function normalizarValor($valor, $campo) {
+    if ($valor === null || $valor === '') {
+        return null;
+    }
+    
+    if (in_array($campo, ['carrera', 'genero', 'status'])) {
+        return (int)$valor;
+    }
+    
+    if (in_array($campo, ['fecha_nac', 'fecha_ingreso'])) {
+        return $valor ? date('Y-m-d', strtotime($valor)) : null;
+    }
+    
+    return trim($valor);
+}
+
+/**
+ * Formatear valor para auditoría
+ */
+function formatearValorParaAuditoria($valor, $campo, $datos_completos = []) {
+    if ($valor === null || $valor === '') {
+        return 'No especificado';
+    }
+    
+    switch ($campo) {
+        case 'carrera':
+            return $datos_completos['nombre_carrera'] ?? 'Carrera ' . $valor;
+            
+        case 'genero':
+            return $datos_completos['nombre_genero'] ?? 'Género ' . $valor;
+            
+        case 'status':
+            return $valor == 1 ? 'Activo' : 'Inactivo';
+            
+        case 'fecha_nac':
+        case 'fecha_ingreso':
+            return $valor ? date('d/m/Y', strtotime($valor)) : 'No especificado';
+            
+        default:
+            return $valor;
+    }
+}
+
+/**
+ * Generar descripción detallada para auditoría
+ */
+function generarDescripcionAuditoria($cambios) {
+    $descripcion = "Edición de estudiante. Campos modificados:\n";
+    
+    foreach ($cambios['campos_modificados'] as $campo => $nombre_legible) {
+        $valor_antiguo = $cambios['valores_antiguos'][$nombre_legible] ?? 'No especificado';
+        $valor_nuevo = $cambios['valores_nuevos'][$nombre_legible] ?? 'No especificado';
+        
+        $descripcion .= "• {$nombre_legible}: ";
+        $descripcion .= "DE '{$valor_antiguo}' A '{$valor_nuevo}'\n";
+    }
+    
+    return $descripcion;
+}
+
+
+
+
+
+
+
 
 //VISTA AUDITORIA ***********************************************************************
 

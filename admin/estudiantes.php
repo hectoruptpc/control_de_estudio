@@ -402,7 +402,7 @@ document.addEventListener('DOMContentLoaded', function() {
         submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
         submitButton.disabled = true;
         
-        fetch('procesar_edicion_estudiante.php', {
+        fetch('actualizar_estudiante.php', {
             method: 'POST',
             body: formData
         })
@@ -440,7 +440,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error:', error);
             
             // Mostrar mensaje de error
-                mostrarMensaje(
+            mostrarMensaje(
                 'Error', 
                 'Error de conexión: ' + error.message,
                 false

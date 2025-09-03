@@ -37,7 +37,7 @@ $generos = obtenerGeneros($db);
 </div>
 
 <div class="modal-body">
-    <form id="formEditarEstudiante" method="post" action="actualizar_estudiante.php">
+    <form id="formEditarEstudiante" method="post">
         <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
         
         <div class="row">
@@ -167,7 +167,7 @@ $(document).ready(function() {
         const formData = new FormData(this);
         
         $.ajax({
-            url: $(this).attr('action'),
+            url: 'actualizar_estudiante.php',
             type: 'POST',
             data: formData,
             processData: false,
