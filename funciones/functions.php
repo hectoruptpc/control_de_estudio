@@ -609,6 +609,15 @@ function actualizarEstudiante(array $datos): array {
     global $db;
     
     try {
+        // Primero obtener los valores antiguos para auditoría
+        $query_antiguo = "SELECT * FROM users WHERE id = ?";
+        $stmt_antiguo = $db->prepare($query_antiguo);
+        $stmt_antiguo->bind_param("i", $datos['id']);
+        $stmt_antiguo->execute();
+        $result_antiguo = $stmt_antiguo->get_result();
+        $valores_antiguos = $result_antiguo->fetch_assoc();
+        $stmt_antiguo->close();
+
         // Consulta SQL con los campos correctos que estás usando
         $sql = "UPDATE users SET 
                 nombre = ?,
@@ -653,6 +662,32 @@ function actualizarEstudiante(array $datos): array {
 
         // Verificar si se realizaron cambios
         $cambios = $stmt->affected_rows > 0;
+        
+        // Registrar auditoría solo si hubo cambios
+        if ($cambios) {
+            $valores_nuevos = [
+                'nombre' => $datos['nombre'],
+                'username' => $datos['username'],
+                'email' => $datos['email'],
+                'tlf' => $datos['tlf'],
+                'num_telf_opc' => $datos['num_telf_opc'],
+                'carrera' => $datos['carrera'],
+                'genero' => $datos['genero'],
+                'fecha_nac' => $datos['fecha_nac'],
+                'fecha_ingreso' => $datos['fecha_ingreso'],
+                'status' => $datos['status']
+            ];
+            
+            registrarAuditoria(
+                "UPDATE", 
+                "users", 
+                $datos['id'], 
+                $valores_antiguos, 
+                $valores_nuevos, 
+                "Estudiantes", 
+                "Actualización de datos de estudiante"
+            );
+        }
         
         return [
             'success' => $cambios,
