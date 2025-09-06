@@ -28,23 +28,20 @@ if (!isLoggedIn()) {
     die();
 }
 
-if (!isEstudiante()) {
+if (!isUser()) {
     header('location: ../usuario/home.php');
 }
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html lang="es-Es" xmlns="http://www.w3.org/1999/xhtml">
 <head>
-
 <meta charset="UTF8">
 <meta http-equiv="Content-type" content="text/html; charset=UTF8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<meta name="description" content="Gestión Estudiantil">
-<meta name="author" content="Jose Herrera">
-
+<meta name="description" content="Gestión Académica">
+<meta name="author" content="Sistema de Gestión">
 <title><?php echo $titulopag; ?></title>
-
-<?php echo $bootstrap_head; ?>
+<?php echo $bootstrap_head;?>
 <style>
     .nav-item-mensajes {
         position: relative;
@@ -56,14 +53,28 @@ if (!isEstudiante()) {
         font-size: 0.6em;
         padding: 3px 6px;
     }
+    /* SOLUCIÓN: Especificar que solo afecte a la navbar superior */
+    .navbar:not(.fixed-bottom) {
+        background-color: #fd7e14 !important;
+    }
+    .navbar:not(.fixed-bottom) .navbar-brand, 
+    .navbar:not(.fixed-bottom) .nav-link {
+        color: white !important;
+    }
+    .dropdown-menu {
+        border: none;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+    }
+    .dropdown-item:hover {
+        background-color: #fff5eb;
+    }
 </style>
 </head>
-
 <body>
-
 <div class="container">
 <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-light fixed-top" style="background-color: #2196F3;">
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top" style="background-color: #fd7e14;">
       <div class="container">
         <a title="Cargar Inicio" class="navbar-brand" href="index.php">
           <?php echo $logopertenencia; ?>
@@ -71,7 +82,6 @@ if (!isEstudiante()) {
         <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
           <span class="navbar-toggler-icon"></span>
         </button>
-
         <div class="collapse navbar-collapse" id="navbarResponsive">
           <ul class="navbar-nav ml-auto">
             <li class="nav-item">
@@ -80,9 +90,9 @@ if (!isEstudiante()) {
               </a>
             </li>
 
-            <!-- Icono de Mensajería con Notificación para Estudiantes -->
+            <!-- Icono de Mensajería con Notificación -->
             <li class="nav-item nav-item-mensajes">
-              <a title="Sistema de Mensajería" class="nav-link position-relative" href="mensajeria_estudiantes.php">
+              <a title="Sistema de Mensajería" class="nav-link position-relative" href="mensajeria.php">
                 <i class="fas fa-envelope fa-fw"></i> Mensajes
                 <?php if ($mensajes_no_leidos > 0): ?>
                   <span class="badge badge-danger badge-notificacion">
@@ -92,51 +102,26 @@ if (!isEstudiante()) {
               </a>
             </li>
 
-            <li id="dropdown-clases" class="nav-item dropdown">
-              <a title="Mis Clases" class="nav-link dropdown-toggle" href="#" id="navbarDropdownClases" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                <i class="fas fa-book fa-fw"></i> Mis Clases
+            <!-- Menú de Asignación de Docentes -->
+            <li class="nav-item">
+              <a title="Asignar Docente al Programa" class="nav-link" href="asignacion_cursos.php">
+                <i class="fas fa-chalkboard-teacher fa-fw"></i> Asignar Docente
               </a>
-              <div class="dropdown-menu" aria-labelledby="navbarDropdownClases">
-                
-                <a title="Horario" class="dropdown-item" href="../pagina_en_construccion.php">
-                  <i class="fas fa-calendar-alt fa-fw"></i> Mi Horario
-                </a>
-                <a title="Secciones" class="dropdown-item" href="mis_secciones.php">
-                  <i class="fas fa-columns fa-fw"></i> Mis Secciones
-                </a>
-                <a title="Pensum Académico" class="dropdown-item" href="mi_pensum.php">
-                  <i class="fas fa-graduation-cap fa-fw"></i> Mi Pensum
-                </a>
-              </div>
             </li>
 
-            <li id="dropdown-calificaciones" class="nav-item dropdown">
-              <a title="Mis Calificaciones" class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                  <i class="fas fa-graduation-cap fa-fw"></i> Mis Calificaciones
-              </a>
-              <div id="dropdown-calificaciones-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
-                  <a title="Ver Calificaciones" class="dropdown-item" href="../pagina_en_construccion.php">
-                      <i class="fas fa-list-ol fa-fw"></i> Ver Mis Notas
-                  </a>
-                  
-              </div>
-            </li>
-
-           
-
+            <!-- Menú de Ajustes -->
             <li id="dropdown-ajustes" class="nav-item dropdown">
-              <a title="Ir a Ajustes" class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-              <i class="fa fa-cogs fa-fw"></i>  Ajustes
-              </a>
-              <div id="dropdown-ajus" class="dropdown-menu" aria-labelledby="navbarDropdown">
-                
-                <div class="dropdown-divider"></div>
-                <a title="Salir del Sistema" class="dropdown-item" href="#" id="logoutLink">
+                <a title="Ir a Ajustes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownAjustes" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <i class="fa fa-cogs fa-fw"></i> Ajustes
+                </a>
+                <div id="dropdown-ajustes-menu" class="dropdown-menu" aria-labelledby="navbarDropdownAjustes">
+                    
+                    <div class="dropdown-divider"></div>
+                    <a title="Salir del Sistema" class="dropdown-item" href="#" id="logoutLink">
                         <i class="fas fa-sign-out-alt fa-fw"></i> Cerrar Sesión
                     </a>
-              </div>
+                </div>
             </li>
-
           </ul>
         </div>
       </div>
@@ -146,7 +131,6 @@ if (!isEstudiante()) {
         <div class="col-sm-6">
             <b class="mt-5"><?php echo 'Bienvenido ' .$_SESSION['user']['nombre']; ?></b>
         </div>
-
         <div class="col-sm-6">
             <?php
             echo '<p class="text-right">';
@@ -160,6 +144,7 @@ if (!isEstudiante()) {
     </div>
     </div>
 </div>
+
 
 <!-- Modal de Confirmación para Cerrar Sesión -->
 <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog" aria-labelledby="logoutModalLabel" aria-hidden="true">
@@ -199,8 +184,6 @@ if (!isEstudiante()) {
 
 
 
-
-
 <!-- Script para actualizar notificaciones cada 30 segundos -->
 <script>
 function actualizarNotificaciones() {
@@ -236,7 +219,6 @@ setInterval(actualizarNotificaciones, 30000);
 // Actualizar también al cargar la página
 document.addEventListener('DOMContentLoaded', actualizarNotificaciones);
 
-
 // Script para manejar el modal de logout
 document.addEventListener('DOMContentLoaded', function() {
     // Manejar el clic en el enlace de logout
@@ -265,6 +247,3 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 </script>
-
-</body>
-</html>

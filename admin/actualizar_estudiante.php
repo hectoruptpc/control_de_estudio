@@ -1,18 +1,20 @@
 <?php
-error_reporting(0);
-ini_set('display_errors', 0);
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 require_once('../funciones/functions.php');
 
-// Verificar conexión
-if (!isset($GLOBALS['db'])) {
-    header("Location: ".$_SERVER['HTTP_REFERER']); // Regresa a la página anterior
+// Verificar que es una solicitud POST
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'message' => 'Método no permitido']);
     exit;
 }
 
 // Validar ID
 if (!isset($_POST['id']) || !is_numeric($_POST['id'])) {
-    header("Location: ".$_SERVER['HTTP_REFERER']);
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'ID de estudiante no válido']);
     exit;
 }
 
@@ -20,6 +22,7 @@ $id = $_POST['id'];
 
 // Procesar datos
 $datos = [
+    'id' => $id,
     'nombre' => trim($_POST['nombre'] ?? ''),
     'username' => trim($_POST['cedula'] ?? ''),
     'email' => trim($_POST['email'] ?? ''),
@@ -29,58 +32,19 @@ $datos = [
     'genero' => trim($_POST['genero'] ?? ''),
     'fecha_nac' => trim($_POST['fecha_nac'] ?? ''),
     'fecha_ingreso' => trim($_POST['fecha_ingreso'] ?? ''),
-    'status' => intval($_POST['status'] ?? 1),
-    'fecha_act' => date('Y-m-d H:i:s')
+    'status' => intval($_POST['status'] ?? 1)
 ];
 
 // Validar campos obligatorios
 if (empty($datos['nombre']) || empty($datos['username']) || empty($datos['fecha_ingreso'])) {
-    header("Location: ".$_SERVER['HTTP_REFERER']);
+    echo json_encode(['success' => false, 'message' => 'Campos obligatorios faltantes']);
     exit;
 }
 
-// Ejecutar actualización
-try {
-    $db = $GLOBALS['db'];
-    
-    $query = "UPDATE users SET 
-              nombre = ?, 
-              username = ?, 
-              email = ?, 
-              tlf = ?, 
-              num_telf_opc = ?, 
-              carrera = ?, 
-              genero = ?, 
-              fecha_nac = ?, 
-              fecha_ingreso = ?, 
-              status = ?, 
-              fecha_act = ? 
-              WHERE id = ?";
-    
-    $stmt = $db->prepare($query);
-    if ($stmt) {
-        $stmt->bind_param(
-            "sssssssssssi",
-            $datos['nombre'],
-            $datos['username'],
-            $datos['email'],
-            $datos['tlf'],
-            $datos['num_telf_opc'],
-            $datos['carrera'],
-            $datos['genero'],
-            $datos['fecha_nac'],
-            $datos['fecha_ingreso'],
-            $datos['status'],
-            $datos['fecha_act'],
-            $id
-        );
-        $stmt->execute();
-        $stmt->close();
-    }
-} catch (Exception $e) {
-    // No hacer nada con los errores
-}
+// Usar tu función existente en lugar de duplicar lógica
+$resultado = actualizarEstudiante($datos);
 
-// Redireccionar siempre al final
-header("Location: ".$_SERVER['HTTP_REFERER']);
+// Devolver respuesta JSON
+header('Content-Type: application/json');
+echo json_encode($resultado);
 exit;

@@ -53,6 +53,10 @@ if (!isAdmin()) {
         font-size: 0.6em;
         padding: 3px 6px;
     }
+    .user-info {
+        background-color: #f8f9fa;
+        border-left: 4px solid #007bff;
+    }
 </style>
 </head>
 <body>
@@ -204,8 +208,8 @@ if (!isAdmin()) {
                     <?php endif; ?>
                     
                     <div class="dropdown-divider"></div>
-                    <a title="Salir del Sistema" class="nav-link" href="../index.php?logout='1'">
-                        <i class="fas fa-sign-out-alt"></i> Salir
+                    <a title="Salir del Sistema" class="dropdown-item" href="#" id="logoutLink">
+                        <i class="fas fa-sign-out-alt fa-fw"></i> Cerrar Sesión
                     </a>
                 </div>
             </li>
@@ -229,6 +233,41 @@ if (!isAdmin()) {
             ?>
         </div>
     </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación para Cerrar Sesión -->
+<div class="modal fade" id="logoutModal" tabindex="-1" role="dialog" aria-labelledby="logoutModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="logoutModalLabel">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Confirmar Cierre de Sesión
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    <strong>¿Está seguro de que desea cerrar la sesión?</strong>
+                </div>
+                <p>Será redirigido a la página de inicio de sesión.</p>
+                <div class="user-info bg-light p-3 rounded">
+                    <p class="mb-1"><strong>Usuario:</strong> <?php echo $_SESSION['user']['nombre'] ?? 'Usuario'; ?></p>
+                   
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fas fa-times mr-2"></i>Cancelar
+                </button>
+                <a href="../logout.php" class="btn btn-danger" id="confirmLogout">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Sí, Cerrar Sesión
+                </a>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -264,8 +303,30 @@ function actualizarNotificaciones() {
 // Actualizar cada 30 segundos
 setInterval(actualizarNotificaciones, 30000);
 
-// Actualizar también al cargar la página
-document.addEventListener('DOMContentLoaded', actualizarNotificaciones);
+// Script para manejar el modal de logout
+document.addEventListener('DOMContentLoaded', function() {
+    // Manejar el clic en el enlace de logout
+    document.getElementById('logoutLink').addEventListener('click', function(e) {
+        e.preventDefault(); // Prevenir el comportamiento por defecto
+        $('#logoutModal').modal('show'); // Mostrar el modal
+    });
+    
+    // Manejar la confirmación de logout
+    document.getElementById('confirmLogout').addEventListener('click', function(e) {
+        e.preventDefault(); // Prevenir cualquier acción por defecto
+        
+        // Cerrar el modal
+        $('#logoutModal').modal('hide');
+        
+        // Redirigir después de que el modal se haya ocultado
+        setTimeout(function() {
+            window.location.href = '../logout.php';
+        }, 500);
+    });
+    
+    // Actualizar también al cargar la página
+    actualizarNotificaciones();
+});
 </script>
 
 </body>

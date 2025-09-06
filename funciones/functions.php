@@ -309,7 +309,6 @@ function insertarEstudiante($datos) {
         // Iniciar transacción
         $db->begin_transaction();
 
-           
         // 1. Preparar datos del usuario
         $username = strtolower(str_replace(' ', '.', $datos['nombre']));
         $cedulaLimpia = substr($datos['idusuario'], 2);
@@ -445,6 +444,25 @@ function insertarEstudiante($datos) {
             $stmtTitulos->close();
         }
 
+        // 7. REGISTRAR EN AUDITORÍA - NUEVO ESTUDIANTE
+        $valores_nuevos = [
+            'idusuario' => $datos['idusuario'],
+            'nombre' => $datos['nombre'],
+            'email' => $datos['email'] ?? '',
+            'carrera' => $datos['carrera'] ?? '',
+            'status' => $datos['status'] ?? 'Activo'
+        ];
+        
+        registrarAuditoria(
+            "INSERT", 
+            "users", 
+            $userId, 
+            null, 
+            $valores_nuevos, 
+            "Estudiantes", 
+            "Registro de nuevo estudiante"
+        );
+
         // Confirmar transacción
         $db->commit();
 
@@ -457,6 +475,22 @@ function insertarEstudiante($datos) {
     } catch(Exception $e) {
         // Revertir transacción en caso de error
         $db->rollback();
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL REGISTRAR ESTUDIANTE
+        registrarAuditoria(
+            "ERROR", 
+            "users", 
+            null, 
+            null, 
+            [
+                'nombre' => $datos['nombre'] ?? '',
+                'idusuario' => $datos['idusuario'] ?? '',
+                'error' => $e->getMessage()
+            ], 
+            "Estudiantes", 
+            "Error al registrar estudiante"
+        );
+        
         error_log("Error en insertarEstudiante: " . $e->getMessage());
         return [
             'success' => false,
@@ -572,93 +606,108 @@ function obtenerEstudiantePorId($id) {
 
 // Función para actualizar estudiante
 function actualizarEstudiante(array $datos): array {
-  global $db;
-  
-  try {
-      // Consulta SQL con parámetros preparados
-      $sql = "UPDATE users SET 
-              idusuario = ?,
-              nombre = ?,
-              email = ?,
-              tlf = ?,
-              cel = ?,
-              direccion = ?,
-              ciudad = ?,
-              estado = ?,
-              municipio = ?,
-              parroquia = ?,
-              fecha_ingreso = ?,
-              status = ?,
-              carrera = ?,
-              genero = ?,
-              edo_civil = ?,
-              fecha_nac = ?,
-              num_telf_opc = ?,
-              fecha_act = ?
-              WHERE id = ?";
+    global $db;
+    
+    try {
+        // Primero obtener los valores antiguos para auditoría
+        $query_antiguo = "SELECT * FROM users WHERE id = ?";
+        $stmt_antiguo = $db->prepare($query_antiguo);
+        $stmt_antiguo->bind_param("i", $datos['id']);
+        $stmt_antiguo->execute();
+        $result_antiguo = $stmt_antiguo->get_result();
+        $valores_antiguos = $result_antiguo->fetch_assoc();
+        $stmt_antiguo->close();
 
-      // Preparar la sentencia
-      $stmt = $db->prepare($sql);
-      if (!$stmt) {
-          throw new Exception("Error en la preparación: " . $db->error);
-      }
+        // Consulta SQL con los campos correctos que estás usando
+        $sql = "UPDATE users SET 
+                nombre = ?,
+                username = ?,
+                email = ?,
+                tlf = ?,
+                num_telf_opc = ?,
+                carrera = ?,
+                genero = ?,
+                fecha_nac = ?,
+                fecha_ingreso = ?,
+                status = ?,
+                fecha_act = NOW()
+                WHERE id = ?";
 
-      // Establecer valores por defecto para campos opcionales
-      $valores = [
-          $datos['idusuario'] ?? '',
-          $datos['nombre'] ?? '',
-          $datos['email'] ?? null,
-          $datos['tlf'] ?? null,
-          $datos['cel'] ?? '',
-          $datos['direccion'] ?? '',
-          $datos['municipio'] ?? '', // ciudad se llena con municipio
-          $datos['estado'] ?? '',
-          $datos['municipio'] ?? '',
-          $datos['parroquia'] ?? '',
-          $datos['fecha_ingreso'] ?? null,
-          $datos['status'] ?? 'Activo',
-          $datos['carrera'] ?? null,
-          $datos['genero'] ?? null,
-          $datos['edo_civil'] ?? null,
-          $datos['fecha_nac'] ?? null,
-          $datos['num_telf_opc'] ?? '',
-          date('Y-m-d H:i:s'), // fecha_act actual
-          $datos['id']
-      ];
+        // Preparar la sentencia
+        $stmt = $db->prepare($sql);
+        if (!$stmt) {
+            throw new Exception("Error en la preparación: " . $db->error);
+        }
 
-      // Vincular parámetros
-      $stmt->bind_param(
-          "ssssssssssssssssssi", // Tipos de parámetros
-          ...$valores            // Valores
-      );
+        // Vincular parámetros
+        $stmt->bind_param(
+            "sssssssssii", // Tipos de parámetros
+            $datos['nombre'],
+            $datos['username'],
+            $datos['email'],
+            $datos['tlf'],
+            $datos['num_telf_opc'],
+            $datos['carrera'],
+            $datos['genero'],
+            $datos['fecha_nac'],
+            $datos['fecha_ingreso'],
+            $datos['status'],
+            $datos['id']
+        );
 
-      // Ejecutar la actualización
-      if (!$stmt->execute()) {
-          throw new Exception("Error al ejecutar: " . $stmt->error);
-      }
+        // Ejecutar la actualización
+        if (!$stmt->execute()) {
+            throw new Exception("Error al ejecutar: " . $stmt->error);
+        }
 
-      // Verificar si se realizaron cambios
-      $cambios = $stmt->affected_rows > 0;
-      
-      return [
-          'success' => $cambios,
-          'message' => $cambios 
-              ? 'Estudiante actualizado correctamente' 
-              : 'No se realizaron cambios (posiblemente los datos son iguales)',
-          'affected_rows' => $stmt->affected_rows
-      ];
+        // Verificar si se realizaron cambios
+        $cambios = $stmt->affected_rows > 0;
+        
+        // Registrar auditoría solo si hubo cambios
+        if ($cambios) {
+            $valores_nuevos = [
+                'nombre' => $datos['nombre'],
+                'username' => $datos['username'],
+                'email' => $datos['email'],
+                'tlf' => $datos['tlf'],
+                'num_telf_opc' => $datos['num_telf_opc'],
+                'carrera' => $datos['carrera'],
+                'genero' => $datos['genero'],
+                'fecha_nac' => $datos['fecha_nac'],
+                'fecha_ingreso' => $datos['fecha_ingreso'],
+                'status' => $datos['status']
+            ];
+            
+            registrarAuditoria(
+                "UPDATE", 
+                "users", 
+                $datos['id'], 
+                $valores_antiguos, 
+                $valores_nuevos, 
+                "Estudiantes", 
+                "Actualización de datos de estudiante"
+            );
+        }
+        
+        return [
+            'success' => $cambios,
+            'message' => $cambios 
+                ? 'Estudiante actualizado correctamente' 
+                : 'No se realizaron cambios (posiblemente los datos son iguales)',
+            'affected_rows' => $stmt->affected_rows
+        ];
 
-  } catch(Exception $e) {
-      error_log("Error en actualizarEstudiante: " . $e->getMessage());
-      return [
-          'success' => false,
-          'message' => 'Error al actualizar estudiante: ' . $e->getMessage()
-      ];
-  } finally {
-      if (isset($stmt)) {
-          $stmt->close();
-      }
-  }
+    } catch(Exception $e) {
+        error_log("Error en actualizarEstudiante: " . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => 'Error al actualizar estudiante: ' . $e->getMessage()
+        ];
+    } finally {
+        if (isset($stmt)) {
+            $stmt->close();
+        }
+    }
 }
 
 function procesarCSVEstudiantes($tmpFilePath, $originalName) {
@@ -2913,6 +2962,130 @@ function deshabilitarDocente($id, $razon) {
 
 //LO DE ARRIBA HAY QUE ARREGLARLO
 
+
+
+//PAGOS 
+
+
+// ==============================================
+// ARCHIVO: funciones/functions.php
+// Funciones para edición y eliminación de pagos
+// ==============================================
+
+/**
+ * Obtener un pago específico por ID
+ */
+function obtenerPagoPorId($pago_id) {
+    global $db;
+    
+    $query = "SELECT p.*, u.nombre as nombre_estudiante, u.idusuario as cedula, 
+                     tp.tipopago as nombre_tipo_pago,
+                     ur.nombre as nombre_registrador
+              FROM pagos p
+              INNER JOIN users u ON p.estudiante_id = u.id
+              INNER JOIN tipo_pago tp ON p.tipo_pago = tp.id
+              INNER JOIN users ur ON p.registrado_por = ur.id
+              WHERE p.id = ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $pago_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Actualizar un pago existente
+ */
+function actualizarPago($pago_id, $tipo_pago, $otro_concepto, $monto, $observaciones) {
+    global $db;
+    
+    // Primero obtener los valores antiguos para auditoría
+    $pago_antiguo = obtenerPagoPorId($pago_id);
+    
+    $query = "UPDATE pagos 
+              SET tipo_pago = ?, otro_concepto = ?, monto = ?, observaciones = ?
+              WHERE id = ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("isdsi", $tipo_pago, $otro_concepto, $monto, $observaciones, $pago_id);
+    
+    if ($stmt->execute()) {
+        // Registrar en auditoría
+        $valores_antiguos = [
+            'tipo_pago' => $pago_antiguo['tipo_pago'],
+            'otro_concepto' => $pago_antiguo['otro_concepto'],
+            'monto' => $pago_antiguo['monto'],
+            'observaciones' => $pago_antiguo['observaciones']
+        ];
+        
+        $valores_nuevos = [
+            'tipo_pago' => $tipo_pago,
+            'otro_concepto' => $otro_concepto,
+            'monto' => $monto,
+            'observaciones' => $observaciones
+        ];
+        
+        registrarAuditoria(
+            "UPDATE", 
+            "pagos", 
+            $pago_id, 
+            $valores_antiguos, 
+            $valores_nuevos, 
+            "Pagos", 
+            "Actualización de pago"
+        );
+        
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * Eliminar un pago
+ */
+function eliminarPago($pago_id) {
+    global $db;
+    
+    // Primero obtener los valores para auditoría
+    $pago = obtenerPagoPorId($pago_id);
+    
+    $query = "DELETE FROM pagos WHERE id = ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $pago_id);
+    
+    if ($stmt->execute()) {
+        // Registrar en auditoría
+        $valores_antiguos = [
+            'estudiante_id' => $pago['estudiante_id'],
+            'tipo_pago' => $pago['tipo_pago'],
+            'otro_concepto' => $pago['otro_concepto'],
+            'monto' => $pago['monto'],
+            'observaciones' => $pago['observaciones'],
+            'fecha_pago' => $pago['fecha_pago'],
+            'registrado_por' => $pago['registrado_por']
+        ];
+        
+        registrarAuditoria(
+            "DELETE", 
+            "pagos", 
+            $pago_id, 
+            $valores_antiguos, 
+            null, 
+            "Pagos", 
+            "Eliminación de pago"
+        );
+        
+        return true;
+    }
+    
+    return false;
+}
+
+
 // Función para obtener pagos por día
 function obtenerPagosPorDia() {
     global $db;
@@ -4143,8 +4316,385 @@ function obtenerCompañerosSeccion($db, $seccion_id, $estudiante_id) {
 }
 
 
+//AUDITORIA ***********************************************************************
 
 
+// ==============================================
+// ARCHIVO: funciones/functions.php
+// Sistema de Auditoría - Funciones adicionales
+// ==============================================
+
+/**
+ * Registrar acción en el sistema de auditoría
+ */
+function registrarAuditoria($accion, $tabla_afectada = null, $registro_id = null, 
+                           $valores_antiguos = null, $valores_nuevos = null, 
+                           $modulo_sistema = null, $descripcion = null) {
+    global $db;
+    
+    // Solo registrar si hay un usuario logueado
+    if (!isset($_SESSION['user']['id'])) {
+        return false;
+    }
+    
+    $usuario_id = $_SESSION['user']['id'];
+    $ip_origen = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+    $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    
+    // Convertir arrays a JSON para almacenamiento
+    $valores_antiguos_json = $valores_antiguos ? json_encode($valores_antiguos) : null;
+    $valores_nuevos_json = $valores_nuevos ? json_encode($valores_nuevos) : null;
+    
+    $query = "INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id, 
+              fecha_hora, valores_antiguos, valores_nuevos, ip_origen, user_agent, 
+              modulo_sistema, descripcion)
+              VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?)";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("ississssss", $usuario_id, $accion, $tabla_afectada, $registro_id,
+                     $valores_antiguos_json, $valores_nuevos_json, $ip_origen, 
+                     $user_agent, $modulo_sistema, $descripcion);
+    
+    return $stmt->execute();
+}
+
+
+
+/**
+ * Función para registrar el inicio de sesión
+ */
+function registrarLoginAuditoria($usuario_id, $exitoso = true) {
+    $descripcion = $exitoso ? "Inicio de sesión exitoso" : "Intento de inicio de sesión fallido";
+    
+    registrarAuditoria(
+        "LOGIN", 
+        "users", 
+        $usuario_id, 
+        null, 
+        null, 
+        "Autenticación", 
+        $descripcion
+    );
+}
+
+/**
+ * Función para registrar el cierre de sesión
+ */
+function registrarLogoutAuditoria($usuario_id) {
+    registrarAuditoria(
+        "LOGOUT", 
+        "users", 
+        $usuario_id, 
+        null, 
+        null, 
+        "Autenticación", 
+        "Cierre de sesión"
+    );
+}
+
+/**
+ * Obtener usuarios para el filtro de auditoría
+ */
+function obtenerUsuariosParaFiltro() {
+    global $db;
+    
+    $query = "SELECT id, nombre, idusuario FROM users ORDER BY nombre";
+    $result = $db->query($query);
+    
+    $usuarios = [];
+    while ($row = $result->fetch_assoc()) {
+        $usuarios[] = $row;
+    }
+    
+    return $usuarios;
+}
+
+/**
+ * Verificar si el usuario actual es administrador
+ */
+function esAdministrador() {
+    if (!isset($_SESSION['user']['tipo_usuario'])) {
+        return false;
+    }
+    
+    // Asumiendo que el tipo_usuario 1 es administrador
+    return $_SESSION['user']['tipo_usuario'] == 1;
+}
+
+
+/**
+ * Obtener datos completos del estudiante para auditoría
+ */
+function obtenerDatosEstudianteCompletos($id) {
+    global $db;
+    
+    $query = "SELECT u.*, c.nombre as nombre_carrera, g.nombre as nombre_genero
+              FROM users u 
+              LEFT JOIN carreras c ON u.carrera = c.id 
+              LEFT JOIN generos g ON u.genero = g.id 
+              WHERE u.id = ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows === 0) {
+        return false;
+    }
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Detectar cambios detallados para auditoría
+ */
+function detectarCambiosDetallados($datos_antiguos, $datos_nuevos) {
+    $campos_modificados = [];
+    $valores_antiguos = [];
+    $valores_nuevos = [];
+    
+    $nombres_campos = [
+        'nombre' => 'Nombre completo',
+        'username' => 'Cédula/Usuario',
+        'email' => 'Correo electrónico',
+        'tlf' => 'Teléfono principal',
+        'num_telf_opc' => 'Teléfono opcional',
+        'carrera' => 'Programa/Carrera',
+        'genero' => 'Género',
+        'fecha_nac' => 'Fecha de nacimiento',
+        'fecha_ingreso' => 'Fecha de ingreso',
+        'status' => 'Estado'
+    ];
+    
+    foreach ($nombres_campos as $campo => $nombre_legible) {
+        $valor_antiguo = $datos_antiguos[$campo] ?? null;
+        $valor_nuevo = $datos_nuevos[$campo] ?? null;
+        
+        if (normalizarValor($valor_antiguo, $campo) !== normalizarValor($valor_nuevo, $campo)) {
+            $campos_modificados[$campo] = $nombre_legible;
+            $valores_antiguos[$nombre_legible] = formatearValorParaAuditoria($valor_antiguo, $campo, $datos_antiguos);
+            $valores_nuevos[$nombre_legible] = formatearValorParaAuditoria($valor_nuevo, $campo, $datos_nuevos);
+        }
+    }
+    
+    return [
+        'campos_modificados' => $campos_modificados,
+        'valores_antiguos' => $valores_antiguos,
+        'valores_nuevos' => $valores_nuevos
+    ];
+}
+
+/**
+ * Normalizar valor para comparación
+ */
+function normalizarValor($valor, $campo) {
+    if ($valor === null || $valor === '') {
+        return null;
+    }
+    
+    if (in_array($campo, ['carrera', 'genero', 'status'])) {
+        return (int)$valor;
+    }
+    
+    if (in_array($campo, ['fecha_nac', 'fecha_ingreso'])) {
+        return $valor ? date('Y-m-d', strtotime($valor)) : null;
+    }
+    
+    return trim($valor);
+}
+
+/**
+ * Formatear valor para auditoría
+ */
+function formatearValorParaAuditoria($valor, $campo, $datos_completos = []) {
+    if ($valor === null || $valor === '') {
+        return 'No especificado';
+    }
+    
+    switch ($campo) {
+        case 'carrera':
+            return $datos_completos['nombre_carrera'] ?? 'Carrera ' . $valor;
+            
+        case 'genero':
+            return $datos_completos['nombre_genero'] ?? 'Género ' . $valor;
+            
+        case 'status':
+            return $valor == 1 ? 'Activo' : 'Inactivo';
+            
+        case 'fecha_nac':
+        case 'fecha_ingreso':
+            return $valor ? date('d/m/Y', strtotime($valor)) : 'No especificado';
+            
+        default:
+            return $valor;
+    }
+}
+
+/**
+ * Generar descripción detallada para auditoría
+ */
+function generarDescripcionAuditoria($cambios) {
+    $descripcion = "Edición de estudiante. Campos modificados:\n";
+    
+    foreach ($cambios['campos_modificados'] as $campo => $nombre_legible) {
+        $valor_antiguo = $cambios['valores_antiguos'][$nombre_legible] ?? 'No especificado';
+        $valor_nuevo = $cambios['valores_nuevos'][$nombre_legible] ?? 'No especificado';
+        
+        $descripcion .= "• {$nombre_legible}: ";
+        $descripcion .= "DE '{$valor_antiguo}' A '{$valor_nuevo}'\n";
+    }
+    
+    return $descripcion;
+}
+
+
+
+
+
+
+
+
+//VISTA AUDITORIA ***********************************************************************
+
+
+// ==============================================
+// ARCHIVO: funciones/functions.php
+// Funciones adicionales para el sistema de auditoría
+// ==============================================
+
+/**
+ * Obtener registros de auditoría con filtros opcionales (versión mejorada)
+ */
+function obtenerRegistrosAuditoria($limite = 100, $fecha_inicio = null, $fecha_fin = null, $usuario_id = null, $accion = null, $modulo = null) {
+    global $db;
+    
+    $query = "SELECT a.*, u.nombre as usuario_nombre, u.idusuario as usuario_cedula
+              FROM auditoria a
+              INNER JOIN users u ON a.usuario_id = u.id
+              WHERE 1=1";
+    
+    $params = [];
+    $types = "";
+    
+    if ($fecha_inicio) {
+        $query .= " AND DATE(a.fecha_hora) >= ?";
+        $params[] = $fecha_inicio;
+        $types .= "s";
+    }
+    
+    if ($fecha_fin) {
+        $query .= " AND DATE(a.fecha_hora) <= ?";
+        $params[] = $fecha_fin;
+        $types .= "s";
+    }
+    
+    if ($usuario_id) {
+        $query .= " AND a.usuario_id = ?";
+        $params[] = $usuario_id;
+        $types .= "i";
+    }
+    
+    if ($accion) {
+        $query .= " AND a.accion = ?";
+        $params[] = $accion;
+        $types .= "s";
+    }
+    
+    if ($modulo) {
+        $query .= " AND a.modulo_sistema = ?";
+        $params[] = $modulo;
+        $types .= "s";
+    }
+    
+    $query .= " ORDER BY a.fecha_hora DESC LIMIT ?";
+    $params[] = $limite;
+    $types .= "i";
+    
+    $stmt = $db->prepare($query);
+    
+    if (!empty($params)) {
+        $stmt->bind_param($types, ...$params);
+    }
+    
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $registros = [];
+    while ($row = $result->fetch_assoc()) {
+        // Decodificar los JSON si existen
+        if ($row['valores_antiguos']) {
+            $row['valores_antiguos'] = json_decode($row['valores_antiguos'], true);
+        }
+        if ($row['valores_nuevos']) {
+            $row['valores_nuevos'] = json_decode($row['valores_nuevos'], true);
+        }
+        $registros[] = $row;
+    }
+    
+    return $registros;
+}
+
+/**
+ * Obtener acciones únicas para filtros
+ */
+function obtenerAccionesUnicas() {
+    global $db;
+    
+    $query = "SELECT DISTINCT accion FROM auditoria ORDER BY accion";
+    $result = $db->query($query);
+    
+    $acciones = [];
+    while ($row = $result->fetch_assoc()) {
+        $acciones[] = $row['accion'];
+    }
+    
+    return $acciones;
+}
+
+/**
+ * Obtener módulos únicos para filtros
+ */
+function obtenerModulosUnicos() {
+    global $db;
+    
+    $query = "SELECT DISTINCT modulo_sistema FROM auditoria WHERE modulo_sistema IS NOT NULL ORDER BY modulo_sistema";
+    $result = $db->query($query);
+    
+    $modulos = [];
+    while ($row = $result->fetch_assoc()) {
+        $modulos[] = $row['modulo_sistema'];
+    }
+    
+    return $modulos;
+}
+
+/**
+ * Contar registros de hoy
+ */
+function contarRegistrosHoy() {
+    global $db;
+    
+    $query = "SELECT COUNT(*) as total FROM auditoria WHERE DATE(fecha_hora) = CURDATE()";
+    $result = $db->query($query);
+    
+    return $result->fetch_assoc()['total'] ?? 0;
+}
+
+/**
+ * Contar acciones por tipo
+ */
+function contarAccionesPorTipo($tipo) {
+    global $db;
+    
+    $query = "SELECT COUNT(*) as total FROM auditoria WHERE accion = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("s", $tipo);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc()['total'] ?? 0;
+}
 
 
 
@@ -8496,77 +9046,7 @@ function breadcrumbs($sep = ' » ', $home = 'Inicio') {
     }
 
 
-    function comentarios() {
-      global $db;
-      $comentario ="";
-      $query = "SELECT *, users.nombre AS 'nombre'
-      FROM comentario
-      INNER JOIN users ON (comentario.user=users.idusuario)
-      WHERE visible = '1'
-      ORDER BY RAND() LIMIT 15 ";
-      $result = mysqli_query($db,$query);
-  $rows = mysqli_num_rows($result);
-  if ($rows){
-    $comentario = '<h5>Comentarios de nuestros usuarios</h5><div id="carouselExampleIndicators" class="carousel slide" data-ride="carousel">
-
-  <ol class="carousel-indicators">
-   <li data-target="#carouselExampleIndicators" data-slide-to="0" class="active"></li>
-   <li data-target="#carouselExampleIndicators" data-slide-to="1"></li>
-   <li data-target="#carouselExampleIndicators" data-slide-to="2"></li>
-  </ol>
-  <div class="carousel-inner">
-   ';
-   $counter = 1;
-   while($row = mysqli_fetch_array($result)){
-
-        $date = date_create($row['fecha']);
-   $fecha = date_format($date, 'd/m/Y');
-   $fecha_comentario = $fecha;
-
-       $comentario .= '<div class="carousel-item ';
-       if($counter <= 1){$comentario .= 'active'; }
-
-       $comentario .=  '">
-
-       <div class="shadow p-3 mb-5 bg-white rounded">
-               <blockquote class="blockquote text-center">
-         <p class="mb-0">'.strtoupper($row['comentario']).'</p>
-         <footer class="blockquote-footer">'.$row['nombre'].' <cite title="fecha">'.$fecha_comentario.'</cite></footer>
-       </blockquote>
-       </div>
-
-       </div>';
-
-
-   $counter++;
-   }
-  //<i class="fa fa-angle-left" aria-hidden="true"></i>
-  //<i class="fa fa-angle-right" aria-hidden="true"></i>
-   $comentario .= '</div>
-
-   <a class="carousel-control-prev" href="#carouselExampleIndicators" role="button" data-slide="prev">
-   <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-   <span class="sr-only">Anterior</span>
-  </a>
-
-  <a class="carousel-control-next" href="#carouselExampleIndicators" role="button" data-slide="next">
-   <span class="carousel-control-next-icon" aria-hidden="true"></span>
-   <span class="sr-only">Siguiente</span>
-  </a>
-
-  </div>';
-
-  } else {
- $comentario ='No hay comentarios que mostrar';
-  }
-  echo $comentario;
-
-  }
-
-
-if (isset($_POST['enviar_comentario_btn'])) {
-    procesar_enviar_comentario();
-}
+    
 
 
 
@@ -8929,7 +9409,7 @@ function getAvailableProfiles() {
     $user = $_SESSION['user'];
     $profiles = [];
     
-    if ($user['usuario'] == 1) $profiles[] = 'usuario';
+    if ($user['usuario'] == 1) $profiles[] = 'director_de_carrera';
     if ($user['estudiante'] == 1) $profiles[] = 'estudiante';
     if ($user['docente'] == 1) $profiles[] = 'docente';
     if ($user['admin'] == 1) $profiles[] = 'admin';
@@ -9623,55 +10103,77 @@ function crear_password(){
 
 // LOGIN USER
 function login(){
-  global $db, $username, $errors;
-  $username = e($_POST['username']);
-  $password = e($_POST['password']);
-  
-  if (empty($username)) {
-      array_push($errors, "Su Numero de Usuario o Correo Electronico es Requerido<br>");
-  }
-  if (empty($password)) {
-      array_push($errors, "Su Contraseña de Acceso es Requerida<br>");
-  }
-  
-  if (count($errors) == 0) {
-      $password = md5($password);
+    global $db, $username, $errors;
+    $username = e($_POST['username']);
+    $password = e($_POST['password']);
+    
+    if (empty($username)) {
+        array_push($errors, "Su Numero de Usuario o Correo Electronico es Requerido<br>");
+    }
+    if (empty($password)) {
+        array_push($errors, "Su Contraseña de Acceso es Requerida<br>");
+    }
+    
+    if (count($errors) == 0) {
+        $password = md5($password);
 
-      $query = "SELECT * FROM users WHERE (username='$username' OR email='$username') AND password='$password' LIMIT 1";
-      $results = mysqli_query($db, $query);
+        $query = "SELECT * FROM users WHERE (username='$username' OR email='$username') AND password='$password' LIMIT 1";
+        $results = mysqli_query($db, $query);
 
-      if (mysqli_num_rows($results) == 1) { // user found
-          $logged_in_user = mysqli_fetch_assoc($results);
-          $_SESSION['user'] = $logged_in_user;
-          $_SESSION['success'] = "Bienvenido/a " . $logged_in_user['username'];
-          
-          // Determinar los perfiles disponibles
-          $available_profiles = [];
-          
-          // Verificar cada perfil usando tus funciones existentes
-          if (isAdmin()) $available_profiles[] = 'admin';
-          if (isDocente()) $available_profiles[] = 'docente';
-          if (isEstudiante()) $available_profiles[] = 'estudiante';
-          if (isUser()) $available_profiles[] = 'user';
-          
-          // Guardar perfiles disponibles en sesión
-          $_SESSION['user']['available_profiles'] = $available_profiles;
-          
-          // Si solo tiene un perfil, redirigir directamente
-          if (count($available_profiles) == 1) {
-              $_SESSION['current_profile'] = $available_profiles[0];
-              $where = $_SESSION['here'] ?? $available_profiles[0] . '/home.php';
-              header("Location: $where");
-          } else {
-              // Mostrar selector de perfiles
-              header('Location: profile_selector.php');
-          }
-          
-          exit();
-      } else {
-          array_push($errors, "Usuario/Correo o contraseña incorrectos");
-      }
-  }
+        if (mysqli_num_rows($results) == 1) { // user found
+            $logged_in_user = mysqli_fetch_assoc($results);
+            $_SESSION['user'] = $logged_in_user;
+            $_SESSION['success'] = "Bienvenido/a " . $logged_in_user['username'];
+            
+            // REGISTRAR EN AUDITORÍA - LOGIN EXITOSO
+            registrarAuditoria(
+                "LOGIN", 
+                "users", 
+                $logged_in_user['id'], 
+                null, 
+                ['username' => $username], 
+                "Autenticación", 
+                "Inicio de sesión exitoso"
+            );
+            
+            // Determinar los perfiles disponibles
+            $available_profiles = [];
+            
+            // Verificar cada perfil usando tus funciones existentes
+            if (isAdmin()) $available_profiles[] = 'admin';
+            if (isDocente()) $available_profiles[] = 'docente';
+            if (isEstudiante()) $available_profiles[] = 'estudiante';
+            if (isUser()) $available_profiles[] = 'user';
+            
+            // Guardar perfiles disponibles en sesión
+            $_SESSION['user']['available_profiles'] = $available_profiles;
+            
+            // Si solo tiene un perfil, redirigir directamente
+            if (count($available_profiles) == 1) {
+                $_SESSION['current_profile'] = $available_profiles[0];
+                $where = $_SESSION['here'] ?? $available_profiles[0] . '/home.php';
+                header("Location: $where");
+            } else {
+                // Mostrar selector de perfiles
+                header('Location: profile_selector.php');
+            }
+            
+            exit();
+        } else {
+            // REGISTRAR EN AUDITORÍA - LOGIN FALLIDO
+            registrarAuditoria(
+                "LOGIN", 
+                "users", 
+                null, 
+                null, 
+                ['username' => $username], 
+                "Autenticación", 
+                "Intento de inicio de sesión fallido"
+            );
+            
+            array_push($errors, "Usuario/Correo o contraseña incorrectos");
+        }
+    }
 }
 
 function visita() {

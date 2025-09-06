@@ -9,6 +9,21 @@ include('../funciones/functions.php');
 $permiso_agregar = isset($_SESSION['user']['agregar_materia']) && $_SESSION['user']['agregar_materia'] == 1;
 $permiso_editar = isset($_SESSION['user']['editar_materia']) && $_SESSION['user']['editar_materia'] == 1;
 
+// Función para obtener los trayectos desde la base de datos
+function obtenerTrayectos($db) {
+    $query = "SELECT id_trayecto, numero_trayecto, nombre_trayecto, descripcion 
+              FROM trayectos 
+              ORDER BY numero_trayecto";
+    $result = $db->query($query);
+    
+    $trayectos = [];
+    while ($row = $result->fetch_assoc()) {
+        $trayectos[] = $row;
+    }
+    
+    return $trayectos;
+}
+
 // Procesar formularios
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['guardar_materia'])) {
@@ -21,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             'activa' => isset($_POST['activa']) ? 1 : 0,
             'horas_teoricas' => $_POST['horas_teoricas'],
             'horas_practicas' => $_POST['horas_practicas'],
-            'trayecto' => $_POST['trayecto']
+            'trayecto' => $_POST['trayecto'] // Este campo ahora guardará el numero_trayecto
         ];
         
         if (!empty($_POST['id_materia'])) {
@@ -59,6 +74,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 // Obtener lista de materias
 $materias = obtenerMaterias($db);
+
+// Obtener lista de trayectos desde la base de datos
+$trayectos = obtenerTrayectos($db);
 
 include("includes/head.php");
 ?>
@@ -139,20 +157,19 @@ include("includes/head.php");
                                     <option value="1">1 periodo</option>
                                     <option value="2">2 periodos</option>
                                     <option value="3">3 periodos</option>
-                                    <option value="4">4 periodos</option>
-                                    <option value="5">5 periodos</option>
+                                    
                                 </select>
                             </div>
 
                             <div class="form-group col-md-2">
                                 <label for="trayecto">Trayecto</label>
                                 <select class="form-control" id="trayecto" name="trayecto" required>
-                                    <option value="0">Trayecto 0</option>
-                                    <option value="1">Trayecto 1</option>
-                                    <option value="2">Trayecto 2</option>
-                                    <option value="3">Trayecto 3</option>
-                                    <option value="4">Trayecto 4</option>
-                                    <option value="5">Trayecto 5</option>
+                                    <option value="">Seleccione...</option>
+                                    <?php foreach ($trayectos as $trayecto): ?>
+                                        <option value="<?= $trayecto['numero_trayecto'] ?>">
+                                            Trayecto <?= $trayecto['numero_trayecto'] ?> - <?= $trayecto['nombre_trayecto'] ?>
+                                        </option>
+                                    <?php endforeach; ?>
                                 </select>
                             </div>
                         </div>
@@ -180,6 +197,7 @@ include("includes/head.php");
                                     <th>Tipo/Duración</th>
                                     <th>Créditos</th>
                                     <th>Horas T/P</th>
+                                    <th>Trayecto</th>
                                     <th>Estado</th>
                                     <?php if ($permiso_editar): ?>
                                         <th>Acciones</th>
@@ -187,7 +205,19 @@ include("includes/head.php");
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($materias as $materia): ?>
+                                <?php 
+                                // Crear un array asociativo para buscar trayectos por número
+                                $trayectos_por_numero = [];
+                                foreach ($trayectos as $trayecto) {
+                                    $trayectos_por_numero[$trayecto['numero_trayecto']] = $trayecto;
+                                }
+                                
+                                foreach ($materias as $materia): 
+                                    // Obtener información del trayecto
+                                    $trayecto_info = isset($materia['trayecto']) && isset($trayectos_por_numero[$materia['trayecto']]) 
+                                        ? $trayectos_por_numero[$materia['trayecto']] 
+                                        : null;
+                                ?>
                                     <tr>
                                         <td><?= htmlspecialchars($materia['cod_materia']) ?></td>
                                         <td><?= htmlspecialchars($materia['nombre_materia']) ?></td>
@@ -200,6 +230,14 @@ include("includes/head.php");
                                         </td>
                                         <td><?= $materia['creditos'] ?></td>
                                         <td><?= $materia['horas_teoricas'] ?> / <?= $materia['horas_practicas'] ?></td>
+                                        <td>
+                                            <?php if ($trayecto_info): ?>
+                                                Trayecto <?= $trayecto_info['numero_trayecto'] ?><br>
+                                                <small class="text-muted"><?= $trayecto_info['nombre_trayecto'] ?></small>
+                                            <?php else: ?>
+                                                <span class="text-muted">No asignado</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td>
                                             <span class="badge badge-<?= $materia['activa'] ? 'success' : 'danger' ?>">
                                                 <?= $materia['activa'] ? 'Activa' : 'Inactiva' ?>
@@ -218,7 +256,7 @@ include("includes/head.php");
                                                         data-teoricas="<?= $materia['horas_teoricas'] ?>" 
                                                         data-practicas="<?= $materia['horas_practicas'] ?>" 
                                                         data-duracion="<?= isset($materia['duracion_periodo']) ? $materia['duracion_periodo'] : '1' ?>"
-                                                        data-trayecto="<?= isset($materia['trayecto']) ? $materia['trayecto'] : '1' ?>">
+                                                        data-trayecto="<?= isset($materia['trayecto']) ? $materia['trayecto'] : '' ?>">
                                                     <i class="fas fa-edit"></i> Editar
                                                 </button>
                                                 
@@ -317,12 +355,12 @@ include("includes/head.php");
                         <div class="form-group col-md-2">
                             <label for="edit-trayecto">Trayecto</label>
                             <select class="form-control" id="edit-trayecto" name="trayecto" required>
-                                <option value="0">Trayecto 0</option>
-                                <option value="1">Trayecto 1</option>
-                                <option value="2">Trayecto 2</option>
-                                <option value="3">Trayecto 3</option>
-                                <option value="4">Trayecto 4</option>
-                                <option value="5">Trayecto 5</option>
+                                <option value="">Seleccione...</option>
+                                <?php foreach ($trayectos as $trayecto): ?>
+                                    <option value="<?= $trayecto['numero_trayecto'] ?>">
+                                        Trayecto <?= $trayecto['numero_trayecto'] ?> - <?= $trayecto['nombre_trayecto'] ?>
+                                    </option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                     </div>
@@ -386,7 +424,7 @@ $(document).ready(function() {
         modal.find('#edit-horas_teoricas').val(teoricas);
         modal.find('#edit-horas_practicas').val(practicas);
         modal.find('#edit-duracion_periodo').val(duracion);
-        modal.find('#edit-trayecto').val(trayecto || '1');
+        modal.find('#edit-trayecto').val(trayecto || '');
         
         if (activa == '1') {
             modal.find('#edit-activa').prop('checked', true);

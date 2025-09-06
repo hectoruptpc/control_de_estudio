@@ -23,7 +23,7 @@ $profileRoutes = [
     'super_user' => 'super_user/index.php',
     'docente' => 'docente/index.php',
     'estudiante' => 'estudiante/index.php',
-    'usuario' => 'perfil/mi_cuenta.php'
+    'usuario' => 'director_de_carrera/index.php'
 ];
 
 // Redirección automática si solo tiene un perfil
@@ -110,7 +110,7 @@ $username = isset($_SESSION['user']['username']) ? (string)$_SESSION['user']['us
                                                             echo '<i class="fas fa-user-graduate"></i>';
                                                             break;
                                                         default:
-                                                            echo '<i class="fas fa-user"></i>';
+                                                            echo '<i class="fas fa-user-tie"></i>';
                                                     }
                                                 ?>
                                             </div>
@@ -130,7 +130,7 @@ $username = isset($_SESSION['user']['username']) ? (string)$_SESSION['user']['us
                                                             echo 'Estudiante';
                                                             break;
                                                         default:
-                                                            echo 'Usuario';
+                                                            echo 'Director de Carrera';
                                                     }
                                                 ?>
                                             </h5>
