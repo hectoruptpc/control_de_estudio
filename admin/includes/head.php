@@ -57,6 +57,20 @@ if (!isAdmin()) {
         background-color: #f8f9fa;
         border-left: 4px solid #007bff;
     }
+    /* Estilos para alinear correctamente todos los elementos del navbar */
+    .navbar-nav .nav-item {
+        display: flex;
+        align-items: center;
+    }
+    .navbar-nav .nav-link {
+        display: flex;
+        align-items: center;
+        height: 100%;
+        padding: 0.5rem 1rem;
+    }
+    .navbar-nav .dropdown-toggle::after {
+        margin-left: 0.5rem;
+    }
 </style>
 </head>
 <body>
@@ -90,6 +104,13 @@ if (!isAdmin()) {
               </a>
             </li>
 
+            <!-- Botón individual de Pagos (no desplegable) -->
+            <li class="nav-item">
+              <a title="Gestión de Pagos" class="nav-link" href="registro_pagos.php">
+                <i class="fas fa-money-bill-wave fa-fw"></i> Pagos
+              </a>
+            </li>
+
             <li id="dropdown-estudiantes" class="nav-item dropdown position-relative">
               <a title="Gestión de Estudiantes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownEstudiantes" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 <i class="fa fa-users fa-fw"></i> Estudiantes
@@ -111,10 +132,10 @@ if (!isAdmin()) {
             </li>
 
             <li id="dropdown-pensum" class="nav-item dropdown">
-                <a title="Gestión de Pensum" class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <a title="Gestión de Pensum" class="nav-link dropdown-toggle" href="#" id="navbarDropdownPensum" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="fas fa-book fa-fw"></i> Pensum
                 </a>
-                <div id="dropdown-pensum-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <div id="dropdown-pensum-menu" class="dropdown-menu" aria-labelledby="navbarDropdownPensum">
                     <?php if ($_SESSION['user']['agregar_carrera'] == 1): ?>
                         <a title="Agregar Nueva Carrera" class="dropdown-item" href="agregar_carrera.php">
                             <i class="fas fa-plus-circle fa-fw"></i> Agregar Carrera
@@ -134,10 +155,10 @@ if (!isAdmin()) {
             </li>
 
             <li id="dropdown-docentes" class="nav-item dropdown">
-                <a title="Gestión de Docentes" class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <a title="Gestión de Docentes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownDocentes" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="fas fa-chalkboard-teacher fa-fw"></i> Docentes
                 </a>
-                <div id="dropdown-docentes-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <div id="dropdown-docentes-menu" class="dropdown-menu" aria-labelledby="navbarDropdownDocentes">
                   
                 <a title="Registrar Nuevo Docente" class="dropdown-item" href="add_docente.php">
                     <i class="fas fa-user-plus fa-fw"></i> Gestionar Docente
@@ -174,14 +195,23 @@ if (!isAdmin()) {
             </li>
 
             <li id="dropdown-ajustes" class="nav-item dropdown">
-                <a title="Ir a Ajustes" class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <a title="Ir a Ajustes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownAjustes" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="fa fa-cogs fa-fw"></i> Ajustes
                 </a>
-                <div id="dropdown-ajus" class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <div id="dropdown-ajustes-menu" class="dropdown-menu" aria-labelledby="navbarDropdownAjustes">
                     
                     <!-- Nueva opción: Cambiar Perfil -->
                     <a title="Cambiar Perfil de Usuario" class="dropdown-item" href="../profile_selector.php">
                         <i class="fas fa-user-edit fa-fw"></i> Cambiar Perfil
+                    </a>
+                    
+                    <!-- Nuevas opciones: Auditoría y Respaldo -->
+                    <div class="dropdown-divider"></div>
+                    <a title="Auditoría del Sistema" class="dropdown-item" href="auditoria.php">
+                        <i class="fas fa-clipboard-list fa-fw"></i> Auditoría
+                    </a>
+                    <a title="Respaldo de Base de Datos" class="dropdown-item" href="respaldo_bd.php">
+                        <i class="fas fa-database fa-fw"></i> Respaldo BD
                     </a>
                     
                     <!-- Nuevo apartado de Títulos y Relaciones con Materias -->
@@ -189,8 +219,6 @@ if (!isAdmin()) {
                     <a title="Títulos y Relaciones con Materias" class="dropdown-item" href="titulos_relaciones_materias.php">
                         <i class="fas fa-graduation-cap fa-fw"></i> Títulos y Relaciones con Materias
                     </a>
-                    
-                   
                     
                     <!-- Opción exclusiva para usuarios con editar_acceso = 1 -->
                     <?php if ($_SESSION['user']['editar_acceso'] == 1): ?>
@@ -207,7 +235,7 @@ if (!isAdmin()) {
                             <i class="fas fa-edit fa-fw"></i> Valores Predefinidos
                         </a>
                         <a title="Editar tipos de pago" class="dropdown-item" href="tipo_pago.php">
-                            <i class="fas fa-edit fa-fw"></i> tipos de pago
+                            <i class="fas fa-edit fa-fw"></i> Tipos de Pago
                         </a>
                     <?php endif; ?>
                     
