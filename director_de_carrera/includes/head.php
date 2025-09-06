@@ -53,6 +53,10 @@ if (!isUser()) {
         font-size: 0.6em;
         padding: 3px 6px;
     }
+    .user-info {
+        background-color: #f8f9fa;
+        border-left: 4px solid #007bff;
+    }
     /* SOLUCIÓN: Especificar que solo afecte a la navbar superior */
     .navbar:not(.fixed-bottom) {
         background-color: #fd7e14 !important;
@@ -109,12 +113,16 @@ if (!isUser()) {
               </a>
             </li>
 
-            <!-- Menú de Ajustes -->
-            <li id="dropdown-ajustes" class="nav-item dropdown">
-                <a title="Ir a Ajustes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownAjustes" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <!-- Menú de Ajustes - ID ÚNICO CORREGIDO -->
+            <li id="dropdown-ajustes-director" class="nav-item dropdown">
+                <a title="Ir a Ajustes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownAjustesDirector" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="fa fa-cogs fa-fw"></i> Ajustes
                 </a>
-                <div id="dropdown-ajustes-menu" class="dropdown-menu" aria-labelledby="navbarDropdownAjustes">
+                <div id="dropdown-ajustes-director-menu" class="dropdown-menu" aria-labelledby="navbarDropdownAjustesDirector">
+                    <!-- Nueva opción: Cambiar Perfil -->
+                    <a title="Cambiar Perfil de Usuario" class="dropdown-item" href="../profile_selector.php">
+                        <i class="fas fa-user-edit fa-fw"></i> Cambiar Perfil
+                    </a>
                     
                     <div class="dropdown-divider"></div>
                     <a title="Salir del Sistema" class="dropdown-item" href="#" id="logoutLink">
@@ -247,3 +255,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 </script>
+
+</body>
+</html>

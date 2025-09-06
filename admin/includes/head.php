@@ -179,6 +179,10 @@ if (!isAdmin()) {
                 </a>
                 <div id="dropdown-ajus" class="dropdown-menu" aria-labelledby="navbarDropdown">
                     
+                    <!-- Nueva opción: Cambiar Perfil -->
+                    <a title="Cambiar Perfil de Usuario" class="dropdown-item" href="../profile_selector.php">
+                        <i class="fas fa-user-edit fa-fw"></i> Cambiar Perfil
+                    </a>
                     
                     <!-- Nuevo apartado de Títulos y Relaciones con Materias -->
                     <div class="dropdown-divider"></div>
