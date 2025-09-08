@@ -179,7 +179,7 @@ if (!isAdmin()) {
                     <i class="fas fa-calendar-alt fa-fw"></i> Horarios
                 </a>
 
-                <a title="Registrar Nuevo Docente" class="dropdown-item" href="directores_carrera.php">
+                <a title="Gestionar Directores de Carrera" class="dropdown-item" href="directores_carrera.php">
                     <i class="fas fa-user-plus fa-fw"></i> Gestionar Directores de Carrera
                 </a>
                 
