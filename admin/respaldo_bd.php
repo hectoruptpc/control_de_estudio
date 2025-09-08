@@ -16,6 +16,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['backup'])) {
     realizarRespaldo();
 }
 
+// Procesar la solicitud de eliminación de respaldo
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['eliminar_respaldo'])) {
+    $id_respaldo = intval($_POST['id_respaldo']);
+    eliminarRespaldo($id_respaldo);
+}
+
 function realizarRespaldo() {
     global $db;
     
@@ -142,6 +148,64 @@ function obtenerHistorialRespaldos() {
     return $historial;
 }
 
+function puedeEliminarRespaldo($fecha_descarga) {
+    // Calcular si han pasado 90 días desde la fecha de descarga
+    $fecha_descarga_obj = new DateTime($fecha_descarga);
+    $fecha_actual = new DateTime();
+    $diferencia = $fecha_actual->diff($fecha_descarga_obj);
+    
+    // Verificar si han pasado al menos 90 días
+    return $diferencia->days >= 90;
+}
+
+function diasParaPoderEliminar($fecha_descarga) {
+    // Calcular cuántos días faltan para poder eliminar el respaldo
+    $fecha_descarga_obj = new DateTime($fecha_descarga);
+    $fecha_actual = new DateTime();
+    $diferencia = $fecha_actual->diff($fecha_descarga_obj);
+    
+    $dias_transcurridos = $diferencia->days;
+    $dias_restantes = 90 - $dias_transcurridos;
+    
+    return max(0, $dias_restantes);
+}
+
+function eliminarRespaldo($id_respaldo) {
+    global $db;
+    
+    // Primero verificar si el respaldo existe y si puede ser eliminado
+    $stmt = $db->prepare("SELECT * FROM respaldos_descargas WHERE id = ?");
+    $stmt->bind_param("i", $id_respaldo);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows === 0) {
+        $_SESSION['error'] = "El respaldo no existe.";
+        return false;
+    }
+    
+    $respaldo = $result->fetch_assoc();
+    
+    // Verificar si han pasado 90 días desde la descarga
+    if (!puedeEliminarRespaldo($respaldo['fecha_descarga'])) {
+        $dias_restantes = diasParaPoderEliminar($respaldo['fecha_descarga']);
+        $_SESSION['error'] = "No se puede eliminar el respaldo. Deben pasar 90 días desde su descarga. Faltan " . $dias_restantes . " días.";
+        return false;
+    }
+    
+    // Eliminar el registro de la base de datos
+    $stmt = $db->prepare("DELETE FROM respaldos_descargas WHERE id = ?");
+    $stmt->bind_param("i", $id_respaldo);
+    
+    if ($stmt->execute()) {
+        $_SESSION['success'] = "Respaldo eliminado correctamente.";
+        return true;
+    } else {
+        $_SESSION['error'] = "Error al eliminar el respaldo: " . $db->error;
+        return false;
+    }
+}
+
 include("includes/head.php");
 ?>
 
@@ -155,6 +219,29 @@ include("includes/head.php");
                     </h4>
                 </div>
                 <div class="card-body">
+                    <?php
+                    // Mostrar mensajes de éxito o error
+                    if (isset($_SESSION['success'])) {
+                        echo '<div class="alert alert-success alert-dismissible fade show" role="alert">';
+                        echo $_SESSION['success'];
+                        echo '<button type="button" class="close" data-dismiss="alert" aria-label="Close">';
+                        echo '<span aria-hidden="true">&times;</span>';
+                        echo '</button>';
+                        echo '</div>';
+                        unset($_SESSION['success']);
+                    }
+                    
+                    if (isset($_SESSION['error'])) {
+                        echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">';
+                        echo $_SESSION['error'];
+                        echo '<button type="button" class="close" data-dismiss="alert" aria-label="Close">';
+                        echo '<span aria-hidden="true">&times;</span>';
+                        echo '</button>';
+                        echo '</div>';
+                        unset($_SESSION['error']);
+                    }
+                    ?>
+                    
                     <div class="alert alert-info">
                         <h5 class="alert-heading">
                             <i class="fas fa-info-circle"></i> Información importante
@@ -167,6 +254,7 @@ include("includes/head.php");
                             <li>Estructura de tablas con <code>CREATE TABLE IF NOT EXISTS</code></li>
                             <li>Datos insertados con <code>INSERT IGNORE</code> para evitar duplicados</li>
                             <li>Se registra automáticamente quién y cuándo se descargó el respaldo</li>
+                            <li>Los respaldos solo pueden eliminarse después de 90 días de su descarga</li>
                         </ul>
                     </div>
 
@@ -252,10 +340,11 @@ include("includes/head.php");
                     <div class="row mt-4">
                         <div class="col-12">
                             <div class="card">
-                                <div class="card-header bg-info text-white">
+                                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                                     <h5 class="mb-0">
                                         <i class="fas fa-history"></i> Historial de Respaldos Recientes
                                     </h5>
+                                    <small>Los respaldos solo pueden eliminarse después de 90 días</small>
                                 </div>
                                 <div class="card-body">
                                     <?php
@@ -275,16 +364,36 @@ include("includes/head.php");
                                         echo '<th>Archivo</th>';
                                         echo '<th>Fecha de Descarga</th>';
                                         echo '<th>IP</th>';
+                                        echo '<th>Acciones</th>';
                                         echo '</tr>';
                                         echo '</thead>';
                                         echo '<tbody>';
                                         
                                         foreach ($historial as $registro) {
+                                            $puede_eliminar = puedeEliminarRespaldo($registro['fecha_descarga']);
+                                            $dias_restantes = diasParaPoderEliminar($registro['fecha_descarga']);
+                                            
                                             echo '<tr>';
                                             echo '<td>' . htmlspecialchars($registro['usuario']) . '</td>';
                                             echo '<td>' . htmlspecialchars($registro['nombre_archivo']) . '</td>';
                                             echo '<td>' . date('d/m/Y H:i:s', strtotime($registro['fecha_descarga'])) . '</td>';
                                             echo '<td>' . htmlspecialchars($registro['ip_address']) . '</td>';
+                                            echo '<td>';
+                                            
+                                            if ($puede_eliminar) {
+                                                echo '<form method="POST" class="d-inline">';
+                                                echo '<input type="hidden" name="id_respaldo" value="' . $registro['id'] . '">';
+                                                echo '<button type="submit" name="eliminar_respaldo" class="btn btn-sm btn-danger" onclick="return confirm(\'¿Está seguro de que desea eliminar este registro de respaldo?\')">';
+                                                echo '<i class="fas fa-trash"></i> Eliminar';
+                                                echo '</button>';
+                                                echo '</form>';
+                                            } else {
+                                                echo '<button type="button" class="btn btn-sm btn-secondary btn-eliminar" data-toggle="modal" data-target="#modalNoEliminar" data-dias="' . $dias_restantes . '">';
+                                                echo '<i class="fas fa-trash"></i> Eliminar';
+                                                echo '</button>';
+                                            }
+                                            
+                                            echo '</td>';
                                             echo '</tr>';
                                         }
                                         
@@ -302,5 +411,38 @@ include("includes/head.php");
         </div>
     </div>
 </div>
+
+<!-- Modal para respaldos que no se pueden eliminar -->
+<div class="modal fade" id="modalNoEliminar" tabindex="-1" role="dialog" aria-labelledby="modalNoEliminarLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="modalNoEliminarLabel">
+                    <i class="fas fa-exclamation-triangle"></i> No se puede eliminar
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>No es posible eliminar este respaldo aún. Deben pasar 90 días desde su descarga para poder eliminarlo.</p>
+                <p class="mb-0">Faltan <span id="dias-restantes" class="font-weight-bold"></span> días para que este respaldo pueda ser eliminado.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Entendido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Script para mostrar los días restantes en el modal
+$(document).ready(function() {
+    $('.btn-eliminar').on('click', function() {
+        var diasRestantes = $(this).data('dias');
+        $('#dias-restantes').text(diasRestantes);
+    });
+});
+</script>
 
 <?php include("includes/footer.php"); ?>
