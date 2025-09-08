@@ -27,13 +27,25 @@ function realizarRespaldo() {
     
     // Obtener información del usuario
     $usuario = $_SESSION['user']['nombre'];
+    $usuario_id = $_SESSION['user']['id'];
     $fecha = date('Y-m-d_H-i-s');
     
     // Nombre del archivo de respaldo con formato: respaldo_(usuario)_(fecha)
     $backup_file = 'respaldo_' . limpiarNombreArchivo($usuario) . '_' . $fecha . '.sql';
     
     // Registrar la descarga en la base de datos
-    registrarDescargaRespaldo($usuario, $backup_file);
+    $registro_id = registrarDescargaRespaldo($usuario, $backup_file);
+    
+    // Registrar auditoría
+    registrarAuditoria(
+        "BACKUP", 
+        "database", 
+        $registro_id, 
+        null, 
+        ['archivo' => $backup_file, 'usuario' => $usuario], 
+        "Sistema", 
+        "Respaldo de base de datos generado"
+    );
     
     // Cabecera para forzar descarga
     header('Content-Type: application/octet-stream');
@@ -125,7 +137,10 @@ function registrarDescargaRespaldo($usuario, $nombre_archivo) {
     $stmt = $db->prepare("INSERT INTO respaldos_descargas (usuario, nombre_archivo, ip_address, user_agent) VALUES (?, ?, ?, ?)");
     $stmt->bind_param("ssss", $usuario, $nombre_archivo, $ip, $user_agent);
     $stmt->execute();
+    $id_registro = $stmt->insert_id;
     $stmt->close();
+    
+    return $id_registro;
 }
 
 function obtenerHistorialRespaldos() {
@@ -173,7 +188,7 @@ function diasParaPoderEliminar($fecha_descarga) {
 function eliminarRespaldo($id_respaldo) {
     global $db;
     
-    // Primero verificar si el respaldo existe y si puede ser eliminado
+    // Primero verificar si el respaldo existe y obtener sus datos para auditoría
     $stmt = $db->prepare("SELECT * FROM respaldos_descargas WHERE id = ?");
     $stmt->bind_param("i", $id_respaldo);
     $stmt->execute();
@@ -192,6 +207,17 @@ function eliminarRespaldo($id_respaldo) {
         $_SESSION['error'] = "No se puede eliminar el respaldo. Deben pasar 90 días desde su descarga. Faltan " . $dias_restantes . " días.";
         return false;
     }
+    
+    // Registrar auditoría antes de eliminar
+    registrarAuditoria(
+        "DELETE", 
+        "respaldos_descargas", 
+        $id_respaldo, 
+        $respaldo, 
+        null, 
+        "Sistema", 
+        "Eliminación de registro de respaldo: " . $respaldo['nombre_archivo']
+    );
     
     // Eliminar el registro de la base de datos
     $stmt = $db->prepare("DELETE FROM respaldos_descargas WHERE id = ?");
@@ -255,6 +281,7 @@ include("includes/head.php");
                             <li>Datos insertados con <code>INSERT IGNORE</code> para evitar duplicados</li>
                             <li>Se registra automáticamente quién y cuándo se descargó el respaldo</li>
                             <li>Los respaldos solo pueden eliminarse después de 90 días de su descarga</li>
+                            <li>Todas las acciones se registran en el sistema de auditoría</li>
                         </ul>
                     </div>
 
@@ -299,6 +326,7 @@ include("includes/head.php");
                                             <li>Verifique que la base de datos esté funcionando correctamente</li>
                                             <li>El proceso puede tomar varios minutos dependiendo del tamaño</li>
                                             <li>Guarde el archivo en un lugar seguro y protegido</li>
+                                            <li>La acción quedará registrada en el sistema de auditoría</li>
                                         </ul>
                                     </div>
 
