@@ -57,7 +57,7 @@ if (!isLoggedIn() || !isDocente()) {
     <!-- Contenido principal -->
     <div class="container">
         <div class="row">
-            <?php include("./includes/sidebar_docente.php"); ?>
+           
 
             <!-- Área de contenido -->
             <div class="col-md-9">
