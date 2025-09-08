@@ -26,7 +26,7 @@ $profileRoutes = [
     'super_user' => 'super_user/index.php',
     'docente' => 'docente/index.php',
     'estudiante' => 'estudiante/index.php',
-    'usuario' => 'director_de_carrera/index.php'
+    'director_de_carrera' => 'director_de_carrera/index.php'
 ];
 
 // Redirección automática si solo tiene un perfil
