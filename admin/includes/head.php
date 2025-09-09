@@ -32,11 +32,11 @@ if (!isAdmin()) {
     header('location: ../usuario/home.php');
 }
 ?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html lang="es-Es" xmlns="http://www.w3.org/1999/xhtml">
+<!DOCTYPE html>
+<html lang="es-Es">
 <head>
-<meta charset="UTF8">
-<meta http-equiv="Content-type" content="text/html; charset=UTF8" />
+<meta charset="UTF-8">
+<meta http-equiv="Content-type" content="text/html; charset=UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <meta name="description" content="Gestion">
 <meta name="author" content="Hector Marulanda">
@@ -56,6 +56,24 @@ if (!isAdmin()) {
     .user-info {
         background-color: #f8f9fa;
         border-left: 4px solid #007bff;
+    }
+    /* Estilos para alinear correctamente todos los elementos del navbar */
+    .navbar-nav .nav-item {
+        display: flex;
+        align-items: center;
+    }
+    .navbar-nav .nav-link {
+        display: flex;
+        align-items: center;
+        height: 100%;
+        padding: 0.5rem 1rem;
+    }
+    .navbar-nav .dropdown-toggle::after {
+        margin-left: 0.5rem;
+    }
+    /* Asegurar que los dropdowns se muestren correctamente */
+    .dropdown-menu {
+        z-index: 1030; /* Mayor que el z-index del navbar (1020) */
     }
 </style>
 </head>
@@ -90,11 +108,18 @@ if (!isAdmin()) {
               </a>
             </li>
 
-            <li id="dropdown-estudiantes" class="nav-item dropdown position-relative">
+            <!-- Botón individual de Pagos (no desplegable) -->
+            <li class="nav-item">
+              <a title="Gestión de Pagos" class="nav-link" href="registro_pagos.php">
+                <i class="fas fa-money-bill-wave fa-fw"></i> Pagos
+              </a>
+            </li>
+
+            <li class="nav-item dropdown">
               <a title="Gestión de Estudiantes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownEstudiantes" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 <i class="fa fa-users fa-fw"></i> Estudiantes
               </a>
-              <div class="dropdown-menu position-absolute" aria-labelledby="navbarDropdownEstudiantes" style="left: 0; top: 100%;">
+              <div class="dropdown-menu" aria-labelledby="navbarDropdownEstudiantes">
                 <a title="Ver Todos los Estudiantes" class="dropdown-item" href="estudiantes.php">
                   <i class="fa fa-users fa-fw"></i> Ver todos los Estudiantes
                 </a>
@@ -106,15 +131,14 @@ if (!isAdmin()) {
                 <a title="Gestionar Secciones" class="dropdown-item" href="gestion_seccion.php">
                   <i class="fas fa-object-group fa-fw"></i> Gestionar Secciones
                 </a>
-                
               </div>
             </li>
 
-            <li id="dropdown-pensum" class="nav-item dropdown">
-                <a title="Gestión de Pensum" class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <li class="nav-item dropdown">
+                <a title="Gestión de Pensum" class="nav-link dropdown-toggle" href="#" id="navbarDropdownPensum" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="fas fa-book fa-fw"></i> Pensum
                 </a>
-                <div id="dropdown-pensum-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <div class="dropdown-menu" aria-labelledby="navbarDropdownPensum">
                     <?php if ($_SESSION['user']['agregar_carrera'] == 1): ?>
                         <a title="Agregar Nueva Carrera" class="dropdown-item" href="agregar_carrera.php">
                             <i class="fas fa-plus-circle fa-fw"></i> Agregar Carrera
@@ -133,11 +157,11 @@ if (!isAdmin()) {
                 </div>
             </li>
 
-            <li id="dropdown-docentes" class="nav-item dropdown">
-                <a title="Gestión de Docentes" class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <li class="nav-item dropdown">
+                <a title="Gestión de Docentes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownDocentes" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="fas fa-chalkboard-teacher fa-fw"></i> Docentes
                 </a>
-                <div id="dropdown-docentes-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <div class="dropdown-menu" aria-labelledby="navbarDropdownDocentes">
                   
                 <a title="Registrar Nuevo Docente" class="dropdown-item" href="add_docente.php">
                     <i class="fas fa-user-plus fa-fw"></i> Gestionar Docente
@@ -154,15 +178,19 @@ if (!isAdmin()) {
                 <a title="Horarios Docentes" class="dropdown-item" href="horarios_docentes.php">
                     <i class="fas fa-calendar-alt fa-fw"></i> Horarios
                 </a>
+
+                <a title="Gestionar Directores de Carrera" class="dropdown-item" href="directores_carrera.php">
+                    <i class="fas fa-user-plus fa-fw"></i> Gestionar Directores de Carrera
+                </a>
                 
                 </div>
             </li>
 
-            <li id="dropdown-notas" class="nav-item dropdown">
+            <li class="nav-item dropdown">
                 <a title="Gestión de Notas" class="nav-link dropdown-toggle" href="#" id="navbarDropdownNotas" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="fas fa-graduation-cap fa-fw"></i> Notas
                 </a>
-                <div id="dropdown-notas-menu" class="dropdown-menu" aria-labelledby="navbarDropdownNotas">
+                <div class="dropdown-menu" aria-labelledby="navbarDropdownNotas">
                     <a title="Registrar Notas" class="dropdown-item" href="admin_notas_pendientes.php">
                         <i class="fas fa-edit fa-fw"></i> Notas Cargadas
                     </a>
@@ -173,20 +201,31 @@ if (!isAdmin()) {
                 </div>
             </li>
 
-            <li id="dropdown-ajustes" class="nav-item dropdown">
-                <a title="Ir a Ajustes" class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <li class="nav-item dropdown">
+                <a title="Ir a Ajustes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownAjustes" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="fa fa-cogs fa-fw"></i> Ajustes
                 </a>
-                <div id="dropdown-ajus" class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <div class="dropdown-menu" aria-labelledby="navbarDropdownAjustes">
                     
+                    <!-- Nueva opción: Cambiar Perfil -->
+                    <a title="Cambiar Perfil de Usuario" class="dropdown-item" href="../profile_selector.php">
+                        <i class="fas fa-user-edit fa-fw"></i> Cambiar Perfil
+                    </a>
+                    
+                    <!-- Nuevas opciones: Auditoría y Respaldo -->
+                    <div class="dropdown-divider"></div>
+                    <a title="Auditoría del Sistema" class="dropdown-item" href="auditoria.php">
+                        <i class="fas fa-clipboard-list fa-fw"></i> Auditoría
+                    </a>
+                    <a title="Respaldo de Base de Datos" class="dropdown-item" href="respaldo_bd.php">
+                        <i class="fas fa-database fa-fw"></i> Respaldo BD
+                    </a>
                     
                     <!-- Nuevo apartado de Títulos y Relaciones con Materias -->
                     <div class="dropdown-divider"></div>
                     <a title="Títulos y Relaciones con Materias" class="dropdown-item" href="titulos_relaciones_materias.php">
                         <i class="fas fa-graduation-cap fa-fw"></i> Títulos y Relaciones con Materias
                     </a>
-                    
-                   
                     
                     <!-- Opción exclusiva para usuarios con editar_acceso = 1 -->
                     <?php if ($_SESSION['user']['editar_acceso'] == 1): ?>
@@ -203,7 +242,7 @@ if (!isAdmin()) {
                             <i class="fas fa-edit fa-fw"></i> Valores Predefinidos
                         </a>
                         <a title="Editar tipos de pago" class="dropdown-item" href="tipo_pago.php">
-                            <i class="fas fa-edit fa-fw"></i> tipos de pago
+                            <i class="fas fa-edit fa-fw"></i> Tipos de Pago
                         </a>
                     <?php endif; ?>
                     
@@ -217,7 +256,7 @@ if (!isAdmin()) {
         </div>
       </div>
     </nav>
-    <div class="container">
+    <div class="container" style="margin-top: 80px;">
     <div class="row">
         <div class="col-sm-6">
             <b class="mt-5"><?php echo 'Bienvenido ' .$_SESSION['user']['nombre']; ?></b>

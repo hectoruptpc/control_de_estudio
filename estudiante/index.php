@@ -17,46 +17,223 @@ if (!isLoggedIn() || !isEstudiante()) {
 <html lang="es">
 <head>
     <?php include("includes/head.php"); ?>
+    <!-- Bootstrap 4.6 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            background-color: #f8f9fc;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .dashboard-header {
+            background: linear-gradient(120deg, #4e73df 0%, #224abe 100%);
+            color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+        .feature-card {
+            border: none;
+            border-radius: 10px;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            height: 100%;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+        .card-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+        }
+        .horario-card {
+            border-bottom: 4px solid #4e73df;
+        }
+        .horario-card .card-icon {
+            color: #4e73df;
+        }
+        .secciones-card {
+            border-bottom: 4px solid #36b9cc;
+        }
+        .secciones-card .card-icon {
+            color: #36b9cc;
+        }
+        .pensum-card {
+            border-bottom: 4px solid #1cc88a;
+        }
+        .pensum-card .card-icon {
+            color: #1cc88a;
+        }
+        .historial-card {
+            border-bottom: 4px solid #f6c23e;
+        }
+        .historial-card .card-icon {
+            color: #f6c23e;
+        }
+        .btn-access {
+            border-radius: 50px;
+            padding: 0.5rem 1.5rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-horario {
+            background-color: #4e73df;
+            border-color: #4e73df;
+            color: white;
+        }
+        .btn-horario:hover {
+            background-color: #3a5fc8;
+            border-color: #2e59d9;
+        }
+        .btn-secciones {
+            background-color: #36b9cc;
+            border-color: #36b9cc;
+            color: white;
+        }
+        .btn-secciones:hover {
+            background-color: #2c9faf;
+            border-color: #2a96a5;
+        }
+        .btn-pensum {
+            background-color: #1cc88a;
+            border-color: #1cc88a;
+            color: white;
+        }
+        .btn-pensum:hover {
+            background-color: #17a673;
+            border-color: #169b6b;
+        }
+        .btn-historial {
+            background-color: #f6c23e;
+            border-color: #f6c23e;
+            color: #212529;
+        }
+        .btn-historial:hover {
+            background-color: #f4b619;
+            border-color: #f4b30d;
+        }
+        .welcome-message {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+        .notification-section {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            margin-top: 2rem;
+        }
+    </style>
 </head>
 
 <body>
-    <!-- Contenido principal -->
-    <div class="main-content" id="mainContent">
+    <div class="container-fluid py-5">
         <!-- Encabezado -->
-        <div class="bg-primary text-white py-4 text-center mb-4">
-            <h2>Panel del Estudiante</h2>
+        <div class="dashboard-header p-4 mb-5 text-center">
+            <h1 class="display-4 font-weight-bold"><i class="fas fa-user-graduate mr-3"></i>Panel del Estudiante</h1>
             <p class="lead mb-0">Bienvenido, <?php echo $_SESSION['user']['nombre_completo'] ?? $_SESSION['user']['username']; ?></p>
         </div>
 
-        <!-- Área de contenido -->
-        <div class="container">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white">
-                    <h4 class="mb-0">Información importante</h4>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">Este es tu panel principal como estudiante. Desde aquí puedes acceder a todas tus herramientas académicas.</p>
-                    
-                    <!-- Espacio para notificaciones importantes -->
-                    <?php if (isset($_SESSION['success'])) : ?>
-                        <div class="alert alert-success alert-dismissible fade show">
-                            <?php 
-                                echo $_SESSION['success']; 
-                                unset($_SESSION['success']);
-                            ?>
-                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
+        <!-- Tarjetas de acceso -->
+        <div class="row justify-content-center mb-5">
+            <!-- Tarjeta de Mi Horario -->
+            <div class="col-md-5 col-lg-3 mb-4">
+                <div class="card feature-card horario-card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="card-icon">
+                            <i class="fas fa-calendar-alt"></i>
                         </div>
-                    <?php endif ?>
-                    
-                    <!-- Contenido adicional para estudiantes -->
-                    <div class="alert alert-info mt-3">
-                        <h5 class="alert-heading"><i class="fas fa-info-circle mr-2"></i>Próximas actividades</h5>
+                        <h3 class="card-title h4 font-weight-bold">Mi Horario</h3>
+                        <p class="card-text text-muted">Consulta tu horario de clases semanal</p>
+                        <a href="mi_horario.php" class="btn btn-access btn-horario mt-3">Acceder</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta de Mis Secciones -->
+            <div class="col-md-5 col-lg-3 mb-4">
+                <div class="card feature-card secciones-card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="card-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h3 class="card-title h4 font-weight-bold">Mis Secciones</h3>
+                        <p class="card-text text-muted">Gestiona las secciones en las que estás inscrito</p>
+                        <a href="mis_secciones.php" class="btn btn-access btn-secciones mt-3">Acceder</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta de Mi Pensum -->
+            <div class="col-md-5 col-lg-3 mb-4">
+                <div class="card feature-card pensum-card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="card-icon">
+                            <i class="fas fa-book"></i>
+                        </div>
+                        <h3 class="card-title h4 font-weight-bold">Mi Pensum</h3>
+                        <p class="card-text text-muted">Consulta el plan de estudios de tu carrera</p>
+                        <a href="mi_pensum.php" class="btn btn-access btn-pensum mt-3">Acceder</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta de Historial Académico -->
+            <div class="col-md-5 col-lg-3 mb-4">
+                <div class="card feature-card historial-card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="card-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h3 class="card-title h4 font-weight-bold">Historial Académico</h3>
+                        <p class="card-text text-muted">Revisa tu progreso y calificaciones</p>
+                        <a href="historial_academico.php" class="btn btn-access btn-historial mt-3">Acceder</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mensaje de bienvenida -->
+        <div class="welcome-message p-4 text-center mx-3">
+            <h4 class="font-weight-bold">Sistema de Gestión Estudiantil</h4>
+            <p class="text-muted mb-0">Selecciona una de las opciones para gestionar tu información académica</p>
+        </div>
+
+        <!-- Notificaciones y actividades -->
+        <div class="notification-section p-4 mx-3 mt-4">
+            <h4 class="font-weight-bold text-center mb-4"><i class="fas fa-info-circle mr-2"></i>Próximas actividades</h4>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="alert alert-info">
+                        <h5 class="alert-heading"><i class="fas fa-tasks mr-2"></i>Tareas Pendientes</h5>
                         <hr>
                         <ul class="list-group list-group-flush">
-                            <li class="list-group-item">Tarea de Matemáticas - Fecha límite: 15/06</li>
-                            <li class="list-group-item">Examen de Ciencias - 20/06</li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Tarea de Matemáticas
+                                <span class="badge badge-primary badge-pill">15/06</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Proyecto de Ciencias
+                                <span class="badge badge-primary badge-pill">20/06</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="alert alert-warning">
+                        <h5 class="alert-heading"><i class="fas fa-calendar-check mr-2"></i>Próximos Exámenes</h5>
+                        <hr>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Examen de Matemáticas
+                                <span class="badge badge-warning badge-pill">18/06</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Examen de Historia
+                                <span class="badge badge-warning badge-pill">25/06</span>
+                            </li>
                         </ul>
                     </div>
                 </div>
@@ -66,43 +243,22 @@ if (!isLoggedIn() || !isEstudiante()) {
 
     <?php include("includes/footer.php"); ?>
 
-    <!-- Script para sincronizar el contenido principal con la barra lateral -->
+    <!-- jQuery and Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
+
     <script>
+    // Notificación de bienvenida
     document.addEventListener('DOMContentLoaded', function() {
-        const sidebar = document.getElementById('sidebar');
-        const mainContent = document.getElementById('mainContent');
-        const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
-        
-        function updateMainContent() {
-            const isMobile = window.innerWidth <= 768;
-            const isCollapsed = sidebar.classList.contains('collapsed');
-            const isOpen = sidebar.classList.contains('open');
-            
-            if (isMobile) {
-                mainContent.classList.remove('collapsed');
-                mainContent.classList.toggle('ml-0', !isOpen);
-            } else {
-                mainContent.classList.toggle('ml-5', isCollapsed);
-                mainContent.classList.remove('ml-0');
-            }
+        // Verificar si Push está disponible antes de usarlo
+        if (typeof Push !== 'undefined') {
+            Push.create('Panel del Estudiante', {
+                body: 'Bienvenido al sistema de gestión estudiantil',
+                icon: '../images/estudiante_icon.png',
+                timeout: 4000
+            });
         }
-        
-        // Observar cambios en la barra lateral
-        const observer = new MutationObserver(updateMainContent);
-        observer.observe(sidebar, { attributes: true, attributeFilter: ['class'] });
-        
-        // Actualizar al cambiar tamaño de ventana
-        window.addEventListener('resize', updateMainContent);
-        
-        // Estado inicial
-        updateMainContent();
-        
-        // Notificación de bienvenida
-        Push.create('Bienvenido al sistema estudiantil', {
-            body: 'Aquí encontrarás todo lo necesario para tu aprendizaje',
-            icon: '../images/estudiante_icon.png',
-            timeout: 5000
-        });
     });
     </script>
 </body>

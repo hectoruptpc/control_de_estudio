@@ -109,12 +109,16 @@ if (!isDocente()) {
               <i class="fa fa-cogs fa-fw"></i>  Ajustes
               </a>
               <div id="dropdown-ajus" class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <!-- Nueva opción: Cambiar Perfil -->
+                <a title="Cambiar Perfil de Usuario" class="dropdown-item" href="../profile_selector.php">
+                  <i class="fas fa-user-edit fa-fw"></i> Cambiar Perfil
+                </a>
                 
                 <a title="Horario" class="dropdown-item" href="mi_horario.php"><i class="fas fa-calendar-alt fa-fw"></i> Mi Horario</a>
                 <div class="dropdown-divider"></div>
                 <a title="Salir del Sistema" class="dropdown-item" href="#" id="logoutLink">
-                        <i class="fas fa-sign-out-alt fa-fw"></i> Cerrar Sesión
-                    </a>
+                  <i class="fas fa-sign-out-alt fa-fw"></i> Cerrar Sesión
+                </a>
               </div>
             </li>
 

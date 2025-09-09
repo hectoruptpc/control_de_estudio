@@ -5,23 +5,42 @@ ini_set('display_errors', '1');
 $titulopag = "Asignación de Materias a Docentes";
 include('../funciones/functions.php');
 
-// Obtener todas las carreras activas usando la función
-$carreras = obtenerTodasLasCarreras();
+// Verificar si el usuario es director de carrera
+if (!isset($_SESSION['user']['carrera_di']) || empty($_SESSION['user']['carrera_di'])) {
+    die("<div class='alert alert-danger'>No tiene permisos de director de carrera para acceder a esta página.</div>");
+}
 
-// Manejar petición AJAX para obtener materias por carrera
-if(isset($_GET['ajax']) && $_GET['ajax'] == 'materias_carrera' && isset($_GET['id_carrera'])) {
+$carrera_director = $_SESSION['user']['carrera_di'];
+
+// Obtener información de la carrera del director
+$query_carrera = "SELECT id_carrera, nombre_carrera FROM carreras WHERE id_carrera = ?";
+$stmt = $db->prepare($query_carrera);
+$stmt->bind_param("s", $carrera_director);
+$stmt->execute();
+$result_carrera = $stmt->get_result();
+
+if ($result_carrera->num_rows === 0) {
+    die("<div class='alert alert-danger'>No se encontró información para la carrera del director.</div>");
+}
+
+$carrera_info = $result_carrera->fetch_assoc();
+
+// Manejar petición AJAX para obtener materias por carrera (solo la del director)
+if(isset($_GET['ajax']) && $_GET['ajax'] == 'materias_carrera') {
     header('Content-Type: application/json');
-    $id_carrera = $db->real_escape_string($_GET['id_carrera']);
     
     $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia 
               FROM carrera_materia cm
               JOIN materias m ON cm.id_materia = m.id_materia
-              WHERE cm.id_carrera = '$id_carrera' AND m.activa = 1
+              WHERE cm.id_carrera = ? AND m.activa = 1
               ORDER BY cm.semestre, m.nombre_materia";
     
-    $result = $db->query($query);
-    $materias = array();
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("s", $carrera_director);
+    $stmt->execute();
+    $result = $stmt->get_result();
     
+    $materias = array();
     while($row = $result->fetch_assoc()) {
         $materias[] = $row;
     }
@@ -30,12 +49,25 @@ if(isset($_GET['ajax']) && $_GET['ajax'] == 'materias_carrera' && isset($_GET['i
     exit();
 }
 
-// Procesar solicitud AJAX para recomendaciones
+// Procesar solicitud AJAX para recomendaciones (solo materias de la carrera del director)
 if(isset($_POST['ajax_request']) && $_POST['ajax_request'] == 'get_recomendaciones' && isset($_POST['id_materia'])) {
     $id_materia = intval($_POST['id_materia']);
     $recomendaciones_html = '';
     
     if($id_materia > 0) {
+        // Verificar que la materia pertenezca a la carrera del director
+        $query_verificar = "SELECT cm.id_carrera FROM carrera_materia cm WHERE cm.id_materia = ? AND cm.id_carrera = ?";
+        $stmt = $db->prepare($query_verificar);
+        $stmt->bind_param("is", $id_materia, $carrera_director);
+        $stmt->execute();
+        $verificar_result = $stmt->get_result();
+        
+        if($verificar_result->num_rows === 0) {
+            $recomendaciones_html .= "<div class='alert alert-warning'>No tiene permisos para acceder a esta materia.</div>";
+            echo $recomendaciones_html;
+            exit();
+        }
+        
         // Obtener información de la materia
         $query_materia = "SELECT nombre_materia FROM materias WHERE id_materia = ?";
         $stmt = $db->prepare($query_materia);
@@ -174,26 +206,37 @@ if(isset($_POST['asignar_materia'])) {
     $id_materia = $_POST['id_materia'] ?? null;
     
     if($id_profesor && $id_materia) {
-        // Verificar si ya existe la asignación
-        $query = "SELECT * FROM docente_materia WHERE id_usuario = ? AND id_materia = ?";
-        $stmt = $db->prepare($query);
-        $stmt->bind_param("ii", $id_profesor, $id_materia);
+        // Verificar que la materia pertenezca a la carrera del director
+        $query_verificar = "SELECT cm.id_carrera FROM carrera_materia cm WHERE cm.id_materia = ? AND cm.id_carrera = ?";
+        $stmt = $db->prepare($query_verificar);
+        $stmt->bind_param("is", $id_materia, $carrera_director);
         $stmt->execute();
-        $result = $stmt->get_result();
+        $verificar_result = $stmt->get_result();
         
-        if($result->num_rows == 0) {
-            // Insertar nueva asignación
-            $insert = "INSERT INTO docente_materia (id_usuario, id_materia, fecha_asignacion) VALUES (?, ?, NOW())";
-            $stmt = $db->prepare($insert);
-            $stmt->bind_param("ii", $id_profesor, $id_materia);
-            
-            if($stmt->execute()) {
-                $mensaje = "<div class='alert alert-success'>Materia asignada correctamente.</div>";
-            } else {
-                $mensaje = "<div class='alert alert-danger'>Error al asignar materia.</div>";
-            }
+        if($verificar_result->num_rows === 0) {
+            $mensaje = "<div class='alert alert-danger'>No tiene permisos para asignar esta materia.</div>";
         } else {
-            $mensaje = "<div class='alert alert-warning'>Este profesor ya tiene asignada esta materia.</div>";
+            // Verificar si ya existe la asignación
+            $query = "SELECT * FROM docente_materia WHERE id_usuario = ? AND id_materia = ?";
+            $stmt = $db->prepare($query);
+            $stmt->bind_param("ii", $id_profesor, $id_materia);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            if($result->num_rows == 0) {
+                // Insertar nueva asignación
+                $insert = "INSERT INTO docente_materia (id_usuario, id_materia, fecha_asignacion) VALUES (?, ?, NOW())";
+                $stmt = $db->prepare($insert);
+                $stmt->bind_param("ii", $id_profesor, $id_materia);
+                
+                if($stmt->execute()) {
+                    $mensaje = "<div class='alert alert-success'>Materia asignada correctamente.</div>";
+                } else {
+                    $mensaje = "<div class='alert alert-danger'>Error al asignar materia.</div>";
+                }
+            } else {
+                $mensaje = "<div class='alert alert-warning'>Este profesor ya tiene asignada esta materia.</div>";
+            }
         }
     } else {
         $mensaje = "<div class='alert alert-danger'>Datos incompletos para la asignación.</div>";
@@ -205,14 +248,28 @@ if(isset($_GET['eliminar'])) {
     $id_asignacion = $_GET['eliminar'] ?? null;
     
     if($id_asignacion) {
-        $delete = "DELETE FROM docente_materia WHERE id = ?";
-        $stmt = $db->prepare($delete);
-        $stmt->bind_param("i", $id_asignacion);
+        // Verificar que la asignación pertenezca a la carrera del director
+        $query_verificar = "SELECT cm.id_carrera 
+                           FROM docente_materia dm
+                           JOIN carrera_materia cm ON dm.id_materia = cm.id_materia
+                           WHERE dm.id = ? AND cm.id_carrera = ?";
+        $stmt = $db->prepare($query_verificar);
+        $stmt->bind_param("is", $id_asignacion, $carrera_director);
+        $stmt->execute();
+        $verificar_result = $stmt->get_result();
         
-        if($stmt->execute()) {
-            $mensaje = "<div class='alert alert-success'>Asignación eliminada correctamente.</div>";
+        if($verificar_result->num_rows === 0) {
+            $mensaje = "<div class='alert alert-danger'>No tiene permisos para eliminar esta asignación.</div>";
         } else {
-            $mensaje = "<div class='alert alert-danger'>Error al eliminar asignación.</div>";
+            $delete = "DELETE FROM docente_materia WHERE id = ?";
+            $stmt = $db->prepare($delete);
+            $stmt->bind_param("i", $id_asignacion);
+            
+            if($stmt->execute()) {
+                $mensaje = "<div class='alert alert-success'>Asignación eliminada correctamente.</div>";
+            } else {
+                $mensaje = "<div class='alert alert-danger'>Error al eliminar asignación.</div>";
+            }
         }
     } else {
         $mensaje = "<div class='alert alert-danger'>ID de asignación no válido.</div>";
@@ -225,52 +282,63 @@ if(isset($_POST['actualizar_asignacion'])) {
     $id_materia = $_POST['id_materia'] ?? null;
     
     if($id_asignacion && $id_materia) {
-        // Verificar si la nueva asignación ya existe
-        $query_check = "SELECT id_usuario FROM docente_materia WHERE id = ?";
-        $stmt = $db->prepare($query_check);
-        $stmt->bind_param("i", $id_asignacion);
+        // Verificar que la nueva materia pertenezca a la carrera del director
+        $query_verificar = "SELECT cm.id_carrera FROM carrera_materia cm WHERE cm.id_materia = ? AND cm.id_carrera = ?";
+        $stmt = $db->prepare($query_verificar);
+        $stmt->bind_param("is", $id_materia, $carrera_director);
         $stmt->execute();
-        $result = $stmt->get_result();
+        $verificar_result = $stmt->get_result();
         
-        if($result->num_rows > 0) {
-            $asignacion = $result->fetch_assoc();
-            $id_usuario = $asignacion['id_usuario'];
-            
-            $query_exists = "SELECT id FROM docente_materia WHERE id_usuario = ? AND id_materia = ? AND id != ?";
-            $stmt = $db->prepare($query_exists);
-            $stmt->bind_param("iii", $id_usuario, $id_materia, $id_asignacion);
+        if($verificar_result->num_rows === 0) {
+            $mensaje = "<div class='alert alert-danger'>No tiene permisos para asignar esta materia.</div>";
+        } else {
+            // Verificar si la nueva asignación ya existe
+            $query_check = "SELECT id_usuario FROM docente_materia WHERE id = ?";
+            $stmt = $db->prepare($query_check);
+            $stmt->bind_param("i", $id_asignacion);
             $stmt->execute();
             $result = $stmt->get_result();
             
-            if($result->num_rows == 0) {
-                $update = "UPDATE docente_materia SET id_materia = ? WHERE id = ?";
-                $stmt = $db->prepare($update);
-                $stmt->bind_param("ii", $id_materia, $id_asignacion);
+            if($result->num_rows > 0) {
+                $asignacion = $result->fetch_assoc();
+                $id_usuario = $asignacion['id_usuario'];
                 
-                if($stmt->execute()) {
-                    $mensaje = "<div class='alert alert-success'>Asignación actualizada correctamente.</div>";
+                $query_exists = "SELECT id FROM docente_materia WHERE id_usuario = ? AND id_materia = ? AND id != ?";
+                $stmt = $db->prepare($query_exists);
+                $stmt->bind_param("iii", $id_usuario, $id_materia, $id_asignacion);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                
+                if($result->num_rows == 0) {
+                    $update = "UPDATE docente_materia SET id_materia = ? WHERE id = ?";
+                    $stmt = $db->prepare($update);
+                    $stmt->bind_param("ii", $id_materia, $id_asignacion);
+                    
+                    if($stmt->execute()) {
+                        $mensaje = "<div class='alert alert-success'>Asignación actualizada correctamente.</div>";
+                    } else {
+                        $mensaje = "<div class='alert alert-danger'>Error al actualizar asignación.</div>";
+                    }
                 } else {
-                    $mensaje = "<div class='alert alert-danger'>Error al actualizar asignación.</div>";
+                    $mensaje = "<div class='alert alert-warning'>Este profesor ya tiene asignada esta materia.</div>";
                 }
             } else {
-                $mensaje = "<div class='alert alert-warning'>Este profesor ya tiene asignada esta materia.</div>";
+                $mensaje = "<div class='alert alert-danger'>Asignación no encontrada.</div>";
             }
-        } else {
-            $mensaje = "<div class='alert alert-danger'>Asignación no encontrada.</div>";
         }
     } else {
         $mensaje = "<div class='alert alert-danger'>Datos incompletos para la actualización.</div>";
     }
 }
 
-// Obtener todas las asignaciones actuales
+// Obtener TODAS las asignaciones actuales (no solo las de la carrera del director)
 $query_asignaciones = "SELECT dm.id, u.nombre as nombre_profesor, u.idusuario, m.nombre_materia, m.cod_materia, 
-                      c.nombre_carrera, dm.fecha_asignacion, dm.id_materia 
+                      c.nombre_carrera, dm.fecha_asignacion, dm.id_materia, cm.id_carrera
                       FROM docente_materia dm
                       JOIN users u ON dm.id_usuario = u.id
                       JOIN materias m ON dm.id_materia = m.id_materia
-                      LEFT JOIN carrera_materia cm ON m.id_materia = cm.id_materia
-                      LEFT JOIN carreras c ON cm.id_carrera = c.id_carrera
+                      JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+                      JOIN carreras c ON cm.id_carrera = c.id_carrera
                       ORDER BY u.nombre, m.nombre_materia";
 $asignaciones = $db->query($query_asignaciones);
 
@@ -281,6 +349,10 @@ include("includes/head.php");
     <div class="row">
         <div class="col-md-12">
             <h1 class="mt-4"><?php echo $titulopag; ?></h1>
+            <div class="alert alert-info">
+                <strong>Director de Carrera:</strong> <?php echo htmlspecialchars($_SESSION['user']['nombre']); ?><br>
+                <strong>Carrera:</strong> <?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>
+            </div>
             
             <?php if(isset($mensaje)) echo $mensaje; ?>
             
@@ -308,9 +380,12 @@ include("includes/head.php");
             <!-- Sección de Asignaciones Actuales -->
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white">
-                    <i class="fas fa-list"></i> Asignaciones Actuales
+                    <i class="fas fa-list"></i> Asignaciones Actuales - Todas las Carreras
                 </div>
                 <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-info-circle"></i> Solo puede editar o eliminar asignaciones de su propia carrera: <strong><?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?></strong>
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-bordered table-hover" id="dataTable" width="100%" cellspacing="0">
                             <thead class="thead-dark">
@@ -325,30 +400,41 @@ include("includes/head.php");
                             </thead>
                             <tbody>
                                 <?php if($asignaciones && $asignaciones->num_rows > 0): ?>
-                                    <?php while($asignacion = $asignaciones->fetch_assoc()): ?>
+                                    <?php while($asignacion = $asignaciones->fetch_assoc()): 
+                                        $es_mi_carrera = ($asignacion['id_carrera'] == $carrera_director);
+                                    ?>
                                     <tr>
                                         <td><?php echo htmlspecialchars($asignacion['nombre_profesor']); ?> (<?php echo htmlspecialchars($asignacion['idusuario']); ?>)</td>
                                         <td><?php echo htmlspecialchars($asignacion['nombre_materia']); ?></td>
                                         <td><?php echo htmlspecialchars($asignacion['cod_materia']); ?></td>
-                                        <td><?php echo htmlspecialchars($asignacion['nombre_carrera'] ?? 'N/A'); ?></td>
+                                        <td>
+                                            <?php echo htmlspecialchars($asignacion['nombre_carrera']); ?>
+                                            <?php if($es_mi_carrera): ?>
+                                                <span class="badge badge-success ml-1">Mi carrera</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td><?php echo date('d/m/Y', strtotime($asignacion['fecha_asignacion'])); ?></td>
                                         <td class="action-buttons">
-                                            <button class="btn btn-sm btn-primary editar-asignacion" 
-                                                    data-toggle="modal" 
-                                                    data-target="#modalEditar"
-                                                    data-id="<?php echo $asignacion['id']; ?>"
-                                                    data-profesor="<?php echo htmlspecialchars($asignacion['nombre_profesor']); ?>"
-                                                    data-materia="<?php echo htmlspecialchars($asignacion['nombre_materia']); ?>"
-                                                    data-id-materia="<?php echo $asignacion['id_materia']; ?>">
-                                                <i class="fas fa-edit"></i> Cambiar
-                                            </button>
-                                            
-                                            <button class="btn btn-sm btn-danger eliminar-asignacion" 
-                                                    data-toggle="modal" 
-                                                    data-target="#confirmDeleteModal"
-                                                    data-id="<?php echo $asignacion['id']; ?>">
-                                                <i class="fas fa-trash"></i> Eliminar
-                                            </button>
+                                            <?php if($es_mi_carrera): ?>
+                                                <button class="btn btn-sm btn-primary editar-asignacion" 
+                                                        data-toggle="modal" 
+                                                        data-target="#modalEditar"
+                                                        data-id="<?php echo $asignacion['id']; ?>"
+                                                        data-profesor="<?php echo htmlspecialchars($asignacion['nombre_profesor']); ?>"
+                                                        data-materia="<?php echo htmlspecialchars($asignacion['nombre_materia']); ?>"
+                                                        data-id-materia="<?php echo $asignacion['id_materia']; ?>">
+                                                    <i class="fas fa-edit"></i> Cambiar
+                                                </button>
+                                                
+                                                <button class="btn btn-sm btn-danger eliminar-asignacion" 
+                                                        data-toggle="modal" 
+                                                        data-target="#confirmDeleteModal"
+                                                        data-id="<?php echo $asignacion['id']; ?>">
+                                                    <i class="fas fa-trash"></i> Eliminar
+                                                </button>
+                                            <?php else: ?>
+                                                <span class="text-muted">No permitido</span>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                     <?php endwhile; ?>
@@ -383,24 +469,29 @@ include("includes/head.php");
                                     <label>Materia Actual:</label>
                                     <input type="text" class="form-control" id="nombre_materia_modal" readonly>
                                 </div>
-                                <div class="form-row">
-                                    <div class="form-group col-md-6">
-                                        <label for="carrera_modal">Carrera:</label>
-                                        <select class="form-control" id="carrera_modal" onchange="cargarMateriasModal()">
-                                            <option value="">-- Todas las carreras --</option>
-                                            <?php foreach($carreras as $carrera): ?>
-                                                <option value="<?php echo $carrera['id']; ?>">
-                                                    <?php echo htmlspecialchars($carrera['nombre']); ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div class="form-group col-md-6">
-                                        <label for="nueva_materia">Nueva Materia:</label>
-                                        <select class="form-control" id="nueva_materia" name="id_materia" required>
-                                            <option value="">-- Seleccione una materia --</option>
-                                        </select>
-                                    </div>
+                                <div class="form-group">
+                                    <label for="nueva_materia">Nueva Materia:</label>
+                                    <select class="form-control" id="nueva_materia" name="id_materia" required>
+                                        <option value="">-- Seleccione una materia --</option>
+                                        <?php
+                                        // Obtener materias de la carrera del director
+                                        $query_materias = "SELECT m.id_materia, m.nombre_materia, m.cod_materia 
+                                                          FROM carrera_materia cm
+                                                          JOIN materias m ON cm.id_materia = m.id_materia
+                                                          WHERE cm.id_carrera = ? AND m.activa = 1
+                                                          ORDER BY cm.semestre, m.nombre_materia";
+                                        $stmt = $db->prepare($query_materias);
+                                        $stmt->bind_param("s", $carrera_director);
+                                        $stmt->execute();
+                                        $materias_result = $stmt->get_result();
+                                        
+                                        while($materia = $materias_result->fetch_assoc()): 
+                                        ?>
+                                            <option value="<?php echo $materia['id_materia']; ?>">
+                                                <?php echo htmlspecialchars($materia['nombre_materia'] . ' (' . $materia['cod_materia'] . ')'); ?>
+                                            </option>
+                                        <?php endwhile; ?>
+                                    </select>
                                 </div>
                                 <input type="hidden" id="id_asignacion" name="id_asignacion">
                             </div>
@@ -416,7 +507,7 @@ include("includes/head.php");
             <!-- Sección para Asignar Nueva Materia -->
             <div class="card mb-4">
                 <div class="card-header bg-success text-white">
-                    <i class="fas fa-chalkboard-teacher"></i> Asignar Nueva Materia
+                    <i class="fas fa-chalkboard-teacher"></i> Asignar Nueva Materia - <?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>
                 </div>
                 <div class="card-body">
                     <form method="post" action="">
@@ -440,28 +531,40 @@ include("includes/head.php");
                             
                             <div class="form-group col-md-6">
                                 <label for="carrera">Carrera:</label>
-                                <select class="form-control" id="carrera" name="carrera" onchange="cargarMaterias()" required>
-                                    <option value="">-- Seleccione una carrera --</option>
-                                    <?php foreach($carreras as $carrera): ?>
-                                        <option value="<?php echo $carrera['id']; ?>">
-                                            <?php echo htmlspecialchars($carrera['nombre']); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
+                                <input type="text" class="form-control" value="<?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>" readonly>
+                                <input type="hidden" name="carrera" value="<?php echo $carrera_director; ?>">
                             </div>
                         </div>
                         
                         <div class="form-row">
                             <div class="form-group col-md-12">
                                 <label for="id_materia">Materia:</label>
-                                <select class="form-control" id="id_materia" name="id_materia" required disabled>
-                                    <option value="">Primero seleccione una carrera</option>
+                                <select class="form-control" id="id_materia" name="id_materia" required>
+                                    <option value="">-- Seleccione una materia --</option>
+                                    <?php
+                                    // Obtener materias de la carrera del director
+                                    $query_materias = "SELECT m.id_materia, m.nombre_materia, m.cod_materia 
+                                                      FROM carrera_materia cm
+                                                      JOIN materias m ON cm.id_materia = m.id_materia
+                                                      WHERE cm.id_carrera = ? AND m.activa = 1
+                                                      ORDER BY cm.semestre, m.nombre_materia";
+                                    $stmt = $db->prepare($query_materias);
+                                    $stmt->bind_param("s", $carrera_director);
+                                    $stmt->execute();
+                                    $materias_result = $stmt->get_result();
+                                    
+                                    while($materia = $materias_result->fetch_assoc()): 
+                                    ?>
+                                        <option value="<?php echo $materia['id_materia']; ?>">
+                                            <?php echo htmlspecialchars($materia['nombre_materia'] . ' (' . $materia['cod_materia'] . ')'); ?>
+                                        </option>
+                                    <?php endwhile; ?>
                                 </select>
                             </div>
                         </div>
                         
                         <button type="submit" name="asignar_materia" class="btn btn-success">
-                            <i class="fas fa-save"></i> Asignar Materia
+                            <i class='fas fa-save'></i> Asignar Materia
                         </button>
                     </form>
                 </div>
@@ -470,25 +573,36 @@ include("includes/head.php");
             <!-- Sección de Recomendaciones -->
             <div class="card mb-4">
                 <div class="card-header bg-info text-white">
-                    <i class="fas fa-graduation-cap"></i> Recomendaciones por Títulos Académicos
+                    <i class="fas fa-graduation-cap"></i> Recomendaciones por Títulos Académicos - <?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>
                 </div>
                 <div class="card-body">
                     <div class="form-row">
                         <div class="form-group col-md-6">
                             <label for="carrera_recomendacion">Carrera:</label>
-                            <select class="form-control" id="carrera_recomendacion" onchange="cargarMateriasRecomendacion()">
-                                <option value="">-- Seleccione una carrera --</option>
-                                <?php foreach($carreras as $carrera): ?>
-                                    <option value="<?php echo $carrera['id']; ?>">
-                                        <?php echo htmlspecialchars($carrera['nombre']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                                </select>
+                            <input type="text" class="form-control" value="<?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>" readonly>
                         </div>
                         <div class="form-group col-md-6">
                             <label for="materia_recomendacion">Materia:</label>
-                            <select class="form-control" id="materia_recomendacion" name="materia_recomendacion" disabled>
-                                <option value="">Primero seleccione una carrera</option>
+                            <select class="form-control" id="materia_recomendacion" name="materia_recomendacion">
+                                <option value="">-- Seleccione una materia --</option>
+                                <?php
+                                // Obtener materias de la carrera del director
+                                $query_materias = "SELECT m.id_materia, m.nombre_materia, m.cod_materia 
+                                                  FROM carrera_materia cm
+                                                  JOIN materias m ON cm.id_materia = m.id_materia
+                                                  WHERE cm.id_carrera = ? AND m.activa = 1
+                                                  ORDER BY cm.semestre, m.nombre_materia";
+                                $stmt = $db->prepare($query_materias);
+                                $stmt->bind_param("s", $carrera_director);
+                                $stmt->execute();
+                                $materias_result = $stmt->get_result();
+                                
+                                while($materia = $materias_result->fetch_assoc()): 
+                                ?>
+                                    <option value="<?php echo $materia['id_materia']; ?>">
+                                        <?php echo htmlspecialchars($materia['nombre_materia'] . ' (' . $materia['cod_materia'] . ')'); ?>
+                                    </option>
+                                <?php endwhile; ?>
                             </select>
                         </div>
                     </div>
@@ -568,239 +682,100 @@ include("includes/head.php");
 </style>
 
 <script>
-function cargarMaterias() {
-    var idCarrera = document.getElementById('carrera').value;
-    var selectMaterias = document.getElementById('id_materia');
+// Configurar modal de edición
+$(document).on('click', '.editar-asignacion', function() {
+    var id = $(this).data('id');
+    var profesor = $(this).data('profesor');
+    var materia = $(this).data('materia');
+    var id_materia = $(this).data('id-materia');
     
-    if(idCarrera === '') {
-        selectMaterias.innerHTML = '<option value="">Primero seleccione una carrera</option>';
-        selectMaterias.disabled = true;
-        return;
-    }
-    
-    // Realizar petición AJAX para obtener las materias de la carrera
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', '?ajax=materias_carrera&id_carrera=' + idCarrera, true);
-    
-    xhr.onload = function() {
-        if(this.status == 200) {
-            try {
-                var materias = JSON.parse(this.responseText);
-                
-                if(materias.length > 0) {
-                    selectMaterias.innerHTML = '<option value="">-- Seleccione una materia --</option>';
-                    materias.forEach(function(materia) {
-                        var option = document.createElement('option');
-                        option.value = materia.id_materia;
-                        option.textContent = materia.nombre_materia + ' (' + materia.cod_materia + ')';
-                        selectMaterias.appendChild(option);
-                    });
-                    selectMaterias.disabled = false;
-                } else {
-                    selectMaterias.innerHTML = '<option value="">Esta carrera no tiene materias asignadas</option>';
-                    selectMaterias.disabled = true;
-                }
-            } catch(e) {
-                selectMaterias.innerHTML = '<option value="">Error al procesar materias</option>';
-                selectMaterias.disabled = true;
-            }
-        } else {
-            selectMaterias.innerHTML = '<option value="">Error al cargar materias</option>';
-            selectMaterias.disabled = true;
-        }
-    };
-    
-    xhr.onerror = function() {
-        selectMaterias.innerHTML = '<option value="">Error de conexión</option>';
-        selectMaterias.disabled = true;
-    };
-    
-    xhr.send();
-}
+    $('#id_asignacion').val(id);
+    $('#nombre_profesor_modal').val(profesor);
+    $('#nombre_materia_modal').val(materia);
+    $('#nueva_materia').val(id_materia);
+});
 
-function cargarMateriasModal() {
-    var idCarrera = document.getElementById('carrera_modal').value;
-    var selectMaterias = document.getElementById('nueva_materia');
-    
-    // Realizar petición AJAX para obtener las materias de la carrera
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', '?ajax=materias_carrera&id_carrera=' + idCarrera, true);
-    
-    xhr.onload = function() {
-        if(this.status == 200) {
-            try {
-                var materias = JSON.parse(this.responseText);
-                
-                selectMaterias.innerHTML = '<option value="">-- Seleccione una materia --</option>';
-                
-                if(materias.length > 0) {
-                    materias.forEach(function(materia) {
-                        var option = document.createElement('option');
-                        option.value = materia.id_materia;
-                        option.textContent = materia.nombre_materia + ' (' + materia.cod_materia + ')';
-                        selectMaterias.appendChild(option);
-                    });
-                }
-            } catch(e) {
-                console.error("Error al procesar respuesta:", e);
-            }
-        }
-    };
-    
-    xhr.send();
-}
+// Configurar modal de eliminación
+$(document).on('click', '.eliminar-asignacion', function() {
+    var id = $(this).data('id');
+    $('#confirmDeleteButton').attr('href', '?eliminar=' + id);
+});
 
-function cargarMateriasRecomendacion() {
-    var idCarrera = document.getElementById('carrera_recomendacion').value;
-    var selectMaterias = document.getElementById('materia_recomendacion');
+// Cargar recomendaciones al cambiar la materia
+$('#materia_recomendacion').change(function() {
+    var id_materia = $(this).val();
     
-    if(idCarrera === '') {
-        selectMaterias.innerHTML = '<option value="">Primero seleccione una carrera</option>';
-        selectMaterias.disabled = true;
+    if(id_materia) {
+        $.ajax({
+            url: window.location.href,
+            type: 'POST',
+            data: {
+                ajax_request: 'get_recomendaciones',
+                id_materia: id_materia
+            },
+            beforeSend: function() {
+                $('#resultados-recomendaciones').html(
+                    '<div class="text-center py-4">'+
+                    '<div class="spinner-border text-primary" role="status">'+
+                    '<span class="sr-only">Cargando...</span>'+
+                    '</div>'+
+                    '<p class="mt-2">Buscando profesores recomendados...</p>'+
+                    '</div>'
+                );
+            },
+            success: function(response) {
+                $('#resultados-recomendaciones').html(response);
+            },
+            error: function(xhr, status, error) {
+                console.error("Error en AJAX:", status, error);
+                $('#resultados-recomendaciones').html(
+                    '<div class="alert alert-danger">'+
+                    'Error al cargar recomendaciones. Por favor intente nuevamente.'+
+                    '</div>'
+                );
+            }
+        });
+    } else {
         $('#resultados-recomendaciones').html('');
-        return;
     }
-    
-    // Realizar petición AJAX para obtener las materias de la carrera
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', '?ajax=materias_carrera&id_carrera=' + idCarrera, true);
-    
-    xhr.onload = function() {
-        if(this.status == 200) {
-            try {
-                var materias = JSON.parse(this.responseText);
-                
-                if(materias.length > 0) {
-                    selectMaterias.innerHTML = '<option value="">-- Seleccione una materia --</option>';
-                    materias.forEach(function(materia) {
-                        var option = document.createElement('option');
-                        option.value = materia.id_materia;
-                        option.textContent = materia.nombre_materia + ' (' + materia.cod_materia + ')';
-                        selectMaterias.appendChild(option);
-                    });
-                    selectMaterias.disabled = false;
-                } else {
-                    selectMaterias.innerHTML = '<option value="">Esta carrera no tiene materias asignadas</option>';
-                    selectMaterias.disabled = true;
-                    $('#resultados-recomendaciones').html('');
-                }
-            } catch(e) {
-                selectMaterias.innerHTML = '<option value="">Error al procesar materias</option>';
-                selectMaterias.disabled = true;
-                $('#resultados-recomendaciones').html('');
-            }
-        } else {
-            selectMaterias.innerHTML = '<option value="">Error al cargar materias</option>';
-            selectMaterias.disabled = true;
-            $('#resultados-recomendaciones').html('');
-        }
-    };
-    
-    xhr.onerror = function() {
-        selectMaterias.innerHTML = '<option value="">Error de conexión</option>';
-        selectMaterias.disabled = true;
-        $('#resultados-recomendaciones').html('');
-    };
-    
-    xhr.send();
-}
+});
 
-$(document).ready(function() {
-    // Configurar modal de edición
-    $(document).on('click', '.editar-asignacion', function() {
-        var id = $(this).data('id');
-        var profesor = $(this).data('profesor');
-        var materia = $(this).data('materia');
-        var id_materia = $(this).data('id-materia');
-        
-        $('#id_asignacion').val(id);
-        $('#nombre_profesor_modal').val(profesor);
-        $('#nombre_materia_modal').val(materia);
-        $('#nueva_materia').val(id_materia);
-    });
+// Asignación rápida desde las recomendaciones
+$(document).on('click', '.asignar-rapido', function(e) {
+    e.preventDefault();
+    var id_profesor = $(this).data('profesor');
+    var id_materia = $(this).data('materia');
     
-    // Configurar modal de eliminación
-    $(document).on('click', '.eliminar-asignacion', function() {
-        var id = $(this).data('id');
-        $('#confirmDeleteButton').attr('href', '?eliminar=' + id);
-    });
-    
-    // Cargar recomendaciones al cambiar la materia
-    $('#materia_recomendacion').change(function() {
-        var id_materia = $(this).val();
+    if(id_profesor && id_materia) {
+        // Seleccionar los valores en los dropdowns
+        $('#id_profesor').val(id_profesor).trigger('change');
+        $('#id_materia').val(id_materia).trigger('change');
         
-        if(id_materia) {
-            $.ajax({
-                url: window.location.href,
-                type: 'POST',
-                data: {
-                    ajax_request: 'get_recomendaciones',
-                    id_materia: id_materia
-                },
-                beforeSend: function() {
-                    $('#resultados-recomendaciones').html(
-                        '<div class="text-center py-4">'+
-                        '<div class="spinner-border text-primary" role="status">'+
-                        '<span class="sr-only">Cargando...</span>'+
-                        '</div>'+
-                        '<p class="mt-2">Buscando profesores recomendados...</p>'+
-                        '</div>'
-                    );
-                },
-                success: function(response) {
-                    $('#resultados-recomendaciones').html(response);
-                },
-                error: function(xhr, status, error) {
-                    console.error("Error en AJAX:", status, error);
-                    $('#resultados-recomendaciones').html(
-                        '<div class="alert alert-danger">'+
-                        'Error al cargar recomendaciones. Por favor intente nuevamente.'+
-                        '</div>'
-                    );
-                }
-            });
-        } else {
-            $('#resultados-recomendaciones').html('');
-        }
-    });
-    
-    // Asignación rápida desde las recomendaciones
-    $(document).on('click', '.asignar-rapido', function(e) {
-        e.preventDefault();
-        var id_profesor = $(this).data('profesor');
-        var id_materia = $(this).data('materia');
+        // Resaltar el formulario
+        $('.card-header.bg-success').css('background-color', '#ffc107');
+        setTimeout(function() {
+            $('.card-header.bg-success').css('background-color', '#28a745');
+        }, 1000);
         
-        if(id_profesor && id_materia) {
-            // Seleccionar los valores en los dropdowns
-            $('#id_profesor').val(id_profesor).trigger('change');
-            $('#id_materia').val(id_materia).trigger('change');
-            
-            // Resaltar el formulario
-            $('.card-header.bg-success').css('background-color', '#ffc107');
-            setTimeout(function() {
-                $('.card-header.bg-success').css('background-color', '#28a745');
-            }, 1000);
-            
-            // Hacer scroll al formulario
-            $('html, body').animate({
-                scrollTop: $('.card-body form').offset().top - 20
-            }, 800);
-            
-            // Mostrar notificación
-            var alertDiv = $(
-                '<div class="alert alert-info alert-dismissible fade show" role="alert">'+
-                'Profesor y materia seleccionados. <strong>Por favor confirme la asignación.</strong>'+
-                '<button type="button" class="close" data-dismiss="alert" aria-label="Close">'+
-                '<span aria-hidden="true">&times;</span></button></div>'
-            );
-            
-            $('.card-body form').before(alertDiv);
-            
-            setTimeout(function() {
-                alertDiv.alert('close');
-            }, 5000);
-        }
-    });
+        // Hacer scroll al formulario
+        $('html, body').animate({
+            scrollTop: $('.card-body form').offset().top - 20
+        }, 800);
+        
+        // Mostrar notificación
+        var alertDiv = $(
+            '<div class="alert alert-info alert-dismissible fade show" role="alert">'+
+            'Profesor y materia seleccionados. <strong>Por favor confirme la asignación.</strong>'+
+            '<button type="button" class="close" data-dismiss="alert" aria-label="Close">'+
+            '<span aria-hidden="true">&times;</span></button></div>'
+        );
+        
+        $('.card-body form').before(alertDiv);
+        
+        setTimeout(function() {
+            alertDiv.alert('close');
+        }, 5000);
+    }
 });
 </script>
 
