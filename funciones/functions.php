@@ -4698,6 +4698,58 @@ function contarAccionesPorTipo($tipo) {
 
 
 
+//MEMBRETES Y REPORTES PDF  ***********************************************************************
+
+
+// Función para generar membrete en PDF
+function generarMembretePDF($pdf, $pageWidth) {
+    // Obtener la fecha actual en formato corto
+    $hoy = new DateTime();
+    $fecha = $hoy->format('d/m/Y');
+
+    // Agregar el membrete (ejemplo para FPDF o TCPDF)
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(0, 10, utf8_decode("República Bolivariana de Venezuela"), 0, 1, 'C');
+    $pdf->Cell(0, 10, utf8_decode("Ministerio del Poder Popular para la Educación Universitaria"), 0, 1, 'C');
+    $pdf->Cell(0, 10, utf8_decode("Universidad Politécnica Territorial de Puerto Cabello"), 0, 1, 'C');
+    $pdf->SetFont('Arial', '', 12);
+    $pdf->Cell(0, 10, $fecha, 0, 1, 'C');
+
+    // Devolver la posición Y después del membrete
+    return $pdf->GetY() + 5;
+}
+
+// Función para generar PDF desde HTML
+function generarPDFDesdeHTML($elementoHTML, $nombreArchivo = 'documento.pdf') {
+    echo "<script>
+        // Configuración de jsPDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const margin = 10;
+        const pageWidth = doc.internal.pageSize.getWidth();
+        
+        // Agregar membrete
+        const startY = " . generarMembretePDF('doc', 'pageWidth') . ";
+        
+        // Capturar el contenido HTML y agregarlo al PDF
+        html2canvas(document.getElementById('$elementoHTML'), {
+            scale: 2,
+            useCORS: true,
+            logging: false
+        }).then(canvas => {
+            const imgData = canvas.toDataURL('image/jpeg', 1.0);
+            const imgWidth = pageWidth - (margin * 2);
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            
+            // Agregar contenido al PDF
+            doc.addImage(imgData, 'JPEG', margin, startY, imgWidth, imgHeight);
+            
+            // Guardar el PDF
+            doc.save('$nombreArchivo');
+        });
+    </script>";
+}
+
 
 
 
