@@ -39,8 +39,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
         
-        
-        
         .construction-icon {
             font-size: 3.5rem;
             margin-bottom: 20px;
@@ -113,6 +111,24 @@
             color: #FFC107;
             transform: translateY(-3px);
         }
+        
+        /* Estilos para el botón de volver */
+        .back-button {
+            margin-top: 25px;
+            padding: 12px 25px;
+            background-color: #FFC107;
+            color: #333;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .back-button:hover {
+            background-color: #ffca28;
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body>
@@ -129,11 +145,23 @@
         
         <p>Estamos trabajando duro para brindarte una experiencia increíble. Muy pronto tendremos novedades para ti.</p>
         
+        <!-- Botón de volver con PHP -->
+        <button class="back-button" onclick="goBack()">Volver Atrás</button>
         
+        <script>
+            function goBack() {
+                window.history.back();
+            }
+        </script>
         
-        
-       
-        
+        <?php
+        // Alternativa con PHP - si JavaScript está deshabilitado
+        echo '<script>';
+        echo 'function goBack() {';
+        echo '  window.history.back();';
+        echo '}';
+        echo '</script>';
+        ?>
         
     </div>
 
