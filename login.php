@@ -126,4 +126,4 @@ setInterval(animacion, 200);
 </script>
 
 
-<?php include("usuario/includes/footer.php"); ?>
+
