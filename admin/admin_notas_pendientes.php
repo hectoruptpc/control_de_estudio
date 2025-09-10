@@ -1,13 +1,10 @@
 <?php
 require_once('../funciones/functions.php');
 
-if (!isLoggedIn()) {
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isAdmin()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como administrador para acceder";
     header('location: ../login.php');
-    exit();
-}
-
-if (!isAdmin()) {
-    header('location: ../usuario/home.php');
     exit();
 }
 
