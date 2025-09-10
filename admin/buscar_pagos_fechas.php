@@ -7,21 +7,6 @@ if (!isLoggedIn()) {
     exit();
 }
 
-// Obtener tipos de pago
-function obtenerTiposPago() {
-    global $db;
-    
-    $query = "SELECT id, tipopago FROM tipo_pago ORDER BY tipopago";
-    $result = $db->query($query);
-    
-    $tipos = [];
-    while ($row = $result->fetch_assoc()) {
-        $tipos[] = $row;
-    }
-    
-    return $tipos;
-}
-
 $tipos_pago = obtenerTiposPago();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -34,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
     
-    // Obtener pagos por rango de fechas
+    // Obtener pagos por rango de fechas usando funciones generales
     $pagos = obtenerPagosPorRangoFechas($fecha_inicio, $fecha_fin);
     $total = obtenerTotalPagosPorRangoFechas($fecha_inicio, $fecha_fin);
     
