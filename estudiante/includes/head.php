@@ -21,15 +21,11 @@ if (isset($_SESSION['user']['id'])) {
     $mensajes_no_leidos = contarMensajesNoLeidos($_SESSION['user']['id']);
 }
 
-if (!isLoggedIn()) {
-    $_SESSION['here'] = $_SERVER['REQUEST_URI'];
-    $_SESSION['msg'] = $msn_iniciar_sesion;
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isEstudiante()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como estudiante para acceder";
     header('location: ../login.php');
-    die();
-}
-
-if (!isEstudiante()) {
-    header('location: ../usuario/home.php');
+    exit();
 }
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
@@ -116,7 +112,7 @@ if (!isEstudiante()) {
               </a>
               <div id="dropdown-calificaciones-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
                   <a title="Ver Calificaciones" class="dropdown-item" href="../pagina_en_construccion.php">
-                      <i class="fas fa-list-ol fa-fw"></i> Ver Mis Notas
+                      <i class="fas fa-list-ol fa-fw"></i> Mi Historial Académico
                   </a>
                   
               </div>
