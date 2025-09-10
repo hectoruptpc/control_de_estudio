@@ -21,15 +21,11 @@ if (isset($_SESSION['user']['id'])) {
     $mensajes_no_leidos = contarMensajesNoLeidos($_SESSION['user']['id']);
 }
 
-if (!isLoggedIn()) {
-    $_SESSION['here'] = $_SERVER['REQUEST_URI'];
-    $_SESSION['msg'] = $msn_iniciar_sesion;
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isAdmin()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como administrador para acceder";
     header('location: ../login.php');
-    die();
-}
-
-if (!isAdmin()) {
-    header('location: ../usuario/home.php');
+    exit();
 }
 ?>
 <!DOCTYPE html>
