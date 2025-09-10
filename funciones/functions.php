@@ -4702,21 +4702,52 @@ function contarAccionesPorTipo($tipo) {
 
 
 // Función para generar membrete en PDF
-function generarMembretePDF($pdf, $pageWidth) {
-    // Obtener la fecha actual en formato corto
+// Función para generar el código JavaScript del membrete
+function generarMembreteJS() {
     $hoy = new DateTime();
     $fecha = $hoy->format('d/m/Y');
-
-    // Agregar el membrete (ejemplo para FPDF o TCPDF)
-    $pdf->SetFont('Arial', 'B', 12);
-    $pdf->Cell(0, 10, utf8_decode("República Bolivariana de Venezuela"), 0, 1, 'C');
-    $pdf->Cell(0, 10, utf8_decode("Ministerio del Poder Popular para la Educación Universitaria"), 0, 1, 'C');
-    $pdf->Cell(0, 10, utf8_decode("Universidad Politécnica Territorial de Puerto Cabello"), 0, 1, 'C');
-    $pdf->SetFont('Arial', '', 12);
-    $pdf->Cell(0, 10, $fecha, 0, 1, 'C');
-
-    // Devolver la posición Y después del membrete
-    return $pdf->GetY() + 5;
+    
+    return "
+    function agregarMembretePDF(doc, pageWidth, margin) {
+        // Cargar imagen del logo
+        const logoImg = new Image();
+        logoImg.crossOrigin = 'Anonymous';
+        logoImg.src = '../images/uptpc.png';
+        
+        return new Promise((resolve) => {
+            logoImg.onload = function() {
+                // Agregar logo (arriba a la izquierda)
+                doc.addImage(logoImg, 'PNG', margin, 10, 20, 20);
+                
+                // Agregar texto del membrete
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text('República Bolivariana de Venezuela', pageWidth / 2, 15, { align: 'center' });
+                doc.text('Ministerio del Poder Popular para la Educación Universitaria', pageWidth / 2, 20, { align: 'center' });
+                doc.text('Universidad Politécnica Territorial de Puerto Cabello', pageWidth / 2, 25, { align: 'center' });
+                
+                // Agregar fecha
+                doc.setFont(undefined, 'normal');
+                doc.text('$fecha', pageWidth - margin, 15, { align: 'right' });
+                
+                resolve(35); // Retornar posición Y después del membrete
+            };
+            
+            logoImg.onerror = function() {
+                // Fallback sin imagen
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text('República Bolivariana de Venezuela', pageWidth / 2, 15, { align: 'center' });
+                doc.text('Ministerio del Poder Popular para la Educación Universitaria', pageWidth / 2, 20, { align: 'center' });
+                doc.text('Universidad Politécnica Territorial de Puerto Cabello', pageWidth / 2, 25, { align: 'center' });
+                doc.setFont(undefined, 'normal');
+                doc.text('$fecha', pageWidth / 2, 32, { align: 'center' });
+                
+                resolve(40); // Retornar posición Y después del membrete
+            };
+        });
+    }
+    ";
 }
 
 // Función para generar PDF desde HTML
