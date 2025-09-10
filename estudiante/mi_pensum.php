@@ -107,9 +107,7 @@ while ($materia = mysqli_fetch_assoc($result_materias)) {
 include("includes/head.php");
 ?>
 
-<!-- Incluir jsPDF y html2canvas para generar el PDF -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
 
 
 
