@@ -267,4 +267,45 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 </body>
+
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #printable-area, #printable-area * {
+            visibility: visible;
+        }
+        #printable-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .no-print {
+            display: none !important;
+        }
+        .card {
+            border: none;
+            box-shadow: none;
+        }
+        .table {
+            font-size: 12px;
+        }
+        h4 {
+            page-break-after: avoid;
+        }
+        .card-body {
+            padding: 0;
+        }
+        .accordion .collapse {
+            display: block !important;
+            opacity: 1;
+        }
+    }
+</style>
+
+
+
+
 </html>
