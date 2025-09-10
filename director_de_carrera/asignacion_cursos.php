@@ -6,8 +6,11 @@ $titulopag = "Asignación de Materias a Docentes";
 include('../funciones/functions.php');
 
 // Verificar si el usuario es director de carrera
-if (!isset($_SESSION['user']['carrera_di']) || empty($_SESSION['user']['carrera_di'])) {
-    die("<div class='alert alert-danger'>No tiene permisos de director de carrera para acceder a esta página.</div>");
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isUser()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como director de carrera para acceder";
+    header('location: ../login.php');
+    exit();
 }
 
 $carrera_director = $_SESSION['user']['carrera_di'];

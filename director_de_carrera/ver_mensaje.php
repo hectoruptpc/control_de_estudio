@@ -1,7 +1,9 @@
 <?php
 require_once('../funciones/functions.php');
 
-if (!isLoggedIn()) {
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isUser()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como director de carrera para acceder";
     header('location: ../login.php');
     exit();
 }
