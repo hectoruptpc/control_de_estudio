@@ -168,7 +168,7 @@ function generarPDF() {
     // Cargar imagen desde URL (ruta actualizada)
     const logoImg = new Image();
     logoImg.crossOrigin = "Anonymous"; // Permite el acceso a recursos externos
-    logoImg.src = '../uptpc.png'; // Ruta actualizada a tu imagen
+    logoImg.src = '../images/uptpc.png'; // Ruta actualizada a tu imagen
     
     // Cuando la imagen se carga, agregarla al PDF
     logoImg.onload = function() {
