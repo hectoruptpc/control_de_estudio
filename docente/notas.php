@@ -2,15 +2,10 @@
 // Iniciar sesión PRIMERO
 require_once('../funciones/functions.php');
 
-// Verificar autenticación
-if (!isLoggedIn()) {
-    $_SESSION['msg'] = "Debe iniciar sesión";
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isDocente()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como docente para acceder";
     header('location: ../login.php');
-    exit();
-}
-
-if (!isDocente()) {
-    header('location: ../usuario/home.php');
     exit();
 }
 

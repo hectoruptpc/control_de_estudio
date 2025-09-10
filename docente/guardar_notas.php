@@ -1,6 +1,13 @@
 <?php
 require_once('../funciones/functions.php');
 
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isDocente()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como docente para acceder";
+    header('location: ../login.php');
+    exit();
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     die('Acceso no permitido');
 }
