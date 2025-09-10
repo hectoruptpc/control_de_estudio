@@ -14,7 +14,7 @@ $materia_id = (int)$_POST['materia_id'];
 $periodo_id = (int)$_POST['periodo_id'];
 $seccion = $_POST['seccion'];
 
-// Obtener información del grupo
+// Obtener información del grupo (FUNCIÓN ESPECÍFICA - se queda aquí)
 function obtenerInfoGrupo($docente_id, $materia_id, $periodo_id) {
     global $db;
     
@@ -41,7 +41,7 @@ function obtenerInfoGrupo($docente_id, $materia_id, $periodo_id) {
     return $stmt->get_result()->fetch_assoc();
 }
 
-// Obtener estudiantes del grupo
+// Obtener estudiantes del grupo (FUNCIÓN ESPECÍFICA - se queda aquí)
 function obtenerEstudiantesGrupo($docente_id, $materia_id, $periodo_id) {
     global $db;
     
@@ -60,7 +60,7 @@ function obtenerEstudiantesGrupo($docente_id, $materia_id, $periodo_id) {
     return $stmt->get_result();
 }
 
-// Calcular promedio según el id_trayecto de la sección
+// Calcular promedio según el id_trayecto de la sección (FUNCIÓN ESPECÍFICA - se queda aquí)
 function calcularPromedioPorTrayecto($nota, $id_trayecto) {
     $suma = 0;
     $count = 0;
@@ -115,7 +115,7 @@ function calcularPromedioPorTrayecto($nota, $id_trayecto) {
     return $count > 0 ? round($suma / $count, 1) : 0;
 }
 
-// Obtener estadísticas del grupo según el id_trayecto
+// Obtener estadísticas del grupo según el id_trayecto (FUNCIÓN ESPECÍFICA - se queda aquí)
 function obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id, $id_trayecto) {
     global $db;
     
@@ -171,7 +171,7 @@ if (!$info_grupo) {
 
 $estadisticas = obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id, $info_grupo['id_trayecto']);
 
-// Determinar qué trayecto se está considerando
+// Determinar qué trayecto se está considerando (REUTILIZANDO función existente)
 $trayecto_considerado = '';
 switch ($info_grupo['id_trayecto']) {
     case 1: $trayecto_considerado = 'Trayecto 0'; break;
