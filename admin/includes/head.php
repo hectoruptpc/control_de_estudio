@@ -364,5 +364,52 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+
+
+
+<!-- Incluir jsPDF y html2canvas para generar el PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #printable-area, #printable-area * {
+            visibility: visible;
+        }
+        #printable-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .no-print {
+            display: none !important;
+        }
+        .card {
+            border: none;
+            box-shadow: none;
+        }
+        .table {
+            font-size: 12px;
+        }
+        h4 {
+            page-break-after: avoid;
+        }
+        .card-body {
+            padding: 0;
+        }
+        .accordion .collapse {
+            display: block !important;
+            opacity: 1;
+        }
+    }
+</style>
+
+
+
+
 </body>
 </html>

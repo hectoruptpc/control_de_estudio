@@ -64,38 +64,47 @@ while ($materia = mysqli_fetch_assoc($result_materias)) {
 include("includes/head.php");
 ?>
 
-<style>
-    @media print {
-        body * {
-            visibility: hidden;
-        }
-        #printable-area, #printable-area * {
-            visibility: visible;
-        }
-        #printable-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-        }
-        .no-print {
-            display: none !important;
-        }
-        .card {
-            border: none;
-            box-shadow: none;
-        }
-        .table {
-            font-size: 12px;
-        }
-        h4 {
-            page-break-after: avoid;
-        }
-        .card-body {
-            padding: 0;
-        }
+<script>
+// Función reutilizable para agregar membrete (desde functions.php)
+<?php echo generarMembreteJS(); ?>
+
+// Función ESPECÍFICA para generar el PDF del pensum desde admin
+async function generarPDF() {
+    try {
+        // Configuración de jsPDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const margin = 10;
+        const pageWidth = doc.internal.pageSize.getWidth();
+        
+        // Agregar membrete reutilizable
+        const yPos = await agregarMembretePDF(doc, pageWidth, margin);
+        
+        // Continuar con el proceso de generación del PDF
+        const printableElement = document.getElementById('printable-area');
+        
+        const canvas = await html2canvas(printableElement, {
+            scale: 2,
+            useCORS: true,
+            logging: false
+        });
+        
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        const imgWidth = pageWidth - (margin * 2);
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        
+        // Agregar contenido al PDF
+        doc.addImage(imgData, 'JPEG', margin, yPos, imgWidth, imgHeight);
+        
+        // Guardar el PDF
+        doc.save('Pensum_<?php echo addslashes(preg_replace('/[^a-zA-Z0-9]/', '_', $carrera['nombre_carrera'])); ?>_' + new Date().toISOString().slice(0, 10) + '.pdf');
+        
+    } catch (error) {
+        console.error('Error al generar PDF:', error);
+        alert('Error al generar el PDF. Por favor, intenta nuevamente.');
     }
-</style>
+}
+</script>
 
 <div class="container-fluid">
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
@@ -104,58 +113,74 @@ include("includes/head.php");
             <a href="lista_carreras.php" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm no-print">
                 <i class="fas fa-arrow-left fa-sm text-white-50"></i> Volver a Carreras
             </a>
-            <button onclick="window.print()" class="d-none d-sm-inline-block btn btn-sm btn-success shadow-sm no-print">
-                <i class="fas fa-print fa-sm text-white-50"></i> Imprimir Pensum
+            <button onclick="generarPDF()" class="d-none d-sm-inline-block btn btn-sm btn-success shadow-sm no-print ml-2">
+                <i class="fas fa-print fa-sm text-white-50"></i> Generar PDF
             </button>
         </div>
     </div>
 
     <div class="card shadow mb-4" id="printable-area">
-        <div class="card-header py-3 d-flex justify-content-between align-items-center">
-            <h6 class="m-0 font-weight-bold text-primary">Estructura del Pensum</h6>
+        <div class="card-header py-3 bg-secondary text-white d-flex justify-content-between align-items-center">
+            <h5 class="m-0 font-weight-bold">Plan de Estudios</h5>
             <span class="no-print"><?php echo date('d/m/Y'); ?></span>
         </div>
         <div class="card-body">
             <?php if (empty($materias_agrupadas)): ?>
                 <div class="alert alert-warning">No hay materias asignadas a esta carrera.</div>
             <?php else: ?>
-                <?php foreach ($materias_agrupadas as $texto_trayecto => $materias): ?>
-                    <div class="mb-5">
-                        <h4 class="font-weight-bold text-primary"><?php echo $texto_trayecto; ?></h4>
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-hover">
-                                <thead class="thead-light">
-                                    <tr>
-                                        <th>Código</th>
-                                        <th>Nombre</th>
-                                        <th>Créditos</th>
-                                        <th>Horas Teóricas</th>
-                                        <th>Horas Prácticas</th>
-                                        <th>Duración</th>
-                                        <th>Estado</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($materias as $materia): ?>
-                                        <tr>
-                                            <td><?php echo htmlspecialchars($materia['cod_materia']); ?></td>
-                                            <td><?php echo htmlspecialchars($materia['nombre_materia']); ?></td>
-                                            <td><?php echo htmlspecialchars($materia['creditos']); ?></td>
-                                            <td><?php echo htmlspecialchars($materia['horas_teoricas']); ?></td>
-                                            <td><?php echo htmlspecialchars($materia['horas_practicas']); ?></td>
-                                            <td><?php echo htmlspecialchars($materia['duracion_periodo']) . ' ' . $texto_duracion; ?></td>
-                                            <td>
-                                                <span class="badge badge-<?php echo $materia['activa'] ? 'success' : 'secondary'; ?>">
-                                                    <?php echo $materia['activa'] ? 'Activa' : 'Inactiva'; ?>
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
+                <div class="accordion" id="pensumAccordion">
+                    <?php foreach ($materias_agrupadas as $texto_trayecto => $materias): ?>
+                        <div class="card mb-3">
+                            <div class="card-header" id="heading<?= md5($texto_trayecto) ?>">
+                                <h5 class="mb-0">
+                                    <button class="btn btn-link" type="button" data-toggle="collapse" 
+                                            data-target="#collapse<?= md5($texto_trayecto) ?>" 
+                                            aria-expanded="true" aria-controls="collapse<?= md5($texto_trayecto) ?>">
+                                        <?= $texto_trayecto ?>
+                                    </button>
+                                </h5>
+                            </div>
+
+                            <div id="collapse<?= md5($texto_trayecto) ?>" class="collapse show" 
+                                 aria-labelledby="heading<?= md5($texto_trayecto) ?>" data-parent="#pensumAccordion">
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-hover table-sm">
+                                            <thead class="thead-light">
+                                                <tr>
+                                                    <th width="10%">Código</th>
+                                                    <th width="35%">Nombre</th>
+                                                    <th width="8%">Créditos</th>
+                                                    <th width="12%">Horas T</th>
+                                                    <th width="12%">Horas P</th>
+                                                    <th width="13%">Duración</th>
+                                                    <th width="10%">Estado</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($materias as $materia): ?>
+                                                    <tr>
+                                                        <td><?php echo htmlspecialchars($materia['cod_materia']); ?></td>
+                                                        <td><?php echo htmlspecialchars($materia['nombre_materia']); ?></td>
+                                                        <td class="text-center"><?php echo htmlspecialchars($materia['creditos']); ?></td>
+                                                        <td class="text-center"><?php echo htmlspecialchars($materia['horas_teoricas']); ?></td>
+                                                        <td class="text-center"><?php echo htmlspecialchars($materia['horas_practicas']); ?></td>
+                                                        <td class="text-center"><?php echo htmlspecialchars($materia['duracion_periodo']) . ' ' . $texto_duracion; ?></td>
+                                                        <td class="text-center">
+                                                            <span class="badge badge-<?php echo $materia['activa'] ? 'success' : 'secondary'; ?>">
+                                                                <?php echo $materia['activa'] ? 'Activa' : 'Inactiva'; ?>
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                <?php endforeach; ?>
+                    <?php endforeach; ?>
+                </div>
             <?php endif; ?>
         </div>
     </div>
