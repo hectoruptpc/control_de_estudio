@@ -1,13 +1,10 @@
 <?php
 require_once('../funciones/functions.php');
 
-if (!isLoggedIn()) {
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isEstudiante()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como estudiante para acceder";
     header('location: ../login.php');
-    exit();
-}
-
-if (!isEstudiante()) {
-    header('location: ../usuario/home.php');
     exit();
 }
 

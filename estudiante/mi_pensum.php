@@ -5,16 +5,11 @@ ini_set('display_errors', 1);
 $titulopag = "Mi Pensum Académico";
 include('../funciones/functions.php');
 
-// 1. Verificar sesión y permisos
-if (!isLoggedIn()) {
-    $_SESSION['msg'] = "Debes iniciar sesión primero";
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isEstudiante()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como estudiante para acceder";
     header('location: ../login.php');
-    die();
-}
-
-if (!isEstudiante()) {
-    header('location: ../usuario/home.php');
-    die();
+    exit();
 }
 
 // 2. Obtener información del estudiante y su carrera
