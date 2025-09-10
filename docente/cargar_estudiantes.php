@@ -19,89 +19,7 @@ if (!isset($_POST['seccion_id']) || !isset($_POST['materia_id'])) {
 $seccion_id = (int)$_POST['seccion_id'];
 $materia_id = (int)$_POST['materia_id'];
 
-function obtenerInfoMateria($materia_id) {
-    global $db;
-    $query = "SELECT m.*, t.numero_trayecto 
-              FROM materias m 
-              LEFT JOIN trayectos t ON m.trayecto = t.id_trayecto 
-              WHERE m.id_materia = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $materia_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        return $result->fetch_assoc();
-    }
-    
-    // Si no encuentra el trayecto, intentar obtener solo la información de la materia
-    $query = "SELECT * FROM materias WHERE id_materia = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $materia_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        $materia = $result->fetch_assoc();
-        
-        // Si el trayecto es 0, establecer manualmente el número de trayecto
-        if ($materia['trayecto'] == 0) {
-            $materia['numero_trayecto'] = 0;
-        }
-        
-        return $materia;
-    }
-    
-    return null;
-}
-
-function obtenerEstudiantesPorSeccion($seccion_id) {
-    global $db;
-    $query = "SELECT u.id, u.nombre, u.idusuario 
-              FROM users u
-              INNER JOIN estudiante_seccion es ON u.id = es.id_usuario
-              WHERE es.id_seccion = ? AND u.estudiante = 1
-              ORDER BY u.nombre";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
-    return $stmt->get_result();
-}
-
-function obtenerNotasEstudiante($estudiante_id, $materia_id) {
-    global $db;
-    $query = "SELECT * FROM notas_pendientes 
-              WHERE id_usuario = ? AND id_materia = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("ii", $estudiante_id, $materia_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
-}
-
-function obtenerPeriodoSeccion($seccion_id) {
-    global $db;
-    $query = "SELECT id_periodo FROM secciones WHERE id_seccion = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->fetch_assoc()['id_periodo'];
-}
-
-function obtenerTrayectoSeccion($seccion_id) {
-    global $db;
-    $query = "SELECT t.id_trayecto, t.numero_trayecto 
-              FROM secciones s 
-              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto 
-              WHERE s.id_seccion = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->fetch_assoc();
-}
-
+// Obtener datos usando las funciones reutilizables
 $materia = obtenerInfoMateria($materia_id);
 $estudiantes = obtenerEstudiantesPorSeccion($seccion_id);
 $periodo_id = obtenerPeriodoSeccion($seccion_id);
@@ -119,17 +37,10 @@ if (!$estudiantes) {
 $trayecto_actual = $trayecto_seccion['numero_trayecto'];
 $id_trayecto_seccion = $trayecto_seccion['id_trayecto'];
 
-// Determinar qué trayecto mostrar según el id_trayecto de la sección
-$trayecto_a_mostrar = '';
-switch ($id_trayecto_seccion) {
-    case 1: $trayecto_a_mostrar = 0; break; // Trayecto Inicial
-    case 2: $trayecto_a_mostrar = 1; break; // Trayecto 1
-    case 3: $trayecto_a_mostrar = 2; break; // Trayecto 2
-    case 4: $trayecto_a_mostrar = 3; break; // Trayecto 3
-    case 5: $trayecto_a_mostrar = 4; break; // Trayecto 4
-    default: $trayecto_a_mostrar = 0;
-}
+// Determinar qué trayecto mostrar
+$trayecto_a_mostrar = determinarTrayectoAMostrar($id_trayecto_seccion);
 
+// Verificar estados de notas
 $notas_aprobadas = false;
 $notas_rechazadas = false;
 $estudiantes_con_notas_aprobadas = [];

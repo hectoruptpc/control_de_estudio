@@ -4784,6 +4784,125 @@ function generarPDFDesdeHTML($elementoHTML, $nombreArchivo = 'documento.pdf') {
 
 
 
+//CARGA DE NOTAS ***********************************************************************
+
+/**
+ * Obtiene información completa de una materia incluyendo trayecto
+ */
+function obtenerInfoMateria($materia_id) {
+    global $db;
+    $query = "SELECT m.*, t.numero_trayecto 
+              FROM materias m 
+              LEFT JOIN trayectos t ON m.trayecto = t.id_trayecto 
+              WHERE m.id_materia = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $materia_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    // Si no encuentra el trayecto, intentar obtener solo la información de la materia
+    $query = "SELECT * FROM materias WHERE id_materia = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $materia_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $materia = $result->fetch_assoc();
+        
+        // Si el trayecto es 0, establecer manualmente el número de trayecto
+        if ($materia['trayecto'] == 0) {
+            $materia['numero_trayecto'] = 0;
+        }
+        
+        return $materia;
+    }
+    
+    return null;
+}
+
+/**
+ * Obtiene todos los estudiantes de una sección específica
+ */
+function obtenerEstudiantesPorSeccion($seccion_id) {
+    global $db;
+    $query = "SELECT u.id, u.nombre, u.idusuario 
+              FROM users u
+              INNER JOIN estudiante_seccion es ON u.id = es.id_usuario
+              WHERE es.id_seccion = ? AND u.estudiante = 1
+              ORDER BY u.nombre";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    return $stmt->get_result();
+}
+
+/**
+ * Obtiene las notas de un estudiante en una materia específica
+ */
+function obtenerNotasEstudiante($estudiante_id, $materia_id) {
+    global $db;
+    $query = "SELECT * FROM notas_pendientes 
+              WHERE id_usuario = ? AND id_materia = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("ii", $estudiante_id, $materia_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
+}
+
+/**
+ * Obtiene el período académico de una sección
+ */
+function obtenerPeriodoSeccion($seccion_id) {
+    global $db;
+    $query = "SELECT id_periodo FROM secciones WHERE id_seccion = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_assoc()['id_periodo'];
+}
+
+/**
+ * Obtiene información del trayecto de una sección
+ */
+function obtenerTrayectoSeccion($seccion_id) {
+    global $db;
+    $query = "SELECT t.id_trayecto, t.numero_trayecto 
+              FROM secciones s 
+              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto 
+              WHERE s.id_seccion = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_assoc();
+}
+
+/**
+ * Determina el trayecto a mostrar basado en el ID de trayecto de la sección
+ */
+function determinarTrayectoAMostrar($id_trayecto_seccion) {
+    switch ($id_trayecto_seccion) {
+        case 1: return 0; // Trayecto Inicial
+        case 2: return 1; // Trayecto 1
+        case 3: return 2; // Trayecto 2
+        case 4: return 3; // Trayecto 3
+        case 5: return 4; // Trayecto 4
+        default: return 0;
+    }
+}
+
+
+
+
+
+
 
 
 
