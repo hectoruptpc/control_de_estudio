@@ -111,7 +111,7 @@ if (!isLoggedIn() || !isEstudiante()) {
                   <i class="fas fa-graduation-cap fa-fw"></i> Mis Calificaciones
               </a>
               <div id="dropdown-calificaciones-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
-                  <a title="Ver Calificaciones" class="dropdown-item" href="../mi_historial.php">
+                  <a title="Ver Calificaciones" class="dropdown-item" href="mi_historial.php">
                       <i class="fas fa-list-ol fa-fw"></i> Mi Historial Académico
                   </a>
                   

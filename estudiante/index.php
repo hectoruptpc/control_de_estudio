@@ -189,7 +189,7 @@ if (!isLoggedIn() || !isEstudiante()) {
                         </div>
                         <h3 class="card-title h4 font-weight-bold">Historial Académico</h3>
                         <p class="card-text text-muted">Revisa tu progreso y calificaciones</p>
-                        <a href="../mi_historial.php" class="btn btn-access btn-historial mt-3">Acceder</a>
+                        <a href="mi_historial.php" class="btn btn-access btn-historial mt-3">Acceder</a>
                     </div>
                 </div>
             </div>
