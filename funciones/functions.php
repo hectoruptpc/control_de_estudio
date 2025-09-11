@@ -5109,7 +5109,7 @@ function obtenerTipoPeriodoPorCarrera($id_carrera) {
     // Valor por defecto si no se encuentra coincidencia
     return 'semestre';
 }
-?>
+
 
 
 
