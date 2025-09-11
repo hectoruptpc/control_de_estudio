@@ -201,44 +201,7 @@ if (!isLoggedIn() || !isEstudiante()) {
             <p class="text-muted mb-0">Selecciona una de las opciones para gestionar tu información académica</p>
         </div>
 
-        <!-- Notificaciones y actividades -->
-        <div class="notification-section p-4 mx-3 mt-4">
-            <h4 class="font-weight-bold text-center mb-4"><i class="fas fa-info-circle mr-2"></i>Próximas actividades</h4>
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="alert alert-info">
-                        <h5 class="alert-heading"><i class="fas fa-tasks mr-2"></i>Tareas Pendientes</h5>
-                        <hr>
-                        <ul class="list-group list-group-flush">
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Tarea de Matemáticas
-                                <span class="badge badge-primary badge-pill">15/06</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Proyecto de Ciencias
-                                <span class="badge badge-primary badge-pill">20/06</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="alert alert-warning">
-                        <h5 class="alert-heading"><i class="fas fa-calendar-check mr-2"></i>Próximos Exámenes</h5>
-                        <hr>
-                        <ul class="list-group list-group-flush">
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Examen de Matemáticas
-                                <span class="badge badge-warning badge-pill">18/06</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Examen de Historia
-                                <span class="badge badge-warning badge-pill">25/06</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
+        
     </div>
 
     <?php include("includes/footer.php"); ?>
