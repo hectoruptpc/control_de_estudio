@@ -32,10 +32,17 @@ include("includes/head.php");
     
     <?php if ($seccion_estudiante): ?>
         <!-- EL ESTUDIANTE TIENE UNA SECCIÓN ASIGNADA -->
-        <h1 class="h3 mb-4 text-gray-800">Mi Horario - <?= htmlspecialchars($seccion_estudiante['codigo_seccion']) ?></h1>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 text-gray-800">Mi Horario - <?= htmlspecialchars($seccion_estudiante['codigo_seccion']) ?></h1>
+            <div>
+                <button class="btn btn-sm btn-success" onclick="generarPDF()">
+                    <i class="fas fa-file-pdf"></i> Descargar PDF
+                </button>
+            </div>
+        </div>
         
-        <!-- Información básica de la sección -->
-        <div class="row mb-4">
+        <!-- Información básica de la sección (solo para web) -->
+        <div class="row mb-4 web-only">
             <div class="col-md-12">
                 <div class="card border-left-primary shadow h-100 py-2">
                     <div class="card-body">
@@ -75,13 +82,10 @@ include("includes/head.php");
         ?>
         
         <div class="card shadow mb-4" id="horario-clases">
-            <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <div class="card-header py-3 d-flex justify-content-between align-items-center web-only">
                 <h6 class="m-0 font-weight-bold text-primary">Horario de Clases Semanal</h6>
                 <div>
                     <span class="badge badge-info"><?= count($horarios) ?> bloques horarios</span>
-                    <button class="btn btn-sm btn-success ml-2" onclick="imprimirHorario()">
-                        <i class="fas fa-print"></i> Imprimir
-                    </button>
                 </div>
             </div>
             <div class="card-body">
@@ -90,6 +94,17 @@ include("includes/head.php");
                         <i class="fas fa-info-circle"></i> No se han definido horarios para esta sección.
                     </div>
                 <?php else: ?>
+                    <!-- Información para PDF (oculta en web) -->
+                    <div id="pdf-info" class="pdf-only text-center mb-3" style="display: none;">
+                        <h4>Universidad Politécnica Territorial de Puerto Cabello</h4>
+                        <h5>Horario de Clases - <?= htmlspecialchars($seccion_estudiante['codigo_seccion']) ?></h5>
+                        <p>
+                            <strong>Carrera:</strong> <?= htmlspecialchars($seccion_estudiante['nombre_carrera']) ?> | 
+                            <strong>Trayecto:</strong> <?= $seccion_estudiante['numero_trayecto'] ?> | 
+                            <strong>Período:</strong> <?= htmlspecialchars($seccion_estudiante['nombre_periodo']) ?>
+                        </p>
+                    </div>
+                    
                     <?php
                     // Definir las horas de la tabla (de 7:00 a 16:00)
                     $horas_tabla = [];
@@ -170,8 +185,8 @@ include("includes/head.php");
                         </table>
                     </div>
                     
-                    <!-- Leyenda de materias -->
-                    <div class="card border-left-primary shadow py-2">
+                    <!-- Leyenda de materias (solo para web) -->
+                    <div class="card border-left-primary shadow py-2 web-only">
                         <div class="card-body">
                             <h5 class="font-weight-bold text-primary mb-3">
                                 <i class="fas fa-info-circle"></i> Detalle de Materias
@@ -256,9 +271,17 @@ include("includes/head.php");
                 top: 0;
                 width: 100%;
             }
-            .btn, .mb-4 {
+            .btn, .web-only {
                 display: none !important;
             }
+            .pdf-only {
+                display: block !important;
+            }
+        }
+        
+        /* Estilos para PDF */
+        .pdf-only {
+            display: none;
         }
         </style>
         
@@ -268,8 +291,86 @@ include("includes/head.php");
             $('[data-toggle="tooltip"]').tooltip();
         });
         
-        function imprimirHorario() {
-            window.print();
+        // Función para generar el PDF con membrete
+        function generarPDF() {
+            // Mostrar información para PDF
+            document.getElementById('pdf-info').style.display = 'block';
+            
+            // Configuración de jsPDF
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const margin = 10;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            
+            // Función para agregar membrete al PDF
+            function agregarMembretePDF(doc, pageWidth, margin) {
+                // Cargar imagen del logo
+                const logoImg = new Image();
+                logoImg.crossOrigin = 'Anonymous';
+                logoImg.src = '../images/uptpc.png';
+                
+                return new Promise((resolve) => {
+                    logoImg.onload = function() {
+                        // Agregar logo (arriba a la izquierda)
+                        doc.addImage(logoImg, 'PNG', margin, 10, 20, 20);
+                        
+                        // Agregar texto del membrete
+                        doc.setFontSize(12);
+                        doc.setFont(undefined, 'bold');
+                        doc.text('República Bolivariana de Venezuela', pageWidth / 2, 15, { align: 'center' });
+                        doc.text('Ministerio del Poder Popular para la Educación Universitaria', pageWidth / 2, 20, { align: 'center' });
+                        doc.text('Universidad Politécnica Territorial de Puerto Cabello', pageWidth / 2, 25, { align: 'center' });
+                        
+                        // Agregar fecha
+                        const hoy = new Date();
+                        const fecha = hoy.toLocaleDateString('es-ES');
+                        doc.setFont(undefined, 'normal');
+                        doc.text(fecha, pageWidth - margin, 15, { align: 'right' });
+                        
+                        resolve(35); // Retornar posición Y después del membrete
+                    };
+                    
+                    logoImg.onerror = function() {
+                        // Fallback sin imagen
+                        doc.setFontSize(12);
+                        doc.setFont(undefined, 'bold');
+                        doc.text('República Bolivariana de Venezuela', pageWidth / 2, 15, { align: 'center' });
+                        doc.text('Ministerio del Poder Popular para la Educación Universitaria', pageWidth / 2, 20, { align: 'center' });
+                        doc.text('Universidad Politécnica Territorial de Puerto Cabello', pageWidth / 2, 25, { align: 'center' });
+                        
+                        // Agregar fecha
+                        const hoy = new Date();
+                        const fecha = hoy.toLocaleDateString('es-ES');
+                        doc.setFont(undefined, 'normal');
+                        doc.text(fecha, pageWidth / 2, 32, { align: 'center' });
+                        
+                        resolve(40); // Retornar posición Y después del membrete
+                    };
+                });
+            }
+            
+            // Llamar a la función para agregar el membrete
+            agregarMembretePDF(doc, pageWidth, margin).then(startY => {
+                // Capturar el contenido HTML y agregarlo al PDF
+                html2canvas(document.getElementById('horario-clases'), {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/jpeg', 1.0);
+                    const imgWidth = pageWidth - (margin * 2);
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    
+                    // Agregar contenido al PDF
+                    doc.addImage(imgData, 'JPEG', margin, startY, imgWidth, imgHeight);
+                    
+                    // Guardar el PDF
+                    doc.save('Horario_<?= $seccion_estudiante['codigo_seccion'] ?>.pdf');
+                    
+                    // Ocultar información para PDF después de generarlo
+                    document.getElementById('pdf-info').style.display = 'none';
+                });
+            });
         }
         </script>
         

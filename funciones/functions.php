@@ -4723,9 +4723,9 @@ function generarMembreteJS() {
                 // Agregar texto del membrete
                 doc.setFontSize(12);
                 doc.setFont(undefined, 'bold');
-                doc.text('República Bolivariana de Venezuela', pageWidth / 2, 15, { align: 'center' });
-                doc.text('Ministerio del Poder Popular para la Educación Universitaria', pageWidth / 2, 20, { align: 'center' });
-                doc.text('Universidad Politécnica Territorial de Puerto Cabello', pageWidth / 2, 25, { align: 'center' });
+                doc.text('REPÚBLICA BOLIVARIANA DE VENEZUELA', pageWidth / 2, 15, { align: 'center' });
+                doc.text('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA', pageWidth / 2, 20, { align: 'center' });
+                doc.text('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO', pageWidth / 2, 25, { align: 'center' });
                 
                 // Agregar fecha
                 doc.setFont(undefined, 'normal');
