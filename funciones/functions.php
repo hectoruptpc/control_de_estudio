@@ -3522,7 +3522,7 @@ function obtenerIngresos($db) {
 
 
 // Constante para el mínimo de estudiantes requeridos
-define('MINIMO_ESTUDIANTES', 15);
+define('MINIMO_ESTUDIANTES', 10);
 
 /**
  * Crea una nueva sección en la base de datos
