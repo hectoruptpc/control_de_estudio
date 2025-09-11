@@ -5072,6 +5072,53 @@ function obtenerSeccionEstudiante($db, $estudiante_id) {
 
 
 
+//SEMESTRE O TRIMESTRE POR CARRERA ***********************************************************************
+
+
+function obtenerTipoPeriodoPorCarrera($id_carrera) {
+    global $db;
+    
+    // Consultar el nombre de la carrera desde la base de datos
+    $query = "SELECT nombre_carrera FROM carreras WHERE id_carrera = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $id_carrera);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $carrera = $result->fetch_assoc();
+        $nombre_carrera = strtolower(trim($carrera['nombre_carrera']));
+        
+        // Carreras que usan trimestre
+        if (strpos($nombre_carrera, 'Informatica') !== false ||
+            strpos($nombre_carrera, 'Materiales Industriales') !== false ||
+            strpos($nombre_carrera, 'Mantenimiento') !== false ||
+            strpos($nombre_carrera, 'Mecanica') !== false) {
+            return 'trimestre';
+        }
+        
+        // Carreras que usan semestre
+        if (strpos($nombre_carrera, 'Turismo') !== false ||
+            strpos($nombre_carrera, 'Logistica y Distribucion') !== false ||
+            strpos($nombre_carrera, 'Mecanica Termica') !== false ||
+            strpos($nombre_carrera, 'Mecanica Automotriz') !== false) {
+            return 'semestre';
+        }
+    }
+    
+    // Valor por defecto si no se encuentra coincidencia
+    return 'semestre';
+}
+?>
+
+
+
+
+
+
+
+
+
 
 
 
