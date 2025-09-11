@@ -5081,33 +5081,60 @@ function obtenerTipoPeriodoPorCarrera($id_carrera) {
     // Consultar el nombre de la carrera desde la base de datos
     $query = "SELECT nombre_carrera FROM carreras WHERE id_carrera = ?";
     $stmt = $db->prepare($query);
+    
+    if (!$stmt) {
+        error_log("Error en preparación de consulta: " . $db->error);
+        return 'semestre'; // Valor por defecto en caso de error
+    }
+    
     $stmt->bind_param("i", $id_carrera);
-    $stmt->execute();
+    
+    if (!$stmt->execute()) {
+        error_log("Error ejecutando consulta: " . $stmt->error);
+        return 'semestre'; // Valor por defecto en caso de error
+    }
+    
     $result = $stmt->get_result();
     
     if ($result->num_rows > 0) {
         $carrera = $result->fetch_assoc();
         $nombre_carrera = strtolower(trim($carrera['nombre_carrera']));
         
+        error_log("Carrera consultada: " . $nombre_carrera); // Para debugging
+        
         // Carreras que usan trimestre
-        if (strpos($nombre_carrera, 'Informatica') !== false ||
-            strpos($nombre_carrera, 'Materiales Industriales') !== false ||
-            strpos($nombre_carrera, 'Mantenimiento') !== false ||
-            strpos($nombre_carrera, 'Mecanica') !== false) {
-            return 'trimestre';
+        $carreras_trimestre = [
+            'informatica',
+            'materiales industriales',
+            'mantenimiento',
+            'mecanica'
+        ];
+        
+        foreach ($carreras_trimestre as $carrera_trim) {
+            if (strpos($nombre_carrera, $carrera_trim) !== false) {
+                error_log("Carrera identificada como TRIMESTRE: " . $nombre_carrera);
+                return 'trimestre';
+            }
         }
         
         // Carreras que usan semestre
-        if (strpos($nombre_carrera, 'Turismo') !== false ||
-            strpos($nombre_carrera, 'Logistica y Distribucion') !== false ||
-            strpos($nombre_carrera, 'Mecanica Termica') !== false ||
-            strpos($nombre_carrera, 'Mecanica Automotriz') !== false) {
-            return 'semestre';
+        $carreras_semestre = [
+            'turismo',
+            'logistica y distribucion',
+            'mecanica termica',
+            'mecanica automotriz'
+        ];
+        
+        foreach ($carreras_semestre as $carrera_sem) {
+            if (strpos($nombre_carrera, $carrera_sem) !== false) {
+                error_log("Carrera identificada como SEMESTRE: " . $nombre_carrera);
+                return 'semestre';
+            }
         }
     }
     
-    // Valor por defecto si no se encuentra coincidencia
-    return 'semestre';
+    error_log("Carrera no encontrada en listas, usando valor por defecto: semestre");
+    return 'semestre'; // Valor por defecto si no se encuentra coincidencia
 }
 
 
