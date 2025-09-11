@@ -11,60 +11,11 @@ if (!isLoggedIn() || !isEstudiante()) {
 $titulopag = "Sistema de Mensajería - Estudiante";
 include("includes/head.php");
 
-// Obtener mensajes recibidos
-function obtenerMensajesRecibidos($user_id) {
-    global $db;
-    
-    $query = "SELECT m.*, u.nombre as remitente_nombre, u.usuario as remitente_usuario,
-                     u.estudiante, u.docente, u.admin, u.idusuario as remitente_cedula
-              FROM mensajeria m
-              INNER JOIN users u ON m.id_usuario_remitente = u.id
-              WHERE m.id_usuario_destinatario = ? 
-              AND m.eliminado_destinatario = FALSE
-              ORDER BY m.fecha_envio DESC";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    return $stmt->get_result();
-}
-
-// Función para obtener el tipo de usuario basado en los campos booleanos
-function obtenerTipoUsuario($usuario) {
-    if ($usuario['estudiante'] == 1) return 'Estudiante';
-    if ($usuario['docente'] == 1) return 'Docente';
-    if ($usuario['admin'] == 1) return 'Administrador';
-    if ($usuario['super_user'] == 1) return 'Super Usuario';
-    return 'Usuario';
-}
-
-// Función para obtener un mensaje específico
-function obtenerMensaje($mensaje_id, $user_id) {
-    global $db;
-    
-    $query = "SELECT m.*, u.nombre as remitente_nombre, u.usuario as remitente_usuario,
-                     u.email as remitente_email, u.estudiante, u.docente, u.admin,
-                     u.idusuario as remitente_cedula
-              FROM mensajeria m
-              INNER JOIN users u ON m.id_usuario_remitente = u.id
-              WHERE m.id = ? AND m.id_usuario_destinatario = ? 
-              AND m.eliminado_destinatario = FALSE";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("ii", $mensaje_id, $user_id);
-    $stmt->execute();
-    return $stmt->get_result()->fetch_assoc();
-}
-
 // Marcar como leído (ahora se hará vía AJAX o al cargar el modal)
 if (isset($_GET['marcar_leido'])) {
     $mensaje_id = (int)$_GET['marcar_leido'];
     $user_id = $_SESSION['user']['id'];
-    
-    $query = "UPDATE mensajeria SET leido = TRUE 
-              WHERE id = ? AND id_usuario_destinatario = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("ii", $mensaje_id, $user_id);
-    $stmt->execute();
+    marcarMensajeLeido($mensaje_id, $user_id);
 }
 
 // Obtener mensaje para modal si se solicita
@@ -73,15 +24,11 @@ if (isset($_GET['ver_mensaje'])) {
     $mensaje_id = (int)$_GET['ver_mensaje'];
     $user_id = $_SESSION['user']['id'];
     
-    $mensaje_modal = obtenerMensaje($mensaje_id, $user_id);
+    $mensaje_modal = obtenerMensaje($mensaje_id, $user_id, 'recibidos');
     
     // Si es un mensaje no leído, marcarlo como leído
     if ($mensaje_modal && !$mensaje_modal['leido']) {
-        $query = "UPDATE mensajeria SET leido = TRUE 
-                  WHERE id = ? AND id_usuario_destinatario = ?";
-        $stmt = $db->prepare($query);
-        $stmt->bind_param("ii", $mensaje_id, $user_id);
-        $stmt->execute();
+        marcarMensajeLeido($mensaje_id, $user_id);
         $mensaje_modal['leido'] = true;
     }
 }

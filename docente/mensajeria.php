@@ -3,129 +3,13 @@ require_once('../funciones/functions.php');
 
 // Verificar autenticación y rol
 if (!isLoggedIn() || !isDocente()) {
-    $_SESSION['msg'] = "Debes iniciar sesión como docente para acceder";
+    $_SESSION['msg'] = "Debes iniciar sesión como Docente para acceder";
     header('location: ../login.php');
     exit();
 }
 
 $titulopag = "Sistema de Mensajería";
 include("includes/head.php");
-
-// Obtener lista de usuarios para enviar mensajes con filtros
-function obtenerUsuarios($filtro_tipo = '', $busqueda_cedula = '') {
-    global $db;
-    $current_user_id = $_SESSION['user']['id'];
-    
-    $query = "SELECT id, nombre, usuario, estudiante, docente, admin, idusuario 
-              FROM users 
-              WHERE id != ? AND status = 1";
-    
-    $params = array($current_user_id);
-    $types = "i";
-    
-    // Aplicar filtro por tipo de usuario
-    if (!empty($filtro_tipo)) {
-        if ($filtro_tipo === 'estudiante') {
-            $query .= " AND estudiante = 1";
-        } elseif ($filtro_tipo === 'docente') {
-            $query .= " AND docente = 1";
-        } elseif ($filtro_tipo === 'admin') {
-            $query .= " AND admin = 1";
-        }
-    }
-    
-    // Aplicar búsqueda por cédula
-    if (!empty($busqueda_cedula)) {
-        $query .= " AND idusuario LIKE ?";
-        $params[] = "%$busqueda_cedula%";
-        $types .= "s";
-    }
-    
-    $query .= " ORDER BY nombre";
-    
-    $stmt = $db->prepare($query);
-    
-    // Bind parameters dinámicamente
-    if (count($params) > 1) {
-        $stmt->bind_param($types, ...$params);
-    } else {
-        $stmt->bind_param($types, $params[0]);
-    }
-    
-    $stmt->execute();
-    return $stmt->get_result();
-}
-
-// Función para obtener el tipo de usuario basado en los campos booleanos
-function obtenerTipoUsuario($usuario) {
-    if ($usuario['estudiante'] == 1) return 'Estudiante';
-    if ($usuario['docente'] == 1) return 'Docente';
-    if ($usuario['admin'] == 1) return 'Administrador';
-    if ($usuario['super_user'] == 1) return 'Super Usuario';
-    return 'Usuario';
-}
-
-// Obtener mensajes recibidos
-function obtenerMensajesRecibidos($user_id) {
-    global $db;
-    
-    $query = "SELECT m.*, u.nombre as remitente_nombre, u.usuario as remitente_usuario,
-                     u.estudiante, u.docente, u.admin, u.idusuario as remitente_cedula
-              FROM mensajeria m
-              INNER JOIN users u ON m.id_usuario_remitente = u.id
-              WHERE m.id_usuario_destinatario = ? 
-              AND m.eliminado_destinatario = FALSE
-              ORDER BY m.fecha_envio DESC";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    return $stmt->get_result();
-}
-
-// Obtener mensajes enviados
-function obtenerMensajesEnviados($user_id) {
-    global $db;
-    
-    $query = "SELECT m.*, u.nombre as destinatario_nombre, u.usuario as destinatario_usuario,
-                     u.estudiante, u.docente, u.admin, u.idusuario as destinatario_cedula
-              FROM mensajeria m
-              INNER JOIN users u ON m.id_usuario_destinatario = u.id
-              WHERE m.id_usuario_remitente = ? 
-              AND m.eliminado_remitente = FALSE
-              ORDER BY m.fecha_envio DESC";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    return $stmt->get_result();
-}
-
-// Función para obtener un mensaje específico
-function obtenerMensaje($mensaje_id, $user_id, $tipo) {
-    global $db;
-    
-    if ($tipo === 'recibidos') {
-        $query = "SELECT m.*, u.nombre as remitente_nombre, u.usuario as remitente_usuario,
-                         u.email as remitente_email, u.estudiante, u.docente, u.admin,
-                         u.idusuario as remitente_cedula
-                  FROM mensajeria m
-                  INNER JOIN users u ON m.id_usuario_remitente = u.id
-                  WHERE m.id = ? AND m.id_usuario_destinatario = ? 
-                  AND m.eliminado_destinatario = FALSE";
-    } else {
-        $query = "SELECT m.*, u.nombre as destinatario_nombre, u.usuario as destinatario_usuario,
-                         u.email as destinatario_email, u.estudiante, u.docente, u.admin,
-                         u.idusuario as destinatario_cedula
-                  FROM mensajeria m
-                  INNER JOIN users u ON m.id_usuario_destinatario = u.id
-                  WHERE m.id = ? AND m.id_usuario_remitente = ? 
-                  AND m.eliminado_remitente = FALSE";
-    }
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("ii", $mensaje_id, $user_id);
-    $stmt->execute();
-    return $stmt->get_result()->fetch_assoc();
-}
 
 // Procesar filtros y búsqueda
 $filtro_tipo = isset($_GET['filtro_tipo']) ? $_GET['filtro_tipo'] : '';
@@ -139,12 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enviar_mensaje'])) {
     $mensaje = trim($_POST['mensaje']);
     
     if (!empty($titulo) && !empty($mensaje) && $destinatario_id > 0) {
-        $query = "INSERT INTO mensajeria (id_usuario_remitente, id_usuario_destinatario, titulo, mensaje)
-                  VALUES (?, ?, ?, ?)";
-        $stmt = $db->prepare($query);
-        $stmt->bind_param("iiss", $remitente_id, $destinatario_id, $titulo, $mensaje);
-        
-        if ($stmt->execute()) {
+        if (enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje)) {
             $mensaje_exito = "Mensaje enviado correctamente";
         } else {
             $mensaje_error = "Error al enviar el mensaje";
@@ -159,11 +38,7 @@ if (isset($_GET['marcar_leido'])) {
     $mensaje_id = (int)$_GET['marcar_leido'];
     $user_id = $_SESSION['user']['id'];
     
-    $query = "UPDATE mensajeria SET leido = TRUE 
-              WHERE id = ? AND id_usuario_destinatario = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("ii", $mensaje_id, $user_id);
-    $stmt->execute();
+    marcarMensajeLeido($mensaje_id, $user_id);
 }
 
 // Obtener mensaje para modal si se solicita
@@ -177,16 +52,13 @@ if (isset($_GET['ver_mensaje'])) {
     
     // Si es un mensaje recibido y no leído, marcarlo como leído
     if ($tipo === 'recibidos' && $mensaje_modal && !$mensaje_modal['leido']) {
-        $query = "UPDATE mensajeria SET leido = TRUE 
-                  WHERE id = ? AND id_usuario_destinatario = ?";
-        $stmt = $db->prepare($query);
-        $stmt->bind_param("ii", $mensaje_id, $user_id);
-        $stmt->execute();
+        marcarMensajeLeido($mensaje_id, $user_id);
         $mensaje_modal['leido'] = true;
     }
 }
 
-$usuarios = obtenerUsuarios($filtro_tipo, $busqueda_cedula);
+// Obtener datos usando las funciones existentes
+$usuarios = obtenerUsuariosMensajeria($filtro_tipo, $busqueda_cedula);
 $mensajes_recibidos = obtenerMensajesRecibidos($_SESSION['user']['id']);
 $mensajes_enviados = obtenerMensajesEnviados($_SESSION['user']['id']);
 ?>
