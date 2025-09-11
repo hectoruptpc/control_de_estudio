@@ -590,218 +590,320 @@ include("includes/head.php");
         </script>
 
     <?php elseif ($action === 'view_schedule' && $seccion_id > 0): ?>
-        <!-- VISTA DE HORARIO SEMANAL -->
-        <?php
-        $seccion = obtenerDetalleSeccion($db, $seccion_id);
-        $horarios = obtenerHorariosSeccion($db, $seccion_id);
+    <!-- VISTA DE HORARIO SEMANAL -->
+    <?php
+    $seccion = obtenerDetalleSeccion($db, $seccion_id);
+    $horarios = obtenerHorariosSeccion($db, $seccion_id);
+    
+    // Asegurarnos que $horarios es un array
+    $horarios = is_array($horarios) ? $horarios : [];
+    
+    // Preparar datos para la leyenda
+    $leyenda_materias = [];
+    ?>
+    
+    <h1 class="h3 mb-4 text-gray-800">Horario Semanal - <?= htmlspecialchars($seccion['codigo_seccion']) ?></h1>
+    
+    <!-- Botones fuera de la caja del horario -->
+    <div class="mb-3">
+        <a href="gestion_seccion.php?action=view&id=<?= $seccion_id ?>" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Volver a la sección
+        </a>
+        <button class="btn btn-success float-right ml-2" onclick="generarPDF()">
+            <i class="fas fa-file-pdf"></i> Descargar PDF
+        </button>
         
-        // Asegurarnos que $horarios es un array
-        $horarios = is_array($horarios) ? $horarios : [];
-        
-        // Preparar datos para la leyenda
-        $leyenda_materias = [];
-        ?>
-        
-        <h1 class="h3 mb-4 text-gray-800">Horario Semanal - <?= htmlspecialchars($seccion['codigo_seccion']) ?></h1>
-        
-        <!-- Botones fuera de la caja del horario -->
-        <div class="mb-3">
-            <a href="gestion_seccion.php?action=view&id=<?= $seccion_id ?>" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Volver a la sección
-            </a>
-            <button class="btn btn-success float-right" onclick="imprimirHorario()">
-                <i class="fas fa-print"></i> Imprimir Horario
-            </button>
+    </div>
+    
+    <div class="card shadow mb-4" id="horario-clases">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">Horario de Clases</h6>
+            <span class="badge badge-info"><?= count($horarios) ?> bloques horarios</span>
         </div>
-        
-        <div class="card shadow mb-4" id="horario-clases">
-            <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                <h6 class="m-0 font-weight-bold text-primary">Horario de Clases</h6>
-                <span class="badge badge-info"><?= count($horarios) ?> bloques horarios</span>
-            </div>
-            <div class="card-body">
-                <?php if (empty($horarios)): ?>
-                    <div class="alert alert-info">
-                        No se han definido horarios para esta sección.
-                    </div>
-                <?php else: ?>
-                    <?php
-                    // 1. Definir las horas de la tabla (de 7:00 a 16:00)
-                    $horas_tabla = [];
-                    for ($h = 7; $h <= 16; $h++) {
-                        $horas_tabla[] = sprintf("%02d:00", $h);
-                    }
+        <div class="card-body">
+            <?php if (empty($horarios)): ?>
+                <div class="alert alert-info">
+                    No se han definido horarios para esta sección.
+                </div>
+            <?php else: ?>
+                <!-- Información para PDF (oculta en web) -->
+                <div id="pdf-info" class="pdf-only text-center mb-3" style="display: none;">
+                    <h4>Universidad Politécnica Territorial de Puerto Cabello</h4>
+                    <h5>Horario de Clases - <?= htmlspecialchars($seccion['codigo_seccion']) ?></h5>
+                    <p>
+                        <strong>Carrera:</strong> <?= htmlspecialchars($seccion['nombre_carrera']) ?> | 
+                        <strong>Trayecto:</strong> <?= $seccion['numero_trayecto'] ?> | 
+                        <strong>Período:</strong> <?= htmlspecialchars($seccion['nombre_periodo']) ?>
+                    </p>
+                </div>
+                
+                <?php
+                // 1. Definir las horas de la tabla (de 7:00 a 16:00)
+                $horas_tabla = [];
+                for ($h = 7; $h <= 16; $h++) {
+                    $horas_tabla[] = sprintf("%02d:00", $h);
+                }
+                
+                // 2. Organizar los horarios por día
+                $dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                $horarios_por_dia = array_fill(0, 6, []);
+                
+                foreach ($horarios as $horario) {
+                    $dia = (int)$horario['dia'];
+                    $hora_inicio = date('H:i', strtotime($horario['hora_inicio']));
+                    $hora_fin = date('H:i', strtotime($horario['hora_fin']));
                     
-                    // 2. Organizar los horarios por día
-                    $dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-                    $horarios_por_dia = array_fill(0, 6, []);
+                    $horarios_por_dia[$dia][] = [
+                        'materia' => $horario['nombre_materia'],
+                        'docente' => $horario['nombre_docente'],
+                        'aula' => $horario['aula'],
+                        'hora_inicio' => $hora_inicio,
+                        'hora_fin' => $hora_fin,
+                        'cod_materia' => $horario['cod_materia'] ?? ''
+                    ];
                     
-                    foreach ($horarios as $horario) {
-                        $dia = (int)$horario['dia'];
-                        $hora_inicio = date('H:i', strtotime($horario['hora_inicio']));
-                        $hora_fin = date('H:i', strtotime($horario['hora_fin']));
-                        
-                        $horarios_por_dia[$dia][] = [
+                    // Preparar datos para la leyenda
+                    $clave_leyenda = $horario['nombre_materia'].$horario['nombre_docente'].$horario['aula'];
+                    if (!isset($leyenda_materias[$clave_leyenda])) {
+                        $leyenda_materias[$clave_leyenda] = [
                             'materia' => $horario['nombre_materia'],
                             'docente' => $horario['nombre_docente'],
                             'aula' => $horario['aula'],
-                            'hora_inicio' => $hora_inicio,
-                            'hora_fin' => $hora_fin,
-                            'cod_materia' => $horario['cod_materia'] ?? ''
+                            'horario' => $hora_inicio.' - '.$hora_fin
                         ];
-                        
-                        // Preparar datos para la leyenda
-                        $clave_leyenda = $horario['nombre_materia'].$horario['nombre_docente'].$horario['aula'];
-                        if (!isset($leyenda_materias[$clave_leyenda])) {
-                            $leyenda_materias[$clave_leyenda] = [
-                                'materia' => $horario['nombre_materia'],
-                                'docente' => $horario['nombre_docente'],
-                                'aula' => $horario['aula'],
-                                'horario' => $hora_inicio.' - '.$hora_fin
-                            ];
-                        }
                     }
-                    ?>
-                    
-                    <div class="table-responsive mb-4">
-                        <table class="table table-bordered table-hover">
-                            <thead class="thead-dark">
-                                <tr>
-                                    <th>Hora</th>
-                                    <?php foreach ($dias_semana as $dia): ?>
-                                        <th><?= $dia ?></th>
-                                    <?php endforeach; ?>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($horas_tabla as $index => $hora): ?>
-                                    <tr>
-                                        <th><?= $hora ?></th>
-                                        <?php for ($dia = 0; $dia <= 5; $dia++): ?>
-                                            <?php
-                                            $contenido_celda = '';
-                                            $clase_css = 'celda-horario';
-                                            $es_continuacion = false;
-                                            
-                                            // Buscar si hay una clase en esta hora y día
-                                            foreach ($horarios_por_dia[$dia] as $clase) {
-                                                if ($hora >= $clase['hora_inicio'] && $hora < $clase['hora_fin']) {
-                                                    $contenido_celda = htmlspecialchars($clase['materia']);
-                                                    $clase_css = 'horario-block';
-                                                    
-                                                    // Verificar si es continuación
-                                                    if ($hora != $clase['hora_inicio']) {
-                                                        $clase_css .= ' continuacion';
-                                                        $es_continuacion = true;
-                                                    }
-                                                    break;
-                                                }
-                                            }
-                                            ?>
-                                            <td class="<?= $clase_css ?>">
-                                                <?php if ($es_continuacion): ?>
-                                                    <span class="continuacion-simbolo">↳</span>
-                                                <?php endif; ?>
-                                                <?= $contenido_celda ?>
-                                            </td>
-                                        <?php endfor; ?>
-                                    </tr>
+                }
+                ?>
+                
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered table-hover">
+                        <thead class="thead-dark">
+                            <tr>
+                                <th>Hora</th>
+                                <?php foreach ($dias_semana as $dia): ?>
+                                    <th><?= $dia ?></th>
                                 <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        <!-- Leyenda de materias -->
-                        <div class="card border-left-primary shadow py-2 mb-4">
-                            <div class="card-body">
-                                <h5 class="font-weight-bold text-primary mb-3">Detalle de Materias</h5>
-                                <div class="row">
-                                    <?php foreach ($leyenda_materias as $item): ?>
-                                        <div class="col-md-4 mb-2">
-                                            <div class="d-flex align-items-center">
-                                                <div class="mr-2">
-                                                    <i class="fas fa-book text-gray-500"></i>
-                                                </div>
-                                                <div>
-                                                    <strong><?= htmlspecialchars($item['materia']) ?></strong><br>
-                                                    <small class="text-muted">
-                                                        <?= htmlspecialchars($item['horario']) ?><br>
-                                                        Prof: <?= htmlspecialchars($item['docente']) ?> | 
-                                                        Aula: <?= htmlspecialchars($item['aula']) ?>
-                                                    </small>
-                                                </div>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($horas_tabla as $index => $hora): ?>
+                                <tr>
+                                    <th><?= $hora ?></th>
+                                    <?php for ($dia = 0; $dia <= 5; $dia++): ?>
+                                        <?php
+                                        $contenido_celda = '';
+                                        $clase_css = 'celda-horario';
+                                        $es_continuacion = false;
+                                        
+                                        // Buscar si hay una clase en esta hora y día
+                                        foreach ($horarios_por_dia[$dia] as $clase) {
+                                            if ($hora >= $clase['hora_inicio'] && $hora < $clase['hora_fin']) {
+                                                $contenido_celda = htmlspecialchars($clase['materia']);
+                                                $clase_css = 'horario-block';
+                                                
+                                                // Verificar si es continuación
+                                                if ($hora != $clase['hora_inicio']) {
+                                                    $clase_css .= ' continuacion';
+                                                    $es_continuacion = true;
+                                                }
+                                                break;
+                                            }
+                                        }
+                                        ?>
+                                        <td class="<?= $clase_css ?>">
+                                            <?php if ($es_continuacion): ?>
+                                                <span class="continuacion-simbolo">↳</span>
+                                            <?php endif; ?>
+                                            <?= $contenido_celda ?>
+                                        </td>
+                                    <?php endfor; ?>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Leyenda de materias -->
+                    <div class="card border-left-primary shadow py-2 mb-4">
+                        <div class="card-body">
+                            <h5 class="font-weight-bold text-primary mb-3">Detalle de Materias</h5>
+                            <div class="row">
+                                <?php foreach ($leyenda_materias as $item): ?>
+                                    <div class="col-md-4 mb-2">
+                                        <div class="d-flex align-items-center">
+                                            <div class="mr-2">
+                                                <i class="fas fa-book text-gray-500"></i>
+                                            </div>
+                                            <div>
+                                                <strong><?= htmlspecialchars($item['materia']) ?></strong><br>
+                                                <small class="text-muted">
+                                                    <?= htmlspecialchars($item['horario']) ?><br>
+                                                    Prof: <?= htmlspecialchars($item['docente']) ?> | 
+                                                    Aula: <?= htmlspecialchars($item['aula']) ?>
+                                                </small>
                                             </div>
                                         </div>
-                                    <?php endforeach; ?>
-                                </div>
+                                    </div>
+                                <?php endforeach; ?>
                             </div>
                         </div>
-                    <?php endif; ?>
-                </div>
+                    </div>
+                <?php endif; ?>
             </div>
+        </div>
+        
+        <style>
+        .horario-block {
+            background-color: #f8f9fa;
+            border-left: 4px solid #4e73df;
+            text-align: center;
+            font-weight: bold;
+            vertical-align: middle;
+            position: relative;
+        }
+        
+        .horario-block.continuacion {
+            background-color: #f1f3f9;
+            border-left: 4px solid #a0a7c5;
+            font-weight: normal;
+        }
+        
+        .continuacion-simbolo {
+            color: #6c757d;
+            margin-right: 5px;
+        }
+        
+        .table {
+            table-layout: fixed;
+            border-collapse: collapse;
+        }
+        
+        .table th, .table td {
+            padding: 10px;
+            height: 50px;
+            vertical-align: middle;
+            border: 1px solid #dee2e6;
+        }
+        
+        .celda-horario {
+            background-color: white;
+        }
+        
+        /* Estilos para impresión */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #horario-clases, #horario-clases * {
+                visibility: visible;
+            }
+            #horario-clases {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .btn, .mb-3 {
+                display: none !important;
+            }
+            .pdf-only {
+                display: block !important;
+            }
+        }
+        
+        /* Estilos para PDF */
+        .pdf-only {
+            display: none;
+        }
+        </style>
+        
+        <script>
+        function imprimirHorario() {
+            window.print();
+        }
+        
+        // Función para generar el PDF con membrete
+        function generarPDF() {
+            // Mostrar información para PDF
+            document.getElementById('pdf-info').style.display = 'block';
             
-            <style>
-            .horario-block {
-                background-color: #f8f9fa;
-                border-left: 4px solid #4e73df;
-                text-align: center;
-                font-weight: bold;
-                vertical-align: middle;
-                position: relative;
+            // Configuración de jsPDF
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const margin = 10;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            
+            // Función para agregar membrete al PDF
+            function agregarMembretePDF(doc, pageWidth, margin) {
+                // Cargar imagen del logo
+                const logoImg = new Image();
+                logoImg.crossOrigin = 'Anonymous';
+                logoImg.src = '../images/uptpc.png';
+                
+                return new Promise((resolve) => {
+                    logoImg.onload = function() {
+                        // Agregar logo (arriba a la izquierda)
+                        doc.addImage(logoImg, 'PNG', margin, 10, 20, 20);
+                        
+                        // Agregar texto del membrete
+                        doc.setFontSize(12);
+                        doc.setFont(undefined, 'bold');
+                        doc.text('República Bolivariana de Venezuela', pageWidth / 2, 15, { align: 'center' });
+                        doc.text('Ministerio del Poder Popular para la Educación Universitaria', pageWidth / 2, 20, { align: 'center' });
+                        doc.text('Universidad Politécnica Territorial de Puerto Cabello', pageWidth / 2, 25, { align: 'center' });
+                        
+                        // Agregar fecha
+                        const hoy = new Date();
+                        const fecha = hoy.toLocaleDateString('es-ES');
+                        doc.setFont(undefined, 'normal');
+                        doc.text(fecha, pageWidth - margin, 15, { align: 'right' });
+                        
+                        resolve(35); // Retornar posición Y después del membrete
+                    };
+                    
+                    logoImg.onerror = function() {
+                        // Fallback sin imagen
+                        doc.setFontSize(12);
+                        doc.setFont(undefined, 'bold');
+                        doc.text('República Bolivariana de Venezuela', pageWidth / 2, 15, { align: 'center' });
+                        doc.text('Ministerio del Poder Popular para la Educación Universitaria', pageWidth / 2, 20, { align: 'center' });
+                        doc.text('Universidad Politécnica Territorial de Puerto Cabello', pageWidth / 2, 25, { align: 'center' });
+                        
+                        // Agregar fecha
+                        const hoy = new Date();
+                        const fecha = hoy.toLocaleDateString('es-ES');
+                        doc.setFont(undefined, 'normal');
+                        doc.text(fecha, pageWidth / 2, 32, { align: 'center' });
+                        
+                        resolve(40); // Retornar posición Y después del membrete
+                    };
+                });
             }
             
-            .horario-block.continuacion {
-                background-color: #f1f3f9;
-                border-left: 4px solid #a0a7c5;
-                font-weight: normal;
-            }
-            
-            .continuacion-simbolo {
-                color: #6c757d;
-                margin-right: 5px;
-            }
-            
-            .table {
-                table-layout: fixed;
-                border-collapse: collapse;
-            }
-            
-            .table th, .table td {
-                padding: 10px;
-                height: 50px;
-                vertical-align: middle;
-                border: 1px solid #dee2e6;
-            }
-            
-            .celda-horario {
-                background-color: white;
-            }
-            
-            /* Estilos para impresión */
-            @media print {
-                body * {
-                    visibility: hidden;
-                }
-                #horario-clases, #horario-clases * {
-                    visibility: visible;
-                }
-                #horario-clases {
-                    position: absolute;
-                    left: 0;
-                    top: 0;
-                    width: 100%;
-                }
-                .btn, .mb-3 {
-                    display: none !important;
-                }
-            }
-            </style>
-            
-            <script>
-            function imprimirHorario() {
-                window.print();
-            }
-            </script>
+            // Llamar a la función para agregar el membrete
+            agregarMembretePDF(doc, pageWidth, margin).then(startY => {
+                // Capturar el contenido HTML y agregarlo al PDF
+                html2canvas(document.getElementById('horario-clases'), {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/jpeg', 1.0);
+                    const imgWidth = pageWidth - (margin * 2);
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    
+                    // Agregar contenido al PDF
+                    doc.addImage(imgData, 'JPEG', margin, startY, imgWidth, imgHeight);
+                    
+                    // Guardar el PDF
+                    doc.save('Horario_<?= $seccion['codigo_seccion'] ?>.pdf');
+                    
+                    // Ocultar información para PDF después de generarlo
+                    document.getElementById('pdf-info').style.display = 'none';
+                });
+            });
+        }
+        </script>
 
     <?php elseif ($action === 'view' && $seccion_id > 0): ?>
         <!-- VISTA DETALLADA DE SECCIÓN -->
