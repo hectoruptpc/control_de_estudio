@@ -15,15 +15,21 @@ include("includes/head.php");
 function buscarEstudiantePorCedulaPagos($cedula) {
     global $db;
     
-    $query = "SELECT u.id, u.nombre, u.idusuario, u.carrera 
+    $query = "SELECT u.id, u.nombre, u.idusuario, u.carrera, c.nombre_carrera 
               FROM users u 
+              LEFT JOIN carreras c ON u.carrera = c.id_carrera 
               WHERE u.idusuario = ? AND u.estudiante = 1";
     $stmt = $db->prepare($query);
     $stmt->bind_param("s", $cedula);
     $stmt->execute();
     $result = $stmt->get_result();
     
-    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
+    if ($result->num_rows > 0) {
+        $estudiante = $result->fetch_assoc();
+        return $estudiante;
+    }
+    
+    return null;
 }
 
 // Función para obtener los tipos de pago
@@ -319,7 +325,7 @@ $fecha_fin = date('Y-m-d');
                             <div class="alert alert-info">
                                 <strong><?= htmlspecialchars($estudiante['nombre']) ?></strong><br>
                                 Cédula: <?= htmlspecialchars($estudiante['idusuario']) ?><br>
-                                Carrera: <?= htmlspecialchars($estudiante['carrera']) ?>
+                                Carrera: <?= htmlspecialchars($estudiante['nombre_carrera']) ?>
                             </div>
                         </div>
                         
