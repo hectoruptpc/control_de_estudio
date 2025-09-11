@@ -5,12 +5,12 @@ ini_set('display_errors', '1');
 $titulopag = "Mi Horario";
 include('../funciones/functions.php');
 
-// Verificar que el usuario es un estudiante - CORREGIDO según tu estructura
-if (empty($_SESSION['user']['estudiante']) || $_SESSION['user']['estudiante'] != 1) {
-    header("Location: ../login.php");
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isEstudiante()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como estudiante para acceder";
+    header('location: ../login.php');
     exit();
 }
-
 // Obtener la sección del estudiante - CORREGIDO: usar $_SESSION['user']['id']
 $estudiante_id = (int)$_SESSION['user']['id'];
 $seccion_estudiante = obtenerSeccionEstudiante($db, $estudiante_id);
@@ -266,14 +266,6 @@ include("includes/head.php");
         $(document).ready(function() {
             // Inicializar tooltips
             $('[data-toggle="tooltip"]').tooltip();
-            
-            // Ajustar el contenido de las celdas para mejor visualización
-            $('.horario-block').each(function() {
-                var texto = $(this).text();
-                if (texto.length > 20) {
-                    $(this).text(texto.substring(0, 17) + '...');
-                }
-            });
         });
         
         function imprimirHorario() {

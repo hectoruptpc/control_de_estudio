@@ -93,8 +93,8 @@ if (!isLoggedIn() || !isEstudiante()) {
                 <i class="fas fa-book fa-fw"></i> Mis Clases
               </a>
               <div class="dropdown-menu" aria-labelledby="navbarDropdownClases">
-                
-                <a title="Horario" class="dropdown-item" href="../pagina_en_construccion.php">
+
+                <a title="Horario" class="dropdown-item" href="mi_horario.php">
                   <i class="fas fa-calendar-alt fa-fw"></i> Mi Horario
                 </a>
                 <a title="Secciones" class="dropdown-item" href="mis_secciones.php">
