@@ -5045,10 +5045,29 @@ function enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje) {
 
 
 
+//MI HORARIO ESTUDIANTE ***********************************************************************
 
 
-
-
+// Obtener la sección del estudiante - CORREGIDO: tabla periodos_academicos
+function obtenerSeccionEstudiante($db, $estudiante_id) {
+    $sql = "SELECT s.id_seccion, s.codigo_seccion, s.id_carrera, c.nombre_carrera, 
+                   t.numero_trayecto, p.nombre_periodo, s.capacidad_maxima, s.inicia,
+                   s.estatus, COUNT(es.id_usuario) as inscritos, p.activo as periodo_activo
+            FROM estudiante_seccion es
+            INNER JOIN secciones s ON es.id_seccion = s.id_seccion
+            INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+            INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+            INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo  -- Cambiado a periodos_academicos
+            WHERE es.id_usuario = ? AND es.estatus = 'activo'
+            GROUP BY s.id_seccion";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $estudiante_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
 
 
 

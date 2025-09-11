@@ -559,7 +559,15 @@ include("includes/head.php");
         </script>
 
     <?php elseif ($action === 'view_schedule' && $seccion_id > 0): ?>
+
+
+
+
 <!-- VISTA DE HORARIO SEMANAL -->
+
+
+
+
 <?php
 $seccion = obtenerDetalleSeccion($db, $seccion_id);
 $horarios = obtenerHorariosSeccion($db, $seccion_id);

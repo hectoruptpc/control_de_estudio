@@ -147,7 +147,7 @@ if (!isLoggedIn() || !isEstudiante()) {
                         </div>
                         <h3 class="card-title h4 font-weight-bold">Mi Horario</h3>
                         <p class="card-text text-muted">Consulta tu horario de clases semanal</p>
-                        <a href="../pagina_en_construccion.php" class="btn btn-access btn-horario mt-3">Acceder</a>
+                        <a href="mi_horario.php" class="btn btn-access btn-horario mt-3">Acceder</a>
                     </div>
                 </div>
             </div>
