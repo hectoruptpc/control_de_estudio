@@ -206,72 +206,7 @@ include("includes/head.php");
             </div>
         </div>
 
-        <style>
-        .horario-block {
-            background-color: #e3f2fd;
-            border-left: 4px solid #2196F3;
-            text-align: center;
-            font-weight: bold;
-            vertical-align: middle;
-            position: relative;
-            cursor: help;
-        }
         
-        .horario-block.continuacion {
-            background-color: #bbdefb;
-            border-left: 4px solid #64b5f6;
-            font-weight: normal;
-        }
-        
-        .continuacion-simbolo {
-            color: #1976d2;
-            margin-right: 5px;
-        }
-        
-        .celda-horario {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-        }
-        
-        .table {
-            table-layout: fixed;
-            border-collapse: collapse;
-        }
-        
-        .table th, .table td {
-            padding: 12px;
-            height: 60px;
-            vertical-align: middle;
-            border: 1px solid #dee2e6;
-        }
-        
-        /* Estilos para impresión */
-        @media print {
-            body * {
-                visibility: hidden;
-            }
-            #horario-clases, #horario-clases * {
-                visibility: visible;
-            }
-            #horario-clases {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-            }
-            .btn, .web-only {
-                display: none !important;
-            }
-            .pdf-only {
-                display: block !important;
-            }
-        }
-        
-        /* Estilos para PDF */
-        .pdf-only {
-            display: none;
-        }
-        </style>
         
         <script>
         $(document).ready(function() {
