@@ -5069,6 +5069,64 @@ function obtenerSeccionEstudiante($db, $estudiante_id) {
     return $result->fetch_assoc();
 }
 
+// HORARIO DOCENTE ***********************************************************************
+
+
+
+// Obtener los horarios del docente - VERSIÓN CORREGIDA según tu estructura
+function obtenerHorariosDocente($db, $docente_id) {
+    $sql = "SELECT 
+                h.id_horario,
+                h.dia,
+                TIME_FORMAT(h.hora_inicio, '%H:%i') as hora_inicio,
+                TIME_FORMAT(h.hora_fin, '%H:%i') as hora_fin,
+                h.aula,
+                m.nombre_materia,
+                s.codigo_seccion,
+                c.nombre_carrera,
+                t.numero_trayecto,
+                pa.nombre_periodo
+            FROM horarios h
+            INNER JOIN docente_seccion ds ON h.id_docente_seccion = ds.id_docente_seccion
+            INNER JOIN materias m ON ds.id_materia = m.id_materia
+            INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+            INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+            INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+            INNER JOIN periodos_academicos pa ON s.id_periodo = pa.id_periodo
+            WHERE ds.id_usuario = ? 
+            AND ds.estatus = 1  -- Cambiado de 'activo' a 1 según tu código
+            ORDER BY h.dia, h.hora_inicio";
+    
+    $stmt = $db->prepare($sql);
+    
+    if ($stmt) {
+        $stmt->bind_param("i", $docente_id);
+        
+        if ($stmt->execute()) {
+            $result = $stmt->get_result();
+            $horarios = [];
+            
+            while ($row = $result->fetch_assoc()) {
+                $horarios[] = $row;
+            }
+            
+            $stmt->close();
+            return $horarios;
+        } else {
+            error_log("Error ejecutando consulta: " . $stmt->error);
+            $stmt->close();
+            return [];
+        }
+    } else {
+        error_log("Error preparando consulta: " . $db->error);
+        return [];
+    }
+}
+
+
+
+
+
 
 
 
