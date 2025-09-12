@@ -1,0 +1,615 @@
+/* VARIABLES*/
+:root {
+   
+    --colorText: #333;
+    
+    --fondo: #4F628E; 
+    --fuente:'arial';
+    --azul_blanco:#fff;
+  
+}
+
+
+/*coño weón esto es importante borrar los estilos por defecto
+que se tiene en el navegador úsalo weón -_-
+*/
+
+*{
+margin: 0;
+padding: 0;
+font-weight: normal;
+outline: none;
+
+}
+
+body {  
+    font-family: var(--fuente), sans-serif;  
+    line-height: 1.6;  
+    margin: 0;  
+    padding: 0;  
+}  
+
+
+header {  
+    background: var(--fondo);  
+    color: #fff;  
+    padding: 10px 20px;  
+    
+}  
+
+
+nav ul {  
+    list-style: none;  
+    padding: 0;  
+}  
+
+nav ul li {  
+    display: inline;  
+    margin: 0 15px;  
+}  
+
+nav ul li a {  
+    color: #fff;  
+    text-decoration: none;  
+}  
+
+main {  
+    padding: 20px;  
+}  
+
+h2 {  
+    color: var(--colorText);  
+}  
+
+.buscador-contenedor {  
+    display: flex;  
+    justify-content: center; /* Alinear el buscador al centro */  
+    margin-bottom: 20px;  
+}  
+
+.buscador {  
+    display: flex;  
+}  
+
+.buscador input[type="text"] {  
+    padding: 8px;  
+    width: 200px;  
+    margin-right: 10px;  
+}  
+
+.buscador button {  
+    padding: 8px;  
+}  
+
+.libros-contenedor {  
+    border: 1px solid #ddd;  
+    padding: 15px;  
+    border-radius: 5px;  
+    background-color: #f9f9f9;
+    display: flex;
+    flex-direction: row;  
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+
+}  
+
+.libros-contenedor ul {  
+    list-style-type: none;  
+    padding: 0; 
+    margin-right: 2rem;
+    width: 20rem;
+    min-width: 17rem;
+   
+}  
+
+.libros-contenedor li {  
+    margin-bottom: 10px;  
+    border: 1px solid #ccc;  
+    padding-bottom: 10px;
+    padding: 2px 10px;
+    border-radius: 15px;  
+}  
+
+/*===================================*/
+/*===== apartado del formulario =====*/
+/*===================================*/
+.campo {  
+    margin-bottom: 15px;  
+}  
+
+label {  
+    display: block;  
+    margin-bottom: 5px;  
+}  
+
+
+form input, form select {  
+    width: 100%;  
+    padding: 8px;  
+    border: 1px solid #ccc;  
+    border-radius: 4px;  
+}  
+
+
+
+form button, a button {  
+    width: 100%;  
+    padding: 10px;  
+    background: var(--fondo);  
+    color: #fff;  
+    border: none;  
+    border-radius: 4px;  
+    cursor: pointer; 
+}  
+
+form button:hover, a button:hover {   
+    color: #f0a500;
+    
+} 
+ 
+
+
+/*=====================================*/
+/*======== estilos del select =========*/
+/*=====================================*/
+
+
+.select-css{
+
+    display: block;
+    /*font-size: 16px;*/
+    /*font-weight: 600;*/
+    color: #444;
+    line-height: 1.3;
+    
+    width: 500px;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    border:  1px solid #00a4;
+    box-shadow: 0 1px 0 1px rgba(0,0,0, .03);
+    background-color: var(--azul_blanco);
+    background-image: linear-gradient(to bottom, #fff 0%,#fff 100%);
+     background-repeat: no-repeat, repeat;
+    background-position: right .7em top 50%, 0 0;
+    background-size: .65em auto, 100%; 
+    position: relative;
+    z-index: 200;
+
+}
+
+.select-css::-ms-expand{
+ display: none;
+
+}
+.select-css:hover{
+    border-color: #3b82f6; /* focus:border-blue-500 */  
+    display: block;
+}
+
+
+
+.select-css option:hover{
+    font-weight: normal;
+    outline: none;
+
+}
+
+
+
+
+
+
+/*===================================*/
+/*=======  Menu de sistema ==========*/
+/*===================================*/
+.navbar2 {  
+    display: flex;  
+    flex-direction: column;
+    justify-content:center;  
+    align-items: center;  
+    background-color: var(--fondo);  
+    padding: 0px 20px;  
+}
+
+.navbar2 div.cabesera{
+display: flex;
+flex-direction: row;
+justify-content:center;  
+align-items: center; 
+}   
+
+.nav-list {  
+    list-style: none;  
+    display: flex; 
+    position: relative;
+    top: 1.4rem;
+    z-index: 300;
+}  
+
+.nav-list li {
+    text-align: center;
+    margin: 0 1px; 
+    min-width: 6rem; 
+    background: var(--fondo); 
+}  
+ 
+.nav-list a {  
+    color: white;  
+    text-decoration: none;  
+    transition: color 0.3s;  
+}  
+
+
+
+/*=======================*/
+/*=======Sub-menú========*/
+/*=======================*/  
+
+.nav-list li  {  
+    position: relative; 
+    width: auto;
+} 
+
+.nav-list li > a{  
+    padding: .3rem 3rem;
+  
+} 
+.nav-list li:hover  {  
+   
+}
+
+.nav-list li > a:hover  { 
+    background: #5553;  
+   color: #f0a500;
+   text-decoration: none;  
+}  
+
+.nav-list li > ul li:hover {
+background: var(--fondo);
+}
+
+.nav-list li > ul li a{
+background: var(--fondo); 
+margin: 0px;
+display: block;
+padding: 15px 1px;
+width: 100%;
+}
+
+.nav-list li > ul li a:hover{
+background: #5553;
+text-decoration: none;
+
+}
+
+.nav-list li ul {  
+  
+    display: none;
+    width: 100%; 
+    position: absolute;
+    top: 1.7rem;
+    left: 0px;
+
+
+} 
+
+.nav-list li > ul li {
+padding: 0;
+overflow: hidden;
+background: var(--fondo);
+position: relative; 
+width: 100%;   
+}
+
+
+.nav-list li:hover > ul {  
+    display: flex;
+    flex-direction: column;
+
+} 
+
+
+.menu-toggle {  
+    display: none;  
+    flex-direction: column;  
+    cursor: pointer;  
+}  
+
+.menu-toggle .bar {  
+    height: 3px;  
+    width: 25px;  
+    background-color: white;  
+    margin: 3px 0;  
+} 
+
+/*=================================*/
+/*===== titulo de la cabecera =====*/
+/*=================================*/
+
+header nav.navbar2 div.cabesera{
+text-align: left;
+flex-direction: row;
+
+} 
+
+/*================================*/
+/*========= formularios ==========*/
+/*================================*/
+
+div.form{
+    background: #fff;  
+    border-radius: 5px;  
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);  
+    padding: 20px;  
+    max-width: 400px;  
+    margin: 0 auto;
+    width: 50rem; 
+}
+
+div.form h2{
+    text-align: center; 
+    margin-bottom: .3rem; 
+}
+
+div.form form div.campo{
+    width: 100%;
+   
+}
+
+span.noValid{
+    display: none;
+    text-align: center;
+    color: #f00;
+}
+/*=============================*/
+/*==== descarga del folios ====*/
+/*=============================*/
+
+i.pdf{
+    color: #fff;
+    background: #d00;
+    outline: solid #a00 1px;
+    border-radius: 5.5px;
+    padding: 0px;
+    font-size: 2rem;
+    
+}
+
+p a{
+    color: var(--colorText);
+    text-decoration: none;
+    
+}
+
+p a:hover{
+    color: var(--colorText);
+    text-decoration: underline;
+    
+}
+
+/*===============================*/
+/*==== botones de los folios ====*/
+/*===============================*/
+a button{
+    width: 4rem;
+}
+
+/*=========================================*/
+/*=========== visualizar clave  ===========*/
+/*=========================================*/
+
+
+
+.inputLg input.input ~ button{
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #999;
+  font-size: 20px;
+  width: 1rem;
+  padding: 10px;
+  cursor: pointer;
+  position: absolute;
+  bottom: -.4rem;
+  right: 1.2rem;
+  z-index: 200;
+
+}
+.inputLg button:hover{
+  background: transparent;
+ 
+
+}
+
+.icon.icon-eye{
+  transition: color .5s;
+  color: #000;
+
+}
+
+.icon.icon-eye-blocked{
+  transition: color .5s;
+  color: #999;
+
+}
+#clave{
+padding-right: 2rem; 
+
+}
+
+/*========= menu de telefono =============*/
+div.menu{
+    width: 100%;
+    display: none;
+}
+
+div.menu i{
+    font-size: 2rem;
+}
+
+/*===================================*/
+/*============  footer ==============*/
+/*===================================*/
+
+footer {  
+    text-align: center;  
+    padding: 10px 0;  
+    background: var(--fondo);  
+    color: #fff;  
+    margin-top: 10px;
+    margin-bottom: -1px;
+    position: static;  
+    width: 100%;  
+    top: 0px;
+    bottom: 0px; 
+    z-index: 300;
+    padding: 1.2rem 0px;  
+    box-sizing: border-box;  
+}
+  
+ 
+
+/*=========================*/
+/*=======  Main ==========*/
+/*========================*/
+
+main, div.container{
+    height: auto;
+    margin-bottom: 50vh;
+}
+
+div.container2{
+     height: auto;
+    margin-bottom: 10vh;
+}
+
+
+/* Estilos para dispositivos móviles */  
+
+/*del alto*/
+
+/* Estilos para dispositivos móviles */  
+
+@media (min-height: 568px) {  
+
+div.form{
+    
+    margin-top: 5rem;
+
+   
+}
+
+@media (min-height:  768px) {  
+
+div.form{
+    
+    margin-top: 10rem;
+
+   
+}
+
+
+
+
+}
+
+/*del ancho*/
+@media (max-width: 768px) {  
+
+div.menu{
+    width: 100%;
+    display: block;
+    position: relative;
+}
+
+
+div.menu ~ .nav-list { 
+      background: var(--fondo); 
+        display: flex;  
+         justify-content: space-around;
+         flex-direction: column;
+         width: 100%;
+         position: absolute;
+        top: 14rem;
+        right: 100rem;
+        z-index: 400;
+        transition: all 1s;
+        
+    } 
+
+div.menu ~ ul.active { 
+        display: flex;  
+         justify-content: space-around;
+         flex-direction: column;
+         width: 100%;
+         position: absolute;
+        right: .1rem;
+        transition: all 1s;
+
+    } 
+    .nav-list li{ 
+        display: block;  
+         justify-content: space-around;
+         flex-direction: column;
+         width: 100%;
+        transition: width 10s;
+        text-align: left;
+       
+    } 
+
+        .nav-list li a{ 
+        display: block; 
+         width: 100%;
+    
+    } 
+/* sub menu */ 
+ .nav-list li ul {  
+    display: none;
+    overflow: hidden;
+    height: 0px;
+    width: 100%; 
+    position: relative;
+    top: 0rem;
+    left: 0px;
+    transition: all 1s;
+
+}
+
+ .nav-list li ul li a {  
+    padding-left: 2rem;
+    
+} 
+
+
+.nav-list li > ul {  
+    display: block;
+    height: auto;
+    overflow: hidden;
+    transition: all .6s ease-in-out; 
+   
+} 
+
+.nav-list li > ul li {  
+    height: 0px;
+    overflow: hidden;
+      transition: all .6s ease-in-out; 
+   
+}  
+
+ .nav-list li.mostrar > ul {  
+   transition: all .6s ease-in-out;
+    height: auto; 
+    
+}  
+
+
+ .nav-list li.mostrar > ul li{  
+   transition: all .6s ease-in-out; /* Ajusta la transición según lo desees */
+    height: 3rem; /* Establece una altura máxima */
+    
+}    
+
+
+}

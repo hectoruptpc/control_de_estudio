@@ -1,0 +1,33 @@
+/*=============== ALERTAS ================*/
+
+    .swal2-popup, .swal2-modal, .swal2-show{
+
+        display: inline-block;
+        height: 560px;
+
+
+     }
+
+
+      .eliminar{
+
+        display: inline-block;
+        height: 300px;
+        padding: 10px;
+       
+
+
+     }
+
+     iframe.contenPDF{
+     	border: none;
+     }
+
+
+     iframe.contenPDF {
+    width: 100%;
+    height: 500px;
+    border-radius: 8px; /* Borde redondeado */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra */
+}
+

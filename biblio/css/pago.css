@@ -1,0 +1,37 @@
+
+/*para la pactalla de pagar para cuando el cliente no ha pagado*/           
+   
+ .pagar {
+            font-family: 'iconos';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: .4s all;
+            opacity: 0;
+        }
+
+        .pagar .spin2 {
+            position: relative;
+            border-top-color: #000;
+            border-radius: 100%;
+            color: #fff;
+            font-size: 20px;
+        }
+
+        
+         
+
+
+            .spin2 .paga{
+            font-size: 50px; 
+            color: red;
+                
+                
+            }

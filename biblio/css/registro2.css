@@ -1,0 +1,1033 @@
+:root {
+ 
+  --form: #fff; 
+  --azulBtns: #4F628E;
+}
+
+
+
+.containerF{
+  margin-top: 2rem;
+  width: 500px;
+  height: auto;
+  background:  var(--form);
+  text-align: center;
+  border-radius: 5px;
+  padding: 10px 35px 10px 35px;
+  position: relative;
+  z-index: 100;
+  box-shadow: 0 0 6px #0002;
+  justify-content: center;
+}
+.containerF header{
+  background:  var(--form);
+  margin: 0 0 30px 0;
+  color: #333;
+  font-weight: normal;
+}
+.containerF .form-outer{
+  width: 100%;
+  
+}
+.containerF .progress-bar2{
+  display: flex;
+  margin: 40px 0;
+  user-select: none;
+}
+.containerF .progress-bar2 .step{
+  text-align: center;
+  width: 100%;
+  position: relative;
+}
+.containerF .progress-bar2 .step p{
+  font-weight: normal;
+  font-size: 18px;
+  color: #000;
+  margin-bottom: 8px;
+}
+.progress-bar2 .step .bullet{
+  height: 25px;
+  width: 25px;
+  border: 2px solid #000;
+  display: inline-block;
+  border-radius: 50%;
+  position: relative;
+  transition: 0.2s;
+  font-weight: 500;
+  font-size: 17px;
+  line-height: 25px;
+}
+
+.progress-bar2 .step .bullet{
+  
+  
+  border-color: var(--azulBtns)
+  
+}
+
+
+.progress-bar2 .step .bullet.active{
+  
+  
+  border-color: var(--azulBtns);
+  background: var(--azulBtns);
+  position: relative;
+}
+
+
+
+.progress-bar2 .step .bullet span{
+  position: absolute;
+  top: -3.5px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.progress-bar2 .step .bullet .icon{
+  display: none;
+}
+
+.progress-bar2 .step .bullet.active .icon{
+  display: block;
+  position: absolute;
+  top: 2.5px;
+  color: #f0a500;
+
+}
+
+
+.progress-bar2 .step .bullet.active span{
+  display: none;
+}
+.progress-bar2 .step .bullet:before,
+.progress-bar2 .step .bullet:after{
+  position: absolute;
+  content: '';
+  bottom: 11px;
+  right: -79px;
+  height: 3px;
+  width: 70px;
+  background: #333;
+}
+
+
+.progress-bar2 .step .bullet:after{
+  background: #333; 
+}
+.progress-bar2 .step .bullet.active:after{
+  background: #f0a500;
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: animate .5s linear forwards;
+}
+@keyframes animate {
+  100%{
+    transform: scaleX(1);
+  }
+}
+.progress-bar2 .step:last-child .bullet:before,
+.progress-bar2 .step:last-child .bullet:after{
+  display: none;
+}
+
+.progress-bar2 .step {
+  color: #333;
+  transition: 0.2s linear;
+}
+
+.progress-bar2 .step p.pasos{
+   
+  color: #333;
+  transition: 0.2s linear;
+}
+
+.progress-bar2 .step p.active{
+  color: #333;
+  transition: 0.2s linear;
+}
+.progress-bar2 .step .check{
+  position: absolute;
+  left: 50%;
+  top: 70%;
+  font-size: 15px;
+  transform: translate(-50%, -50%);
+  display: none;
+}
+.progress-bar2 .step .check.active{
+  display: block;
+  color: #000;
+}
+
+
+
+/*==========================================*/
+/*========= Paginas del formulario ==========*/
+/*==========================================*/
+
+.containerF .form-outer form{
+  display: flex;
+  width: 100%;
+   overflow: hidden;
+   height: auto;
+}
+.form-outer form .page{
+  width: 100%;
+  transition: margin-left 0.3s ease-in-out;
+  color: #333;
+}
+.form-outer form .page .title{
+  text-align: left;
+  font-size: 25px;
+  font-weight: 500;
+  color: #ffff;
+}
+.form-outer form .page .field{
+  width: 100%;
+  height: 45px;
+  margin: 45px 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+ 
+  
+}
+form .page .field > .label{
+  width: 100%;
+  font-weight: normal;
+  text-align: left;
+}
+form .page .field input, form .page .field textarea{
+  height: auto;
+  width: 100%;
+  border: 1px solid lightgrey;
+  border-radius: 5px;
+  padding-left: 15px;
+  font-size: 18px;
+  
+  font-weight: normal;
+}
+form .page .field select{
+  width: 500px;
+  padding-left: 10px;
+  font-size: 17px;
+  font-weight: normal;
+}
+form .page .field button{
+  width: 90%;
+  height: calc(100% + 5px);
+  border: none;
+  background: var(--azulBtns);
+  margin-top: -20px;
+  border-radius: 5px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 17px;
+  font-weight: normal;
+  letter-spacing: 1px;
+  transition: 0.5s ease;
+}
+form .page .field button:hover{
+  color: #f0a500;
+}
+form .page .btns button{
+  margin-top: 0px!important;
+  width:  45%!important;
+}
+form .page .btns button.prev{
+  margin-right: 3px;
+  font-size: 17px;
+}
+form .page .btns button.next{
+  margin-left: 3px;
+}
+
+
+
+/*==========================================*/
+/*========= titulos de los inputs ==========*/
+/*==========================================*/
+
+
+
+
+form div .label{
+  font-size: 16px;
+  color: #333;
+  font-weight:normal;
+
+
+}
+
+
+  
+.label{
+
+font-size:16px;
+color:#000;
+display: block;
+
+}
+
+
+.page .field select:invalid ~ .label{
+top: 4px;
+font-size: 16px;
+display: block;
+color: #0000;
+
+}
+
+.page .field textarea:invalid ~ .label{
+top: 4px;
+font-size: 16px;
+display: block;
+color: #0000;
+}
+
+
+
+
+.page .field input:invalid ~ .label{
+top: 4px;
+font-size: 16px;
+display: block;
+color: #0000;
+
+}
+
+
+
+.page .field input[type = "file"] ~ .label{
+  top:2px;
+  font-size:12px;
+  color:#0008;
+  display: none;
+ 
+}
+
+
+
+.page .field input[readonly] ~ .label{
+  top:12px;
+  left: 16px;
+  font-size:15px;
+  color:#0008;
+  display: none;
+ 
+}
+
+
+.page .field input[readonly]{
+ background: #bbb;
+ cursor: no-drop;
+ transition: all .7s;
+ 
+}
+
+.page .field input[required]{
+ 
+ transition: all .7s;
+ 
+}
+
+
+
+
+.page .field input[value] {
+
+  color:#333;
+ 
+ 
+}
+
+
+
+.page .field input[value=''] ~ .label{
+  top:-2px;
+  font-size:16px;
+  color:#000;
+  display: none;
+}
+
+
+
+
+
+.page .field input:valid ~ div.label{
+top:2px;
+left:5px; 
+font-size:12px;
+color:#0008;
+display: block;
+
+}
+
+
+.page .field input:valid ~ .label[for ='cedula1']{
+
+ top:2px;
+  font-size:13px;
+  color:#0008;
+
+}
+
+
+.page .field select:valid ~ .label{
+top:7px;
+left:5px; 
+font-size:13px;
+color:#0008;
+display: block;
+margin-bottom: 5px;
+
+}
+
+.page .field textarea:valid ~ .label{
+top:0px;
+left:5px; 
+font-size:12px;
+padding-left: 5px;
+color:#0008;
+display: inline-block;
+background: #fff;
+width: 100%;
+text-align: left;
+
+
+
+}
+
+.page .field textarea:valid {
+padding-top: 15px;
+
+
+
+}
+
+
+select:valid ~ .label[for='cedula0']{
+
+ top:4px;
+  font-size:12px;
+  color:#ffff;
+  
+
+}
+
+.containerF .caja0 ~ .label{
+  top:7px;
+  font-size:16px;
+  color:#ffff;
+
+ 
+}
+
+form .page .field select[multiple]:valid ~ .label{
+  font-size:12px;
+  color:#0008;
+
+ 
+}
+
+form .page .field .integr:invalid ~ .label{
+
+  font-size:16px;
+  color:#0008;
+
+}
+
+form .page .field .integr:valid ~ .label:after{
+content:":";
+content:":"/"";
+ font-size:12px;
+  color:#0008;
+}
+
+
+/*=========================================*/
+/*========= ESTILOS DE LOS INPUS ==========*/
+/*=========================================*/
+
+form .page .field > input[placeholder]{
+  
+  font-size: 16px;
+  font-weight: normal;
+
+}
+
+form .page .field > input[type='date'], form .page .field > input[type='file']{
+  
+  font-size: 16px;
+  font-weight: normal;
+  height: 3rem;
+ 
+}
+
+ form .page .field > input[type='file']{
+  
+  font-size: 16px;
+  font-weight: normal;
+  height: 3rem;
+  padding-top:.8rem;
+  padding-bottom:1.9rem;
+ 
+}
+
+
+ form .page .field > input[type='date']{
+  
+  font-size: 16px;
+  font-weight: normal;
+  height: 3rem;
+  padding-top:.8rem;
+  padding-bottom:1.9rem;
+ 
+}
+
+
+.form-outer form .page .field .next, .form-outer form .page .field .prev {
+  
+margin-top: 10px;
+margin-bottom: 10px;
+
+ 
+}
+
+
+.form-outer form .page .btns {
+display: flex;
+flex-direction: row;
+padding-top: .2rem;
+
+
+}
+
+/*============================================*/
+/*========= ESTILOS DE LOS textarea ==========*/
+/*============================================*/
+
+form .page .field textarea{
+  height: 100px;
+  font-size: 16px;
+  font-weight: normal;
+  resize: none;
+
+
+}
+
+.form-outer form .page .conten_textarea{
+height: 100px;
+padding-bottom: 30px;
+
+
+}
+
+
+/*=== select ===*/
+
+form .page .field .select2-container--default .select2-selection--single {
+  text-transform: capitalize;
+   font-size: 15px; 
+    font-family: 'Arial', sans-serif;
+    font-weight: 600;
+    width: 100%;
+  padding: 7px 7px;
+    margin: 5px 0;
+  height: 45px;
+ border-radius:3px;
+ border: solid #0002 1px;
+-webkit-box-sizing:border-box;
+-moz-box-sizing: border-box;
+box-sizing: border-box; 
+order: 2;
+text-decoration: none;
+font-weight: normal;
+text-transform: capitalize;
+text-align: left;
+   
+   
+}
+
+
+form .page .field .selection .select2-selection--single .select2-selection__rendered{
+
+
+  padding-top: 5px;
+
+
+}
+
+form .page .field .select2-container--default .select2-selection--single .select2-selection__placeholder {
+ color:#444;
+ font-size: 15px; 
+ text-transform:capitalize;
+font-family: arial;
+font-weight: normal;
+ 
+}
+
+form .page .field .select2-container--default .select2-selection--single .select2-selection__arrow {
+ height:26px;
+ position:absolute;
+ top:1px;
+ right:1px;
+ width:20px;
+ font-weight: normal;
+
+
+}
+
+form .page .field .select2-container--default .select2-selection--single .select2-selection__arrow b {
+ border-color:#444 transparent transparent transparent;
+ border-style:solid;
+ border-width:5px 4px 0 4px;
+ height:0;
+ left:50%;
+ margin-left:-4px;
+ margin-top:-2px;
+ position:absolute;
+ top:100%;
+ width:0;
+font-size: 15px; 
+font-weight: normal;
+
+}
+
+form .page .field .select2-results__option {
+ padding:6px;
+ user-select:none;
+ -webkit-user-select:none;
+ font-size: 15px;
+
+}
+
+
+form .page .field .select2-container--default button{
+  width: auto;
+  height: auto;
+  border: none;
+  background: auto;
+  margin-top: 0px;
+  border-radius: 2px;
+  color: #0008;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: normal;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: 0.5s ease;
+}
+
+
+form .page .field .select2-selection__choice .select2-selection__choice__display{
+  color: #333a;
+}
+
+form .page .field .select2-container--default button:hover{
+  color: #333a;
+  background: auto;
+}
+
+
+
+.select2-results__option[aria-selected=true] {
+  
+  background-color:#d43f8d !important;
+  color:#fff !important;
+}
+
+
+form .page .multiple .selection .select2-selection--multiple{
+
+height: auto;
+max-height: 100px;
+margin-bottom: 300px;
+overflow: auto;
+
+
+
+}
+
+form .page .multiple {
+height: 100px;
+padding-bottom: 30px;
+
+
+
+}
+
+form .page .multiple ~ .btns{
+
+
+margin-top: 100px;
+
+
+
+}
+
+
+/*=========================================*/
+/*========= pre visualisar fotos ==========*/
+/*=========================================*/
+
+
+form .page .thumb1{
+display: inline-block;
+width:200px;
+height:400px;
+padding-bottom: 30px;
+justify-content: center;
+
+}
+
+
+
+
+
+/*======================================================*/
+/*========= BOTONES DE SELEPCIÓN DE ARCHIVOAS ==========*/
+/*======================================================*/
+
+
+
+ .form-outer form .page .field .caja0{
+  display: inline-block;
+  border:  1px solid #0007;
+  font-family: 'Arial', sans-serif;
+  background-color: #fff;
+  color: #0009;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  margin: 0 auto 0;
+  min-height: 50px;
+  overflow: hidden;
+  padding: 10px 1px;
+  padding-top: 15px;
+  padding-left: 20px;
+  position: relative;
+  top: 8px;
+  text-align: left;
+  width: 100%;
+  border-radius: 4px;
+  background-repeat: no-repeat, repeat;
+  background-position: right .7em top 50%, 0 0;
+  background-size: .65em auto, 100%; 
+  transition: all .5s; 
+  font-weight: normal;
+  cursor: pointer;
+  margin-bottom: 25px;
+
+
+}
+
+ .caja0 span{
+  cursor: pointer;
+}
+
+.caja0:hover{
+  border:1px solid #333;
+  background: #ddd;
+  background-repeat: no-repeat, repeat;
+  background-position: right .7em top 50%, 0 0;
+  background-size: .65em auto, 100%; 
+  transition: all .5s; 
+  cursor: pointer;
+
+}
+
+ .caja0 input[type="file"]{
+
+  cursor: pointer;
+  font-size: 10000px;
+  margin: 0;
+  opacity: 0;
+  outline: 0 none;
+  padding: 0;
+  padding-bottom: 20px;
+  position: absolute;
+  right: 0px;
+  top: 0px;
+  z-index: 500;
+
+   
+}
+
+/* ---- ----- ----- VOLVER ----- ----- ----- */
+
+.volver a{
+
+  color: #fff;
+  text-decoration: none;
+  padding: 7px;
+  padding-top: 15px;
+  outline: none;
+  display: inline-block;
+  width: 100%;
+  height: 100px;
+  border-radius: 3px;
+  -webkit-box-sizing:border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  transition: all .4s; 
+ 
+
+
+
+}
+
+.volver:hover > a{
+
+  color: #333;
+  
+ 
+
+
+
+}
+
+/* ---- ----- ----- Requerimientos ----- ----- ----- */
+
+.row{
+
+  width: 100%;
+  justify-content: center;
+  padding-left: 1.5rem;
+}
+
+.row .reqP{
+width: 250px;
+position: relative;
+
+
+}
+
+.row .reqP .req{
+border-radius: 3px;
+overflow: auto;
+background: #FFF;
+height: 70%;
+width: 130%;
+padding: 0 20px;
+position: relative;
+left: -1.6rem;
+
+
+}
+
+.row .reqP .req ol, .row .reqP .req ul{
+
+  text-align: left;
+  font-size: 15px;
+  height:200px;
+
+}
+
+
+/* ---- ----- ----- VER CLAVE ----- ----- ----- */
+
+.page .containerClave{
+  position: relative;
+  
+
+}
+
+.form .page .containerClave button{
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #999;
+  font-size: 20px;
+  padding: 0px;
+  cursor: pointer;
+  position: absolute;
+  display: inline-block;
+  width: 1px;
+  bottom: -5px;
+  right: 1.8rem;
+
+
+
+}
+
+.icon.icon-eye{
+  transition: color .5s;
+  color: #000;
+
+}
+
+.icon.icon-eye-blocked{
+  transition: color .5s;
+  color: #444;
+
+}
+
+/*------------- QUITAR BOTON INNESESARIO -----------------*/
+
+header .contenedor nav  {
+  opacity: 0;
+  position: relative;
+  top: -1000px;
+}
+
+
+
+/* ---- ----- ----- PREGUNTA ----- ----- ----- */
+
+
+.info{
+color: #fff9;
+position: absolute;
+top: 2px;
+left: 2px;
+font-size: 20px;
+cursor: pointer;
+
+}
+
+.info:hover{
+  color: #fff;
+  text-shadow: 0 0 1px 0 #fff9;
+}
+
+div p{
+  color: #fff;
+
+}
+
+.registrarse a{
+  color: #fff;
+  font-family: 'arial Black';
+  text-decoration: none;
+  background-color: #666;
+  padding:  7px 0px;
+  outline: solid 2px  #2229;
+  display: inline-block;
+  width: 100%;
+  border-radius: 3px;
+  -webkit-box-sizing:border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box; 
+  transition: background .5s;
+
+}
+
+.registrarse a:hover{
+
+  background-color: #444;
+
+}
+
+.registrarse a:active{
+
+  outline: none;
+
+}
+
+/*=========================================*/
+/*========= pre visualisar fotos ==========*/
+/*=========================================*/
+
+
+.thumb{
+display: inline-block;
+width:200px;
+height:200px;
+
+}
+
+
+
+
+
+/*==================================================*/
+/*========= BOTONES DE ELIMINAR ARCHIVOAS ==========*/
+/*==================================================*/
+
+
+
+.borrar  {
+
+justify-content: space-around;
+
+text-align: left;
+margin-bottom: 1rem;
+margin-top: 1rem;
+  
+  
+
+}
+
+.borrar  a{
+
+text-decoration: none;
+
+color: #444;
+padding: 5px 3px;
+border-radius: 2px;
+outline: solid #0007 .1rem;
+
+  
+  
+
+}
+
+.borrar  a:hover{
+
+
+
+}
+
+/* ---- ----- ----- Media Queries ----- ----- ----- */
+@media screen and (max-width: 700px) {
+
+
+.progress-bar2 .step .bullet:before,
+.progress-bar2 .step .bullet:after{
+  position: absolute;
+  content: '';
+  bottom: 11px;
+  right: -51px;
+  height: 3px;
+  width: 40px;
+  background: #262626;
+}
+
+.progress-bar2 .step .bullet:after{
+  
+  
+  border-color: #333;
+  background: #333;
+  
+}
+
+
+.containerF{
+
+  width: 400px;
+ 
+}
+
+.progress-bar2 .step .bullet.active:after{
+  background: #f0a500;
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: animate 0.3s linear forwards;
+}
+  
+  .row .reqP{
+display: none;
+
+
+}
+
+
+
+}
+
+
+
+
+
+
+

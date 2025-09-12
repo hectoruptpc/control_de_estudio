@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bienvenido - Portafolio</title>
+    <style>
+        /* Reset y estilos base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        /* Barra de navegación fija */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-decoration: none;
+            color: white;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+        }
+
+        .nav-links a:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .container {
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            padding: 2rem;
+            transition: all 0.5s ease;
+            margin-top: 80px; /* Para que no quede detrás de la navbar */
+        }
+
+        .welcome-section {
+            height: calc(100vh - 80px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            text-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            animation: fadeIn 1.5s ease-out;
+        }
+
+        p {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+            animation: fadeIn 2s ease-out;
+        }
+
+        .btn {
+            display: inline-block;
+            background: white;
+            color: #667eea;
+            padding: 15px 30px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            animation: fadeIn 2.5s ease-out;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .particles-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        /* Galería de proyectos */
+        .projects-section {
+            display: none;
+            padding: 3rem 0;
+            background-color: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            margin: 2rem auto;
+            max-width: 1200px;
+            width: 90%;
+        }
+
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            padding: 2rem;
+        }
+
+        .project-card {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            text-decoration: none;
+            color: white;
+            display: block;
+        }
+
+        .project-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .project-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .project-card:hover .project-image {
+            transform: scale(1.05);
+        }
+
+        .project-info {
+            padding: 1.5rem;
+        }
+
+        .project-title {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .project-description {
+            font-size: 1rem;
+            opacity: 0.8;
+            line-height: 1.5;
+        }
+
+        .project-link {
+            display: inline-block;
+            margin-top: 1rem;
+            color: white;
+            font-weight: bold;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .project-link:hover {
+            text-decoration: underline;
+        }
+
+        .back-btn {
+            margin-top: 2rem;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid white;
+        }
+
+        .back-btn:hover {
+            background: white;
+            color: #667eea;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Efectos de confeti */
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f0f;
+            opacity: 0.7;
+            animation: confettiFall 5s linear infinite;
+        }
+
+        @keyframes confettiFall {
+            0% {
+                transform: translateY(-100vh) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+            p {
+                font-size: 1.2rem;
+            }
+
+            .projects-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .navbar {
+                padding: 1rem;
+            }
+
+            .nav-links {
+                gap: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Barra de navegación fija -->
+    <nav class="navbar">
+        <a href="#" class="logo">MisProyectos</a>
+    </nav>
+
+    <div class="container">
+        <!-- Sección de bienvenida -->
+        <div class="welcome-section" id="welcomeSection">
+            <h1>¡Bienvenido!</h1>
+            <p>Explora mis proyectos profesionales</p>
+            <button class="btn" id="showProjectsBtn">Ver mis proyectos</button>
+        </div>
+
+        <!-- Sección de proyectos -->
+        <div class="projects-section" id="projectsSection">
+            <h2>Mis Proyectos</h2>
+            <div class="projects-grid" id="projectsGrid">
+                <!-- Proyectos se agregarán dinámicamente con JavaScript -->
+            </div>
+            <button class="btn back-btn" id="backBtn">Volver</button>
+        </div>
+    </div>
+
+    <div class="particles-container" id="particles"></div>
+
+    <script>
+        // Datos de los proyectos con imágenes locales
+        const projects = [
+            {
+                title: "Sistema de Control de Estudios",
+                description: "Sistema Nuevo de control de estudios en creacion.",
+                image: "logouptpc.jpeg", // Cambia por tu ruta local
+                url: "CE/login.php"  // Reemplaza con tu URL real
+            },
+            {
+                title: "Servicio comunitario de biblioteca",
+                description: "Sistema en creacion para la biblioteca.",
+                image: "logobiblio.jpeg", // Cambia por tu ruta local
+                url: "biblio/"  // Reemplaza con tu URL real
+            },
+            {
+                title: "Red Social para Artistas",
+                description: "Red social especializada donde artistas pueden compartir sus trabajos, colaborar y recibir feedback.",
+                image: "images/artsocial.jpg", // Cambia por tu ruta local
+                url: "https://tuartesocial.com"  // Reemplaza con tu URL real
+            }
+        ];
+
+        // Elementos del DOM
+        const welcomeSection = document.getElementById('welcomeSection');
+        const projectsSection = document.getElementById('projectsSection');
+        const projectsGrid = document.getElementById('projectsGrid');
+        const showProjectsBtn = document.getElementById('showProjectsBtn');
+        const backBtn = document.getElementById('backBtn');
+        const particlesContainer = document.getElementById('particles');
+
+        // Crear confeti mejorado
+        function createConfetti() {
+            const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
+
+            // Limpiar contenedor primero
+            particlesContainer.innerHTML = '';
+
+            // Crear más confeti y con mejor distribución
+            for (let i = 0; i < 150; i++) {
+                const confetti = document.createElement('div');
+                confetti.classList.add('confetti');
+
+                // Posición aleatoria en toda la pantalla
+                confetti.style.left = Math.random() * 100 + 'vw';
+
+                // Tamaño aleatorio entre 5 y 15px
+                const size = Math.random() * 10 + 5;
+                confetti.style.width = size + 'px';
+                confetti.style.height = size + 'px';
+
+                // Color aleatorio
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+
+                // Forma aleatoria (redonda o cuadrada)
+                if (Math.random() > 0.5) {
+                    confetti.style.borderRadius = '50%';
+                }
+
+                // Animación con duración y delay aleatorios
+                const duration = Math.random() * 3 + 2;
+                confetti.style.animationDuration = duration + 's';
+                confetti.style.animationDelay = Math.random() * 5 + 's';
+
+                // Rotación aleatoria
+                confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+
+                // Añadir al contenedor
+                particlesContainer.appendChild(confetti);
+            }
+        }
+
+        // Efecto de escritura para el título
+        function typeWriter() {
+            const title = document.querySelector('h1');
+            const originalText = title.textContent;
+            title.textContent = '';
+
+            let i = 0;
+            const speed = 150; // velocidad en milisegundos
+
+            function type() {
+                if (i < originalText.length) {
+                    title.textContent += originalText.charAt(i);
+                    i++;
+                    setTimeout(type, speed);
+                }
+            }
+
+            type();
+        }
+
+        // Mostrar proyectos
+        function showProjects() {
+            welcomeSection.style.display = 'none';
+            projectsSection.style.display = 'block';
+
+            // Limpiar grid
+            projectsGrid.innerHTML = '';
+
+            // Agregar proyectos
+            projects.forEach(project => {
+                const projectCard = document.createElement('a');
+                projectCard.className = 'project-card';
+                projectCard.href = project.url;
+                projectCard.target = '_blank'; // Abre en nueva pestaña
+
+                projectCard.innerHTML = `
+                    <img src="${project.image}" alt="${project.title}" class="project-image">
+                    <div class="project-info">
+                        <h3 class="project-title">${project.title}</h3>
+                        <p class="project-description">${project.description}</p>
+                        <span class="project-link">Visitar sistema →</span>
+                    </div>
+                `;
+                projectsGrid.appendChild(projectCard);
+            });
+
+            // Animación de aparición
+            setTimeout(() => {
+                const cards = document.querySelectorAll('.project-card');
+                cards.forEach((card, index) => {
+                    card.style.animation = `fadeIn 0.5s ease-out ${index * 0.2}s forwards`;
+                    card.style.opacity = '0';
+                });
+            }, 50);
+        }
+
+        // Volver a la sección de bienvenida
+        function backToWelcome() {
+            projectsSection.style.display = 'none';
+            welcomeSection.style.display = 'flex';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Event listeners
+        showProjectsBtn.addEventListener('click', showProjects);
+        backBtn.addEventListener('click', backToWelcome);
+
+        // Iniciar efectos cuando la página cargue
+        window.onload = function() {
+            createConfetti();
+            typeWriter();
+
+            // Volver a crear confeti cada 10 segundos para mantenerlo activo
+            setInterval(createConfetti, 10000);
+
+            // Efecto de movimiento con el mouse
+            document.body.addEventListener('mousemove', (e) => {
+                const container = document.querySelector('.container');
+                const xAxis = (window.innerWidth / 2 - e.pageX) / 25;
+                const yAxis = (window.innerHeight / 2 - e.pageY) / 25;
+                container.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
+            });
+        };
+    </script>
+</body>
+</html>
