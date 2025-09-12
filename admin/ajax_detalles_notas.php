@@ -41,7 +41,7 @@ function obtenerInfoGrupo($docente_id, $materia_id, $periodo_id) {
     return $stmt->get_result()->fetch_assoc();
 }
 
-// Obtener estudiantes del grupo (FUNCIÓN ESPECÍFICA - se queda aquí)
+// Obtener estudiantes del grupo (FUNCIÓN ESPECÍFICA - MODIFICADA para excluir rechazados)
 function obtenerEstudiantesGrupo($docente_id, $materia_id, $periodo_id) {
     global $db;
     
@@ -51,7 +51,7 @@ function obtenerEstudiantesGrupo($docente_id, $materia_id, $periodo_id) {
               WHERE np.id_docente = ? 
               AND np.id_materia = ? 
               AND np.id_periodo = ?
-              AND np.estado = 'pendiente'
+              AND np.estado = 'pendiente'  -- SOLO notas pendientes, no rechazadas
               ORDER BY u.nombre";
     
     $stmt = $db->prepare($query);
@@ -115,7 +115,7 @@ function calcularPromedioPorTrayecto($nota, $id_trayecto) {
     return $count > 0 ? round($suma / $count, 1) : 0;
 }
 
-// Obtener estadísticas del grupo según el id_trayecto (FUNCIÓN ESPECÍFICA - se queda aquí)
+// Obtener estadísticas del grupo según el id_trayecto (FUNCIÓN ESPECÍFICA - MODIFICADA para excluir rechazados)
 function obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id, $id_trayecto) {
     global $db;
     
@@ -124,7 +124,7 @@ function obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id, $id_tra
               WHERE np.id_docente = ? 
               AND np.id_materia = ? 
               AND np.id_periodo = ?
-              AND np.estado = 'pendiente'";
+              AND np.estado = 'pendiente'";  // SOLO notas pendientes, no rechazadas
     
     $stmt = $db->prepare($query);
     $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
@@ -248,7 +248,8 @@ switch ($seccion) {
                                 </td>
                                 <td>
                                     <select class="form-control form-control-sm accion-individual" 
-                                            data-nota-id="<?= $estudiante['id'] ?>">
+                                            data-nota-id="<?= $estudiante['id'] ?>"
+                                            data-estudiante-nombre="<?= htmlspecialchars($estudiante['nombre_estudiante']) ?>">
                                         <option value="">-- Seleccionar --</option>
                                         <option value="aprobar">Aprobar</option>
                                         <option value="rechazar">Rechazar</option>
@@ -271,6 +272,11 @@ switch ($seccion) {
         </form>
 
         <script>
+        // Variables globales para almacenar la acción pendiente
+        let accionPendiente = null;
+        let notasIdsPendientes = [];
+        let estudianteNombrePendiente = "";
+        
         function aplicarAccion(accion) {
             const selected = $('.estudiante-checkbox:checked');
             if (selected.length === 0) {
@@ -282,19 +288,63 @@ switch ($seccion) {
                 return $(this).val();
             }).get();
             
-            if (confirm(`¿${accion === 'aprobar' ? 'Aprobar' : 'Rechazar'} ${selected.length} nota(s)?`)) {
-                $.ajax({
-                    url: 'procesar_acciones.php',
-                    type: 'POST',
-                    data: {
-                        accion: accion,
-                        notas_ids: notasIds
-                    },
-                    success: function() {
-                        location.reload();
-                    }
-                });
+            // Obtener nombres de estudiantes seleccionados
+            const nombresEstudiantes = [];
+            selected.each(function() {
+                const nombre = $(this).closest('tr').find('td:eq(2)').text();
+                nombresEstudiantes.push(nombre);
+            });
+            
+            if (accion === 'rechazar') {
+                // Mostrar modal para ingresar mensaje de rechazo
+                accionPendiente = accion;
+                notasIdsPendientes = notasIds;
+                estudianteNombrePendiente = nombresEstudiantes.join(", ");
+                $('#mensajeRechazoModal').modal('show');
+                
+                // Actualizar el mensaje en el modal
+                $('#estudiantesRechazados').text(estudianteNombrePendiente);
+                $('#mensajeRechazoTexto').val(''); // Limpiar el mensaje anterior
+            } else {
+                // Para aprobar, proceder directamente
+                if (confirm(`¿Aprobar ${selected.length} nota(s)?`)) {
+                    $.ajax({
+                        url: 'procesar_acciones.php',
+                        type: 'POST',
+                        data: {
+                            accion: accion,
+                            notas_ids: notasIds
+                        },
+                        success: function() {
+                            location.reload();
+                        }
+                    });
+                }
             }
+        }
+        
+        function confirmarRechazoConMensaje() {
+            const mensaje = $('#mensajeRechazoTexto').val().trim();
+            
+            if (!mensaje) {
+                alert('Por favor, ingrese un mensaje de rechazo');
+                return;
+            }
+            
+            $('#mensajeRechazoModal').modal('hide');
+            
+            $.ajax({
+                url: 'procesar_acciones.php',
+                type: 'POST',
+                data: {
+                    accion: 'rechazar',
+                    notas_ids: notasIdsPendientes,
+                    mensaje_rechazo: mensaje
+                },
+                success: function() {
+                    location.reload();
+                }
+            });
         }
         
         $('#selectAllEstudiantes').change(function() {
@@ -304,24 +354,58 @@ switch ($seccion) {
         $('.accion-individual').change(function() {
             const notaId = $(this).data('nota-id');
             const accion = $(this).val();
+            const estudianteNombre = $(this).data('estudiante-nombre');
             
             if (accion) {
-                if (confirm(`${accion === 'aprobar' ? 'Aprobar' : 'Rechazar'} esta nota?`)) {
-                    $.ajax({
-                        url: 'procesar_acciones.php',
-                        type: 'POST',
-                        data: {
-                            accion: accion,
-                            notas_ids: [notaId]
-                        },
-                        success: function() {
-                            location.reload();
-                        }
-                    });
+                if (accion === 'rechazar') {
+                    // Para rechazo individual, mostrar modal
+                    accionPendiente = accion;
+                    notasIdsPendientes = [notaId];
+                    estudianteNombrePendiente = estudianteNombre;
+                    $('#mensajeRechazoModal').modal('show');
+                    
+                    // Actualizar el mensaje en el modal
+                    $('#estudiantesRechazados').text(estudianteNombrePendiente);
+                    $('#mensajeRechazoTexto').val(''); // Limpiar el mensaje anterior
+                    $(this).val(''); // Resetear el selector
                 } else {
-                    $(this).val('');
+                    // Para aprobación individual, proceder directamente
+                    if (confirm(`${accion === 'aprobar' ? 'Aprobar' : 'Rechazar'} esta nota?`)) {
+                        $.ajax({
+                            url: 'procesar_acciones.php',
+                            type: 'POST',
+                            data: {
+                                accion: accion,
+                                notas_ids: [notaId]
+                            },
+                            success: function() {
+                                location.reload();
+                            }
+                        });
+                    } else {
+                        $(this).val('');
+                    }
                 }
             }
+        });
+        
+        // Configurar el modal para que se pueda abrir siempre
+        $(document).ready(function() {
+            // Eliminar la funcionalidad de arrastre
+            // $('#mensajeRechazoModal').draggable({
+            //    handle: ".modal-header"
+            // });
+            
+            // Asegurar que el modal se cierre correctamente sin afectar otros modales
+            $('#mensajeRechazoModal').on('show.bs.modal', function() {
+                // Limpiar el mensaje anterior al abrir el modal
+                $('#mensajeRechazoTexto').val('');
+            });
+            
+            // Configurar el botón de cancelar para que solo cierre este modal
+            $('#mensajeRechazoModal .btn-secondary, #mensajeRechazoModal .close').click(function() {
+                $('#mensajeRechazoModal').modal('hide');
+            });
         });
         </script>
         <?php
@@ -434,25 +518,100 @@ switch ($seccion) {
 
         <script>
         function accionGrupo(accion) {
-            if (confirm(`¿Está seguro de ${accion === 'aprobar' ? 'APROBAR' : 'RECHAZAR'} TODO el grupo?`)) {
-                $.ajax({
-                    url: 'procesar_acciones.php',
-                    type: 'POST',
-                    data: {
-                        accion: accion,
-                        docente_id: <?= $docente_id ?>,
-                        materia_id: <?= $materia_id ?>,
-                        periodo_id: <?= $periodo_id ?>,
-                        accion_grupo: true
-                    },
-                    success: function() {
-                        location.reload();
-                    }
-                });
+            if (accion === 'rechazar') {
+                // Mostrar modal para ingresar mensaje de rechazo
+                accionPendiente = accion;
+                notasIdsPendientes = []; // Vacío indica acción grupal
+                estudianteNombrePendiente = "TODO EL GRUPO";
+                $('#mensajeRechazoModal').modal('show');
+                
+                // Actualizar el mensaje en el modal
+                $('#estudiantesRechazados').text(estudianteNombrePendiente);
+                $('#mensajeRechazoTexto').val(''); // Limpiar el mensaje anterior
+            } else {
+                // Para aprobar, proceder directamente
+                if (confirm(`¿Está seguro de APROBAR TODO el grupo?`)) {
+                    $.ajax({
+                        url: 'procesar_acciones.php',
+                        type: 'POST',
+                        data: {
+                            accion: accion,
+                            docente_id: <?= $docente_id ?>,
+                            materia_id: <?= $materia_id ?>,
+                            periodo_id: <?= $periodo_id ?>,
+                            accion_grupo: true
+                        },
+                        success: function() {
+                            location.reload();
+                        }
+                    });
+                }
             }
+        }
+        
+        function confirmarRechazoGrupoConMensaje() {
+            const mensaje = $('#mensajeRechazoTexto').val().trim();
+            
+            if (!mensaje) {
+                alert('Por favor, ingrese un mensaje de rechazo');
+                return;
+            }
+            
+            $('#mensajeRechazoModal').modal('hide');
+            
+            $.ajax({
+                url: 'procesar_acciones.php',
+                type: 'POST',
+                data: {
+                    accion: 'rechazar',
+                    docente_id: <?= $docente_id ?>,
+                    materia_id: <?= $materia_id ?>,
+                    periodo_id: <?= $periodo_id ?>,
+                    accion_grupo: true,
+                    mensaje_rechazo: mensaje
+                },
+                success: function() {
+                    location.reload();
+                }
+            });
         }
         </script>
         <?php
         break;
 }
 ?>
+
+<!-- Modal para mensaje de rechazo -->
+<div class="modal fade" id="mensajeRechazoModal" tabindex="-1" role="dialog" aria-labelledby="mensajeRechazoModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="mensajeRechazoModalLabel">Mensaje de Rechazo</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <strong>Estudiante(s) a rechazar:</strong>
+                    <span id="estudiantesRechazados"></span>
+                </div>
+                <p>Por favor, ingrese el motivo del rechazo de las notas. Este mensaje será enviado al docente.</p>
+                <div class="form-group">
+                    <label for="mensajeRechazoTexto">Mensaje:</label>
+                    <textarea class="form-control" id="mensajeRechazoTexto" rows="5" placeholder="Explique los motivos del rechazo..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="
+                    if (notasIdsPendientes.length > 0) {
+                        confirmarRechazoConMensaje();
+                    } else {
+                        confirmarRechazoGrupoConMensaje();
+                    }
+                ">Enviar Rechazo</button>
+            </div>
+        </div>
+    </div>
+</div>
