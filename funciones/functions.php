@@ -5048,8 +5048,8 @@ function enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje) {
 //MI HORARIO ESTUDIANTE ***********************************************************************
 
 
-// Obtener la sección del estudiante - CORREGIDO: tabla periodos_academicos
 function obtenerSeccionEstudiante($db, $estudiante_id) {
+    // Consulta SQL para obtener información completa de la sección del estudiante
     $sql = "SELECT s.id_seccion, s.codigo_seccion, s.id_carrera, c.nombre_carrera, 
                    t.numero_trayecto, p.nombre_periodo, s.capacidad_maxima, s.inicia,
                    s.estatus, COUNT(es.id_usuario) as inscritos, p.activo as periodo_activo
@@ -5057,15 +5057,24 @@ function obtenerSeccionEstudiante($db, $estudiante_id) {
             INNER JOIN secciones s ON es.id_seccion = s.id_seccion
             INNER JOIN carreras c ON s.id_carrera = c.id_carrera
             INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
-            INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo  -- Cambiado a periodos_academicos
+            INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo  -- Usa periodos_academicos
             WHERE es.id_usuario = ? AND es.estatus = 'activo'
             GROUP BY s.id_seccion";
     
+    // Preparar la sentencia SQL para prevenir inyecciones
     $stmt = $db->prepare($sql);
+    
+    // Vincular el parámetro: 'i' indica que es un integer
     $stmt->bind_param("i", $estudiante_id);
+    
+    // Ejecutar la consulta
     $stmt->execute();
+    
+    // Obtener el resultado de la consulta
     $result = $stmt->get_result();
     
+    // Retornar la primera fila como array asociativo
+    // Si no hay resultados, retorna null
     return $result->fetch_assoc();
 }
 
@@ -5073,7 +5082,6 @@ function obtenerSeccionEstudiante($db, $estudiante_id) {
 
 
 
-// Obtener los horarios del docente - VERSIÓN CORREGIDA según tu estructura
 function obtenerHorariosDocente($db, $docente_id) {
     $sql = "SELECT 
                 h.id_horario,
@@ -5094,30 +5102,36 @@ function obtenerHorariosDocente($db, $docente_id) {
             INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
             INNER JOIN periodos_academicos pa ON s.id_periodo = pa.id_periodo
             WHERE ds.id_usuario = ? 
-            AND ds.estatus = 1  -- Cambiado de 'activo' a 1 según tu código
+            AND ds.estatus = 1
             ORDER BY h.dia, h.hora_inicio";
     
-    $stmt = $db->prepare($sql);
-    
-    if ($stmt) {
+    // Preparar la consulta
+    if ($stmt = $db->prepare($sql)) {
+        // Vincular parámetros
         $stmt->bind_param("i", $docente_id);
         
+        // Ejecutar la consulta
         if ($stmt->execute()) {
+            // Obtener resultados
             $result = $stmt->get_result();
             $horarios = [];
             
+            // Recorrer resultados
             while ($row = $result->fetch_assoc()) {
                 $horarios[] = $row;
             }
             
+            // Cerrar statement
             $stmt->close();
             return $horarios;
         } else {
+            // Manejar error de ejecución
             error_log("Error ejecutando consulta: " . $stmt->error);
             $stmt->close();
             return [];
         }
     } else {
+        // Manejar error de preparación
         error_log("Error preparando consulta: " . $db->error);
         return [];
     }
