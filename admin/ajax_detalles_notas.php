@@ -204,7 +204,7 @@ switch ($seccion) {
                             <th>Estudiante</th>
                             <th>Nota del Trayecto</th>
                             <th>Estado</th>
-                            <th>Acción</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -247,13 +247,20 @@ switch ($seccion) {
                                     </span>
                                 </td>
                                 <td>
-                                    <select class="form-control form-control-sm accion-individual" 
-                                            data-nota-id="<?= $estudiante['id'] ?>"
-                                            data-estudiante-nombre="<?= htmlspecialchars($estudiante['nombre_estudiante']) ?>">
-                                        <option value="">-- Seleccionar --</option>
-                                        <option value="aprobar">Aprobar</option>
-                                        <option value="rechazar">Rechazar</option>
-                                    </select>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-success accion-individual" 
+                                                data-accion="aprobar"
+                                                data-nota-id="<?= $estudiante['id'] ?>"
+                                                data-estudiante-nombre="<?= htmlspecialchars($estudiante['nombre_estudiante']) ?>">
+                                            <i class="fas fa-check"></i> Aprobar
+                                        </button>
+                                        <button type="button" class="btn btn-danger accion-individual" 
+                                                data-accion="rechazar"
+                                                data-nota-id="<?= $estudiante['id'] ?>"
+                                                data-estudiante-nombre="<?= htmlspecialchars($estudiante['nombre_estudiante']) ?>">
+                                            <i class="fas fa-times"></i> Rechazar
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endwhile; ?>
@@ -302,9 +309,13 @@ switch ($seccion) {
                 estudianteNombrePendiente = nombresEstudiantes.join(", ");
                 $('#mensajeRechazoModal').modal('show');
                 
-                // Actualizar el mensaje en el modal
+                // Actualizar el título y mensaje en el modal
+                $('#tituloRechazoModal').html('<i class="fas fa-exclamation-triangle"></i> Rechazar Notas de: ' + (nombresEstudiantes.length > 3 ? nombresEstudiantes.length + ' Estudiantes' : estudianteNombrePendiente));
                 $('#estudiantesRechazados').text(estudianteNombrePendiente);
-                $('#mensajeRechazoTexto').val(''); // Limpiar el mensaje anterior
+                
+                // Establecer mensaje predeterminado
+                const mensajePredeterminado = "Las notas de los estudiantes " + estudianteNombrePendiente + " han sido rechazadas debido a: [ESPECIFIQUE EL MOTIVO]";
+                $('#mensajeRechazoTexto').val(mensajePredeterminado);
             } else {
                 // Para aprobar, proceder directamente
                 if (confirm(`¿Aprobar ${selected.length} nota(s)?`)) {
@@ -351,51 +362,45 @@ switch ($seccion) {
             $('.estudiante-checkbox').prop('checked', this.checked);
         });
         
-        $('.accion-individual').change(function() {
+        $('.accion-individual').click(function() {
             const notaId = $(this).data('nota-id');
-            const accion = $(this).val();
+            const accion = $(this).data('accion');
             const estudianteNombre = $(this).data('estudiante-nombre');
             
-            if (accion) {
-                if (accion === 'rechazar') {
-                    // Para rechazo individual, mostrar modal
-                    accionPendiente = accion;
-                    notasIdsPendientes = [notaId];
-                    estudianteNombrePendiente = estudianteNombre;
-                    $('#mensajeRechazoModal').modal('show');
-                    
-                    // Actualizar el mensaje en el modal
-                    $('#estudiantesRechazados').text(estudianteNombrePendiente);
-                    $('#mensajeRechazoTexto').val(''); // Limpiar el mensaje anterior
-                    $(this).val(''); // Resetear el selector
-                } else {
-                    // Para aprobación individual, proceder directamente
-                    if (confirm(`${accion === 'aprobar' ? 'Aprobar' : 'Rechazar'} esta nota?`)) {
-                        $.ajax({
-                            url: 'procesar_acciones.php',
-                            type: 'POST',
-                            data: {
-                                accion: accion,
-                                notas_ids: [notaId]
-                            },
-                            success: function() {
-                                location.reload();
-                            }
-                        });
-                    } else {
-                        $(this).val('');
-                    }
+            if (accion === 'rechazar') {
+                // Para rechazo individual, mostrar modal
+                accionPendiente = accion;
+                notasIdsPendientes = [notaId];
+                estudianteNombrePendiente = estudianteNombre;
+                $('#mensajeRechazoModal').modal('show');
+                
+                // Actualizar el título y mensaje en el modal
+                $('#tituloRechazoModal').html('<i class="fas fa-exclamation-triangle"></i> Rechazar Nota de: ' + estudianteNombre);
+                $('#estudiantesRechazados').text(estudianteNombrePendiente);
+                
+                // Establecer mensaje predeterminado
+                const mensajePredeterminado = "La nota del estudiante " + estudianteNombre + " ha sido rechazada debido a: [ESPECIFIQUE EL MOTIVO]";
+                $('#mensajeRechazoTexto').val(mensajePredeterminado);
+            } else {
+                // Para aprobación individual, proceder directamente
+                if (confirm(`¿Aprobar la nota de ${estudianteNombre}?`)) {
+                    $.ajax({
+                        url: 'procesar_acciones.php',
+                        type: 'POST',
+                        data: {
+                            accion: accion,
+                            notas_ids: [notaId]
+                        },
+                        success: function() {
+                            location.reload();
+                        }
+                    });
                 }
             }
         });
         
         // Configurar el modal para que se pueda abrir siempre
         $(document).ready(function() {
-            // Eliminar la funcionalidad de arrastre
-            // $('#mensajeRechazoModal').draggable({
-            //    handle: ".modal-header"
-            // });
-            
             // Asegurar que el modal se cierre correctamente sin afectar otros modales
             $('#mensajeRechazoModal').on('show.bs.modal', function() {
                 // Limpiar el mensaje anterior al abrir el modal
@@ -405,6 +410,7 @@ switch ($seccion) {
             // Configurar el botón de cancelar para que solo cierre este modal
             $('#mensajeRechazoModal .btn-secondary, #mensajeRechazoModal .close').click(function() {
                 $('#mensajeRechazoModal').modal('hide');
+                return false; // Prevenir que se cierren otros modales
             });
         });
         </script>
@@ -525,9 +531,13 @@ switch ($seccion) {
                 estudianteNombrePendiente = "TODO EL GRUPO";
                 $('#mensajeRechazoModal').modal('show');
                 
-                // Actualizar el mensaje en el modal
+                // Actualizar el título y mensaje en el modal
+                $('#tituloRechazoModal').html('<i class="fas fa-exclamation-triangle"></i> Rechazar Notas de Todo el Grupo');
                 $('#estudiantesRechazados').text(estudianteNombrePendiente);
-                $('#mensajeRechazoTexto').val(''); // Limpiar el mensaje anterior
+                
+                // Establecer mensaje predeterminado
+                const mensajePredeterminado = "Las notas de todos los estudiantes del grupo han sido rechazadas debido a: [ESPECIFIQUE EL MOTIVO]";
+                $('#mensajeRechazoTexto').val(mensajePredeterminado);
             } else {
                 // Para aprobar, proceder directamente
                 if (confirm(`¿Está seguro de APROBAR TODO el grupo?`)) {
@@ -583,10 +593,10 @@ switch ($seccion) {
 
 <!-- Modal para mensaje de rechazo -->
 <div class="modal fade" id="mensajeRechazoModal" tabindex="-1" role="dialog" aria-labelledby="mensajeRechazoModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header bg-warning">
-                <h5 class="modal-title" id="mensajeRechazoModalLabel">Mensaje de Rechazo</h5>
+                <h5 class="modal-title" id="tituloRechazoModal">Mensaje de Rechazo</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
@@ -600,6 +610,9 @@ switch ($seccion) {
                 <div class="form-group">
                     <label for="mensajeRechazoTexto">Mensaje:</label>
                     <textarea class="form-control" id="mensajeRechazoTexto" rows="5" placeholder="Explique los motivos del rechazo..."></textarea>
+                </div>
+                <div class="alert alert-secondary">
+                    <small><i class="fas fa-info-circle"></i> Puede editar el mensaje predeterminado según sea necesario.</small>
                 </div>
             </div>
             <div class="modal-footer">
