@@ -22,8 +22,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Obtener usuarios
-$query_usuarios = "SELECT id, nombre, username FROM users ORDER BY nombre";
+// Obtener solo el personal (docente, admin, super_user o usuario = 1)
+$query_usuarios = "SELECT id, nombre, username, docente, admin, super_user, usuario 
+                   FROM users 
+                   WHERE docente = 1 OR admin = 1 OR super_user = 1 OR usuario = 1
+                   ORDER BY nombre";
 $result_usuarios = $db->query($query_usuarios);
 $usuarios = $result_usuarios ? $result_usuarios->fetch_all(MYSQLI_ASSOC) : [];
 
@@ -51,17 +54,24 @@ if (isset($mensaje)) {
             <!-- Formulario para asignar horario -->
             <div class="card mb-4">
                 <div class="card-header">
-                    <h5>Asignar Horario a Usuario</h5>
+                    <h5>Asignar Horario a Personal</h5>
                 </div>
                 <div class="card-body">
                     <form method="POST" action="">
                         <div class="form-group">
-                            <label for="id_usuario">Usuario:</label>
+                            <label for="id_usuario">Personal:</label>
                             <select class="form-control" id="id_usuario" name="id_usuario" required>
-                                <option value="">Seleccionar usuario</option>
-                                <?php foreach ($usuarios as $usuario): ?>
+                                <option value="">Seleccionar personal</option>
+                                <?php foreach ($usuarios as $usuario): 
+                                    $tipo_usuario = [];
+                                    if ($usuario['docente'] == 1) $tipo_usuario[] = 'Docente';
+                                    if ($usuario['admin'] == 1) $tipo_usuario[] = 'Admin';
+                                    if ($usuario['super_user'] == 1) $tipo_usuario[] = 'Super User';
+                                    if ($usuario['usuario'] == 1) $tipo_usuario[] = 'Usuario';
+                                    $tipo_text = implode(', ', $tipo_usuario);
+                                ?>
                                     <option value="<?php echo $usuario['id']; ?>">
-                                        <?php echo htmlspecialchars($usuario['nombre'] . ' (' . $usuario['username'] . ')'); ?>
+                                        <?php echo htmlspecialchars($usuario['nombre'] . ' (' . $usuario['username'] . ') - ' . $tipo_text); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -73,7 +83,7 @@ if (isset($mensaje)) {
                                 <option value="">Seleccionar tipo de horario</option>
                                 <?php foreach ($tipos_horario as $tipo): ?>
                                     <option value="<?php echo $tipo['id']; ?>">
-                                        <?php echo htmlspecialchars($tipo['nombre']); ?>
+                                        <?php echo htmlspecialchars($tipo['nombre'] . ' (Acad: ' . $tipo['horas_academicas'] . 'h, At: ' . $tipo['horas_atendiendo'] . 'h)'); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -93,11 +103,13 @@ if (isset($mensaje)) {
                 </div>
                 <div class="card-body">
                     <?php 
-                    // Obtener todas las relaciones
-                    $query_relaciones = "SELECT thp.*, u.nombre as usuario_nombre, u.username, th.nombre as horario_nombre
+                    // Obtener todas las relaciones solo para personal
+                    $query_relaciones = "SELECT thp.*, u.nombre as usuario_nombre, u.username, th.nombre as horario_nombre,
+                                        u.docente, u.admin, u.super_user, u.usuario
                                         FROM tipo_horario_personal thp
                                         JOIN users u ON thp.id_usuario = u.id
                                         JOIN tipos_horario th ON thp.id_tipo_horario = th.id
+                                        WHERE u.docente = 1 OR u.admin = 1 OR u.super_user = 1 OR u.usuario = 1
                                         ORDER BY u.nombre, th.nombre";
                     $result_relaciones = $db->query($query_relaciones);
                     $relaciones = $result_relaciones ? $result_relaciones->fetch_all(MYSQLI_ASSOC) : [];
@@ -108,15 +120,24 @@ if (isset($mensaje)) {
                             <table class="table table-striped table-bordered">
                                 <thead class="thead-dark">
                                     <tr>
-                                        <th>Usuario</th>
+                                        <th>Personal</th>
+                                        <th>Tipo</th>
                                         <th>Horario</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($relaciones as $relacion): ?>
+                                    <?php foreach ($relaciones as $relacion): 
+                                        $tipo_usuario = [];
+                                        if ($relacion['docente'] == 1) $tipo_usuario[] = 'Docente';
+                                        if ($relacion['admin'] == 1) $tipo_usuario[] = 'Admin';
+                                        if ($relacion['super_user'] == 1) $tipo_usuario[] = 'Super User';
+                                        if ($relacion['usuario'] == 1) $tipo_usuario[] = 'Usuario';
+                                        $tipo_text = implode(', ', $tipo_usuario);
+                                    ?>
                                         <tr>
                                             <td><?php echo htmlspecialchars($relacion['usuario_nombre'] . ' (' . $relacion['username'] . ')'); ?></td>
+                                            <td><?php echo htmlspecialchars($tipo_text); ?></td>
                                             <td><?php echo htmlspecialchars($relacion['horario_nombre']); ?></td>
                                             <td>
                                                 <form method="POST" action="" style="display:inline;">
@@ -134,7 +155,7 @@ if (isset($mensaje)) {
                             </table>
                         </div>
                     <?php else: ?>
-                        <div class="alert alert-info">No hay relaciones entre usuarios y horarios registradas aún.</div>
+                        <div class="alert alert-info">No hay relaciones entre personal y horarios registradas aún.</div>
                     <?php endif; ?>
                 </div>
             </div>
