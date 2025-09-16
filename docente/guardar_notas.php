@@ -96,10 +96,12 @@ try {
         
         // Actualizar solo el trayecto correspondiente
         if (isset($notas_trayectos[$campo_trayecto]) && $notas_trayectos[$campo_trayecto] !== '') {
+            // Asegurar que el valor sea numérico y esté en el rango correcto
             $valor = (int)$notas_trayectos[$campo_trayecto];
-            $valores_trayectos[$trayecto_a_procesar] = $valor >= 1 && $valor <= 20 ? $valor : 1;
+            $valor = max(1, min(20, $valor)); // Forzar entre 1 y 20
+            $valores_trayectos[$trayecto_a_procesar] = $valor;
         } else {
-            $valores_trayectos[$trayecto_a_procesar] = 1;
+            $valores_trayectos[$trayecto_a_procesar] = 1; // Valor por defecto
         }
         
         $nuevo_estado = 'pendiente';
