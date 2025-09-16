@@ -5213,6 +5213,62 @@ function obtenerTipoPeriodoPorCarrera($id_carrera) {
 
 
 
+//TIPOS DE HORARIO ***********************************************************************
+
+function obtenerTiposHorario($db) {
+    $query = "SELECT * FROM tipos_horario ORDER BY nombre";
+    $result = $db->query($query);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/**
+ * Obtener un tipo de horario por ID
+ */
+function obtenerTipoHorarioPorId($db, $id) {
+    $query = "SELECT * FROM tipos_horario WHERE id = $id";
+    $result = $db->query($query);
+    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
+}
+
+/**
+ * Agregar un nuevo tipo de horario
+ */
+function agregarTipoHorario($db, $nombre, $horas_academicas, $horas_atendiendo) {
+    $nombre = $db->real_escape_string($nombre);
+    $horas_academicas = (int)$horas_academicas;
+    $horas_atendiendo = (int)$horas_atendiendo;
+    
+    $query = "INSERT INTO tipos_horario (nombre, horas_academicas, horas_atendiendo) 
+              VALUES ('$nombre', $horas_academicas, $horas_atendiendo)";
+    return $db->query($query);
+}
+
+/**
+ * Actualizar un tipo de horario existente
+ */
+function actualizarTipoHorario($db, $id, $nombre, $horas_academicas, $horas_atendiendo) {
+    $nombre = $db->real_escape_string($nombre);
+    $horas_academicas = (int)$horas_academicas;
+    $horas_atendiendo = (int)$horas_atendiendo;
+    
+    $query = "UPDATE tipos_horario SET 
+              nombre = '$nombre', 
+              horas_academicas = $horas_academicas, 
+              horas_atendiendo = $horas_atendiendo 
+              WHERE id = $id";
+    return $db->query($query);
+}
+
+/**
+ * Eliminar un tipo de horario
+ */
+function eliminarTipoHorario($db, $id) {
+    $query = "DELETE FROM tipos_horario WHERE id = $id";
+    return $db->query($query);
+}
+
+
+
 
 
 

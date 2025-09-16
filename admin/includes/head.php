@@ -237,9 +237,13 @@ if (!isLoggedIn() || !isAdmin()) {
                         <a title="Editar Valores del Sistema" class="dropdown-item" href="valores_predefinidos.php">
                             <i class="fas fa-edit fa-fw"></i> Valores Predefinidos
                         </a>
-                        <a title="Editar tipos de pago" class="dropdown-item" href="tipo_pago.php">
-                            <i class="fas fa-edit fa-fw"></i> Tipos de Pago
-                        </a>
+                         <a title="Editar tipos de pago" class="dropdown-item" href="tipo_pago.php">
+                <i class="fas fa-money-bill fa-fw"></i> Tipos de Pago
+            </a>
+                          <!-- Nueva opción: Tipos de Horario -->
+            <a title="Gestionar tipos de horario" class="dropdown-item" href="tipos_horario.php">
+                <i class="fas fa-clock fa-fw"></i> Tipos de Horario
+            </a>
                     <?php endif; ?>
                     
                     <div class="dropdown-divider"></div>
