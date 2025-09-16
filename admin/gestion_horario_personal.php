@@ -13,25 +13,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         $resultado = asignarTipoHorarioUsuario($db, $id_usuario, $id_tipo_horario);
         $mensaje = $resultado ? "Horario asignado correctamente." : "Error: Esta relación ya existe o hubo un problema.";
-    } elseif (isset($_POST['eliminar'])) {
-        $id_usuario = $_POST['id_usuario'];
+    } elseif (isset($_POST['editar'])) {
+        $id_relacion = $_POST['id_relacion'];
         $id_tipo_horario = $_POST['id_tipo_horario'];
         
-        $resultado = eliminarTipoHorarioUsuario($db, $id_usuario, $id_tipo_horario);
+        $resultado = actualizarTipoHorarioUsuario($db, $id_relacion, $id_tipo_horario);
+        $mensaje = $resultado ? "Horario actualizado correctamente." : "Error al actualizar el horario.";
+    } elseif (isset($_POST['eliminar'])) {
+        $id_relacion = $_POST['id_relacion'];
+        
+        $resultado = eliminarTipoHorarioUsuarioPorId($db, $id_relacion);
         $mensaje = $resultado ? "Relación eliminada correctamente." : "Error al eliminar la relación.";
     }
 }
 
-// Obtener solo el personal (docente, admin, super_user o usuario = 1)
-$query_usuarios = "SELECT id, nombre, username, docente, admin, super_user, usuario 
-                   FROM users 
-                   WHERE docente = 1 OR admin = 1 OR super_user = 1 OR usuario = 1
-                   ORDER BY nombre";
-$result_usuarios = $db->query($query_usuarios);
-$usuarios = $result_usuarios ? $result_usuarios->fetch_all(MYSQLI_ASSOC) : [];
+// Obtener solo el personal (docente, admin, super_user o usuario = 1) que NO tiene asignación de horario
+$query_personal_sin_horario = "SELECT u.id, u.idusuario, u.nombre, u.username, u.docente, u.admin, u.super_user, u.usuario 
+                               FROM users u
+                               WHERE (u.docente = 1 OR u.admin = 1 OR u.super_user = 1 OR u.usuario = 1)
+                               AND u.id NOT IN (SELECT id_usuario FROM tipo_horario_personal)
+                               ORDER BY u.nombre";
+$result_personal_sin_horario = $db->query($query_personal_sin_horario);
+$personal_sin_horario = $result_personal_sin_horario ? $result_personal_sin_horario->fetch_all(MYSQLI_ASSOC) : [];
 
 // Obtener tipos de horario
 $tipos_horario = obtenerTiposHorario($db);
+
+// Obtener todas las relaciones existentes
+$relaciones = obtenerTodasRelacionesHorarioPersonal($db);
 
 include("includes/head.php");
 
@@ -57,21 +66,17 @@ if (isset($mensaje)) {
                     <h5>Asignar Horario a Personal</h5>
                 </div>
                 <div class="card-body">
+                    <?php if (count($personal_sin_horario) > 0): ?>
                     <form method="POST" action="">
                         <div class="form-group">
                             <label for="id_usuario">Personal:</label>
                             <select class="form-control" id="id_usuario" name="id_usuario" required>
                                 <option value="">Seleccionar personal</option>
-                                <?php foreach ($usuarios as $usuario): 
-                                    $tipo_usuario = [];
-                                    if ($usuario['docente'] == 1) $tipo_usuario[] = 'Docente';
-                                    if ($usuario['admin'] == 1) $tipo_usuario[] = 'Admin';
-                                    if ($usuario['super_user'] == 1) $tipo_usuario[] = 'Super User';
-                                    if ($usuario['usuario'] == 1) $tipo_usuario[] = 'Usuario';
-                                    $tipo_text = implode(', ', $tipo_usuario);
+                                <?php foreach ($personal_sin_horario as $usuario): 
+                                    $tipo_usuario = obtenerTipoUsuarioTexto($usuario);
                                 ?>
                                     <option value="<?php echo $usuario['id']; ?>">
-                                        <?php echo htmlspecialchars($usuario['nombre'] . ' (' . $usuario['username'] . ') - ' . $tipo_text); ?>
+                                        <?php echo htmlspecialchars($usuario['nombre'] . ' (C.I: ' . $usuario['idusuario'] . ') - ' . $tipo_usuario); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -93,6 +98,48 @@ if (isset($mensaje)) {
                             Asignar Horario
                         </button>
                     </form>
+                    <?php else: ?>
+                    <div class="alert alert-info">
+                        Todo el personal ya tiene asignación de horario.
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <!-- Tabla de personal sin horario -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Personal Sin Asignación de Horario</h5>
+                </div>
+                <div class="card-body">
+                    <?php if (count($personal_sin_horario) > 0): ?>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered">
+                                <thead class="thead-dark">
+                                    <tr>
+                                        <th>Cédula</th>
+                                        <th>Nombre</th>
+                                        <th>Tipo de Personal</th>
+                                        <th>Usuario</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($personal_sin_horario as $usuario): 
+                                        $tipo_usuario = obtenerTipoUsuarioTexto($usuario);
+                                    ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($usuario['idusuario']); ?></td>
+                                            <td><?php echo htmlspecialchars($usuario['nombre']); ?></td>
+                                            <td><?php echo htmlspecialchars($tipo_usuario); ?></td>
+                                            <td><?php echo htmlspecialchars($usuario['username']); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else: ?>
+                        <div class="alert alert-info">Todo el personal tiene asignación de horario.</div>
+                    <?php endif; ?>
                 </div>
             </div>
             
@@ -102,52 +149,46 @@ if (isset($mensaje)) {
                     <h5>Relaciones Existentes</h5>
                 </div>
                 <div class="card-body">
-                    <?php 
-                    // Obtener todas las relaciones solo para personal
-                    $query_relaciones = "SELECT thp.*, u.nombre as usuario_nombre, u.username, th.nombre as horario_nombre,
-                                        u.docente, u.admin, u.super_user, u.usuario
-                                        FROM tipo_horario_personal thp
-                                        JOIN users u ON thp.id_usuario = u.id
-                                        JOIN tipos_horario th ON thp.id_tipo_horario = th.id
-                                        WHERE u.docente = 1 OR u.admin = 1 OR u.super_user = 1 OR u.usuario = 1
-                                        ORDER BY u.nombre, th.nombre";
-                    $result_relaciones = $db->query($query_relaciones);
-                    $relaciones = $result_relaciones ? $result_relaciones->fetch_all(MYSQLI_ASSOC) : [];
-                    ?>
-                    
                     <?php if (count($relaciones) > 0): ?>
                         <div class="table-responsive">
                             <table class="table table-striped table-bordered">
                                 <thead class="thead-dark">
                                     <tr>
-                                        <th>Personal</th>
-                                        <th>Tipo</th>
+                                        <th>Cédula</th>
+                                        <th>Nombre</th>
+                                        <th>Tipo de Personal</th>
                                         <th>Horario</th>
+                                        <th>Horas Académicas</th>
+                                        <th>Horas Atendiendo</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($relaciones as $relacion): 
-                                        $tipo_usuario = [];
-                                        if ($relacion['docente'] == 1) $tipo_usuario[] = 'Docente';
-                                        if ($relacion['admin'] == 1) $tipo_usuario[] = 'Admin';
-                                        if ($relacion['super_user'] == 1) $tipo_usuario[] = 'Super User';
-                                        if ($relacion['usuario'] == 1) $tipo_usuario[] = 'Usuario';
-                                        $tipo_text = implode(', ', $tipo_usuario);
+                                        $tipo_usuario = obtenerTipoUsuarioTexto($relacion);
                                     ?>
                                         <tr>
-                                            <td><?php echo htmlspecialchars($relacion['usuario_nombre'] . ' (' . $relacion['username'] . ')'); ?></td>
-                                            <td><?php echo htmlspecialchars($tipo_text); ?></td>
+                                            <td><?php echo htmlspecialchars($relacion['idusuario']); ?></td>
+                                            <td><?php echo htmlspecialchars($relacion['usuario_nombre']); ?></td>
+                                            <td><?php echo htmlspecialchars($tipo_usuario); ?></td>
                                             <td><?php echo htmlspecialchars($relacion['horario_nombre']); ?></td>
+                                            <td><?php echo htmlspecialchars($relacion['horas_academicas']); ?>h</td>
+                                            <td><?php echo htmlspecialchars($relacion['horas_atendiendo']); ?>h</td>
                                             <td>
-                                                <form method="POST" action="" style="display:inline;">
-                                                    <input type="hidden" name="id_usuario" value="<?php echo $relacion['id_usuario']; ?>">
-                                                    <input type="hidden" name="id_tipo_horario" value="<?php echo $relacion['id_tipo_horario']; ?>">
-                                                    <button type="submit" class="btn btn-sm btn-danger" name="eliminar" 
-                                                            onclick="return confirm('¿Estás seguro de eliminar esta relación?');">
-                                                        Eliminar
-                                                    </button>
-                                                </form>
+                                                <button type="button" class="btn btn-sm btn-warning" data-toggle="modal" data-target="#modalEditar" 
+                                                        data-id="<?php echo $relacion['id']; ?>"
+                                                        data-id-usuario="<?php echo $relacion['id_usuario']; ?>"
+                                                        data-nombre="<?php echo htmlspecialchars($relacion['usuario_nombre']); ?>"
+                                                        data-id-tipo-horario="<?php echo $relacion['id_tipo_horario']; ?>"
+                                                        data-horario-actual="<?php echo htmlspecialchars($relacion['horario_nombre']); ?>">
+                                                    Editar
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-danger" data-toggle="modal" data-target="#modalEliminar" 
+                                                        data-id="<?php echo $relacion['id']; ?>"
+                                                        data-nombre="<?php echo htmlspecialchars($relacion['usuario_nombre']); ?>"
+                                                        data-horario="<?php echo htmlspecialchars($relacion['horario_nombre']); ?>">
+                                                    Eliminar
+                                                </button>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -162,5 +203,112 @@ if (isset($mensaje)) {
         </div>
     </div>
 </div>
+
+<!-- Modal para Editar -->
+<div class="modal fade" id="modalEditar" tabindex="-1" role="dialog" aria-labelledby="modalEditarLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalEditarLabel">Editar Horario de Personal</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST" action="">
+                <div class="modal-body">
+                    <input type="hidden" name="id_relacion" id="edit_id_relacion">
+                    <input type="hidden" name="id_usuario" id="edit_id_usuario">
+                    
+                    <div class="form-group">
+                        <label>Personal:</label>
+                        <p class="form-control-static" id="edit_nombre_usuario"></p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Horario Actual:</label>
+                        <p class="form-control-static" id="edit_horario_actual"></p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit_id_tipo_horario">Nuevo Tipo de Horario:</label>
+                        <select class="form-control" id="edit_id_tipo_horario" name="id_tipo_horario" required>
+                            <option value="">Seleccionar tipo de horario</option>
+                            <?php foreach ($tipos_horario as $tipo): ?>
+                                <option value="<?php echo $tipo['id']; ?>">
+                                    <?php echo htmlspecialchars($tipo['nombre'] . ' (Acad: ' . $tipo['horas_academicas'] . 'h, At: ' . $tipo['horas_atendiendo'] . 'h)'); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" name="editar">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Eliminar -->
+<div class="modal fade" id="modalEliminar" tabindex="-1" role="dialog" aria-labelledby="modalEliminarLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalEliminarLabel">Eliminar Asignación de Horario</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST" action="">
+                <div class="modal-body">
+                    <input type="hidden" name="id_relacion" id="delete_id_relacion">
+                    <p>¿Estás seguro de que deseas eliminar la asignación de horario para <strong id="delete_nombre"></strong>?</p>
+                    <p>Horario: <strong id="delete_horario"></strong></p>
+                    <p class="text-danger">Esta acción no se puede deshacer.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger" name="eliminar">Eliminar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Script para manejar los modales
+document.addEventListener('DOMContentLoaded', function() {
+    // Modal de edición
+    $('#modalEditar').on('show.bs.modal', function (event) {
+        var button = $(event.relatedTarget);
+        var id = button.data('id');
+        var idUsuario = button.data('id-usuario');
+        var nombre = button.data('nombre');
+        var idTipoHorario = button.data('id-tipo-horario');
+        var horarioActual = button.data('horario-actual');
+        
+        var modal = $(this);
+        modal.find('#edit_id_relacion').val(id);
+        modal.find('#edit_id_usuario').val(idUsuario);
+        modal.find('#edit_nombre_usuario').text(nombre);
+        modal.find('#edit_horario_actual').text(horarioActual);
+        modal.find('#edit_id_tipo_horario').val(idTipoHorario);
+    });
+    
+    // Modal de eliminación
+    $('#modalEliminar').on('show.bs.modal', function (event) {
+        var button = $(event.relatedTarget);
+        var id = button.data('id');
+        var nombre = button.data('nombre');
+        var horario = button.data('horario');
+        
+        var modal = $(this);
+        modal.find('#delete_id_relacion').val(id);
+        modal.find('#delete_nombre').text(nombre);
+        modal.find('#delete_horario').text(horario);
+    });
+});
+</script>
 
 <?php include("includes/footer.php"); ?>

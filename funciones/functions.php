@@ -5329,6 +5329,53 @@ function obtenerUsuariosPorTipoHorario($db, $id_tipo_horario) {
 
 
 
+/**
+ * Obtener texto del tipo de usuario (estético)
+ */
+function obtenerTipoUsuarioTexto($usuario) {
+    $tipo_usuario = [];
+    if ($usuario['docente'] == 1) $tipo_usuario[] = 'Docente';
+    if ($usuario['admin'] == 1) $tipo_usuario[] = 'Admin';
+    if ($usuario['super_user'] == 1) $tipo_usuario[] = 'Super User';
+    if ($usuario['usuario'] == 1) $tipo_usuario[] = 'Director de Carrera';
+    
+    return implode(', ', $tipo_usuario);
+}
+
+/**
+ * Obtener todas las relaciones horario-personal
+ */
+function obtenerTodasRelacionesHorarioPersonal($db) {
+    $query = "SELECT thp.id, thp.id_usuario, thp.id_tipo_horario, 
+                     u.idusuario, u.nombre as usuario_nombre, u.username, 
+                     u.docente, u.admin, u.super_user, u.usuario,
+                     th.nombre as horario_nombre, th.horas_academicas, th.horas_atendiendo
+              FROM tipo_horario_personal thp
+              JOIN users u ON thp.id_usuario = u.id
+              JOIN tipos_horario th ON thp.id_tipo_horario = th.id
+              ORDER BY u.nombre, th.nombre";
+    $result = $db->query($query);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/**
+ * Actualizar tipo de horario de usuario
+ */
+function actualizarTipoHorarioUsuario($db, $id_relacion, $id_tipo_horario) {
+    $query = "UPDATE tipo_horario_personal SET id_tipo_horario = $id_tipo_horario WHERE id = $id_relacion";
+    return $db->query($query);
+}
+
+/**
+ * Eliminar relación por ID
+ */
+function eliminarTipoHorarioUsuarioPorId($db, $id_relacion) {
+    $query = "DELETE FROM tipo_horario_personal WHERE id = $id_relacion";
+    return $db->query($query);
+}
+
+
+
 
 
 
