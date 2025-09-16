@@ -5270,6 +5270,65 @@ function eliminarTipoHorario($db, $id) {
 
 
 
+//ASIGNACION TIPO HORARIO AL PERSONAL ***********************************************************************
+
+/**
+ * Asignar tipo de horario a un usuario
+ */
+function asignarTipoHorarioUsuario($db, $id_usuario, $id_tipo_horario) {
+    // Verificar si ya existe la relación
+    $query_check = "SELECT id FROM tipo_horario_personal 
+                    WHERE id_usuario = $id_usuario AND id_tipo_horario = $id_tipo_horario";
+    $result = $db->query($query_check);
+    
+    if ($result->num_rows > 0) {
+        return false; // Ya existe esta relación
+    }
+    
+    // Insertar nueva relación
+    $query = "INSERT INTO tipo_horario_personal (id_usuario, id_tipo_horario) 
+              VALUES ($id_usuario, $id_tipo_horario)";
+    return $db->query($query);
+}
+
+/**
+ * Obtener tipos de horario de un usuario
+ */
+function obtenerTiposHorarioUsuario($db, $id_usuario) {
+    $query = "SELECT th.* 
+              FROM tipo_horario_personal thp
+              JOIN tipos_horario th ON thp.id_tipo_horario = th.id
+              WHERE thp.id_usuario = $id_usuario
+              ORDER BY th.nombre";
+    $result = $db->query($query);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/**
+ * Eliminar asignación de horario de usuario
+ */
+function eliminarTipoHorarioUsuario($db, $id_usuario, $id_tipo_horario) {
+    $query = "DELETE FROM tipo_horario_personal 
+              WHERE id_usuario = $id_usuario AND id_tipo_horario = $id_tipo_horario";
+    return $db->query($query);
+}
+
+/**
+ * Obtener usuarios por tipo de horario
+ */
+function obtenerUsuariosPorTipoHorario($db, $id_tipo_horario) {
+    $query = "SELECT u.* 
+              FROM tipo_horario_personal thp
+              JOIN users u ON thp.id_usuario = u.id
+              WHERE thp.id_tipo_horario = $id_tipo_horario
+              ORDER BY u.nombre";
+    $result = $db->query($query);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+
+
+
 
 
 

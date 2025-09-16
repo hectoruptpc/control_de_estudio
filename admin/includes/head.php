@@ -244,6 +244,11 @@ if (!isLoggedIn() || !isAdmin()) {
             <a title="Gestionar tipos de horario" class="dropdown-item" href="tipos_horario.php">
                 <i class="fas fa-clock fa-fw"></i> Tipos de Horario
             </a>
+ <a title="Gestionar horarios por personal" class="dropdown-item" href="gestion_horario_personal.php">
+                <i class="fas fa-user-clock fa-fw"></i> Horarios por Personal
+            </a>
+
+
                     <?php endif; ?>
                     
                     <div class="dropdown-divider"></div>
