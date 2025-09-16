@@ -102,7 +102,13 @@ include("includes/head.php");
     </div>
     
     <!-- Resultados -->
-    <div id="resultados"></div>
+    <div id="resultados">
+        <div class="text-right mb-3" id="volver-container" style="display: none;">
+            <button class="btn btn-secondary" id="btn-volver">
+                <i class="fas fa-arrow-left"></i> Volver a Secciones
+            </button>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -113,6 +119,11 @@ $(document).ready(function() {
         const materiaId = $(this).data('materia');
         
         $('#resultados').html(`
+            <div class="text-right mb-3" id="volver-container">
+                <button class="btn btn-secondary" id="btn-volver">
+                    <i class="fas fa-arrow-left"></i> Volver a Secciones
+                </button>
+            </div>
             <div class="text-center py-4">
                 <div class="spinner-border text-primary"></div>
                 <p>Cargando estudiantes...</p>
@@ -134,10 +145,23 @@ $(document).ready(function() {
             return response.text();
         })
         .then(html => {
-            $('#resultados').html(html);
+            // Mantener el botón de volver y agregar el contenido
+            $('#resultados').html(`
+                <div class="text-right mb-3" id="volver-container">
+                    <button class="btn btn-secondary" id="btn-volver">
+                        <i class="fas fa-arrow-left"></i> Volver a Secciones
+                    </button>
+                </div>
+                ${html}
+            `);
         })
         .catch(error => {
             $('#resultados').html(`
+                <div class="text-right mb-3" id="volver-container">
+                    <button class="btn btn-secondary" id="btn-volver">
+                        <i class="fas fa-arrow-left"></i> Volver a Secciones
+                    </button>
+                </div>
                 <div class="alert alert-danger">
                     Error: ${error.message}
                 </div>
@@ -145,11 +169,27 @@ $(document).ready(function() {
         });
     });
     
+    // Función para volver a secciones
+    $(document).on('click', '#btn-volver', function() {
+        $('#resultados').html(`
+            <div class="text-right mb-3" id="volver-container" style="display: none;">
+                <button class="btn btn-secondary" id="btn-volver">
+                    <i class="fas fa-arrow-left"></i> Volver a Secciones
+                </button>
+            </div>
+        `);
+    });
+    
     // Guardar notas
     $(document).on('submit', '#form-notas', function(e) {
         e.preventDefault();
         
         $('#resultados').html(`
+            <div class="text-right mb-3" id="volver-container">
+                <button class="btn btn-secondary" id="btn-volver">
+                    <i class="fas fa-arrow-left"></i> Volver a Secciones
+                </button>
+            </div>
             <div class="text-center py-4">
                 <div class="spinner-border text-success"></div>
                 <p>Guardando notas...</p>
@@ -165,6 +205,11 @@ $(document).ready(function() {
         .then(response => response.text())
         .then(result => {
             $('#resultados').html(`
+                <div class="text-right mb-3" id="volver-container">
+                    <button class="btn btn-secondary" id="btn-volver">
+                        <i class="fas fa-arrow-left"></i> Volver a Secciones
+                    </button>
+                </div>
                 <div class="alert alert-success">
                     ${result}
                 </div>
@@ -172,6 +217,11 @@ $(document).ready(function() {
         })
         .catch(error => {
             $('#resultados').html(`
+                <div class="text-right mb-3" id="volver-container">
+                    <button class="btn btn-secondary" id="btn-volver">
+                        <i class="fas fa-arrow-left"></i> Volver a Secciones
+                    </button>
+                </div>
                 <div class="alert alert-danger">
                     Error al guardar: ${error.message}
                 </div>

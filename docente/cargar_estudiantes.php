@@ -67,6 +67,8 @@ while ($estudiante = $estudiantes->fetch_assoc()) {
 }
 ?>
 
+
+
 <div class="card">
     <div class="card-header bg-info text-white">
         <h5>Estudiantes - <?= htmlspecialchars($materia['nombre_materia']) ?></h5>
@@ -245,5 +247,18 @@ document.addEventListener('DOMContentLoaded', function() {
     <?php if ($notas_rechazadas): ?>
     document.getElementById('alert-rechazadas').classList.remove('d-none');
     <?php endif; ?>
+    
+    // Agregar funcionalidad al botón volver
+    document.getElementById('btn-volver').addEventListener('click', function() {
+        // Esta función será manejada por el JavaScript principal en notas.php
+        // Solo está aquí por si se accede directamente a cargar_estudiantes.php
+        if (window.parent && window.parent !== window) {
+            // Si estamos en un iframe o contexto similar
+            window.parent.postMessage('volver-a-secciones', '*');
+        } else {
+            // Si estamos en la página directamente
+            window.history.back();
+        }
+    });
 });
 </script>
