@@ -134,7 +134,7 @@
 <body>
     <div class="construction-card">
         <div class="university-logo">
-            <img src="uptpc.png" alt="Logo Universidad" style="width: 160px; height: 160px; object-fit: contain;">
+            <img src="images/uptpc.png" alt="Logo Universidad" style="width: 160px; height: 160px; object-fit: contain;">
         </div>
         
         <div class="construction-icon">

@@ -193,7 +193,10 @@ if (!isLoggedIn() || !isAdmin()) {
                     <a title="Consultar Notas" class="dropdown-item" href="consulta_notas.php">
                         <i class="fas fa-search fa-fw"></i> Consultar Notas
                     </a>
-                    
+                    <!-- Nueva opción: Consultar Notas Pasadas -->
+                    <a title="Consultar Notas Pasadas" class="dropdown-item" href="../pagina_en_construccion.php">
+                        <i class="fas fa-history fa-fw"></i> Consultar Notas Pasadas
+                    </a>
                 </div>
             </li>
 
