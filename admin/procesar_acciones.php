@@ -26,14 +26,33 @@ function enviarMensajeRechazo($docente_id, $contenido_mensaje) {
     return $stmt->execute();
 }
 
+// Función para enviar mensaje de aprobación al docente
+function enviarMensajeAprobacion($docente_id, $contenido_mensaje) {
+    global $db;
+    
+    $admin_id = $_SESSION['user']['id'];
+    $titulo = "Notas Aprobadas";
+    
+    $query = "INSERT INTO mensajeria 
+              (id_usuario_remitente, id_usuario_destinatario, titulo, mensaje, fecha_envio, leido) 
+              VALUES (?, ?, ?, ?, NOW(), 0)";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iiss", $admin_id, $docente_id, $titulo, $contenido_mensaje);
+    
+    return $stmt->execute();
+}
+
 if (isset($_POST['accion']) && ($_POST['accion'] === 'aprobar' || $_POST['accion'] === 'rechazar')) {
     $accion = $_POST['accion'];
     $admin_id = $_SESSION['user']['id'];
     $nuevo_estado = $accion === 'aprobar' ? 'aprobada' : 'rechazada';
     
-    // Obtener el contenido del mensaje si se está rechazando
+    // Obtener el contenido del mensaje si se está rechazando o aprobando
     $contenido_mensaje = '';
-    if ($accion === 'rechazar' && isset($_POST['mensaje_rechazo'])) {
+    if (isset($_POST['mensaje_aprobacion'])) {
+        $contenido_mensaje = trim($_POST['mensaje_aprobacion']);
+    } elseif (isset($_POST['mensaje_rechazo'])) {
         $contenido_mensaje = trim($_POST['mensaje_rechazo']);
     }
     
@@ -71,6 +90,11 @@ if (isset($_POST['accion']) && ($_POST['accion'] === 'aprobar' || $_POST['accion
                                 AND id_materia = $materia_id 
                                 AND id_periodo = $periodo_id";
                 $db->query($insert_query);
+                
+                // Enviar mensaje de aprobación al docente
+                if (!empty($contenido_mensaje)) {
+                    enviarMensajeAprobacion($docente_id, $contenido_mensaje);
+                }
             } else {
                 // Enviar mensaje de rechazo al docente
                 if (!empty($contenido_mensaje)) {
@@ -102,6 +126,13 @@ if (isset($_POST['accion']) && ($_POST['accion'] === 'aprobar' || $_POST['accion
                                 FROM notas_pendientes 
                                 WHERE id IN ($ids_str)";
                 $db->query($insert_query);
+                
+                // Enviar mensajes de aprobación a cada docente afectado
+                if (!empty($contenido_mensaje)) {
+                    while ($docente = $docentes_result->fetch_assoc()) {
+                        enviarMensajeAprobacion($docente['id_docente'], $contenido_mensaje);
+                    }
+                }
             } else {
                 // Enviar mensajes de rechazo a cada docente afectado
                 if (!empty($contenido_mensaje)) {
