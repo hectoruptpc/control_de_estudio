@@ -384,6 +384,69 @@ switch ($seccion) {
                 </div>
             </div>
         </div>
+        
+        <!-- Modales para acciones grupales (APROBAR TODO / RECHAZAR TODO) -->
+        <div class="modal fade" id="mensajeRechazoGrupoModal" tabindex="-1" role="dialog" aria-labelledby="mensajeRechazoGrupoModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning">
+                        <h5 class="modal-title" id="tituloRechazoGrupoModal">Mensaje de Rechazo Grupal</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <strong>Estudiante(s) a rechazar:</strong>
+                            <span id="estudiantesRechazadosGrupo">TODO EL GRUPO</span>
+                        </div>
+                        <p>Por favor, ingrese el motivo del rechazo de las notas. Este mensaje será enviado al docente.</p>
+                        <div class="form-group">
+                            <label for="mensajeRechazoGrupoTexto">Mensaje:</label>
+                            <textarea class="form-control" id="mensajeRechazoGrupoTexto" rows="5" placeholder="Explique los motivos del rechazo..."></textarea>
+                        </div>
+                        <div class="alert alert-secondary">
+                            <small><i class="fas fa-info-circle"></i> Puede editar el mensaje predeterminado según sea necesario.</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" onclick="confirmarRechazoGrupoConMensaje()">Enviar Rechazo</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="mensajeAprobacionGrupoModal" tabindex="-1" role="dialog" aria-labelledby="mensajeAprobacionGrupoModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header bg-success">
+                        <h5 class="modal-title" id="tituloAprobacionGrupoModal">Mensaje de Aprobación Grupal</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <strong>Estudiante(s) a aprobar:</strong>
+                            <span id="estudiantesAprobadosGrupo">TODO EL GRUPO</span>
+                        </div>
+                        <p>Puede enviar un mensaje de confirmación al docente. Este mensaje será enviado al docente.</p>
+                        <div class="form-group">
+                            <label for="mensajeAprobacionGrupoTexto">Mensaje:</label>
+                            <textarea class="form-control" id="mensajeAprobacionGrupoTexto" rows="5" placeholder="Mensaje de confirmación de aprobación..."></textarea>
+                        </div>
+                        <div class="alert alert-secondary">
+                            <small><i class="fas fa-info-circle"></i> Puede editar el mensaje predeterminado según sea necesario.</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" onclick="confirmarAprobacionGrupoConMensaje()">Enviar Aprobación</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <?php
         break;
 }
@@ -535,7 +598,7 @@ $('.accion-individual').click(function() {
 // Configurar el modal para que se pueda abrir siempre
 $(document).ready(function() {
     // Asegurar que los modales se cierren correctamente sin afectar otros modales
-    $('#mensajeRechazoModal, #mensajeAprobacionModal').on('show.bs.modal', function() {
+    $('#mensajeRechazoModal, #mensajeAprobacionModal, #mensajeRechazoGrupoModal, #mensajeAprobacionGrupoModal').on('show.bs.modal', function() {
         // Limpiar el mensaje anterior al abrir el modal
         $(this).find('textarea').val('');
     });
@@ -550,44 +613,30 @@ $(document).ready(function() {
 function accionGrupo(accion) {
     if (accion === 'rechazar') {
         // Mostrar modal para ingresar mensaje de rechazo
-        accionPendiente = accion;
-        notasIdsPendientes = []; // Vacío indica acción grupal
-        estudianteNombrePendiente = "TODO EL GRUPO";
-        $('#mensajeRechazoModal').modal('show');
-        
-        // Actualizar el título y mensaje en el modal
-        $('#tituloRechazoModal').html('<i class="fas fa-exclamation-triangle"></i> Rechazar Notas de Todo el Grupo');
-        $('#estudiantesRechazados').text(estudianteNombrePendiente);
+        $('#mensajeRechazoGrupoModal').modal('show');
         
         // Establecer mensaje predeterminado
         const mensajePredeterminado = "Las notas de todos los estudiantes del grupo han sido rechazadas debido a: [ESPECIFIQUE EL MOTIVO]";
-        $('#mensajeRechazoTexto').val(mensajePredeterminado);
+        $('#mensajeRechazoGrupoTexto').val(mensajePredeterminado);
     } else if (accion === 'aprobar') {
         // Mostrar modal para ingresar mensaje de aprobación
-        accionPendiente = accion;
-        notasIdsPendientes = []; // Vacío indica acción grupal
-        estudianteNombrePendiente = "TODO EL GRUPO";
-        $('#mensajeAprobacionModal').modal('show');
-        
-        // Actualizar el título y mensaje en el modal
-        $('#tituloAprobacionModal').html('<i class="fas fa-check-circle"></i> Aprobar Notas de Todo el Grupo');
-        $('#estudiantesAprobados').text(estudianteNombrePendiente);
+        $('#mensajeAprobacionGrupoModal').modal('show');
         
         // Establecer mensaje predeterminado
         const mensajePredeterminado = "Las notas de todos los estudiantes del grupo han sido aprobadas exitosamente.";
-        $('#mensajeAprobacionTexto').val(mensajePredeterminado);
+        $('#mensajeAprobacionGrupoTexto').val(mensajePredeterminado);
     }
 }
 
 function confirmarRechazoGrupoConMensaje() {
-    const mensaje = $('#mensajeRechazoTexto').val().trim();
+    const mensaje = $('#mensajeRechazoGrupoTexto').val().trim();
     
     if (!mensaje) {
         alert('Por favor, ingrese un mensaje de rechazo');
         return;
     }
     
-    $('#mensajeRechazoModal').modal('hide');
+    $('#mensajeRechazoGrupoModal').modal('hide');
     
     $.ajax({
         url: 'procesar_acciones.php',
@@ -607,14 +656,14 @@ function confirmarRechazoGrupoConMensaje() {
 }
 
 function confirmarAprobacionGrupoConMensaje() {
-    const mensaje = $('#mensajeAprobacionTexto').val().trim();
+    const mensaje = $('#mensajeAprobacionGrupoTexto').val().trim();
     
     if (!mensaje) {
         alert('Por favor, ingrese un mensaje de aprobación');
         return;
     }
     
-    $('#mensajeAprobacionModal').modal('hide');
+    $('#mensajeAprobacionGrupoModal').modal('hide');
     
     $.ajax({
         url: 'procesar_acciones.php',
@@ -634,7 +683,7 @@ function confirmarAprobacionGrupoConMensaje() {
 }
 </script>
 
-<!-- Modal para mensaje de rechazo -->
+<!-- Modal para mensaje de rechazo (INDIVIDUAL) -->
 <div class="modal fade" id="mensajeRechazoModal" tabindex="-1" role="dialog" aria-labelledby="mensajeRechazoModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -660,19 +709,13 @@ function confirmarAprobacionGrupoConMensaje() {
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="
-                    if (notasIdsPendientes.length > 0) {
-                        confirmarRechazoConMensaje();
-                    } else {
-                        confirmarRechazoGrupoConMensaje();
-                    }
-                ">Enviar Rechazo</button>
+                <button type="button" class="btn btn-primary" onclick="confirmarRechazoConMensaje()">Enviar Rechazo</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal para mensaje de aprobación -->
+<!-- Modal para mensaje de aprobación (INDIVIDUAL) -->
 <div class="modal fade" id="mensajeAprobacionModal" tabindex="-1" role="dialog" aria-labelledby="mensajeAprobacionModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -698,13 +741,7 @@ function confirmarAprobacionGrupoConMensaje() {
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="
-                    if (notasIdsPendientes.length > 0) {
-                        confirmarAprobacionConMensaje();
-                    } else {
-                        confirmarAprobacionGrupoConMensaje();
-                    }
-                ">Enviar Aprobación</button>
+                <button type="button" class="btn btn-primary" onclick="confirmarAprobacionConMensaje()">Enviar Aprobación</button>
             </div>
         </div>
     </div>
