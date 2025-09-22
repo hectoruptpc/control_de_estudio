@@ -39,6 +39,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
             $agregar_materia = isset($permisos['agregar_materia']) ? 1 : 0;
             $editar_materia = isset($permisos['editar_materia']) ? 1 : 0;
             
+            // Nuevos permisos
+            $pagos = isset($permisos['pagos']) ? 1 : 0;
+            $auditoria = isset($permisos['auditoria']) ? 1 : 0;
+            $secciones = isset($permisos['secciones']) ? 1 : 0;
+            $rela_materia_carrera = isset($permisos['rela_materia_carrera']) ? 1 : 0;
+            $periodos_academicos = isset($permisos['periodos_academicos']) ? 1 : 0;
+            $asig_secciones = isset($permisos['asig_secciones']) ? 1 : 0;
+            $asig_cursos = isset($permisos['asig_cursos']) ? 1 : 0;
+            $horarios = isset($permisos['horarios']) ? 1 : 0;
+            $gestion_director_carrera = isset($permisos['gestion_director_carrera']) ? 1 : 0;
+            $notas_cargadas = isset($permisos['notas_cargadas']) ? 1 : 0;
+            $consultar_notas = isset($permisos['consultar_notas']) ? 1 : 0;
+            $consultar_notas_pasadas = isset($permisos['consultar_notas_pasadas']) ? 1 : 0;
+            $tipos_pago = isset($permisos['tipos_pago']) ? 1 : 0;
+            $tipos_horario = isset($permisos['tipos_horario']) ? 1 : 0;
+            $horario_personal = isset($permisos['horario_personal']) ? 1 : 0;
+            $respaldo_bd = isset($permisos['respaldo_bd']) ? 1 : 0;
+            
             $query = "UPDATE users SET 
                      estudiante = ?, 
                      docente = ?, 
@@ -54,12 +72,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
                      editar_docente = ?,
                      agregar_carrera = ?,
                      agregar_materia = ?,
-                     editar_materia = ?
+                     editar_materia = ?,
+                     pagos = ?,
+                     auditoria = ?,
+                     secciones = ?,
+                     rela_materia_carrera = ?,
+                     periodos_academicos = ?,
+                     asig_secciones = ?,
+                     asig_cursos = ?,
+                     horarios = ?,
+                     gestion_director_carrera = ?,
+                     notas_cargadas = ?,
+                     consultar_notas = ?,
+                     consultar_notas_pasadas = ?,
+                     tipos_pago = ?,
+                     tipos_horario = ?,
+                     horario_personal = ?,
+                     respaldo_bd = ?
                      WHERE id = ?";
             
             $stmt = $db->prepare($query);
             if ($stmt) {
-                $stmt->bind_param("iiiiiiiiiiiiiiii", 
+                $stmt->bind_param("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", 
                     $estudiante, 
                     $docente, 
                     $admin, 
@@ -75,6 +109,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
                     $agregar_carrera,
                     $agregar_materia,
                     $editar_materia,
+                    $pagos,
+                    $auditoria,
+                    $secciones,
+                    $rela_materia_carrera,
+                    $periodos_academicos,
+                    $asig_secciones,
+                    $asig_cursos,
+                    $horarios,
+                    $gestion_director_carrera,
+                    $notas_cargadas,
+                    $consultar_notas,
+                    $consultar_notas_pasadas,
+                    $tipos_pago,
+                    $tipos_horario,
+                    $horario_personal,
+                    $respaldo_bd,
                     $user_id
                 );
                 $stmt->execute();
@@ -145,12 +195,29 @@ include("includes/head.php");
                         <th>Agregar Carrera</th>
                         <th>Agregar Materia</th>
                         <th>Editar Materia</th>
+                        <!-- Nuevos permisos -->
+                        <th>Pagos</th>
+                        <th>Auditoría</th>
+                        <th>Secciones</th>
+                        <th>Relación Materia-Carrera</th>
+                        <th>Periodos Académicos</th>
+                        <th>Asignar Secciones</th>
+                        <th>Asignar Cursos</th>
+                        <th>Horarios</th>
+                        <th>Gestión Director Carrera</th>
+                        <th>Notas Cargadas</th>
+                        <th>Consultar Notas</th>
+                        <th>Consultar Notas Pasadas</th>
+                        <th>Tipos de Pago</th>
+                        <th>Tipos de Horario</th>
+                        <th>Horario Personal</th>
+                        <th>Respaldo BD</th>
                     </tr>
                 </thead>
                 <tbody id="tabla-usuarios">
                     <?php
                     global $db;
-                    $query = "SELECT id, username, estudiante, docente, admin, super_user, editar_user, editar_nota, editar_acceso, editar_valores, editar_estudiante, agregar_estudiante, agregar_docente, editar_docente, agregar_carrera, agregar_materia, editar_materia FROM users ORDER BY username";
+                    $query = "SELECT id, username, estudiante, docente, admin, super_user, editar_user, editar_nota, editar_acceso, editar_valores, editar_estudiante, agregar_estudiante, agregar_docente, editar_docente, agregar_carrera, agregar_materia, editar_materia, pagos, auditoria, secciones, rela_materia_carrera, periodos_academicos, asig_secciones, asig_cursos, horarios, gestion_director_carrera, notas_cargadas, consultar_notas, consultar_notas_pasadas, tipos_pago, tipos_horario, horario_personal, respaldo_bd FROM users ORDER BY username";
                     $result = $db->query($query);
                     
                     if ($result && $result->num_rows > 0):
@@ -161,7 +228,12 @@ include("includes/head.php");
                                            $user['editar_user'] || $user['editar_nota'] || $user['editar_acceso'] || 
                                            $user['editar_valores'] || $user['editar_estudiante'] || $user['agregar_estudiante'] || 
                                            $user['agregar_docente'] || $user['editar_docente'] || $user['agregar_carrera'] || 
-                                           $user['agregar_materia'] || $user['editar_materia'];
+                                           $user['agregar_materia'] || $user['editar_materia'] || $user['pagos'] || 
+                                           $user['auditoria'] || $user['secciones'] || $user['rela_materia_carrera'] || 
+                                           $user['periodos_academicos'] || $user['asig_secciones'] || $user['asig_cursos'] || 
+                                           $user['horarios'] || $user['gestion_director_carrera'] || $user['notas_cargadas'] || 
+                                           $user['consultar_notas'] || $user['consultar_notas_pasadas'] || $user['tipos_pago'] || 
+                                           $user['tipos_horario'] || $user['horario_personal'] || $user['respaldo_bd'];
                             
                             $clases = 'fila-usuario';
                             $clases .= $esEstudiante ? ' estudiante' : '';
@@ -170,6 +242,7 @@ include("includes/head.php");
                     ?>
                     <tr class="<?= $clases ?>" data-nombre="<?= htmlspecialchars(strtolower($user['username'])) ?>">
                         <td><?= htmlspecialchars($user['username']) ?></td>
+                        <!-- Permisos originales -->
                         <td class="text-center">
                             <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][estudiante]" <?= $user['estudiante'] ? 'checked' : '' ?>>
                         </td>
@@ -215,13 +288,63 @@ include("includes/head.php");
                         <td class="text-center">
                             <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][editar_materia]" <?= $user['editar_materia'] ? 'checked' : '' ?>>
                         </td>
+                        
+                        <!-- Nuevos permisos -->
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][pagos]" <?= $user['pagos'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][auditoria]" <?= $user['auditoria'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][secciones]" <?= $user['secciones'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][rela_materia_carrera]" <?= $user['rela_materia_carrera'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][periodos_academicos]" <?= $user['periodos_academicos'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][asig_secciones]" <?= $user['asig_secciones'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][asig_cursos]" <?= $user['asig_cursos'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][horarios]" <?= $user['horarios'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][gestion_director_carrera]" <?= $user['gestion_director_carrera'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][notas_cargadas]" <?= $user['notas_cargadas'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][consultar_notas]" <?= $user['consultar_notas'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][consultar_notas_pasadas]" <?= $user['consultar_notas_pasadas'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][tipos_pago]" <?= $user['tipos_pago'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][tipos_horario]" <?= $user['tipos_horario'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][horario_personal]" <?= $user['horario_personal'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][respaldo_bd]" <?= $user['respaldo_bd'] ? 'checked' : '' ?>>
+                        </td>
                     </tr>
                     <?php
                         endwhile;
                     else:
                     ?>
                     <tr>
-                        <td colspan="16" class="text-center">No hay usuarios registrados</td>
+                        <td colspan="33" class="text-center">No hay usuarios registrados</td>
                     </tr>
                     <?php endif; ?>
                 </tbody>
