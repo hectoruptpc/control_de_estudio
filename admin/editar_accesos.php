@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
         foreach ($_POST['permisos'] as $user_id => $permisos) {
             if (!is_numeric($user_id)) continue;
             
+            // Campos originales - manejar NULL si no están presentes
             $estudiante = isset($permisos['estudiante']) ? 1 : 0;
             $docente = isset($permisos['docente']) ? 1 : 0;
             $admin = isset($permisos['admin']) ? 1 : 0;
@@ -39,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
             $agregar_materia = isset($permisos['agregar_materia']) ? 1 : 0;
             $editar_materia = isset($permisos['editar_materia']) ? 1 : 0;
             
-            // Nuevos permisos
+            // Nuevos campos - manejar NULL si no están presentes
             $pagos = isset($permisos['pagos']) ? 1 : 0;
             $auditoria = isset($permisos['auditoria']) ? 1 : 0;
             $secciones = isset($permisos['secciones']) ? 1 : 0;
@@ -93,7 +94,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
             
             $stmt = $db->prepare($query);
             if ($stmt) {
-                $stmt->bind_param("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", 
+                // Contamos correctamente: 16 campos originales + 16 nuevos + 1 ID = 33 parámetros
+                $stmt->bind_param("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", 
                     $estudiante, 
                     $docente, 
                     $admin, 
@@ -127,8 +129,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
                     $respaldo_bd,
                     $user_id
                 );
-                $stmt->execute();
+                
+                if ($stmt->execute()) {
+                    // Éxito
+                } else {
+                    error_log("Error al ejecutar query: " . $stmt->error);
+                }
                 $stmt->close();
+            } else {
+                error_log("Error al preparar query: " . $db->error);
             }
         }
         
@@ -195,7 +204,7 @@ include("includes/head.php");
                         <th>Agregar Carrera</th>
                         <th>Agregar Materia</th>
                         <th>Editar Materia</th>
-                        <!-- Nuevos permisos -->
+                        <!-- Nuevos campos -->
                         <th>Pagos</th>
                         <th>Auditoría</th>
                         <th>Secciones</th>
@@ -217,7 +226,14 @@ include("includes/head.php");
                 <tbody id="tabla-usuarios">
                     <?php
                     global $db;
-                    $query = "SELECT id, username, estudiante, docente, admin, super_user, editar_user, editar_nota, editar_acceso, editar_valores, editar_estudiante, agregar_estudiante, agregar_docente, editar_docente, agregar_carrera, agregar_materia, editar_materia, pagos, auditoria, secciones, rela_materia_carrera, periodos_academicos, asig_secciones, asig_cursos, horarios, gestion_director_carrera, notas_cargadas, consultar_notas, consultar_notas_pasadas, tipos_pago, tipos_horario, horario_personal, respaldo_bd FROM users ORDER BY username";
+                    $query = "SELECT id, username, 
+                             estudiante, docente, admin, super_user, editar_user, editar_nota, editar_acceso, 
+                             editar_valores, editar_estudiante, agregar_estudiante, agregar_docente, editar_docente, 
+                             agregar_carrera, agregar_materia, editar_materia,
+                             pagos, auditoria, secciones, rela_materia_carrera, periodos_academicos, asig_secciones, 
+                             asig_cursos, horarios, gestion_director_carrera, notas_cargadas, consultar_notas, 
+                             consultar_notas_pasadas, tipos_pago, tipos_horario, horario_personal, respaldo_bd 
+                             FROM users ORDER BY username";
                     $result = $db->query($query);
                     
                     if ($result && $result->num_rows > 0):
@@ -242,7 +258,7 @@ include("includes/head.php");
                     ?>
                     <tr class="<?= $clases ?>" data-nombre="<?= htmlspecialchars(strtolower($user['username'])) ?>">
                         <td><?= htmlspecialchars($user['username']) ?></td>
-                        <!-- Permisos originales -->
+                        <!-- Campos originales -->
                         <td class="text-center">
                             <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][estudiante]" <?= $user['estudiante'] ? 'checked' : '' ?>>
                         </td>
@@ -289,54 +305,54 @@ include("includes/head.php");
                             <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][editar_materia]" <?= $user['editar_materia'] ? 'checked' : '' ?>>
                         </td>
                         
-                        <!-- Nuevos permisos -->
+                        <!-- Nuevos campos -->
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][pagos]" <?= $user['pagos'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][pagos]" <?= isset($user['pagos']) && $user['pagos'] ? 'checked' : '' ?>>
                         </td>
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][auditoria]" <?= $user['auditoria'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][auditoria]" <?= isset($user['auditoria']) && $user['auditoria'] ? 'checked' : '' ?>>
                         </td>
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][secciones]" <?= $user['secciones'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][secciones]" <?= isset($user['secciones']) && $user['secciones'] ? 'checked' : '' ?>>
                         </td>
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][rela_materia_carrera]" <?= $user['rela_materia_carrera'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][rela_materia_carrera]" <?= isset($user['rela_materia_carrera']) && $user['rela_materia_carrera'] ? 'checked' : '' ?>>
                         </td>
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][periodos_academicos]" <?= $user['periodos_academicos'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][periodos_academicos]" <?= isset($user['periodos_academicos']) && $user['periodos_academicos'] ? 'checked' : '' ?>>
                         </td>
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][asig_secciones]" <?= $user['asig_secciones'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][asig_secciones]" <?= isset($user['asig_secciones']) && $user['asig_secciones'] ? 'checked' : '' ?>>
                         </td>
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][asig_cursos]" <?= $user['asig_cursos'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][asig_cursos]" <?= isset($user['asig_cursos']) && $user['asig_cursos'] ? 'checked' : '' ?>>
                         </td>
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][horarios]" <?= $user['horarios'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][horarios]" <?= isset($user['horarios']) && $user['horarios'] ? 'checked' : '' ?>>
                         </td>
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][gestion_director_carrera]" <?= $user['gestion_director_carrera'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][gestion_director_carrera]" <?= isset($user['gestion_director_carrera']) && $user['gestion_director_carrera'] ? 'checked' : '' ?>>
                         </td>
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][notas_cargadas]" <?= $user['notas_cargadas'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][notas_cargadas]" <?= isset($user['notas_cargadas']) && $user['notas_cargadas'] ? 'checked' : '' ?>>
                         </td>
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][consultar_notas]" <?= $user['consultar_notas'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][consultar_notas]" <?= isset($user['consultar_notas']) && $user['consultar_notas'] ? 'checked' : '' ?>>
                         </td>
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][consultar_notas_pasadas]" <?= $user['consultar_notas_pasadas'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][consultar_notas_pasadas]" <?= isset($user['consultar_notas_pasadas']) && $user['consultar_notas_pasadas'] ? 'checked' : '' ?>>
                         </td>
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][tipos_pago]" <?= $user['tipos_pago'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][tipos_pago]" <?= isset($user['tipos_pago']) && $user['tipos_pago'] ? 'checked' : '' ?>>
                         </td>
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][tipos_horario]" <?= $user['tipos_horario'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][tipos_horario]" <?= isset($user['tipos_horario']) && $user['tipos_horario'] ? 'checked' : '' ?>>
                         </td>
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][horario_personal]" <?= $user['horario_personal'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][horario_personal]" <?= isset($user['horario_personal']) && $user['horario_personal'] ? 'checked' : '' ?>>
                         </td>
                         <td class="text-center">
-                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][respaldo_bd]" <?= $user['respaldo_bd'] ? 'checked' : '' ?>>
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][respaldo_bd]" <?= isset($user['respaldo_bd']) && $user['respaldo_bd'] ? 'checked' : '' ?>>
                         </td>
                     </tr>
                     <?php
