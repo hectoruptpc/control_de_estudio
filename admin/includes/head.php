@@ -122,7 +122,7 @@ if (!isLoggedIn() || !isAdmin()) {
                 <a title="Ver Todos los Estudiantes" class="dropdown-item" href="estudiantes.php">
                   <i class="fa fa-users fa-fw"></i> Ver todos los Estudiantes
                 </a>
-                <?php if ($_SESSION['user']['agregar_estudiante'] == 1): ?>
+                <?php if (tienePermiso('agregar_estudiante')): ?>
                   <a title="Agregar Estudiante" class="dropdown-item" href="agregar_estudiante.php">
                     <i class="fa fa-user-plus fa-fw"></i> Agregar Estudiante
                   </a>

@@ -86,7 +86,7 @@ include("includes/head.php");
                                                         data-id="<?php echo $estudiante['id']; ?>">
                                                         <i class="fas fa-eye"></i>
                                                     </button>
-                                                    <?php if ($puedeEditar): ?>
+                                                    <?php if (tienePermiso('editar_estudiante')): ?>
                                                         <button class="btn btn-warning btn-sm btn-edit" 
                                                             data-toggle="modal" 
                                                             data-target="#editarEstudianteModal"
