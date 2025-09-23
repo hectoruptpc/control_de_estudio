@@ -5,15 +5,15 @@ ini_set('display_errors', '1');
 $titulopag = "Gestión de Niveles de Acceso";
 include('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('editar_acceso');
+
+
 if (!isAdmin()) {
     header('location: ../usuario/home.php');
 }
 
-// Verificar permisos
-if (!isset($_SESSION['user']['editar_acceso']) || $_SESSION['user']['editar_acceso'] != 1) {
-    header('Location: index.php');
-    exit();
-}
 
 // Procesar formulario de permisos
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {

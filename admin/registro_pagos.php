@@ -4,7 +4,7 @@ require_once('../funciones/functions.php');
 //CARGAR PERMISOS
 cargarPermisosUsuario();
 verificarPermiso('pagos');
-echo "Si ves esto, es que tienes permisos!";
+
 
 
 
