@@ -24,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
             if (!is_numeric($user_id)) continue;
             
             // Campos originales - manejar NULL si no están presentes
+            $usuario = isset($permisos['usuario']) ? 1 : 0;
             $estudiante = isset($permisos['estudiante']) ? 1 : 0;
             $docente = isset($permisos['docente']) ? 1 : 0;
             $admin = isset($permisos['admin']) ? 1 : 0;
@@ -59,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
             $respaldo_bd = isset($permisos['respaldo_bd']) ? 1 : 0;
             
             $query = "UPDATE users SET 
+                     usuario = ?,
                      estudiante = ?, 
                      docente = ?, 
                      admin = ?, 
@@ -94,8 +96,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
             
             $stmt = $db->prepare($query);
             if ($stmt) {
-                // Contamos correctamente: 16 campos originales + 16 nuevos + 1 ID = 33 parámetros
-                $stmt->bind_param("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", 
+                // Contamos correctamente: 17 campos originales + 16 nuevos + 1 ID = 34 parámetros
+                $stmt->bind_param("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", 
+                    $usuario,
                     $estudiante, 
                     $docente, 
                     $admin, 
@@ -189,6 +192,7 @@ include("includes/head.php");
                 <thead class="thead-dark">
                     <tr>
                         <th>Usuario</th>
+                        <th>Director de Carrera</th>
                         <th>Estudiante</th>
                         <th>Docente</th>
                         <th>Admin</th>
@@ -227,7 +231,7 @@ include("includes/head.php");
                     <?php
                     global $db;
                     $query = "SELECT id, username, 
-                             estudiante, docente, admin, super_user, editar_user, editar_nota, editar_acceso, 
+                             usuario, estudiante, docente, admin, super_user, editar_user, editar_nota, editar_acceso, 
                              editar_valores, editar_estudiante, agregar_estudiante, agregar_docente, editar_docente, 
                              agregar_carrera, agregar_materia, editar_materia,
                              pagos, auditoria, secciones, rela_materia_carrera, periodos_academicos, asig_secciones, 
@@ -239,6 +243,7 @@ include("includes/head.php");
                     if ($result && $result->num_rows > 0):
                         while ($user = $result->fetch_assoc()):
                             // Determinar tipo de usuario
+                            $esUsuario = $user['usuario'];
                             $esEstudiante = $user['estudiante'];
                             $tieneAccesos = $user['docente'] || $user['admin'] || $user['super_user'] || 
                                            $user['editar_user'] || $user['editar_nota'] || $user['editar_acceso'] || 
@@ -252,13 +257,17 @@ include("includes/head.php");
                                            $user['tipos_horario'] || $user['horario_personal'] || $user['respaldo_bd'];
                             
                             $clases = 'fila-usuario';
+                            $clases .= $esUsuario ? ' usuario' : '';
                             $clases .= $esEstudiante ? ' estudiante' : '';
                             $clases .= $tieneAccesos ? ' personal' : '';
-                            $clases .= (!$esEstudiante && !$tieneAccesos) ? ' sin-accesos' : '';
+                            $clases .= (!$esUsuario && !$esEstudiante && !$tieneAccesos) ? ' sin-accesos' : '';
                     ?>
                     <tr class="<?= $clases ?>" data-nombre="<?= htmlspecialchars(strtolower($user['username'])) ?>">
                         <td><?= htmlspecialchars($user['username']) ?></td>
                         <!-- Campos originales -->
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][usuario]" <?= $user['usuario'] ? 'checked' : '' ?>>
+                        </td>
                         <td class="text-center">
                             <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][estudiante]" <?= $user['estudiante'] ? 'checked' : '' ?>>
                         </td>
@@ -360,7 +369,7 @@ include("includes/head.php");
                     else:
                     ?>
                     <tr>
-                        <td colspan="33" class="text-center">No hay usuarios registrados</td>
+                        <td colspan="34" class="text-center">No hay usuarios registrados</td>
                     </tr>
                     <?php endif; ?>
                 </tbody>
@@ -389,6 +398,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const textoBusqueda = buscador.value.toLowerCase();
         
         filasUsuarios.forEach(fila => {
+            const esUsuario = fila.classList.contains('usuario');
             const esEstudiante = fila.classList.contains('estudiante');
             const esPersonal = fila.classList.contains('personal');
             const esSinAccesos = fila.classList.contains('sin-accesos');
