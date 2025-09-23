@@ -105,11 +105,14 @@ if (!isLoggedIn() || !isAdmin()) {
             </li>
 
             <!-- Botón individual de Pagos (no desplegable) -->
+
+            <?php if (tienePermiso('pagos')): ?>
             <li class="nav-item">
               <a title="Gestión de Pagos" class="nav-link" href="registro_pagos.php">
                 <i class="fas fa-money-bill-wave fa-fw"></i> Pagos
               </a>
             </li>
+            <?php endif; ?>
 
             <li class="nav-item dropdown">
               <a title="Gestión de Estudiantes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownEstudiantes" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
