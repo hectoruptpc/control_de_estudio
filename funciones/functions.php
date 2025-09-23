@@ -5376,6 +5376,87 @@ function eliminarTipoHorarioUsuarioPorId($db, $id_relacion) {
 
 
 
+//ACCESOS ***************************************************************
+
+/**
+ * Verificar permisos de acceso a una página específica
+ * @param string $pagina Nombre del permiso (debe coincidir con el campo en la tabla users)
+ * @return void Redirige a login.php si no tiene permisos
+ */
+function verificarPermiso($pagina) {
+    // Si no hay sesión de usuario, redirigir al login
+    if (!isset($_SESSION['user'])) {
+        header('location: login.php');
+        exit();
+    }
+    
+    // Lista de permisos válidos en la base de datos
+    $permisosValidos = [
+        'usuario', 'estudiante', 'docente', 'admin', 'super_user', 
+        'editar_user', 'editar_nota', 'editar_acceso', 'editar_valores', 
+        'editar_estudiante', 'agregar_estudiante', 'agregar_docente', 
+        'editar_docente', 'agregar_carrera', 'agregar_materia', 'editar_materia',
+        'pagos', 'auditoria', 'secciones', 'rela_materia_carrera', 
+        'periodos_academicos', 'asig_secciones', 'asig_cursos', 'horarios', 
+        'gestion_director_carrera', 'notas_cargadas', 'consultar_notas', 
+        'consultar_notas_pasadas', 'tipos_pago', 'tipos_horario', 
+        'horario_personal', 'respaldo_bd'
+    ];
+    
+    // Verificar que el permiso solicitado sea válido
+    if (!in_array($pagina, $permisosValidos)) {
+        error_log("Permiso no válido: " . $pagina);
+        header('location: ../login.php');
+        exit();
+    }
+    
+    // Si es super_user, tiene acceso a todo
+    if (isset($_SESSION['user']['super_user']) && $_SESSION['user']['super_user'] == 1) {
+        return true;
+    }
+    
+    // Verificar si el usuario tiene el permiso específico
+    if (!isset($_SESSION['user'][$pagina]) || $_SESSION['user'][$pagina] != 1) {
+        // Registrar intento de acceso no autorizado
+        error_log("Acceso denegado a " . $pagina . " para el usuario: " . $_SESSION['user']['username']);
+        
+        // Redirigir a home con mensaje de error
+        $_SESSION['error'] = "No tienes permisos para acceder a esta página.";
+        header('location: ../login.php');
+        exit();
+    }
+    
+    return true;
+}
+
+/**
+ * Función para verificar permisos sin redirección (útil para mostrar/ocultar elementos)
+ * @param string $pagina Nombre del permiso
+ * @return bool True si tiene permiso, False si no
+ */
+function tienePermiso($pagina) {
+    if (!isset($_SESSION['user'])) {
+        return false;
+    }
+    
+    // Si es super_user, tiene acceso a todo
+    if (isset($_SESSION['user']['super_user']) && $_SESSION['user']['super_user'] == 1) {
+        return true;
+    }
+    
+    // Verificar permiso específico
+    return isset($_SESSION['user'][$pagina]) && $_SESSION['user'][$pagina] == 1;
+}
+
+
+
+
+
+
+
+
+
+
 
 
 
