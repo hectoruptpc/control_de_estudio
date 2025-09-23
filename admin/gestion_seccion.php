@@ -5,6 +5,10 @@ ini_set('display_errors', '1');
 $titulopag = "Gestión de Secciones";
 include('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('secciones');
+
 // Obtener parámetros de acción
 $action = $_POST['action'] ?? ($_GET['action'] ?? 'list');
 $seccion_id = $_POST['id'] ?? ($_GET['id'] ?? 0);

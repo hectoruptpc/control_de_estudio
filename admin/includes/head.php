@@ -127,11 +127,15 @@ if (!isLoggedIn() || !isAdmin()) {
                     <i class="fa fa-user-plus fa-fw"></i> Agregar Estudiante
                   </a>
                 <?php endif; ?>
+
+                <?php if (tienePermiso('gestionar_secciones')): ?>
                 <a title="Gestionar Secciones" class="dropdown-item" href="gestion_seccion.php">
                   <i class="fas fa-object-group fa-fw"></i> Gestionar Secciones
                 </a>
+                <?php endif; ?>
               </div>
             </li>
+
 
             <li class="nav-item dropdown">
                 <a title="Gestión de Pensum" class="nav-link dropdown-toggle" href="#" id="navbarDropdownPensum" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -140,7 +144,7 @@ if (!isLoggedIn() || !isAdmin()) {
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownPensum">
                     <?php if ($_SESSION['user']['agregar_carrera'] == 1): ?>
                         <a title="Agregar Nueva Carrera" class="dropdown-item" href="agregar_carrera.php">
-                            <i class="fas fa-plus-circle fa-fw"></i> Agregar Carrera
+                            <i class="fas fa-plus-circle fa-fw"></i> Gestion de Programas
                         </a>
                     <?php endif; ?>
                     
