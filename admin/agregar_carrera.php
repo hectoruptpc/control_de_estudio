@@ -54,6 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 include("includes/head.php");
 ?>
 
+<?php if (tienePermiso('agregar_carrera')): ?>
+
 <div class="container mt-4">
     <h2>Agregar Nuevo Programa</h2>
     
@@ -106,6 +108,9 @@ include("includes/head.php");
         <button type="submit" class="btn btn-primary">Guardar Programa</button>
         <a href="lista_carreras.php" class="btn btn-secondary">Cancelar</a>
     </form>
+
+<?php endif; ?>
+
     
     <h3 class="mt-4">Programas Registrados en el Sistema</h3>
     <div id="tabla-carreras">

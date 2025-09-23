@@ -11,11 +11,7 @@ include("includes/head.php");
 <div class="container mt-4">
     <h2>Listado de Carreras Registradas</h2>
     
-    <div class="mb-4">
-        <button class="btn btn-success" data-toggle="modal" data-target="#modalAgregarCarrera">
-            <i class="fas fa-plus"></i> Agregar Nueva Carrera
-        </button>
-    </div>
+  
     
     <div id="tabla-carreras">
         <?php include('partials/tabla_carreras.php'); ?>

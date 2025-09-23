@@ -142,11 +142,11 @@ if (!isLoggedIn() || !isAdmin()) {
                     <i class="fas fa-book fa-fw"></i> Pensum
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownPensum">
-                    <?php if ($_SESSION['user']['agregar_carrera'] == 1): ?>
+                    
                         <a title="Agregar Nueva Carrera" class="dropdown-item" href="agregar_carrera.php">
                             <i class="fas fa-plus-circle fa-fw"></i> Gestion de Programas
                         </a>
-                    <?php endif; ?>
+                    
                     
                     <a title="Asignaturas" class="dropdown-item" href="materia.php">
                         <i class="fas fa-book-open fa-fw"></i> Asignaturas
