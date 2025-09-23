@@ -4,7 +4,9 @@ ini_set('display_errors', '1');
 
 $titulopag = "Sistema de Gestión - Panel de Administración";
 include('../funciones/functions.php');
-requireAdmin();
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('admin');
 ?>
 
 <!DOCTYPE html>
