@@ -378,6 +378,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 
+<!-- Bootstrap 4.6 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+
 
 <!-- Incluir jsPDF y html2canvas para generar el PDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -420,6 +426,131 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 </style>
 
+<!-- ESTILOS PERSONALIZADOS DEL PANEL DE ADMINISTRACION -->
+
+<style>
+        body {
+            background-color: #f8f9fc;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .dashboard-header {
+            background: linear-gradient(120deg, #4e73df 0%, #224abe 100%);
+            color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .feature-card {
+            border: none;
+            border-radius: 10px;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            height: 100%;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+        .card-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+        }
+        .pagos-card {
+            border-bottom: 4px solid #28a745;
+        }
+        .pagos-card .card-icon {
+            color: #28a745;
+        }
+        .soporte-card {
+            border-bottom: 4px solid #ffc107;
+        }
+        .soporte-card .card-icon {
+            color: #ffc107;
+        }
+        .mensajeria-card {
+            border-bottom: 4px solid #17a2b8;
+        }
+        .mensajeria-card .card-icon {
+            color: #17a2b8;
+        }
+        .auditoria-card {
+            border-bottom: 4px solid #6f42c1;
+        }
+        .auditoria-card .card-icon {
+            color: #6f42c1;
+        }
+        .btn-access {
+            border-radius: 50px;
+            padding: 0.5rem 1.5rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-pagos {
+            background-color: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+        .btn-pagos:hover {
+            background-color: #218838;
+            border-color: #1e7e34;
+        }
+        .btn-soporte {
+            background-color: #ffc107;
+            border-color: #ffc107;
+            color: #212529;
+        }
+        .btn-soporte:hover {
+            background-color: #e0a800;
+            border-color: #d39e00;
+        }
+        .btn-mensajeria {
+            background-color: #17a2b8;
+            border-color: #17a2b8;
+            color: white;
+        }
+        .btn-mensajeria:hover {
+            background-color: #138496;
+            border-color: #117a8b;
+        }
+        .btn-auditoria {
+            background-color: #6f42c1;
+            border-color: #6f42c1;
+            color: white;
+        }
+        .btn-auditoria:hover {
+            background-color: #5a359c;
+            border-color: #523091;
+        }
+        .welcome-message {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+        /* Nuevos estilos para centrar las tarjetas */
+        .cards-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }
+        .card-wrapper {
+            flex: 0 0 auto;
+            width: 270px; /* Ancho fijo para consistencia */
+        }
+        @media (max-width: 1200px) {
+            .card-wrapper {
+                width: 250px;
+            }
+        }
+        @media (max-width: 768px) {
+            .cards-container {
+                justify-content: center;
+            }
+            .card-wrapper {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+    </style>
 
 
 

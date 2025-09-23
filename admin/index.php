@@ -13,108 +13,7 @@ verificarPermiso('admin');
 <html lang="es">
 <head>
     <?php include("includes/head.php"); ?>
-    <!-- Bootstrap 4.6 CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <style>
-        body {
-            background-color: #f8f9fc;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .dashboard-header {
-            background: linear-gradient(120deg, #4e73df 0%, #224abe 100%);
-            color: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-        }
-        .feature-card {
-            border: none;
-            border-radius: 10px;
-            transition: all 0.3s;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-            height: 100%;
-        }
-        .feature-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-        }
-        .card-icon {
-            font-size: 3.5rem;
-            margin-bottom: 1rem;
-        }
-        .pagos-card {
-            border-bottom: 4px solid #28a745;
-        }
-        .pagos-card .card-icon {
-            color: #28a745;
-        }
-        .soporte-card {
-            border-bottom: 4px solid #ffc107;
-        }
-        .soporte-card .card-icon {
-            color: #ffc107;
-        }
-        .mensajeria-card {
-            border-bottom: 4px solid #17a2b8;
-        }
-        .mensajeria-card .card-icon {
-            color: #17a2b8;
-        }
-        .auditoria-card {
-            border-bottom: 4px solid #6f42c1;
-        }
-        .auditoria-card .card-icon {
-            color: #6f42c1;
-        }
-        .btn-access {
-            border-radius: 50px;
-            padding: 0.5rem 1.5rem;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-        .btn-pagos {
-            background-color: #28a745;
-            border-color: #28a745;
-            color: white;
-        }
-        .btn-pagos:hover {
-            background-color: #218838;
-            border-color: #1e7e34;
-        }
-        .btn-soporte {
-            background-color: #ffc107;
-            border-color: #ffc107;
-            color: #212529;
-        }
-        .btn-soporte:hover {
-            background-color: #e0a800;
-            border-color: #d39e00;
-        }
-        .btn-mensajeria {
-            background-color: #17a2b8;
-            border-color: #17a2b8;
-            color: white;
-        }
-        .btn-mensajeria:hover {
-            background-color: #138496;
-            border-color: #117a8b;
-        }
-        .btn-auditoria {
-            background-color: #6f42c1;
-            border-color: #6f42c1;
-            color: white;
-        }
-        .btn-auditoria:hover {
-            background-color: #5a359c;
-            border-color: #523091;
-        }
-        .welcome-message {
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-        }
-    </style>
+    
 </head>
 
 <body>
@@ -126,25 +25,25 @@ verificarPermiso('admin');
         </div>
 
         <!-- Tarjetas de acceso -->
-        <div class="row mb-5">
-           <?php if (tienePermiso('pagos')): ?>
-    <!-- Tarjeta de Pagos -->
-    <div class="col-md-3 mb-4">
-        <div class="card feature-card pagos-card h-100">
-            <div class="card-body text-center p-4">
-                <div class="card-icon">
-                    <i class="fas fa-money-bill-wave"></i>
+        <div class="cards-container mb-5">
+            <?php if (tienePermiso('pagos')): ?>
+            <!-- Tarjeta de Pagos -->
+            <div class="card-wrapper">
+                <div class="card feature-card pagos-card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="card-icon">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </div>
+                        <h3 class="card-title h4 font-weight-bold">Pagos</h3>
+                        <p class="card-text text-muted">Gestionar sistema de pagos y transacciones</p>
+                        <a href="registro_pagos.php" class="btn btn-access btn-pagos mt-3">Acceder</a>
+                    </div>
                 </div>
-                <h3 class="card-title h4 font-weight-bold">Pagos</h3>
-                <p class="card-text text-muted">Gestionar sistema de pagos y transacciones</p>
-                <a href="registro_pagos.php" class="btn btn-access btn-pagos mt-3">Acceder</a>
             </div>
-        </div>
-    </div>
-<?php endif; ?>
+            <?php endif; ?>
 
             <!-- Tarjeta de Soporte -->
-            <div class="col-md-3 mb-4">
+            <div class="card-wrapper">
                 <div class="card feature-card soporte-card h-100">
                     <div class="card-body text-center p-4">
                         <div class="card-icon">
@@ -158,7 +57,7 @@ verificarPermiso('admin');
             </div>
 
             <!-- Tarjeta de Mensajería -->
-            <div class="col-md-3 mb-4">
+            <div class="card-wrapper">
                 <div class="card feature-card mensajeria-card h-100">
                     <div class="card-body text-center p-4">
                         <div class="card-icon">
@@ -171,10 +70,9 @@ verificarPermiso('admin');
                 </div>
             </div>
 
-
             <?php if (tienePermiso('auditoria')): ?>
-            <!-- Tarjeta de Auditoría (NUEVA) -->
-            <div class="col-md-3 mb-4">
+            <!-- Tarjeta de Auditoría -->
+            <div class="card-wrapper">
                 <div class="card feature-card auditoria-card h-100">
                     <div class="card-body text-center p-4">
                         <div class="card-icon">
@@ -187,7 +85,6 @@ verificarPermiso('admin');
                 </div>
             </div>
             <?php endif; ?>
-            
         </div>
 
         <!-- Mensaje de bienvenida -->
