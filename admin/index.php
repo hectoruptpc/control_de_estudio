@@ -127,19 +127,21 @@ verificarPermiso('admin');
 
         <!-- Tarjetas de acceso -->
         <div class="row mb-5">
-            <!-- Tarjeta de Pagos -->
-            <div class="col-md-3 mb-4">
-                <div class="card feature-card pagos-card h-100">
-                    <div class="card-body text-center p-4">
-                        <div class="card-icon">
-                            <i class="fas fa-money-bill-wave"></i>
-                        </div>
-                        <h3 class="card-title h4 font-weight-bold">Pagos</h3>
-                        <p class="card-text text-muted">Gestionar sistema de pagos y transacciones</p>
-                        <a href="registro_pagos.php" class="btn btn-access btn-pagos mt-3">Acceder</a>
-                    </div>
+           <?php if (tienePermiso('pagos')): ?>
+    <!-- Tarjeta de Pagos -->
+    <div class="col-md-3 mb-4">
+        <div class="card feature-card pagos-card h-100">
+            <div class="card-body text-center p-4">
+                <div class="card-icon">
+                    <i class="fas fa-money-bill-wave"></i>
                 </div>
+                <h3 class="card-title h4 font-weight-bold">Pagos</h3>
+                <p class="card-text text-muted">Gestionar sistema de pagos y transacciones</p>
+                <a href="registro_pagos.php" class="btn btn-access btn-pagos mt-3">Acceder</a>
             </div>
+        </div>
+    </div>
+<?php endif; ?>
 
             <!-- Tarjeta de Soporte -->
             <div class="col-md-3 mb-4">
@@ -169,6 +171,8 @@ verificarPermiso('admin');
                 </div>
             </div>
 
+
+            <?php if (tienePermiso('auditoria')): ?>
             <!-- Tarjeta de Auditoría (NUEVA) -->
             <div class="col-md-3 mb-4">
                 <div class="card feature-card auditoria-card h-100">
@@ -182,6 +186,8 @@ verificarPermiso('admin');
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
+            
         </div>
 
         <!-- Mensaje de bienvenida -->
