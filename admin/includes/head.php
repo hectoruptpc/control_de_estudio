@@ -176,9 +176,11 @@ if (!isLoggedIn() || !isAdmin()) {
                 </a>
 
                 <!-- Nueva opción: Asignar Secciones -->
+                  <?php if (tienePermiso('asig_secciones')): ?>
                 <a title="Asignación de Secciones" class="dropdown-item" href="asignar_secciones.php">
                     <i class="fas fa-object-group fa-fw"></i> Asignar Secciones
                 </a>
+                <?php endif; ?>
                    
                 <a title="Asignación de Cursos" class="dropdown-item" href="asignacion_cursos.php">
                     <i class="fas fa-tasks fa-fw"></i> Asignar Cursos
