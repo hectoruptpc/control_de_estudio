@@ -51,11 +51,11 @@ if ($stmt = $db->prepare($query)) {
 }
 ?>
 
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-lg-12">
-            <?php if ($permiso_agregar): ?>
-            <div class="card border-0">
+<div class="container-fluid py-3">
+    <div class="row">
+        <div class="col-12">
+             <?php if (tienePermiso('agregar_docente')): ?>
+            <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
                     <h5 class="mb-0"><i class="fas fa-chalkboard-teacher me-2"></i>Agregar Nuevo Docente</h5>
                 </div>
@@ -64,7 +64,7 @@ if ($stmt = $db->prepare($query)) {
                         <!-- Sección 1: Identificación -->
                         <h5 class="mb-3"><i class="fas fa-id-card me-2"></i> Identificación</h5>
                         <div class="row g-3 mb-4">
-                            <div class="col-md-6">
+                            <div class="col-12 col-md-6 col-lg-4">
                                 <div class="mb-3">
                                     <label for="nombre" class="form-label required">Nombre Completo</label>
                                     <input type="text" class="form-control" id="nombre" name="nombre" 
@@ -72,31 +72,31 @@ if ($stmt = $db->prepare($query)) {
                                 </div>
                             </div>
                             
-                           <div class="col-md-3">
-    <div class="mb-3">
-        <label for="tipo_documento" class="form-label required">Tipo de Documento</label>
-        <select class="custom-select d-block w-100" id="tipo_documento" name="tipo_documento" required>
-            <option value="">Seleccione...</option>
-            <?php
-            $query = "SELECT id, tipo FROM tipo_cedula ORDER BY tipo";
-            if ($stmt = $db->prepare($query)) {
-                $stmt->execute();
-                $result = $stmt->get_result();
-                
-                while ($row = $result->fetch_assoc()) {
-                    $selected = (isset($_POST['tipo_documento']) && $_POST['tipo_documento'] == $row['id']) ? 'selected' : '';
-                    echo '<option value="' . $row['id'] . '" ' . $selected . '>' 
-                         . htmlspecialchars($row['tipo']) . '</option>';
-                }
-                
-                $stmt->close();
-            }
-            ?>
-        </select>
-    </div>
-</div>
+                           <div class="col-12 col-md-6 col-lg-4">
+                                <div class="mb-3">
+                                    <label for="tipo_documento" class="form-label required">Tipo de Documento</label>
+                                    <select class="form-select" id="tipo_documento" name="tipo_documento" required>
+                                        <option value="">Seleccione...</option>
+                                        <?php
+                                        $query = "SELECT id, tipo FROM tipo_cedula ORDER BY tipo";
+                                        if ($stmt = $db->prepare($query)) {
+                                            $stmt->execute();
+                                            $result = $stmt->get_result();
+                                            
+                                            while ($row = $result->fetch_assoc()) {
+                                                $selected = (isset($_POST['tipo_documento']) && $_POST['tipo_documento'] == $row['id']) ? 'selected' : '';
+                                                echo '<option value="' . $row['id'] . '" ' . $selected . '>' 
+                                                     . htmlspecialchars($row['tipo']) . '</option>';
+                                            }
+                                            
+                                            $stmt->close();
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+                            </div>
                             
-                            <div class="col-md-3">
+                            <div class="col-12 col-md-6 col-lg-4">
                                 <div class="mb-3">
                                     <label for="documento" class="form-label required">Número de Documento</label>
                                     <input type="text" class="form-control" id="documento" name="documento" 
@@ -108,7 +108,7 @@ if ($stmt = $db->prepare($query)) {
                         <!-- Sección 2: Datos Personales -->
                         <h5 class="mb-3"><i class="fas fa-user-tag me-2"></i> Datos Personales</h5>
                         <div class="row g-3 mb-4">
-                            <div class="col-md-3">
+                            <div class="col-12 col-md-6 col-lg-3">
                                 <div class="mb-3">
                                     <label for="fecha_nacimiento" class="form-label required">Fecha de Nacimiento</label>
                                     <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento" 
@@ -116,16 +116,16 @@ if ($stmt = $db->prepare($query)) {
                                 </div>
                             </div>
                             
-                            <div class="col-md-3">
+                            <div class="col-12 col-md-6 col-lg-3">
                                 <div class="mb-3">
                                     <label class="form-label required">Género</label>
-                                    <div>
-                                        <div class="form-check form-check-inline">
+                                    <div class="d-flex flex-wrap gap-3">
+                                        <div class="form-check">
                                             <input class="form-check-input" type="radio" name="genero" id="genero_m" 
                                                    value="Masculino" <?= ($_POST['genero'] ?? '') == 'Masculino' ? 'checked' : '' ?> required>
                                             <label class="form-check-label" for="genero_m">Masculino</label>
                                         </div>
-                                        <div class="form-check form-check-inline">
+                                        <div class="form-check">
                                             <input class="form-check-input" type="radio" name="genero" id="genero_f" 
                                                    value="Femenino" <?= ($_POST['genero'] ?? '') == 'Femenino' ? 'checked' : '' ?>>
                                             <label class="form-check-label" for="genero_f">Femenino</label>
@@ -134,34 +134,34 @@ if ($stmt = $db->prepare($query)) {
                                 </div>
                             </div>
                             
-                            <div class="col-md-3">
-    <div class="mb-3">
-        <label for="estado_civil" class="form-label required">Estado Civil</label>
-        <select class="custom-select d-block w-100" id="estado_civil" name="estado_civil" required>
-            <option value="">Seleccione...</option>
-            <?php
-            // Consulta para obtener los estados civiles desde la base de datos
-            $query = "SELECT id, estado_civil FROM estado_civil ORDER BY estado_civil";
-            $result = $db->query($query);
-            
-            if ($result && $result->num_rows > 0) {
-                while ($row = $result->fetch_assoc()) {
-                    $selected = (isset($_POST['estado_civil']) && $_POST['estado_civil'] == $row['id']) ? 'selected' : '';
-                    echo '<option value="' . $row['id'] . '" ' . $selected . '>' 
-                         . htmlspecialchars($row['estado_civil']) . '</option>';
-                }
-            }
-            
-            // Cerrar el resultado si es necesario (depende de tu configuración)
-            if ($result) {
-                $result->free();
-            }
-            ?>
-        </select>
-    </div>
-</div>
+                            <div class="col-12 col-md-6 col-lg-3">
+                                <div class="mb-3">
+                                    <label for="estado_civil" class="form-label required">Estado Civil</label>
+                                    <select class="form-select" id="estado_civil" name="estado_civil" required>
+                                        <option value="">Seleccione...</option>
+                                        <?php
+                                        // Consulta para obtener los estados civiles desde la base de datos
+                                        $query = "SELECT id, estado_civil FROM estado_civil ORDER BY estado_civil";
+                                        $result = $db->query($query);
+                                        
+                                        if ($result && $result->num_rows > 0) {
+                                            while ($row = $result->fetch_assoc()) {
+                                                $selected = (isset($_POST['estado_civil']) && $_POST['estado_civil'] == $row['id']) ? 'selected' : '';
+                                                echo '<option value="' . $row['id'] . '" ' . $selected . '>' 
+                                                     . htmlspecialchars($row['estado_civil']) . '</option>';
+                                            }
+                                        }
+                                        
+                                        // Cerrar el resultado si es necesario (depende de tu configuración)
+                                        if ($result) {
+                                            $result->free();
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+                            </div>
                             
-                            <div class="col-md-3">
+                            <div class="col-12 col-md-6 col-lg-3">
                                 <div class="mb-3">
                                     <label for="etnia" class="form-label">Etnia</label>
                                     <input type="text" class="form-control" id="etnia" name="etnia" 
@@ -174,7 +174,7 @@ if ($stmt = $db->prepare($query)) {
                         <h5 class="mb-3"><i class="fas fa-briefcase me-2"></i> Datos Profesionales</h5>
                         <div class="row g-3 mb-4">
                             <!-- Potencialidades -->
-                            <div class="col-md-6">
+                            <div class="col-12 col-lg-6">
                                 <div class="mb-3">
                                     <label for="especialidad" class="form-label required">Especialidad / Potencialidades</label>
                                     <div class="input-group">
@@ -203,12 +203,12 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                            <!-- Títulos Obtenidos e Instituciones -->
-<div class="col-md-12">
+<div class="col-12">
     <div class="mb-3">
         <label class="form-label">Títulos Obtenidos e Instituciones</label>
-        <div class="row g-3 mb-3">
-            <div class="col-md-5">
-                <select class="custom-select d-block w-100" id="titulos" name="titulos_main">
+        <div class="row g-2 mb-3">
+            <div class="col-12 col-md-5">
+                <select class="form-select" id="titulos" name="titulos_main">
                     <option value="">Seleccione un título...</option>
                     <?php foreach ($titulos_db as $titulo): ?>
                         <option value="<?= htmlspecialchars($titulo['nombre']) ?>" <?= isset($_POST['titulos_main']) && $_POST['titulos_main'] == $titulo['nombre'] ? 'selected' : '' ?>>
@@ -217,29 +217,29 @@ if ($stmt = $db->prepare($query)) {
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-5">
+            <div class="col-12 col-md-5">
                 <input type="text" class="form-control" id="institutos" name="institutos_main" 
                        value="<?= htmlspecialchars($_POST['institutos_main'] ?? '') ?>" placeholder="Institución donde obtuvo el título">
             </div>
-            <div class="col-md-2">
+            <div class="col-12 col-md-2">
                 <button type="button" class="btn btn-outline-primary w-100" id="addTituloInstituto">
-                    <i class="fas fa-plus mr-1"></i> Agregar
+                    <i class="fas fa-plus me-1"></i> Agregar
                 </button>
             </div>
         </div>
         <div id="titulosInstitutosContainer">
             <?php if(!empty($_POST['titulos_institutos'])): ?>
                 <?php foreach($_POST['titulos_institutos'] as $index => $pair): ?>
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-5">
+                    <div class="row g-2 mb-2">
+                        <div class="col-12 col-md-5">
                             <input type="text" class="form-control" name="titulos[]" 
                                    value="<?= htmlspecialchars($pair['titulo']) ?>">
                         </div>
-                        <div class="col-md-5">
+                        <div class="col-12 col-md-5">
                             <input type="text" class="form-control" name="institutos[]" 
                                    value="<?= htmlspecialchars($pair['instituto']) ?>">
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-12 col-md-2">
                             <button type="button" class="btn btn-outline-danger w-100 remove-field">
                                 <i class="fas fa-minus"></i> Eliminar
                             </button>
@@ -251,7 +251,7 @@ if ($stmt = $db->prepare($query)) {
     </div>
 </div>
                             
-                            <div class="col-md-6">
+                            <div class="col-12 col-md-6">
                                 <div class="mb-3">
                                     <label for="fecha_contratacion" class="form-label required">Fecha de Contratación</label>
                                     <input type="date" class="form-control" id="fecha_contratacion" name="fecha_contratacion" 
@@ -259,10 +259,10 @@ if ($stmt = $db->prepare($query)) {
                                 </div>
                             </div>
                             
-                            <div class="col-md-6">
+                            <div class="col-12 col-md-6">
                                 <div class="mb-3">
                                     <label for="estado_laboral" class="form-label required">Estado Laboral</label>
-                                    <select class="custom-select d-block w-100" id="estado_laboral" name="estado_laboral" required>
+                                    <select class="form-select" id="estado_laboral" name="estado_laboral" required>
                                         <option value="Activo" <?= ($_POST['estado_laboral'] ?? '') == 'Activo' ? 'selected' : '' ?>>Activo</option>
                                         <option value="Inactivo" <?= ($_POST['estado_laboral'] ?? '') == 'Inactivo' ? 'selected' : '' ?>>Inactivo</option>
                                     </select>
@@ -273,7 +273,7 @@ if ($stmt = $db->prepare($query)) {
                         <!-- Sección 4: Ubicación y Vivienda -->
                         <h5 class="mb-3"><i class="fas fa-home me-2"></i> Vivienda</h5>
                         <div class="row g-3 mb-4">
-                            <div class="col-md-4">
+                            <div class="col-12 col-md-6 col-lg-4">
                                 <div class="mb-3">
                                     <label for="estado_residencia" class="form-label required">Estado</label>
                                     <input type="text" class="form-control" id="estado_residencia" name="estado_residencia" 
@@ -281,7 +281,7 @@ if ($stmt = $db->prepare($query)) {
                                 </div>
                             </div>
                             
-                            <div class="col-md-4">
+                            <div class="col-12 col-md-6 col-lg-4">
                                 <div class="mb-3">
                                     <label for="municipio" class="form-label required">Municipio</label>
                                     <input type="text" class="form-control" id="municipio" name="municipio" 
@@ -289,7 +289,7 @@ if ($stmt = $db->prepare($query)) {
                                 </div>
                             </div>
                             
-                            <div class="col-md-4">
+                            <div class="col-12 col-md-6 col-lg-4">
                                 <div class="mb-3">
                                     <label for="parroquia" class="form-label">Parroquia</label>
                                     <input type="text" class="form-control" id="parroquia" name="parroquia" 
@@ -297,7 +297,7 @@ if ($stmt = $db->prepare($query)) {
                                 </div>
                             </div>
                             
-                            <div class="col-md-6">
+                            <div class="col-12 col-lg-6">
                                 <div class="mb-3">
                                     <label for="direccion" class="form-label required">Dirección</label>
                                     <textarea class="form-control" id="direccion" name="direccion" rows="2" required><?= 
@@ -305,7 +305,7 @@ if ($stmt = $db->prepare($query)) {
                                 </div>
                             </div>
                             
-                            <div class="col-md-6">
+                            <div class="col-12 col-lg-6">
                                 <div class="mb-3">
                                     <label for="punto_referencia" class="form-label">Punto de Referencia</label>
                                     <input type="text" class="form-control" id="punto_referencia" name="punto_referencia" 
@@ -313,66 +313,66 @@ if ($stmt = $db->prepare($query)) {
                                 </div>
                             </div>
                             
-                            <div class="col-md-4">
-    <div class="mb-3">
-        <label for="tipo_vivienda" class="form-label">Tipo de Vivienda</label>
-        <select class="custom-select d-block w-100" id="tipo_vivienda" name="tipo_vivienda">
-            <option value="">Seleccione...</option>
-            <?php
-            $query = "SELECT id, vivienda FROM tipo_vivienda ORDER BY vivienda";
-            if ($stmt = $db->prepare($query)) {
-                $stmt->execute();
-                $result = $stmt->get_result();
-                
-                while ($row = $result->fetch_assoc()) {
-                    $selected = (isset($_POST['tipo_vivienda']) && $_POST['tipo_vivienda'] == $row['vivienda']) ? 'selected' : '';
-                    echo '<option value="' . htmlspecialchars($row['vivienda']) . '" ' . $selected . '>' 
-                         . htmlspecialchars($row['vivienda']) . '</option>';
-                }
-                
-                $stmt->close();
-            }
-            ?>
-        </select>
-    </div>
-</div>
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="mb-3">
+                                    <label for="tipo_vivienda" class="form-label">Tipo de Vivienda</label>
+                                    <select class="form-select" id="tipo_vivienda" name="tipo_vivienda">
+                                        <option value="">Seleccione...</option>
+                                        <?php
+                                        $query = "SELECT id, vivienda FROM tipo_vivienda ORDER BY vivienda";
+                                        if ($stmt = $db->prepare($query)) {
+                                            $stmt->execute();
+                                            $result = $stmt->get_result();
+                                            
+                                            while ($row = $result->fetch_assoc()) {
+                                                $selected = (isset($_POST['tipo_vivienda']) && $_POST['tipo_vivienda'] == $row['vivienda']) ? 'selected' : '';
+                                                echo '<option value="' . htmlspecialchars($row['vivienda']) . '" ' . $selected . '>' 
+                                                     . htmlspecialchars($row['vivienda']) . '</option>';
+                                            }
+                                            
+                                            $stmt->close();
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+                            </div>
                             
-                            <div class="col-md-4">
-    <div class="mb-3">
-        <label for="tenencia_vivienda" class="form-label">Tenencia de Vivienda</label>
-        <select class="custom-select d-block w-100" id="tenencia_vivienda" name="tenencia_vivienda">
-            <option value="">Seleccione...</option>
-            <?php
-            try {
-                $query = "SELECT id, tenencia FROM tenencia_vivienda ORDER BY tenencia";
-                if ($stmt = $db->prepare($query)) {
-                    $stmt->execute();
-                    $result = $stmt->get_result();
-                    
-                    while ($row = $result->fetch_assoc()) {
-                        $selected = (isset($_POST['tenencia_vivienda']) && $_POST['tenencia_vivienda'] == $row['tenencia']) ? 'selected' : '';
-                        echo '<option value="' . htmlspecialchars($row['tenencia']) . '" ' . $selected . '>' 
-                             . htmlspecialchars($row['tenencia']) . '</option>';
-                    }
-                    
-                    $stmt->close();
-                } else {
-                    echo '<option value="">Error al preparar la consulta</option>';
-                }
-            } catch (Exception $e) {
-                echo '<option value="">Error al cargar opciones</option>';
-                error_log("Error en tenencia_vivienda: " . $e->getMessage());
-            }
-            ?>
-        </select>
-    </div>
-</div>
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="mb-3">
+                                    <label for="tenencia_vivienda" class="form-label">Tenencia de Vivienda</label>
+                                    <select class="form-select" id="tenencia_vivienda" name="tenencia_vivienda">
+                                        <option value="">Seleccione...</option>
+                                        <?php
+                                        try {
+                                            $query = "SELECT id, tenencia FROM tenencia_vivienda ORDER BY tenencia";
+                                            if ($stmt = $db->prepare($query)) {
+                                                $stmt->execute();
+                                                $result = $stmt->get_result();
+                                                
+                                                while ($row = $result->fetch_assoc()) {
+                                                    $selected = (isset($_POST['tenencia_vivienda']) && $_POST['tenencia_vivienda'] == $row['tenencia']) ? 'selected' : '';
+                                                    echo '<option value="' . htmlspecialchars($row['tenencia']) . '" ' . $selected . '>' 
+                                                         . htmlspecialchars($row['tenencia']) . '</option>';
+                                                }
+                                                
+                                                $stmt->close();
+                                            } else {
+                                                echo '<option value="">Error al preparar la consulta</option>';
+                                            }
+                                        } catch (Exception $e) {
+                                            echo '<option value="">Error al cargar opciones</option>';
+                                            error_log("Error en tenencia_vivienda: " . $e->getMessage());
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Sección 5: Situación Familiar -->
                         <h5 class="mb-3"><i class="fas fa-users me-2"></i> Situación Familiar</h5>
                         <div class="row g-3 mb-4">
-                            <div class="col-md-6">
+                            <div class="col-12 col-md-6 col-lg-4">
                                 <div class="mb-3">
                                     <label for="grupo_familiar" class="form-label">Grupo Familiar</label>
                                     <input type="number" class="form-control" id="grupo_familiar" name="grupo_familiar" 
@@ -380,7 +380,7 @@ if ($stmt = $db->prepare($query)) {
                                 </div>
                             </div>
                             
-                            <div class="col-md-6">
+                            <div class="col-12 col-md-6 col-lg-4">
                                 <div class="mb-3">
                                     <label for="personas_a_cargo" class="form-label">Personas a su cargo</label>
                                     <input type="number" class="form-control" id="personas_a_cargo" name="personas_a_cargo" 
@@ -388,25 +388,25 @@ if ($stmt = $db->prepare($query)) {
                                 </div>
                             </div>
                             
-                            <div class="col-md-6">
-    <div class="mb-3">
-        <label for="fuente_ingresos" class="form-label">Fuente de Ingresos</label>
-        <select class="custom-select d-block w-100" id="fuente_ingresos" name="fuente_ingresos">
-            <option value="">Seleccione una opción</option>
-            <?php 
-            $ingresos = obtenerIngresos($db);
-            foreach ($ingresos as $id => $ingreso): ?>
-                <option value="<?php echo $id; ?>"><?php echo htmlspecialchars($ingreso); ?></option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-</div>
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="mb-3">
+                                    <label for="fuente_ingresos" class="form-label">Fuente de Ingresos</label>
+                                    <select class="form-select" id="fuente_ingresos" name="fuente_ingresos">
+                                        <option value="">Seleccione una opción</option>
+                                        <?php 
+                                        $ingresos = obtenerIngresos($db);
+                                        foreach ($ingresos as $id => $ingreso): ?>
+                                            <option value="<?php echo $id; ?>"><?php echo htmlspecialchars($ingreso); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Sección 6: Salud -->
                         <h5 class="mb-3"><i class="fas fa-heartbeat me-2"></i> Salud</h5>
                         <div class="row g-3 mb-4">
-                            <div class="col-md-6">
+                            <div class="col-12 col-md-6">
                                 <div class="mb-3">
                                     <label for="enfermedades" class="form-label">Enfermedades</label>
                                     <input type="text" class="form-control" id="enfermedades" name="enfermedades" 
@@ -414,7 +414,7 @@ if ($stmt = $db->prepare($query)) {
                                 </div>
                             </div>
                             
-                            <div class="col-md-6">
+                            <div class="col-12 col-md-6">
                                 <div class="mb-3">
                                     <label for="discapacidad" class="form-label">Discapacidad</label>
                                     <input type="text" class="form-control" id="discapacidad" name="discapacidad" 
@@ -426,7 +426,7 @@ if ($stmt = $db->prepare($query)) {
                         <!-- Sección 7: Contacto -->
                         <h5 class="mb-3"><i class="fas fa-address-book me-2"></i> Contacto</h5>
                         <div class="row g-3 mb-4">
-                            <div class="col-md-6">
+                            <div class="col-12 col-md-6">
                                 <div class="mb-3">
                                     <label for="telefono" class="form-label required">Teléfono Principal</label>
                                     <input type="tel" class="form-control" id="telefono" name="telefono" 
@@ -440,7 +440,7 @@ if ($stmt = $db->prepare($query)) {
                                 </div>
                             </div>
                             
-                            <div class="col-md-6">
+                            <div class="col-12 col-md-6">
                                 <div class="mb-3">
                                     <label for="email" class="form-label required">Correo Electrónico</label>
                                     <input type="email" class="form-control" id="email" name="email" 
@@ -455,13 +455,13 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                         </div>
 
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-between mt-4">
-                            <button type="button" onclick="history.back()" class="btn btn-outline-secondary">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mt-4 gap-3">
+                            <button type="button" onclick="history.back()" class="btn btn-outline-secondary order-2 order-md-1 w-100 w-md-auto">
                                 <i class="fas fa-arrow-left me-1"></i> Regresar
                             </button>
                             
-                            <div>
-                                <button type="reset" class="btn btn-secondary me-md-2">
+                            <div class="d-flex flex-column flex-md-row gap-2 order-1 order-md-2 w-100 w-md-auto">
+                                <button type="reset" class="btn btn-secondary">
                                     <i class="fas fa-eraser me-1"></i> Limpiar
                                 </button>
                                 <button type="submit" class="btn btn-primary">
@@ -475,30 +475,30 @@ if ($stmt = $db->prepare($query)) {
             <?php endif; ?>
             
             <!-- Tabla de docentes registrados -->
-            <div class="card mt-4">
+            <div class="card mt-4 shadow-sm">
                 <div class="card-header">
-                    <h5>Docentes Registrados</h5>
+                    <h5 class="mb-0">Docentes Registrados</h5>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-striped table-bordered" id="tablaDocentes">
-                            <thead class="thead-dark">
+                        <table class="table table-striped table-hover mb-0" id="tablaDocentes">
+                            <thead class="table-dark">
                                 <tr>
-                                    <th>ID</th>
+                                    <th width="70">ID</th>
                                     <th>Documento</th>
                                     <th>Nombre</th>
                                     <th>Email</th>
                                     <th>Contacto</th>
-                                    <th>Estado</th>
+                                    <th width="100">Estado</th>
                                     <?php if ($permiso_editar): ?>
-                                    <th>Acciones</th>
+                                    <th width="150" class="text-center">Acciones</th>
                                     <?php endif; ?>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($docentes as $docente): ?>
                                 <tr>
-                                    <td><?= $docente['id'] ?></td>
+                                    <td class="fw-bold"><?= $docente['id'] ?></td>
                                     <td><?= $docente['idusuario'] ?></td>
                                     <td><?= $docente['nombre'] ?></td>
                                     <td><?= $docente['email'] ?></td>
@@ -509,21 +509,22 @@ if ($stmt = $db->prepare($query)) {
                                         </span>
                                     </td>
                                     <?php if ($permiso_editar): ?>
-                                    <td>
-                                        <button class="btn btn-sm btn-primary btn-editar" 
-                                                data-id="<?= $docente['id'] ?>" 
-                                                data-bs-toggle="modal" 
-                                                data-bs-target="#modalEditar">
-                                            <i class="fas fa-edit"></i> Editar
-                                        </button>
-                                        <button class="btn btn-sm <?= ($docente['status'] == 1) ? 'btn-warning' : 'btn-success' ?> btn-estado" 
-                                                data-id="<?= $docente['id'] ?>" 
-                                                data-status="<?= $docente['status'] ?>"
-                                                data-bs-toggle="modal" 
-                                                data-bs-target="#modalEstado">
-                                            <i class="fas <?= ($docente['status'] == 1) ? 'fa-ban' : 'fa-check' ?>"></i> 
-                                            <?= ($docente['status'] == 1) ? 'Deshabilitar' : 'Habilitar' ?>
-                                        </button>
+                                    <td class="text-center">
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary btn-editar" 
+                                                    data-id="<?= $docente['id'] ?>" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#modalEditar">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-outline-<?= ($docente['status'] == 1) ? 'warning' : 'success' ?> btn-estado" 
+                                                    data-id="<?= $docente['id'] ?>" 
+                                                    data-status="<?= $docente['status'] ?>"
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#modalEstado">
+                                                <i class="fas <?= ($docente['status'] == 1) ? 'fa-ban' : 'fa-check' ?>"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                     <?php endif; ?>
                                 </tr>
@@ -537,16 +538,14 @@ if ($stmt = $db->prepare($query)) {
     </div>
 </div>
 
-<?php if ($permiso_editar): ?>
+ <?php if (tienePermiso('editar_docente')): ?>
 <!-- Modal para Editar Docente -->
 <div class="modal fade" id="modalEditar" tabindex="-1" aria-labelledby="modalEditarLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="modalEditarLabel">Editar Docente</h5>
-               <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-  <span aria-hidden="true">&times;</span>
-</button>
+               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="contenidoModalEditar">
                 <!-- El contenido se cargará aquí via AJAX -->
@@ -567,9 +566,7 @@ if ($stmt = $db->prepare($query)) {
         <div class="modal-content">
             <div class="modal-header bg-warning text-white">
                 <h5 class="modal-title" id="modalEstadoLabel">Cambiar Estado del Docente</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p id="textoConfirmacion">¿Está seguro que desea cambiar el estado de este docente?</p>
@@ -577,7 +574,7 @@ if ($stmt = $db->prepare($query)) {
                 <input type="hidden" id="nuevoEstado">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-warning" id="confirmarCambioEstado">Confirmar</button>
             </div>
         </div>
@@ -587,6 +584,87 @@ if ($stmt = $db->prepare($query)) {
 
 <?php include("includes/footer.php"); ?>
 
+<style>
+/* ESTILOS RESPONSIVE */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .btn-group {
+        width: 100%;
+    }
+    
+    .btn-group .btn {
+        flex: 1;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .form-check {
+        margin-right: 1rem;
+    }
+    
+    .input-group {
+        flex-direction: column;
+    }
+    
+    .input-group .form-control {
+        border-radius: 0.375rem !important;
+        margin-bottom: 0.5rem;
+    }
+    
+    .input-group .btn {
+        border-radius: 0.375rem;
+        width: 100%;
+    }
+}
+
+@media (max-width: 576px) {
+    .container-fluid {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    .card-header h5 {
+        font-size: 1.1rem;
+    }
+    
+    .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .d-flex.flex-md-row {
+        flex-direction: column !important;
+    }
+    
+    .gap-3 {
+        gap: 1rem !important;
+    }
+}
+
+/* Mejoras generales */
+.form-select, .form-control {
+    border-radius: 0.375rem;
+}
+
+.card {
+    border-radius: 0.5rem;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+</style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -604,15 +682,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById('titulosInstitutosContainer');
         
         const newRow = document.createElement('div');
-        newRow.className = 'row g-3 mb-3';
+        newRow.className = 'row g-2 mb-2';
         newRow.innerHTML = `
-            <div class="col-md-5">
+            <div class="col-12 col-md-5">
                 <input type="text" class="form-control" name="titulos[]" value="${titulo.replace(/"/g, '&quot;')}">
             </div>
-            <div class="col-md-5">
+            <div class="col-12 col-md-5">
                 <input type="text" class="form-control" name="institutos[]" value="${instituto.replace(/"/g, '&quot;')}">
             </div>
-            <div class="col-md-2">
+            <div class="col-12 col-md-2">
                 <button type="button" class="btn btn-outline-danger w-100 remove-field">
                     <i class="fas fa-minus"></i> Eliminar
                 </button>
@@ -691,7 +769,9 @@ document.addEventListener('DOMContentLoaded', function() {
         language: {
             url: '//cdn.datatables.net/plug-ins/1.10.25/i18n/Spanish.json'
         },
-        responsive: true
+        responsive: true,
+        pageLength: 10,
+        lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "Todos"]]
     });
     
     // Manejar clic en botón Editar
@@ -730,14 +810,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const container = $('#titulosInstitutosContainerEdit');
             
             const newRow = $(`
-                <div class="row g-3 mb-3">
-                    <div class="col-md-5">
+                <div class="row g-2 mb-2">
+                    <div class="col-12 col-md-5">
                         <input type="text" class="form-control" name="titulos[]" value="${titulo.replace(/"/g, '&quot;')}">
                     </div>
-                    <div class="col-md-5">
+                    <div class="col-12 col-md-5">
                         <input type="text" class="form-control" name="institutos[]" value="${instituto.replace(/"/g, '&quot;')}">
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-12 col-md-2">
                         <button type="button" class="btn btn-outline-danger w-100 remove-field">
                             <i class="fas fa-minus"></i> Eliminar
                         </button>

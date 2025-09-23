@@ -97,7 +97,7 @@ include("includes/head.php");
             <h1 class="mt-4">Gestión de Asignaturas</h1>
             
             <!-- Formulario de Materias -->
-            <?php if ($permiso_agregar): ?>
+            <?php if (tienePermiso('agregar_materia')): ?>
             <div class="card mt-4">
                 <div class="card-header">
                     <h5>Agregar Nueva Materia</h5>
@@ -243,7 +243,7 @@ include("includes/head.php");
                                                 <?= $materia['activa'] ? 'Activa' : 'Inactiva' ?>
                                             </span>
                                         </td>
-                                        <?php if ($permiso_editar): ?>
+                                        <?php if (tienePermiso('editar_materia')): ?>
                                             <td>
                                                 <button type="button" class="btn btn-sm btn-warning" 
                                                         data-toggle="modal" data-target="#modalEditar" 

@@ -46,11 +46,12 @@ class ConnectionPool {
 
 // Crear una instancia del pool de conexiones
 $maxConnections = 50;
-$pool = new ConnectionPool($maxConnections, 'localhost', 'root', '01012023', 'uptpc');
+
+$pool = new ConnectionPool($maxConnections, 'localhost', 'root', '12345678', 'proyecto_tsu');
+$db = new mysqli('localhost', 'root', '12345678', 'proyecto_tsu');
 
 
 
-$db = new mysqli('localhost', 'root', '01012023', 'uptpc');
 //query("SET NAMES 'utf8';");
 $db->set_charset("utf8");
 

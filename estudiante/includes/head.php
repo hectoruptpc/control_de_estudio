@@ -21,15 +21,11 @@ if (isset($_SESSION['user']['id'])) {
     $mensajes_no_leidos = contarMensajesNoLeidos($_SESSION['user']['id']);
 }
 
-if (!isLoggedIn()) {
-    $_SESSION['here'] = $_SERVER['REQUEST_URI'];
-    $_SESSION['msg'] = $msn_iniciar_sesion;
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isEstudiante()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como estudiante para acceder";
     header('location: ../login.php');
-    die();
-}
-
-if (!isEstudiante()) {
-    header('location: ../usuario/home.php');
+    exit();
 }
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
@@ -97,8 +93,8 @@ if (!isEstudiante()) {
                 <i class="fas fa-book fa-fw"></i> Mis Clases
               </a>
               <div class="dropdown-menu" aria-labelledby="navbarDropdownClases">
-                
-                <a title="Horario" class="dropdown-item" href="../pagina_en_construccion.php">
+
+                <a title="Horario" class="dropdown-item" href="mi_horario.php">
                   <i class="fas fa-calendar-alt fa-fw"></i> Mi Horario
                 </a>
                 <a title="Secciones" class="dropdown-item" href="mis_secciones.php">
@@ -115,8 +111,8 @@ if (!isEstudiante()) {
                   <i class="fas fa-graduation-cap fa-fw"></i> Mis Calificaciones
               </a>
               <div id="dropdown-calificaciones-menu" class="dropdown-menu" aria-labelledby="navbarDropdown">
-                  <a title="Ver Calificaciones" class="dropdown-item" href="../pagina_en_construccion.php">
-                      <i class="fas fa-list-ol fa-fw"></i> Ver Mis Notas
+                  <a title="Ver Calificaciones" class="dropdown-item" href="mi_historial.php">
+                      <i class="fas fa-list-ol fa-fw"></i> Mi Historial Académico
                   </a>
                   
               </div>
@@ -270,5 +266,58 @@ document.addEventListener('DOMContentLoaded', function() {
 
 </script>
 
+
+<!-- Incluir jsPDF y html2canvas para generar el PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+
+
+
+
+
+
+
 </body>
+
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #printable-area, #printable-area * {
+            visibility: visible;
+        }
+        #printable-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .no-print {
+            display: none !important;
+        }
+        .card {
+            border: none;
+            box-shadow: none;
+        }
+        .table {
+            font-size: 12px;
+        }
+        h4 {
+            page-break-after: avoid;
+        }
+        .card-body {
+            padding: 0;
+        }
+        .accordion .collapse {
+            display: block !important;
+            opacity: 1;
+        }
+    }
+</style>
+
+
+
+
 </html>

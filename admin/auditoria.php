@@ -13,6 +13,11 @@ if (!isAdmin()) {
     exit();
 }
 
+
+// Cargar permisos del usuario
+cargarPermisosUsuario();
+verificarPermiso('auditoria');
+
 $titulopag = "Sistema de Auditoría";
 include("includes/head.php");
 

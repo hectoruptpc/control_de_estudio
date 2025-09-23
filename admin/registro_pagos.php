@@ -1,7 +1,16 @@
 <?php
 require_once('../funciones/functions.php');
 
-if (!isLoggedIn()) {
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('pagos');
+
+
+
+
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isAdmin()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como administrador para acceder";
     header('location: ../login.php');
     exit();
 }
@@ -13,15 +22,21 @@ include("includes/head.php");
 function buscarEstudiantePorCedulaPagos($cedula) {
     global $db;
     
-    $query = "SELECT u.id, u.nombre, u.idusuario, u.carrera 
+    $query = "SELECT u.id, u.nombre, u.idusuario, u.carrera, c.nombre_carrera 
               FROM users u 
+              LEFT JOIN carreras c ON u.carrera = c.id_carrera 
               WHERE u.idusuario = ? AND u.estudiante = 1";
     $stmt = $db->prepare($query);
     $stmt->bind_param("s", $cedula);
     $stmt->execute();
     $result = $stmt->get_result();
     
-    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
+    if ($result->num_rows > 0) {
+        $estudiante = $result->fetch_assoc();
+        return $estudiante;
+    }
+    
+    return null;
 }
 
 // Función para obtener los tipos de pago
@@ -317,7 +332,7 @@ $fecha_fin = date('Y-m-d');
                             <div class="alert alert-info">
                                 <strong><?= htmlspecialchars($estudiante['nombre']) ?></strong><br>
                                 Cédula: <?= htmlspecialchars($estudiante['idusuario']) ?><br>
-                                Carrera: <?= htmlspecialchars($estudiante['carrera']) ?>
+                                Carrera: <?= htmlspecialchars($estudiante['nombre_carrera']) ?>
                             </div>
                         </div>
                         
@@ -342,7 +357,7 @@ $fecha_fin = date('Y-m-d');
                             <label for="monto">Monto:</label>
                             <div class="input-group">
                                 <div class="input-group-prepend">
-                                    <span class="input-group-text">$</span>
+                                    <span class="input-group-text">Bs</span>
                                 </div>
                                 <input type="number" class="form-control" id="monto" name="monto" 
                                        step="0.01" min="0.01" required placeholder="0.00">
@@ -372,7 +387,7 @@ $fecha_fin = date('Y-m-d');
                 </div>
                 <div class="card-body">
                     <div class="alert alert-primary">
-                        <strong>Total del día de hoy: $<?= number_format($total_pagos_hoy, 2, ',', '.') ?></strong>
+                        <strong>Total del día de hoy: Bs<?= number_format($total_pagos_hoy, 2, ',', '.') ?></strong>
                     </div>
                     
                     <!-- Buscador por fechas -->
@@ -431,7 +446,7 @@ $fecha_fin = date('Y-m-d');
                                         if ($current_date !== null && $current_date !== $pago_date): ?>
                                             <tr class="table-success">
                                                 <td colspan="5" class="text-right"><strong>Total del día <?= date('d/m/Y', strtotime($current_date)) ?>:</strong></td>
-                                                <td class="text-right"><strong>$<?= number_format($daily_total, 2, ',', '.') ?></strong></td>
+                                                <td class="text-right"><strong>Bs<?= number_format($daily_total, 2, ',', '.') ?></strong></td>
                                                 <td colspan="3"></td>
                                             </tr>
                                             <?php 
@@ -462,7 +477,7 @@ $fecha_fin = date('Y-m-d');
                                                 <br><small>(<?= htmlspecialchars($pago['otro_concepto']) ?>)</small>
                                             <?php endif; ?>
                                         </td>
-                                        <td class="text-right">$<?= number_format($pago['monto'], 2, ',', '.') ?></td>
+                                        <td class="text-right">Bs<?= number_format($pago['monto'], 2, ',', '.') ?></td>
                                         <td><?= !empty($pago['observaciones']) ? htmlspecialchars($pago['observaciones']) : 'N/A' ?></td>
                                         <td><?= htmlspecialchars($pago['nombre_registrador']) ?></td>
                                         <td>
@@ -520,7 +535,7 @@ $fecha_fin = date('Y-m-d');
                                                                     <label for="monto_edit<?= $pago['id'] ?>">Monto:</label>
                                                                     <div class="input-group">
                                                                         <div class="input-group-prepend">
-                                                                            <span class="input-group-text">$</span>
+                                                                            <span class="input-group-text">Bs</span>
                                                                         </div>
                                                                         <input type="number" class="form-control" id="monto_edit<?= $pago['id'] ?>" name="monto_edit" 
                                                                                step="0.01" min="0.01" required value="<?= $pago['monto'] ?>">
@@ -576,7 +591,7 @@ $fecha_fin = date('Y-m-d');
                                     <?php if ($current_date !== null): ?>
                                     <tr class="table-success">
                                         <td colspan="5" class="text-right"><strong>Total del día <?= date('d/m/Y', strtotime($current_date)) ?>:</strong></td>
-                                        <td class="text-right"><strong>$<?= number_format($daily_total, 2, ',', '.') ?></strong></td>
+                                        <td class="text-right"><strong>Bs<?= number_format($daily_total, 2, ',', '.') ?></strong></td>
                                         <td colspan="3"></td>
                                     </tr>
                                     <?php endif; ?>

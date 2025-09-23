@@ -6,7 +6,16 @@ ini_set('display_errors', '1');
 
 $titulopag = "Gestión de Materias por Carrera";
 include('../funciones/functions.php');
+
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('rela_materia_carrera');
+
+
 include("includes/head.php");
+
+
+
 
 // Procesar formularios
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {

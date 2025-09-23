@@ -21,15 +21,11 @@ if (isset($_SESSION['user']['id'])) {
     $mensajes_no_leidos = contarMensajesNoLeidos($_SESSION['user']['id']);
 }
 
-if (!isLoggedIn()) {
-    $_SESSION['here'] = $_SERVER['REQUEST_URI'];
-    $_SESSION['msg'] = $msn_iniciar_sesion;
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isAdmin()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como administrador para acceder";
     header('location: ../login.php');
-    die();
-}
-
-if (!isAdmin()) {
-    header('location: ../usuario/home.php');
+    exit();
 }
 ?>
 <!DOCTYPE html>
@@ -109,11 +105,14 @@ if (!isAdmin()) {
             </li>
 
             <!-- Botón individual de Pagos (no desplegable) -->
+
+            <?php if (tienePermiso('pagos')): ?>
             <li class="nav-item">
               <a title="Gestión de Pagos" class="nav-link" href="registro_pagos.php">
                 <i class="fas fa-money-bill-wave fa-fw"></i> Pagos
               </a>
             </li>
+            <?php endif; ?>
 
             <li class="nav-item dropdown">
               <a title="Gestión de Estudiantes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownEstudiantes" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -123,37 +122,46 @@ if (!isAdmin()) {
                 <a title="Ver Todos los Estudiantes" class="dropdown-item" href="estudiantes.php">
                   <i class="fa fa-users fa-fw"></i> Ver todos los Estudiantes
                 </a>
-                <?php if ($_SESSION['user']['agregar_estudiante'] == 1): ?>
+                <?php if (tienePermiso('agregar_estudiante')): ?>
                   <a title="Agregar Estudiante" class="dropdown-item" href="agregar_estudiante.php">
                     <i class="fa fa-user-plus fa-fw"></i> Agregar Estudiante
                   </a>
                 <?php endif; ?>
+
+                <?php if (tienePermiso('gestionar_secciones')): ?>
                 <a title="Gestionar Secciones" class="dropdown-item" href="gestion_seccion.php">
                   <i class="fas fa-object-group fa-fw"></i> Gestionar Secciones
                 </a>
+                <?php endif; ?>
               </div>
             </li>
+
 
             <li class="nav-item dropdown">
                 <a title="Gestión de Pensum" class="nav-link dropdown-toggle" href="#" id="navbarDropdownPensum" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="fas fa-book fa-fw"></i> Pensum
                 </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownPensum">
-                    <?php if ($_SESSION['user']['agregar_carrera'] == 1): ?>
+                    
                         <a title="Agregar Nueva Carrera" class="dropdown-item" href="agregar_carrera.php">
-                            <i class="fas fa-plus-circle fa-fw"></i> Agregar Carrera
+                            <i class="fas fa-plus-circle fa-fw"></i> Gestion de Programas
                         </a>
-                    <?php endif; ?>
+                    
                     
                     <a title="Asignaturas" class="dropdown-item" href="materia.php">
                         <i class="fas fa-book-open fa-fw"></i> Asignaturas
                     </a>
+                    <?php if (tienePermiso('rela_materia_carrera')): ?>
                     <a title="Relacionar Materias con Carreras" class="dropdown-item" href="carrera_materias.php">
                         <i class="fas fa-link fa-fw"></i> Relacionar Materias-Carreras
                     </a>
+                    <?php endif; ?>
+
+                    <?php if (tienePermiso('periodos_academicos')): ?>
                     <a title="Periodos Académicos" class="dropdown-item" href="periodos_academicos.php">
                         <i class="fas fa-calendar fa-fw"></i> Periodos Académicos
                     </a>
+                    <?php endif; ?>
                 </div>
             </li>
 
@@ -168,9 +176,11 @@ if (!isAdmin()) {
                 </a>
 
                 <!-- Nueva opción: Asignar Secciones -->
+                  <?php if (tienePermiso('asig_secciones')): ?>
                 <a title="Asignación de Secciones" class="dropdown-item" href="asignar_secciones.php">
                     <i class="fas fa-object-group fa-fw"></i> Asignar Secciones
                 </a>
+                <?php endif; ?>
                    
                 <a title="Asignación de Cursos" class="dropdown-item" href="asignacion_cursos.php">
                     <i class="fas fa-tasks fa-fw"></i> Asignar Cursos
@@ -197,7 +207,10 @@ if (!isAdmin()) {
                     <a title="Consultar Notas" class="dropdown-item" href="consulta_notas.php">
                         <i class="fas fa-search fa-fw"></i> Consultar Notas
                     </a>
-                    
+                    <!-- Nueva opción: Consultar Notas Pasadas -->
+                    <a title="Consultar Notas Pasadas" class="dropdown-item" href="../pagina_en_construccion.php">
+                        <i class="fas fa-history fa-fw"></i> Consultar Notas Pasadas
+                    </a>
                 </div>
             </li>
 
@@ -241,9 +254,18 @@ if (!isAdmin()) {
                         <a title="Editar Valores del Sistema" class="dropdown-item" href="valores_predefinidos.php">
                             <i class="fas fa-edit fa-fw"></i> Valores Predefinidos
                         </a>
-                        <a title="Editar tipos de pago" class="dropdown-item" href="tipo_pago.php">
-                            <i class="fas fa-edit fa-fw"></i> Tipos de Pago
-                        </a>
+                         <a title="Editar tipos de pago" class="dropdown-item" href="tipo_pago.php">
+                <i class="fas fa-money-bill fa-fw"></i> Tipos de Pago
+            </a>
+                          <!-- Nueva opción: Tipos de Horario -->
+            <a title="Gestionar tipos de horario" class="dropdown-item" href="tipos_horario.php">
+                <i class="fas fa-clock fa-fw"></i> Tipos de Horario
+            </a>
+ <a title="Gestionar horarios por personal" class="dropdown-item" href="gestion_horario_personal.php">
+                <i class="fas fa-user-clock fa-fw"></i> Horarios por Personal
+            </a>
+
+
                     <?php endif; ?>
                     
                     <div class="dropdown-divider"></div>
@@ -367,6 +389,184 @@ document.addEventListener('DOMContentLoaded', function() {
     actualizarNotificaciones();
 });
 </script>
+
+
+
+<!-- Bootstrap 4.6 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+
+
+<!-- Incluir jsPDF y html2canvas para generar el PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #printable-area, #printable-area * {
+            visibility: visible;
+        }
+        #printable-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .no-print {
+            display: none !important;
+        }
+        .card {
+            border: none;
+            box-shadow: none;
+        }
+        .table {
+            font-size: 12px;
+        }
+        h4 {
+            page-break-after: avoid;
+        }
+        .card-body {
+            padding: 0;
+        }
+        .accordion .collapse {
+            display: block !important;
+            opacity: 1;
+        }
+    }
+</style>
+
+<!-- ESTILOS PERSONALIZADOS DEL PANEL DE ADMINISTRACION -->
+
+<style>
+        body {
+            background-color: #f8f9fc;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .dashboard-header {
+            background: linear-gradient(120deg, #4e73df 0%, #224abe 100%);
+            color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .feature-card {
+            border: none;
+            border-radius: 10px;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            height: 100%;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+        .card-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+        }
+        .pagos-card {
+            border-bottom: 4px solid #28a745;
+        }
+        .pagos-card .card-icon {
+            color: #28a745;
+        }
+        .soporte-card {
+            border-bottom: 4px solid #ffc107;
+        }
+        .soporte-card .card-icon {
+            color: #ffc107;
+        }
+        .mensajeria-card {
+            border-bottom: 4px solid #17a2b8;
+        }
+        .mensajeria-card .card-icon {
+            color: #17a2b8;
+        }
+        .auditoria-card {
+            border-bottom: 4px solid #6f42c1;
+        }
+        .auditoria-card .card-icon {
+            color: #6f42c1;
+        }
+        .btn-access {
+            border-radius: 50px;
+            padding: 0.5rem 1.5rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-pagos {
+            background-color: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+        .btn-pagos:hover {
+            background-color: #218838;
+            border-color: #1e7e34;
+        }
+        .btn-soporte {
+            background-color: #ffc107;
+            border-color: #ffc107;
+            color: #212529;
+        }
+        .btn-soporte:hover {
+            background-color: #e0a800;
+            border-color: #d39e00;
+        }
+        .btn-mensajeria {
+            background-color: #17a2b8;
+            border-color: #17a2b8;
+            color: white;
+        }
+        .btn-mensajeria:hover {
+            background-color: #138496;
+            border-color: #117a8b;
+        }
+        .btn-auditoria {
+            background-color: #6f42c1;
+            border-color: #6f42c1;
+            color: white;
+        }
+        .btn-auditoria:hover {
+            background-color: #5a359c;
+            border-color: #523091;
+        }
+        .welcome-message {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+        /* Nuevos estilos para centrar las tarjetas */
+        .cards-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }
+        .card-wrapper {
+            flex: 0 0 auto;
+            width: 270px; /* Ancho fijo para consistencia */
+        }
+        @media (max-width: 1200px) {
+            .card-wrapper {
+                width: 250px;
+            }
+        }
+        @media (max-width: 768px) {
+            .cards-container {
+                justify-content: center;
+            }
+            .card-wrapper {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+    </style>
+
+
 
 </body>
 </html>

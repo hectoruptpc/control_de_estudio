@@ -4,7 +4,15 @@ ini_set('display_errors', '1');
 
 $titulopag = "Sistema de Gestión - Panel de Director de Carrera";
 include('../funciones/functions.php');
-isUser();
+
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isUser()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como director de carrera para acceder";
+    header('location: ../login.php');
+    exit();
+}
+
+
 ?>
 
 <!DOCTYPE html>

@@ -5,6 +5,10 @@ ini_set('display_errors', '1');
 $titulopag = "Gestión de Secciones";
 include('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('secciones');
+
 // Obtener parámetros de acción
 $action = $_POST['action'] ?? ($_GET['action'] ?? 'list');
 $seccion_id = $_POST['id'] ?? ($_GET['id'] ?? 0);
@@ -149,7 +153,7 @@ include("includes/head.php");
             </div>
             <div class="card-body">
                 <div class="alert alert-info">
-                    <strong>Nota:</strong> Las secciones requieren al menos <?= MINIMO_ESTUDIANTES ?> estudiantes para activarse.
+                    <strong>Nota:</strong> Las secciones requieren al menos <?= MINIMO_ESTUDIANTES ?> estudiantes para activarse. Una vez iniciadas, no se desactivan por falta de estudiantes.
                 </div>
                 <div class="table-responsive">
                     <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
@@ -174,21 +178,35 @@ include("includes/head.php");
                                 $porcentaje = $seccion['capacidad_maxima'] > 0 ? 
                                     round(($seccion['inscritos'] / $seccion['capacidad_maxima']) * 100) : 0;
                                 
+                                // Verificar si la sección ya inició
+                                $ya_inicio = false;
+                                if (isset($seccion['inicia']) && !empty($seccion['inicia'])) {
+                                    $fecha_inicio = new DateTime($seccion['inicia']);
+                                    $fecha_actual = new DateTime();
+                                    $ya_inicio = ($fecha_actual >= $fecha_inicio);
+                                }
+                                
                                 // Determinar clase y texto del estado
                                 if ($seccion['periodo_activo'] == 0) {
                                     $estado_clase = 'secondary';
                                     $estado_texto = 'Período Inactivo';
                                     $mostrar_faltantes = false;
                                 } else {
-                                    // Estado normal de la sección
-                                    if ($seccion['estatus'] == 'activa') {
+                                    if ($ya_inicio) {
                                         $estado_clase = 'success';
-                                        $estado_texto = 'Activa';
+                                        $estado_texto = 'Activa (Ya inició)';
                                         $mostrar_faltantes = false;
                                     } else {
-                                        $estado_clase = 'danger';
-                                        $estado_texto = 'Inactiva';
-                                        $mostrar_faltantes = true;
+                                        // Estado normal de la sección
+                                        if ($seccion['estatus'] == 'activa') {
+                                            $estado_clase = 'success';
+                                            $estado_texto = 'Activa';
+                                            $mostrar_faltantes = false;
+                                        } else {
+                                            $estado_clase = 'danger';
+                                            $estado_texto = 'Inactiva';
+                                            $mostrar_faltantes = true;
+                                        }
                                     }
                                 }
                             ?>
@@ -273,7 +291,7 @@ include("includes/head.php");
             </div>
             <div class="card-body">
                 <div class="alert alert-info">
-                    <strong>Importante:</strong> La sección se activará automáticamente cuando tenga al menos <?= MINIMO_ESTUDIANTES ?> estudiantes asignados.
+                    <strong>Importante:</strong> La sección se activará automáticamente cuando tenga al menos <?= MINIMO_ESTUDIANTES ?> estudiantes asignados. Una vez que la sección haya iniciado, no se desactivará por falta de estudiantes.
                 </div>
                 <form method="POST">
                     <input type="hidden" name="action" value="<?= $action === 'new' ? 'crear_seccion' : 'editar_seccion' ?>">
@@ -380,13 +398,30 @@ include("includes/head.php");
                     Sección: <?= htmlspecialchars($seccion['codigo_seccion']) ?> - <?= htmlspecialchars($seccion['nombre_carrera']) ?>
                 </h6>
                 <div>
-                    <span class="badge badge-<?= $seccion['estatus'] == 'activa' ? 'success' : 'danger' ?>">
-                        <?= ucfirst($seccion['estatus']) ?>
+                    <?php
+                    // Verificar si la sección ya inició
+                    $ya_inicio = false;
+                    if (isset($seccion['inicia']) && !empty($seccion['inicia'])) {
+                        $fecha_inicio = new DateTime($seccion['inicia']);
+                        $fecha_actual = new DateTime();
+                        $ya_inicio = ($fecha_actual >= $fecha_inicio);
+                    }
+                    
+                    if ($ya_inicio) {
+                        $estado_clase = 'success';
+                        $estado_texto = 'Activa (Ya inició)';
+                    } else {
+                        $estado_clase = $seccion['estatus'] == 'activa' ? 'success' : 'danger';
+                        $estado_texto = ucfirst($seccion['estatus']);
+                    }
+                    ?>
+                    <span class="badge badge-<?= $estado_clase ?>">
+                        <?= $estado_texto ?>
                     </span>
                     <span class="badge badge-info ml-2">
                         Cupos: <?= $seccion['inscritos'] ?>/<?= $seccion['capacidad_maxima'] ?>
                     </span>
-                    <?php if ($seccion['estatus'] == 'inactiva'): ?>
+                    <?php if (!$ya_inicio && $seccion['estatus'] == 'inactiva'): ?>
                         <span class="badge badge-danger ml-2">
                             Faltan <?= MINIMO_ESTUDIANTES - $seccion['inscritos'] ?> para activar
                         </span>
@@ -559,218 +594,320 @@ include("includes/head.php");
         </script>
 
     <?php elseif ($action === 'view_schedule' && $seccion_id > 0): ?>
-<!-- VISTA DE HORARIO SEMANAL -->
-<?php
-$seccion = obtenerDetalleSeccion($db, $seccion_id);
-$horarios = obtenerHorariosSeccion($db, $seccion_id);
-
-// Asegurarnos que $horarios es un array
-$horarios = is_array($horarios) ? $horarios : [];
-
-// Preparar datos para la leyenda
-$leyenda_materias = [];
-?>
-
-<h1 class="h3 mb-4 text-gray-800">Horario Semanal - <?= htmlspecialchars($seccion['codigo_seccion']) ?></h1>
-
-<!-- Botones fuera de la caja del horario -->
-<div class="mb-3">
-    <a href="gestion_seccion.php?action=view&id=<?= $seccion_id ?>" class="btn btn-secondary">
-        <i class="fas fa-arrow-left"></i> Volver a la sección
-    </a>
-    <button class="btn btn-success float-right" onclick="imprimirHorario()">
-        <i class="fas fa-print"></i> Imprimir Horario
-    </button>
-</div>
-
-<div class="card shadow mb-4" id="horario-clases">
-    <div class="card-header py-3 d-flex justify-content-between align-items-center">
-        <h6 class="m-0 font-weight-bold text-primary">Horario de Clases</h6>
-        <span class="badge badge-info"><?= count($horarios) ?> bloques horarios</span>
+    <!-- VISTA DE HORARIO SEMANAL -->
+    <?php
+    $seccion = obtenerDetalleSeccion($db, $seccion_id);
+    $horarios = obtenerHorariosSeccion($db, $seccion_id);
+    
+    // Asegurarnos que $horarios es un array
+    $horarios = is_array($horarios) ? $horarios : [];
+    
+    // Preparar datos para la leyenda
+    $leyenda_materias = [];
+    ?>
+    
+    <h1 class="h3 mb-4 text-gray-800">Horario Semanal - <?= htmlspecialchars($seccion['codigo_seccion']) ?></h1>
+    
+    <!-- Botones fuera de la caja del horario -->
+    <div class="mb-3">
+        <a href="gestion_seccion.php?action=view&id=<?= $seccion_id ?>" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Volver a la sección
+        </a>
+        <button class="btn btn-success float-right ml-2" onclick="generarPDF()">
+            <i class="fas fa-file-pdf"></i> Descargar PDF
+        </button>
+        
     </div>
-    <div class="card-body">
-        <?php if (empty($horarios)): ?>
-            <div class="alert alert-info">
-                No se han definido horarios para esta sección.
-            </div>
-        <?php else: ?>
-            <?php
-            // 1. Definir las horas de la tabla (de 7:00 a 16:00)
-            $horas_tabla = [];
-            for ($h = 7; $h <= 16; $h++) {
-                $horas_tabla[] = sprintf("%02d:00", $h);
-            }
-            
-            // 2. Organizar los horarios por día
-            $dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-            $horarios_por_dia = array_fill(0, 6, []);
-            
-            foreach ($horarios as $horario) {
-                $dia = (int)$horario['dia'];
-                $hora_inicio = date('H:i', strtotime($horario['hora_inicio']));
-                $hora_fin = date('H:i', strtotime($horario['hora_fin']));
+    
+    <div class="card shadow mb-4" id="horario-clases">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">Horario de Clases</h6>
+            <span class="badge badge-info"><?= count($horarios) ?> bloques horarios</span>
+        </div>
+        <div class="card-body">
+            <?php if (empty($horarios)): ?>
+                <div class="alert alert-info">
+                    No se han definido horarios para esta sección.
+                </div>
+            <?php else: ?>
+                <!-- Información para PDF (oculta en web) -->
+                <div id="pdf-info" class="pdf-only text-center mb-3" style="display: none;">
+                    <h4>Universidad Politécnica Territorial de Puerto Cabello</h4>
+                    <h5>Horario de Clases - <?= htmlspecialchars($seccion['codigo_seccion']) ?></h5>
+                    <p>
+                        <strong>Carrera:</strong> <?= htmlspecialchars($seccion['nombre_carrera']) ?> | 
+                        <strong>Trayecto:</strong> <?= $seccion['numero_trayecto'] ?> | 
+                        <strong>Período:</strong> <?= htmlspecialchars($seccion['nombre_periodo']) ?>
+                    </p>
+                </div>
                 
-                $horarios_por_dia[$dia][] = [
-                    'materia' => $horario['nombre_materia'],
-                    'docente' => $horario['nombre_docente'],
-                    'aula' => $horario['aula'],
-                    'hora_inicio' => $hora_inicio,
-                    'hora_fin' => $hora_fin,
-                    'cod_materia' => $horario['cod_materia'] ?? ''
-                ];
+                <?php
+                // 1. Definir las horas de la tabla (de 7:00 a 16:00)
+                $horas_tabla = [];
+                for ($h = 7; $h <= 16; $h++) {
+                    $horas_tabla[] = sprintf("%02d:00", $h);
+                }
                 
-                // Preparar datos para la leyenda
-                $clave_leyenda = $horario['nombre_materia'].$horario['nombre_docente'].$horario['aula'];
-                if (!isset($leyenda_materias[$clave_leyenda])) {
-                    $leyenda_materias[$clave_leyenda] = [
+                // 2. Organizar los horarios por día
+                $dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                $horarios_por_dia = array_fill(0, 6, []);
+                
+                foreach ($horarios as $horario) {
+                    $dia = (int)$horario['dia'];
+                    $hora_inicio = date('H:i', strtotime($horario['hora_inicio']));
+                    $hora_fin = date('H:i', strtotime($horario['hora_fin']));
+                    
+                    $horarios_por_dia[$dia][] = [
                         'materia' => $horario['nombre_materia'],
                         'docente' => $horario['nombre_docente'],
                         'aula' => $horario['aula'],
-                        'horario' => $hora_inicio.' - '.$hora_fin
+                        'hora_inicio' => $hora_inicio,
+                        'hora_fin' => $hora_fin,
+                        'cod_materia' => $horario['cod_materia'] ?? ''
                     ];
+                    
+                    // Preparar datos para la leyenda
+                    $clave_leyenda = $horario['nombre_materia'].$horario['nombre_docente'].$horario['aula'];
+                    if (!isset($leyenda_materias[$clave_leyenda])) {
+                        $leyenda_materias[$clave_leyenda] = [
+                            'materia' => $horario['nombre_materia'],
+                            'docente' => $horario['nombre_docente'],
+                            'aula' => $horario['aula'],
+                            'horario' => $hora_inicio.' - '.$hora_fin
+                        ];
+                    }
                 }
-            }
-            ?>
-            
-            <div class="table-responsive mb-4">
-                <table class="table table-bordered table-hover">
-                    <thead class="thead-dark">
-                        <tr>
-                            <th>Hora</th>
-                            <?php foreach ($dias_semana as $dia): ?>
-                                <th><?= $dia ?></th>
-                            <?php endforeach; ?>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($horas_tabla as $index => $hora): ?>
+                ?>
+                
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered table-hover">
+                        <thead class="thead-dark">
                             <tr>
-                                <th><?= $hora ?></th>
-                                <?php for ($dia = 0; $dia <= 5; $dia++): ?>
-                                    <?php
-                                    $contenido_celda = '';
-                                    $clase_css = 'celda-horario';
-                                    $es_continuacion = false;
-                                    
-                                    // Buscar si hay una clase en esta hora y día
-                                    foreach ($horarios_por_dia[$dia] as $clase) {
-                                        if ($hora >= $clase['hora_inicio'] && $hora < $clase['hora_fin']) {
-                                            $contenido_celda = htmlspecialchars($clase['materia']);
-                                            $clase_css = 'horario-block';
-                                            
-                                            // Verificar si es continuación
-                                            if ($hora != $clase['hora_inicio']) {
-                                                $clase_css .= ' continuacion';
-                                                $es_continuacion = true;
-                                            }
-                                            break;
-                                        }
-                                    }
-                                    ?>
-                                    <td class="<?= $clase_css ?>">
-                                        <?php if ($es_continuacion): ?>
-                                            <span class="continuacion-simbolo">↳</span>
-                                        <?php endif; ?>
-                                        <?= $contenido_celda ?>
-                                    </td>
-                                <?php endfor; ?>
+                                <th>Hora</th>
+                                <?php foreach ($dias_semana as $dia): ?>
+                                    <th><?= $dia ?></th>
+                                <?php endforeach; ?>
                             </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-            
-            <!-- Leyenda de materias -->
-            <div class="card border-left-primary shadow py-2 mb-4">
-                <div class="card-body">
-                    <h5 class="font-weight-bold text-primary mb-3">Detalle de Materias</h5>
-                    <div class="row">
-                        <?php foreach ($leyenda_materias as $item): ?>
-                            <div class="col-md-4 mb-2">
-                                <div class="d-flex align-items-center">
-                                    <div class="mr-2">
-                                        <i class="fas fa-book text-gray-500"></i>
-                                    </div>
-                                    <div>
-                                        <strong><?= htmlspecialchars($item['materia']) ?></strong><br>
-                                        <small class="text-muted">
-                                            <?= htmlspecialchars($item['horario']) ?><br>
-                                            Prof: <?= htmlspecialchars($item['docente']) ?> | 
-                                            Aula: <?= htmlspecialchars($item['aula']) ?>
-                                        </small>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($horas_tabla as $index => $hora): ?>
+                                <tr>
+                                    <th><?= $hora ?></th>
+                                    <?php for ($dia = 0; $dia <= 5; $dia++): ?>
+                                        <?php
+                                        $contenido_celda = '';
+                                        $clase_css = 'celda-horario';
+                                        $es_continuacion = false;
+                                        
+                                        // Buscar si hay una clase en esta hora y día
+                                        foreach ($horarios_por_dia[$dia] as $clase) {
+                                            if ($hora >= $clase['hora_inicio'] && $hora < $clase['hora_fin']) {
+                                                $contenido_celda = htmlspecialchars($clase['materia']);
+                                                $clase_css = 'horario-block';
+                                                
+                                                // Verificar si es continuación
+                                                if ($hora != $clase['hora_inicio']) {
+                                                    $clase_css .= ' continuacion';
+                                                    $es_continuacion = true;
+                                                }
+                                                break;
+                                            }
+                                        }
+                                        ?>
+                                        <td class="<?= $clase_css ?>">
+                                            <?php if ($es_continuacion): ?>
+                                                <span class="continuacion-simbolo">↳</span>
+                                            <?php endif; ?>
+                                            <?= $contenido_celda ?>
+                                        </td>
+                                    <?php endfor; ?>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
-                </div>
+                    
+                    <!-- Leyenda de materias -->
+                    <div class="card border-left-primary shadow py-2 mb-4">
+                        <div class="card-body">
+                            <h5 class="font-weight-bold text-primary mb-3">Detalle de Materias</h5>
+                            <div class="row">
+                                <?php foreach ($leyenda_materias as $item): ?>
+                                    <div class="col-md-4 mb-2">
+                                        <div class="d-flex align-items-center">
+                                            <div class="mr-2">
+                                                <i class="fas fa-book text-gray-500"></i>
+                                            </div>
+                                            <div>
+                                                <strong><?= htmlspecialchars($item['materia']) ?></strong><br>
+                                                <small class="text-muted">
+                                                    <?= htmlspecialchars($item['horario']) ?><br>
+                                                    Prof: <?= htmlspecialchars($item['docente']) ?> | 
+                                                    Aula: <?= htmlspecialchars($item['aula']) ?>
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
-        <?php endif; ?>
-    </div>
-</div>
-
-<style>
-.horario-block {
-    background-color: #f8f9fa;
-    border-left: 4px solid #4e73df;
-    text-align: center;
-    font-weight: bold;
-    vertical-align: middle;
-    position: relative;
-}
-
-.horario-block.continuacion {
-    background-color: #f1f3f9;
-    border-left: 4px solid #a0a7c5;
-    font-weight: normal;
-}
-
-.continuacion-simbolo {
-    color: #6c757d;
-    margin-right: 5px;
-}
-
-.table {
-    table-layout: fixed;
-    border-collapse: collapse;
-}
-
-.table th, .table td {
-    padding: 10px;
-    height: 50px;
-    vertical-align: middle;
-    border: 1px solid #dee2e6;
-}
-
-.celda-horario {
-    background-color: white;
-}
-
-/* Estilos para impresión */
-@media print {
-    body * {
-        visibility: hidden;
-    }
-    #horario-clases, #horario-clases * {
-        visibility: visible;
-    }
-    #horario-clases {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-    }
-    .btn, .mb-3 {
-        display: none !important;
-    }
-}
-</style>
-
-<script>
-function imprimirHorario() {
-    window.print();
-}
-</script>
+        </div>
+        
+        <style>
+        .horario-block {
+            background-color: #f8f9fa;
+            border-left: 4px solid #4e73df;
+            text-align: center;
+            font-weight: bold;
+            vertical-align: middle;
+            position: relative;
+        }
+        
+        .horario-block.continuacion {
+            background-color: #f1f3f9;
+            border-left: 4px solid #a0a7c5;
+            font-weight: normal;
+        }
+        
+        .continuacion-simbolo {
+            color: #6c757d;
+            margin-right: 5px;
+        }
+        
+        .table {
+            table-layout: fixed;
+            border-collapse: collapse;
+        }
+        
+        .table th, .table td {
+            padding: 10px;
+            height: 50px;
+            vertical-align: middle;
+            border: 1px solid #dee2e6;
+        }
+        
+        .celda-horario {
+            background-color: white;
+        }
+        
+        /* Estilos para impresión */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #horario-clases, #horario-clases * {
+                visibility: visible;
+            }
+            #horario-clases {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .btn, .mb-3 {
+                display: none !important;
+            }
+            .pdf-only {
+                display: block !important;
+            }
+        }
+        
+        /* Estilos para PDF */
+        .pdf-only {
+            display: none;
+        }
+        </style>
+        
+        <script>
+        function imprimirHorario() {
+            window.print();
+        }
+        
+        // Función para generar el PDF con membrete
+        function generarPDF() {
+            // Mostrar información para PDF
+            document.getElementById('pdf-info').style.display = 'block';
+            
+            // Configuración de jsPDF
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const margin = 10;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            
+            // Función para agregar membrete al PDF
+            function agregarMembretePDF(doc, pageWidth, margin) {
+                // Cargar imagen del logo
+                const logoImg = new Image();
+                logoImg.crossOrigin = 'Anonymous';
+                logoImg.src = '../images/uptpc.png';
+                
+                return new Promise((resolve) => {
+                    logoImg.onload = function() {
+                        // Agregar logo (arriba a la izquierda)
+                        doc.addImage(logoImg, 'PNG', margin, 10, 20, 20);
+                        
+                        // Agregar texto del membrete
+                        doc.setFontSize(12);
+                        doc.setFont(undefined, 'bold');
+                        doc.text('República Bolivariana de Venezuela', pageWidth / 2, 15, { align: 'center' });
+                        doc.text('Ministerio del Poder Popular para la Educación Universitaria', pageWidth / 2, 20, { align: 'center' });
+                        doc.text('Universidad Politécnica Territorial de Puerto Cabello', pageWidth / 2, 25, { align: 'center' });
+                        
+                        // Agregar fecha
+                        const hoy = new Date();
+                        const fecha = hoy.toLocaleDateString('es-ES');
+                        doc.setFont(undefined, 'normal');
+                        doc.text(fecha, pageWidth - margin, 15, { align: 'right' });
+                        
+                        resolve(35); // Retornar posición Y después del membrete
+                    };
+                    
+                    logoImg.onerror = function() {
+                        // Fallback sin imagen
+                        doc.setFontSize(12);
+                        doc.setFont(undefined, 'bold');
+                        doc.text('República Bolivariana de Venezuela', pageWidth / 2, 15, { align: 'center' });
+                        doc.text('Ministerio del Poder Popular para la Educación Universitaria', pageWidth / 2, 20, { align: 'center' });
+                        doc.text('Universidad Politécnica Territorial de Puerto Cabello', pageWidth / 2, 25, { align: 'center' });
+                        
+                        // Agregar fecha
+                        const hoy = new Date();
+                        const fecha = hoy.toLocaleDateString('es-ES');
+                        doc.setFont(undefined, 'normal');
+                        doc.text(fecha, pageWidth / 2, 32, { align: 'center' });
+                        
+                        resolve(40); // Retornar posición Y después del membrete
+                    };
+                });
+            }
+            
+            // Llamar a la función para agregar el membrete
+            agregarMembretePDF(doc, pageWidth, margin).then(startY => {
+                // Capturar el contenido HTML y agregarlo al PDF
+                html2canvas(document.getElementById('horario-clases'), {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/jpeg', 1.0);
+                    const imgWidth = pageWidth - (margin * 2);
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    
+                    // Agregar contenido al PDF
+                    doc.addImage(imgData, 'JPEG', margin, startY, imgWidth, imgHeight);
+                    
+                    // Guardar el PDF
+                    doc.save('Horario_<?= $seccion['codigo_seccion'] ?>.pdf');
+                    
+                    // Ocultar información para PDF después de generarlo
+                    document.getElementById('pdf-info').style.display = 'none';
+                });
+            });
+        }
+        </script>
 
     <?php elseif ($action === 'view' && $seccion_id > 0): ?>
         <!-- VISTA DETALLADA DE SECCIÓN -->
@@ -784,18 +921,31 @@ function imprimirHorario() {
         $seccion_llena = ($estudiantes_inscritos >= $seccion['capacidad_maxima']);
         $periodo_inactivo = ($seccion['periodo_activo'] == 0);
         
+        // Verificar si la sección ya inició
+        $ya_inicio = false;
+        if (isset($seccion['inicia']) && !empty($seccion['inicia'])) {
+            $fecha_inicio = new DateTime($seccion['inicia']);
+            $fecha_actual = new DateTime();
+            $ya_inicio = ($fecha_actual >= $fecha_inicio);
+        }
+        
         // Determinar el estado a mostrar
         if ($periodo_inactivo) {
             $estado_clase = 'secondary';
             $estado_texto = 'Período Inactivo';
         } else {
-            // Estado normal de la sección (basado en estudiantes)
-            if ($seccion['estatus'] == 'activa') {
+            if ($ya_inicio) {
                 $estado_clase = 'success';
-                $estado_texto = 'Activa';
+                $estado_texto = 'Activa (Ya inició)';
             } else {
-                $estado_clase = 'danger';
-                $estado_texto = 'Inactiva';
+                // Estado normal de la sección (basado en estudiantes)
+                if ($seccion['estatus'] == 'activa') {
+                    $estado_clase = 'success';
+                    $estado_texto = 'Activa';
+                } else {
+                    $estado_clase = 'danger';
+                    $estado_texto = 'Inactiva';
+                }
             }
         }
         ?>
@@ -820,8 +970,10 @@ function imprimirHorario() {
                                 <?= $estado_texto ?>
                                 <?php if ($periodo_inactivo): ?>
                                     <br><small>(Período desactivado)</small>
-                                <?php elseif ($seccion['estatus'] == 'inactiva'): ?>
+                                <?php elseif (!$ya_inicio && $seccion['estatus'] == 'inactiva'): ?>
                                     <br><small>(Faltan <?= $faltan_para_activar ?> estudiantes para activar)</small>
+                                <?php elseif ($ya_inicio): ?>
+                                    <br><small>(Ya inició - No se desactiva)</small>
                                 <?php endif; ?>
                                 <?php if ($seccion_llena): ?>
                                     <br><small>(Sección llena)</small>
@@ -911,9 +1063,13 @@ function imprimirHorario() {
                             <span class="badge badge-secondary">
                                 Período inactivo - No se pueden hacer cambios
                             </span>
-                        <?php elseif ($seccion['estatus'] == 'inactiva'): ?>
+                        <?php elseif (!$ya_inicio && $seccion['estatus'] == 'inactiva'): ?>
                             <span class="badge badge-danger">
                                 Se requiere <?= MINIMO_ESTUDIANTES ?> para activar (faltan <?= $faltan_para_activar ?>)
+                            </span>
+                        <?php elseif ($ya_inicio): ?>
+                            <span class="badge badge-success">
+                                Sección ya inició - No se desactiva
                             </span>
                         <?php endif; ?>
                         <?php if ($seccion_llena): ?>

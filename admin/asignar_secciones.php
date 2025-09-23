@@ -5,6 +5,10 @@ ini_set('display_errors', '1');
 $titulopag = "Asignación de Secciones a Docentes";
 include('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('asig_secciones');
+
 // Manejar petición AJAX para obtener materias del docente
 if(isset($_GET['ajax']) && $_GET['ajax'] == 'materias_docente' && isset($_GET['id_docente'])) {
     header('Content-Type: application/json');

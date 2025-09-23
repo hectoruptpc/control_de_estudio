@@ -532,10 +532,6 @@ include("includes/head.php");
                     <input type="hidden" name="tabla" value="status">
                     <input type="hidden" name="id" value="<?php echo $id; ?>">
                     <div class="form-group">
-                        <label for="nuevo_id_status_<?php echo $id; ?>">ID</label>
-                        <input type="number" class="form-control" id="nuevo_id_status_<?php echo $id; ?>" name="nuevo_id" value="<?php echo $id; ?>">
-                    </div>
-                    <div class="form-group">
                         <label for="valor_status_<?php echo $id; ?>">Estatus</label>
                         <input type="text" class="form-control" id="valor_status_<?php echo $id; ?>" name="valor" value="<?php echo $status; ?>" required>
                     </div>
@@ -621,10 +617,6 @@ include("includes/head.php");
                 <div class="modal-body">
                     <input type="hidden" name="tabla" value="estado_civil">
                     <input type="hidden" name="id" value="<?php echo $id; ?>">
-                    <div class="form-group">
-                        <label for="nuevo_id_civil_<?php echo $id; ?>">ID</label>
-                        <input type="number" class="form-control" id="nuevo_id_civil_<?php echo $id; ?>" name="nuevo_id" value="<?php echo $id; ?>">
-                    </div>
                     <div class="form-group">
                         <label for="valor_civil_<?php echo $id; ?>">Estado Civil</label>
                         <input type="text" class="form-control" id="valor_civil_<?php echo $id; ?>" name="valor" value="<?php echo $estado; ?>" required>
@@ -712,10 +704,6 @@ include("includes/head.php");
                     <input type="hidden" name="tabla" value="tenencia_vivienda">
                     <input type="hidden" name="id" value="<?php echo $id; ?>">
                     <div class="form-group">
-                        <label for="nuevo_id_tenencia_<?php echo $id; ?>">ID</label>
-                        <input type="number" class="form-control" id="nuevo_id_tenencia_<?php echo $id; ?>" name="nuevo_id" value="<?php echo $id; ?>">
-                    </div>
-                    <div class="form-group">
                         <label for="valor_tenencia_<?php echo $id; ?>">Tenencia</label>
                         <input type="text" class="form-control" id="valor_tenencia_<?php echo $id; ?>" name="valor" value="<?php echo $tenencia; ?>" required>
                     </div>
@@ -801,10 +789,6 @@ include("includes/head.php");
                 <div class="modal-body">
                     <input type="hidden" name="tabla" value="tipo_cedula">
                     <input type="hidden" name="id" value="<?php echo $tipo['id']; ?>">
-                    <div class="form-group">
-                        <label for="nuevo_id_cedula_<?php echo $tipo['id']; ?>">ID</label>
-                        <input type="number" class="form-control" id="nuevo_id_cedula_<?php echo $tipo['id']; ?>" name="nuevo_id" value="<?php echo $tipo['id']; ?>">
-                    </div>
                     <div class="form-group">
                         <label for="valor_cedula_<?php echo $tipo['id']; ?>">Tipo de Cédula</label>
                         <input type="text" class="form-control" id="valor_cedula_<?php echo $tipo['id']; ?>" name="valor" value="<?php echo $tipo['tipo']; ?>" required>
@@ -892,10 +876,6 @@ include("includes/head.php");
                     <input type="hidden" name="tabla" value="tipo_vivienda">
                     <input type="hidden" name="id" value="<?php echo $id; ?>">
                     <div class="form-group">
-                        <label for="nuevo_id_vivienda_<?php echo $id; ?>">ID</label>
-                        <input type="number" class="form-control" id="nuevo_id_vivienda_<?php echo $id; ?>" name="nuevo_id" value="<?php echo $id; ?>">
-                    </div>
-                    <div class="form-group">
                         <label for="valor_vivienda_<?php echo $id; ?>">Tipo de Vivienda</label>
                         <input type="text" class="form-control" id="valor_vivienda_<?php echo $id; ?>" name="valor" value="<?php echo $vivienda; ?>" required>
                     </div>
@@ -981,10 +961,6 @@ include("includes/head.php");
                 <div class="modal-body">
                     <input type="hidden" name="tabla" value="ingresos">
                     <input type="hidden" name="id" value="<?php echo $id; ?>">
-                    <div class="form-group">
-                        <label for="nuevo_id_ingreso_<?php echo $id; ?>">ID</label>
-                        <input type="number" class="form-control" id="nuevo_id_ingreso_<?php echo $id; ?>" name="nuevo_id" value="<?php echo $id; ?>">
-                    </div>
                     <div class="form-group">
                         <label for="valor_ingreso_<?php echo $id; ?>">Ingreso</label>
                         <input type="text" class="form-control" id="valor_ingreso_<?php echo $id; ?>" name="valor" value="<?php echo $ingreso; ?>" required>
@@ -1072,10 +1048,6 @@ include("includes/head.php");
                     <input type="hidden" name="tabla" value="genero">
                     <input type="hidden" name="id" value="<?php echo $id; ?>">
                     <div class="form-group">
-                        <label for="nuevo_id_genero_<?php echo $id; ?>">ID</label>
-                        <input type="number" class="form-control" id="nuevo_id_genero_<?php echo $id; ?>" name="nuevo_id" value="<?php echo $id; ?>">
-                    </div>
-                    <div class="form-group">
                         <label for="valor_genero_<?php echo $id; ?>">Género</label>
                         <input type="text" class="form-control" id="valor_genero_<?php echo $id; ?>" name="valor" value="<?php echo htmlspecialchars($genero); ?>" required>
                     </div>
@@ -1161,10 +1133,6 @@ include("includes/head.php");
                 <div class="modal-body">
                     <input type="hidden" name="tabla" value="tipo_formacion">
                     <input type="hidden" name="id" value="<?php echo $id; ?>">
-                    <div class="form-group">
-                        <label for="nuevo_id_formacion_<?php echo $id; ?>">ID</label>
-                        <input type="number" class="form-control" id="nuevo_id_formacion_<?php echo $id; ?>" name="nuevo_id" value="<?php echo $id; ?>">
-                    </div>
                     <div class="form-group">
                         <label for="valor_formacion_<?php echo $id; ?>">Tipo de Formación</label>
                         <input type="text" class="form-control" id="valor_formacion_<?php echo $id; ?>" name="valor" value="<?php echo $formacion; ?>" required>

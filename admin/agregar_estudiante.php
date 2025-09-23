@@ -5,6 +5,10 @@ ini_set('display_errors', '1');
 $titulopag = "Agregar Estudiante";
 require_once('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('agregar_estudiante');
+
 // Obtener los datos necesarios usando las nuevas funciones
 $tiposCedula = obtenerTiposCedula($db);
 $estadosCiviles = obtenerEstadosCiviless($db);

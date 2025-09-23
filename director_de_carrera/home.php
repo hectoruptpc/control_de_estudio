@@ -1,8 +1,12 @@
 <?php
 include('../funciones/functions.php');
 
-// Verificación de acceso simplificada con la nueva función
-verifyProfileAccess();
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isUser()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como director de carrera para acceder";
+    header('location: ../login.php');
+    exit();
+}
 
 // Verificar redirección guardada (manteniendo tu lógica original)
 if (isset($_SESSION['here']) && !empty($_SESSION['here'])) {

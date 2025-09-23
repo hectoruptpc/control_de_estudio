@@ -1,101 +1,15 @@
 <?php
 require_once('../funciones/functions.php');
 
-if (!isLoggedIn()) {
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isDocente()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como Docente para acceder";
     header('location: ../login.php');
     exit();
 }
 
 $titulopag = "Sistema de Mensajería";
 include("includes/head.php");
-
-// Obtener lista de usuarios para enviar mensajes con filtros
-function obtenerUsuarios($filtro_tipo = '', $busqueda_cedula = '') {
-    global $db;
-    $current_user_id = $_SESSION['user']['id'];
-    
-    $query = "SELECT id, nombre, usuario, estudiante, docente, admin, idusuario 
-              FROM users 
-              WHERE id != ? AND status = 1";
-    
-    $params = array($current_user_id);
-    $types = "i";
-    
-    // Aplicar filtro por tipo de usuario
-    if (!empty($filtro_tipo)) {
-        if ($filtro_tipo === 'estudiante') {
-            $query .= " AND estudiante = 1";
-        } elseif ($filtro_tipo === 'docente') {
-            $query .= " AND docente = 1";
-        } elseif ($filtro_tipo === 'admin') {
-            $query .= " AND admin = 1";
-        }
-    }
-    
-    // Aplicar búsqueda por cédula
-    if (!empty($busqueda_cedula)) {
-        $query .= " AND idusuario LIKE ?";
-        $params[] = "%$busqueda_cedula%";
-        $types .= "s";
-    }
-    
-    $query .= " ORDER BY nombre";
-    
-    $stmt = $db->prepare($query);
-    
-    // Bind parameters dinámicamente
-    if (count($params) > 1) {
-        $stmt->bind_param($types, ...$params);
-    } else {
-        $stmt->bind_param($types, $params[0]);
-    }
-    
-    $stmt->execute();
-    return $stmt->get_result();
-}
-
-// Función para obtener el tipo de usuario basado en los campos booleanos
-function obtenerTipoUsuario($usuario) {
-    if ($usuario['estudiante'] == 1) return 'Estudiante';
-    if ($usuario['docente'] == 1) return 'Docente';
-    if ($usuario['admin'] == 1) return 'Administrador';
-    if ($usuario['super_user'] == 1) return 'Super Usuario';
-    return 'Usuario';
-}
-
-// Obtener mensajes recibidos
-function obtenerMensajesRecibidos($user_id) {
-    global $db;
-    
-    $query = "SELECT m.*, u.nombre as remitente_nombre, u.usuario as remitente_usuario,
-                     u.estudiante, u.docente, u.admin, u.idusuario as remitente_cedula
-              FROM mensajeria m
-              INNER JOIN users u ON m.id_usuario_remitente = u.id
-              WHERE m.id_usuario_destinatario = ? 
-              AND m.eliminado_destinatario = FALSE
-              ORDER BY m.fecha_envio DESC";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    return $stmt->get_result();
-}
-
-// Obtener mensajes enviados
-function obtenerMensajesEnviados($user_id) {
-    global $db;
-    
-    $query = "SELECT m.*, u.nombre as destinatario_nombre, u.usuario as destinatario_usuario,
-                     u.estudiante, u.docente, u.admin, u.idusuario as destinatario_cedula
-              FROM mensajeria m
-              INNER JOIN users u ON m.id_usuario_destinatario = u.id
-              WHERE m.id_usuario_remitente = ? 
-              AND m.eliminado_remitente = FALSE
-              ORDER BY m.fecha_envio DESC";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    return $stmt->get_result();
-}
 
 // Procesar filtros y búsqueda
 $filtro_tipo = isset($_GET['filtro_tipo']) ? $_GET['filtro_tipo'] : '';
@@ -109,12 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enviar_mensaje'])) {
     $mensaje = trim($_POST['mensaje']);
     
     if (!empty($titulo) && !empty($mensaje) && $destinatario_id > 0) {
-        $query = "INSERT INTO mensajeria (id_usuario_remitente, id_usuario_destinatario, titulo, mensaje)
-                  VALUES (?, ?, ?, ?)";
-        $stmt = $db->prepare($query);
-        $stmt->bind_param("iiss", $remitente_id, $destinatario_id, $titulo, $mensaje);
-        
-        if ($stmt->execute()) {
+        if (enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje)) {
             $mensaje_exito = "Mensaje enviado correctamente";
         } else {
             $mensaje_error = "Error al enviar el mensaje";
@@ -124,19 +33,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enviar_mensaje'])) {
     }
 }
 
-// Marcar como leído
+// Marcar como leído (ahora se hará vía AJAX)
 if (isset($_GET['marcar_leido'])) {
     $mensaje_id = (int)$_GET['marcar_leido'];
     $user_id = $_SESSION['user']['id'];
     
-    $query = "UPDATE mensajeria SET leido = TRUE 
-              WHERE id = ? AND id_usuario_destinatario = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("ii", $mensaje_id, $user_id);
-    $stmt->execute();
+    marcarMensajeLeido($mensaje_id, $user_id);
 }
 
-$usuarios = obtenerUsuarios($filtro_tipo, $busqueda_cedula);
+// Obtener mensaje para modal si se solicita
+$mensaje_modal = null;
+if (isset($_GET['ver_mensaje'])) {
+    $mensaje_id = (int)$_GET['ver_mensaje'];
+    $tipo = $_GET['tipo'];
+    $user_id = $_SESSION['user']['id'];
+    
+    $mensaje_modal = obtenerMensaje($mensaje_id, $user_id, $tipo);
+    
+    // Si es un mensaje recibido y no leído, marcarlo como leído
+    if ($tipo === 'recibidos' && $mensaje_modal && !$mensaje_modal['leido']) {
+        marcarMensajeLeido($mensaje_id, $user_id);
+        $mensaje_modal['leido'] = true;
+    }
+}
+
+// Obtener datos usando las funciones existentes
+$usuarios = obtenerUsuariosMensajeria($filtro_tipo, $busqueda_cedula);
 $mensajes_recibidos = obtenerMensajesRecibidos($_SESSION['user']['id']);
 $mensajes_enviados = obtenerMensajesEnviados($_SESSION['user']['id']);
 ?>
@@ -277,10 +199,11 @@ $mensajes_enviados = obtenerMensajesEnviados($_SESSION['user']['id']);
                                                 <?= strlen($mensaje['mensaje']) > 100 ? '...' : '' ?>
                                             </p>
                                             <div>
-                                                <a href="ver_mensaje.php?id=<?= $mensaje['id'] ?>&tipo=recibidos" 
-                                                   class="btn btn-info btn-sm">
+                                                <button type="button" class="btn btn-info btn-sm ver-mensaje-btn" 
+                                                        data-id="<?= $mensaje['id'] ?>" 
+                                                        data-tipo="recibidos">
                                                     <i class="fas fa-eye"></i> Leer
-                                                </a>
+                                                </button>
                                             </div>
                                         </div>
                                     <?php endwhile; ?>
@@ -316,10 +239,11 @@ $mensajes_enviados = obtenerMensajesEnviados($_SESSION['user']['id']);
                                                 <?= strlen($mensaje['mensaje']) > 100 ? '...' : '' ?>
                                             </p>
                                             <div>
-                                                <a href="ver_mensaje.php?id=<?= $mensaje['id'] ?>&tipo=enviados" 
-                                                   class="btn btn-info btn-sm">
+                                                <button type="button" class="btn btn-info btn-sm ver-mensaje-btn" 
+                                                        data-id="<?= $mensaje['id'] ?>" 
+                                                        data-tipo="enviados">
                                                     <i class="fas fa-eye"></i> Ver
-                                                </a>
+                                                </button>
                                             </div>
                                         </div>
                                     <?php endwhile; ?>
@@ -334,5 +258,155 @@ $mensajes_enviados = obtenerMensajesEnviados($_SESSION['user']['id']);
         </div>
     </div>
 </div>
+
+<!-- Modal para ver mensaje -->
+<div class="modal fade" id="modalMensaje" tabindex="-1" role="dialog" aria-labelledby="modalMensajeLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="modalMensajeLabel">Cargando mensaje...</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="modalMensajeBody">
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="sr-only">Cargando...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Manejar clic en botones de ver mensaje
+    $('.ver-mensaje-btn').click(function() {
+        var mensajeId = $(this).data('id');
+        var tipo = $(this).data('tipo');
+        
+        // Cargar el mensaje en el modal
+        $.ajax({
+            url: 'mensajeria.php',
+            type: 'GET',
+            data: {
+                ver_mensaje: mensajeId,
+                tipo: tipo
+            },
+            success: function(response) {
+                // Extraer solo el contenido del modal desde la respuesta
+                var tempDiv = $('<div>').html(response);
+                var mensajeData = tempDiv.find('#mensajeModalContent').html();
+                
+                if (mensajeData) {
+                    $('#modalMensajeBody').html(mensajeData);
+                    $('#modalMensajeLabel').text(tempDiv.find('#modalTitulo').text());
+                } else {
+                    $('#modalMensajeBody').html('<p class="text-danger">Error al cargar el mensaje.</p>');
+                }
+                
+                $('#modalMensaje').modal('show');
+            },
+            error: function() {
+                $('#modalMensajeBody').html('<p class="text-danger">Error al cargar el mensaje.</p>');
+                $('#modalMensaje').modal('show');
+            }
+        });
+    });
+    
+    <?php if ($mensaje_modal): ?>
+    // Mostrar modal automáticamente si se cargó un mensaje
+    $(window).on('load', function() {
+        // Preparar contenido del modal
+        $('#modalMensajeLabel').text("<?= htmlspecialchars($mensaje_modal['titulo']) ?>");
+        
+        var contenidoModal = `
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <?php if ($tipo === 'recibidos'): ?>
+                        <p><strong>De:</strong> <?= htmlspecialchars($mensaje_modal['remitente_nombre']) ?></p>
+                        <p><strong>Usuario:</strong> <?= htmlspecialchars($mensaje_modal['remitente_usuario']) ?></p>
+                        <p><strong>Tipo:</strong> <?= obtenerTipoUsuario($mensaje_modal) ?></p>
+                        <p><strong>Cédula:</strong> <?= htmlspecialchars($mensaje_modal['remitente_cedula']) ?></p>
+                        <p><strong>Email:</strong> <?= htmlspecialchars($mensaje_modal['remitente_email']) ?></p>
+                    <?php else: ?>
+                        <p><strong>Para:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_nombre']) ?></p>
+                        <p><strong>Usuario:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_usuario']) ?></p>
+                        <p><strong>Tipo:</strong> <?= obtenerTipoUsuario($mensaje_modal) ?></p>
+                        <p><strong>Cédula:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_cedula']) ?></p>
+                        <p><strong>Email:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_email']) ?></p>
+                    <?php endif; ?>
+                </div>
+                <div class="col-md-6 text-right">
+                    <p><strong>Fecha:</strong> <?= date('d/m/Y H:i', strtotime($mensaje_modal['fecha_envio'])) ?></p>
+                    <?php if ($tipo === 'recibidos'): ?>
+                        <p><strong>Estado:</strong> 
+                            <span class="badge badge-<?= $mensaje_modal['leido'] ? 'success' : 'warning' ?>">
+                                <?= $mensaje_modal['leido'] ? 'Leído' : 'No leído' ?>
+                            </span>
+                        </p>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <hr>
+            
+            <div class="mensaje-contenido">
+                <?= nl2br(htmlspecialchars($mensaje_modal['mensaje'])) ?>
+            </div>
+        `;
+        
+        $('#modalMensajeBody').html(contenidoModal);
+        $('#modalMensaje').modal('show');
+    });
+    <?php endif; ?>
+});
+</script>
+
+<?php 
+// Si se está cargando un mensaje para el modal, mostrar el contenido oculto para AJAX
+if ($mensaje_modal): ?>
+    <div id="mensajeModalContent" style="display: none;">
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <?php if ($tipo === 'recibidos'): ?>
+                    <p><strong>De:</strong> <?= htmlspecialchars($mensaje_modal['remitente_nombre']) ?></p>
+                    <p><strong>Usuario:</strong> <?= htmlspecialchars($mensaje_modal['remitente_usuario']) ?></p>
+                    <p><strong>Tipo:</strong> <?= obtenerTipoUsuario($mensaje_modal) ?></p>
+                    <p><strong>Cédula:</strong> <?= htmlspecialchars($mensaje_modal['remitente_cedula']) ?></p>
+                    <p><strong>Email:</strong> <?= htmlspecialchars($mensaje_modal['remitente_email']) ?></p>
+                <?php else: ?>
+                    <p><strong>Para:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_nombre']) ?></p>
+                    <p><strong>Usuario:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_usuario']) ?></p>
+                    <p><strong>Tipo:</strong> <?= obtenerTipoUsuario($mensaje_modal) ?></p>
+                    <p><strong>Cédula:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_cedula']) ?></p>
+                    <p><strong>Email:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_email']) ?></p>
+                <?php endif; ?>
+            </div>
+            <div class="col-md-6 text-right">
+                <p><strong>Fecha:</strong> <?= date('d/m/Y H:i', strtotime($mensaje_modal['fecha_envio'])) ?></p>
+                <?php if ($tipo === 'recibidos'): ?>
+                    <p><strong>Estado:</strong> 
+                        <span class="badge badge-<?= $mensaje_modal['leido'] ? 'success' : 'warning' ?>">
+                            <?= $mensaje_modal['leido'] ? 'Leído' : 'No leído' ?>
+                        </span>
+                    </p>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <hr>
+        
+        <div class="mensaje-contenido">
+            <?= nl2br(htmlspecialchars($mensaje_modal['mensaje'])) ?>
+        </div>
+    </div>
+    <div id="modalTitulo" style="display: none;"><?= htmlspecialchars($mensaje_modal['titulo']) ?></div>
+<?php endif; ?>
 
 <?php include("includes/footer.php"); ?>

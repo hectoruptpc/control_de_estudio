@@ -11,8 +11,12 @@ if (!isset($_SERVER['HTTP_X_REQUESTED_WITH']) || strtolower($_SERVER['HTTP_X_REQ
     exit;
 }
 
-// Verificar permisos - USAR requireAdmin() en lugar de isAdmin()
-requireAdmin(); // Esto redirigirá automáticamente si no tiene permisos
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isAdmin()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como administrador para acceder";
+    header('location: ../login.php');
+    exit();
+}
 
 // Obtener término de búsqueda
 $cedula = isset($_GET['cedula']) ? trim($_GET['cedula']) : '';

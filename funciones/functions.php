@@ -3204,6 +3204,7 @@ function buscarEstudiantePorCedula($cedula) {
 }
 
 
+
 //USERS
 
 /**
@@ -3521,7 +3522,7 @@ function obtenerIngresos($db) {
 
 
 // Constante para el mínimo de estudiantes requeridos
-define('MINIMO_ESTUDIANTES', 15);
+define('MINIMO_ESTUDIANTES', 10);
 
 /**
  * Crea una nueva sección en la base de datos
@@ -4702,21 +4703,52 @@ function contarAccionesPorTipo($tipo) {
 
 
 // Función para generar membrete en PDF
-function generarMembretePDF($pdf, $pageWidth) {
-    // Obtener la fecha actual en formato corto
+// Función para generar el código JavaScript del membrete
+function generarMembreteJS() {
     $hoy = new DateTime();
     $fecha = $hoy->format('d/m/Y');
-
-    // Agregar el membrete (ejemplo para FPDF o TCPDF)
-    $pdf->SetFont('Arial', 'B', 12);
-    $pdf->Cell(0, 10, utf8_decode("República Bolivariana de Venezuela"), 0, 1, 'C');
-    $pdf->Cell(0, 10, utf8_decode("Ministerio del Poder Popular para la Educación Universitaria"), 0, 1, 'C');
-    $pdf->Cell(0, 10, utf8_decode("Universidad Politécnica Territorial de Puerto Cabello"), 0, 1, 'C');
-    $pdf->SetFont('Arial', '', 12);
-    $pdf->Cell(0, 10, $fecha, 0, 1, 'C');
-
-    // Devolver la posición Y después del membrete
-    return $pdf->GetY() + 5;
+    
+    return "
+    function agregarMembretePDF(doc, pageWidth, margin) {
+        // Cargar imagen del logo
+        const logoImg = new Image();
+        logoImg.crossOrigin = 'Anonymous';
+        logoImg.src = '../images/uptpc.png';
+        
+        return new Promise((resolve) => {
+            logoImg.onload = function() {
+                // Agregar logo (arriba a la izquierda)
+                doc.addImage(logoImg, 'PNG', margin, 10, 20, 20);
+                
+                // Agregar texto del membrete
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text('REPÚBLICA BOLIVARIANA DE VENEZUELA', pageWidth / 2, 15, { align: 'center' });
+                doc.text('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA', pageWidth / 2, 20, { align: 'center' });
+                doc.text('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO', pageWidth / 2, 25, { align: 'center' });
+                
+                // Agregar fecha
+                doc.setFont(undefined, 'normal');
+                doc.text('$fecha', pageWidth - margin, 15, { align: 'right' });
+                
+                resolve(35); // Retornar posición Y después del membrete
+            };
+            
+            logoImg.onerror = function() {
+                // Fallback sin imagen
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text('República Bolivariana de Venezuela', pageWidth / 2, 15, { align: 'center' });
+                doc.text('Ministerio del Poder Popular para la Educación Universitaria', pageWidth / 2, 20, { align: 'center' });
+                doc.text('Universidad Politécnica Territorial de Puerto Cabello', pageWidth / 2, 25, { align: 'center' });
+                doc.setFont(undefined, 'normal');
+                doc.text('$fecha', pageWidth / 2, 32, { align: 'center' });
+                
+                resolve(40); // Retornar posición Y después del membrete
+            };
+        });
+    }
+    ";
 }
 
 // Función para generar PDF desde HTML
@@ -4749,6 +4781,735 @@ function generarPDFDesdeHTML($elementoHTML, $nombreArchivo = 'documento.pdf') {
         });
     </script>";
 }
+
+
+
+
+//CARGA DE NOTAS ***********************************************************************
+
+/**
+ * Obtiene información completa de una materia incluyendo trayecto
+ */
+function obtenerInfoMateria($materia_id) {
+    global $db;
+    $query = "SELECT m.*, t.numero_trayecto 
+              FROM materias m 
+              LEFT JOIN trayectos t ON m.trayecto = t.id_trayecto 
+              WHERE m.id_materia = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $materia_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    // Si no encuentra el trayecto, intentar obtener solo la información de la materia
+    $query = "SELECT * FROM materias WHERE id_materia = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $materia_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $materia = $result->fetch_assoc();
+        
+        // Si el trayecto es 0, establecer manualmente el número de trayecto
+        if ($materia['trayecto'] == 0) {
+            $materia['numero_trayecto'] = 0;
+        }
+        
+        return $materia;
+    }
+    
+    return null;
+}
+
+/**
+ * Obtiene todos los estudiantes de una sección específica
+ */
+function obtenerEstudiantesPorSeccion($seccion_id) {
+    global $db;
+    $query = "SELECT u.id, u.nombre, u.idusuario 
+              FROM users u
+              INNER JOIN estudiante_seccion es ON u.id = es.id_usuario
+              WHERE es.id_seccion = ? AND u.estudiante = 1
+              ORDER BY u.nombre";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    return $stmt->get_result();
+}
+
+/**
+ * Obtiene las notas de un estudiante en una materia específica
+ */
+function obtenerNotasEstudiante($estudiante_id, $materia_id) {
+    global $db;
+    $query = "SELECT * FROM notas_pendientes 
+              WHERE id_usuario = ? AND id_materia = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("ii", $estudiante_id, $materia_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
+}
+
+/**
+ * Obtiene el período académico de una sección
+ */
+function obtenerPeriodoSeccion($seccion_id) {
+    global $db;
+    $query = "SELECT id_periodo FROM secciones WHERE id_seccion = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_assoc()['id_periodo'];
+}
+
+/**
+ * Obtiene información del trayecto de una sección
+ */
+function obtenerTrayectoSeccion($seccion_id) {
+    global $db;
+    $query = "SELECT t.id_trayecto, t.numero_trayecto 
+              FROM secciones s 
+              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto 
+              WHERE s.id_seccion = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_assoc();
+}
+
+/**
+ * Determina el trayecto a mostrar basado en el ID de trayecto de la sección
+ */
+function determinarTrayectoAMostrar($id_trayecto_seccion) {
+    switch ($id_trayecto_seccion) {
+        case 1: return 0; // Trayecto Inicial
+        case 2: return 1; // Trayecto 1
+        case 3: return 2; // Trayecto 2
+        case 4: return 3; // Trayecto 3
+        case 5: return 4; // Trayecto 4
+        default: return 0;
+    }
+}
+
+
+
+
+//MENSAJERIA ***********************************************************************
+
+// Obtener lista de usuarios para enviar mensajes con filtros
+function obtenerUsuariosMensajeria($filtro_tipo = '', $busqueda_cedula = '') {
+    global $db;
+    $current_user_id = $_SESSION['user']['id'];
+    
+    $query = "SELECT id, nombre, usuario, estudiante, docente, admin, idusuario 
+              FROM users 
+              WHERE id != ? AND status = 1";
+    
+    $params = array($current_user_id);
+    $types = "i";
+    
+    // Aplicar filtro por tipo de usuario
+    if (!empty($filtro_tipo)) {
+        if ($filtro_tipo === 'estudiante') {
+            $query .= " AND estudiante = 1";
+        } elseif ($filtro_tipo === 'docente') {
+            $query .= " AND docente = 1";
+        } elseif ($filtro_tipo === 'admin') {
+            $query .= " AND admin = 1";
+        }
+    }
+    
+    // Aplicar búsqueda por cédula
+    if (!empty($busqueda_cedula)) {
+        $query .= " AND idusuario LIKE ?";
+        $params[] = "%$busqueda_cedula%";
+        $types .= "s";
+    }
+    
+    $query .= " ORDER BY nombre";
+    
+    $stmt = $db->prepare($query);
+    
+    // Bind parameters dinámicamente
+    if (count($params) > 1) {
+        $stmt->bind_param($types, ...$params);
+    } else {
+        $stmt->bind_param($types, $params[0]);
+    }
+    
+    $stmt->execute();
+    return $stmt->get_result();
+}
+
+// Función para obtener el tipo de usuario basado en los campos booleanos
+function obtenerTipoUsuario($usuario) {
+    if ($usuario['estudiante'] == 1) return 'Estudiante';
+    if ($usuario['docente'] == 1) return 'Docente';
+    if ($usuario['admin'] == 1) return 'Administrador';
+    if ($usuario['super_user'] == 1) return 'Super Usuario';
+    return 'Usuario';
+}
+
+// Obtener mensajes recibidos
+function obtenerMensajesRecibidos($user_id) {
+    global $db;
+    
+    $query = "SELECT m.*, u.nombre as remitente_nombre, u.usuario as remitente_usuario,
+                     u.estudiante, u.docente, u.admin, u.idusuario as remitente_cedula
+              FROM mensajeria m
+              INNER JOIN users u ON m.id_usuario_remitente = u.id
+              WHERE m.id_usuario_destinatario = ? 
+              AND m.eliminado_destinatario = FALSE
+              ORDER BY m.fecha_envio DESC";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    return $stmt->get_result();
+}
+
+// Obtener mensajes enviados
+function obtenerMensajesEnviados($user_id) {
+    global $db;
+    
+    $query = "SELECT m.*, u.nombre as destinatario_nombre, u.usuario as destinatario_usuario,
+                     u.estudiante, u.docente, u.admin, u.idusuario as destinatario_cedula
+              FROM mensajeria m
+              INNER JOIN users u ON m.id_usuario_destinatario = u.id
+              WHERE m.id_usuario_remitente = ? 
+              AND m.eliminado_remitente = FALSE
+              ORDER BY m.fecha_envio DESC";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    return $stmt->get_result();
+}
+
+// Función para obtener un mensaje específico
+function obtenerMensaje($mensaje_id, $user_id, $tipo = 'recibidos') {
+    global $db;
+    
+    if ($tipo === 'recibidos') {
+        $query = "SELECT m.*, u.nombre as remitente_nombre, u.usuario as remitente_usuario,
+                         u.email as remitente_email, u.estudiante, u.docente, u.admin,
+                         u.idusuario as remitente_cedula
+                  FROM mensajeria m
+                  INNER JOIN users u ON m.id_usuario_remitente = u.id
+                  WHERE m.id = ? AND m.id_usuario_destinatario = ? 
+                  AND m.eliminado_destinatario = FALSE";
+    } else {
+        $query = "SELECT m.*, u.nombre as destinatario_nombre, u.usuario as destinatario_usuario,
+                         u.email as destinatario_email, u.estudiante, u.docente, u.admin,
+                         u.idusuario as destinatario_cedula
+                  FROM mensajeria m
+                  INNER JOIN users u ON m.id_usuario_destinatario = u.id
+                  WHERE m.id = ? AND m.id_usuario_remitente = ? 
+                  AND m.eliminado_remitente = FALSE";
+    }
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("ii", $mensaje_id, $user_id);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc();
+}
+
+// Marcar mensaje como leído
+function marcarMensajeLeido($mensaje_id, $user_id) {
+    global $db;
+    
+    $query = "UPDATE mensajeria SET leido = TRUE 
+              WHERE id = ? AND id_usuario_destinatario = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("ii", $mensaje_id, $user_id);
+    return $stmt->execute();
+}
+
+// Enviar mensaje
+function enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje) {
+    global $db;
+    
+    $query = "INSERT INTO mensajeria (id_usuario_remitente, id_usuario_destinatario, titulo, mensaje)
+              VALUES (?, ?, ?, ?)";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iiss", $remitente_id, $destinatario_id, $titulo, $mensaje);
+    
+    return $stmt->execute();
+}
+
+
+
+//MI HORARIO ESTUDIANTE ***********************************************************************
+
+
+function obtenerSeccionEstudiante($db, $estudiante_id) {
+    // Consulta SQL para obtener información completa de la sección del estudiante
+    $sql = "SELECT s.id_seccion, s.codigo_seccion, s.id_carrera, c.nombre_carrera, 
+                   t.numero_trayecto, p.nombre_periodo, s.capacidad_maxima, s.inicia,
+                   s.estatus, COUNT(es.id_usuario) as inscritos, p.activo as periodo_activo
+            FROM estudiante_seccion es
+            INNER JOIN secciones s ON es.id_seccion = s.id_seccion
+            INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+            INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+            INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo  -- Usa periodos_academicos
+            WHERE es.id_usuario = ? AND es.estatus = 'activo'
+            GROUP BY s.id_seccion";
+    
+    // Preparar la sentencia SQL para prevenir inyecciones
+    $stmt = $db->prepare($sql);
+    
+    // Vincular el parámetro: 'i' indica que es un integer
+    $stmt->bind_param("i", $estudiante_id);
+    
+    // Ejecutar la consulta
+    $stmt->execute();
+    
+    // Obtener el resultado de la consulta
+    $result = $stmt->get_result();
+    
+    // Retornar la primera fila como array asociativo
+    // Si no hay resultados, retorna null
+    return $result->fetch_assoc();
+}
+
+// HORARIO DOCENTE ***********************************************************************
+
+
+
+function obtenerHorariosDocente($db, $docente_id) {
+    $sql = "SELECT 
+                h.id_horario,
+                h.dia,
+                TIME_FORMAT(h.hora_inicio, '%H:%i') as hora_inicio,
+                TIME_FORMAT(h.hora_fin, '%H:%i') as hora_fin,
+                h.aula,
+                m.nombre_materia,
+                s.codigo_seccion,
+                c.nombre_carrera,
+                t.numero_trayecto,
+                pa.nombre_periodo
+            FROM horarios h
+            INNER JOIN docente_seccion ds ON h.id_docente_seccion = ds.id_docente_seccion
+            INNER JOIN materias m ON ds.id_materia = m.id_materia
+            INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+            INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+            INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+            INNER JOIN periodos_academicos pa ON s.id_periodo = pa.id_periodo
+            WHERE ds.id_usuario = ? 
+            AND ds.estatus = 1
+            ORDER BY h.dia, h.hora_inicio";
+    
+    // Preparar la consulta
+    if ($stmt = $db->prepare($sql)) {
+        // Vincular parámetros
+        $stmt->bind_param("i", $docente_id);
+        
+        // Ejecutar la consulta
+        if ($stmt->execute()) {
+            // Obtener resultados
+            $result = $stmt->get_result();
+            $horarios = [];
+            
+            // Recorrer resultados
+            while ($row = $result->fetch_assoc()) {
+                $horarios[] = $row;
+            }
+            
+            // Cerrar statement
+            $stmt->close();
+            return $horarios;
+        } else {
+            // Manejar error de ejecución
+            error_log("Error ejecutando consulta: " . $stmt->error);
+            $stmt->close();
+            return [];
+        }
+    } else {
+        // Manejar error de preparación
+        error_log("Error preparando consulta: " . $db->error);
+        return [];
+    }
+}
+
+
+
+
+
+
+
+
+//SEMESTRE O TRIMESTRE POR CARRERA ***********************************************************************
+
+
+function obtenerTipoPeriodoPorCarrera($id_carrera) {
+    global $db;
+    
+    // Consultar el nombre de la carrera desde la base de datos
+    $query = "SELECT nombre_carrera FROM carreras WHERE id_carrera = ?";
+    $stmt = $db->prepare($query);
+    
+    if (!$stmt) {
+        error_log("Error en preparación de consulta: " . $db->error);
+        return 'semestre'; // Valor por defecto en caso de error
+    }
+    
+    $stmt->bind_param("i", $id_carrera);
+    
+    if (!$stmt->execute()) {
+        error_log("Error ejecutando consulta: " . $stmt->error);
+        return 'semestre'; // Valor por defecto en caso de error
+    }
+    
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $carrera = $result->fetch_assoc();
+        $nombre_carrera = strtolower(trim($carrera['nombre_carrera']));
+        
+        error_log("Carrera consultada: " . $nombre_carrera); // Para debugging
+        
+        // Carreras que usan trimestre
+        $carreras_trimestre = [
+            'informatica',
+            'materiales industriales',
+            'mantenimiento',
+            'mecanica'
+        ];
+        
+        foreach ($carreras_trimestre as $carrera_trim) {
+            if (strpos($nombre_carrera, $carrera_trim) !== false) {
+                error_log("Carrera identificada como TRIMESTRE: " . $nombre_carrera);
+                return 'trimestre';
+            }
+        }
+        
+        // Carreras que usan semestre
+        $carreras_semestre = [
+            'turismo',
+            'logistica y distribucion',
+            'mecanica termica',
+            'mecanica automotriz'
+        ];
+        
+        foreach ($carreras_semestre as $carrera_sem) {
+            if (strpos($nombre_carrera, $carrera_sem) !== false) {
+                error_log("Carrera identificada como SEMESTRE: " . $nombre_carrera);
+                return 'semestre';
+            }
+        }
+    }
+    
+    error_log("Carrera no encontrada en listas, usando valor por defecto: semestre");
+    return 'semestre'; // Valor por defecto si no se encuentra coincidencia
+}
+
+
+
+
+
+//TIPOS DE HORARIO ***********************************************************************
+
+function obtenerTiposHorario($db) {
+    $query = "SELECT * FROM tipos_horario ORDER BY nombre";
+    $result = $db->query($query);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/**
+ * Obtener un tipo de horario por ID
+ */
+function obtenerTipoHorarioPorId($db, $id) {
+    $query = "SELECT * FROM tipos_horario WHERE id = $id";
+    $result = $db->query($query);
+    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
+}
+
+/**
+ * Agregar un nuevo tipo de horario
+ */
+function agregarTipoHorario($db, $nombre, $horas_academicas, $horas_atendiendo) {
+    $nombre = $db->real_escape_string($nombre);
+    $horas_academicas = (int)$horas_academicas;
+    $horas_atendiendo = (int)$horas_atendiendo;
+    
+    $query = "INSERT INTO tipos_horario (nombre, horas_academicas, horas_atendiendo) 
+              VALUES ('$nombre', $horas_academicas, $horas_atendiendo)";
+    return $db->query($query);
+}
+
+/**
+ * Actualizar un tipo de horario existente
+ */
+function actualizarTipoHorario($db, $id, $nombre, $horas_academicas, $horas_atendiendo) {
+    $nombre = $db->real_escape_string($nombre);
+    $horas_academicas = (int)$horas_academicas;
+    $horas_atendiendo = (int)$horas_atendiendo;
+    
+    $query = "UPDATE tipos_horario SET 
+              nombre = '$nombre', 
+              horas_academicas = $horas_academicas, 
+              horas_atendiendo = $horas_atendiendo 
+              WHERE id = $id";
+    return $db->query($query);
+}
+
+/**
+ * Eliminar un tipo de horario
+ */
+function eliminarTipoHorario($db, $id) {
+    $query = "DELETE FROM tipos_horario WHERE id = $id";
+    return $db->query($query);
+}
+
+
+
+
+//ASIGNACION TIPO HORARIO AL PERSONAL ***********************************************************************
+
+/**
+ * Asignar tipo de horario a un usuario
+ */
+function asignarTipoHorarioUsuario($db, $id_usuario, $id_tipo_horario) {
+    // Verificar si ya existe la relación
+    $query_check = "SELECT id FROM tipo_horario_personal 
+                    WHERE id_usuario = $id_usuario AND id_tipo_horario = $id_tipo_horario";
+    $result = $db->query($query_check);
+    
+    if ($result->num_rows > 0) {
+        return false; // Ya existe esta relación
+    }
+    
+    // Insertar nueva relación
+    $query = "INSERT INTO tipo_horario_personal (id_usuario, id_tipo_horario) 
+              VALUES ($id_usuario, $id_tipo_horario)";
+    return $db->query($query);
+}
+
+/**
+ * Obtener tipos de horario de un usuario
+ */
+function obtenerTiposHorarioUsuario($db, $id_usuario) {
+    $query = "SELECT th.* 
+              FROM tipo_horario_personal thp
+              JOIN tipos_horario th ON thp.id_tipo_horario = th.id
+              WHERE thp.id_usuario = $id_usuario
+              ORDER BY th.nombre";
+    $result = $db->query($query);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/**
+ * Eliminar asignación de horario de usuario
+ */
+function eliminarTipoHorarioUsuario($db, $id_usuario, $id_tipo_horario) {
+    $query = "DELETE FROM tipo_horario_personal 
+              WHERE id_usuario = $id_usuario AND id_tipo_horario = $id_tipo_horario";
+    return $db->query($query);
+}
+
+/**
+ * Obtener usuarios por tipo de horario
+ */
+function obtenerUsuariosPorTipoHorario($db, $id_tipo_horario) {
+    $query = "SELECT u.* 
+              FROM tipo_horario_personal thp
+              JOIN users u ON thp.id_usuario = u.id
+              WHERE thp.id_tipo_horario = $id_tipo_horario
+              ORDER BY u.nombre";
+    $result = $db->query($query);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+
+
+
+/**
+ * Obtener texto del tipo de usuario (estético)
+ */
+function obtenerTipoUsuarioTexto($usuario) {
+    $tipo_usuario = [];
+    if ($usuario['docente'] == 1) $tipo_usuario[] = 'Docente';
+    if ($usuario['admin'] == 1) $tipo_usuario[] = 'Admin';
+    if ($usuario['super_user'] == 1) $tipo_usuario[] = 'Super User';
+    if ($usuario['usuario'] == 1) $tipo_usuario[] = 'Director de Carrera';
+    
+    return implode(', ', $tipo_usuario);
+}
+
+/**
+ * Obtener todas las relaciones horario-personal
+ */
+function obtenerTodasRelacionesHorarioPersonal($db) {
+    $query = "SELECT thp.id, thp.id_usuario, thp.id_tipo_horario, 
+                     u.idusuario, u.nombre as usuario_nombre, u.username, 
+                     u.docente, u.admin, u.super_user, u.usuario,
+                     th.nombre as horario_nombre, th.horas_academicas, th.horas_atendiendo
+              FROM tipo_horario_personal thp
+              JOIN users u ON thp.id_usuario = u.id
+              JOIN tipos_horario th ON thp.id_tipo_horario = th.id
+              ORDER BY u.nombre, th.nombre";
+    $result = $db->query($query);
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/**
+ * Actualizar tipo de horario de usuario
+ */
+function actualizarTipoHorarioUsuario($db, $id_relacion, $id_tipo_horario) {
+    $query = "UPDATE tipo_horario_personal SET id_tipo_horario = $id_tipo_horario WHERE id = $id_relacion";
+    return $db->query($query);
+}
+
+/**
+ * Eliminar relación por ID
+ */
+function eliminarTipoHorarioUsuarioPorId($db, $id_relacion) {
+    $query = "DELETE FROM tipo_horario_personal WHERE id = $id_relacion";
+    return $db->query($query);
+}
+
+
+
+//ACCESOS ***************************************************************
+
+/**
+ * Verificar permisos de acceso a una página específica
+ * @param string $pagina Nombre del permiso (debe coincidir con el campo en la tabla users)
+ * @return void Redirige a home.php si no tiene permisos
+ */
+function verificarPermiso($pagina) {
+    // Si no hay sesión de usuario, redirigir al login
+    if (!isset($_SESSION['user']) || !isset($_SESSION['user']['id'])) {
+        header('location: ../login.php');
+        exit();
+    }
+    
+    // Lista de permisos válidos en la base de datos
+    $permisosValidos = [
+        'usuario', 'estudiante', 'docente', 'admin', 'super_user', 
+        'editar_user', 'editar_nota', 'editar_acceso', 'editar_valores', 
+        'editar_estudiante', 'agregar_estudiante', 'agregar_docente', 
+        'editar_docente', 'agregar_carrera', 'agregar_materia', 'editar_materia',
+        'pagos', 'auditoria', 'secciones', 'rela_materia_carrera', 
+        'periodos_academicos', 'asig_secciones', 'asig_cursos', 'horarios', 
+        'gestion_director_carrera', 'notas_cargadas', 'consultar_notas', 
+        'consultar_notas_pasadas', 'tipos_pago', 'tipos_horario', 
+        'horario_personal', 'respaldo_bd'
+    ];
+    
+    // Verificar que el permiso solicitado sea válido
+    if (!in_array($pagina, $permisosValidos)) {
+        error_log("Permiso no válido: " . $pagina);
+        $_SESSION['error'] = "Error de permisos: permiso no válido.";
+        header('location: ../login.php');
+        exit();
+    }
+    
+    // Si es super_user, tiene acceso a todo
+    if (isset($_SESSION['user']['super_user']) && $_SESSION['user']['super_user'] == 1) {
+        return true;
+    }
+    
+    // Verificar si el permiso existe en la sesión y es igual a 1
+    if (!isset($_SESSION['user'][$pagina]) || $_SESSION['user'][$pagina] != 1) {
+        // Registrar intento de acceso no autorizado
+        error_log("Acceso denegado a " . $pagina . " para el usuario: " . $_SESSION['user']['username']);
+        
+        // Redirigir a home con mensaje de error
+        $_SESSION['error'] = "No tienes permisos para acceder a la página de " . $pagina . ".";
+        header('location: ../login.php');
+        exit();
+    }
+    
+    return true;
+}
+
+/**
+ * Función para verificar permisos sin redirección (útil para mostrar/ocultar elementos)
+ * @param string $pagina Nombre del permiso
+ * @return bool True si tiene permiso, False si no
+ */
+function tienePermiso($pagina) {
+    if (!isset($_SESSION['user']) || !isset($_SESSION['user']['id'])) {
+        return false;
+    }
+    
+    // Si es super_user, tiene acceso a todo
+    if (isset($_SESSION['user']['super_user']) && $_SESSION['user']['super_user'] == 1) {
+        return true;
+    }
+    
+    // Verificar permiso específico - debe existir y ser igual a 1
+    return isset($_SESSION['user'][$pagina]) && $_SESSION['user'][$pagina] == 1;
+}
+
+/**
+ * Función para cargar/actualizar los permisos del usuario en la sesión
+ * Esto asegura que siempre tengamos los permisos actualizados
+ */
+function cargarPermisosUsuario() {
+    global $db;
+    
+    if (!isset($_SESSION['user']) || !isset($_SESSION['user']['id'])) {
+        return false;
+    }
+    
+    $user_id = $_SESSION['user']['id'];
+    
+    $query = "SELECT 
+        usuario, estudiante, docente, admin, super_user, 
+        editar_user, editar_nota, editar_acceso, editar_valores, 
+        editar_estudiante, agregar_estudiante, agregar_docente, 
+        editar_docente, agregar_carrera, agregar_materia, editar_materia,
+        pagos, auditoria, secciones, rela_materia_carrera, 
+        periodos_academicos, asig_secciones, asig_cursos, horarios, 
+        gestion_director_carrera, notas_cargadas, consultar_notas, 
+        consultar_notas_pasadas, tipos_pago, tipos_horario, 
+        horario_personal, respaldo_bd 
+        FROM users WHERE id = ?";
+    
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result && $result->num_rows > 0) {
+            $permisos = $result->fetch_assoc();
+            
+            // Actualizar los permisos en la sesión
+            foreach ($permisos as $key => $value) {
+                $_SESSION['user'][$key] = $value;
+            }
+            
+            $stmt->close();
+            return true;
+        }
+        $stmt->close();
+    }
+    
+    return false;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -10177,6 +10938,9 @@ function login(){
             $_SESSION['user'] = $logged_in_user;
             $_SESSION['success'] = "Bienvenido/a " . $logged_in_user['username'];
             
+            // **CARGAR TODOS LOS PERMISOS ACTUALIZADOS**
+            cargarPermisosUsuario();
+            
             // REGISTRAR EN AUDITORÍA - LOGIN EXITOSO
             registrarAuditoria(
                 "LOGIN", 
@@ -10227,7 +10991,6 @@ function login(){
         }
     }
 }
-
 function visita() {
   global $pool, $nombrepag, $usua, $stmt_visita;
   try {

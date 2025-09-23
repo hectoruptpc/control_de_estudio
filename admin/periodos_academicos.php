@@ -5,6 +5,11 @@ ini_set('display_errors', '1');
 $titulopag = "Gestión de Periodos Académicos";
 include('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('periodos_academicos');
+
+
 // Procesar formularios
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['crear_periodo'])) {

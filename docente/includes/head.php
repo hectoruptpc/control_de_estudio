@@ -21,15 +21,11 @@ if (isset($_SESSION['user']['id'])) {
     $mensajes_no_leidos = contarMensajesNoLeidos($_SESSION['user']['id']);
 }
 
-if (!isLoggedIn()) {
-    $_SESSION['here'] = $_SERVER['REQUEST_URI'];
-    $_SESSION['msg'] = $msn_iniciar_sesion;
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isDocente()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como docente para acceder";
     header('location: ../login.php');
-    die();
-}
-
-if (!isDocente()) {
-    header('location: ../usuario/home.php');
+    exit();
 }
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
@@ -251,10 +247,60 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 
-
-
-
 </script>
 
+
+<!-- Incluir jsPDF y html2canvas para generar el PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+
+
 </body>
+
+
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #printable-area, #printable-area * {
+            visibility: visible;
+        }
+        #printable-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .no-print {
+            display: none !important;
+        }
+        .card {
+            border: none;
+            box-shadow: none;
+        }
+        .table {
+            font-size: 12px;
+        }
+        h4 {
+            page-break-after: avoid;
+        }
+        .card-body {
+            padding: 0;
+        }
+        .accordion .collapse {
+            display: block !important;
+            opacity: 1;
+        }
+    }
+</style>
+
+
+
+
+
+
+
+
 </html>

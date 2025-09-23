@@ -5,16 +5,11 @@ ini_set('display_errors', 1);
 $titulopag = "Mi Pensum Académico";
 include('../funciones/functions.php');
 
-// 1. Verificar sesión y permisos
-if (!isLoggedIn()) {
-    $_SESSION['msg'] = "Debes iniciar sesión primero";
+// Verificar autenticación y rol
+if (!isLoggedIn() || !isEstudiante()) {
+    $_SESSION['msg'] = "Debes iniciar sesión como estudiante para acceder";
     header('location: ../login.php');
-    die();
-}
-
-if (!isEstudiante()) {
-    header('location: ../usuario/home.php');
-    die();
+    exit();
 }
 
 // 2. Obtener información del estudiante y su carrera
@@ -112,134 +107,45 @@ while ($materia = mysqli_fetch_assoc($result_materias)) {
 include("includes/head.php");
 ?>
 
-<!-- Incluir jsPDF y html2canvas para generar el PDF -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
-<style>
-    @media print {
-        body * {
-            visibility: hidden;
-        }
-        #printable-area, #printable-area * {
-            visibility: visible;
-        }
-        #printable-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-        }
-        .no-print {
-            display: none !important;
-        }
-        .card {
-            border: none;
-            box-shadow: none;
-        }
-        .table {
-            font-size: 12px;
-        }
-        h4 {
-            page-break-after: avoid;
-        }
-        .card-body {
-            padding: 0;
-        }
-        .accordion .collapse {
-            display: block !important;
-            opacity: 1;
-        }
-    }
-</style>
-
 <script>
-// Función para generar el PDF con el membrete
-function generarPDF() {
-    // Configuración de jsPDF
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('p', 'mm', 'a4');
-    const margin = 10;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    
-    // Obtener la fecha actual en formato corto
-    const hoy = new Date();
-    const fecha = hoy.toLocaleDateString('es-ES', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-    });
-    
-    // Cargar imagen desde URL (ruta actualizada)
-    const logoImg = new Image();
-    logoImg.crossOrigin = "Anonymous"; // Permite el acceso a recursos externos
-    logoImg.src = '../uptpc.png'; // Ruta actualizada a tu imagen
-    
-    // Cuando la imagen se carga, agregarla al PDF
-    logoImg.onload = function() {
-        // Agregar la imagen al PDF (arriba a la izquierda)
-        doc.addImage(logoImg, 'PNG', 15, 10, 20, 20);
+// Función reutilizable para agregar membrete (desde functions.php)
+<?php echo generarMembreteJS(); ?>
+
+// Función ESPECÍFICA para este archivo
+async function generarPDF() {
+    try {
+        // Configuración de jsPDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const margin = 10;
+        const pageWidth = doc.internal.pageSize.getWidth();
         
-        // Agregar el membrete centrado
-        doc.setFontSize(12);
-        doc.setFont(undefined, 'bold');
-        doc.text("República Bolivariana de Venezuela", pageWidth / 2, 15, { align: 'center' });
-        doc.text("Ministerio del Poder Popular para la Educación Universitaria", pageWidth / 2, 20, { align: 'center' });
-        doc.text("Universidad Politécnica Territorial de Puerto Cabello", pageWidth / 2, 25, { align: 'center' });
-        doc.setFont(undefined, 'normal');
-        doc.text(fecha, pageWidth - margin, 15, { align: 'right' });
+        // Agregar membrete reutilizable
+        const yPos = await agregarMembretePDF(doc, pageWidth, margin);
         
         // Continuar con el proceso de generación del PDF
         const printableElement = document.getElementById('printable-area');
         
-        html2canvas(printableElement, {
+        const canvas = await html2canvas(printableElement, {
             scale: 2,
             useCORS: true,
             logging: false
-        }).then(canvas => {
-            const imgData = canvas.toDataURL('image/jpeg', 1.0);
-            const imgWidth = pageWidth - (margin * 2);
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            
-            // Agregar contenido al PDF (empezando más abajo para dejar espacio al membrete)
-            doc.addImage(imgData, 'JPEG', margin, 35, imgWidth, imgHeight);
-            
-            // Guardar el PDF
-            doc.save('Pensum_Academico_' + new Date().toISOString().slice(0, 10) + '.pdf');
         });
-    };
-    
-    // En caso de error al cargar la imagen
-    logoImg.onerror = function() {
-        console.error('Error al cargar la imagen del logo');
         
-        // Continuar sin la imagen pero con el membrete centrado
-        doc.setFontSize(12);
-        doc.setFont(undefined, 'bold');
-        doc.text("República Bolivariana de Venezuela", pageWidth / 2, 15, { align: 'center' });
-        doc.text("Ministerio del Poder Popular para la Educación Universitaria", pageWidth / 2, 20, { align: 'center' });
-        doc.text("Universidad Politécnica Territorial de Puerto Cabello", pageWidth / 2, 25, { align: 'center' });
-        doc.setFont(undefined, 'normal');
-        doc.text(fecha, pageWidth / 2, 32, { align: 'center' });
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        const imgWidth = pageWidth - (margin * 2);
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
         
-        const printableElement = document.getElementById('printable-area');
+        // Agregar contenido al PDF
+        doc.addImage(imgData, 'JPEG', margin, yPos, imgWidth, imgHeight);
         
-        html2canvas(printableElement, {
-            scale: 2,
-            useCORS: true,
-            logging: false
-        }).then(canvas => {
-            const imgData = canvas.toDataURL('image/jpeg', 1.0);
-            const imgWidth = pageWidth - (margin * 2);
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            
-            // Agregar contenido al PDF
-            doc.addImage(imgData, 'JPEG', margin, 40, imgWidth, imgHeight);
-            
-            // Guardar el PDF
-            doc.save('Pensum_Academico_' + new Date().toISOString().slice(0, 10) + '.pdf');
-        });
-    };
+        // Guardar el PDF
+        doc.save('Pensum_Academico_' + new Date().toISOString().slice(0, 10) + '.pdf');
+        
+    } catch (error) {
+        console.error('Error al generar PDF:', error);
+        alert('Error al generar el PDF. Por favor, intenta nuevamente.');
+    }
 }
 </script>
 

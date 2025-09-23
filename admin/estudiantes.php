@@ -28,7 +28,7 @@ include("includes/head.php");
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0"><i class="fas fa-users me-2"></i>Listado de Estudiantes</h5>
                         <div>
-                            <?php if ($puedeEditar): ?>
+                            <?php if (tienePermiso('agregar_estudiante')): ?>
                                 <button class="btn btn-success btn-sm" onclick="abrirModalNuevoEstudiante()">
                                     <i class="fas fa-plus-circle me-1"></i> Nuevo Estudiante
                                 </button>
@@ -86,7 +86,7 @@ include("includes/head.php");
                                                         data-id="<?php echo $estudiante['id']; ?>">
                                                         <i class="fas fa-eye"></i>
                                                     </button>
-                                                    <?php if ($puedeEditar): ?>
+                                                    <?php if (tienePermiso('editar_estudiante')): ?>
                                                         <button class="btn btn-warning btn-sm btn-edit" 
                                                             data-toggle="modal" 
                                                             data-target="#editarEstudianteModal"
