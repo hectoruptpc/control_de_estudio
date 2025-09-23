@@ -156,9 +156,12 @@ if (!isLoggedIn() || !isAdmin()) {
                         <i class="fas fa-link fa-fw"></i> Relacionar Materias-Carreras
                     </a>
                     <?php endif; ?>
+
+                    <?php if (tienePermiso('periodos_academicos')): ?>
                     <a title="Periodos Académicos" class="dropdown-item" href="periodos_academicos.php">
                         <i class="fas fa-calendar fa-fw"></i> Periodos Académicos
                     </a>
+                    <?php endif; ?>
                 </div>
             </li>
 
