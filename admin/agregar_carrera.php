@@ -76,13 +76,13 @@ include("includes/head.php");
         </div>
 
         <div class="form-group">
-    <label for="tipo_formacion">Tipo de Formación:</label>
-    <?php 
-    $selected = $_POST['tipo_formacion'] ?? '';
-    echo selectTiposFormacion('tipo_formacion', $selected); 
-    ?>
-    <small class="form-text text-muted">Seleccione el tipo de formación del programa</small>
-</div>
+            <label for="tipo_formacion">Tipo de Formación:</label>
+            <?php 
+            $selected = $_POST['tipo_formacion'] ?? '';
+            echo selectTiposFormacion('tipo_formacion', $selected); 
+            ?>
+            <small class="form-text text-muted">Seleccione el tipo de formación del programa</small>
+        </div>
         
         <div class="form-group">
             <label for="duracion_anios">Duración en Años:</label>
@@ -135,73 +135,35 @@ include("includes/head.php");
     </div>
 </div>
 
+<!-- Modal para Confirmar Cambio de Estado -->
+<div class="modal fade" id="modalCambiarEstado" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalCambiarEstadoLabel">Confirmar Cambio de Estado</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="contenido-modal-estado">
+                <!-- El contenido se carga aquí dinámicamente -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmar-cambio-estado">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 $(document).ready(function() {
-    // Resto del código JavaScript permanece igual...
-    $(document).on('click', '.btn-cambiar-estado', function() {
-        var $btn = $(this);
-        var id = $btn.data('id');
-        var accion = $btn.data('accion');
-        var textoAccion = accion === 'activar' ? 'activar' : 'desactivar';
-        
-        if (!confirm(`¿Estás seguro que deseas ${textoAccion} esta carrera?`)) {
-            return;
-        }
-        
-        $btn.prop('disabled', true).html(
-            `<i class="fas fa-spinner fa-spin"></i> ${textoAccion}...`
-        );
-        
-        $.ajax({
-            url: 'ajax/cambiar_estado_carrera.php',
-            type: 'POST',
-            dataType: 'json',
-            data: {
-                id: id,
-                accion: accion
-            },
-            success: function(response) {
-                if (response.success) {
-                    var $fila = $btn.closest('tr');
-                    
-                    $fila.find('.badge')
-                        .removeClass('badge-secondary badge-success')
-                        .addClass(response.nuevoEstado ? 'badge-success' : 'badge-secondary')
-                        .text(response.nuevoEstado ? 'Activa' : 'Inactiva');
-                    
-                    var nuevoBoton = response.nuevoEstado ? 
-                        `<button class="btn btn-sm btn-danger btn-cambiar-estado" 
-                                 data-id="${id}" data-accion="desactivar">
-                            <i class="fas fa-toggle-off"></i> Desactivar
-                        </button>` :
-                        `<button class="btn btn-sm btn-success btn-cambiar-estado" 
-                                 data-id="${id}" data-accion="activar">
-                            <i class="fas fa-toggle-on"></i> Activar
-                        </button>`;
-                    
-                    $btn.replaceWith(nuevoBoton);
-                    
-                    mostrarAlerta('success', response.message);
-                } else {
-                    mostrarAlerta('danger', response.message || 'Error al cambiar el estado');
-                    $btn.prop('disabled', false).html(
-                        accion === 'activar' ? 
-                        '<i class="fas fa-toggle-on"></i> Activar' : 
-                        '<i class="fas fa-toggle-off"></i> Desactivar'
-                    );
-                }
-            },
-            error: function(xhr, status, error) {
-                mostrarAlerta('danger', 'Error de conexión: ' + error);
-                $btn.prop('disabled', false).html(
-                    accion === 'activar' ? 
-                    '<i class="fas fa-toggle-on"></i> Activar' : 
-                    '<i class="fas fa-toggle-off"></i> Desactivar'
-                );
-                console.error("Error AJAX:", status, error);
-            }
-        });
-    });
+    let estadoActual = {
+        id: null,
+        accion: null,
+        nombre: null,
+        boton: null
+    };
 
     // Manejar clic en botón Editar
     $(document).on('click', '.btn-editar', function() {
@@ -209,6 +171,108 @@ $(document).ready(function() {
         $('#contenido-modal-editar').load('partials/editar_carrera_modal.php?id=' + id, function() {
             $('#modalEditarCarrera').modal('show');
         });
+    });
+
+    // Manejar clic en botón Activar/Desactivar - ABRE EL MODAL
+    $(document).on('click', '.btn-cambiar-estado', function(e) {
+        e.preventDefault();
+        
+        var $btn = $(this);
+        estadoActual.id = $btn.data('id');
+        estadoActual.accion = $btn.data('accion');
+        estadoActual.nombre = $btn.closest('tr').find('td:first').text() || 'esta carrera';
+        estadoActual.boton = $btn;
+        
+        var textoAccion = estadoActual.accion === 'activar' ? 'activar' : 'desactivar';
+        var titulo = estadoActual.accion === 'activar' ? 'Activar Carrera' : 'Desactivar Carrera';
+        var btnColor = estadoActual.accion === 'activar' ? 'success' : 'danger';
+        var icono = estadoActual.accion === 'activar' ? 'check-circle' : 'times-circle';
+        
+        // Configurar el modal
+        $('#modalCambiarEstadoLabel').text(titulo);
+        $('#contenido-modal-estado').html(`
+            <div class="alert alert-${btnColor}">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                <strong>¿Estás seguro que deseas ${textoAccion} la carrera?</strong>
+            </div>
+            <p><strong>Carrera:</strong> ${estadoActual.nombre}</p>
+            <p class="text-muted">
+                ${estadoActual.accion === 'activar' ? 
+                    'La carrera estará disponible para nuevos estudiantes.' : 
+                    'La carrera no estará disponible para nuevos estudiantes.'}
+            </p>
+        `);
+        
+        $('#confirmar-cambio-estado')
+            .removeClass('btn-success btn-danger')
+            .addClass('btn-' + btnColor)
+            .html(`<i class="fas fa-${icono} mr-2"></i> ${titulo}`);
+        
+        $('#modalCambiarEstado').modal('show');
+    });
+
+    // Confirmar cambio de estado
+    $('#confirmar-cambio-estado').on('click', function() {
+        var $btnConfirmar = $(this);
+        var $btnOriginal = estadoActual.boton;
+        
+        // Deshabilitar botón y mostrar loading
+        $btnConfirmar.prop('disabled', true).html(
+            `<i class="fas fa-spinner fa-spin mr-2"></i> Procesando...`
+        );
+        
+        $.ajax({
+            url: 'ajax/cambiar_estado_carrera.php',
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                id: estadoActual.id,
+                accion: estadoActual.accion
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Recargar la tabla completa
+                    $('#tabla-carreras').load('partials/tabla_carreras.php');
+                    
+                    // Cerrar modal
+                    $('#modalCambiarEstado').modal('hide');
+                    
+                    // Mostrar alerta de éxito
+                    mostrarAlerta('success', 
+                        `<i class="fas fa-check-circle mr-2"></i> 
+                         ${response.message || 'Estado cambiado correctamente'}`);
+                } else {
+                    mostrarAlerta('danger', 
+                        `<i class="fas fa-exclamation-circle mr-2"></i> 
+                         ${response.message || 'Error al cambiar el estado'}`);
+                }
+            },
+            error: function(xhr, status, error) {
+                mostrarAlerta('danger', 
+                    `<i class="fas fa-exclamation-circle mr-2"></i> 
+                     Error de conexión: ${error}`);
+                console.error("Error AJAX:", status, error);
+            },
+            complete: function() {
+                // Rehabilitar botón del modal
+                var textoAccion = estadoActual.accion === 'activar' ? 'Activar' : 'Desactivar';
+                var icono = estadoActual.accion === 'activar' ? 'check' : 'times';
+                $btnConfirmar.prop('disabled', false).html(
+                    `<i class="fas fa-${icono} mr-2"></i> ${textoAccion}`
+                );
+            }
+        });
+    });
+
+    // Resetear estado cuando se cierra el modal
+    $('#modalCambiarEstado').on('hidden.bs.modal', function() {
+        estadoActual = {
+            id: null,
+            accion: null,
+            nombre: null,
+            boton: null
+        };
+        $('#confirmar-cambio-estado').prop('disabled', false);
     });
 
     function mostrarAlerta(tipo, mensaje) {
