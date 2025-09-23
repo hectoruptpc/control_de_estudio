@@ -1,6 +1,13 @@
 <?php
 require_once('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('pagos');
+echo "Si ves esto, es que tienes permisos!";
+
+
+
 // Verificar autenticación y rol
 if (!isLoggedIn() || !isAdmin()) {
     $_SESSION['msg'] = "Debes iniciar sesión como administrador para acceder";

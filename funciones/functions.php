@@ -5381,12 +5381,12 @@ function eliminarTipoHorarioUsuarioPorId($db, $id_relacion) {
 /**
  * Verificar permisos de acceso a una página específica
  * @param string $pagina Nombre del permiso (debe coincidir con el campo en la tabla users)
- * @return void Redirige a login.php si no tiene permisos
+ * @return void Redirige a home.php si no tiene permisos
  */
 function verificarPermiso($pagina) {
     // Si no hay sesión de usuario, redirigir al login
-    if (!isset($_SESSION['user'])) {
-        header('location: login.php');
+    if (!isset($_SESSION['user']) || !isset($_SESSION['user']['id'])) {
+        header('location: ../login.php');
         exit();
     }
     
@@ -5406,6 +5406,7 @@ function verificarPermiso($pagina) {
     // Verificar que el permiso solicitado sea válido
     if (!in_array($pagina, $permisosValidos)) {
         error_log("Permiso no válido: " . $pagina);
+        $_SESSION['error'] = "Error de permisos: permiso no válido.";
         header('location: ../login.php');
         exit();
     }
@@ -5415,13 +5416,13 @@ function verificarPermiso($pagina) {
         return true;
     }
     
-    // Verificar si el usuario tiene el permiso específico
+    // Verificar si el permiso existe en la sesión y es igual a 1
     if (!isset($_SESSION['user'][$pagina]) || $_SESSION['user'][$pagina] != 1) {
         // Registrar intento de acceso no autorizado
         error_log("Acceso denegado a " . $pagina . " para el usuario: " . $_SESSION['user']['username']);
         
         // Redirigir a home con mensaje de error
-        $_SESSION['error'] = "No tienes permisos para acceder a esta página.";
+        $_SESSION['error'] = "No tienes permisos para acceder a la página de " . $pagina . ".";
         header('location: ../login.php');
         exit();
     }
@@ -5435,7 +5436,7 @@ function verificarPermiso($pagina) {
  * @return bool True si tiene permiso, False si no
  */
 function tienePermiso($pagina) {
-    if (!isset($_SESSION['user'])) {
+    if (!isset($_SESSION['user']) || !isset($_SESSION['user']['id'])) {
         return false;
     }
     
@@ -5444,8 +5445,56 @@ function tienePermiso($pagina) {
         return true;
     }
     
-    // Verificar permiso específico
+    // Verificar permiso específico - debe existir y ser igual a 1
     return isset($_SESSION['user'][$pagina]) && $_SESSION['user'][$pagina] == 1;
+}
+
+/**
+ * Función para cargar/actualizar los permisos del usuario en la sesión
+ * Esto asegura que siempre tengamos los permisos actualizados
+ */
+function cargarPermisosUsuario() {
+    global $db;
+    
+    if (!isset($_SESSION['user']) || !isset($_SESSION['user']['id'])) {
+        return false;
+    }
+    
+    $user_id = $_SESSION['user']['id'];
+    
+    $query = "SELECT 
+        usuario, estudiante, docente, admin, super_user, 
+        editar_user, editar_nota, editar_acceso, editar_valores, 
+        editar_estudiante, agregar_estudiante, agregar_docente, 
+        editar_docente, agregar_carrera, agregar_materia, editar_materia,
+        pagos, auditoria, secciones, rela_materia_carrera, 
+        periodos_academicos, asig_secciones, asig_cursos, horarios, 
+        gestion_director_carrera, notas_cargadas, consultar_notas, 
+        consultar_notas_pasadas, tipos_pago, tipos_horario, 
+        horario_personal, respaldo_bd 
+        FROM users WHERE id = ?";
+    
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result && $result->num_rows > 0) {
+            $permisos = $result->fetch_assoc();
+            
+            // Actualizar los permisos en la sesión
+            foreach ($permisos as $key => $value) {
+                $_SESSION['user'][$key] = $value;
+            }
+            
+            $stmt->close();
+            return true;
+        }
+        $stmt->close();
+    }
+    
+    return false;
 }
 
 
@@ -10889,6 +10938,9 @@ function login(){
             $_SESSION['user'] = $logged_in_user;
             $_SESSION['success'] = "Bienvenido/a " . $logged_in_user['username'];
             
+            // **CARGAR TODOS LOS PERMISOS ACTUALIZADOS**
+            cargarPermisosUsuario();
+            
             // REGISTRAR EN AUDITORÍA - LOGIN EXITOSO
             registrarAuditoria(
                 "LOGIN", 
@@ -10939,7 +10991,6 @@ function login(){
         }
     }
 }
-
 function visita() {
   global $pool, $nombrepag, $usua, $stmt_visita;
   try {
