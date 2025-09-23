@@ -97,7 +97,7 @@ include("includes/head.php");
             <h1 class="mt-4">Gestión de Asignaturas</h1>
             
             <!-- Formulario de Materias -->
-            <<?php if (tienePermiso('agregar_materia')): ?>
+            <?php if (tienePermiso('agregar_materia')): ?>
             <div class="card mt-4">
                 <div class="card-header">
                     <h5>Agregar Nueva Materia</h5>
