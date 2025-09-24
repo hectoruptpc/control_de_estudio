@@ -187,9 +187,12 @@ if (!isLoggedIn() || !isAdmin()) {
                     <i class="fas fa-tasks fa-fw"></i> Asignar Cursos
                 </a>
                 <?php endif; ?>
+
+                <?php if (tienePermiso('horarios')): ?>
                 <a title="Horarios Docentes" class="dropdown-item" href="horarios_docentes.php">
                     <i class="fas fa-calendar-alt fa-fw"></i> Horarios
                 </a>
+                <?php endif; ?>
 
                 <a title="Gestionar Directores de Carrera" class="dropdown-item" href="directores_carrera.php">
                     <i class="fas fa-user-plus fa-fw"></i> Gestionar Directores de Carrera

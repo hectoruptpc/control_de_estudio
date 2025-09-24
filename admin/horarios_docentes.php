@@ -5,6 +5,10 @@ ini_set('display_errors', '1');
 $titulopag = "Gestión de Horarios Docentes";
 include('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('horarios');
+
 global $db;
 
 // Procesar solicitudes AJAX
