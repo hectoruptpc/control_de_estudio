@@ -194,9 +194,11 @@ if (!isLoggedIn() || !isAdmin()) {
                 </a>
                 <?php endif; ?>
 
+                <?php if (tienePermiso('gestion_director_carrera')): ?>
                 <a title="Gestionar Directores de Carrera" class="dropdown-item" href="directores_carrera.php">
                     <i class="fas fa-user-plus fa-fw"></i> Gestionar Directores de Carrera
                 </a>
+                <?php endif; ?>
                 
                 </div>
             </li>

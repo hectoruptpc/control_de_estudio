@@ -5,6 +5,10 @@ ini_set('display_errors', '1');
 $titulopag = "Asignar Carreras a Directores";
 include('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('gestion_director_carrera');
+
 // Verificar permisos de administrador
 if (!isAdmin()) {
     header('location: ../usuario/home.php');
