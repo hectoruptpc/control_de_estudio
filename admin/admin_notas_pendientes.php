@@ -1,6 +1,10 @@
 <?php
 require_once('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('notas_cargadas');
+
 // Verificar autenticación y rol
 if (!isLoggedIn() || !isAdmin()) {
     $_SESSION['msg'] = "Debes iniciar sesión como administrador para acceder";

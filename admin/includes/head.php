@@ -207,10 +207,15 @@ if (!isLoggedIn() || !isAdmin()) {
                 <a title="Gestión de Notas" class="nav-link dropdown-toggle" href="#" id="navbarDropdownNotas" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="fas fa-graduation-cap fa-fw"></i> Notas
                 </a>
+
+                
                 <div class="dropdown-menu" aria-labelledby="navbarDropdownNotas">
+
+                <?php if (tienePermiso('notas_cargadas')): ?>
                     <a title="Registrar Notas" class="dropdown-item" href="admin_notas_pendientes.php">
                         <i class="fas fa-edit fa-fw"></i> Notas Cargadas
                     </a>
+                    <?php endif; ?>
                     <a title="Consultar Notas" class="dropdown-item" href="consulta_notas.php">
                         <i class="fas fa-search fa-fw"></i> Consultar Notas
                     </a>
