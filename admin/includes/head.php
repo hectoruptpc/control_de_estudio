@@ -182,9 +182,11 @@ if (!isLoggedIn() || !isAdmin()) {
                 </a>
                 <?php endif; ?>
                    
+                <?php if (tienePermiso('asig_cursos')): ?>
                 <a title="Asignación de Cursos" class="dropdown-item" href="asignacion_cursos.php">
                     <i class="fas fa-tasks fa-fw"></i> Asignar Cursos
                 </a>
+                <?php endif; ?>
                 <a title="Horarios Docentes" class="dropdown-item" href="horarios_docentes.php">
                     <i class="fas fa-calendar-alt fa-fw"></i> Horarios
                 </a>

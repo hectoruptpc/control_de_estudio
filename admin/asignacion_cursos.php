@@ -5,6 +5,10 @@ ini_set('display_errors', '1');
 $titulopag = "Asignación de Materias a Docentes";
 include('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('asig_cursos');
+
 // Obtener todas las carreras activas usando la función
 $carreras = obtenerTodasLasCarreras();
 
