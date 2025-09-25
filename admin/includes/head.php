@@ -243,10 +243,13 @@ if (!isLoggedIn() || !isAdmin()) {
                     </a>
                     
                     <!-- Nuevas opciones: Auditoría y Respaldo -->
+                     
                     <div class="dropdown-divider"></div>
+                    <?php if (tienePermiso('auditoria')): ?>
                     <a title="Auditoría del Sistema" class="dropdown-item" href="auditoria.php">
                         <i class="fas fa-clipboard-list fa-fw"></i> Auditoría
                     </a>
+                    <?php endif; ?>
 
                     <?php if (tienePermiso('respaldo_bd')): ?>
                     <a title="Respaldo de Base de Datos" class="dropdown-item" href="respaldo_bd.php">
