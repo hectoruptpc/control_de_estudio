@@ -5,6 +5,11 @@ ini_set('display_errors', '1');
 $titulopag = "Administración de Datos Predefinidos";
 include('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('editar_valores');
+
+
 if (!isAdmin()) {
     header('location: ../usuario/home.php');
     exit();

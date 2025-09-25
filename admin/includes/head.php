@@ -264,7 +264,7 @@ if (!isLoggedIn() || !isAdmin()) {
                     </a>
                     
                     <!-- Opción exclusiva para usuarios con editar_acceso = 1 -->
-                    <?php if ($_SESSION['user']['editar_acceso'] == 1): ?>
+                    <?php if (tienePermiso('editar_acceso')): ?>
                         <div class="dropdown-divider"></div>
                         <a title="Editar Niveles de Acceso" class="dropdown-item" href="editar_accesos.php">
                             <i class="fas fa-user-lock fa-fw"></i> Niveles de Acceso
@@ -272,11 +272,15 @@ if (!isLoggedIn() || !isAdmin()) {
                     <?php endif; ?>
                     
                     <!-- Opción exclusiva para usuarios con editar_valores = 1 -->
-                    <?php if (isset($_SESSION['user']['editar_valores']) && $_SESSION['user']['editar_valores'] == 1): ?>
+                   
                         <div class="dropdown-divider"></div>
+                        <?php if (tienePermiso('editar_valores')): ?>
                         <a title="Editar Valores del Sistema" class="dropdown-item" href="valores_predefinidos.php">
                             <i class="fas fa-edit fa-fw"></i> Valores Predefinidos
                         </a>
+                        <?php endif; ?>
+
+
                          <a title="Editar tipos de pago" class="dropdown-item" href="tipo_pago.php">
                 <i class="fas fa-money-bill fa-fw"></i> Tipos de Pago
             </a>
@@ -289,7 +293,7 @@ if (!isLoggedIn() || !isAdmin()) {
             </a>
 
 
-                    <?php endif; ?>
+                   
                     
                     <div class="dropdown-divider"></div>
                     <a title="Salir del Sistema" class="dropdown-item" href="#" id="logoutLink">
