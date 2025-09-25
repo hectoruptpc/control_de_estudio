@@ -216,9 +216,12 @@ if (!isLoggedIn() || !isAdmin()) {
                         <i class="fas fa-edit fa-fw"></i> Notas Cargadas
                     </a>
                     <?php endif; ?>
+
+                    <?php if (tienePermiso('consultar_notas')): ?>
                     <a title="Consultar Notas" class="dropdown-item" href="consulta_notas.php">
                         <i class="fas fa-search fa-fw"></i> Consultar Notas
                     </a>
+                    <?php endif; ?>
                     <!-- Nueva opción: Consultar Notas Pasadas -->
                     <a title="Consultar Notas Pasadas" class="dropdown-item" href="../pagina_en_construccion.php">
                         <i class="fas fa-history fa-fw"></i> Consultar Notas Pasadas

@@ -1,6 +1,13 @@
 <?php
 require_once('../funciones/functions.php');
 
+
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('consultar_notas');
+
+
+
 if (!isLoggedIn()) {
     header('location: ../login.php');
     exit();
