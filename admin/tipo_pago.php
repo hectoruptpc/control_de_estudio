@@ -5,10 +5,13 @@ ini_set('display_errors', '1');
 $titulopag = "Gestión de Tipos de Pago";
 include('../funciones/functions.php');
 
-// Verificar conexión a base de datos
-if (!isset($db) || !($db instanceof mysqli)) {
-    die("Error: No hay conexión a la base de datos");
-}
+
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('tipos_pago');
+
+
+
 
 // Variables
 $error = $success = '';

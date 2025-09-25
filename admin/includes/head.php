@@ -280,14 +280,21 @@ if (!isLoggedIn() || !isAdmin()) {
                         </a>
                         <?php endif; ?>
 
-
+                            <?php if (tienePermiso('tipos_pago')): ?>
                          <a title="Editar tipos de pago" class="dropdown-item" href="tipo_pago.php">
                 <i class="fas fa-money-bill fa-fw"></i> Tipos de Pago
             </a>
+                                <?php endif; ?>
+
+
                           <!-- Nueva opción: Tipos de Horario -->
+                           <?php if (tienePermiso('tipos_horario')): ?>
             <a title="Gestionar tipos de horario" class="dropdown-item" href="tipos_horario.php">
                 <i class="fas fa-clock fa-fw"></i> Tipos de Horario
             </a>
+                            <?php endif; ?>
+
+
  <a title="Gestionar horarios por personal" class="dropdown-item" href="gestion_horario_personal.php">
                 <i class="fas fa-user-clock fa-fw"></i> Horarios por Personal
             </a>
