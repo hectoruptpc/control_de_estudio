@@ -5,6 +5,12 @@ ini_set('display_errors', '1');
 $titulopag = "Respaldo de Base de Datos";
 include('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('respaldo_bd');
+
+
+
 // Verificar permisos de administrador
 if (!isAdmin()) {
     header('location: ../usuario/home.php');

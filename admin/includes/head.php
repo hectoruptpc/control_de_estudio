@@ -247,9 +247,12 @@ if (!isLoggedIn() || !isAdmin()) {
                     <a title="Auditoría del Sistema" class="dropdown-item" href="auditoria.php">
                         <i class="fas fa-clipboard-list fa-fw"></i> Auditoría
                     </a>
+
+                    <?php if (tienePermiso('respaldo_bd')): ?>
                     <a title="Respaldo de Base de Datos" class="dropdown-item" href="respaldo_bd.php">
                         <i class="fas fa-database fa-fw"></i> Respaldo BD
                     </a>
+                    <?php endif; ?>
                     
                     <!-- Nuevo apartado de Títulos y Relaciones con Materias -->
                     <div class="dropdown-divider"></div>
