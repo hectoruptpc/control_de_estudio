@@ -294,11 +294,11 @@ if (!isLoggedIn() || !isAdmin()) {
             </a>
                             <?php endif; ?>
 
-
+                            <?php if (tienePermiso('horario_personal')): ?>
  <a title="Gestionar horarios por personal" class="dropdown-item" href="gestion_horario_personal.php">
                 <i class="fas fa-user-clock fa-fw"></i> Horarios por Personal
             </a>
-
+                                <?php endif; ?>
 
                    
                     
