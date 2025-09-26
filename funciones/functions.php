@@ -5413,9 +5413,9 @@ function verificarPermiso($pagina) {
         exit();
     }
     
-    // Si es super_user, tiene acceso a todo
+    // Si es super_user, tiene acceso a todo - RETORNAR EXPLÍCITAMENTE
     if (isset($_SESSION['user']['super_user']) && $_SESSION['user']['super_user'] == 1) {
-        return true;
+        return; // Cambiado de return true a return;
     }
     
     // Verificar si el permiso existe en la sesión y es igual a 1
@@ -5428,8 +5428,6 @@ function verificarPermiso($pagina) {
         header('location: ../usuario/home.php');
         exit();
     }
-    
-    return true;
 }
 
 /**

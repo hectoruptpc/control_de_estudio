@@ -5,12 +5,22 @@ ini_set('display_errors', '1');
 $titulopag = "Gestión de Niveles de Acceso";
 include('../funciones/functions.php');
 
-//CARGAR PERMISOS
+// Iniciar sesión si no está iniciada
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// CARGAR PERMISOS - hacerlo ANTES de verificar
 cargarPermisosUsuario();
+
+// Verificar permiso para editar acceso
 verificarPermiso('editar_acceso');
 
+// Verificar si es admin (esta función debe existir en functions.php)
 if (!isAdmin()) {
+    $_SESSION['error'] = "No tien permisos de administrador para acceder a esta página.";
     header('location: ../usuario/home.php');
+    exit();
 }
 
 // Procesar formulario de permisos
