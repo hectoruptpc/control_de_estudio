@@ -38,18 +38,23 @@ try {
                         </span>
                     </td>
                     <td>
+
+                    <?php if (tienePermiso('gestionar_carrera')): ?>
                         <button class="btn btn-sm btn-warning btn-editar" 
                                 data-id="<?= intval($carrera['id_carrera']) ?>" 
                                 onclick="cargarModalEditar(this)">
                             <i class="fas fa-edit"></i> Editar
                         </button>
+                    <?php endif; ?>
                         
                         <?php if ($carrera['activa']): ?>
+                            <?php if (tienePermiso('gestionar_carrera')): ?>
                             <button class="btn btn-sm btn-danger btn-cambiar-estado" 
                                     data-id="<?= $carrera['id_carrera'] ?>" 
                                     data-accion="desactivar">
                                 <i class="fas fa-toggle-off"></i> Desactivar
                             </button>
+                            <?php endif; ?>
                         <?php else: ?>
                             <button class="btn btn-sm btn-success btn-cambiar-estado" 
                                     data-id="<?= $carrera['id_carrera'] ?>" 
