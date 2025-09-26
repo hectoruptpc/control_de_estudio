@@ -224,7 +224,7 @@ if (!isLoggedIn() || !isAdmin()) {
                     <?php endif; ?>
                     <!-- Nueva opción: Consultar Notas Pasadas -->
                      <?php if (tienePermiso('consultar_notas_pasadas')): ?>
-                    <a title="Consultar Notas Pasadas" class="dropdown-item" href="../pagina_en_construccion.php">
+                    <a title="Consultar Notas Pasadas" class="dropdown-item" href="notas_pasadas.php">
                         <i class="fas fa-history fa-fw"></i> Consultar Notas Pasadas
                     </a>
                     <?php endif; ?>
