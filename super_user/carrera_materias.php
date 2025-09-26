@@ -6,7 +6,16 @@ ini_set('display_errors', '1');
 
 $titulopag = "Gestión de Materias por Carrera";
 include('../funciones/functions.php');
+
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('rela_materia_carrera');
+
+
 include("includes/head.php");
+
+
+
 
 // Procesar formularios
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -88,7 +97,7 @@ $materias_asignadas = obtenerMateriasAsignadas($carrera_seleccionada);
                         <div class="form-group">
                             <label>Trimestre/Semestre:</label>
                             <select name="semestre" class="form-control" required>
-                                <?php for ($i = 1; $i <= 10; $i++): ?>
+                                <?php for ($i = 1; $i <= 3; $i++): ?>
                                     <option value="<?= $i ?>">Periodo <?= $i ?></option>
                                 <?php endfor; ?>
                             </select>
