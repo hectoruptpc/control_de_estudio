@@ -719,8 +719,10 @@ include("includes/head.php");
                                 </select>
                             </div>
                             <div class="form-group col-md-6 d-flex align-items-end">
+                                <?php if (tienePermiso('gestion_horario')): ?>
                                 <button type="submit" class="btn btn-primary">Cargar Horario</button>
                                 <button type="button" id="btnAutoAsignar" class="btn btn-success ml-2" disabled>Asignación Automática</button>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </form>
