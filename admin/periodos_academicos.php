@@ -65,9 +65,11 @@ include("includes/head.php");
 <div class="container-fluid">
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800">Gestión de Periodos Académicos</h1>
+        <?php if (tienePermiso('gestion_periodo_academico')): ?>
         <button class="btn btn-primary" data-toggle="modal" data-target="#crearPeriodoModal">
             <i class="fas fa-plus"></i> Crear Nuevo Periodo
         </button>
+        <?php endif; ?>
     </div>
 
     <?php if (isset($_SESSION['mensaje'])): ?>
@@ -109,6 +111,7 @@ include("includes/head.php");
                                 </span>
                             </td>
                             <td>
+                                <?php if (tienePermiso('gestionar_periodo_academico')): ?>
                                 <button class="btn btn-sm btn-primary editar-periodo" 
                                         data-id="<?= $periodo['id_periodo'] ?>"
                                         data-nombre="<?= htmlspecialchars($periodo['nombre_periodo']) ?>"
@@ -127,6 +130,7 @@ include("includes/head.php");
                                             data-id="<?= $periodo['id_periodo'] ?>">
                                         <i class="fas fa-check"></i> Activar
                                     </button>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </td>
                         </tr>
