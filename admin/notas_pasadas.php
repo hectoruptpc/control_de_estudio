@@ -2,158 +2,281 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
-$titulopag = "Notas Definitivas por Profesor";
+$titulopag = "Consultar Notas Definitivas por Profesor";
 include('../funciones/functions.php');
 
 // CARGAR PERMISOS
 cargarPermisosUsuario();
 verificarPermiso('consultar_notas_pasadas');
 
-// Obtener datos para los filtros
-$docentes = [];
-$materias = [];
-$periodos = [];
-$carreras = [];
-
-// Obtener docentes
-$sql_docentes = "SELECT id, nombre, username FROM users WHERE docente = 1 AND status = 1 ORDER BY nombre";
-$result_docentes = $db->query($sql_docentes);
-if ($result_docentes) {
-    while ($row = $result_docentes->fetch_assoc()) {
-        $docentes[] = $row;
-    }
-    $result_docentes->free();
+// Verificar autenticación
+if (!isLoggedIn()) {
+    $_SESSION['msg'] = "Debes iniciar sesión para acceder";
+    header('location: ../login.php');
+    exit();
 }
 
-// Obtener materias
-$sql_materias = "SELECT id_materia, cod_materia, nombre_materia FROM materias WHERE activa = 1 ORDER BY nombre_materia";
-$result_materias = $db->query($sql_materias);
-if ($result_materias) {
-    while ($row = $result_materias->fetch_assoc()) {
-        $materias[] = $row;
-    }
-    $result_materias->free();
-}
-
-// Obtener periodos académicos
-$sql_periodos = "SELECT id_periodo, nombre_periodo FROM periodos_academicos WHERE activo = 1 ORDER BY fecha_inicio DESC";
-$result_periodos = $db->query($sql_periodos);
-if ($result_periodos) {
-    while ($row = $result_periodos->fetch_assoc()) {
-        $periodos[] = $row;
-    }
-    $result_periodos->free();
-}
-
-// Obtener carreras - CORREGIDO: asegurar que obtenemos strings, no arrays
-$sql_carreras = "SELECT DISTINCT carrera FROM users WHERE carrera IS NOT NULL AND carrera != '' ORDER BY carrera";
-$result_carreras = $db->query($sql_carreras);
-if ($result_carreras) {
-    while ($row = $result_carreras->fetch_assoc()) {
-        // Asegurarnos de que carrera es un string
-        if (is_string($row['carrera']) && !empty($row['carrera'])) {
-            $carreras[] = $row['carrera'];
-        }
-    }
-    $result_carreras->free();
-}
-
-// Procesar filtros
-$filtros = [];
-$where_conditions = [];
-$params = [];
-$param_types = "";
-
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (!empty($_POST['id_docente'])) {
-        $filtros['id_docente'] = intval($_POST['id_docente']);
-        $where_conditions[] = "nd.id_docente = ?";
-        $params[] = $filtros['id_docente'];
-        $param_types .= "i";
-    }
+// Obtener lista de docentes que tienen notas definitivas
+function obtenerDocentesConNotas() {
+    global $db;
     
-    if (!empty($_POST['id_materia'])) {
-        $filtros['id_materia'] = intval($_POST['id_materia']);
-        $where_conditions[] = "nd.id_materia = ?";
-        $params[] = $filtros['id_materia'];
-        $param_types .= "i";
-    }
+    $query = "SELECT DISTINCT 
+                     ud.id,
+                     ud.nombre as nombre_docente,
+                     ud.username,
+                     COUNT(DISTINCT nd.id_materia) as total_materias,
+                     COUNT(nd.id) as total_notas,
+                     MAX(nd.fecha_registro) as ultima_fecha
+              FROM notas_definitivas nd
+              INNER JOIN users ud ON nd.id_docente = ud.id
+              WHERE ud.docente = 1 AND ud.status = 1
+              GROUP BY ud.id, ud.nombre, ud.username
+              ORDER BY ud.nombre";
     
-    if (!empty($_POST['id_periodo'])) {
-        $filtros['id_periodo'] = intval($_POST['id_periodo']);
-        $where_conditions[] = "nd.id_periodo = ?";
-        $params[] = $filtros['id_periodo'];
-        $param_types .= "i";
-    }
+    $result = $db->query($query);
+    return $result;
+}
+
+// Obtener clases del docente seleccionado
+function obtenerClasesDelDocente($docente_id, $fecha_desde = null, $fecha_hasta = null) {
+    global $db;
     
-    if (!empty($_POST['carrera'])) {
-        $filtros['carrera'] = $db->real_escape_string($_POST['carrera']);
-        $where_conditions[] = "u.carrera = ?";
-        $params[] = $filtros['carrera'];
+    $query = "SELECT 
+                     nd.id_materia,
+                     nd.id_periodo,
+                     m.nombre_materia,
+                     m.trayecto,
+                     pa.nombre_periodo,
+                     pa.fecha_inicio,
+                     pa.fecha_fin,
+                     s.codigo_seccion,
+                     c.nombre_carrera,
+                     COUNT(nd.id) as total_estudiantes,
+                     MAX(nd.fecha_registro) as ultima_fecha
+              FROM notas_definitivas nd
+              INNER JOIN materias m ON nd.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+              INNER JOIN users ue ON nd.id_usuario = ue.id
+              LEFT JOIN docente_seccion ds ON nd.id_docente = ds.id_usuario 
+                                           AND nd.id_materia = ds.id_materia
+              LEFT JOIN secciones s ON ds.id_seccion = s.id_seccion
+              LEFT JOIN carreras c ON s.id_carrera = c.id_carrera
+              WHERE nd.id_docente = ?";
+    
+    $params = [$docente_id];
+    $param_types = "i";
+    
+    // Filtros de fecha
+    if ($fecha_desde) {
+        $query .= " AND nd.fecha_registro >= ?";
+        $params[] = $fecha_desde;
         $param_types .= "s";
     }
     
-    if (!empty($_POST['trayecto'])) {
-        $filtros['trayecto'] = intval($_POST['trayecto']);
-        $where_conditions[] = "m.trayecto = ?";
-        $params[] = $filtros['trayecto'];
-        $param_types .= "i";
+    if ($fecha_hasta) {
+        $query .= " AND nd.fecha_registro <= ?";
+        $params[] = $fecha_hasta . ' 23:59:59';
+        $param_types .= "s";
+    }
+    
+    $query .= " GROUP BY nd.id_materia, nd.id_periodo, m.nombre_materia, m.trayecto, 
+                         pa.nombre_periodo, pa.fecha_inicio, pa.fecha_fin, 
+                         s.codigo_seccion, c.nombre_carrera
+                ORDER BY pa.fecha_inicio DESC, m.nombre_materia";
+    
+    $stmt = $db->prepare($query);
+    
+    if (!empty($params)) {
+        $stmt->bind_param($param_types, ...$params);
+    }
+    
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $clases = [];
+    while ($row = $result->fetch_assoc()) {
+        $clases[] = $row;
+    }
+    $stmt->close();
+    
+    return $clases;
+}
+
+// Obtener información adicional de una clase específica
+function obtenerInfoAdminAprobador($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT admin.nombre as admin_aprobador
+              FROM notas_definitivas nd
+              LEFT JOIN users admin ON nd.id_admin_aprobador = admin.id
+              WHERE nd.id_docente = ? 
+                AND nd.id_materia = ? 
+                AND nd.id_periodo = ?
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+    
+    return $row ? $row['admin_aprobador'] : 'No asignado';
+}
+
+// Obtener estudiantes y notas de una clase específica
+function obtenerDetallesClase($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT nd.id, 
+                     ue.nombre as nombre_estudiante,
+                     ue.idusuario as cedula,
+                     ue.carrera,
+                     nd.trayecto_0,
+                     nd.trayecto_1,
+                     nd.trayecto_2,
+                     nd.trayecto_3,
+                     nd.trayecto_4,
+                     nd.fecha_registro,
+                     admin.nombre as admin_aprobador
+              FROM notas_definitivas nd
+              INNER JOIN users ue ON nd.id_usuario = ue.id
+              LEFT JOIN users admin ON nd.id_admin_aprobador = admin.id
+              WHERE nd.id_docente = ? 
+                AND nd.id_materia = ? 
+                AND nd.id_periodo = ?
+              ORDER BY ue.nombre";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $detalles = [];
+    while ($row = $result->fetch_assoc()) {
+        $detalles[] = $row;
+    }
+    $stmt->close();
+    
+    return $detalles;
+}
+
+// Procesar solicitud AJAX para detalles
+if (isset($_POST['ajax']) && $_POST['ajax'] == 'detalles') {
+    $docente_id = intval($_POST['docente_id']);
+    $materia_id = intval($_POST['materia_id']);
+    $periodo_id = intval($_POST['periodo_id']);
+    $seccion = $_POST['seccion'];
+    
+    $detalles = obtenerDetallesClase($docente_id, $materia_id, $periodo_id);
+    
+    if ($seccion == 'lista-estudiantes') {
+        echo '<h6>Lista de Estudiantes y Notas</h6>';
+        echo '<div class="table-responsive">';
+        echo '<table class="table table-bordered table-sm">';
+        echo '<thead class="thead-light">';
+        echo '<tr>';
+        echo '<th>Estudiante</th>';
+        echo '<th>Cédula</th>';
+        echo '<th>Carrera</th>';
+        echo '<th>Nota T0</th>';
+        echo '<th>Nota T1</th>';
+        echo '<th>Nota T2</th>';
+        echo '<th>Nota T3</th>';
+        echo '<th>Nota T4</th>';
+        echo '<th>Fecha Registro</th>';
+        echo '<th>Aprobado por</th>';
+        echo '</tr>';
+        echo '</thead>';
+        echo '<tbody>';
+        
+        foreach ($detalles as $estudiante) {
+            echo '<tr>';
+            echo '<td>' . htmlspecialchars($estudiante['nombre_estudiante']) . '</td>';
+            echo '<td>' . htmlspecialchars($estudiante['cedula'] ?? 'N/A') . '</td>';
+            echo '<td>' . htmlspecialchars($estudiante['carrera']) . '</td>';
+            echo '<td>' . ($estudiante['trayecto_0'] ?? '-') . '</td>';
+            echo '<td>' . ($estudiante['trayecto_1'] ?? '-') . '</td>';
+            echo '<td>' . ($estudiante['trayecto_2'] ?? '-') . '</td>';
+            echo '<td>' . ($estudiante['trayecto_3'] ?? '-') . '</td>';
+            echo '<td>' . ($estudiante['trayecto_4'] ?? '-') . '</td>';
+            echo '<td>' . date('d/m/Y', strtotime($estudiante['fecha_registro'])) . '</td>';
+            echo '<td>' . htmlspecialchars($estudiante['admin_aprobador'] ?? 'No asignado') . '</td>';
+            echo '</tr>';
+        }
+        
+        echo '</tbody>';
+        echo '</table>';
+        echo '</div>';
+        
+        // Botón de exportación
+        echo '<button type="button" class="btn btn-success btn-sm" onclick="exportarExcelClase(' . $docente_id . ', ' . $materia_id . ', ' . $periodo_id . ')">';
+        echo '<i class="fas fa-file-excel"></i> Exportar a Excel';
+        echo '</button>';
+    }
+    elseif ($seccion == 'resumen') {
+        echo '<h6>Resumen de la Clase</h6>';
+        
+        $total_estudiantes = count($detalles);
+        $notas_promedio = [
+            't0' => 0, 't1' => 0, 't2' => 0, 't3' => 0, 't4' => 0
+        ];
+        $contadores = [0, 0, 0, 0, 0];
+        
+        foreach ($detalles as $est) {
+            for ($i = 0; $i <= 4; $i++) {
+                $campo = "trayecto_$i";
+                if (isset($est[$campo]) && is_numeric($est[$campo])) {
+                    $notas_promedio["t$i"] += $est[$campo];
+                    $contadores[$i]++;
+                }
+            }
+        }
+        
+        echo '<div class="row">';
+        echo '<div class="col-md-6">';
+        echo '<div class="card">';
+        echo '<div class="card-body">';
+        echo '<h6>Estadísticas de la Clase</h6>';
+        echo '<p>Total de estudiantes: <strong>' . $total_estudiantes . '</strong></p>';
+        
+        for ($i = 0; $i <= 4; $i++) {
+            if ($contadores[$i] > 0) {
+                $promedio = $notas_promedio["t$i"] / $contadores[$i];
+                echo '<p>Promedio Trayecto ' . $i . ': <strong>' . number_format($promedio, 2) . '</strong></p>';
+            }
+        }
+        
+        echo '</div>';
+        echo '</div>';
+        echo '</div>';
+        echo '</div>';
+    }
+    
+    exit();
+}
+
+// Procesar filtros
+$docente_seleccionado = null;
+$clases_docente = [];
+$filtros = [];
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (!empty($_POST['docente_id'])) {
+        $docente_seleccionado = intval($_POST['docente_id']);
+        $filtros['docente_id'] = $docente_seleccionado;
+        
+        $fecha_desde = !empty($_POST['fecha_desde']) ? $_POST['fecha_desde'] : null;
+        $fecha_hasta = !empty($_POST['fecha_hasta']) ? $_POST['fecha_hasta'] : null;
+        
+        $filtros['fecha_desde'] = $fecha_desde;
+        $filtros['fecha_hasta'] = $fecha_hasta;
+        
+        $clases_docente = obtenerClasesDelDocente($docente_seleccionado, $fecha_desde, $fecha_hasta);
     }
 }
 
-// Consulta para obtener las notas definitivas
-$notas = [];
-if (!empty($where_conditions) || isset($_GET['mostrar_todo'])) {
-    $sql = "SELECT 
-                nd.id,
-                d.nombre as nombre_docente,
-                u.nombre as nombre_estudiante,
-                u.carrera,
-                m.nombre_materia,
-                m.trayecto,
-                p.nombre_periodo,
-                nd.trayecto_0,
-                nd.trayecto_1,
-                nd.trayecto_2,
-                nd.trayecto_3,
-                nd.trayecto_4,
-                nd.fecha_registro,
-                a.nombre as admin_aprobador
-            FROM notas_definitivas nd
-            INNER JOIN users d ON nd.id_docente = d.id
-            INNER JOIN users u ON nd.id_usuario = u.id
-            INNER JOIN materias m ON nd.id_materia = m.id_materia
-            INNER JOIN periodos_academicos p ON nd.id_periodo = p.id_periodo
-            LEFT JOIN users a ON nd.id_admin_aprobador = a.id";
-    
-    if (!empty($where_conditions)) {
-        $sql .= " WHERE " . implode(" AND ", $where_conditions);
-    }
-    
-    $sql .= " ORDER BY d.nombre, p.fecha_inicio DESC, m.nombre_materia, u.nombre";
-    
-    $stmt = $db->prepare($sql);
-    
-    if ($stmt) {
-        // Bind parameters if they exist
-        if (!empty($params)) {
-            $stmt->bind_param($param_types, ...$params);
-        }
-        
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($result) {
-            while ($row = $result->fetch_assoc()) {
-                $notas[] = $row;
-            }
-            $result->free();
-        }
-        $stmt->close();
-    } else {
-        $error = "Error en la consulta: " . $db->error;
-    }
-}
+$docentes = obtenerDocentesConNotas();
 
 include("includes/head.php");
 ?>
@@ -161,201 +284,273 @@ include("includes/head.php");
 <div class="container-fluid">
     <div class="row">
         <div class="col-md-12">
-            <h1 class="h3 mb-4 text-gray-800">Notas Definitivas por Profesor</h1>
+            <h1 class="h3 mb-4 text-gray-800">Consultar Notas Definitivas por Profesor</h1>
             
-            <?php if (isset($error)): ?>
-                <div class="alert alert-danger"><?php echo $error; ?></div>
-            <?php endif; ?>
-            
-            <!-- Formulario de Filtros -->
+            <!-- Filtros principales -->
             <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Filtros de Búsqueda</h6>
+                <div class="card-header py-3 bg-primary text-white">
+                    <h6 class="m-0 font-weight-bold">Filtros de Búsqueda</h6>
                 </div>
                 <div class="card-body">
                     <form method="POST" action="">
                         <div class="row">
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <div class="form-group">
-                                    <label for="id_docente">Profesor:</label>
-                                    <select class="form-control" id="id_docente" name="id_docente">
-                                        <option value="">Seleccionar Profesor</option>
-                                        <?php foreach ($docentes as $docente): ?>
+                                    <label for="docente_id">Seleccionar Profesor:</label>
+                                    <select class="form-control select2" id="docente_id" name="docente_id" required>
+                                        <option value="">-- Buscar Profesor --</option>
+                                        <?php 
+                                        if ($docentes->num_rows > 0) {
+                                            $docentes->data_seek(0); // Reset pointer
+                                            while ($docente = $docentes->fetch_assoc()): 
+                                        ?>
                                             <option value="<?php echo $docente['id']; ?>" 
-                                                <?php echo (isset($filtros['id_docente']) && $filtros['id_docente'] == $docente['id']) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($docente['nombre']); ?>
+                                                <?php echo (isset($filtros['docente_id']) && $filtros['docente_id'] == $docente['id']) ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($docente['nombre_docente']); ?> 
+                                                (<?php echo $docente['total_materias']; ?> materias, 
+                                                <?php echo $docente['total_notas']; ?> notas)
                                             </option>
-                                        <?php endforeach; ?>
+                                        <?php 
+                                            endwhile;
+                                        }
+                                        ?>
                                     </select>
                                 </div>
                             </div>
                             
                             <div class="col-md-3">
                                 <div class="form-group">
-                                    <label for="id_materia">Materia:</label>
-                                    <select class="form-control" id="id_materia" name="id_materia">
-                                        <option value="">Seleccionar Materia</option>
-                                        <?php foreach ($materias as $materia): ?>
-                                            <option value="<?php echo $materia['id_materia']; ?>" 
-                                                <?php echo (isset($filtros['id_materia']) && $filtros['id_materia'] == $materia['id_materia']) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($materia['nombre_materia']); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                    <label for="fecha_desde">Fecha Desde:</label>
+                                    <input type="date" class="form-control" id="fecha_desde" name="fecha_desde" 
+                                           value="<?php echo $filtros['fecha_desde'] ?? ''; ?>">
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="fecha_hasta">Fecha Hasta:</label>
+                                    <input type="date" class="form-control" id="fecha_hasta" name="fecha_hasta" 
+                                           value="<?php echo $filtros['fecha_hasta'] ?? ''; ?>">
                                 </div>
                             </div>
                             
                             <div class="col-md-2">
                                 <div class="form-group">
-                                    <label for="id_periodo">Periodo:</label>
-                                    <select class="form-control" id="id_periodo" name="id_periodo">
-                                        <option value="">Seleccionar Periodo</option>
-                                        <?php foreach ($periodos as $periodo): ?>
-                                            <option value="<?php echo $periodo['id_periodo']; ?>" 
-                                                <?php echo (isset($filtros['id_periodo']) && $filtros['id_periodo'] == $periodo['id_periodo']) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($periodo['nombre_periodo']); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                    <label>&nbsp;</label>
+                                    <button type="submit" class="btn btn-primary btn-block">
+                                        <i class="fas fa-search"></i> Buscar
+                                    </button>
                                 </div>
-                            </div>
-                            
-                            <div class="col-md-2">
-                                <div class="form-group">
-                                    <label for="carrera">Carrera:</label>
-                                    <select class="form-control" id="carrera" name="carrera">
-                                        <option value="">Seleccionar Carrera</option>
-                                        <?php foreach ($carreras as $carrera): ?>
-                                            <!-- CORREGIDO: $carrera ahora es un string, no un array -->
-                                            <option value="<?php echo htmlspecialchars($carrera); ?>" 
-                                                <?php echo (isset($filtros['carrera']) && $filtros['carrera'] == $carrera) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($carrera); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-2">
-                                <div class="form-group">
-                                    <label for="trayecto">Trayecto:</label>
-                                    <select class="form-control" id="trayecto" name="trayecto">
-                                        <option value="">Todos</option>
-                                        <option value="0" <?php echo (isset($filtros['trayecto']) && $filtros['trayecto'] == '0') ? 'selected' : ''; ?>>Trayecto 0</option>
-                                        <option value="1" <?php echo (isset($filtros['trayecto']) && $filtros['trayecto'] == '1') ? 'selected' : ''; ?>>Trayecto 1</option>
-                                        <option value="2" <?php echo (isset($filtros['trayecto']) && $filtros['trayecto'] == '2') ? 'selected' : ''; ?>>Trayecto 2</option>
-                                        <option value="3" <?php echo (isset($filtros['trayecto']) && $filtros['trayecto'] == '3') ? 'selected' : ''; ?>>Trayecto 3</option>
-                                        <option value="4" <?php echo (isset($filtros['trayecto']) && $filtros['trayecto'] == '4') ? 'selected' : ''; ?>>Trayecto 4</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-12">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-search"></i> Buscar
-                                </button>
-                                <a href="?mostrar_todo=1" class="btn btn-secondary">
-                                    <i class="fas fa-list"></i> Mostrar Todo
-                                </a>
-                                <button type="button" class="btn btn-success" onclick="exportarExcel()">
-                                    <i class="fas fa-file-excel"></i> Exportar Excel
-                                </button>
                             </div>
                         </div>
                     </form>
                 </div>
             </div>
-            
-            <!-- Resultados -->
-            <?php if (!empty($notas)): ?>
+
+            <!-- Lista de clases del docente seleccionado -->
+            <?php if ($docente_seleccionado): ?>
                 <div class="card shadow mb-4">
-                    <div class="card-header py-3">
-                        <h6 class="m-0 font-weight-bold text-primary">
-                            Resultados (<?php echo count($notas); ?> registros encontrados)
+                    <div class="card-header py-3 bg-success text-white">
+                        <h6 class="m-0 font-weight-bold">
+                            Clases del Profesor: 
+                            <?php 
+                                $docente_nombre = '';
+                                if ($docentes->num_rows > 0) {
+                                    $docentes->data_seek(0); // Reset pointer
+                                    while ($doc = $docentes->fetch_assoc()) {
+                                        if ($doc['id'] == $docente_seleccionado) {
+                                            $docente_nombre = $doc['nombre_docente'];
+                                            break;
+                                        }
+                                    }
+                                }
+                                echo htmlspecialchars($docente_nombre);
+                            ?>
+                            (<?php echo count($clases_docente); ?> clases encontradas)
                         </h6>
                     </div>
                     <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-bordered" id="tablaNotas" width="100%" cellspacing="0">
-                                <thead>
-                                    <tr>
-                                        <th>Profesor</th>
-                                        <th>Estudiante</th>
-                                        <th>Carrera</th>
-                                        <th>Materia</th>
-                                        <th>Trayecto</th>
-                                        <th>Periodo</th>
-                                        <th>Nota T0</th>
-                                        <th>Nota T1</th>
-                                        <th>Nota T2</th>
-                                        <th>Nota T3</th>
-                                        <th>Nota T4</th>
-                                        <th>Fecha Registro</th>
-                                        <th>Aprobado por</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($notas as $nota): ?>
+                        <?php if (!empty($clases_docente)): ?>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover" id="tablaClases" width="100%" cellspacing="0">
+                                    <thead class="thead-light">
                                         <tr>
-                                            <td><?php echo htmlspecialchars($nota['nombre_docente']); ?></td>
-                                            <td><?php echo htmlspecialchars($nota['nombre_estudiante']); ?></td>
-                                            <td><?php echo htmlspecialchars($nota['carrera']); ?></td>
-                                            <td><?php echo htmlspecialchars($nota['nombre_materia']); ?></td>
-                                            <td><?php echo htmlspecialchars($nota['trayecto']); ?></td>
-                                            <td><?php echo htmlspecialchars($nota['nombre_periodo']); ?></td>
-                                            <td><?php echo isset($nota['trayecto_0']) && $nota['trayecto_0'] !== null ? $nota['trayecto_0'] : '-'; ?></td>
-                                            <td><?php echo isset($nota['trayecto_1']) && $nota['trayecto_1'] !== null ? $nota['trayecto_1'] : '-'; ?></td>
-                                            <td><?php echo isset($nota['trayecto_2']) && $nota['trayecto_2'] !== null ? $nota['trayecto_2'] : '-'; ?></td>
-                                            <td><?php echo isset($nota['trayecto_3']) && $nota['trayecto_3'] !== null ? $nota['trayecto_3'] : '-'; ?></td>
-                                            <td><?php echo isset($nota['trayecto_4']) && $nota['trayecto_4'] !== null ? $nota['trayecto_4'] : '-'; ?></td>
-                                            <td><?php echo date('d/m/Y', strtotime($nota['fecha_registro'])); ?></td>
-                                            <td><?php echo htmlspecialchars($nota['admin_aprobador'] ?? 'No asignado'); ?></td>
+                                            <th>Materia</th>
+                                            <th>Trayecto</th>
+                                            <th>Periodo</th>
+                                            <th>Sección</th>
+                                            <th>Carrera</th>
+                                            <th># Estudiantes</th>
+                                            <th>Última Actualización</th>
+                                            <th>Acciones</th>
                                         </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($clases_docente as $clase): ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($clase['nombre_materia']); ?></td>
+                                                <td><?php echo htmlspecialchars($clase['trayecto']); ?></td>
+                                                <td><?php echo htmlspecialchars($clase['nombre_periodo']); ?></td>
+                                                <td><?php echo htmlspecialchars($clase['codigo_seccion'] ?? 'N/A'); ?></td>
+                                                <td><?php echo htmlspecialchars($clase['nombre_carrera'] ?? 'N/A'); ?></td>
+                                                <td><span class="badge badge-info"><?php echo $clase['total_estudiantes']; ?></span></td>
+                                                <td><?php echo date('d/m/Y H:i', strtotime($clase['ultima_fecha'])); ?></td>
+                                                <td>
+                                                    <button type="button" class="btn btn-sm btn-info btn-detalles" 
+                                                            data-toggle="modal" data-target="#modalDetalles"
+                                                            data-docente-id="<?php echo $docente_seleccionado; ?>"
+                                                            data-materia-id="<?php echo $clase['id_materia']; ?>"
+                                                            data-periodo-id="<?php echo $clase['id_periodo']; ?>"
+                                                            data-docente="<?php echo htmlspecialchars($docente_nombre); ?>"
+                                                            data-materia="<?php echo htmlspecialchars($clase['nombre_materia']); ?>"
+                                                            data-periodo="<?php echo htmlspecialchars($clase['nombre_periodo']); ?>"
+                                                            data-seccion="<?php echo htmlspecialchars($clase['codigo_seccion'] ?? 'N/A'); ?>"
+                                                            data-carrera="<?php echo htmlspecialchars($clase['nombre_carrera'] ?? 'N/A'); ?>">
+                                                        <i class="fas fa-eye"></i> Ver Notas
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-warning">
+                                No se encontraron clases con notas para el profesor seleccionado en el rango de fechas especificado.
+                            </div>
+                        <?php endif; ?>
                     </div>
-                </div>
-            <?php elseif ($_SERVER['REQUEST_METHOD'] == 'POST' || isset($_GET['mostrar_todo'])): ?>
-                <div class="alert alert-warning">
-                    No se encontraron registros con los filtros seleccionados.
                 </div>
             <?php endif; ?>
         </div>
     </div>
 </div>
 
-<script>
-function exportarExcel() {
-    // Crear una tabla temporal para la exportación
-    let tabla = document.getElementById('tablaNotas');
-    let html = tabla.outerHTML;
-    
-    // Crear un blob y descargar
-    let blob = new Blob([html], {type: 'application/vnd.ms-excel'});
-    let url = URL.createObjectURL(blob);
-    let a = document.createElement('a');
-    a.href = url;
-    a.download = 'notas_definitivas_' + new Date().toISOString().split('T')[0] + '.xls';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
+<!-- Modal para ver detalles de la clase -->
+<div class="modal fade" id="modalDetalles" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">Detalles de Notas - <span id="tituloClase"></span></h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Sidebar de navegación -->
+                    <div class="col-md-3">
+                        <div class="list-group" id="sidebarDetalles">
+                            <a href="#lista-estudiantes" class="list-group-item list-group-item-action active" data-toggle="tab">
+                                <i class="fas fa-users"></i> Lista de Estudiantes
+                            </a>
+                            <a href="#resumen" class="list-group-item list-group-item-action" data-toggle="tab">
+                                <i class="fas fa-chart-bar"></i> Resumen
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Contenido de las pestañas -->
+                    <div class="col-md-9">
+                        <div class="tab-content" id="contenidoDetalles">
+                            <div class="tab-pane fade show active" id="lista-estudiantes">
+                                <div class="text-center">
+                                    <div class="spinner-border text-primary"></div>
+                                    <p>Cargando estudiantes...</p>
+                                </div>
+                            </div>
+                            <div class="tab-pane fade" id="resumen">
+                                <div class="text-center">
+                                    <div class="spinner-border text-primary"></div>
+                                    <p>Cargando resumen...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
-// Inicializar DataTables
+<script>
 $(document).ready(function() {
-    $('#tablaNotas').DataTable({
+    // Inicializar Select2 para búsqueda de profesores
+    $('.select2').select2({
+        placeholder: "Buscar profesor...",
+        allowClear: true
+    });
+
+    // Inicializar DataTable para la tabla de clases
+    $('#tablaClases').DataTable({
         "language": {
             "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Spanish.json"
         },
         "pageLength": 25,
-        "order": [[0, 'asc'], [4, 'asc'], [3, 'asc']]
+        "order": [[6, 'desc']]
+    });
+
+    // Cargar detalles de la clase via AJAX
+    $('.btn-detalles').click(function() {
+        const docenteId = $(this).data('docente-id');
+        const materiaId = $(this).data('materia-id');
+        const periodoId = $(this).data('periodo-id');
+        const docente = $(this).data('docente');
+        const materia = $(this).data('materia');
+        const periodo = $(this).data('periodo');
+        const seccion = $(this).data('seccion');
+        const carrera = $(this).data('carrera');
+        
+        // Actualizar título del modal
+        $('#tituloClase').text(`${docente} - ${materia} - ${periodo}`);
+        
+        // Cargar lista de estudiantes
+        cargarSeccion('lista-estudiantes', docenteId, materiaId, periodoId);
+    });
+    
+    // Cambiar entre pestañas
+    $('#sidebarDetalles a').click(function(e) {
+        e.preventDefault();
+        const target = $(this).attr('href').substring(1);
+        const docenteId = $('#modalDetalles').data('current-docente');
+        const materiaId = $('#modalDetalles').data('current-materia');
+        const periodoId = $('#modalDetalles').data('current-periodo');
+        
+        cargarSeccion(target, docenteId, materiaId, periodoId);
     });
 });
+
+function cargarSeccion(seccion, docenteId, materiaId, periodoId) {
+    // Guardar IDs actuales en el modal
+    $('#modalDetalles').data('current-docente', docenteId);
+    $('#modalDetalles').data('current-materia', materiaId);
+    $('#modalDetalles').data('current-periodo', periodoId);
+    
+    $.ajax({
+        url: '<?php echo $_SERVER['PHP_SELF']; ?>',
+        type: 'POST',
+        data: { 
+            ajax: 'detalles',
+            docente_id: docenteId, 
+            materia_id: materiaId, 
+            periodo_id: periodoId,
+            seccion: seccion
+        },
+        success: function(data) {
+            $('#' + seccion).html(data);
+        }
+    });
+}
+
+function exportarExcelClase(docenteId, materiaId, periodoId) {
+    // Redirigir a página de exportación
+    window.open('exportar_notas.php?docente=' + docenteId + '&materia=' + materiaId + '&periodo=' + periodoId, '_blank');
+}
 </script>
+
+<!-- Incluir Select2 CSS y JS -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/i18n/es.js"></script>
 
 <?php include("includes/footer.php"); ?>
