@@ -259,9 +259,11 @@ if (!isLoggedIn() || !isAdmin()) {
                     
                     <!-- Nuevo apartado de Títulos y Relaciones con Materias -->
                     <div class="dropdown-divider"></div>
+                    <?php if (tienePermiso('titulos_re_materia')): ?>
                     <a title="Títulos y Relaciones con Materias" class="dropdown-item" href="titulos_relaciones_materias.php">
                         <i class="fas fa-graduation-cap fa-fw"></i> Títulos y Relaciones con Materias
                     </a>
+                    <?php endif; ?>
                     
                     <!-- Opción exclusiva para usuarios con editar_acceso = 1 -->
                     <?php if (tienePermiso('editar_acceso')): ?>

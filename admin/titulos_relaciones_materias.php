@@ -5,6 +5,10 @@ ini_set('display_errors', '1');
 $titulopag = "Gestión de Títulos y Materias";
 include('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('titulos_re_materia');
+
 // **1. Manejar solicitudes AJAX para búsqueda en tiempo real**
 if (isset($_GET['ajax_type'])) {
     header('Content-Type: application/json');
