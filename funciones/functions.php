@@ -5390,7 +5390,7 @@ function verificarPermiso($pagina) {
         exit();
     }
     
-    // Lista de permisos válidos en la base de datos
+    // Lista de permisos válidos en la base de datos (actualizada con los nuevos)
     $permisosValidos = [
         'usuario', 'estudiante', 'docente', 'admin', 'super_user', 
         'editar_user', 'editar_nota', 'editar_acceso', 'editar_valores', 
@@ -5400,14 +5400,16 @@ function verificarPermiso($pagina) {
         'periodos_academicos', 'asig_secciones', 'asig_cursos', 'horarios', 
         'gestion_director_carrera', 'notas_cargadas', 'consultar_notas', 
         'consultar_notas_pasadas', 'tipos_pago', 'tipos_horario', 
-        'horario_personal', 'respaldo_bd'
+        'horario_personal', 'respaldo_bd',
+        'gestionar_carrera', 'gestion_periodo_academico', 'gestion_asig_cursos', 
+        'gestion_horario', 'titulos_re_materia'
     ];
     
     // Verificar que el permiso solicitado sea válido
     if (!in_array($pagina, $permisosValidos)) {
         error_log("Permiso no válido: " . $pagina);
         $_SESSION['error'] = "Error de permisos: permiso no válido.";
-        header('location: ../login.php');
+        header('location: ../usuario/home.php');
         exit();
     }
     
@@ -5423,7 +5425,7 @@ function verificarPermiso($pagina) {
         
         // Redirigir a home con mensaje de error
         $_SESSION['error'] = "No tienes permisos para acceder a la página de " . $pagina . ".";
-        header('location: ../login.php');
+        header('location: ../usuario/home.php');
         exit();
     }
     
@@ -5471,7 +5473,9 @@ function cargarPermisosUsuario() {
         periodos_academicos, asig_secciones, asig_cursos, horarios, 
         gestion_director_carrera, notas_cargadas, consultar_notas, 
         consultar_notas_pasadas, tipos_pago, tipos_horario, 
-        horario_personal, respaldo_bd 
+        horario_personal, respaldo_bd,
+        gestionar_carrera, gestion_periodo_academico, gestion_asig_cursos, 
+        gestion_horario, titulos_re_materia
         FROM users WHERE id = ?";
     
     $stmt = $db->prepare($query);
