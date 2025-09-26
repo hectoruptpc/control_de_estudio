@@ -102,28 +102,6 @@ function obtenerClasesDelDocente($docente_id, $fecha_desde = null, $fecha_hasta 
     return $clases;
 }
 
-// Obtener información adicional de una clase específica
-function obtenerInfoAdminAprobador($docente_id, $materia_id, $periodo_id) {
-    global $db;
-    
-    $query = "SELECT admin.nombre as admin_aprobador
-              FROM notas_definitivas nd
-              LEFT JOIN users admin ON nd.id_admin_aprobador = admin.id
-              WHERE nd.id_docente = ? 
-                AND nd.id_materia = ? 
-                AND nd.id_periodo = ?
-              LIMIT 1";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $row = $result->fetch_assoc();
-    $stmt->close();
-    
-    return $row ? $row['admin_aprobador'] : 'No asignado';
-}
-
 // Obtener estudiantes y notas de una clase específica
 function obtenerDetallesClase($docente_id, $materia_id, $periodo_id) {
     global $db;
@@ -172,85 +150,96 @@ if (isset($_POST['ajax']) && $_POST['ajax'] == 'detalles') {
     
     if ($seccion == 'lista-estudiantes') {
         echo '<h6>Lista de Estudiantes y Notas</h6>';
-        echo '<div class="table-responsive">';
-        echo '<table class="table table-bordered table-sm">';
-        echo '<thead class="thead-light">';
-        echo '<tr>';
-        echo '<th>Estudiante</th>';
-        echo '<th>Cédula</th>';
-        echo '<th>Carrera</th>';
-        echo '<th>Nota T0</th>';
-        echo '<th>Nota T1</th>';
-        echo '<th>Nota T2</th>';
-        echo '<th>Nota T3</th>';
-        echo '<th>Nota T4</th>';
-        echo '<th>Fecha Registro</th>';
-        echo '<th>Aprobado por</th>';
-        echo '</tr>';
-        echo '</thead>';
-        echo '<tbody>';
         
-        foreach ($detalles as $estudiante) {
+        if (empty($detalles)) {
+            echo '<div class="alert alert-warning">No hay estudiantes registrados para esta clase.</div>';
+        } else {
+            echo '<div class="table-responsive">';
+            echo '<table class="table table-bordered table-sm">';
+            echo '<thead class="thead-light">';
             echo '<tr>';
-            echo '<td>' . htmlspecialchars($estudiante['nombre_estudiante']) . '</td>';
-            echo '<td>' . htmlspecialchars($estudiante['cedula'] ?? 'N/A') . '</td>';
-            echo '<td>' . htmlspecialchars($estudiante['carrera']) . '</td>';
-            echo '<td>' . ($estudiante['trayecto_0'] ?? '-') . '</td>';
-            echo '<td>' . ($estudiante['trayecto_1'] ?? '-') . '</td>';
-            echo '<td>' . ($estudiante['trayecto_2'] ?? '-') . '</td>';
-            echo '<td>' . ($estudiante['trayecto_3'] ?? '-') . '</td>';
-            echo '<td>' . ($estudiante['trayecto_4'] ?? '-') . '</td>';
-            echo '<td>' . date('d/m/Y', strtotime($estudiante['fecha_registro'])) . '</td>';
-            echo '<td>' . htmlspecialchars($estudiante['admin_aprobador'] ?? 'No asignado') . '</td>';
+            echo '<th>Estudiante</th>';
+            echo '<th>Cédula</th>';
+            echo '<th>Carrera</th>';
+            echo '<th>Nota T0</th>';
+            echo '<th>Nota T1</th>';
+            echo '<th>Nota T2</th>';
+            echo '<th>Nota T3</th>';
+            echo '<th>Nota T4</th>';
+            echo '<th>Fecha Registro</th>';
+            echo '<th>Aprobado por</th>';
             echo '</tr>';
+            echo '</thead>';
+            echo '<tbody>';
+            
+            foreach ($detalles as $estudiante) {
+                echo '<tr>';
+                echo '<td>' . htmlspecialchars($estudiante['nombre_estudiante']) . '</td>';
+                echo '<td>' . htmlspecialchars($estudiante['cedula'] ?? 'N/A') . '</td>';
+                echo '<td>' . htmlspecialchars($estudiante['carrera']) . '</td>';
+                echo '<td>' . ($estudiante['trayecto_0'] !== null ? $estudiante['trayecto_0'] : '-') . '</td>';
+                echo '<td>' . ($estudiante['trayecto_1'] !== null ? $estudiante['trayecto_1'] : '-') . '</td>';
+                echo '<td>' . ($estudiante['trayecto_2'] !== null ? $estudiante['trayecto_2'] : '-') . '</td>';
+                echo '<td>' . ($estudiante['trayecto_3'] !== null ? $estudiante['trayecto_3'] : '-') . '</td>';
+                echo '<td>' . ($estudiante['trayecto_4'] !== null ? $estudiante['trayecto_4'] : '-') . '</td>';
+                echo '<td>' . date('d/m/Y', strtotime($estudiante['fecha_registro'])) . '</td>';
+                echo '<td>' . htmlspecialchars($estudiante['admin_aprobador'] ?? 'No asignado') . '</td>';
+                echo '</tr>';
+            }
+            
+            echo '</tbody>';
+            echo '</table>';
+            echo '</div>';
+            
+            // Botón de exportación
+            echo '<button type="button" class="btn btn-success btn-sm mt-3" onclick="exportarExcelClase(' . $docente_id . ', ' . $materia_id . ', ' . $periodo_id . ')">';
+            echo '<i class="fas fa-file-excel"></i> Exportar a Excel';
+            echo '</button>';
         }
-        
-        echo '</tbody>';
-        echo '</table>';
-        echo '</div>';
-        
-        // Botón de exportación
-        echo '<button type="button" class="btn btn-success btn-sm" onclick="exportarExcelClase(' . $docente_id . ', ' . $materia_id . ', ' . $periodo_id . ')">';
-        echo '<i class="fas fa-file-excel"></i> Exportar a Excel';
-        echo '</button>';
     }
     elseif ($seccion == 'resumen') {
         echo '<h6>Resumen de la Clase</h6>';
         
-        $total_estudiantes = count($detalles);
-        $notas_promedio = [
-            't0' => 0, 't1' => 0, 't2' => 0, 't3' => 0, 't4' => 0
-        ];
-        $contadores = [0, 0, 0, 0, 0];
-        
-        foreach ($detalles as $est) {
-            for ($i = 0; $i <= 4; $i++) {
-                $campo = "trayecto_$i";
-                if (isset($est[$campo]) && is_numeric($est[$campo])) {
-                    $notas_promedio["t$i"] += $est[$campo];
-                    $contadores[$i]++;
+        if (empty($detalles)) {
+            echo '<div class="alert alert-warning">No hay datos para mostrar.</div>';
+        } else {
+            $total_estudiantes = count($detalles);
+            $notas_promedio = [
+                't0' => 0, 't1' => 0, 't2' => 0, 't3' => 0, 't4' => 0
+            ];
+            $contadores = [0, 0, 0, 0, 0];
+            
+            foreach ($detalles as $est) {
+                for ($i = 0; $i <= 4; $i++) {
+                    $campo = "trayecto_$i";
+                    if (isset($est[$campo]) && is_numeric($est[$campo]) && $est[$campo] !== null) {
+                        $notas_promedio["t$i"] += $est[$campo];
+                        $contadores[$i]++;
+                    }
                 }
             }
-        }
-        
-        echo '<div class="row">';
-        echo '<div class="col-md-6">';
-        echo '<div class="card">';
-        echo '<div class="card-body">';
-        echo '<h6>Estadísticas de la Clase</h6>';
-        echo '<p>Total de estudiantes: <strong>' . $total_estudiantes . '</strong></p>';
-        
-        for ($i = 0; $i <= 4; $i++) {
-            if ($contadores[$i] > 0) {
-                $promedio = $notas_promedio["t$i"] / $contadores[$i];
-                echo '<p>Promedio Trayecto ' . $i . ': <strong>' . number_format($promedio, 2) . '</strong></p>';
+            
+            echo '<div class="row">';
+            echo '<div class="col-md-6">';
+            echo '<div class="card">';
+            echo '<div class="card-body">';
+            echo '<h6>Estadísticas de la Clase</h6>';
+            echo '<p>Total de estudiantes: <strong>' . $total_estudiantes . '</strong></p>';
+            
+            for ($i = 0; $i <= 4; $i++) {
+                if ($contadores[$i] > 0) {
+                    $promedio = $notas_promedio["t$i"] / $contadores[$i];
+                    echo '<p>Promedio Trayecto ' . $i . ': <strong>' . number_format($promedio, 2) . '</strong></p>';
+                } else {
+                    echo '<p>Promedio Trayecto ' . $i . ': <strong>No hay datos</strong></p>';
+                }
             }
+            
+            echo '</div>';
+            echo '</div>';
+            echo '</div>';
+            echo '</div>';
         }
-        
-        echo '</div>';
-        echo '</div>';
-        echo '</div>';
-        echo '</div>';
     }
     
     exit();
@@ -300,15 +289,14 @@ include("includes/head.php");
                                     <select class="form-control select2" id="docente_id" name="docente_id" required>
                                         <option value="">-- Buscar Profesor --</option>
                                         <?php 
-                                        if ($docentes->num_rows > 0) {
-                                            $docentes->data_seek(0); // Reset pointer
+                                        if ($docentes && $docentes->num_rows > 0) {
+                                            $docentes->data_seek(0);
                                             while ($docente = $docentes->fetch_assoc()): 
                                         ?>
                                             <option value="<?php echo $docente['id']; ?>" 
                                                 <?php echo (isset($filtros['docente_id']) && $filtros['docente_id'] == $docente['id']) ? 'selected' : ''; ?>>
                                                 <?php echo htmlspecialchars($docente['nombre_docente']); ?> 
-                                                (<?php echo $docente['total_materias']; ?> materias, 
-                                                <?php echo $docente['total_notas']; ?> notas)
+                                                (<?php echo $docente['total_materias']; ?> materias)
                                             </option>
                                         <?php 
                                             endwhile;
@@ -355,8 +343,8 @@ include("includes/head.php");
                             Clases del Profesor: 
                             <?php 
                                 $docente_nombre = '';
-                                if ($docentes->num_rows > 0) {
-                                    $docentes->data_seek(0); // Reset pointer
+                                if ($docentes && $docentes->num_rows > 0) {
+                                    $docentes->data_seek(0);
                                     while ($doc = $docentes->fetch_assoc()) {
                                         if ($doc['id'] == $docente_seleccionado) {
                                             $docente_nombre = $doc['nombre_docente'];
@@ -403,9 +391,7 @@ include("includes/head.php");
                                                             data-periodo-id="<?php echo $clase['id_periodo']; ?>"
                                                             data-docente="<?php echo htmlspecialchars($docente_nombre); ?>"
                                                             data-materia="<?php echo htmlspecialchars($clase['nombre_materia']); ?>"
-                                                            data-periodo="<?php echo htmlspecialchars($clase['nombre_periodo']); ?>"
-                                                            data-seccion="<?php echo htmlspecialchars($clase['codigo_seccion'] ?? 'N/A'); ?>"
-                                                            data-carrera="<?php echo htmlspecialchars($clase['nombre_carrera'] ?? 'N/A'); ?>">
+                                                            data-periodo="<?php echo htmlspecialchars($clase['nombre_periodo']); ?>">
                                                         <i class="fas fa-eye"></i> Ver Notas
                                                     </button>
                                                 </td>
@@ -482,6 +468,9 @@ $(document).ready(function() {
     });
 
     // Inicializar DataTable para la tabla de clases
+    if ($.fn.DataTable.isDataTable('#tablaClases')) {
+        $('#tablaClases').DataTable().destroy();
+    }
     $('#tablaClases').DataTable({
         "language": {
             "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Spanish.json"
@@ -491,43 +480,60 @@ $(document).ready(function() {
     });
 
     // Cargar detalles de la clase via AJAX
-    $('.btn-detalles').click(function() {
+    $(document).on('click', '.btn-detalles', function() {
         const docenteId = $(this).data('docente-id');
         const materiaId = $(this).data('materia-id');
         const periodoId = $(this).data('periodo-id');
         const docente = $(this).data('docente');
         const materia = $(this).data('materia');
         const periodo = $(this).data('periodo');
-        const seccion = $(this).data('seccion');
-        const carrera = $(this).data('carrera');
         
         // Actualizar título del modal
         $('#tituloClase').text(`${docente} - ${materia} - ${periodo}`);
         
-        // Cargar lista de estudiantes
+        // Mostrar loading en ambas pestañas
+        $('#lista-estudiantes').html('<div class="text-center"><div class="spinner-border text-primary"></div><p>Cargando estudiantes...</p></div>');
+        $('#resumen').html('<div class="text-center"><div class="spinner-border text-primary"></div><p>Cargando resumen...</p></div>');
+        
+        // Cargar lista de estudiantes inmediatamente
         cargarSeccion('lista-estudiantes', docenteId, materiaId, periodoId);
+        
+        // Guardar IDs para uso posterior
+        $('#modalDetalles').data('current-docente', docenteId);
+        $('#modalDetalles').data('current-materia', materiaId);
+        $('#modalDetalles').data('current-periodo', periodoId);
     });
     
-    // Cambiar entre pestañas
-    $('#sidebarDetalles a').click(function(e) {
+    // Cambiar entre pestañas - cargar contenido cuando se active la pestaña
+    $('#modalDetalles').on('show.bs.modal', function() {
+        // Ya cargamos lista-estudiantes al abrir el modal
+    });
+    
+    // Cuando se hace clic en una pestaña, cargar su contenido si no está cargado
+    $('#sidebarDetalles a').on('click', function(e) {
         e.preventDefault();
+        
+        // Remover active de todas las pestañas
+        $('#sidebarDetalles a').removeClass('active');
+        // Agregar active a la pestaña clickeada
+        $(this).addClass('active');
+        
         const target = $(this).attr('href').substring(1);
         const docenteId = $('#modalDetalles').data('current-docente');
         const materiaId = $('#modalDetalles').data('current-materia');
         const periodoId = $('#modalDetalles').data('current-periodo');
         
+        // Mostrar loading
+        $('#' + target).html('<div class="text-center"><div class="spinner-border text-primary"></div><p>Cargando...</p></div>');
+        
+        // Cargar contenido de la pestaña
         cargarSeccion(target, docenteId, materiaId, periodoId);
     });
 });
 
 function cargarSeccion(seccion, docenteId, materiaId, periodoId) {
-    // Guardar IDs actuales en el modal
-    $('#modalDetalles').data('current-docente', docenteId);
-    $('#modalDetalles').data('current-materia', materiaId);
-    $('#modalDetalles').data('current-periodo', periodoId);
-    
     $.ajax({
-        url: '<?php echo $_SERVER['PHP_SELF']; ?>',
+        url: window.location.href,
         type: 'POST',
         data: { 
             ajax: 'detalles',
@@ -538,6 +544,9 @@ function cargarSeccion(seccion, docenteId, materiaId, periodoId) {
         },
         success: function(data) {
             $('#' + seccion).html(data);
+        },
+        error: function(xhr, status, error) {
+            $('#' + seccion).html('<div class="alert alert-danger">Error al cargar los datos: ' + error + '</div>');
         }
     });
 }
