@@ -1,18 +1,18 @@
 <?php
 require_once('../funciones/functions.php');
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    die('Acceso no permitido');
+}
+
 if (!isset($_GET['termino'])) {
-    die(json_encode([]));
+    die('Término de búsqueda no especificado');
 }
 
-$termino = trim($_GET['termino']);
+$termino = $_GET['termino'];
 
-if (strlen($termino) < 2) {
-    die(json_encode([]));
-}
-
-// Buscar profesores por nombre o cédula
-function buscarProfesores($termino) {
+// Buscar profesores por término
+function buscarProfesoresAjax($termino) {
     global $db;
     $query = "SELECT id, idusuario, nombre 
               FROM users 
@@ -28,16 +28,15 @@ function buscarProfesores($termino) {
     
     $profesores = [];
     while ($profesor = $result->fetch_assoc()) {
-        $profesores[] = [
-            'id' => $profesor['id'],
-            'idusuario' => htmlspecialchars($profesor['idusuario']),
-            'nombre' => htmlspecialchars($profesor['nombre'])
-        ];
+        $profesores[] = $profesor;
     }
     
     return $profesores;
 }
 
+$profesores = buscarProfesoresAjax($termino);
+
+// Devolver resultados en formato JSON
 header('Content-Type: application/json');
-echo json_encode(buscarProfesores($termino));
+echo json_encode($profesores);
 ?>

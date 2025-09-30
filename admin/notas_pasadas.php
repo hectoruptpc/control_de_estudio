@@ -280,6 +280,19 @@ include("includes/head.php");
                                                 data-carrera="<?= htmlspecialchars($grupo['nombre_carrera']) ?>">
                                             <i class="fas fa-eye"></i> Ver Notas
                                         </button>
+                                        
+                                        <!-- Botón para generar PDF -->
+                                        <button type="button" class="btn btn-sm btn-danger btn-pdf" 
+                                                data-docente-id="<?= $grupo['id_docente'] ?>"
+                                                data-materia-id="<?= $grupo['id_materia'] ?>"
+                                                data-periodo-id="<?= $grupo['id_periodo'] ?>"
+                                                data-docente="<?= htmlspecialchars($grupo['nombre_docente']) ?>"
+                                                data-materia="<?= htmlspecialchars($grupo['nombre_materia']) ?>"
+                                                data-periodo="<?= htmlspecialchars($grupo['nombre_periodo']) ?>"
+                                                data-seccion="<?= htmlspecialchars($grupo['codigo_seccion']) ?>"
+                                                data-carrera="<?= htmlspecialchars($grupo['nombre_carrera']) ?>">
+                                            <i class="fas fa-file-pdf"></i> PDF
+                                        </button>
                                     </td>
                                 </tr>
                             <?php endwhile; ?>
@@ -320,35 +333,10 @@ include("includes/head.php");
                 </button>
             </div>
             <div class="modal-body">
-                <div class="row">
-                    <!-- Sidebar de navegación -->
-                    <div class="col-md-3">
-                        <div class="list-group" id="sidebarDetalles">
-                            <a href="#lista-estudiantes" class="list-group-item list-group-item-action active" data-toggle="list">
-                                <i class="fas fa-users mr-2"></i> Lista de Estudiantes
-                            </a>
-                            <a href="#resumen" class="list-group-item list-group-item-action" data-toggle="list">
-                                <i class="fas fa-chart-bar mr-2"></i> Resumen
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <!-- Contenido de las pestañas -->
-                    <div class="col-md-9">
-                        <div class="tab-content">
-                            <div class="tab-pane fade show active" id="lista-estudiantes">
-                                <div class="text-center py-4">
-                                    <div class="spinner-border text-primary"></div>
-                                    <p class="mt-2">Cargando estudiantes...</p>
-                                </div>
-                            </div>
-                            <div class="tab-pane fade" id="resumen">
-                                <div class="text-center py-4">
-                                    <div class="spinner-border text-primary"></div>
-                                    <p class="mt-2">Cargando resumen...</p>
-                                </div>
-                            </div>
-                        </div>
+                <div id="contenido-detalles">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary"></div>
+                        <p class="mt-2">Cargando información...</p>
                     </div>
                 </div>
             </div>
@@ -439,13 +427,11 @@ $(document).ready(function() {
         const docente = $(this).data('docente');
         const materia = $(this).data('materia');
         const periodo = $(this).data('periodo');
-        const seccion = $(this).data('seccion');
-        const carrera = $(this).data('carrera');
         
         // Actualizar título del modal
         $('#tituloGrupo').text(`${docente} - ${materia} - ${periodo}`);
         
-        // Cargar lista de estudiantes
+        // Cargar detalles
         $.ajax({
             url: 'ajax_detalles_notas_definitivas.php',
             type: 'POST',
@@ -453,19 +439,37 @@ $(document).ready(function() {
                 docente_id: docenteId, 
                 materia_id: materiaId, 
                 periodo_id: periodoId,
-                seccion: 'lista-estudiantes'
+                accion: 'detalles'
             },
             success: function(data) {
-                $('#lista-estudiantes').html(data);
+                $('#contenido-detalles').html(data);
             },
             error: function() {
-                $('#lista-estudiantes').html(
-                    '<div class="alert alert-danger">Error al cargar los estudiantes</div>'
+                $('#contenido-detalles').html(
+                    '<div class="alert alert-danger">Error al cargar los detalles</div>'
                 );
             }
         });
+    });
+    
+    // Manejar clic en botón PDF
+    $('.btn-pdf').click(function() {
+        const docenteId = $(this).data('docente-id');
+        const materiaId = $(this).data('materia-id');
+        const periodoId = $(this).data('periodo-id');
+        const docente = $(this).data('docente');
+        const materia = $(this).data('materia');
+        const periodo = $(this).data('periodo');
+        const seccion = $(this).data('seccion');
+        const carrera = $(this).data('carrera');
         
-        // Cargar resumen
+        // Mostrar loading
+        const $btn = $(this);
+        const originalHtml = $btn.html();
+        $btn.html('<i class="fas fa-spinner fa-spin"></i> Generando...');
+        $btn.prop('disabled', true);
+        
+        // Cargar datos para el PDF
         $.ajax({
             url: 'ajax_detalles_notas_definitivas.php',
             type: 'POST',
@@ -473,36 +477,24 @@ $(document).ready(function() {
                 docente_id: docenteId, 
                 materia_id: materiaId, 
                 periodo_id: periodoId,
-                seccion: 'resumen'
+                accion: 'pdf'
             },
             success: function(data) {
-                $('#resumen').html(data);
+                // Restaurar botón
+                $btn.html(originalHtml);
+                $btn.prop('disabled', false);
+                
+                // Generar PDF
+                generarPDF(data, docente, materia, periodo, seccion, carrera);
             },
-            error: function() {
-                $('#resumen').html(
-                    '<div class="alert alert-danger">Error al cargar el resumen</div>'
-                );
+            error: function(xhr, status, error) {
+                // Restaurar botón
+                $btn.html(originalHtml);
+                $btn.prop('disabled', false);
+                console.error('Error:', error);
+                alert('Error al generar el PDF: ' + error);
             }
         });
-    });
-    
-    // Manejar cambio de pestañas en el modal
-    $('#sidebarDetalles a').on('click', function (e) {
-        e.preventDefault();
-        $(this).tab('show');
-    });
-    
-    // Resetear el contenido cuando se cierre el modal
-    $('#modalDetalles').on('hidden.bs.modal', function () {
-        $('#lista-estudiantes, #resumen').html(`
-            <div class="text-center py-4">
-                <div class="spinner-border text-primary"></div>
-                <p class="mt-2">Cargando...</p>
-            </div>
-        `);
-        
-        // Reactivar la primera pestaña
-        $('#sidebarDetalles a:first').tab('show');
     });
 
     // Validación de fechas: fecha_hasta no puede ser menor que fecha_desde
@@ -516,6 +508,73 @@ $(document).ready(function() {
         }
     });
 });
+
+// Función para generar PDF - SIMPLIFICADA Y FUNCIONAL
+function generarPDF(contenido, docente, materia, periodo, seccion, carrera) {
+    // Crear elemento temporal para el contenido del PDF
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = contenido;
+    tempDiv.style.padding = '20px';
+    tempDiv.style.fontFamily = 'Arial, sans-serif';
+    tempDiv.style.width = '800px';
+    tempDiv.style.margin = '0 auto';
+    document.body.appendChild(tempDiv);
+    
+    // Generar nombre del archivo
+    const filename = `notas_definitivas_${docente.replace(/[^a-zA-Z0-9]/g, '_')}_${materia.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+    
+    // Configuración de jsPDF
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const margin = 10;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // Agregar membrete
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('REPÚBLICA BOLIVARIANA DE VENEZUELA', pageWidth / 2, 15, { align: 'center' });
+    doc.text('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA', pageWidth / 2, 20, { align: 'center' });
+    doc.text('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO', pageWidth / 2, 25, { align: 'center' });
+    
+    // Agregar fecha
+    const hoy = new Date();
+    const fecha = hoy.toLocaleDateString('es-ES');
+    doc.setFont(undefined, 'normal');
+    doc.text(fecha, pageWidth - margin, 15, { align: 'right' });
+    
+    // Línea separadora
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, 30, pageWidth - margin, 30);
+    
+    // Capturar el contenido HTML y agregarlo al PDF
+    html2canvas(tempDiv, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        width: tempDiv.scrollWidth,
+        height: tempDiv.scrollHeight,
+        windowWidth: tempDiv.scrollWidth,
+        windowHeight: tempDiv.scrollHeight
+    }).then(canvas => {
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        const imgWidth = pageWidth - (margin * 2);
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        
+        // Agregar contenido al PDF (empezando después del membrete)
+        doc.addImage(imgData, 'JPEG', margin, 35, imgWidth, imgHeight);
+        
+        // Guardar el PDF - ESTA ES LA PARTE IMPORTANTE QUE FALTABA
+        doc.save(filename);
+        
+        // Limpiar elemento temporal
+        document.body.removeChild(tempDiv);
+        
+    }).catch(error => {
+        console.error('Error al generar PDF:', error);
+        alert('Error al generar el PDF: ' + error.message);
+        document.body.removeChild(tempDiv);
+    });
+}
 
 // Función para limpiar la selección del profesor
 function limpiarProfesor() {

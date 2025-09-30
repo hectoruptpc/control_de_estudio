@@ -5,14 +5,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     die('Acceso no permitido');
 }
 
-if (!isset($_POST['docente_id']) || !isset($_POST['materia_id']) || !isset($_POST['periodo_id']) || !isset($_POST['seccion'])) {
+if (!isset($_POST['docente_id']) || !isset($_POST['materia_id']) || !isset($_POST['periodo_id']) || !isset($_POST['accion'])) {
     die('Parámetros incompletos');
 }
 
 $docente_id = (int)$_POST['docente_id'];
 $materia_id = (int)$_POST['materia_id'];
 $periodo_id = (int)$_POST['periodo_id'];
-$seccion = $_POST['seccion'];
+$accion = $_POST['accion'];
 
 // Obtener información del grupo para notas definitivas
 function obtenerInfoGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
@@ -63,103 +63,15 @@ function obtenerEstudiantesGrupoDefinitivas($docente_id, $materia_id, $periodo_i
 
 // Calcular promedio según el id_trayecto de la sección
 function calcularPromedioPorTrayecto($nota, $id_trayecto) {
-    $suma = 0;
-    $count = 0;
-    
     // Determinar qué trayectos promediar según el id_trayecto de la sección
     switch ($id_trayecto) {
-        case 1: // Trayecto Inicial - Solo trayecto_0
-            if ($nota['trayecto_0'] !== null) {
-                $suma = $nota['trayecto_0'];
-                $count = 1;
-            }
-            break;
-            
-        case 2: // Trayecto 1 - Solo trayecto_1
-            if ($nota['trayecto_1'] !== null) {
-                $suma = $nota['trayecto_1'];
-                $count = 1;
-            }
-            break;
-            
-        case 3: // Trayecto 2 - Solo trayecto_2
-            if ($nota['trayecto_2'] !== null) {
-                $suma = $nota['trayecto_2'];
-                $count = 1;
-            }
-            break;
-            
-        case 4: // Trayecto 3 - Solo trayecto_3
-            if ($nota['trayecto_3'] !== null) {
-                $suma = $nota['trayecto_3'];
-                $count = 1;
-            }
-            break;
-            
-        case 5: // Trayecto 4 - Solo trayecto_4
-            if ($nota['trayecto_4'] !== null) {
-                $suma = $nota['trayecto_4'];
-                $count = 1;
-            }
-            break;
-            
-        default:
-            // Por defecto, calcular todos los trayectos (no debería pasar)
-            for ($i = 0; $i <= 4; $i++) {
-                if ($nota['trayecto_' . $i] !== null) {
-                    $suma += $nota['trayecto_' . $i];
-                    $count++;
-                }
-            }
+        case 1: return $nota['trayecto_0'] ?? 0;
+        case 2: return $nota['trayecto_1'] ?? 0;
+        case 3: return $nota['trayecto_2'] ?? 0;
+        case 4: return $nota['trayecto_3'] ?? 0;
+        case 5: return $nota['trayecto_4'] ?? 0;
+        default: return 0;
     }
-    
-    return $count > 0 ? round($suma / $count, 1) : 0;
-}
-
-// Obtener estadísticas del grupo según el id_trayecto
-function obtenerEstadisticasGrupoDefinitivas($docente_id, $materia_id, $periodo_id, $id_trayecto) {
-    global $db;
-    
-    $query = "SELECT nd.trayecto_0, nd.trayecto_1, nd.trayecto_2, nd.trayecto_3, nd.trayecto_4
-              FROM notas_definitivas nd
-              WHERE nd.id_docente = ? 
-              AND nd.id_materia = ? 
-              AND nd.id_periodo = ?";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $total_estudiantes = 0;
-    $suma_total = 0;
-    $aprobados = 0;
-    $reprobados = 0;
-    
-    while ($nota = $result->fetch_assoc()) {
-        $total_estudiantes++;
-        
-        // Calcular promedio según el id_trayecto de la sección
-        $promedio_estudiante = calcularPromedioPorTrayecto($nota, $id_trayecto);
-        $suma_total += $promedio_estudiante;
-        
-        // Aprobados desde 12 puntos
-        if ($promedio_estudiante >= 12) {
-            $aprobados++;
-        } else {
-            $reprobados++;
-        }
-    }
-    
-    $promedio_general = $total_estudiantes > 0 ? round($suma_total / $total_estudiantes, 1) : 0;
-    
-    return [
-        'total_estudiantes' => $total_estudiantes,
-        'promedio_general' => $promedio_general,
-        'aprobados' => $aprobados,
-        'reprobados' => $reprobados,
-        'id_trayecto' => $id_trayecto
-    ];
 }
 
 $info_grupo = obtenerInfoGrupoDefinitivas($docente_id, $materia_id, $periodo_id);
@@ -168,8 +80,6 @@ $estudiantes = obtenerEstudiantesGrupoDefinitivas($docente_id, $materia_id, $per
 if (!$info_grupo) {
     die('Información no encontrada');
 }
-
-$estadisticas = obtenerEstadisticasGrupoDefinitivas($docente_id, $materia_id, $periodo_id, $info_grupo['id_trayecto']);
 
 // Determinar qué trayecto se está considerando
 $trayecto_considerado = '';
@@ -182,135 +92,215 @@ switch ($info_grupo['id_trayecto']) {
     default: $trayecto_considerado = 'Todos los trayectos';
 }
 
-switch ($seccion) {
-    case 'lista-estudiantes':
-        ?>
-        <h4>Lista de Estudiantes - Notas Definitivas</h4>
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i> 
-            Trayecto considerado: <strong><?= $trayecto_considerado ?></strong><br>
-            Aprobación: ≥12pts
+if ($accion === 'detalles') {
+    // Mostrar detalles en el modal
+    ?>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> 
+                Trayecto considerado: <strong><?= $trayecto_considerado ?></strong> | 
+                Aprobación: ≥12pts
+            </div>
         </div>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="table table-bordered table-sm">
+            <thead class="thead-light">
+                <tr>
+                    <th>#</th>
+                    <th>Cédula</th>
+                    <th>Estudiante</th>
+                    <th>Nota</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php 
+                $contador = 1;
+                while ($estudiante = $estudiantes->fetch_assoc()): 
+                    $promedio = calcularPromedioPorTrayecto($estudiante, $info_grupo['id_trayecto']);
+                    $estado = $promedio >= 12 ? 'Aprobado' : 'Reprobado';
+                    $color_estado = $promedio >= 12 ? 'success' : 'danger';
+                    
+                    // Obtener la nota específica del trayecto
+                    $nota_trayecto = '';
+                    switch ($info_grupo['id_trayecto']) {
+                        case 1: $nota_trayecto = $estudiante['trayecto_0']; break;
+                        case 2: $nota_trayecto = $estudiante['trayecto_1']; break;
+                        case 3: $nota_trayecto = $estudiante['trayecto_2']; break;
+                        case 4: $nota_trayecto = $estudiante['trayecto_3']; break;
+                        case 5: $nota_trayecto = $estudiante['trayecto_4']; break;
+                    }
+                ?>
+                <tr>
+                    <td><?= $contador ?></td>
+                    <td><?= htmlspecialchars($estudiante['cedula']) ?></td>
+                    <td><?= htmlspecialchars($estudiante['nombre_estudiante']) ?></td>
+                    <td>
+                        <?php if ($nota_trayecto !== null): ?>
+                            <span class="badge badge-info">
+                                <?= $nota_trayecto ?>
+                            </span>
+                        <?php else: ?>
+                            <span class="badge badge-secondary">Sin nota</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <span class="badge badge-<?= $color_estado ?>">
+                            <?= $estado ?>
+                        </span>
+                    </td>
+                    <td><?= date('d/m/Y H:i', strtotime($estudiante['fecha_registro'])) ?></td>
+                </tr>
+                <?php 
+                $contador++;
+                endwhile; 
+                ?>
+            </tbody>
+        </table>
+    </div>
+    <?php
+} elseif ($accion === 'pdf') {
+    // Generar contenido para PDF
+    // Recalcular estadísticas
+    $estudiantes->data_seek(0);
+    $total_estudiantes = 0;
+    $aprobados = 0;
+    $suma_notas = 0;
+    
+    while ($estudiante = $estudiantes->fetch_assoc()) {
+        $total_estudiantes++;
+        $promedio = calcularPromedioPorTrayecto($estudiante, $info_grupo['id_trayecto']);
+        $suma_notas += $promedio;
+        if ($promedio >= 12) {
+            $aprobados++;
+        }
+    }
+    
+    $promedio_general = $total_estudiantes > 0 ? round($suma_notas / $total_estudiantes, 1) : 0;
+    $reprobados = $total_estudiantes - $aprobados;
+    $porcentaje_aprobados = $total_estudiantes > 0 ? round(($aprobados / $total_estudiantes) * 100, 1) : 0;
+    ?>
+    <div style="font-family: Arial, sans-serif; padding: 10px;">
+        <h3 style="text-align: center; color: #2c3e50; margin-bottom: 15px;">REPORTE DE NOTAS DEFINITIVAS</h3>
         
-        <div class="table-responsive">
-            <table class="table table-bordered table-sm">
-                <thead class="thead-light">
-                    <tr>
-                        <th>Cédula</th>
-                        <th>Estudiante</th>
-                        <th>Nota del Trayecto</th>
-                        <th>Estado</th>
-                        <th>Fecha Aprobación</th>
-                        <th>Aprobado por</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php while ($estudiante = $estudiantes->fetch_assoc()): ?>
-                        <?php
-                        $promedio = calcularPromedioPorTrayecto($estudiante, $info_grupo['id_trayecto']);
-                        $estado = $promedio >= 12 ? 'Aprobado' : 'Reprobado';
-                        $color_estado = $promedio >= 12 ? 'success' : 'danger';
-                        
-                        // Obtener la nota específica del trayecto
-                        $nota_trayecto = '';
-                        switch ($info_grupo['id_trayecto']) {
-                            case 1: $nota_trayecto = $estudiante['trayecto_0']; break;
-                            case 2: $nota_trayecto = $estudiante['trayecto_1']; break;
-                            case 3: $nota_trayecto = $estudiante['trayecto_2']; break;
-                            case 4: $nota_trayecto = $estudiante['trayecto_3']; break;
-                            case 5: $nota_trayecto = $estudiante['trayecto_4']; break;
-                        }
-                        ?>
-                        <tr>
-                            <td><?= htmlspecialchars($estudiante['cedula']) ?></td>
-                            <td><?= htmlspecialchars($estudiante['nombre_estudiante']) ?></td>
-                            <td>
-                                <?php if ($nota_trayecto !== null): ?>
-                                    <span class="badge badge-info">
-                                        T<?= $info_grupo['id_trayecto'] - 1 ?>: <?= $nota_trayecto ?>
-                                    </span>
-                                <?php else: ?>
-                                    <span class="badge badge-secondary">Sin nota</span>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <span class="badge badge-<?= $color_estado ?>">
-                                    <?= $estado ?>
-                                </span>
-                            </td>
-                            <td><?= date('d/m/Y H:i', strtotime($estudiante['fecha_registro'])) ?></td>
-                            <td><?= htmlspecialchars($estudiante['admin_aprobador'] ?? 'Sistema') ?></td>
-                        </tr>
-                    <?php endwhile; ?>
-                </tbody>
+        <!-- Información del grupo -->
+        <div style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+            <h4 style="color: #34495e; margin-bottom: 8px; font-size: 14px;">Información del Grupo</h4>
+            <table style="width: 100%; font-size: 11px;">
+                <tr>
+                    <td style="width: 80px; font-weight: bold;">Docente:</td>
+                    <td><?= htmlspecialchars($info_grupo['nombre_docente']) ?></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">Materia:</td>
+                    <td><?= htmlspecialchars($info_grupo['nombre_materia']) ?> (<?= htmlspecialchars($info_grupo['cod_materia']) ?>)</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">Periodo:</td>
+                    <td><?= htmlspecialchars($info_grupo['nombre_periodo']) ?></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">Sección:</td>
+                    <td><?= htmlspecialchars($info_grupo['codigo_seccion']) ?></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">Carrera:</td>
+                    <td><?= htmlspecialchars($info_grupo['nombre_carrera']) ?></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">Trayecto:</td>
+                    <td><?= htmlspecialchars($info_grupo['nombre_trayecto']) ?></td>
+                </tr>
             </table>
         </div>
-        <?php
-        break;
+
+        <h4 style="color: #2c3e50; margin-bottom: 10px; font-size: 13px;">Lista de Estudiantes - Notas Definitivas</h4>
         
-    case 'resumen':
-        ?>
-        <h4>Resumen del Grupo - Notas Definitivas</h4>
-        <div class="alert alert-info">
-            <strong>Trayecto considerado:</strong> <?= $trayecto_considerado ?><br>
-            <strong>Aprobación:</strong> ≥12pts
+        <div style="background: #e8f4fd; padding: 8px; border-radius: 3px; margin-bottom: 10px; border-left: 3px solid #3498db; font-size: 10px;">
+            <strong>Información:</strong> Trayecto considerado: <strong><?= $trayecto_considerado ?></strong> | Aprobación: ≥12pts
         </div>
         
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card mb-3">
-                    <div class="card-header bg-light">Información del Grupo</div>
-                    <div class="card-body">
-                        <p><strong>Docente:</strong> <?= htmlspecialchars($info_grupo['nombre_docente']) ?></p>
-                        <p><strong>Materia:</strong> <?= htmlspecialchars($info_grupo['nombre_materia']) ?></p>
-                        <p><strong>Código:</strong> <?= htmlspecialchars($info_grupo['cod_materia']) ?></p>
-                        <p><strong>Trayecto:</strong> <?= htmlspecialchars($info_grupo['nombre_trayecto']) ?> (ID: <?= $info_grupo['id_trayecto'] ?>)</p>
-                        <p><strong>Periodo:</strong> <?= htmlspecialchars($info_grupo['nombre_periodo']) ?></p>
-                        <p><strong>Sección:</strong> <?= htmlspecialchars($info_grupo['codigo_seccion']) ?></p>
-                        <p><strong>Carrera:</strong> <?= htmlspecialchars($info_grupo['nombre_carrera']) ?></p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-6">
-                <div class="card mb-3">
-                    <div class="card-header bg-light">Estadísticas Definitivas</div>
-                    <div class="card-body">
-                        <p><strong>Total Estudiantes:</strong> 
-                            <span class="badge badge-primary"><?= $estadisticas['total_estudiantes'] ?></span>
-                        </p>
-                        <p><strong>Promedio General:</strong> 
-                            <span class="badge badge-<?= $estadisticas['promedio_general'] >= 12 ? 'success' : 'warning' ?>">
-                                <?= $estadisticas['promedio_general'] ?>
-                            </span>
-                        </p>
-                        <p><strong>Aprobados (≥12pts):</strong> 
-                            <span class="badge badge-success"><?= $estadisticas['aprobados'] ?></span>
-                            (<?= $estadisticas['total_estudiantes'] > 0 ? round(($estadisticas['aprobados'] / $estadisticas['total_estudiantes']) * 100, 1) : 0 ?>%)
-                        </p>
-                        <p><strong>Reprobados (<12pts):</strong> 
-                            <span class="badge badge-danger"><?= $estadisticas['reprobados'] ?></span>
-                            (<?= $estadisticas['total_estudiantes'] > 0 ? round(($estadisticas['reprobados'] / $estadisticas['total_estudiantes']) * 100, 1) : 0 ?>%)
-                        </p>
-                        
-                        <!-- Gráfico simple de progreso -->
-                        <?php if ($estadisticas['total_estudiantes'] > 0): ?>
-                        <div class="progress mt-3" style="height: 20px;">
-                            <div class="progress-bar bg-success" 
-                                 style="width: <?= ($estadisticas['aprobados'] / $estadisticas['total_estudiantes']) * 100 ?>%">
-                                Aprobados: <?= $estadisticas['aprobados'] ?>
-                            </div>
-                            <div class="progress-bar bg-danger" 
-                                 style="width: <?= ($estadisticas['reprobados'] / $estadisticas['total_estudiantes']) * 100 ?>%">
-                                Reprobados: <?= $estadisticas['reprobados'] ?>
-                            </div>
-                        </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 15px;">
+            <thead>
+                <tr style="background: #34495e; color: white;">
+                    <th style="border: 1px solid #ddd; padding: 6px; text-align: center; width: 5%;">#</th>
+                    <th style="border: 1px solid #ddd; padding: 6px; text-align: left; width: 20%;">Cédula</th>
+                    <th style="border: 1px solid #ddd; padding: 6px; text-align: left; width: 35%;">Estudiante</th>
+                    <th style="border: 1px solid #ddd; padding: 6px; text-align: center; width: 10%;">Nota</th>
+                    <th style="border: 1px solid #ddd; padding: 6px; text-align: center; width: 15%;">Estado</th>
+                    <th style="border: 1px solid #ddd; padding: 6px; text-align: center; width: 15%;">Fecha</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php 
+                $contador = 1;
+                $estudiantes->data_seek(0);
+                while ($estudiante = $estudiantes->fetch_assoc()): 
+                    $promedio = calcularPromedioPorTrayecto($estudiante, $info_grupo['id_trayecto']);
+                    $estado = $promedio >= 12 ? 'Aprobado' : 'Reprobado';
+                    $color_estado = $promedio >= 12 ? '#27ae60' : '#e74c3c';
+                    $fecha = date('d/m/Y H:i', strtotime($estudiante['fecha_registro']));
+                    
+                    // Obtener la nota específica del trayecto
+                    $nota_trayecto = '';
+                    switch ($info_grupo['id_trayecto']) {
+                        case 1: $nota_trayecto = $estudiante['trayecto_0']; break;
+                        case 2: $nota_trayecto = $estudiante['trayecto_1']; break;
+                        case 3: $nota_trayecto = $estudiante['trayecto_2']; break;
+                        case 4: $nota_trayecto = $estudiante['trayecto_3']; break;
+                        case 5: $nota_trayecto = $estudiante['trayecto_4']; break;
+                    }
+                ?>
+                <tr style="background: <?= $contador % 2 === 0 ? '#f8f9fa' : '#ffffff' ?>;">
+                    <td style="border: 1px solid #ddd; padding: 6px; text-align: center;"><?= $contador ?></td>
+                    <td style="border: 1px solid #ddd; padding: 6px;"><?= htmlspecialchars($estudiante['cedula']) ?></td>
+                    <td style="border: 1px solid #ddd; padding: 6px;"><?= htmlspecialchars($estudiante['nombre_estudiante']) ?></td>
+                    <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-weight: bold;">
+                        <?= $nota_trayecto !== null ? $nota_trayecto : 'N/A' ?>
+                    </td>
+                    <td style="border: 1px solid #ddd; padding: 6px; text-align: center; color: <?= $color_estado ?>; font-weight: bold;">
+                        <?= $estado ?>
+                    </td>
+                    <td style="border: 1px solid #ddd; padding: 6px; text-align: center;"><?= $fecha ?></td>
+                </tr>
+                <?php 
+                $contador++;
+                endwhile; 
+                ?>
+            </tbody>
+        </table>
+        
+        <!-- Estadísticas -->
+        <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #dee2e6; font-size: 10px;">
+            <h4 style="color: #2c3e50; margin-bottom: 8px; font-size: 12px;">Estadísticas del Grupo</h4>
+            <table style="width: 100%; font-size: 10px;">
+                <tr>
+                    <td style="width: 120px; font-weight: bold;">Total estudiantes:</td>
+                    <td style="font-weight: bold; color: #3498db;"><?= $total_estudiantes ?></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">Aprobados:</td>
+                    <td style="font-weight: bold; color: #27ae60;"><?= $aprobados ?> (<?= $porcentaje_aprobados ?>%)</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">Reprobados:</td>
+                    <td style="font-weight: bold; color: #e74c3c;"><?= $reprobados ?></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">Promedio general:</td>
+                    <td style="font-weight: bold; color: #f39c12;"><?= $promedio_general ?></td>
+                </tr>
+            </table>
         </div>
-        <?php
-        break;
+        
+        <div style="margin-top: 15px; text-align: center; color: #7f8c8d; font-size: 8px;">
+            Generado el: <?= date('d/m/Y H:i:s') ?> | Sistema Académico - UPT Puerto Cabello
+        </div>
+    </div>
+    <?php
 }
 ?>
