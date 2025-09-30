@@ -202,24 +202,42 @@ if ($accion === 'detalles') {
             </tbody>
         </table>
 
-        <!-- Firma y sello -->
-        <div style="margin-top: 40px; border-top: 1px solid #bdc3c7; padding-top: 20px;">
+               <!-- Firma y sello - FIRMA SOBRE LA LÍNEA -->
+        <div style="margin-top: 50px; padding-top: 20px;">
             <table style="width: 100%; font-size: 9px;">
                 <tr>
-                    <td style="width: 50%; text-align: center;">
-                        <div style="border-bottom: 1px solid #34495e; padding-bottom: 5px; margin-bottom: 5px; width: 70%; margin-left: auto; margin-right: auto;">
-                            <strong>FIRMA DEL DOCENTE</strong>
-                        </div>
-                        <div style="color: #7f8c8d;">
-                            <?= htmlspecialchars($info_grupo['nombre_docente']) ?>
+                    <td style="width: 50%; text-align: center; vertical-align: top;">
+                        <!-- Firma del docente -->
+                        <div style="margin-bottom: 30px; width: 80%; margin-left: auto; margin-right: auto;">
+                            <div style="height: 50px; margin-bottom: 10px;">
+                                <!-- ESPACIO PARA LA FIRMA (encima de la línea) -->
+                            </div>
+                            <div style="border-top: 1px solid #34495e; padding-top: 8px; margin-bottom: 5px;">
+                                <strong>FIRMA DEL DOCENTE</strong>
+                            </div>
+                            <div style="color: #7f8c8d; font-size: 8px;">
+                                <?= htmlspecialchars($info_grupo['nombre_docente']) ?>
+                            </div>
+                            <div style="color: #95a5a6; font-size: 7px; margin-top: 2px;">
+                                Docente responsable
+                            </div>
                         </div>
                     </td>
-                    <td style="width: 50%; text-align: center;">
-                        <div style="border-bottom: 1px solid #34495e; padding-bottom: 5px; margin-bottom: 5px; width: 70%; margin-left: auto; margin-right: auto;">
-                            <strong>SELLO INSTITUCIONAL</strong>
-                        </div>
-                        <div style="color: #7f8c8d;">
-                            Universidad Politécnica Territorial<br>de Puerto Cabello
+                    <td style="width: 50%; text-align: center; vertical-align: top;">
+                        <!-- Sello institucional -->
+                        <div style="margin-bottom: 30px; width: 80%; margin-left: auto; margin-right: auto;">
+                            <div style="height: 50px; margin-bottom: 10px;">
+                                <!-- ESPACIO PARA EL SELLO (encima de la línea) -->
+                            </div>
+                            <div style="border-top: 1px solid #34495e; padding-top: 8px; margin-bottom: 5px;">
+                                <strong>SELLO INSTITUCIONAL</strong>
+                            </div>
+                            <div style="color: #7f8c8d; font-size: 8px;">
+                                Universidad Politécnica Territorial<br>de Puerto Cabello
+                            </div>
+                            <div style="color: #95a5a6; font-size: 7px; margin-top: 2px;">
+                                Entidad certificadora
+                            </div>
                         </div>
                     </td>
                 </tr>
