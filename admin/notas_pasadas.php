@@ -509,7 +509,7 @@ $(document).ready(function() {
     });
 });
 
-// Función para generar PDF - SIMPLIFICADA Y FUNCIONAL
+// Función para generar PDF - USANDO LA FUNCIÓN DEL MEMBRETE DE functions.php
 function generarPDF(contenido, docente, materia, periodo, seccion, carrera) {
     // Crear elemento temporal para el contenido del PDF
     const tempDiv = document.createElement('div');
@@ -529,49 +529,42 @@ function generarPDF(contenido, docente, materia, periodo, seccion, carrera) {
     const margin = 10;
     const pageWidth = doc.internal.pageSize.getWidth();
     
-    // Agregar membrete
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text('REPÚBLICA BOLIVARIANA DE VENEZUELA', pageWidth / 2, 15, { align: 'center' });
-    doc.text('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA', pageWidth / 2, 20, { align: 'center' });
-    doc.text('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO', pageWidth / 2, 25, { align: 'center' });
+    // Usar la función del membrete desde PHP
+    <?php echo generarMembreteJS(); ?>
     
-    // Agregar fecha
-    const hoy = new Date();
-    const fecha = hoy.toLocaleDateString('es-ES');
-    doc.setFont(undefined, 'normal');
-    doc.text(fecha, pageWidth - margin, 15, { align: 'right' });
-    
-    // Línea separadora
-    doc.setDrawColor(200, 200, 200);
-    doc.line(margin, 30, pageWidth - margin, 30);
-    
-    // Capturar el contenido HTML y agregarlo al PDF
-    html2canvas(tempDiv, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        width: tempDiv.scrollWidth,
-        height: tempDiv.scrollHeight,
-        windowWidth: tempDiv.scrollWidth,
-        windowHeight: tempDiv.scrollHeight
-    }).then(canvas => {
-        const imgData = canvas.toDataURL('image/jpeg', 1.0);
-        const imgWidth = pageWidth - (margin * 2);
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        
-        // Agregar contenido al PDF (empezando después del membrete)
-        doc.addImage(imgData, 'JPEG', margin, 35, imgWidth, imgHeight);
-        
-        // Guardar el PDF - ESTA ES LA PARTE IMPORTANTE QUE FALTABA
-        doc.save(filename);
-        
-        // Limpiar elemento temporal
-        document.body.removeChild(tempDiv);
-        
+    // Llamar a la función para agregar el membrete
+    agregarMembretePDF(doc, pageWidth, margin).then(startY => {
+        // Capturar el contenido HTML y agregarlo al PDF
+        html2canvas(tempDiv, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            width: tempDiv.scrollWidth,
+            height: tempDiv.scrollHeight,
+            windowWidth: tempDiv.scrollWidth,
+            windowHeight: tempDiv.scrollHeight
+        }).then(canvas => {
+            const imgData = canvas.toDataURL('image/jpeg', 1.0);
+            const imgWidth = pageWidth - (margin * 2);
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            
+            // Agregar contenido al PDF (empezando después del membrete)
+            doc.addImage(imgData, 'JPEG', margin, startY, imgWidth, imgHeight);
+            
+            // Guardar el PDF
+            doc.save(filename);
+            
+            // Limpiar elemento temporal
+            document.body.removeChild(tempDiv);
+            
+        }).catch(error => {
+            console.error('Error al generar PDF:', error);
+            alert('Error al generar el PDF: ' + error.message);
+            document.body.removeChild(tempDiv);
+        });
     }).catch(error => {
-        console.error('Error al generar PDF:', error);
-        alert('Error al generar el PDF: ' + error.message);
+        console.error('Error al cargar el membrete:', error);
+        alert('Error al generar el membrete del PDF');
         document.body.removeChild(tempDiv);
     });
 }
