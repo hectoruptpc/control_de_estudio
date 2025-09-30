@@ -40,34 +40,113 @@ $id_trayecto_seccion = $trayecto_seccion['id_trayecto'];
 // Determinar qué trayecto mostrar
 $trayecto_a_mostrar = determinarTrayectoAMostrar($id_trayecto_seccion);
 
+// Obtener ID del docente
+if (isset($_SESSION['user']['id'])) {
+    $docente_id = (int)$_SESSION['user']['id'];
+} elseif (isset($_SESSION['id'])) {
+    $docente_id = (int)$_SESSION['id'];
+} else {
+    $docente_id = 0;
+}
+
 // Verificar estados de notas
 $notas_aprobadas = false;
 $notas_rechazadas = false;
+$notas_en_revision = false;
+$notas_pendientes = false;
+
 $estudiantes_con_notas_aprobadas = [];
 $estudiantes_con_notas_rechazadas = [];
+$estudiantes_con_notas_en_revision = [];
+$estudiantes_con_notas_pendientes = [];
+
+// Función para verificar si existe en notas_pendientes
+function existeEnNotasPendientes($id_estudiante, $id_materia, $id_periodo, $id_docente) {
+    global $db;
+    
+    $query = "SELECT id FROM notas_pendientes 
+              WHERE id_usuario = ? 
+              AND id_materia = ? 
+              AND id_periodo = ? 
+              AND id_docente = ? 
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iiii", $id_estudiante, $id_materia, $id_periodo, $id_docente);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->num_rows > 0;
+}
 
 // Obtener información de estados ANTES de mostrar el formulario
 $estudiantes_info = [];
 while ($estudiante = $estudiantes->fetch_assoc()) {
     $notas = obtenerNotasEstudiante($estudiante['id'], $materia_id);
-    $estudiantes_info[] = [
-        'datos' => $estudiante,
-        'notas' => $notas
-    ];
     
+    // Determinar el estado basado en las tablas con la JERARQUÍA CORRECTA:
+    // 1. Aprobada/Rechazada (máxima prioridad)
+    // 2. En Revisión (si está en notas_pendientes)
+    // 3. Pendiente (por defecto)
+    
+    $estado = 'pendiente'; // Por defecto
+    
+    // PRIMERO: Verificar si existe en la tabla de notas aprobadas/rechazadas (MÁXIMA PRIORIDAD)
     if ($notas) {
         if ($notas['estado'] === 'aprobada') {
+            $estado = 'aprobada';
             $notas_aprobadas = true;
             $estudiantes_con_notas_aprobadas[] = $estudiante['nombre'];
         } elseif ($notas['estado'] === 'rechazada') {
+            $estado = 'rechazada';
             $notas_rechazadas = true;
             $estudiantes_con_notas_rechazadas[] = $estudiante['nombre'];
         }
+    } 
+    // SEGUNDO: Si no está aprobada/rechazada, verificar si está en notas_pendientes
+    elseif (existeEnNotasPendientes($estudiante['id'], $materia_id, $periodo_id, $docente_id)) {
+        $estado = 'en_revision';
+        $notas_en_revision = true;
+        $estudiantes_con_notas_en_revision[] = $estudiante['nombre'];
+    } 
+    // TERCERO: Si no está en ninguna tabla, es pendiente
+    else {
+        $estado = 'pendiente';
+        $notas_pendientes = true;
+        $estudiantes_con_notas_pendientes[] = $estudiante['nombre'];
     }
+    
+    $estudiantes_info[] = [
+        'datos' => $estudiante,
+        'notas' => $notas,
+        'estado' => $estado
+    ];
+}
+
+// Función para obtener la nota de la tabla notas_pendientes
+function obtenerNotaPendiente($id_estudiante, $id_materia, $id_periodo, $id_docente, $campo_trayecto) {
+    global $db;
+    
+    $query = "SELECT $campo_trayecto FROM notas_pendientes 
+              WHERE id_usuario = ? 
+              AND id_materia = ? 
+              AND id_periodo = ? 
+              AND id_docente = ? 
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iiii", $id_estudiante, $id_materia, $id_periodo, $id_docente);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        return $row[$campo_trayecto];
+    }
+    
+    return null;
 }
 ?>
-
-
 
 <div class="card">
     <div class="card-header bg-info text-white">
@@ -93,11 +172,28 @@ while ($estudiante = $estudiantes->fetch_assoc()) {
             <?= implode(', ', $estudiantes_con_notas_rechazadas) ?>
         </div>
         
+        <div class="alert alert-warning <?= $notas_en_revision ? '' : 'd-none' ?>" id="alert-en-revision">
+            <strong>⏳ Notas en Revisión:</strong> Algunas notas están siendo revisadas por los administradores. 
+            No pueden ser modificadas hasta que se complete la revisión.
+            <br>
+            <strong>Estudiantes con notas en revisión:</strong>
+            <?= implode(', ', $estudiantes_con_notas_en_revision) ?>
+        </div>
+        
+        <div class="alert alert-secondary <?= $notas_pendientes ? '' : 'd-none' ?>" id="alert-pendientes">
+            <strong>📝 Notas Pendientes:</strong> Algunas notas no han sido subidas aún. 
+            Por favor, ingrese las notas faltantes.
+            <br>
+            <strong>Estudiantes con notas pendientes:</strong>
+            <?= implode(', ', $estudiantes_con_notas_pendientes) ?>
+        </div>
+        
         <!-- MOSTRAR SIEMPRE EL PANEL DE INFORMACIÓN DE ESTADOS -->
         <div class="alert alert-info">
             <i class="fas fa-info-circle"></i> 
             <strong>Estados:</strong><br>
-            • <span class="badge badge-warning">Pendiente</span> - Puede editar<br>
+            • <span class="badge badge-secondary">Pendiente</span> - No se ha subido la nota<br>
+            • <span class="badge badge-warning">En Revisión</span> - En revisión por administradores<br>
             • <span class="badge badge-success">Aprobada</span> - No se puede modificar<br>
             • <span class="badge badge-danger">Rechazada</span> - Puede corregir y reenviar
         </div>
@@ -108,6 +204,7 @@ while ($estudiante = $estudiantes->fetch_assoc()) {
             <input type="hidden" name="periodo_id" value="<?= $periodo_id ?>">
             <input type="hidden" name="trayecto_actual" value="<?= $trayecto_actual ?>">
             <input type="hidden" name="id_trayecto_seccion" value="<?= $id_trayecto_seccion ?>">
+            <input type="hidden" name="docente_id" value="<?= $docente_id ?>">
             
             <div class="table-responsive">
                 <table class="table table-bordered">
@@ -115,7 +212,7 @@ while ($estudiante = $estudiantes->fetch_assoc()) {
                         <tr>
                             <th>Cédula</th>
                             <th>Nombre</th>
-                            <th>Nota Trayecto <?= $trayecto_actual ?></th>
+                            <th class="text-center">Nota Trayecto <?= $trayecto_actual ?></th>
                             <th>Estado</th>
                         </tr>
                     </thead>
@@ -123,68 +220,85 @@ while ($estudiante = $estudiantes->fetch_assoc()) {
                         <?php foreach ($estudiantes_info as $info): 
                             $estudiante = $info['datos'];
                             $notas = $info['notas'];
-                            $estado = $notas ? $notas['estado'] : 'pendiente';
+                            $estado = $info['estado'];
+                            
+                            // Solo se puede editar si está pendiente o rechazada
                             $puede_editar = ($estado === 'pendiente' || $estado === 'rechazada');
                             
-                            // Obtener valor de la nota en formato de 2 dígitos
-                            $valor_nota = '';
+                            // Obtener valor de la nota
+                            $valor_nota = 1;
                             $campo_trayecto = 'trayecto_' . $trayecto_a_mostrar;
                             
+                            // Si hay notas aprobadas/rechazadas, usar ese valor
                             if ($notas && isset($notas[$campo_trayecto]) && $notas[$campo_trayecto] !== null) {
-                                $valor_nota = str_pad($notas[$campo_trayecto], 2, '0', STR_PAD_LEFT);
+                                $valor_nota = (int)$notas[$campo_trayecto];
                             } else {
-                                $valor_nota = '01'; // Valor por defecto en 2 dígitos
+                                // Si está en revisión, intentar obtener el valor de notas_pendientes
+                                if ($estado === 'en_revision') {
+                                    $nota_pendiente = obtenerNotaPendiente($estudiante['id'], $materia_id, $periodo_id, $docente_id, $campo_trayecto);
+                                    if ($nota_pendiente !== null) {
+                                        $valor_nota = (int)$nota_pendiente;
+                                    }
+                                }
                             }
                         ?>
                             <tr>
                                 <td><?= htmlspecialchars($estudiante['idusuario']) ?></td>
                                 <td><?= htmlspecialchars($estudiante['nombre']) ?></td>
-                                <td>
+                                <td class="text-center">
                                     <?php if ($puede_editar): ?>
-                                        <input type="text" 
-                                               name="notas[<?= $estudiante['id'] ?>][<?= $campo_trayecto ?>]" 
-                                               class="form-control nota-input" 
-                                               min="1" 
-                                               max="20" 
-                                               oninput="validarNota(this)"
-                                               value="<?= $valor_nota ?>"
-                                               pattern="[0-9]{2}"
-                                               maxlength="2"
-                                               required>
+                                        <div class="d-inline-block">
+                                            <input type="number" 
+                                                   name="notas[<?= $estudiante['id'] ?>][<?= $campo_trayecto ?>]" 
+                                                   class="form-control nota-input two-digit" 
+                                                   min="1" 
+                                                   max="20" 
+                                                   step="1"
+                                                   value="<?= $valor_nota ?>"
+                                                   oninput="validarNota(this)"
+                                                   onkeydown="limitarDigitos(event, this)"
+                                                   maxlength="2"
+                                                   required
+                                                   style="width: 80px; text-align: center; margin: 0 auto;">
+                                        </div>
                                     <?php else: ?>
-                                        <input type="text" 
-                                               class="form-control" 
-                                               value="<?= $valor_nota ?>"
-                                               readonly
-                                               style="background-color: #f8f9fa; cursor: not-allowed;">
-                                        <input type="hidden" 
-                                               name="notas[<?= $estudiante['id'] ?>][<?= $campo_trayecto ?>]" 
-                                               value="<?= $valor_nota ?>">
+                                        <div class="d-inline-block">
+                                            <input type="text" 
+                                                   class="form-control two-digit-display" 
+                                                   value="<?= str_pad($valor_nota, 2, '0', STR_PAD_LEFT) ?>"
+                                                   readonly
+                                                   style="width: 80px; text-align: center; margin: 0 auto; background-color: #f8f9fa; cursor: not-allowed;">
+                                            <input type="hidden" 
+                                                   name="notas[<?= $estudiante['id'] ?>][<?= $campo_trayecto ?>]" 
+                                                   value="<?= $valor_nota ?>">
+                                        </div>
                                     <?php endif; ?>
                                 </td>
                                 <td>
                                     <?php
                                     $badge_class = 'secondary';
-                                    $badge_text = 'Sin estado';
+                                    $badge_text = 'Pendiente';
+                                    $descripcion_estado = 'No se ha subido la nota';
                                     
-                                    if ($estado === 'pendiente') {
+                                    if ($estado === 'en_revision') {
                                         $badge_class = 'warning';
-                                        $badge_text = 'Pendiente';
+                                        $badge_text = 'En Revisión';
+                                        $descripcion_estado = 'En revisión por administradores';
                                     } elseif ($estado === 'aprobada') {
                                         $badge_class = 'success';
                                         $badge_text = 'Aprobada';
+                                        $descripcion_estado = 'No se puede modificar';
                                     } elseif ($estado === 'rechazada') {
                                         $badge_class = 'danger';
                                         $badge_text = 'Rechazada';
+                                        $descripcion_estado = 'Puede corregir y reenviar';
                                     }
                                     ?>
                                     <span class="badge badge-<?= $badge_class ?>">
                                         <?= $badge_text ?>
                                     </span>
-                                    <?php if ($estado === 'rechazada'): ?>
-                                        <br>
-                                        <small class="text-danger">Puede corregir y reenviar</small>
-                                    <?php endif; ?>
+                                    <br>
+                                    <small class="text-muted"><?= $descripcion_estado ?></small>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -194,20 +308,78 @@ while ($estudiante = $estudiantes->fetch_assoc()) {
             
             <button type="submit" class="btn btn-success btn-lg">
                 <i class="fas fa-save"></i> 
-                <?= $notas_rechazadas ? 'Reenviar Notas Rechazadas' : 'Guardar Notas' ?>
+                <?= ($notas_rechazadas || $notas_pendientes) ? 'Enviar Notas' : 'Actualizar Notas' ?>
             </button>
+            
+            <?php if ($notas_en_revision): ?>
+                <div class="mt-3 alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Nota:</strong> Las notas en revisión no pueden ser modificadas hasta que los administradores completen su evaluación.
+                </div>
+            <?php endif; ?>
         </form>
     </div>
 </div>
 
+<style>
+/* Estilo para que los inputs de número muestren siempre 2 dígitos */
+.nota-input.two-digit {
+    font-variant-numeric: tabular-nums;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+
+.nota-input.two-digit::-webkit-outer-spin-button,
+.nota-input.two-digit::-webkit-inner-spin-button {
+    opacity: 1;
+    height: 30px;
+}
+
+/* Para Firefox */
+.nota-input.two-digit {
+    -moz-appearance: textfield;
+}
+
+.nota-input.two-digit::-webkit-inner-spin-button, 
+.nota-input.two-digit::-webkit-outer-spin-button { 
+    opacity: 1;
+}
+
+/* Estilo para los campos de solo lectura */
+.two-digit-display {
+    font-variant-numeric: tabular-nums;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+</style>
+
 <script>
+function limitarDigitos(event, input) {
+    // Permitir teclas de control (backspace, delete, tab, etc.)
+    if (event.key === 'Backspace' || event.key === 'Delete' || event.key === 'Tab' || 
+        event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'Home' || event.key === 'End') {
+        return;
+    }
+    
+    // Si ya tiene 2 dígitos y no es una tecla de control, prevenir la entrada
+    if (input.value.length >= 2 && !event.ctrlKey && !event.metaKey) {
+        event.preventDefault();
+        
+        // Si presiona un número, reemplazar el valor completo
+        if (event.key >= '0' && event.key <= '9') {
+            input.value = event.key;
+            validarNota(input);
+        }
+    }
+}
+
 function validarNota(input) {
     // Eliminar cualquier carácter no numérico
     input.value = input.value.replace(/[^0-9]/g, '');
     
-    // Si está vacío, establecer como 01
+    // Si está vacío, establecer como 1
     if (input.value === '') {
-        input.value = '01';
+        input.value = '1';
         return;
     }
     
@@ -216,19 +388,23 @@ function validarNota(input) {
     
     // Validar rango
     if (valor < 1) {
-        input.value = '01';
+        input.value = '1';
     } else if (valor > 20) {
         input.value = '20';
-    } else {
-        // Asegurar que siempre tenga 2 dígitos
-        input.value = valor.toString().padStart(2, '0');
+    }
+    
+    // Limitar a 2 dígitos máximo
+    if (input.value.length > 2) {
+        input.value = input.value.slice(0, 2);
     }
 }
 
 // Validar todas las notas al cargar la página
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.nota-input').forEach(input => {
-        validarNota(input);
+        // Formatear inicialmente a número (sin ceros a la izquierda)
+        let valor = parseInt(input.value);
+        input.value = valor;
         
         input.addEventListener('blur', function() {
             validarNota(this);
@@ -236,6 +412,28 @@ document.addEventListener('DOMContentLoaded', function() {
         
         input.addEventListener('focus', function() {
             this.select();
+        });
+        
+        input.addEventListener('change', function() {
+            validarNota(this);
+        });
+        
+        input.addEventListener('input', function(e) {
+            if (this.value === '') {
+                setTimeout(() => {
+                    this.value = '1';
+                }, 10);
+            }
+        });
+        
+        input.addEventListener('paste', function(e) {
+            e.preventDefault();
+            let pastedData = e.clipboardData.getData('text');
+            let numero = parseInt(pastedData.replace(/[^0-9]/g, ''));
+            if (!isNaN(numero) && numero >= 1 && numero <= 20) {
+                this.value = numero;
+                validarNota(this);
+            }
         });
     });
     
@@ -248,17 +446,12 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('alert-rechazadas').classList.remove('d-none');
     <?php endif; ?>
     
-    // Agregar funcionalidad al botón volver
-    document.getElementById('btn-volver').addEventListener('click', function() {
-        // Esta función será manejada por el JavaScript principal en notas.php
-        // Solo está aquí por si se accede directamente a cargar_estudiantes.php
-        if (window.parent && window.parent !== window) {
-            // Si estamos en un iframe o contexto similar
-            window.parent.postMessage('volver-a-secciones', '*');
-        } else {
-            // Si estamos en la página directamente
-            window.history.back();
-        }
-    });
+    <?php if ($notas_en_revision): ?>
+    document.getElementById('alert-en-revision').classList.remove('d-none');
+    <?php endif; ?>
+    
+    <?php if ($notas_pendientes): ?>
+    document.getElementById('alert-pendientes').classList.remove('d-none');
+    <?php endif; ?>
 });
 </script>
