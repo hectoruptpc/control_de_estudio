@@ -61,19 +61,6 @@ function obtenerEstudiantesGrupoDefinitivas($docente_id, $materia_id, $periodo_i
     return $stmt->get_result();
 }
 
-// Calcular promedio según el id_trayecto de la sección
-function calcularPromedioPorTrayecto($nota, $id_trayecto) {
-    // Determinar qué trayectos promediar según el id_trayecto de la sección
-    switch ($id_trayecto) {
-        case 1: return $nota['trayecto_0'] ?? 0;
-        case 2: return $nota['trayecto_1'] ?? 0;
-        case 3: return $nota['trayecto_2'] ?? 0;
-        case 4: return $nota['trayecto_3'] ?? 0;
-        case 5: return $nota['trayecto_4'] ?? 0;
-        default: return 0;
-    }
-}
-
 $info_grupo = obtenerInfoGrupoDefinitivas($docente_id, $materia_id, $periodo_id);
 $estudiantes = obtenerEstudiantesGrupoDefinitivas($docente_id, $materia_id, $periodo_id);
 
@@ -81,30 +68,9 @@ if (!$info_grupo) {
     die('Información no encontrada');
 }
 
-// Determinar qué trayecto se está considerando
-$trayecto_considerado = '';
-switch ($info_grupo['id_trayecto']) {
-    case 1: $trayecto_considerado = 'Trayecto 0'; break;
-    case 2: $trayecto_considerado = 'Trayecto 1'; break;
-    case 3: $trayecto_considerado = 'Trayecto 2'; break;
-    case 4: $trayecto_considerado = 'Trayecto 3'; break;
-    case 5: $trayecto_considerado = 'Trayecto 4'; break;
-    default: $trayecto_considerado = 'Todos los trayectos';
-}
-
 if ($accion === 'detalles') {
     // Mostrar detalles en el modal
     ?>
-    <div class="row">
-        <div class="col-md-12">
-            <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i> 
-                Trayecto considerado: <strong><?= $trayecto_considerado ?></strong> | 
-                Aprobación: ≥12pts
-            </div>
-        </div>
-    </div>
-    
     <div class="table-responsive">
         <table class="table table-bordered table-sm">
             <thead class="thead-light">
@@ -113,7 +79,6 @@ if ($accion === 'detalles') {
                     <th>Cédula</th>
                     <th>Estudiante</th>
                     <th>Nota</th>
-                    <th>Estado</th>
                     <th>Fecha</th>
                 </tr>
             </thead>
@@ -121,10 +86,6 @@ if ($accion === 'detalles') {
                 <?php 
                 $contador = 1;
                 while ($estudiante = $estudiantes->fetch_assoc()): 
-                    $promedio = calcularPromedioPorTrayecto($estudiante, $info_grupo['id_trayecto']);
-                    $estado = $promedio >= 12 ? 'Aprobado' : 'Reprobado';
-                    $color_estado = $promedio >= 12 ? 'success' : 'danger';
-                    
                     // Obtener la nota específica del trayecto
                     $nota_trayecto = '';
                     switch ($info_grupo['id_trayecto']) {
@@ -148,11 +109,6 @@ if ($accion === 'detalles') {
                             <span class="badge badge-secondary">Sin nota</span>
                         <?php endif; ?>
                     </td>
-                    <td>
-                        <span class="badge badge-<?= $color_estado ?>">
-                            <?= $estado ?>
-                        </span>
-                    </td>
                     <td><?= date('d/m/Y H:i', strtotime($estudiante['fecha_registro'])) ?></td>
                 </tr>
                 <?php 
@@ -164,75 +120,54 @@ if ($accion === 'detalles') {
     </div>
     <?php
 } elseif ($accion === 'pdf') {
-    // Generar contenido para PDF
-    // Recalcular estadísticas
-    $estudiantes->data_seek(0);
-    $total_estudiantes = 0;
-    $aprobados = 0;
-    $suma_notas = 0;
-    
-    while ($estudiante = $estudiantes->fetch_assoc()) {
-        $total_estudiantes++;
-        $promedio = calcularPromedioPorTrayecto($estudiante, $info_grupo['id_trayecto']);
-        $suma_notas += $promedio;
-        if ($promedio >= 12) {
-            $aprobados++;
-        }
-    }
-    
-    $promedio_general = $total_estudiantes > 0 ? round($suma_notas / $total_estudiantes, 1) : 0;
-    $reprobados = $total_estudiantes - $aprobados;
-    $porcentaje_aprobados = $total_estudiantes > 0 ? round(($aprobados / $total_estudiantes) * 100, 1) : 0;
+    // Generar contenido para PDF - ESTILO PROFESIONAL
     ?>
-    <div style="font-family: Arial, sans-serif; padding: 10px;">
-        <h3 style="text-align: center; color: #2c3e50; margin-bottom: 15px;">REPORTE DE NOTAS DEFINITIVAS</h3>
-        
-        <!-- Información del grupo -->
-        <div style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
-            <h4 style="color: #34495e; margin-bottom: 8px; font-size: 14px;">Información del Grupo</h4>
-            <table style="width: 100%; font-size: 11px;">
-                <tr>
-                    <td style="width: 80px; font-weight: bold;">Docente:</td>
-                    <td><?= htmlspecialchars($info_grupo['nombre_docente']) ?></td>
-                </tr>
-                <tr>
-                    <td style="font-weight: bold;">Materia:</td>
-                    <td><?= htmlspecialchars($info_grupo['nombre_materia']) ?> (<?= htmlspecialchars($info_grupo['cod_materia']) ?>)</td>
-                </tr>
-                <tr>
-                    <td style="font-weight: bold;">Periodo:</td>
-                    <td><?= htmlspecialchars($info_grupo['nombre_periodo']) ?></td>
-                </tr>
-                <tr>
-                    <td style="font-weight: bold;">Sección:</td>
-                    <td><?= htmlspecialchars($info_grupo['codigo_seccion']) ?></td>
-                </tr>
-                <tr>
-                    <td style="font-weight: bold;">Carrera:</td>
-                    <td><?= htmlspecialchars($info_grupo['nombre_carrera']) ?></td>
-                </tr>
-                <tr>
-                    <td style="font-weight: bold;">Trayecto:</td>
-                    <td><?= htmlspecialchars($info_grupo['nombre_trayecto']) ?></td>
-                </tr>
-            </table>
+    <div style="font-family: 'Arial', sans-serif; padding: 15px; color: #333;">
+        <!-- Encabezado profesional -->
+        <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #2c3e50; padding-bottom: 15px;">
+            <h2 style="color: #2c3e50; margin: 0; font-size: 20px; font-weight: bold;">
+                ACTA DE NOTAS DEFINITIVAS
+            </h2>
+            <p style="color: #7f8c8d; margin: 5px 0 0 0; font-size: 12px;">
+                Universidad Politécnica Territorial de Puerto Cabello
+            </p>
         </div>
 
-        <h4 style="color: #2c3e50; margin-bottom: 10px; font-size: 13px;">Lista de Estudiantes - Notas Definitivas</h4>
-        
-        <div style="background: #e8f4fd; padding: 8px; border-radius: 3px; margin-bottom: 10px; border-left: 3px solid #3498db; font-size: 10px;">
-            <strong>Información:</strong> Trayecto considerado: <strong><?= $trayecto_considerado ?></strong> | Aprobación: ≥12pts
-        </div>
-        
-        <table style="width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 15px;">
+        <!-- Información del grupo en tabla profesional -->
+        <table style="width: 100%; margin-bottom: 20px; font-size: 10px; border-collapse: collapse;">
+            <tr>
+                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1; width: 25%;"><strong>Docente:</strong></td>
+                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><?= htmlspecialchars($info_grupo['nombre_docente']) ?></td>
+                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1; width: 20%;"><strong>Materia:</strong></td>
+                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><?= htmlspecialchars($info_grupo['nombre_materia']) ?></td>
+            </tr>
+            <tr>
+                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><strong>Código:</strong></td>
+                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><?= htmlspecialchars($info_grupo['cod_materia']) ?></td>
+                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><strong>Sección:</strong></td>
+                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><?= htmlspecialchars($info_grupo['codigo_seccion']) ?></td>
+            </tr>
+            <tr>
+                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><strong>Periodo:</strong></td>
+                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><?= htmlspecialchars($info_grupo['nombre_periodo']) ?></td>
+                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><strong>Carrera:</strong></td>
+                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><?= htmlspecialchars($info_grupo['nombre_carrera']) ?></td>
+            </tr>
+            <tr>
+                <td style="padding: 6px;"><strong>Trayecto:</strong></td>
+                <td style="padding: 6px;" colspan="3"><?= htmlspecialchars($info_grupo['nombre_trayecto']) ?></td>
+            </tr>
+        </table>
+
+        <!-- Tabla de estudiantes - Estilo profesional -->
+        <table style="width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 20px; border: 1px solid #34495e;">
             <thead>
                 <tr style="background: #34495e; color: white;">
-                    <th style="border: 1px solid #ddd; padding: 6px; text-align: center; width: 5%;">#</th>
-                    <th style="border: 1px solid #ddd; padding: 6px; text-align: left; width: 20%;">Cédula</th>
-                    <th style="border: 1px solid #ddd; padding: 6px; text-align: left; width: 35%;">Estudiante</th>
-                    <th style="border: 1px solid #ddd; padding: 6px; text-align: center; width: 10%;">Nota</th>
-                    <th style="border: 1px solid #ddd; padding: 6px; text-align: center; width: 15%;">Estado</th>
-                    <th style="border: 1px solid #ddd; padding: 6px; text-align: center; width: 15%;">Fecha</th>
+                    <th style="border: 1px solid #2c3e50; padding: 8px; text-align: center; width: 8%;">N°</th>
+                    <th style="border: 1px solid #2c3e50; padding: 8px; text-align: left; width: 25%;">CÉDULA</th>
+                    <th style="border: 1px solid #2c3e50; padding: 8px; text-align: left; width: 47%;">ESTUDIANTE</th>
+                    <th style="border: 1px solid #2c3e50; padding: 8px; text-align: center; width: 10%;">NOTA</th>
+                    <th style="border: 1px solid #2c3e50; padding: 8px; text-align: center; width: 10%;">FECHA</th>
                 </tr>
             </thead>
             <tbody>
@@ -240,11 +175,6 @@ if ($accion === 'detalles') {
                 $contador = 1;
                 $estudiantes->data_seek(0);
                 while ($estudiante = $estudiantes->fetch_assoc()): 
-                    $promedio = calcularPromedioPorTrayecto($estudiante, $info_grupo['id_trayecto']);
-                    $estado = $promedio >= 12 ? 'Aprobado' : 'Reprobado';
-                    $color_estado = $promedio >= 12 ? '#27ae60' : '#e74c3c';
-                    $fecha = date('d/m/Y H:i', strtotime($estudiante['fecha_registro']));
-                    
                     // Obtener la nota específica del trayecto
                     $nota_trayecto = '';
                     switch ($info_grupo['id_trayecto']) {
@@ -254,18 +184,16 @@ if ($accion === 'detalles') {
                         case 4: $nota_trayecto = $estudiante['trayecto_3']; break;
                         case 5: $nota_trayecto = $estudiante['trayecto_4']; break;
                     }
+                    $fecha = date('d/m/Y', strtotime($estudiante['fecha_registro']));
                 ?>
                 <tr style="background: <?= $contador % 2 === 0 ? '#f8f9fa' : '#ffffff' ?>;">
-                    <td style="border: 1px solid #ddd; padding: 6px; text-align: center;"><?= $contador ?></td>
-                    <td style="border: 1px solid #ddd; padding: 6px;"><?= htmlspecialchars($estudiante['cedula']) ?></td>
-                    <td style="border: 1px solid #ddd; padding: 6px;"><?= htmlspecialchars($estudiante['nombre_estudiante']) ?></td>
-                    <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-weight: bold;">
+                    <td style="border: 1px solid #bdc3c7; padding: 7px; text-align: center; font-weight: bold;"><?= $contador ?></td>
+                    <td style="border: 1px solid #bdc3c7; padding: 7px;"><?= htmlspecialchars($estudiante['cedula']) ?></td>
+                    <td style="border: 1px solid #bdc3c7; padding: 7px;"><?= htmlspecialchars($estudiante['nombre_estudiante']) ?></td>
+                    <td style="border: 1px solid #bdc3c7; padding: 7px; text-align: center; font-weight: bold; font-size: 10px;">
                         <?= $nota_trayecto !== null ? $nota_trayecto : 'N/A' ?>
                     </td>
-                    <td style="border: 1px solid #ddd; padding: 6px; text-align: center; color: <?= $color_estado ?>; font-weight: bold;">
-                        <?= $estado ?>
-                    </td>
-                    <td style="border: 1px solid #ddd; padding: 6px; text-align: center;"><?= $fecha ?></td>
+                    <td style="border: 1px solid #bdc3c7; padding: 7px; text-align: center;"><?= $fecha ?></td>
                 </tr>
                 <?php 
                 $contador++;
@@ -273,32 +201,35 @@ if ($accion === 'detalles') {
                 ?>
             </tbody>
         </table>
-        
-        <!-- Estadísticas -->
-        <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #dee2e6; font-size: 10px;">
-            <h4 style="color: #2c3e50; margin-bottom: 8px; font-size: 12px;">Estadísticas del Grupo</h4>
-            <table style="width: 100%; font-size: 10px;">
+
+        <!-- Firma y sello -->
+        <div style="margin-top: 40px; border-top: 1px solid #bdc3c7; padding-top: 20px;">
+            <table style="width: 100%; font-size: 9px;">
                 <tr>
-                    <td style="width: 120px; font-weight: bold;">Total estudiantes:</td>
-                    <td style="font-weight: bold; color: #3498db;"><?= $total_estudiantes ?></td>
-                </tr>
-                <tr>
-                    <td style="font-weight: bold;">Aprobados:</td>
-                    <td style="font-weight: bold; color: #27ae60;"><?= $aprobados ?> (<?= $porcentaje_aprobados ?>%)</td>
-                </tr>
-                <tr>
-                    <td style="font-weight: bold;">Reprobados:</td>
-                    <td style="font-weight: bold; color: #e74c3c;"><?= $reprobados ?></td>
-                </tr>
-                <tr>
-                    <td style="font-weight: bold;">Promedio general:</td>
-                    <td style="font-weight: bold; color: #f39c12;"><?= $promedio_general ?></td>
+                    <td style="width: 50%; text-align: center;">
+                        <div style="border-bottom: 1px solid #34495e; padding-bottom: 5px; margin-bottom: 5px; width: 70%; margin-left: auto; margin-right: auto;">
+                            <strong>FIRMA DEL DOCENTE</strong>
+                        </div>
+                        <div style="color: #7f8c8d;">
+                            <?= htmlspecialchars($info_grupo['nombre_docente']) ?>
+                        </div>
+                    </td>
+                    <td style="width: 50%; text-align: center;">
+                        <div style="border-bottom: 1px solid #34495e; padding-bottom: 5px; margin-bottom: 5px; width: 70%; margin-left: auto; margin-right: auto;">
+                            <strong>SELLO INSTITUCIONAL</strong>
+                        </div>
+                        <div style="color: #7f8c8d;">
+                            Universidad Politécnica Territorial<br>de Puerto Cabello
+                        </div>
+                    </td>
                 </tr>
             </table>
         </div>
-        
-        <div style="margin-top: 15px; text-align: center; color: #7f8c8d; font-size: 8px;">
-            Generado el: <?= date('d/m/Y H:i:s') ?> | Sistema Académico - UPT Puerto Cabello
+
+        <!-- Pie de página profesional -->
+        <div style="margin-top: 30px; text-align: center; color: #95a5a6; font-size: 7px; border-top: 1px solid #ecf0f1; padding-top: 10px;">
+            Documento generado el <?= date('d/m/Y H:i:s') ?> | Sistema Académico UPT Puerto Cabello<br>
+            Este documento tiene validez oficial y debe ser conservado según normativa institucional
         </div>
     </div>
     <?php
