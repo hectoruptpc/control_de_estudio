@@ -133,6 +133,11 @@ if (!isLoggedIn() || !isAdmin()) {
                   <i class="fas fa-object-group fa-fw"></i> Gestionar Secciones
                 </a>
                 <?php endif; ?>
+
+                    <a title="Títulos y Relaciones con Materias" class="dropdown-item" href="../pagina_en_construccion.php">
+                        <i class="fas fa-graduation-cap fa-fw"></i> Grado
+                    </a>
+
               </div>
             </li>
 
