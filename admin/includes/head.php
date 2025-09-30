@@ -134,7 +134,7 @@ if (!isLoggedIn() || !isAdmin()) {
                 </a>
                 <?php endif; ?>
 
-                    <a title="Títulos y Relaciones con Materias" class="dropdown-item" href="../pagina_en_construccion.php">
+                    <a title="Títulos y Relaciones con Materias" class="dropdown-item" href="grado.php">
                         <i class="fas fa-graduation-cap fa-fw"></i> Grado
                     </a>
 
