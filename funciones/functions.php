@@ -5506,6 +5506,10 @@ function cargarPermisosUsuario() {
 
 
 
+// =============================================
+// FUNCIONES PARA PAGINACIÓN
+// =============================================
+
 /**
  * Obtener la cantidad de registros por página
  */
@@ -5517,7 +5521,24 @@ function obtener_registros_por_pagina() {
 }
 
 /**
- * Obtener estudiantes con paginación
+ * Obtener ID del usuario admin logueado
+ */
+function obtener_id_admin() {
+    // Probar diferentes variables de sesión comunes
+    $posibles_variables = ['user_id', 'id', 'usuario_id', 'admin_id', 'userid', 'userId', 'idusuario'];
+    
+    foreach ($posibles_variables as $variable) {
+        if (isset($_SESSION[$variable]) && !empty($_SESSION[$variable])) {
+            return $_SESSION[$variable];
+        }
+    }
+    
+    // Si no se encuentra, usar un valor por defecto
+    return 1;
+}
+
+/**
+ * Obtener estudiantes con paginación para graduación
  */
 function obtener_estudiantes_graduacion_paginados($filtros = [], $pagina = 1, $registros_por_pagina = 20) {
     global $db;
@@ -5543,7 +5564,7 @@ function obtener_estudiantes_graduacion_paginados($filtros = [], $pagina = 1, $r
         $estado = mysqli_real_escape_string($db, $filtros['estado']);
         
         if ($estado == 'cumple_requisitos') {
-            // Consulta para estudiantes que cumplen requisitos
+            // Consulta para estudiantes que cumplen requisitos pero no están graduados
             $query_base = "FROM users u 
                           LEFT JOIN graduados g ON u.id = g.id_usuario 
                           WHERE u.estudiante = 1 AND u.status = 1 
@@ -5591,7 +5612,8 @@ function obtener_estudiantes_graduacion_paginados($filtros = [], $pagina = 1, $r
     $result_count = mysqli_query($db, $query_count);
     $total_registros = 0;
     if ($result_count) {
-        $total_registros = mysqli_fetch_assoc($result_count)['total'];
+        $total_data = mysqli_fetch_assoc($result_count);
+        $total_registros = $total_data['total'];
     }
     $total_paginas = ceil($total_registros / $registros_por_pagina);
     
@@ -5621,8 +5643,12 @@ function generar_url_paginacion($pagina) {
     return 'grado.php?' . http_build_query($params);
 }
 
+// =============================================
+// FUNCIONES PARA GESTIÓN DE GRADUACIÓN
+// =============================================
+
 /**
- * Obtener estudiantes con filtros para graduación (función original mantenida)
+ * Obtener estudiantes con filtros para graduación
  */
 function obtener_estudiantes_graduacion($filtros = []) {
     global $db;
@@ -5685,7 +5711,10 @@ function marcar_como_graduado($id_usuario) {
     global $db;
     
     $id_usuario = mysqli_real_escape_string($db, $id_usuario);
-    $id_admin = $_SESSION['user_id'];
+    
+    // Obtener el ID del admin desde la sesión
+    $id_admin = obtener_id_admin();
+    
     $observaciones = isset($_POST['observaciones']) ? mysqli_real_escape_string($db, $_POST['observaciones']) : '';
     
     // Verificar si ya existe registro
@@ -5726,7 +5755,9 @@ function marcar_titulo_entregado($id_graduado) {
     global $db;
     
     $id_graduado = mysqli_real_escape_string($db, $id_graduado);
-    $id_admin = $_SESSION['user_id'];
+    
+    // Obtener el ID del admin desde la sesión
+    $id_admin = obtener_id_admin();
     
     $query = "UPDATE graduados SET 
              titulo_entregado = 1, 
@@ -5808,44 +5839,192 @@ function obtener_carreras() {
     return mysqli_query($db, $query);
 }
 
+// =============================================
+// FUNCIONES PARA EVALUACIÓN DE GRADOS (TSU Y GRADO COMPLETO)
+// =============================================
+
 /**
- * Verificar si un estudiante cumple requisitos de graduación
- * (Implementación básica - debes adaptarla a tus reglas específicas)
+ * Determinar si un estudiante es apto para el primer título (TSU) o grado completo
  */
-function cumple_requisitos_graduacion($id_usuario) {
+function es_apto_para_grado($estudiante_id) {
     global $db;
     
-    // EJEMPLO: Verificar que tenga todas las materias del último trayecto aprobadas
-    // Ajusta esta lógica según las reglas de tu universidad
+    $estudiante_id = mysqli_real_escape_string($db, $estudiante_id);
     
-    $id_usuario = mysqli_real_escape_string($db, $id_usuario);
+    // 1. Obtener información del estudiante y su carrera
+    $query_estudiante = "SELECT u.id, u.carrera, c.nombre_carrera, c.creditos_totales 
+                        FROM users u 
+                        LEFT JOIN carreras c ON u.carrera = c.id_carrera 
+                        WHERE u.id = '$estudiante_id'";
+    $result_estudiante = mysqli_query($db, $query_estudiante);
     
-    // Contar materias del último trayecto (ajusta el trayecto según tu estructura)
-    $query_materias = "SELECT COUNT(*) as total_materias 
-                      FROM materias 
-                      WHERE trayecto = 4 AND activa = 1"; // Ajusta el trayecto
+    if (!$result_estudiante || mysqli_num_rows($result_estudiante) === 0) {
+        return [
+            'apto_tsu' => false,
+            'apto_grado_completo' => false,
+            'materias_aprobadas_tsu' => 0,
+            'total_materias_tsu' => 0,
+            'porcentaje_tsu' => 0,
+            'creditos_aprobados_tsu' => 0,
+            'materias_aprobadas_completo' => 0,
+            'total_materias_carrera' => 0,
+            'porcentaje_completo' => 0,
+            'creditos_aprobados_completo' => 0,
+            'requisitos_adicionales' => false,
+            'carrera' => 'No especificada'
+        ];
+    }
     
-    $result_materias = mysqli_fetch_assoc(mysqli_query($db, $query_materias));
-    $total_materias = $result_materias['total_materias'];
+    $estudiante = mysqli_fetch_assoc($result_estudiante);
+    $carrera_id = $estudiante['carrera'];
     
-    // Contar materias aprobadas del último trayecto
-    $query_aprobadas = "SELECT COUNT(*) as aprobadas 
-                       FROM notas_definitivas nd 
-                       JOIN materias m ON nd.id_materia = m.id_materia 
-                       WHERE nd.id_usuario = '$id_usuario' 
-                       AND m.trayecto = 4 
-                       AND nd.trayecto_4 IS NOT NULL"; // Ajusta según tu estructura de notas
+    // 2. Obtener todas las materias de la carrera (para evaluación completa)
+    $query_materias_completo = "SELECT m.id_materia, m.trayecto, m.creditos
+                               FROM carrera_materia cm
+                               INNER JOIN materias m ON cm.id_materia = m.id_materia
+                               WHERE cm.id_carrera = '$carrera_id' 
+                               AND m.activa = 1
+                               ORDER BY m.trayecto";
     
-    $result_aprobadas = mysqli_fetch_assoc(mysqli_query($db, $query_aprobadas));
-    $aprobadas = $result_aprobadas['aprobadas'];
+    $result_materias_completo = mysqli_query($db, $query_materias_completo);
+    $total_materias_carrera = mysqli_num_rows($result_materias_completo);
     
-    // También podrías verificar otros requisitos como:
-    // - Servicio social completado
-    // - Prácticas profesionales
-    // - Trabajo de grado
-    // - No tener deudas
+    if ($total_materias_carrera === 0) {
+        return [
+            'apto_tsu' => false,
+            'apto_grado_completo' => false,
+            'materias_aprobadas_tsu' => 0,
+            'total_materias_tsu' => 0,
+            'porcentaje_tsu' => 0,
+            'creditos_aprobados_tsu' => 0,
+            'materias_aprobadas_completo' => 0,
+            'total_materias_carrera' => 0,
+            'porcentaje_completo' => 0,
+            'creditos_aprobados_completo' => 0,
+            'requisitos_adicionales' => false,
+            'carrera' => $estudiante['nombre_carrera']
+        ];
+    }
     
-    return ($aprobadas >= $total_materias);
+    // 3. Obtener solo materias de TSU (trayectos 0, 1, 2)
+    $query_materias_tsu = "SELECT m.id_materia, m.trayecto, m.creditos
+                          FROM carrera_materia cm
+                          INNER JOIN materias m ON cm.id_materia = m.id_materia
+                          WHERE cm.id_carrera = '$carrera_id' 
+                          AND m.trayecto IN (0, 1, 2)
+                          AND m.activa = 1";
+    
+    $result_materias_tsu = mysqli_query($db, $query_materias_tsu);
+    $total_materias_tsu = mysqli_num_rows($result_materias_tsu);
+    
+    // 4. Contar materias aprobadas para TSU
+    $materias_aprobadas_tsu = 0;
+    $creditos_aprobados_tsu = 0;
+    
+    if ($result_materias_tsu) {
+        mysqli_data_seek($result_materias_tsu, 0);
+        while ($materia = mysqli_fetch_assoc($result_materias_tsu)) {
+            $materia_id = $materia['id_materia'];
+            $trayecto = $materia['trayecto'];
+            $creditos = $materia['creditos'] ?: 3;
+            
+            if (tiene_materia_aprobada($estudiante_id, $materia_id, $trayecto)) {
+                $materias_aprobadas_tsu++;
+                $creditos_aprobados_tsu += $creditos;
+            }
+        }
+    }
+    
+    // 5. Contar materias aprobadas para carrera completa
+    $materias_aprobadas_completo = 0;
+    $creditos_aprobados_completo = 0;
+    
+    mysqli_data_seek($result_materias_completo, 0);
+    while ($materia = mysqli_fetch_assoc($result_materias_completo)) {
+        $materia_id = $materia['id_materia'];
+        $trayecto = $materia['trayecto'];
+        $creditos = $materia['creditos'] ?: 3;
+        
+        if (tiene_materia_aprobada($estudiante_id, $materia_id, $trayecto)) {
+            $materias_aprobadas_completo++;
+            $creditos_aprobados_completo += $creditos;
+        }
+    }
+    
+    // 6. Verificar requisitos adicionales
+    $requisitos_adicionales_cumplidos = verificar_requisitos_adicionales($estudiante_id);
+    
+    // 7. Determinar estados
+    $porcentaje_tsu = $total_materias_tsu > 0 ? ($materias_aprobadas_tsu / $total_materias_tsu) * 100 : 0;
+    $porcentaje_completo = $total_materias_carrera > 0 ? ($materias_aprobadas_completo / $total_materias_carrera) * 100 : 0;
+    
+    $apto_tsu = ($porcentaje_tsu >= 90) && $requisitos_adicionales_cumplidos;
+    $apto_grado_completo = ($porcentaje_completo >= 100) && $requisitos_adicionales_cumplidos;
+    
+    return [
+        'apto_tsu' => $apto_tsu,
+        'apto_grado_completo' => $apto_grado_completo,
+        
+        // Estadísticas TSU
+        'materias_aprobadas_tsu' => $materias_aprobadas_tsu,
+        'total_materias_tsu' => $total_materias_tsu,
+        'porcentaje_tsu' => round($porcentaje_tsu, 1),
+        'creditos_aprobados_tsu' => $creditos_aprobados_tsu,
+        
+        // Estadísticas carrera completa
+        'materias_aprobadas_completo' => $materias_aprobadas_completo,
+        'total_materias_carrera' => $total_materias_carrera,
+        'porcentaje_completo' => round($porcentaje_completo, 1),
+        'creditos_aprobados_completo' => $creditos_aprobados_completo,
+        
+        // Información general
+        'requisitos_adicionales' => $requisitos_adicionales_cumplidos,
+        'carrera' => $estudiante['nombre_carrera']
+    ];
+}
+
+/**
+ * Verificar si un estudiante tiene una materia aprobada
+ */
+function tiene_materia_aprobada($estudiante_id, $materia_id, $trayecto) {
+    global $db;
+    
+    $estudiante_id = mysqli_real_escape_string($db, $estudiante_id);
+    $materia_id = mysqli_real_escape_string($db, $materia_id);
+    $trayecto = mysqli_real_escape_string($db, $trayecto);
+    
+    $query_nota = "SELECT trayecto_$trayecto as nota 
+                  FROM notas_definitivas 
+                  WHERE id_usuario = '$estudiante_id' 
+                  AND id_materia = '$materia_id' 
+                  AND trayecto_$trayecto >= 12 
+                  AND trayecto_$trayecto IS NOT NULL";
+    
+    $result_nota = mysqli_query($db, $query_nota);
+    return ($result_nota && mysqli_num_rows($result_nota) > 0);
+}
+
+/**
+ * Verificar requisitos adicionales para el grado
+ */
+function verificar_requisitos_adicionales($estudiante_id) {
+    global $db;
+    
+    $estudiante_id = mysqli_real_escape_string($db, $estudiante_id);
+    
+    // Por ahora, asumimos que todos los requisitos adicionales están cumplidos
+    // Debes implementar estas verificaciones según las reglas de tu universidad
+    return true;
+}
+
+/**
+ * Función mejorada para verificar requisitos de graduación (para usar en grado.php)
+ */
+function cumple_requisitos_graduacion($id_usuario) {
+    $info_aptitud = es_apto_para_grado($id_usuario);
+    
+    // Para la página de graduación, consideramos aptos tanto TSU como grado completo
+    return ($info_aptitud['apto_tsu'] || $info_aptitud['apto_grado_completo']);
 }
 
 
