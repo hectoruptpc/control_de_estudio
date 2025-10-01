@@ -31,6 +31,38 @@ include("includes/head.php");
         <div class="col-12">
             <h1 class="h3 mb-4 text-gray-800">Gestión de Graduación</h1>
             
+            <!-- ============================================= -->
+            <!-- 🐛 INSTRUCCIONES DEBUG - COMO ACTIVAR EL MODO DEBUG -->
+            <!-- ============================================= -->
+            <!-- 
+            PARA ACTIVAR EL MODO DEBUG USA ESTAS URLS:
+            
+            1. DEBUG COMPLETO (todos los estudiantes):
+               http://tudominio.com/admin/grado.php?debug=1
+            
+            2. DEBUG SOLO ESTUDIANTES APTOS:
+               http://tudominio.com/admin/grado.php?debug=1&estado=cumple_requisitos
+            
+            3. DEBUG CON FILTROS ESPECÍFICOS:
+               http://tudominio.com/admin/grado.php?debug=1&carrera=Ingeniería&buscar=nombre
+            
+            El modo DEBUG te muestra información detallada de por qué cada estudiante 
+            es considerado APTO o NO APTO para graduarse.
+            -->
+            
+            <!-- DEBUG: Información de depuración -->
+            <?php if (isset($_GET['debug'])): ?>
+            <div class="alert alert-info">
+                <h5>🔍 MODO DEBUG ACTIVADO</h5>
+                <p>Esta información te ayuda a ver por qué los estudiantes aparecen como aptos o no aptos.</p>
+                <small>
+                    <a href="grado.php" class="text-primary">[Ocultar DEBUG]</a> | 
+                    <a href="grado.php?debug=1&estado=cumple_requisitos" class="text-primary">[DEBUG Solo Aptos]</a> |
+                    <a href="grado.php?debug=1" class="text-primary">[DEBUG Todos]</a>
+                </small>
+            </div>
+            <?php endif; ?>
+            
             <!-- Filtros -->
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
@@ -58,8 +90,8 @@ include("includes/head.php");
                                 $carreras = obtener_carreras();
                                 if ($carreras) {
                                     while ($carrera = mysqli_fetch_assoc($carreras)) {
-                                        $selected = (isset($_GET['carrera']) && $_GET['carrera'] == $carrera['carrera']) ? 'selected' : '';
-                                        echo "<option value='" . htmlspecialchars($carrera['carrera']) . "' $selected>" . htmlspecialchars($carrera['carrera']) . "</option>";
+                                        $selected = (isset($_GET['carrera']) && $_GET['carrera'] == $carrera['nombre_carrera']) ? 'selected' : '';
+                                        echo "<option value='" . htmlspecialchars($carrera['nombre_carrera']) . "' $selected>" . htmlspecialchars($carrera['nombre_carrera']) . "</option>";
                                     }
                                 }
                                 ?>
@@ -67,9 +99,89 @@ include("includes/head.php");
                         </div>
                         <button type="submit" class="btn btn-primary mb-2">Filtrar</button>
                         <a href="grado.php" class="btn btn-secondary mb-2 ml-2">Limpiar</a>
+                        
+                        <!-- Enlace de depuración -->
+                        <div class="ml-2">
+                            <small>
+                                <?php if (!isset($_GET['debug'])): ?>
+                                    <a href="grado.php?debug=1<?php echo isset($_GET['estado']) ? '&estado=' . $_GET['estado'] : ''; ?><?php echo isset($_GET['carrera']) ? '&carrera=' . $_GET['carrera'] : ''; ?><?php echo isset($_GET['buscar']) ? '&buscar=' . $_GET['buscar'] : ''; ?>" class="text-muted">[DEBUG] Ver evaluación</a>
+                                <?php else: ?>
+                                    <a href="grado.php<?php echo isset($_GET['estado']) ? '?estado=' . $_GET['estado'] : ''; ?><?php echo isset($_GET['carrera']) ? '&carrera=' . $_GET['carrera'] : ''; ?><?php echo isset($_GET['buscar']) ? '&buscar=' . $_GET['buscar'] : ''; ?>" class="text-muted">[DEBUG] Ocultar</a>
+                                <?php endif; ?>
+                            </small>
+                        </div>
                     </form>
                 </div>
             </div>
+
+            <!-- DEBUG: Información detallada de evaluación -->
+            <?php if (isset($_GET['debug'])): ?>
+            <div class="card shadow mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="m-0 font-weight-bold">🔍 Información de Depuración</h6>
+                </div>
+                <div class="card-body">
+                    <?php
+                    // Obtener estudiantes para debug
+                    $estudiantes_debug = obtener_estudiantes_graduacion($_GET);
+                    $total_aptos = 0;
+                    $total_no_aptos = 0;
+                    
+                    if ((is_array($estudiantes_debug) && count($estudiantes_debug) > 0)) {
+                        
+                        echo "<div class='table-responsive'>";
+                        echo "<table class='table table-sm table-bordered'>";
+                        echo "<thead><tr class='bg-light'>
+                                <th>Estudiante</th>
+                                <th>Cédula</th>
+                                <th>Carrera</th>
+                                <th>TSU (Aprobadas/Total)</th>
+                                <th>% TSU</th>
+                                <th>Completo (Aprobadas/Total)</th>
+                                <th>% Completo</th>
+                                <th>Apto TSU</th>
+                                <th>Apto Completo</th>
+                                <th>Estado</th>
+                              </tr></thead><tbody>";
+                        
+                        // Manejar arrays de estudiantes
+                        foreach ($estudiantes_debug as $est) {
+                            $info = es_apto_para_grado($est['id']);
+                            $es_apto = $info['apto_tsu'] || $info['apto_grado_completo'];
+                            
+                            if ($es_apto) $total_aptos++; else $total_no_aptos++;
+                            
+                            echo "<tr>";
+                            echo "<td>" . htmlspecialchars($est['nombre']) . "</td>";
+                            echo "<td>" . htmlspecialchars($est['idusuario']) . "</td>";
+                            echo "<td>" . htmlspecialchars($est['nombre_carrera'] ?: 'Carrera ' . $est['carrera']) . "</td>";
+                            echo "<td>{$info['materias_aprobadas_tsu']}/{$info['total_materias_tsu']}</td>";
+                            echo "<td><span class='badge badge-" . ($info['porcentaje_tsu'] >= 90 ? 'success' : 'warning') . "'>{$info['porcentaje_tsu']}%</span></td>";
+                            echo "<td>{$info['materias_aprobadas_completo']}/{$info['total_materias_carrera']}</td>";
+                            echo "<td><span class='badge badge-" . ($info['porcentaje_completo'] >= 100 ? 'success' : 'info') . "'>{$info['porcentaje_completo']}%</span></td>";
+                            echo "<td><span class='badge badge-" . ($info['apto_tsu'] ? 'success' : 'secondary') . "'>" . ($info['apto_tsu'] ? 'SÍ' : 'NO') . "</span></td>";
+                            echo "<td><span class='badge badge-" . ($info['apto_grado_completo'] ? 'success' : 'secondary') . "'>" . ($info['apto_grado_completo'] ? 'SÍ' : 'NO') . "</span></td>";
+                            echo "<td>" . obtener_badge_estado($est['estado']) . "</td>";
+                            echo "</tr>";
+                        }
+                        
+                        echo "</tbody></table>";
+                        echo "</div>";
+                        
+                        echo "<div class='mt-3 p-3 bg-light rounded'>";
+                        echo "<h6>Resumen de Evaluación:</h6>";
+                        echo "<p><strong>Total estudiantes evaluados:</strong> " . ($total_aptos + $total_no_aptos) . "</p>";
+                        echo "<p><strong>Estudiantes aptos para graduación:</strong> <span class='badge badge-success'>$total_aptos</span></p>";
+                        echo "<p><strong>Estudiantes NO aptos:</strong> <span class='badge badge-secondary'>$total_no_aptos</span></p>";
+                        echo "<p><small class='text-muted'>Criterios: TSU ≥90% aprobado | Grado Completo = 100% aprobado</small></p>";
+                        echo "</div>";
+                    } else {
+                        echo "<p class='text-muted'>No hay estudiantes para mostrar con los filtros actuales.</p>";
+                    }
+                    ?>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <!-- Lista de Estudiantes -->
             <div class="card shadow mb-4">
@@ -123,12 +235,13 @@ include("includes/head.php");
                             </thead>
                             <tbody>
                                 <?php
-                                if ($estudiantes && mysqli_num_rows($estudiantes) > 0) {
-                                    while ($estudiante = mysqli_fetch_assoc($estudiantes)) {
+                                if (is_array($estudiantes) && count($estudiantes) > 0) {
+                                    // Si es un array (resultado filtrado)
+                                    foreach ($estudiantes as $estudiante) {
                                         echo "<tr>";
                                         echo "<td>" . htmlspecialchars($estudiante['idusuario']) . "</td>";
                                         echo "<td>" . htmlspecialchars($estudiante['nombre']) . "</td>";
-                                        echo "<td>" . htmlspecialchars($estudiante['carrera']) . "</td>";
+                                        echo "<td>" . htmlspecialchars($estudiante['nombre_carrera'] ?: 'Carrera ' . $estudiante['carrera']) . "</td>";
                                         echo "<td>" . obtener_badge_estado($estudiante['estado']) . "</td>";
                                         echo "<td>" . ($estudiante['fecha_graduacion'] ? date('d/m/Y', strtotime($estudiante['fecha_graduacion'])) : '-') . "</td>";
                                         echo "<td>" . generar_botones_accion($estudiante) . "</td>";
@@ -228,4 +341,18 @@ function cambiarRegistrosPorPagina(cantidad) {
     url.searchParams.set('pagina', 1);
     window.location.href = url.toString();
 }
+
+// =============================================
+// 🐛 INSTRUCCIONES DEBUG EN CONSOLA
+// =============================================
+console.log("🔍 MODO DEBUG DISPONIBLE:");
+console.log("1. grado.php?debug=1 - Ver evaluación completa");
+console.log("2. grado.php?debug=1&estado=cumple_requisitos - Ver solo aptos");
+console.log("3. grado.php?debug=1&carrera=X&buscar=Y - Ver con filtros específicos");
+console.log("");
+console.log("📊 ESTADOS DE GRADUACIÓN:");
+console.log("- Cumple Requisitos: Estudiantes que pueden graduarse");
+console.log("- Pendiente: Estudiantes que NO cumplen requisitos");
+console.log("- Graduado: Estudiantes marcados como graduados");
+console.log("- Título Entregado: Estudiantes que recibieron su título");
 </script>
