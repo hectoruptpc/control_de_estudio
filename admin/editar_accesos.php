@@ -74,6 +74,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
             $gestion_horario = isset($permisos['gestion_horario']) ? 1 : 0;
             $titulos_re_materia = isset($permisos['titulos_re_materia']) ? 1 : 0;
             
+            // NUEVOS CAMPOS GRADO Y GESTIÓN GRADO
+            $grado = isset($permisos['grado']) ? 1 : 0;
+            $gestion_grado = isset($permisos['gestion_grado']) ? 1 : 0;
+            
             $query = "UPDATE users SET 
                      usuario = ?,
                      estudiante = ?, 
@@ -111,13 +115,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
                      gestion_periodo_academico = ?,
                      gestion_asig_cursos = ?,
                      gestion_horario = ?,
-                     titulos_re_materia = ?
+                     titulos_re_materia = ?,
+                     grado = ?,
+                     gestion_grado = ?
                      WHERE id = ?";
             
             $stmt = $db->prepare($query);
             if ($stmt) {
-                // CORRECCIÓN: 38 campos + 1 ID = 39 parámetros, pero el string de tipos debe tener 38 'i' + 1 'i' para el ID = 39 'i'
-                $stmt->bind_param("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", 
+                // 40 campos + 1 ID = 41 parámetros
+                $stmt->bind_param("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", 
                     $usuario,                    // 1
                     $estudiante,                 // 2
                     $docente,                    // 3
@@ -155,7 +161,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
                     $gestion_asig_cursos,        // 35
                     $gestion_horario,            // 36
                     $titulos_re_materia,         // 37
-                    $user_id                     // 38 (ID)
+                    $grado,                      // 38 - NUEVO CAMPO
+                    $gestion_grado,              // 39 - NUEVO CAMPO
+                    $user_id                     // 40 (ID)
                 );
                 
                 if ($stmt->execute()) {
@@ -257,6 +265,9 @@ include("includes/head.php");
                         <th>Gestión Asignar Cursos</th>
                         <th>Gestión Horario</th>
                         <th>Títulos RE Materia</th>
+                        <!-- NUEVOS CAMPOS GRADO -->
+                        <th>Grado</th>
+                        <th>Gestión Grado</th>
                     </tr>
                 </thead>
                 <tbody id="tabla-usuarios">
@@ -269,7 +280,8 @@ include("includes/head.php");
                              pagos, auditoria, secciones, rela_materia_carrera, periodos_academicos, asig_secciones, 
                              asig_cursos, horarios, gestion_director_carrera, notas_cargadas, consultar_notas, 
                              consultar_notas_pasadas, tipos_pago, tipos_horario, horario_personal, respaldo_bd,
-                             gestionar_carrera, gestion_periodo_academico, gestion_asig_cursos, gestion_horario, titulos_re_materia
+                             gestionar_carrera, gestion_periodo_academico, gestion_asig_cursos, gestion_horario, titulos_re_materia,
+                             grado, gestion_grado
                              FROM users ORDER BY username";
                     $result = $db->query($query);
                     
@@ -292,7 +304,9 @@ include("includes/head.php");
                                            (isset($user['gestion_periodo_academico']) && $user['gestion_periodo_academico']) || 
                                            (isset($user['gestion_asig_cursos']) && $user['gestion_asig_cursos']) || 
                                            (isset($user['gestion_horario']) && $user['gestion_horario']) || 
-                                           (isset($user['titulos_re_materia']) && $user['titulos_re_materia']);
+                                           (isset($user['titulos_re_materia']) && $user['titulos_re_materia']) ||
+                                           (isset($user['grado']) && $user['grado']) || 
+                                           (isset($user['gestion_grado']) && $user['gestion_grado']);
                             
                             $clases = 'fila-usuario';
                             $clases .= $esUsuario ? ' usuario' : '';
@@ -418,13 +432,21 @@ include("includes/head.php");
                         <td class="text-center">
                             <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][titulos_re_materia]" <?= isset($user['titulos_re_materia']) && $user['titulos_re_materia'] ? 'checked' : '' ?>>
                         </td>
+                        
+                        <!-- NUEVOS CAMPOS GRADO -->
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][grado]" <?= isset($user['grado']) && $user['grado'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][gestion_grado]" <?= isset($user['gestion_grado']) && $user['gestion_grado'] ? 'checked' : '' ?>>
+                        </td>
                     </tr>
                     <?php
                         endwhile;
                     else:
                     ?>
                     <tr>
-                        <td colspan="39" class="text-center">No hay usuarios registrados</td>
+                        <td colspan="41" class="text-center">No hay usuarios registrados</td>
                     </tr>
                     <?php endif; ?>
                 </tbody>
