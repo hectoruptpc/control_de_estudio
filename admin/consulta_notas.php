@@ -1,12 +1,9 @@
 <?php
 require_once('../funciones/functions.php');
 
-
 //CARGAR PERMISOS
 cargarPermisosUsuario();
 verificarPermiso('consultar_notas');
-
-
 
 if (!isLoggedIn()) {
     header('location: ../login.php');
@@ -126,12 +123,91 @@ function obtenerNotasEstudianteConsulta($estudiante_id) {
     return $notas;
 }
 
+// Función para determinar si el estudiante es apto para grado (similar a grado.php)
+function esAptoParaGradoConsulta($estudiante_id, $carrera_id) {
+    global $db;
+    
+    // Obtener todas las materias de la carrera
+    $materias_carrera = obtenerMateriasCarrera($carrera_id);
+    $total_materias_carrera = $materias_carrera->num_rows;
+    
+    // Obtener notas del estudiante
+    $notas_estudiante = obtenerNotasEstudianteConsulta($estudiante_id);
+    
+    // Contadores para TSU (trayectos 0, 1, 2)
+    $materias_aprobadas_tsu = 0;
+    $total_materias_tsu = 0;
+    
+    // Contadores para carrera completa
+    $materias_aprobadas_completo = 0;
+    
+    // Recorrer todas las materias de la carrera
+    while ($materia = $materias_carrera->fetch_assoc()) {
+        $trayecto = (int)$materia['trayecto'];
+        $materia_id = $materia['id_materia'];
+        
+        // Verificar si es materia de TSU (trayectos 0, 1, 2)
+        if ($trayecto <= 2) {
+            $total_materias_tsu++;
+        }
+        
+        // Verificar si el estudiante aprobó esta materia
+        if (isset($notas_estudiante[$materia_id])) {
+            $nota = $notas_estudiante[$materia_id];
+            $campo_trayecto = 'trayecto_' . $trayecto;
+            
+            if (isset($nota[$campo_trayecto]) && $nota[$campo_trayecto] !== null) {
+                $nota_valor = (float)$nota[$campo_trayecto];
+                if ($nota_valor >= 12) {
+                    $materias_aprobadas_completo++;
+                    
+                    // Si es materia de TSU, contar para TSU también
+                    if ($trayecto <= 2) {
+                        $materias_aprobadas_tsu++;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Calcular porcentajes
+    $porcentaje_tsu = $total_materias_tsu > 0 ? round(($materias_aprobadas_tsu / $total_materias_tsu) * 100, 1) : 0;
+    $porcentaje_completo = $total_materias_carrera > 0 ? round(($materias_aprobadas_completo / $total_materias_carrera) * 100, 1) : 0;
+    
+    // Determinar si es apto
+    $apto_tsu = ($porcentaje_tsu >= 90); // 90% o más para TSU
+    $apto_grado_completo = ($porcentaje_completo >= 100); // 100% para grado completo
+    
+    return [
+        'apto_tsu' => $apto_tsu,
+        'apto_grado_completo' => $apto_grado_completo,
+        'materias_aprobadas_tsu' => $materias_aprobadas_tsu,
+        'total_materias_tsu' => $total_materias_tsu,
+        'porcentaje_tsu' => $porcentaje_tsu,
+        'materias_aprobadas_completo' => $materias_aprobadas_completo,
+        'total_materias_carrera' => $total_materias_carrera,
+        'porcentaje_completo' => $porcentaje_completo
+    ];
+}
+
+// Función para obtener el badge de estado (similar a grado.php)
+function obtenerBadgeEstadoConsulta($info_apto) {
+    if ($info_apto['apto_grado_completo']) {
+        return '<span class="badge badge-success">APTO - GRADO COMPLETO</span>';
+    } elseif ($info_apto['apto_tsu']) {
+        return '<span class="badge badge-warning">APTO - TSU</span>';
+    } else {
+        return '<span class="badge badge-secondary">NO APTO</span>';
+    }
+}
+
 // Procesar búsqueda
 $estudiante = null;
 $carrera = null;
 $materias_carrera = [];
 $notas_estudiante = [];
 $mensaje_error = '';
+$info_apto = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
     $cedula = trim($_POST['cedula']);
@@ -149,6 +225,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                 
                 // Obtener notas del estudiante (si existen)
                 $notas_estudiante = obtenerNotasEstudianteConsulta($estudiante['id']);
+                
+                // Determinar si es apto para grado
+                $info_apto = esAptoParaGradoConsulta($estudiante['id'], $carrera['id_carrera']);
             }
         } else {
             $mensaje_error = "No se encontró ningún estudiante con la cédula: " . htmlspecialchars($cedula);
@@ -198,8 +277,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                 <div class="col-md-6">
                     <p><strong>Carrera:</strong> <?= htmlspecialchars($carrera['nombre_carrera']) ?> (<?= htmlspecialchars($carrera['cod_carrera']) ?>)</p>
                     <p><strong>Total de Materias:</strong> <span class="badge badge-primary"><?= $materias_carrera->num_rows ?></span></p>
+                    <?php if ($info_apto): ?>
+                    <p><strong>Estado para Grado:</strong> 
+                        <?= obtenerBadgeEstadoConsulta($info_apto) ?>
+                    </p>
+                    <?php endif; ?>
                 </div>
             </div>
+            
+            <?php if ($info_apto): ?>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="alert <?= ($info_apto['apto_grado_completo'] || $info_apto['apto_tsu']) ? 'alert-success' : 'alert-warning' ?>">
+                        <h6><i class="fas fa-graduation-cap"></i> Evaluación para Grado:</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>TSU (Trayectos 0-2):</strong><br>
+                                <?= $info_apto['materias_aprobadas_tsu'] ?>/<?= $info_apto['total_materias_tsu'] ?> materias aprobadas<br>
+                                <span class="badge badge-<?= $info_apto['porcentaje_tsu'] >= 90 ? 'success' : 'warning' ?>">
+                                    <?= $info_apto['porcentaje_tsu'] ?>% completado
+                                </span>
+                                <?php if ($info_apto['apto_tsu']): ?>
+                                    <span class="badge badge-success ml-2">APTO TSU</span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Grado Completo:</strong><br>
+                                <?= $info_apto['materias_aprobadas_completo'] ?>/<?= $info_apto['total_materias_carrera'] ?> materias aprobadas<br>
+                                <span class="badge badge-<?= $info_apto['porcentaje_completo'] >= 100 ? 'success' : 'info' ?>">
+                                    <?= $info_apto['porcentaje_completo'] ?>% completado
+                                </span>
+                                <?php if ($info_apto['apto_grado_completo']): ?>
+                                    <span class="badge badge-success ml-2">APTO GRADO COMPLETO</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
     
@@ -230,6 +346,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                         $materias_sin_notas = 0;
                         $suma_promedios = 0;
                         $materias_con_notas = 0;
+                        
+                        // Reiniciar el puntero del resultado
+                        $materias_carrera->data_seek(0);
                         
                         while ($materia = $materias_carrera->fetch_assoc()): 
                             $nota = isset($notas_estudiante[$materia['id_materia']]) ? $notas_estudiante[$materia['id_materia']] : null;
