@@ -5402,7 +5402,7 @@ function verificarPermiso($pagina) {
         'consultar_notas_pasadas', 'tipos_pago', 'tipos_horario', 
         'horario_personal', 'respaldo_bd',
         'gestionar_carrera', 'gestion_periodo_academico', 'gestion_asig_cursos', 
-        'gestion_horario', 'titulos_re_materia'
+        'gestion_horario', 'titulos_re_materia', 'grado', 'gestion_grado'
     ];
     
     // Verificar que el permiso solicitado sea válido

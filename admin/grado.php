@@ -7,7 +7,7 @@ include('../funciones/functions.php');
 
 //CARGAR PERMISOS
 cargarPermisosUsuario();
-verificarPermiso('admin');
+verificarPermiso('grado');
 
 // Configuración de paginación
 $registros_por_pagina = obtener_registros_por_pagina();
