@@ -102,6 +102,7 @@ include("includes/head.php");
                         
                         <!-- Enlace de depuración -->
                         <div class="ml-2">
+                             <?php if (tienePermiso('gestion_grado')): ?>
                             <small>
                                 <?php if (!isset($_GET['debug'])): ?>
                                     <a href="grado.php?debug=1<?php echo isset($_GET['estado']) ? '&estado=' . $_GET['estado'] : ''; ?><?php echo isset($_GET['carrera']) ? '&carrera=' . $_GET['carrera'] : ''; ?><?php echo isset($_GET['buscar']) ? '&buscar=' . $_GET['buscar'] : ''; ?>" class="text-muted">[DEBUG] Ver evaluación</a>
@@ -109,6 +110,7 @@ include("includes/head.php");
                                     <a href="grado.php<?php echo isset($_GET['estado']) ? '?estado=' . $_GET['estado'] : ''; ?><?php echo isset($_GET['carrera']) ? '&carrera=' . $_GET['carrera'] : ''; ?><?php echo isset($_GET['buscar']) ? '&buscar=' . $_GET['buscar'] : ''; ?>" class="text-muted">[DEBUG] Ocultar</a>
                                 <?php endif; ?>
                             </small>
+                            <?php endif; ?>
                         </div>
                     </form>
                 </div>
@@ -230,7 +232,9 @@ include("includes/head.php");
                                     <th>Carrera</th>
                                     <th>Estado</th>
                                     <th>Fecha Graduación</th>
+                                     <?php if (tienePermiso('gestion_grado')): ?>
                                     <th>Acciones</th>
+                                        <?php endif; ?>
                                 </tr>
                             </thead>
                             <tbody>
@@ -244,7 +248,10 @@ include("includes/head.php");
                                         echo "<td>" . htmlspecialchars($estudiante['nombre_carrera'] ?: 'Carrera ' . $estudiante['carrera']) . "</td>";
                                         echo "<td>" . obtener_badge_estado($estudiante['estado']) . "</td>";
                                         echo "<td>" . ($estudiante['fecha_graduacion'] ? date('d/m/Y', strtotime($estudiante['fecha_graduacion'])) : '-') . "</td>";
-                                        echo "<td>" . generar_botones_accion($estudiante) . "</td>";
+                                       // Solo mostrar acciones si tiene permiso
+                    if (tienePermiso('gestion_grado')) {
+                        echo "<td>" . generar_botones_accion($estudiante) . "</td>";
+                    }
                                         echo "</tr>";
                                     }
                                 } else {

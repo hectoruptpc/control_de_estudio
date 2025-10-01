@@ -128,15 +128,17 @@ if (!isLoggedIn() || !isAdmin()) {
                   </a>
                 <?php endif; ?>
 
-                <?php if (tienePermiso('gestionar_secciones')): ?>
+                <?php if (tienePermiso('secciones')): ?>
                 <a title="Gestionar Secciones" class="dropdown-item" href="gestion_seccion.php">
                   <i class="fas fa-object-group fa-fw"></i> Gestionar Secciones
                 </a>
                 <?php endif; ?>
 
+                <?php if (tienePermiso('grado')): ?>
                     <a title="Títulos y Relaciones con Materias" class="dropdown-item" href="grado.php">
                         <i class="fas fa-graduation-cap fa-fw"></i> Grado
                     </a>
+                <?php endif; ?>
 
               </div>
             </li>

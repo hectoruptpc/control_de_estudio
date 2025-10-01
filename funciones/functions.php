@@ -5409,7 +5409,7 @@ function verificarPermiso($pagina) {
     if (!in_array($pagina, $permisosValidos)) {
         error_log("Permiso no válido: " . $pagina);
         $_SESSION['error'] = "Error de permisos: permiso no válido.";
-        header('location: ../usuario/home.php');
+        header('location: ../login.php');
         exit();
     }
     
@@ -5425,7 +5425,7 @@ function verificarPermiso($pagina) {
         
         // Redirigir a home con mensaje de error
         $_SESSION['error'] = "No tienes permisos para acceder a la página de " . $pagina . ".";
-        header('location: ../usuario/home.php');
+        header('location: ../login.php');
         exit();
     }
 }
@@ -5473,7 +5473,7 @@ function cargarPermisosUsuario() {
         consultar_notas_pasadas, tipos_pago, tipos_horario, 
         horario_personal, respaldo_bd,
         gestionar_carrera, gestion_periodo_academico, gestion_asig_cursos, 
-        gestion_horario, titulos_re_materia
+        gestion_horario, titulos_re_materia, grado, gestion_grado
         FROM users WHERE id = ?";
     
     $stmt = $db->prepare($query);
