@@ -6003,7 +6003,7 @@ function tiene_materia_aprobada($estudiante_id, $materia_id, $trayecto) {
                   FROM notas_definitivas 
                   WHERE id_usuario = '$estudiante_id' 
                   AND id_materia = '$materia_id' 
-                  AND $campo_trayecto >= 10  -- Nota mínima para aprobar
+                  AND $campo_trayecto >= 12  -- Nota mínima para aprobar
                   AND $campo_trayecto IS NOT NULL
                   LIMIT 1";
     
