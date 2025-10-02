@@ -9,15 +9,18 @@ include('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('asig_secciones');
 
-// Manejar petición AJAX para obtener materias del docente
-if(isset($_GET['ajax']) && $_GET['ajax'] == 'materias_docente' && isset($_GET['id_docente'])) {
+// Manejar petición AJAX para obtener materias del docente POR CARRERA
+if(isset($_GET['ajax']) && $_GET['ajax'] == 'materias_docente_carrera' && isset($_GET['id_docente']) && isset($_GET['id_carrera'])) {
     header('Content-Type: application/json');
     $id_docente = $db->real_escape_string($_GET['id_docente']);
+    $id_carrera = $db->real_escape_string($_GET['id_carrera']);
     
-    $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia 
+    $query = "SELECT DISTINCT m.id_materia, m.nombre_materia, m.cod_materia 
               FROM docente_materia dm
               JOIN materias m ON dm.id_materia = m.id_materia
+              JOIN carrera_materia cm ON m.id_materia = cm.id_materia
               WHERE dm.id_usuario = '$id_docente'
+              AND cm.id_carrera = '$id_carrera'
               ORDER BY m.nombre_materia";
     
     $result = $db->query($query);
@@ -110,7 +113,7 @@ include("includes/head.php");
                         <div class="form-row">
                             <div class="form-group col-md-4">
                                 <label for="id_usuario">Docente:</label>
-                                <select class="form-control" id="id_usuario" name="id_usuario" required onchange="cargarMateriasDocente()">
+                                <select class="form-control" id="id_usuario" name="id_usuario" required onchange="cargarMateriasPorCarrera()">
                                     <option value="">Seleccione un docente</option>
                                     <?php
                                     $query = "SELECT id, idusuario, nombre FROM users WHERE docente = 1 ORDER BY nombre";
@@ -123,10 +126,10 @@ include("includes/head.php");
                             </div>
                             <div class="form-group col-md-4">
                                 <label for="id_seccion">Sección:</label>
-                                <select class="form-control" id="id_seccion" name="id_seccion" required>
+                                <select class="form-control" id="id_seccion" name="id_seccion" required onchange="cargarMateriasPorCarrera()">
                                     <option value="">Seleccione una sección</option>
                                     <?php
-                                    $query = "SELECT s.id_seccion, s.codigo_seccion, c.nombre_carrera 
+                                    $query = "SELECT s.id_seccion, s.codigo_seccion, c.id_carrera, c.nombre_carrera 
                                               FROM secciones s
                                               LEFT JOIN carreras c ON s.id_carrera = c.id_carrera
                                               WHERE s.estatus = 'activa' AND (c.activa = 1 OR c.activa IS NULL)
@@ -135,8 +138,9 @@ include("includes/head.php");
                                     
                                     if($result->num_rows > 0) {
                                         while($row = $result->fetch_assoc()) {
+                                            $id_carrera = $row['id_carrera'] ?? '0';
                                             $nombre_carrera = $row['nombre_carrera'] ?? 'Sin carrera asignada';
-                                            echo "<option value='".$row['id_seccion']."'>".$row['codigo_seccion']." - ".$nombre_carrera."</option>";
+                                            echo "<option value='".$row['id_seccion']."' data-carrera='".$id_carrera."'>".$row['codigo_seccion']." - ".$nombre_carrera."</option>";
                                         }
                                     } else {
                                         echo "<option value=''>No hay secciones activas disponibles</option>";
@@ -147,7 +151,7 @@ include("includes/head.php");
                             <div class="form-group col-md-4">
                                 <label for="id_materia">Materia:</label>
                                 <select class="form-control" id="id_materia" name="id_materia" required disabled>
-                                    <option value="">Primero seleccione un docente</option>
+                                    <option value="">Primero seleccione docente y sección</option>
                                 </select>
                             </div>
                         </div>
@@ -221,19 +225,23 @@ include("includes/head.php");
 </div>
 
 <script>
-function cargarMateriasDocente() {
+function cargarMateriasPorCarrera() {
     var idDocente = document.getElementById('id_usuario').value;
+    var selectSeccion = document.getElementById('id_seccion');
     var selectMaterias = document.getElementById('id_materia');
     
-    if(idDocente === '') {
-        selectMaterias.innerHTML = '<option value="">Primero seleccione un docente</option>';
+    // Obtener la carrera de la sección seleccionada
+    var idCarrera = selectSeccion.options[selectSeccion.selectedIndex]?.getAttribute('data-carrera') || '0';
+    
+    if(idDocente === '' || selectSeccion.value === '') {
+        selectMaterias.innerHTML = '<option value="">Primero seleccione docente y sección</option>';
         selectMaterias.disabled = true;
         return;
     }
     
-    // Realizar petición AJAX para obtener las materias del docente
+    // Realizar petición AJAX para obtener las materias del docente por carrera
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', '?ajax=materias_docente&id_docente=' + idDocente, true);
+    xhr.open('GET', '?ajax=materias_docente_carrera&id_docente=' + idDocente + '&id_carrera=' + idCarrera, true);
     
     xhr.onload = function() {
         if(this.status == 200) {
@@ -250,7 +258,7 @@ function cargarMateriasDocente() {
                     });
                     selectMaterias.disabled = false;
                 } else {
-                    selectMaterias.innerHTML = '<option value="">Este docente no tiene materias asignadas</option>';
+                    selectMaterias.innerHTML = '<option value="">Este docente no tiene materias para esta carrera</option>';
                     selectMaterias.disabled = true;
                 }
             } catch(e) {
