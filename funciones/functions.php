@@ -6042,6 +6042,102 @@ function cumple_requisitos_graduacion($id_usuario) {
 }
 
 
+//IMAGENES SOPORTE *********************************************************************
+
+
+// Función para subir imagen de soporte
+function subirSoporte($archivo) {
+    // Directorio relativo a la raíz del proyecto
+    $directorio = '../soportes/';
+    
+    // Verificar y crear directorio si no existe
+    if (!file_exists($directorio)) {
+        if (!mkdir($directorio, 0755, true)) {
+            return ['success' => false, 'error' => 'No se pudo crear el directorio de soportes'];
+        }
+    }
+    
+    // Validar que se haya subido un archivo
+    if (!isset($archivo['name']) || empty($archivo['name'])) {
+        return ['success' => false, 'error' => 'No se ha seleccionado ningún archivo'];
+    }
+    
+    // Validar errores de subida
+    if ($archivo['error'] !== UPLOAD_ERR_OK) {
+        $errores = [
+            UPLOAD_ERR_INI_SIZE => 'El archivo excede el tamaño máximo permitido',
+            UPLOAD_ERR_FORM_SIZE => 'El archivo excede el tamaño máximo del formulario',
+            UPLOAD_ERR_PARTIAL => 'El archivo fue solo parcialmente subido',
+            UPLOAD_ERR_NO_FILE => 'No se subió ningún archivo',
+            UPLOAD_ERR_NO_TMP_DIR => 'Falta la carpeta temporal',
+            UPLOAD_ERR_CANT_WRITE => 'No se pudo escribir el archivo en el disco',
+            UPLOAD_ERR_EXTENSION => 'Una extensión de PHP detuvo la subida del archivo'
+        ];
+        return ['success' => false, 'error' => $errores[$archivo['error']] ?? 'Error desconocido al subir archivo'];
+    }
+    
+    // Validar tipo de archivo
+    $tiposPermitidos = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
+    $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
+    
+    if (!in_array($extension, $tiposPermitidos)) {
+        return ['success' => false, 'error' => 'Tipo de archivo no permitido. Use: ' . implode(', ', $tiposPermitidos)];
+    }
+    
+    // Validar tamaño (máximo 5MB)
+    $tamañoMaximo = 5 * 1024 * 1024; // 5MB en bytes
+    if ($archivo['size'] > $tamañoMaximo) {
+        return ['success' => false, 'error' => 'El archivo es demasiado grande. Máximo 5MB'];
+    }
+    
+    // Generar nombre único
+    $nombreUnico = uniqid() . '_' . time() . '.' . $extension;
+    $rutaDestino = $directorio . $nombreUnico;
+    
+    // Mover archivo
+    if (move_uploaded_file($archivo['tmp_name'], $rutaDestino)) {
+        return [
+            'success' => true,
+            'ruta' => $nombreUnico,
+            'tipo' => $extension,
+            'tamaño' => $archivo['size']
+        ];
+    } else {
+        return ['success' => false, 'error' => 'Error al mover el archivo subido. Verifique permisos del directorio.'];
+    }
+}
+
+// Función para eliminar soporte anterior si existe
+function eliminarSoporteAnterior($nombreArchivo) {
+    $directorio = '../soportes/';
+    if (!empty($nombreArchivo) && file_exists($directorio . $nombreArchivo)) {
+        return unlink($directorio . $nombreArchivo);
+    }
+    return false;
+}
+
+// Función para obtener soporte actual de un estudiante
+function obtenerSoporteActual($id_estudiante, $id_materia, $id_periodo) {
+    global $db;
+    
+    $query = "SELECT soporte, tipo_archivo FROM notas_pendientes 
+              WHERE id_usuario = ? 
+              AND id_materia = ? 
+              AND id_periodo = ? 
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $id_estudiante, $id_materia, $id_periodo);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    return null;
+}
+
 
 
 

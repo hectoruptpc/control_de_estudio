@@ -130,7 +130,6 @@ $(document).ready(function() {
             </div>
         `);
         
-        // Usar FETCH API en lugar de jQuery para mejor control
         fetch('cargar_estudiantes.php', {
             method: 'POST',
             headers: {
@@ -145,7 +144,6 @@ $(document).ready(function() {
             return response.text();
         })
         .then(html => {
-            // Mantener el botón de volver y agregar el contenido
             $('#resultados').html(`
                 <div class="text-right mb-3" id="volver-container">
                     <button class="btn btn-secondary" id="btn-volver">
@@ -192,7 +190,7 @@ $(document).ready(function() {
             </div>
             <div class="text-center py-4">
                 <div class="spinner-border text-success"></div>
-                <p>Guardando notas...</p>
+                <p>Guardando notas y soporte...</p>
             </div>
         `);
         
@@ -227,6 +225,34 @@ $(document).ready(function() {
                 </div>
             `);
         });
+    });
+    
+    // Preview de imagen antes de subir
+    $(document).on('change', '.soporte-grupo', function() {
+        const file = this.files[0];
+        const preview = $('#preview-grupo');
+        const fileName = $('#nombre-archivo-grupo');
+        
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (file.type.startsWith('image/')) {
+                    preview.html(`<img src="${e.target.result}" class="img-thumbnail" style="max-height: 150px;">`);
+                } else {
+                    preview.html(`
+                        <div class="alert alert-info text-center">
+                            <i class="fas fa-file-pdf fa-3x"></i><br>
+                            <strong>Archivo PDF</strong>
+                        </div>
+                    `);
+                }
+                fileName.text(file.name);
+            }
+            reader.readAsDataURL(file);
+        } else {
+            preview.html('<small class="text-muted">No se ha seleccionado ningún archivo</small>');
+            fileName.text('Ningún archivo seleccionado');
+        }
     });
 });
 </script>

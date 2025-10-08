@@ -146,6 +146,15 @@ function obtenerNotaPendiente($id_estudiante, $id_materia, $id_periodo, $id_doce
     
     return null;
 }
+
+// Verificar si hay algún estudiante que pueda editar (para mostrar el campo de soporte)
+$mostrar_campo_soporte = false;
+foreach ($estudiantes_info as $info) {
+    if ($info['estado'] === 'pendiente' || $info['estado'] === 'rechazada') {
+        $mostrar_campo_soporte = true;
+        break;
+    }
+}
 ?>
 
 <div class="card">
@@ -155,7 +164,7 @@ function obtenerNotaPendiente($id_estudiante, $id_materia, $id_periodo, $id_doce
     </div>
     <div class="card-body">
         
-        <!-- MOSTRAR SIEMPRE LOS MENSAJES DE ESTADO (fuera del condicional) -->
+        <!-- MOSTRAR SIEMPRE LOS MENSAJES DE ESTADO -->
         <div class="alert alert-success <?= $notas_aprobadas ? '' : 'd-none' ?>" id="alert-aprobadas">
             <strong>✅ Notas Aprobadas:</strong> Algunas notas ya fueron aprobadas y no pueden ser modificadas. 
             Si necesita hacer correcciones, debe dirigirse a la universidad.
@@ -198,13 +207,50 @@ function obtenerNotaPendiente($id_estudiante, $id_materia, $id_periodo, $id_doce
             • <span class="badge badge-danger">Rechazada</span> - Puede corregir y reenviar
         </div>
         
-        <form id="form-notas" method="POST">
+        <form id="form-notas" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="materia_id" value="<?= $materia_id ?>">
             <input type="hidden" name="seccion_id" value="<?= $seccion_id ?>">
             <input type="hidden" name="periodo_id" value="<?= $periodo_id ?>">
             <input type="hidden" name="trayecto_actual" value="<?= $trayecto_actual ?>">
             <input type="hidden" name="id_trayecto_seccion" value="<?= $id_trayecto_seccion ?>">
             <input type="hidden" name="docente_id" value="<?= $docente_id ?>">
+            
+            <!-- CAMPO DE SOPORTE PARA TODO EL GRUPO -->
+            <?php if ($mostrar_campo_soporte): ?>
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h6><i class="fas fa-paperclip"></i> Soporte del Grupo</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="soporte_grupo"><strong>Imagen/PDF de Soporte:</strong></label>
+                                <input type="file" 
+                                       name="soporte_grupo" 
+                                       id="soporte_grupo"
+                                       class="form-control soporte-grupo" 
+                                       accept=".jpg,.jpeg,.png,.gif,.webp,.pdf">
+                                <small class="form-text text-muted">
+                                    Formatos permitidos: JPG, PNG, GIF, WEBP, PDF. Tamaño máximo: 5MB
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label><strong>Vista Previa:</strong></label>
+                                <div id="preview-grupo" class="mt-2">
+                                    <small class="text-muted">No se ha seleccionado ningún archivo</small>
+                                </div>
+                                <small id="nombre-archivo-grupo" class="form-text text-muted">
+                                    Ningún archivo seleccionado
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
             
             <div class="table-responsive">
                 <table class="table table-bordered">
@@ -306,9 +352,17 @@ function obtenerNotaPendiente($id_estudiante, $id_materia, $id_periodo, $id_doce
                 </table>
             </div>
             
+            <?php if ($mostrar_campo_soporte): ?>
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Importante:</strong> El archivo de soporte será aplicado a todas las notas del grupo. 
+                Formatos permitidos: imágenes (JPG, PNG, GIF, WEBP) o PDF. Tamaño máximo: 5MB.
+            </div>
+            <?php endif; ?>
+            
             <button type="submit" class="btn btn-success btn-lg">
                 <i class="fas fa-save"></i> 
-                <?= ($notas_rechazadas || $notas_pendientes) ? 'Enviar Notas' : 'Actualizar Notas' ?>
+                <?= ($notas_rechazadas || $notas_pendientes) ? 'Enviar Notas y Soporte' : 'Actualizar Notas' ?>
             </button>
             
             <?php if ($notas_en_revision): ?>
@@ -322,7 +376,6 @@ function obtenerNotaPendiente($id_estudiante, $id_materia, $id_periodo, $id_doce
 </div>
 
 <style>
-/* Estilo para que los inputs de número muestren siempre 2 dígitos */
 .nota-input.two-digit {
     font-variant-numeric: tabular-nums;
     font-weight: bold;
@@ -335,37 +388,33 @@ function obtenerNotaPendiente($id_estudiante, $id_materia, $id_periodo, $id_doce
     height: 30px;
 }
 
-/* Para Firefox */
-.nota-input.two-digit {
-    -moz-appearance: textfield;
-}
-
-.nota-input.two-digit::-webkit-inner-spin-button, 
-.nota-input.two-digit::-webkit-outer-spin-button { 
-    opacity: 1;
-}
-
-/* Estilo para los campos de solo lectura */
 .two-digit-display {
     font-variant-numeric: tabular-nums;
     font-weight: bold;
     letter-spacing: 2px;
 }
+
+.img-preview img {
+    max-width: 100%;
+    height: auto;
+}
+
+#preview-grupo img {
+    max-height: 150px;
+    max-width: 100%;
+}
 </style>
 
 <script>
 function limitarDigitos(event, input) {
-    // Permitir teclas de control (backspace, delete, tab, etc.)
     if (event.key === 'Backspace' || event.key === 'Delete' || event.key === 'Tab' || 
         event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'Home' || event.key === 'End') {
         return;
     }
     
-    // Si ya tiene 2 dígitos y no es una tecla de control, prevenir la entrada
     if (input.value.length >= 2 && !event.ctrlKey && !event.metaKey) {
         event.preventDefault();
         
-        // Si presiona un número, reemplazar el valor completo
         if (event.key >= '0' && event.key <= '9') {
             input.value = event.key;
             validarNota(input);
@@ -374,35 +423,61 @@ function limitarDigitos(event, input) {
 }
 
 function validarNota(input) {
-    // Eliminar cualquier carácter no numérico
     input.value = input.value.replace(/[^0-9]/g, '');
     
-    // Si está vacío, establecer como 1
     if (input.value === '') {
         input.value = '1';
         return;
     }
     
-    // Convertir a número
     let valor = parseInt(input.value);
     
-    // Validar rango
     if (valor < 1) {
         input.value = '1';
     } else if (valor > 20) {
         input.value = '20';
     }
     
-    // Limitar a 2 dígitos máximo
     if (input.value.length > 2) {
         input.value = input.value.slice(0, 2);
     }
 }
 
-// Validar todas las notas al cargar la página
+// Preview para el soporte del grupo
 document.addEventListener('DOMContentLoaded', function() {
+    const soporteGrupo = document.getElementById('soporte_grupo');
+    const previewGrupo = document.getElementById('preview-grupo');
+    const nombreArchivoGrupo = document.getElementById('nombre-archivo-grupo');
+    
+    if (soporteGrupo) {
+        soporteGrupo.addEventListener('change', function() {
+            const file = this.files[0];
+            
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    if (file.type.startsWith('image/')) {
+                        previewGrupo.innerHTML = `<img src="${e.target.result}" class="img-thumbnail">`;
+                    } else {
+                        previewGrupo.innerHTML = `
+                            <div class="alert alert-info text-center">
+                                <i class="fas fa-file-pdf fa-3x"></i><br>
+                                <strong>Archivo PDF</strong>
+                            </div>
+                        `;
+                    }
+                    nombreArchivoGrupo.textContent = file.name;
+                }
+                reader.readAsDataURL(file);
+            } else {
+                previewGrupo.innerHTML = '<small class="text-muted">No se ha seleccionado ningún archivo</small>';
+                nombreArchivoGrupo.textContent = 'Ningún archivo seleccionado';
+            }
+        });
+    }
+    
+    // Validar todas las notas al cargar la página
     document.querySelectorAll('.nota-input').forEach(input => {
-        // Formatear inicialmente a número (sin ceros a la izquierda)
         let valor = parseInt(input.value);
         input.value = valor;
         
