@@ -4787,6 +4787,91 @@ function generarPDFDesdeHTML($elementoHTML, $nombreArchivo = 'documento.pdf') {
 
 //CARGA DE NOTAS ***********************************************************************
 
+
+// FUNCIÓN PARA OBTENER NOTAS DEFINITIVAS
+function obtenerNotasDefinitivas($estudiante_id, $materia_id) {
+    global $db;
+    $query = "SELECT * FROM notas_definitivas 
+              WHERE id_usuario = ? AND id_materia = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("ii", $estudiante_id, $materia_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
+}
+
+
+
+
+// FUNCIÓN PARA OBTENER DATOS COMPLETOS DE notas_pendientes
+function obtenerNotasPendientesEstudiante($id_estudiante, $id_materia, $id_periodo, $id_docente) {
+    global $db;
+    
+    $query = "SELECT * FROM notas_pendientes 
+              WHERE id_usuario = ? 
+              AND id_materia = ? 
+              AND id_periodo = ? 
+              AND id_docente = ? 
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iiii", $id_estudiante, $id_materia, $id_periodo, $id_docente);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    return null;
+}
+
+
+
+
+
+// FUNCIÓN MEJORADA PARA OBTENER ESTADO (CORREGIDA)
+function obtenerEstadoCorregido($id_estudiante, $id_materia, $id_periodo, $id_docente) {
+    global $db;
+    
+    // PRIMERO: Verificar si está en notas_definitivas (APROBADA)
+    $query_definitivas = "SELECT id FROM notas_definitivas 
+                         WHERE id_usuario = ? AND id_materia = ?";
+    $stmt = $db->prepare($query_definitivas);
+    $stmt->bind_param("ii", $id_estudiante, $id_materia);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return 'aprobada'; // Está en notas_definitivas = APROBADA
+    }
+    
+    // SEGUNDO: Verificar si existe en notas_pendientes
+    $query_pendientes = "SELECT id, estado FROM notas_pendientes 
+                        WHERE id_usuario = ? AND id_materia = ? AND id_periodo = ? AND id_docente = ?";
+    $stmt = $db->prepare($query_pendientes);
+    $stmt->bind_param("iiii", $id_estudiante, $id_materia, $id_periodo, $id_docente);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        // Si tiene campo estado, usarlo; si no, asumir "en_revision"
+        if (isset($row['estado']) && $row['estado'] === 'rechazada') {
+            return 'rechazada';
+        }
+        return 'en_revision'; // SIEMPRE muestra como "En Revisión" si está en pendientes
+    }
+    
+    // No existe en ninguna tabla
+    return 'pendiente';
+}
+
+
+
+
+
+
 /**
  * Obtiene información completa de una materia incluyendo trayecto
  */
