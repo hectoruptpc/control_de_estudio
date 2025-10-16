@@ -278,7 +278,7 @@ include("includes/head.php");
                                                 data-periodo="<?= htmlspecialchars($grupo['nombre_periodo']) ?>"
                                                 data-seccion="<?= htmlspecialchars($grupo['codigo_seccion']) ?>"
                                                 data-carrera="<?= htmlspecialchars($grupo['nombre_carrera']) ?>">
-                                            <i class="fas fa-eye"></i> Ver Notas
+                                            <i class="fas fa-eye"></i> Ver Detalles
                                         </button>
                                         
                                         <!-- Botón para generar PDF -->
@@ -333,10 +333,44 @@ include("includes/head.php");
                 </button>
             </div>
             <div class="modal-body">
-                <div id="contenido-detalles">
-                    <div class="text-center py-4">
-                        <div class="spinner-border text-primary"></div>
-                        <p class="mt-2">Cargando información...</p>
+                <div class="row">
+                    <!-- Sidebar de navegación -->
+                    <div class="col-md-3">
+                        <div class="list-group" id="sidebarDetalles">
+                            <a href="#lista-estudiantes" class="list-group-item list-group-item-action active" data-toggle="tab">
+                                <i class="fas fa-users"></i> Lista de Estudiantes
+                            </a>
+                            <a href="#resumen" class="list-group-item list-group-item-action" data-toggle="tab">
+                                <i class="fas fa-chart-bar"></i> Resumen
+                            </a>
+                            <a href="#soporte" class="list-group-item list-group-item-action" data-toggle="tab">
+                                <i class="fas fa-paperclip"></i> Soporte
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Contenido de las pestañas -->
+                    <div class="col-md-9">
+                        <div class="tab-content" id="contenidoDetalles">
+                            <div class="tab-pane fade show active" id="lista-estudiantes">
+                                <div class="text-center">
+                                    <div class="spinner-border text-primary"></div>
+                                    <p>Cargando estudiantes...</p>
+                                </div>
+                            </div>
+                            <div class="tab-pane fade" id="resumen">
+                                <div class="text-center">
+                                    <div class="spinner-border text-primary"></div>
+                                    <p>Cargando resumen...</p>
+                                </div>
+                            </div>
+                            <div class="tab-pane fade" id="soporte">
+                                <div class="text-center">
+                                    <div class="spinner-border text-primary"></div>
+                                    <p>Cargando soporte...</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -427,11 +461,13 @@ $(document).ready(function() {
         const docente = $(this).data('docente');
         const materia = $(this).data('materia');
         const periodo = $(this).data('periodo');
+        const seccion = $(this).data('seccion');
+        const carrera = $(this).data('carrera');
         
         // Actualizar título del modal
         $('#tituloGrupo').text(`${docente} - ${materia} - ${periodo}`);
         
-        // Cargar detalles
+        // Cargar lista de estudiantes
         $.ajax({
             url: 'ajax_detalles_notas_definitivas.php',
             type: 'POST',
@@ -439,15 +475,40 @@ $(document).ready(function() {
                 docente_id: docenteId, 
                 materia_id: materiaId, 
                 periodo_id: periodoId,
-                accion: 'detalles'
+                seccion: 'lista-estudiantes'
             },
             success: function(data) {
-                $('#contenido-detalles').html(data);
+                $('#lista-estudiantes').html(data);
+            }
+        });
+        
+        // Cargar resumen
+        $.ajax({
+            url: 'ajax_detalles_notas_definitivas.php',
+            type: 'POST',
+            data: { 
+                docente_id: docenteId, 
+                materia_id: materiaId, 
+                periodo_id: periodoId,
+                seccion: 'resumen'
             },
-            error: function() {
-                $('#contenido-detalles').html(
-                    '<div class="alert alert-danger">Error al cargar los detalles</div>'
-                );
+            success: function(data) {
+                $('#resumen').html(data);
+            }
+        });
+        
+        // Cargar soporte
+        $.ajax({
+            url: 'ajax_detalles_notas_definitivas.php',
+            type: 'POST',
+            data: { 
+                docente_id: docenteId, 
+                materia_id: materiaId, 
+                periodo_id: periodoId,
+                seccion: 'soporte'
+            },
+            success: function(data) {
+                $('#soporte').html(data);
             }
         });
     });

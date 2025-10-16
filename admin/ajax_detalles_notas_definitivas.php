@@ -5,22 +5,25 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     die('Acceso no permitido');
 }
 
-if (!isset($_POST['docente_id']) || !isset($_POST['materia_id']) || !isset($_POST['periodo_id']) || !isset($_POST['accion'])) {
+if (!isset($_POST['docente_id']) || !isset($_POST['materia_id']) || !isset($_POST['periodo_id'])) {
     die('Parámetros incompletos');
 }
 
 $docente_id = (int)$_POST['docente_id'];
 $materia_id = (int)$_POST['materia_id'];
 $periodo_id = (int)$_POST['periodo_id'];
-$accion = $_POST['accion'];
+$seccion = $_POST['seccion'] ?? 'lista-estudiantes';
+$accion = $_POST['accion'] ?? '';
 
-// Obtener información del grupo para notas definitivas
-function obtenerInfoGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
+// Obtener información del grupo
+function obtenerInfoGrupo($docente_id, $materia_id, $periodo_id) {
     global $db;
     
-    $query = "SELECT ud.nombre as nombre_docente, m.nombre_materia, m.cod_materia,
+    $query = "SELECT ud.nombre as nombre_docente, ud.idusuario as cedula_docente, 
+                     m.nombre_materia, m.cod_materia,
                      pa.nombre_periodo, s.codigo_seccion, c.nombre_carrera, 
-                     t.nombre_trayecto, t.id_trayecto, t.numero_trayecto
+                     t.nombre_trayecto, t.id_trayecto, t.numero_trayecto,
+                     a.nombre as nombre_admin
               FROM notas_definitivas nd
               INNER JOIN users ud ON nd.id_docente = ud.id
               INNER JOIN materias m ON nd.id_materia = m.id_materia
@@ -30,6 +33,7 @@ function obtenerInfoGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
               INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
               INNER JOIN carreras c ON s.id_carrera = c.id_carrera
               INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+              LEFT JOIN users a ON nd.id_admin_aprobador = a.id
               WHERE nd.id_docente = ? 
               AND nd.id_materia = ? 
               AND nd.id_periodo = ?
@@ -41,15 +45,14 @@ function obtenerInfoGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
     return $stmt->get_result()->fetch_assoc();
 }
 
-// Obtener estudiantes del grupo para notas definitivas
-function obtenerEstudiantesGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
+// Obtener estudiantes del grupo
+function obtenerEstudiantesGrupo($docente_id, $materia_id, $periodo_id) {
     global $db;
     
     $query = "SELECT nd.*, u.nombre as nombre_estudiante, u.idusuario as cedula,
-                     admin.nombre as admin_aprobador
+                     nd.fecha_registro, nd.soporte, nd.tipo_archivo
               FROM notas_definitivas nd
               INNER JOIN users u ON nd.id_usuario = u.id
-              LEFT JOIN users admin ON nd.id_admin_aprobador = admin.id
               WHERE nd.id_docente = ? 
               AND nd.id_materia = ? 
               AND nd.id_periodo = ?
@@ -61,195 +64,383 @@ function obtenerEstudiantesGrupoDefinitivas($docente_id, $materia_id, $periodo_i
     return $stmt->get_result();
 }
 
-$info_grupo = obtenerInfoGrupoDefinitivas($docente_id, $materia_id, $periodo_id);
-$estudiantes = obtenerEstudiantesGrupoDefinitivas($docente_id, $materia_id, $periodo_id);
+// Obtener información de soporte del grupo
+function obtenerSoporteGrupo($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT DISTINCT soporte, tipo_archivo, fecha_registro
+              FROM notas_definitivas 
+              WHERE id_docente = ? 
+              AND id_materia = ? 
+              AND id_periodo = ?
+              AND soporte IS NOT NULL
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    return null;
+}
+
+// Calcular promedio según el id_trayecto de la sección
+function calcularPromedioPorTrayecto($nota, $id_trayecto) {
+    $suma = 0;
+    $count = 0;
+    
+    // Determinar qué trayectos promediar según el id_trayecto de la sección
+    switch ($id_trayecto) {
+        case 1: // Trayecto Inicial - Solo trayecto_0
+            if ($nota['trayecto_0'] !== null) {
+                $suma = $nota['trayecto_0'];
+                $count = 1;
+            }
+            break;
+            
+        case 2: // Trayecto 1 - Solo trayecto_1
+            if ($nota['trayecto_1'] !== null) {
+                $suma = $nota['trayecto_1'];
+                $count = 1;
+            }
+            break;
+            
+        case 3: // Trayecto 2 - Solo trayecto_2
+            if ($nota['trayecto_2'] !== null) {
+                $suma = $nota['trayecto_2'];
+                $count = 1;
+            }
+            break;
+            
+        case 4: // Trayecto 3 - Solo trayecto_3
+            if ($nota['trayecto_3'] !== null) {
+                $suma = $nota['trayecto_3'];
+                $count = 1;
+            }
+            break;
+            
+        case 5: // Trayecto 4 - Solo trayecto_4
+            if ($nota['trayecto_4'] !== null) {
+                $suma = $nota['trayecto_4'];
+                $count = 1;
+            }
+            break;
+            
+        default:
+            // Por defecto, calcular todos los trayectos (no debería pasar)
+            for ($i = 0; $i <= 4; $i++) {
+                if ($nota['trayecto_' . $i] !== null) {
+                    $suma += $nota['trayecto_' . $i];
+                    $count++;
+                }
+            }
+    }
+    
+    return $count > 0 ? round($suma / $count, 1) : 0;
+}
+
+// Obtener estadísticas del grupo según el id_trayecto
+function obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id, $id_trayecto) {
+    global $db;
+    
+    $query = "SELECT nd.trayecto_0, nd.trayecto_1, nd.trayecto_2, nd.trayecto_3, nd.trayecto_4
+              FROM notas_definitivas nd
+              WHERE nd.id_docente = ? 
+              AND nd.id_materia = ? 
+              AND nd.id_periodo = ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $total_estudiantes = 0;
+    $suma_total = 0;
+    $aprobados = 0;
+    $reprobados = 0;
+    
+    while ($nota = $result->fetch_assoc()) {
+        $total_estudiantes++;
+        
+        // Calcular promedio según el id_trayecto de la sección
+        $promedio_estudiante = calcularPromedioPorTrayecto($nota, $id_trayecto);
+        $suma_total += $promedio_estudiante;
+        
+        // Aprobados desde 12 puntos
+        if ($promedio_estudiante >= 12) {
+            $aprobados++;
+        } else {
+            $reprobados++;
+        }
+    }
+    
+    $promedio_general = $total_estudiantes > 0 ? round($suma_total / $total_estudiantes, 1) : 0;
+    
+    return [
+        'total_estudiantes' => $total_estudiantes,
+        'promedio_general' => $promedio_general,
+        'aprobados' => $aprobados,
+        'reprobados' => $reprobados,
+        'id_trayecto' => $id_trayecto
+    ];
+}
+
+$info_grupo = obtenerInfoGrupo($docente_id, $materia_id, $periodo_id);
+$estudiantes = obtenerEstudiantesGrupo($docente_id, $materia_id, $periodo_id);
+$soporte_info = obtenerSoporteGrupo($docente_id, $materia_id, $periodo_id);
 
 if (!$info_grupo) {
     die('Información no encontrada');
 }
 
-if ($accion === 'detalles') {
-    // Mostrar detalles en el modal
-    ?>
-    <div class="table-responsive">
-        <table class="table table-bordered table-sm">
-            <thead class="thead-light">
-                <tr>
-                    <th>#</th>
-                    <th>Cédula</th>
-                    <th>Estudiante</th>
-                    <th>Nota</th>
-                    <th>Fecha</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php 
-                $contador = 1;
-                while ($estudiante = $estudiantes->fetch_assoc()): 
-                    // Obtener la nota específica del trayecto
-                    $nota_trayecto = '';
-                    switch ($info_grupo['id_trayecto']) {
-                        case 1: $nota_trayecto = $estudiante['trayecto_0']; break;
-                        case 2: $nota_trayecto = $estudiante['trayecto_1']; break;
-                        case 3: $nota_trayecto = $estudiante['trayecto_2']; break;
-                        case 4: $nota_trayecto = $estudiante['trayecto_3']; break;
-                        case 5: $nota_trayecto = $estudiante['trayecto_4']; break;
-                    }
-                ?>
-                <tr>
-                    <td><?= $contador ?></td>
-                    <td><?= htmlspecialchars($estudiante['cedula']) ?></td>
-                    <td><?= htmlspecialchars($estudiante['nombre_estudiante']) ?></td>
-                    <td>
-                        <?php if ($nota_trayecto !== null): ?>
-                            <span class="badge badge-info">
-                                <?= $nota_trayecto ?>
-                            </span>
-                        <?php else: ?>
-                            <span class="badge badge-secondary">Sin nota</span>
-                        <?php endif; ?>
-                    </td>
-                    <td><?= date('d/m/Y H:i', strtotime($estudiante['fecha_registro'])) ?></td>
-                </tr>
-                <?php 
-                $contador++;
-                endwhile; 
-                ?>
-            </tbody>
-        </table>
-    </div>
-    <?php
-} elseif ($accion === 'pdf') {
-    // Generar contenido para PDF - ESTILO PROFESIONAL
-    ?>
-    <div style="font-family: 'Arial', sans-serif; padding: 15px; color: #333;">
-        <!-- Encabezado profesional -->
-        <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #2c3e50; padding-bottom: 15px;">
-            <h2 style="color: #2c3e50; margin: 0; font-size: 20px; font-weight: bold;">
-                ACTA DE NOTAS DEFINITIVAS
-            </h2>
-            <p style="color: #7f8c8d; margin: 5px 0 0 0; font-size: 12px;">
-                Universidad Politécnica Territorial de Puerto Cabello
-            </p>
+$estadisticas = obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id, $info_grupo['id_trayecto']);
+
+// Determinar qué trayecto se está considerando
+$trayecto_considerado = '';
+switch ($info_grupo['id_trayecto']) {
+    case 1: $trayecto_considerado = 'Trayecto 0'; break;
+    case 2: $trayecto_considerado = 'Trayecto 1'; break;
+    case 3: $trayecto_considerado = 'Trayecto 2'; break;
+    case 4: $trayecto_considerado = 'Trayecto 3'; break;
+    case 5: $trayecto_considerado = 'Trayecto 4'; break;
+    default: $trayecto_considerado = 'Todos los trayectos';
+}
+
+// Manejar acción PDF
+if ($accion === 'pdf') {
+    // Generar contenido para PDF
+    ob_start();
+    include('pdf_notas_definitivas.php');
+    $contenido = ob_get_clean();
+    echo $contenido;
+    exit;
+}
+
+// Manejar secciones del modal
+switch ($seccion) {
+    case 'lista-estudiantes':
+        ?>
+        <h4>Lista de Estudiantes</h4>
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> 
+            Trayecto considerado: <strong><?= $trayecto_considerado ?></strong><br>
+            Aprobación: ≥12pts
         </div>
-
-        <!-- Información del grupo en tabla profesional -->
-        <table style="width: 100%; margin-bottom: 20px; font-size: 10px; border-collapse: collapse;">
-            <tr>
-                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1; width: 25%;"><strong>Docente:</strong></td>
-                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><?= htmlspecialchars($info_grupo['nombre_docente']) ?></td>
-                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1; width: 20%;"><strong>Materia:</strong></td>
-                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><?= htmlspecialchars($info_grupo['nombre_materia']) ?></td>
-            </tr>
-            <tr>
-                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><strong>Código:</strong></td>
-                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><?= htmlspecialchars($info_grupo['cod_materia']) ?></td>
-                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><strong>Sección:</strong></td>
-                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><?= htmlspecialchars($info_grupo['codigo_seccion']) ?></td>
-            </tr>
-            <tr>
-                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><strong>Periodo:</strong></td>
-                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><?= htmlspecialchars($info_grupo['nombre_periodo']) ?></td>
-                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><strong>Carrera:</strong></td>
-                <td style="padding: 6px; border-bottom: 1px solid #ecf0f1;"><?= htmlspecialchars($info_grupo['nombre_carrera']) ?></td>
-            </tr>
-            <tr>
-                <td style="padding: 6px;"><strong>Trayecto:</strong></td>
-                <td style="padding: 6px;" colspan="3"><?= htmlspecialchars($info_grupo['nombre_trayecto']) ?></td>
-            </tr>
-        </table>
-
-        <!-- Tabla de estudiantes - Estilo profesional -->
-        <table style="width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 20px; border: 1px solid #34495e;">
-            <thead>
-                <tr style="background: #34495e; color: white;">
-                    <th style="border: 1px solid #2c3e50; padding: 8px; text-align: center; width: 8%;">N°</th>
-                    <th style="border: 1px solid #2c3e50; padding: 8px; text-align: left; width: 25%;">CÉDULA</th>
-                    <th style="border: 1px solid #2c3e50; padding: 8px; text-align: left; width: 47%;">ESTUDIANTE</th>
-                    <th style="border: 1px solid #2c3e50; padding: 8px; text-align: center; width: 10%;">NOTA</th>
-                    <th style="border: 1px solid #2c3e50; padding: 8px; text-align: center; width: 10%;">FECHA</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php 
-                $contador = 1;
-                $estudiantes->data_seek(0);
-                while ($estudiante = $estudiantes->fetch_assoc()): 
-                    // Obtener la nota específica del trayecto
-                    $nota_trayecto = '';
-                    switch ($info_grupo['id_trayecto']) {
-                        case 1: $nota_trayecto = $estudiante['trayecto_0']; break;
-                        case 2: $nota_trayecto = $estudiante['trayecto_1']; break;
-                        case 3: $nota_trayecto = $estudiante['trayecto_2']; break;
-                        case 4: $nota_trayecto = $estudiante['trayecto_3']; break;
-                        case 5: $nota_trayecto = $estudiante['trayecto_4']; break;
-                    }
-                    $fecha = date('d/m/Y', strtotime($estudiante['fecha_registro']));
-                ?>
-                <tr style="background: <?= $contador % 2 === 0 ? '#f8f9fa' : '#ffffff' ?>;">
-                    <td style="border: 1px solid #bdc3c7; padding: 7px; text-align: center; font-weight: bold;"><?= $contador ?></td>
-                    <td style="border: 1px solid #bdc3c7; padding: 7px;"><?= htmlspecialchars($estudiante['cedula']) ?></td>
-                    <td style="border: 1px solid #bdc3c7; padding: 7px;"><?= htmlspecialchars($estudiante['nombre_estudiante']) ?></td>
-                    <td style="border: 1px solid #bdc3c7; padding: 7px; text-align: center; font-weight: bold; font-size: 10px;">
-                        <?= $nota_trayecto !== null ? $nota_trayecto : 'N/A' ?>
-                    </td>
-                    <td style="border: 1px solid #bdc3c7; padding: 7px; text-align: center;"><?= $fecha ?></td>
-                </tr>
-                <?php 
-                $contador++;
-                endwhile; 
-                ?>
-            </tbody>
-        </table>
-
-               <!-- Firma y sello - FIRMA SOBRE LA LÍNEA -->
-        <div style="margin-top: 50px; padding-top: 20px;">
-            <table style="width: 100%; font-size: 9px;">
-                <tr>
-                    <td style="width: 50%; text-align: center; vertical-align: top;">
-                        <!-- Firma del docente -->
-                        <div style="margin-bottom: 30px; width: 80%; margin-left: auto; margin-right: auto;">
-                            <div style="height: 50px; margin-bottom: 10px;">
-                                <!-- ESPACIO PARA LA FIRMA (encima de la línea) -->
-                            </div>
-                            <div style="border-top: 1px solid #34495e; padding-top: 8px; margin-bottom: 5px;">
-                                <strong>FIRMA DEL DOCENTE</strong>
-                            </div>
-                            <div style="color: #7f8c8d; font-size: 8px;">
-                                <?= htmlspecialchars($info_grupo['nombre_docente']) ?>
-                            </div>
-                            <div style="color: #95a5a6; font-size: 7px; margin-top: 2px;">
-                                Docente responsable
-                            </div>
-                        </div>
-                    </td>
-                    <td style="width: 50%; text-align: center; vertical-align: top;">
-                        <!-- Sello institucional -->
-                        <div style="margin-bottom: 30px; width: 80%; margin-left: auto; margin-right: auto;">
-                            <div style="height: 50px; margin-bottom: 10px;">
-                                <!-- ESPACIO PARA EL SELLO (encima de la línea) -->
-                            </div>
-                            <div style="border-top: 1px solid #34495e; padding-top: 8px; margin-bottom: 5px;">
-                                <strong>SELLO INSTITUCIONAL</strong>
-                            </div>
-                            <div style="color: #7f8c8d; font-size: 8px;">
-                                Universidad Politécnica Territorial<br>de Puerto Cabello
-                            </div>
-                            <div style="color: #95a5a6; font-size: 7px; margin-top: 2px;">
-                                Entidad certificadora
-                            </div>
-                        </div>
-                    </td>
-                </tr>
+        
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Cédula</th>
+                        <th>Estudiante</th>
+                        <th>Nota del Trayecto</th>
+                        <th>Estado</th>
+                        <th>Fecha de Aprobación</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php while ($estudiante = $estudiantes->fetch_assoc()): ?>
+                        <?php
+                        $promedio = calcularPromedioPorTrayecto($estudiante, $info_grupo['id_trayecto']);
+                        $estado = $promedio >= 12 ? 'Aprobado' : 'Reprobado';
+                        $color_estado = $promedio >= 12 ? 'success' : 'danger';
+                        
+                        // Obtener la nota específica del trayecto
+                        $nota_trayecto = '';
+                        switch ($info_grupo['id_trayecto']) {
+                            case 1: $nota_trayecto = $estudiante['trayecto_0']; break;
+                            case 2: $nota_trayecto = $estudiante['trayecto_1']; break;
+                            case 3: $nota_trayecto = $estudiante['trayecto_2']; break;
+                            case 4: $nota_trayecto = $estudiante['trayecto_3']; break;
+                            case 5: $nota_trayecto = $estudiante['trayecto_4']; break;
+                        }
+                        ?>
+                        <tr>
+                            <td><?= htmlspecialchars($estudiante['cedula']) ?></td>
+                            <td><?= htmlspecialchars($estudiante['nombre_estudiante']) ?></td>
+                            <td>
+                                <?php if ($nota_trayecto !== null): ?>
+                                    <span class="badge badge-info">
+                                        T<?= $info_grupo['id_trayecto'] - 1 ?>: <?= $nota_trayecto ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span class="badge badge-secondary">Sin nota</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <span class="badge badge-<?= $color_estado ?>">
+                                    <?= $estado ?>
+                                </span>
+                            </td>
+                            <td>
+                                <small class="text-muted">
+                                    <?= date('d/m/Y H:i', strtotime($estudiante['fecha_registro'])) ?>
+                                </small>
+                            </td>
+                        </tr>
+                    <?php endwhile; ?>
+                </tbody>
             </table>
         </div>
-
-        <!-- Pie de página profesional -->
-        <div style="margin-top: 30px; text-align: center; color: #95a5a6; font-size: 7px; border-top: 1px solid #ecf0f1; padding-top: 10px;">
-            Documento generado el <?= date('d/m/Y H:i:s') ?> | Sistema Académico UPT Puerto Cabello<br>
-            Este documento tiene validez oficial y debe ser conservado según normativa institucional
+        <?php
+        break;
+        
+    case 'resumen':
+        ?>
+        <h4>Resumen del Grupo</h4>
+        <div class="alert alert-info">
+            <strong>Trayecto considerado:</strong> <?= $trayecto_considerado ?><br>
+            <strong>Aprobación:</strong> ≥12pts
         </div>
-    </div>
-    <?php
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header bg-light">Información del Grupo</div>
+                    <div class="card-body">
+                        <p><strong>Docente:</strong> <?= htmlspecialchars($info_grupo['nombre_docente']) ?></p>
+                        <p><strong>Cédula:</strong> <?= htmlspecialchars($info_grupo['cedula_docente']) ?></p>
+                        <p><strong>Materia:</strong> <?= htmlspecialchars($info_grupo['nombre_materia']) ?></p>
+                        <p><strong>Código:</strong> <?= htmlspecialchars($info_grupo['cod_materia']) ?></p>
+                        <p><strong>Trayecto:</strong> <?= htmlspecialchars($info_grupo['nombre_trayecto']) ?> (ID: <?= $info_grupo['id_trayecto'] ?>)</p>
+                        <p><strong>Periodo:</strong> <?= htmlspecialchars($info_grupo['nombre_periodo']) ?></p>
+                        <p><strong>Sección:</strong> <?= htmlspecialchars($info_grupo['codigo_seccion']) ?></p>
+                        <p><strong>Carrera:</strong> <?= htmlspecialchars($info_grupo['nombre_carrera']) ?></p>
+                        <?php if (!empty($info_grupo['nombre_admin'])): ?>
+                            <p><strong>Aprobado por:</strong> <?= htmlspecialchars($info_grupo['nombre_admin']) ?></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header bg-light">Estadísticas</div>
+                    <div class="card-body">
+                        <p><strong>Total Estudiantes:</strong> 
+                            <span class="badge badge-primary"><?= $estadisticas['total_estudiantes'] ?></span>
+                        </p>
+                        <p><strong>Promedio General:</strong> 
+                            <span class="badge badge-<?= $estadisticas['promedio_general'] >= 12 ? 'success' : 'warning' ?>">
+                                <?= $estadisticas['promedio_general'] ?>
+                            </span>
+                        </p>
+                        <p><strong>Aprobados (≥12pts):</strong> 
+                            <span class="badge badge-success"><?= $estadisticas['aprobados'] ?></span>
+                            (<?= $estadisticas['total_estudiantes'] > 0 ? round(($estadisticas['aprobados'] / $estadisticas['total_estudiantes']) * 100, 1) : 0 ?>%)
+                        </p>
+                        <p><strong>Reprobados (<12pts):</strong> 
+                            <span class="badge badge-danger"><?= $estadisticas['reprobados'] ?></span>
+                            (<?= $estadisticas['total_estudiantes'] > 0 ? round(($estadisticas['reprobados'] / $estadisticas['total_estudiantes']) * 100, 1) : 0 ?>%)
+                        </p>
+                        
+                        <!-- Gráfico simple de progreso -->
+                        <?php if ($estadisticas['total_estudiantes'] > 0): ?>
+                        <div class="progress mt-3" style="height: 20px;">
+                            <div class="progress-bar bg-success" 
+                                 style="width: <?= ($estadisticas['aprobados'] / $estadisticas['total_estudiantes']) * 100 ?>%">
+                                Aprobados: <?= $estadisticas['aprobados'] ?>
+                            </div>
+                            <div class="progress-bar bg-danger" 
+                                 style="width: <?= ($estadisticas['reprobados'] / $estadisticas['total_estudiantes']) * 100 ?>%">
+                                Reprobados: <?= $estadisticas['reprobados'] ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php
+        break;
+        
+    case 'soporte':
+        ?>
+        <h4>Soporte del Grupo</h4>
+        
+        <?php if ($soporte_info): ?>
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i> 
+                <strong>Archivo de soporte disponible</strong>
+            </div>
+            
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Información del Archivo</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Nombre del archivo:</strong> <?= htmlspecialchars($soporte_info['soporte']) ?></p>
+                            <p><strong>Tipo de archivo:</strong> 
+                                <span class="badge badge-info"><?= strtoupper($soporte_info['tipo_archivo']) ?></span>
+                            </p>
+                            <p><strong>Fecha de registro:</strong> 
+                                <?= date('d/m/Y H:i', strtotime($soporte_info['fecha_registro'])) ?>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-center">
+                                <?php if (in_array($soporte_info['tipo_archivo'], ['jpg', 'jpeg', 'png', 'gif', 'webp'])): ?>
+                                    <div class="img-preview mb-3">
+                                        <img src="../soportes/<?= htmlspecialchars($soporte_info['soporte']) ?>" 
+                                             alt="Vista previa del soporte" 
+                                             class="img-fluid rounded border" 
+                                             style="max-height: 300px;">
+                                    </div>
+                                <?php else: ?>
+                                    <div class="alert alert-info text-center">
+                                        <i class="fas fa-file-pdf fa-3x mb-3"></i>
+                                        <br>
+                                        <strong>Archivo PDF</strong>
+                                        <br>
+                                        <small class="text-muted">Haga clic en el botón para descargar</small>
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <div class="btn-group">
+                                    <a href="../soportes/<?= htmlspecialchars($soporte_info['soporte']) ?>" 
+                                       class="btn btn-primary" 
+                                       target="_blank" 
+                                       download="<?= htmlspecialchars($soporte_info['soporte']) ?>">
+                                        <i class="fas fa-download"></i> Descargar
+                                    </a>
+                                    <a href="../soportes/<?= htmlspecialchars($soporte_info['soporte']) ?>" 
+                                       class="btn btn-info" 
+                                       target="_blank">
+                                        <i class="fas fa-external-link-alt"></i> Ver
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle"></i>
+                <strong>Nota:</strong> Este archivo de soporte fue utilizado durante la aprobación de las notas definitivas.
+            </div>
+        <?php else: ?>
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>No hay archivo de soporte disponible</strong>
+                <p class="mb-0">No se encontró ningún archivo de soporte asociado a este grupo de notas definitivas.</p>
+            </div>
+            
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="fas fa-paperclip fa-3x text-muted mb-3"></i>
+                    <h5>Sin Soporte</h5>
+                    <p class="text-muted">No se encontró ningún archivo de soporte asociado a este grupo de notas.</p>
+                </div>
+            </div>
+        <?php endif; ?>
+        <?php
+        break;
 }
 ?>
