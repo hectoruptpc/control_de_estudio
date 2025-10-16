@@ -60,6 +60,31 @@ function obtenerEstudiantesGrupo($docente_id, $materia_id, $periodo_id) {
     return $stmt->get_result();
 }
 
+// Obtener información de soporte del grupo
+function obtenerSoporteGrupo($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT DISTINCT soporte, tipo_archivo, fecha_subida
+              FROM notas_pendientes 
+              WHERE id_docente = ? 
+              AND id_materia = ? 
+              AND id_periodo = ?
+              AND soporte IS NOT NULL
+              AND estado = 'pendiente'
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    return null;
+}
+
 // Calcular promedio según el id_trayecto de la sección (FUNCIÓN ESPECÍFICA - se queda aquí)
 function calcularPromedioPorTrayecto($nota, $id_trayecto) {
     $suma = 0;
@@ -164,6 +189,7 @@ function obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id, $id_tra
 
 $info_grupo = obtenerInfoGrupo($docente_id, $materia_id, $periodo_id);
 $estudiantes = obtenerEstudiantesGrupo($docente_id, $materia_id, $periodo_id);
+$soporte_info = obtenerSoporteGrupo($docente_id, $materia_id, $periodo_id);
 
 if (!$info_grupo) {
     die('Información no encontrada');
@@ -345,6 +371,91 @@ switch ($seccion) {
         <?php
         break;
         
+    case 'soporte':
+        ?>
+        <h4>Soporte del Grupo</h4>
+        
+        <?php if ($soporte_info): ?>
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i> 
+                <strong>Archivo de soporte disponible</strong>
+            </div>
+            
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Información del Archivo</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Nombre del archivo:</strong> <?= htmlspecialchars($soporte_info['soporte']) ?></p>
+                            <p><strong>Tipo de archivo:</strong> 
+                                <span class="badge badge-info"><?= strtoupper($soporte_info['tipo_archivo']) ?></span>
+                            </p>
+                            <p><strong>Fecha de subida:</strong> 
+                                <?= date('d/m/Y H:i', strtotime($soporte_info['fecha_subida'])) ?>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-center">
+                                <?php if (in_array($soporte_info['tipo_archivo'], ['jpg', 'jpeg', 'png', 'gif', 'webp'])): ?>
+                                    <div class="img-preview mb-3">
+                                        <img src="../soportes/<?= htmlspecialchars($soporte_info['soporte']) ?>" 
+                                             alt="Vista previa del soporte" 
+                                             class="img-fluid rounded border" 
+                                             style="max-height: 300px;">
+                                    </div>
+                                <?php else: ?>
+                                    <div class="alert alert-info text-center">
+                                        <i class="fas fa-file-pdf fa-3x mb-3"></i>
+                                        <br>
+                                        <strong>Archivo PDF</strong>
+                                        <br>
+                                        <small class="text-muted">Haga clic en el botón para descargar</small>
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <div class="btn-group">
+                                    <a href="../soportes/<?= htmlspecialchars($soporte_info['soporte']) ?>" 
+                                       class="btn btn-primary" 
+                                       target="_blank" 
+                                       download="<?= htmlspecialchars($soporte_info['soporte']) ?>">
+                                        <i class="fas fa-download"></i> Descargar
+                                    </a>
+                                    <a href="../soportes/<?= htmlspecialchars($soporte_info['soporte']) ?>" 
+                                       class="btn btn-info" 
+                                       target="_blank">
+                                        <i class="fas fa-external-link-alt"></i> Ver
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-info-circle"></i>
+                <strong>Nota:</strong> Este archivo de soporte será copiado a las notas definitivas cuando se aprueben las notas.
+            </div>
+        <?php else: ?>
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>No hay archivo de soporte disponible</strong>
+                <p class="mb-0">El docente no ha subido ningún archivo de soporte para este grupo.</p>
+            </div>
+            
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="fas fa-paperclip fa-3x text-muted mb-3"></i>
+                    <h5>Sin Soporte</h5>
+                    <p class="text-muted">No se encontró ningún archivo de soporte asociado a este grupo de notas.</p>
+                </div>
+            </div>
+        <?php endif; ?>
+        <?php
+        break;
+        
     case 'acciones-grupo':
         ?>
         <h4>Acciones Grupales</h4>
@@ -361,6 +472,17 @@ switch ($seccion) {
                     </div>
                     <div class="card-body">
                         <p>Aprobará las notas de todos los estudiantes en este grupo.</p>
+                        <?php if ($soporte_info): ?>
+                            <div class="alert alert-info">
+                                <i class="fas fa-paperclip"></i> 
+                                Se incluirá el archivo de soporte en las notas definitivas.
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i> 
+                                No hay archivo de soporte disponible.
+                            </div>
+                        <?php endif; ?>
                         <button class="btn btn-success btn-block" 
                                 onclick="accionGrupo('aprobar')">
                             Aprobar Todo
@@ -452,6 +574,7 @@ switch ($seccion) {
 }
 ?>
 
+<!-- El resto del JavaScript permanece igual -->
 <script>
 // Variables globales para almacenar la acción pendiente
 let accionPendiente = null;
