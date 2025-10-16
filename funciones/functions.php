@@ -4702,7 +4702,6 @@ function contarAccionesPorTipo($tipo) {
 //MEMBRETES Y REPORTES PDF  ***********************************************************************
 
 
-// Función para generar membrete en PDF
 // Función para generar el código JavaScript del membrete
 function generarMembreteJS() {
     $hoy = new DateTime();
@@ -4720,14 +4719,15 @@ function generarMembreteJS() {
                 // Agregar logo (arriba a la izquierda)
                 doc.addImage(logoImg, 'PNG', margin, 10, 20, 20);
                 
-                // Agregar texto del membrete
-                doc.setFontSize(12);
+                // Agregar texto del membrete con fuente más pequeña
+                doc.setFontSize(10); // Reducido de 12 a 10
                 doc.setFont(undefined, 'bold');
                 doc.text('REPÚBLICA BOLIVARIANA DE VENEZUELA', pageWidth / 2, 15, { align: 'center' });
                 doc.text('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA', pageWidth / 2, 20, { align: 'center' });
                 doc.text('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO', pageWidth / 2, 25, { align: 'center' });
                 
-                // Agregar fecha
+                // Agregar fecha con fuente más pequeña
+                doc.setFontSize(9); // Reducido para la fecha
                 doc.setFont(undefined, 'normal');
                 doc.text('$fecha', pageWidth - margin, 15, { align: 'right' });
                 
@@ -4735,12 +4735,14 @@ function generarMembreteJS() {
             };
             
             logoImg.onerror = function() {
-                // Fallback sin imagen
-                doc.setFontSize(12);
+                // Fallback sin imagen con fuente más pequeña
+                doc.setFontSize(10); // Reducido de 12 a 10
                 doc.setFont(undefined, 'bold');
                 doc.text('República Bolivariana de Venezuela', pageWidth / 2, 15, { align: 'center' });
                 doc.text('Ministerio del Poder Popular para la Educación Universitaria', pageWidth / 2, 20, { align: 'center' });
                 doc.text('Universidad Politécnica Territorial de Puerto Cabello', pageWidth / 2, 25, { align: 'center' });
+                
+                doc.setFontSize(9); // Reducido para la fecha
                 doc.setFont(undefined, 'normal');
                 doc.text('$fecha', pageWidth / 2, 32, { align: 'center' });
                 
