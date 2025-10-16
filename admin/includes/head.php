@@ -62,7 +62,7 @@ if (!isLoggedIn() || !isAdmin()) {
         border-left: 4px solid #007bff;
     }
     
-    /* MEJORAS ESPECÍFICAS PARA MÓVILES */
+    /* MEJORAS ESPECÍFICAS PARA DROPDOWNS */
     
     /* Alineación de elementos del navbar */
     .navbar-nav .nav-item {
@@ -76,11 +76,18 @@ if (!isLoggedIn() || !isAdmin()) {
         padding: 0.5rem 1rem;
     }
     
-    /* Dropdown optimizado para móviles */
+    /* Dropdown optimizado - SOLUCIÓN AL PROBLEMA */
     .dropdown-menu {
-        z-index: 1030; /* Mayor prioridad para que se muestre por encima */
+        z-index: 1050; /* Mayor prioridad para que se muestre por encima del navbar */
         border: 1px solid rgba(0,0,0,.15);
         box-shadow: 0 2px 10px rgba(0,0,0,.1);
+        max-height: 70vh; /* Limitar altura máxima */
+        overflow-y: auto; /* Scroll si es muy largo */
+    }
+    
+    /* Asegurar que los dropdowns no se corten */
+    .navbar-nav .dropdown-menu {
+        position: absolute !important;
     }
     
     /* Mejorar el botón hamburguesa en móviles */
@@ -98,11 +105,17 @@ if (!isLoggedIn() || !isAdmin()) {
     .dropdown-item {
         padding: 0.75rem 1.5rem;
         font-size: 0.9rem;
+        white-space: normal; /* Permitir que el texto se ajuste */
     }
     
     .dropdown-toggle::after {
         margin-left: 0.3em;
         vertical-align: 0.15em;
+    }
+    
+    /* ESPACIO PARA EL NAVBAR FIJO */
+    body {
+        padding-top: 76px; /* Compensar altura del navbar fijo */
     }
     
     /* ESTILOS ESPECÍFICOS PARA DISPOSITIVOS MÓVILES */
@@ -115,6 +128,10 @@ if (!isLoggedIn() || !isAdmin()) {
             border: none;
             box-shadow: none;
             background-color: #f8f9fa; /* Fondo más claro para móviles */
+            position: static !important; /* En móviles, los dropdowns son estáticos */
+            transform: none !important;
+            margin-left: 1rem;
+            max-height: 50vh; /* Menor altura en móviles */
         }
         
         .dropdown-item {
@@ -124,13 +141,21 @@ if (!isLoggedIn() || !isAdmin()) {
         /* Mejorar el colapso del navbar en móviles */
         .navbar-collapse {
             padding: 1rem 0;
+            max-height: calc(100vh - 76px); /* Limitar altura del menú colapsado */
+            overflow-y: auto; /* Scroll si el menú es muy largo */
         }
         
-        /* Asegurar que los dropdowns sean claramente visibles */
+        /* Asegurar que los dropdowns sean claramente visibles en móviles */
         .dropdown-menu.show {
-            position: static !important;
-            transform: none !important;
-            margin-left: 1rem;
+            display: block !important;
+        }
+    }
+    
+    /* MEJORAS PARA DROPDOWNS LARGOS EN ESCRITORIO */
+    @media (min-width: 992px) {
+        .dropdown-menu {
+            max-height: 60vh; /* Altura máxima en desktop */
+            overflow-y: auto; /* Scroll para dropdowns muy largos */
         }
     }
     
@@ -237,7 +262,7 @@ if (!isLoggedIn() || !isAdmin()) {
 <body>
 <div class="container">
     <!-- NAVEGACIÓN PRINCIPAL -->
-    <nav class="navbar navbar-expand-lg navbar-light fixed-top" style="background-color: #c2d9fe;">
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top" style="background-color: #c2d9fe; z-index: 1030;">
         <div class="container">
             <!-- Logo -->
             <a title="Cargar Inicio" class="navbar-brand" href="index.php">
@@ -503,7 +528,7 @@ if (!isLoggedIn() || !isAdmin()) {
     </nav>
 
     <!-- CONTENIDO PRINCIPAL -->
-    <div class="container" style="margin-top: 80px;">
+    <div class="container">
         <div class="row">
             <div class="col-sm-6">
                 <b class="mt-5"><?php echo 'Bienvenido ' .$_SESSION['user']['nombre']; ?></b>
@@ -595,7 +620,7 @@ function actualizarNotificaciones() {
         .catch(error => console.error('Error:', error));
 }
 
-// MEJORAS ESPECÍFICAS PARA MÓVILES
+// MEJORAS ESPECÍFICAS PARA DROPDOWNS
 document.addEventListener('DOMContentLoaded', function() {
     // 1. Manejar el clic en el enlace de logout
     document.getElementById('logoutLink').addEventListener('click', function(e) {
@@ -612,17 +637,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 500);
     });
     
-    // 3. MEJORA CRÍTICA: Forzar la inicialización de dropdowns en móviles
+    // 3. SOLUCIÓN PARA DROPDOWNS - Cerrar al hacer clic fuera
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('.dropdown').length) {
+            $('.dropdown-menu').removeClass('show');
+        }
+    });
+    
+    // 4. Prevenir que los dropdowns se cierren al hacer clic dentro
+    $('.dropdown-menu').on('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // 5. MEJORA PARA MÓVILES: Manejar dropdowns en móviles
     if (window.innerWidth <= 991) {
-        // Asegurar que los dropdowns se cierren al tocar fuera
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.dropdown')) {
-                $('.dropdown-menu').removeClass('show');
-            }
-        });
-        
-        // Mejorar la experiencia táctil en dropdowns
-        $('.dropdown-toggle').on('click', function() {
+        $('.dropdown-toggle').on('click', function(e) {
+            e.preventDefault();
             var $parent = $(this).closest('.dropdown');
             var $menu = $parent.find('.dropdown-menu');
             
@@ -634,14 +664,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // 4. Actualizar notificaciones al cargar la página
+    // 6. Actualizar notificaciones al cargar la página
     actualizarNotificaciones();
 });
 
 // Actualizar notificaciones cada 30 segundos
 setInterval(actualizarNotificaciones, 30000);
 
-// 5. DETECCIÓN DE DISPOSITIVO MÓVIL Y MEJORAS ADICIONALES
+// 7. DETECCIÓN DE DISPOSITIVO MÓVIL Y MEJORAS ADICIONALES
 if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
     // Aplicar mejoras específicas para móviles
     document.addEventListener('touchstart', function() {}, {passive: true});
