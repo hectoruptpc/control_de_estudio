@@ -39,57 +39,13 @@ function obtenerGruposNotasPendientes() {
     return $result;
 }
 
-// Procesar aprobación/rechazo
+// Procesar aprobación/rechazo - versión simplificada que redirige a procesar_acciones.php
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['accion']) && isset($_POST['notas_ids'])) {
-        $accion = $_POST['accion'];
-        $notas_ids = $_POST['notas_ids'];
-        $admin_id = $_SESSION['user']['id'];
-        
-        if ($accion === 'aprobar' || $accion === 'rechazar') {
-            $nuevo_estado = $accion === 'aprobar' ? 'aprobada' : 'rechazada';
-            
-            if (!empty($notas_ids)) {
-                $ids_str = implode(',', array_map('intval', $notas_ids));
-                
-                // Obtener información de soporte para copiar a notas_definitivas
-                $soporte_info = [];
-                if ($accion === 'aprobar') {
-                    $query_soporte = "SELECT soporte, tipo_archivo FROM notas_pendientes WHERE id IN ($ids_str) LIMIT 1";
-                    $result_soporte = $db->query($query_soporte);
-                    if ($result_soporte->num_rows > 0) {
-                        $soporte_info = $result_soporte->fetch_assoc();
-                    }
-                }
-                
-                // Actualizar estado en notas_pendientes
-                $update_query = "UPDATE notas_pendientes SET estado = '$nuevo_estado' 
-                                WHERE id IN ($ids_str)";
-                $db->query($update_query);
-                
-                // Si se aprueban, copiar a notas_definitivas con soporte
-                if ($accion === 'aprobar') {
-                    $soporte = !empty($soporte_info['soporte']) ? "'" . $db->real_escape_string($soporte_info['soporte']) . "'" : "NULL";
-                    $tipo_archivo = !empty($soporte_info['tipo_archivo']) ? "'" . $db->real_escape_string($soporte_info['tipo_archivo']) . "'" : "NULL";
-                    
-                    $insert_query = "INSERT INTO notas_definitivas 
-                                    (id_usuario, id_materia, id_periodo, id_docente, 
-                                     trayecto_0, trayecto_1, trayecto_2, trayecto_3, trayecto_4, 
-                                     soporte, tipo_archivo, fecha_registro, id_admin_aprobador)
-                                    SELECT id_usuario, id_materia, id_periodo, id_docente,
-                                           trayecto_0, trayecto_1, trayecto_2, trayecto_3, trayecto_4,
-                                           $soporte, $tipo_archivo, NOW(), $admin_id
-                                    FROM notas_pendientes 
-                                    WHERE id IN ($ids_str)";
-                    $db->query($insert_query);
-                }
-                
-                $_SESSION['msg'] = count($notas_ids) . " nota(s) $nuevo_estado correctamente";
-            }
-            
-            header('location: admin_notas_pendientes.php');
-            exit();
-        }
+        // Esta lógica ahora se maneja en procesar_acciones.php
+        // Solo redirigimos si es una acción directa del formulario principal
+        $_SESSION['msg'] = "Procesando acción...";
+        // La lógica detallada está en procesar_acciones.php
     }
 }
 
