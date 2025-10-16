@@ -4831,6 +4831,7 @@ function obtenerNotasPendientesEstudiante($id_estudiante, $id_materia, $id_perio
 
 
 // FUNCIÓN MEJORADA PARA OBTENER ESTADO (CORREGIDA)
+// FUNCIÓN MEJORADA PARA OBTENER ESTADO (CORREGIDA)
 function obtenerEstadoCorregido($id_estudiante, $id_materia, $id_periodo, $id_docente) {
     global $db;
     

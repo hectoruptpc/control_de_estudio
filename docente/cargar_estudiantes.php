@@ -69,7 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['notas'])) {
                             SET $campo_trayecto = ?, 
                                 soporte = ?, 
                                 tipo_archivo = ?, 
-                                fecha_subida = NOW() 
+                                fecha_subida = NOW(),
+                                estado = 'en_revision' 
                             WHERE id_usuario = ? 
                             AND id_materia = ? 
                             AND id_periodo = ? 
@@ -82,8 +83,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['notas'])) {
             // Insertar nuevo registro - el estado por defecto es 'en revision'
             $insert_query = "INSERT INTO notas_pendientes 
                             (id_usuario, id_materia, id_periodo, id_docente, 
-                             $campo_trayecto, soporte, tipo_archivo, fecha_envio, fecha_subida) 
-                            VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+                             $campo_trayecto, soporte, tipo_archivo, estado, fecha_envio, fecha_subida) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 'en_revision', NOW(), NOW())";
             
             $stmt = $db->prepare($insert_query);
             $stmt->bind_param("iiiiiss", $id_estudiante, $materia_id, $periodo_id, $docente_id,
@@ -163,11 +164,11 @@ $estudiantes_con_notas_rechazadas = [];
 $estudiantes_con_notas_en_revision = [];
 $estudiantes_con_notas_pendientes = [];
 
-// Función para obtener datos completos de notas_pendientes
+// Función para obtener datos completos de notas_pendientes MEJORADA
 function obtenerNotasPendientes($id_estudiante, $id_materia, $id_periodo, $id_docente) {
     global $db;
     
-    $query = "SELECT * FROM notas_pendientes 
+    $query = "SELECT *, estado as estado_pendiente FROM notas_pendientes 
               WHERE id_usuario = ? 
               AND id_materia = ? 
               AND id_periodo = ? 
@@ -186,16 +187,17 @@ function obtenerNotasPendientes($id_estudiante, $id_materia, $id_periodo, $id_do
     return null;
 }
 
-// Obtener información de estados MEJORADA
+// Obtener información de estados CORREGIDA
 $estudiantes_info = [];
 while ($estudiante = $estudiantes->fetch_assoc()) {
     $notas_definitivas = obtenerNotasDefinitivas($estudiante['id'], $materia_id);
     $notas_pendientes_data = obtenerNotasPendientes($estudiante['id'], $materia_id, $periodo_id, $docente_id);
     
-    // Determinar el estado basado en las tablas con la JERARQUÍA CORRECTA:
+    // JERARQUÍA CORRECTA DE ESTADOS:
     // 1. Aprobada (máxima prioridad) - tabla de notas_definitivas
-    // 2. En Revisión - si está en tabla notas_pendientes
-    // 3. Pendiente - no está en ninguna tabla
+    // 2. Rechazada - si está en notas_pendientes con estado 'rechazada'
+    // 3. En Revisión - si está en tabla notas_pendientes con cualquier otro estado
+    // 4. Pendiente - no está en ninguna tabla
     
     $estado = 'pendiente'; // Por defecto
     $valor_nota = 1; // Valor por defecto
@@ -211,11 +213,21 @@ while ($estudiante = $estudiantes->fetch_assoc()) {
             $valor_nota = (int)$notas_definitivas[$campo_trayecto];
         }
     } 
-    // SEGUNDO: Si no está aprobada, verificar si está en notas_pendientes
+    // SEGUNDO: Si no está aprobada, verificar si está en notas_pendientes y su estado
     elseif ($notas_pendientes_data) {
-        $estado = 'en_revision';
-        $notas_en_revision = true;
-        $estudiantes_con_notas_en_revision[] = $estudiante['nombre'];
+        // Verificar el estado en notas_pendientes
+        $estado_pendiente = isset($notas_pendientes_data['estado_pendiente']) ? $notas_pendientes_data['estado_pendiente'] : 'en_revision';
+        
+        if ($estado_pendiente === 'rechazada') {
+            $estado = 'rechazada';
+            $notas_rechazadas = true;
+            $estudiantes_con_notas_rechazadas[] = $estudiante['nombre'];
+        } else {
+            $estado = 'en_revision';
+            $notas_en_revision = true;
+            $estudiantes_con_notas_en_revision[] = $estudiante['nombre'];
+        }
+        
         // Obtener la nota de la tabla notas_pendientes
         if (isset($notas_pendientes_data[$campo_trayecto]) && $notas_pendientes_data[$campo_trayecto] !== null) {
             $valor_nota = (int)$notas_pendientes_data[$campo_trayecto];
@@ -236,10 +248,11 @@ while ($estudiante = $estudiantes->fetch_assoc()) {
     ];
 }
 
-// Verificar si hay algún estudiante que pueda editar (para mostrar el campo de soporte)
+// Actualizar la lógica para mostrar campo de soporte - incluir rechazadas
 $mostrar_campo_soporte = false;
 foreach ($estudiantes_info as $info) {
-    if ($info['estado'] === 'pendiente') {
+    // Se puede editar si está pendiente O rechazada
+    if ($info['estado'] === 'pendiente' || $info['estado'] === 'rechazada') {
         $mostrar_campo_soporte = true;
         break;
     }
@@ -282,6 +295,17 @@ foreach ($estudiantes_info as $info) {
                 <br>
                 <strong>Estudiantes con notas aprobadas:</strong>
                 <?= implode(', ', $estudiantes_con_notas_aprobadas) ?>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+        
+        <?php if ($notas_rechazadas): ?>
+        <div class="alert alert-danger">
+            <strong>❌ Notas Rechazadas:</strong> Algunas notas fueron rechazadas y necesitan corrección. 
+            <?php if (!empty($estudiantes_con_notas_rechazadas)): ?>
+                <br>
+                <strong>Estudiantes con notas rechazadas:</strong>
+                <?= implode(', ', $estudiantes_con_notas_rechazadas) ?>
             <?php endif; ?>
         </div>
         <?php endif; ?>
@@ -375,8 +399,8 @@ foreach ($estudiantes_info as $info) {
                             $estado = $info['estado'];
                             $valor_nota = $info['valor_nota'];
                             
-                            // Solo se puede editar si está pendiente
-                            $puede_editar = ($estado === 'pendiente');
+                            // Determinar si se puede editar
+                            $puede_editar = ($estado === 'pendiente' || $estado === 'rechazada');
                             $campo_trayecto = 'trayecto_' . $trayecto_a_mostrar;
                         ?>
                             <tr>
@@ -425,6 +449,10 @@ foreach ($estudiantes_info as $info) {
                                         $badge_class = 'success';
                                         $badge_text = 'Aprobada';
                                         $descripcion_estado = 'No se puede modificar';
+                                    } elseif ($estado === 'rechazada') {
+                                        $badge_class = 'danger';
+                                        $badge_text = 'Rechazada';
+                                        $descripcion_estado = 'Puede corregir y reenviar';
                                     }
                                     ?>
                                     <span class="badge badge-<?= $badge_class ?>">
@@ -449,7 +477,7 @@ foreach ($estudiantes_info as $info) {
             
             <button type="submit" class="btn btn-success btn-lg">
                 <i class="fas fa-save"></i> 
-                <?= ($notas_pendientes) ? 'Enviar Notas y Soporte' : 'Actualizar Notas' ?>
+                <?= ($notas_pendientes || $notas_rechazadas) ? 'Enviar Notas y Soporte' : 'Actualizar Notas' ?>
             </button>
             
             <?php if ($notas_en_revision): ?>
