@@ -85,7 +85,12 @@ include("includes/head.php");
                                         <button class="btn btn-sm btn-primary btn-cargar" 
                                                 data-seccion="<?= $seccion['id_seccion'] ?>"
                                                 data-materia="<?= $seccion['id_materia'] ?>">
-                                            Cargar Estudiantes
+                                            <i class="fas fa-users"></i> Cargar Estudiantes
+                                        </button>
+                                        <button class="btn btn-sm btn-success btn-descargar-pdf" 
+                                                data-seccion="<?= $seccion['id_seccion'] ?>"
+                                                data-materia="<?= $seccion['id_materia'] ?>">
+                                            <i class="fas fa-download"></i> Planilla PDF
                                         </button>
                                     </td>
                                 </tr>
@@ -176,6 +181,27 @@ $(document).ready(function() {
                 </button>
             </div>
         `);
+    });
+    
+    // Descargar planilla PDF
+    $(document).on('click', '.btn-descargar-pdf', function() {
+        const seccionId = $(this).data('seccion');
+        const materiaId = $(this).data('materia');
+        
+        // Mostrar loading
+        const btn = $(this);
+        const originalHtml = btn.html();
+        btn.html('<i class="fas fa-spinner fa-spin"></i> Generando...');
+        btn.prop('disabled', true);
+        
+        // Descargar PDF
+        window.location.href = `descargar_planilla.php?seccion_id=${seccionId}&materia_id=${materiaId}`;
+        
+        // Restaurar botón después de 3 segundos
+        setTimeout(() => {
+            btn.html(originalHtml);
+            btn.prop('disabled', false);
+        }, 3000);
     });
     
     // Guardar notas

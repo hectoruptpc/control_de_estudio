@@ -6228,10 +6228,268 @@ function obtenerSoporteActual($id_estudiante, $id_materia, $id_periodo) {
 
 
 
+// PLANILLA VACIA DE ESTUDIANTES PARA LLENADO MANUAL
 
 
 
 
+/**
+ * Funciones específicas para la planilla PDF de notas
+ */
+
+/**
+ * Clase para generar PDF de planilla de notas
+ */
+class PDF_PlanillaNotas {
+    private $pdf;
+    private $info;
+    private $estudiantes;
+    
+    function __construct() {
+        // Incluir FPDF solo cuando se instancie la clase
+        require_once('../fpdf/fpdf.php');
+        $this->pdf = new FPDF();
+    }
+    
+    function generarPlanilla($info, $estudiantes) {
+        $this->info = $info;
+        $this->estudiantes = $estudiantes;
+        
+        $this->pdf->AddPage();
+        $this->Cuerpo();
+        $this->pdf->Output('D', $this->getNombreArchivo());
+        exit;
+    }
+    
+    function Header() {
+        // Solo mostrar encabezado en la primera pagina
+        if ($this->pdf->PageNo() == 1) {
+            // Encabezado institucional
+            $this->pdf->SetFont('Arial', 'B', 14);
+            $this->pdf->Cell(0, 8, $this->codificarTexto('PLANILLA DE REGISTRO DE NOTAS'), 0, 1, 'C');
+            $this->pdf->SetFont('Arial', 'B', 10);
+            $this->pdf->Cell(0, 6, $this->codificarTexto('SISTEMA DE CONTROL DE NOTAS'), 0, 1, 'C');
+            $this->pdf->Ln(2);
+            
+            // Informacion de la seccion y materia
+            $this->pdf->SetFont('Arial', '', 9);
+            $this->pdf->Cell(25, 5, $this->codificarTexto('Sección:'), 0, 0);
+            $this->pdf->Cell(50, 5, $this->codificarTexto($this->info['codigo_seccion']), 0, 1);
+            
+            $this->pdf->Cell(25, 5, $this->codificarTexto('Carrera:'), 0, 0);
+            $this->pdf->Cell(50, 5, $this->codificarTexto($this->info['nombre_carrera']), 0, 1);
+            
+            $this->pdf->Cell(25, 5, $this->codificarTexto('Trayecto:'), 0, 0);
+            $this->pdf->Cell(50, 5, $this->codificarTexto($this->info['nombre_trayecto']), 0, 1);
+            
+            $this->pdf->Cell(25, 5, $this->codificarTexto('Materia:'), 0, 0);
+            $this->pdf->Cell(50, 5, $this->codificarTexto($this->info['nombre_materia']), 0, 1);
+            
+            $this->pdf->Cell(25, 5, $this->codificarTexto('Cod materia:'), 0, 0);
+            $this->pdf->Cell(50, 5, $this->codificarTexto($this->info['cod_materia']), 0, 1);
+            
+            $this->pdf->Cell(25, 5, $this->codificarTexto('Periodo:'), 0, 0);
+            $this->pdf->Cell(50, 5, $this->codificarTexto($this->info['nombre_periodo']), 0, 1);
+            
+            $this->pdf->Ln(3);
+        }
+    }
+    
+    function Footer() {
+        // Posicion a 1.5 cm del final
+        $this->pdf->SetY(-25);
+        
+        // Firma del docente en cada pagina
+        $this->pdf->SetFont('Arial', '', 9);
+        $this->pdf->Cell(0, 5, $this->codificarTexto('Firma del Docente:'), 0, 1);
+        $this->pdf->Ln(3);
+        $this->pdf->Cell(60, 5, '_________________________________', 0, 1);
+        $this->pdf->Cell(60, 5, $this->codificarTexto('Nombre: _________________________'), 0, 1);
+        $this->pdf->Cell(60, 5, $this->codificarTexto('Cédula: _________________________'), 0, 1);
+        
+        // Numero de pagina
+        $this->pdf->SetY(-10);
+        $this->pdf->SetFont('Arial', 'I', 8);
+        $this->pdf->Cell(0, 5, $this->codificarTexto('Página ') . $this->pdf->PageNo() . ' de {nb}', 0, 0, 'C');
+    }
+    
+    function Cuerpo() {
+        // Configurar numero total de paginas
+        $this->pdf->AliasNbPages();
+        
+        // Asignar los métodos Header y Footer a FPDF
+        $this->pdf->Header = array($this, 'Header');
+        $this->pdf->Footer = array($this, 'Footer');
+        
+        $estudiantes_por_pagina = 30;
+        $total_estudiantes = count($this->estudiantes);
+        $contador_general = 0;
+        
+        foreach ($this->estudiantes as $estudiante) {
+            $contador_general++;
+            
+            // Verificar si necesita nueva pagina (cada 30 estudiantes)
+            if (($contador_general - 1) % $estudiantes_por_pagina == 0) {
+                if ($contador_general > 1) {
+                    $this->pdf->AddPage();
+                }
+                
+                // Encabezado de la tabla
+                $this->pdf->SetFillColor(200, 200, 200);
+                $this->pdf->SetFont('Arial', 'B', 8);
+                
+                // Columnas ajustadas para 30 estudiantes
+                $this->pdf->Cell(8, 6, 'N°', 1, 0, 'C', true);
+                $this->pdf->Cell(20, 6, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
+                $this->pdf->Cell(55, 6, $this->codificarTexto('Nombre Completo'), 1, 0, 'C', true);
+                
+                // 8 casillas para notas
+                for ($i = 1; $i <= 8; $i++) {
+                    $this->pdf->Cell(8, 6, "N$i", 1, 0, 'C', true);
+                }
+                
+                $this->pdf->Cell(10, 6, 'Final', 1, 1, 'C', true);
+                $this->pdf->SetFont('Arial', '', 8);
+            }
+            
+            // Calcular numero local en la pagina (1-30, 1-30, etc.)
+            $numero_en_pagina = (($contador_general - 1) % $estudiantes_por_pagina) + 1;
+            
+            $this->pdf->Cell(8, 5, $numero_en_pagina, 1, 0, 'C');
+            $this->pdf->Cell(20, 5, $estudiante['cedula'], 1, 0, 'C');
+            
+            $nombreCompleto = $estudiante['nombre'];
+            $nombreCompleto = $this->codificarTexto($nombreCompleto);
+            if (strlen($nombreCompleto) > 32) {
+                $nombreCompleto = substr($nombreCompleto, 0, 32) . '...';
+            }
+            $this->pdf->Cell(55, 5, $nombreCompleto, 1, 0);
+            
+            // 8 casillas vacias para llenado manual
+            for ($i = 1; $i <= 8; $i++) {
+                $this->pdf->Cell(8, 5, '', 1, 0, 'C');
+            }
+            
+            // Casilla para nota final
+            $this->pdf->Cell(10, 5, '', 1, 1, 'C');
+        }
+    }
+    
+    /**
+     * Funcion para codificar texto correctamente
+     */
+    function codificarTexto($texto) {
+        // Si el texto ya esta en UTF-8, convertirlo a ISO-8859-1 para FPDF
+        if (mb_detect_encoding($texto, 'UTF-8', true)) {
+            return utf8_decode($texto);
+        }
+        return $texto;
+    }
+    
+    function getNombreArchivo() {
+        $seccion = preg_replace('/[^a-zA-Z0-9]/', '_', $this->info['codigo_seccion']);
+        $materia = preg_replace('/[^a-zA-Z0-9]/', '_', $this->info['cod_materia']);
+        return "Planilla_Notas_{$seccion}_{$materia}.pdf";
+    }
+}
+
+/**
+ * Generar planilla PDF para lista de estudiantes con casillas de notas
+ */
+function generarPlanillaNotasPDF($seccion_id, $materia_id, $docente_id) {
+    global $db;
+    
+    // Verificar que el docente tiene acceso a esta sección y materia
+    if (!verificarAccesoDocente($docente_id, $seccion_id, $materia_id)) {
+        return false;
+    }
+    
+    // Obtener información de la sección y materia
+    $info = obtenerInfoSeccionMateria($seccion_id, $materia_id);
+    if (!$info) {
+        return false;
+    }
+    
+    // Obtener estudiantes de la sección
+    $estudiantes = obtenerEstudiantesSeccion($seccion_id);
+    
+    if (empty($estudiantes)) {
+        return false;
+    }
+    
+    // Crear PDF
+    $pdf = new PDF_PlanillaNotas();
+    $pdf->generarPlanilla($info, $estudiantes);
+    
+    return true;
+}
+
+/**
+ * Verificar acceso del docente a la sección y materia
+ */
+function verificarAccesoDocente($docente_id, $seccion_id, $materia_id) {
+    global $db;
+    
+    $query = "SELECT 1 FROM docente_seccion 
+              WHERE id_usuario = ? AND id_seccion = ? AND id_materia = ?
+              AND (estatus = 'activo' OR estatus = 1)";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $seccion_id, $materia_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->num_rows > 0;
+}
+
+/**
+ * Obtener información de sección y materia
+ */
+function obtenerInfoSeccionMateria($seccion_id, $materia_id) {
+    global $db;
+    
+    $query = "SELECT s.codigo_seccion, c.nombre_carrera, 
+                     t.nombre_trayecto, t.numero_trayecto,
+                     pa.nombre_periodo, m.nombre_materia, m.cod_materia
+              FROM secciones s
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+              INNER JOIN periodos_academicos pa ON s.id_periodo = pa.id_periodo
+              INNER JOIN materias m ON m.id_materia = ?
+              WHERE s.id_seccion = ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("ii", $materia_id, $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Obtener estudiantes de una sección
+ */
+function obtenerEstudiantesSeccion($seccion_id) {
+    global $db;
+    
+    $query = "SELECT u.idusuario as cedula, u.nombre
+              FROM users u
+              INNER JOIN estudiante_seccion es ON u.id = es.id_usuario
+              WHERE es.id_seccion = ? AND es.estatus = 'activo'
+              ORDER BY u.nombre";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $estudiantes = [];
+    while ($row = $result->fetch_assoc()) {
+        $estudiantes[] = $row;
+    }
+    
+    return $estudiantes;
+}
 
 
 
