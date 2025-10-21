@@ -244,9 +244,7 @@ switch ($seccion) {
             <button type="button" class="btn btn-danger btn-sm" onclick="aplicarAccion('rechazar')">
                 <i class="fas fa-times-circle"></i> Rechazar Seleccionados
             </button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="limpiarSeleccion()">
-                <i class="fas fa-times"></i> Limpiar Selección
-            </button>
+            
         </div>
         
         <form id="formGestionIndividual">
