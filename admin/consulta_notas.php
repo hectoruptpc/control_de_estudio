@@ -326,17 +326,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-bordered table-striped">
-                    <thead class="thead-dark">
+                <table class="table table-bordered table-sm">
+                    <thead class="thead-light">
                         <tr>
-                            <th>Trayecto</th>
+                            <th width="100">Trayecto</th>
                             <th>Materia</th>
-                            <th>Código</th>
-                            <th>Nota</th>
-                            <th>Estado</th>
-                            <th>Periodo</th>
-                            <th>Fecha Registro</th>
-                            <th>Aprobado por</th>
+                            <th width="100">Cod Materia</th>
+                            <th width="80">Nota</th>
+                            <th width="90">Estado</th>
+                            <th width="120">Periodo</th>
+                            <th width="100">Fecha</th>
+                            <th width="120">Aprobado por</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -400,9 +400,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                                 
                                 <td class="text-center">
                                     <?php if ($tiene_nota): ?>
-                                        <span class="badge badge-<?= $nota_trayecto >= 12 ? 'success' : 'danger' ?>">
-                                            <?= $nota_trayecto ?>
-                                        </span>
+                                        <div class="nota-display">
+                                            <span class="nota-valor <?= $nota_trayecto >= 12 ? 'nota-aprobada' : 'nota-reprobada' ?>">
+                                                <?= $nota_trayecto ?>
+                                            </span>
+                                        </div>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
@@ -458,26 +460,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                             $porcentaje_completado = $total_materias > 0 ? round(($materias_con_notas / $total_materias) * 100, 1) : 0;
                             ?>
                             
-                            <p><strong>Promedio General:</strong> 
-                                <span class="badge badge-<?= $promedio_general >= 12 ? 'success' : ($promedio_general > 0 ? 'warning' : 'secondary') ?>">
-                                    <?= $promedio_general > 0 ? $promedio_general : 'N/A' ?>
-                                </span>
-                            </p>
-                            <p><strong>Materias Aprobadas:</strong> 
-                                <span class="badge badge-success"><?= $materias_aprobadas ?></span>
-                                <?= $materias_con_notas > 0 ? "($porcentaje_aprobadas%)" : '' ?>
-                            </p>
-                            <p><strong>Materias Reprobadas:</strong> 
-                                <span class="badge badge-danger"><?= $materias_reprobadas ?></span>
-                                <?= $materias_con_notas > 0 ? "(" . (100 - $porcentaje_aprobadas) . "%)" : '' ?>
-                            </p>
-                            <p><strong>Materias Sin Notas:</strong> 
-                                <span class="badge badge-secondary"><?= $materias_sin_notas ?></span>
-                                (<?= $porcentaje_completado ?>% completado)
-                            </p>
-                            <p><strong>Total Materias:</strong> 
-                                <span class="badge badge-primary"><?= $total_materias ?></span>
-                            </p>
+                            <div class="stats-container">
+                                <div class="stat-item">
+                                    <div class="stat-value h4 text-primary"><?= $total_materias ?></div>
+                                    <div class="stat-label">Total Materias</div>
+                                </div>
+                                
+                                <div class="stat-item">
+                                    <div class="stat-value h4 <?= $promedio_general >= 12 ? 'text-success' : ($promedio_general > 0 ? 'text-warning' : 'text-secondary') ?>">
+                                        <?= $promedio_general > 0 ? $promedio_general : 'N/A' ?>
+                                    </div>
+                                    <div class="stat-label">Promedio</div>
+                                </div>
+                                
+                                <div class="stat-item">
+                                    <div class="stat-value h4 text-success"><?= $materias_aprobadas ?></div>
+                                    <div class="stat-label">Aprobadas</div>
+                                </div>
+                                
+                                <div class="stat-item">
+                                    <div class="stat-value h4 text-danger"><?= $materias_reprobadas ?></div>
+                                    <div class="stat-label">Reprobadas</div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <p><strong>Progreso:</strong> 
+                                    <span class="badge badge-<?= $porcentaje_completado >= 100 ? 'success' : ($porcentaje_completado >= 50 ? 'info' : 'warning') ?>">
+                                        <?= $porcentaje_completado ?>% completado
+                                    </span>
+                                </p>
+                                <p><strong>Efectividad:</strong> 
+                                    <span class="badge badge-<?= $porcentaje_aprobadas >= 80 ? 'success' : ($porcentaje_aprobadas >= 50 ? 'warning' : 'danger') ?>">
+                                        <?= $porcentaje_aprobadas ?>% de aprobación
+                                    </span>
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -512,7 +530,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                                 <div class="progress-bar bg-success" 
                                      style="width: <?= $porcentaje_completado ?>%"
                                      title="<?= $porcentaje_completado ?>% completado">
-                                    <?= $porcentaje_completado ?>% Completado
+                                    <span class="progress-text" style="color: #000; font-weight: bold;"><?= $porcentaje_completado ?>%</span>
                                 </div>
                                 
                                 <!-- Línea de meta para TSU -->
@@ -550,15 +568,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                             <div class="progress mb-3" style="height: 20px;">
                                 <div class="progress-bar bg-success" 
                                      style="width: <?= ($materias_aprobadas / $total_materias) * 100 ?>%">
-                                    Aprobadas: <?= $materias_aprobadas ?>
+                                    <span class="progress-text" style="color: #000; font-weight: bold;"><?= $materias_aprobadas ?></span>
                                 </div>
                                 <div class="progress-bar bg-danger" 
                                      style="width: <?= ($materias_reprobadas / $total_materias) * 100 ?>%">
-                                    Reprobadas: <?= $materias_reprobadas ?>
+                                    <span class="progress-text" style="color: #000; font-weight: bold;"><?= $materias_reprobadas ?></span>
                                 </div>
                                 <div class="progress-bar bg-secondary" 
                                      style="width: <?= ($materias_sin_notas / $total_materias) * 100 ?>%">
-                                    Pendientes: <?= $materias_sin_notas ?>
+                                    <span class="progress-text" style="color: #000; font-weight: bold;"><?= $materias_sin_notas ?></span>
                                 </div>
                             </div>
                             
@@ -595,5 +613,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
     
     <?php endif; ?>
 </div>
+
+<style>
+.nota-display {
+    text-align: center;
+    padding: 2px;
+}
+
+.nota-valor {
+    display: inline-block;
+    font-size: 1rem;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 6px;
+    min-width: 40px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    color: #000000 !important; /* Texto negro */
+    font-weight: 900; /* Texto más grueso */
+}
+
+.nota-aprobada {
+    background: #90EE90; /* Verde claro */
+    border: 1px solid #28a745;
+}
+
+.nota-reprobada {
+    background: #FFB6C1; /* Rojo claro */
+    border: 1px solid #dc3545;
+}
+
+.stats-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 8px;
+    border-radius: 6px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+}
+
+.stat-value {
+    font-weight: bold;
+    margin-bottom: 2px;
+    color: #000 !important; /* Texto negro en estadísticas */
+    font-weight: 700;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.progress-text {
+    font-weight: bold;
+    text-shadow: 1px 1px 1px rgba(255,255,255,0.5);
+}
+
+.table-sm td, .table-sm th {
+    padding: 0.5rem;
+}
+</style>
 
 <?php include("includes/footer.php"); ?>
