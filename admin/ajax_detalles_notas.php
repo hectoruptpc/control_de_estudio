@@ -218,6 +218,37 @@ switch ($seccion) {
             Aprobación: ≥12pts
         </div>
         
+        <!-- Botones Aprobar/Rechazar Todo - Se muestran inicialmente -->
+        <div id="botonesGrupo" class="mb-3">
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i> 
+                <strong>Acciones Grupales:</strong> Estas acciones afectarán a TODOS los estudiantes del grupo.
+            </div>
+            <button type="button" class="btn btn-success btn-sm" onclick="accionGrupo('aprobar')">
+                <i class="fas fa-check-circle"></i> Aprobar Todo
+            </button>
+            <button type="button" class="btn btn-danger btn-sm" onclick="accionGrupo('rechazar')">
+                <i class="fas fa-times-circle"></i> Rechazar Todo
+            </button>
+        </div>
+        
+        <!-- Botones Aprobar/Rechazar Seleccionados - Ocultos inicialmente -->
+        <div id="botonesSeleccion" class="mb-3" style="display: none;">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> 
+                <strong>Acciones sobre selección:</strong> Estas acciones afectarán solo a los estudiantes seleccionados.
+            </div>
+            <button type="button" class="btn btn-success btn-sm" onclick="aplicarAccion('aprobar')">
+                <i class="fas fa-check-circle"></i> Aprobar Seleccionados
+            </button>
+            <button type="button" class="btn btn-danger btn-sm" onclick="aplicarAccion('rechazar')">
+                <i class="fas fa-times-circle"></i> Rechazar Seleccionados
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="limpiarSeleccion()">
+                <i class="fas fa-times"></i> Limpiar Selección
+            </button>
+        </div>
+        
         <form id="formGestionIndividual">
             <div class="table-responsive">
                 <table class="table table-bordered table-sm">
@@ -230,7 +261,7 @@ switch ($seccion) {
                             <th>Estudiante</th>
                             <th width="90">Nota</th>
                             <th width="80">Estado</th>
-                            <th width="180">Acciones</th>
+                            <th width="180">Acciones Individuales</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -295,15 +326,6 @@ switch ($seccion) {
                         <?php endwhile; ?>
                     </tbody>
                 </table>
-            </div>
-            
-            <div class="mt-3">
-                <button type="button" class="btn btn-success btn-sm" onclick="aplicarAccion('aprobar')">
-                    <i class="fas fa-check-circle"></i> Aprobar Seleccionados
-                </button>
-                <button type="button" class="btn btn-danger btn-sm" onclick="aplicarAccion('rechazar')">
-                    <i class="fas fa-times-circle"></i> Rechazar Seleccionados
-                </button>
             </div>
         </form>
 
@@ -538,112 +560,6 @@ switch ($seccion) {
         <?php endif; ?>
         <?php
         break;
-        
-    case 'acciones-grupo':
-        ?>
-        <h4>Acciones Grupales</h4>
-        <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle"></i> 
-            <strong>Precaución:</strong> Estas acciones afectarán a TODOS los estudiantes del grupo.
-        </div>
-        
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header bg-success text-white py-2">
-                        <i class="fas fa-check-circle"></i> Aprobar Todo
-                    </div>
-                    <div class="card-body">
-                        <p class="mb-2">Aprobará las notas de todos los estudiantes.</p>
-                        <?php if ($soporte_info): ?>
-                            <div class="alert alert-info py-1">
-                                <i class="fas fa-paperclip"></i> 
-                                Incluye soporte
-                            </div>
-                        <?php else: ?>
-                            <div class="alert alert-warning py-1">
-                                <i class="fas fa-exclamation-triangle"></i> 
-                                Sin soporte
-                            </div>
-                        <?php endif; ?>
-                        <button class="btn btn-success btn-sm btn-block" 
-                                onclick="accionGrupo('aprobar')">
-                            Aprobar Todo
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header bg-danger text-white py-2">
-                        <i class="fas fa-times-circle"></i> Rechazar Todo
-                    </div>
-                    <div class="card-body">
-                        <p class="mb-2">Rechazará las notas de todos los estudiantes.</p>
-                        <button class="btn btn-danger btn-sm btn-block" 
-                                onclick="accionGrupo('rechazar')">
-                            Rechazar Todo
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Modales para acciones grupales -->
-        <div class="modal fade" id="mensajeRechazoGrupoModal" tabindex="-1" role="dialog" aria-labelledby="mensajeRechazoGrupoModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-lg" role="document">
-                <div class="modal-content">
-                    <div class="modal-header bg-warning py-2">
-                        <h5 class="modal-title" id="tituloRechazoGrupoModal">Mensaje de Rechazo Grupal</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="alert alert-info py-1">
-                            <strong>Estudiantes:</strong> TODO EL GRUPO
-                        </div>
-                        <p>Ingrese el motivo del rechazo:</p>
-                        <div class="form-group mb-2">
-                            <textarea class="form-control form-control-sm" id="mensajeRechazoGrupoTexto" rows="4" placeholder="Explique los motivos del rechazo..."></textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
-                        <button type="button" class="btn btn-primary btn-sm" onclick="confirmarRechazoGrupoConMensaje()">Enviar</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="modal fade" id="mensajeAprobacionGrupoModal" tabindex="-1" role="dialog" aria-labelledby="mensajeAprobacionGrupoModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-lg" role="document">
-                <div class="modal-content">
-                    <div class="modal-header bg-success py-2">
-                        <h5 class="modal-title" id="tituloAprobacionGrupoModal">Mensaje de Aprobación Grupal</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="alert alert-info py-1">
-                            <strong>Estudiantes:</strong> TODO EL GRUPO
-                        </div>
-                        <p>Mensaje de confirmación:</p>
-                        <div class="form-group mb-2">
-                            <textarea class="form-control form-control-sm" id="mensajeAprobacionGrupoTexto" rows="4" placeholder="Mensaje de confirmación..."></textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
-                        <button type="button" class="btn btn-primary btn-sm" onclick="confirmarAprobacionGrupoConMensaje()">Enviar</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <?php
-        break;
 }
 ?>
 
@@ -653,6 +569,34 @@ switch ($seccion) {
 let accionPendiente = null;
 let notasIdsPendientes = [];
 let estudianteNombrePendiente = "";
+
+// Función para mostrar/ocultar botones según selección
+function actualizarBotones() {
+    const selected = $('.estudiante-checkbox:checked');
+    const botonesGrupo = $('#botonesGrupo');
+    const botonesSeleccion = $('#botonesSeleccion');
+    
+    if (selected.length === 0) {
+        // No hay estudiantes seleccionados - mostrar botones grupales
+        botonesGrupo.show();
+        botonesSeleccion.hide();
+    } else {
+        // Hay estudiantes seleccionados - mostrar botones de selección
+        botonesGrupo.hide();
+        botonesSeleccion.show();
+        
+        // Actualizar contador en el botón de selección
+        const contador = selected.length === 1 ? '1 estudiante' : selected.length + ' estudiantes';
+        $('#contadorSeleccion').text(contador);
+    }
+}
+
+// Función para limpiar selección
+function limpiarSeleccion() {
+    $('.estudiante-checkbox').prop('checked', false);
+    $('#selectAllEstudiantes').prop('checked', false);
+    actualizarBotones();
+}
 
 function aplicarAccion(accion) {
     const selected = $('.estudiante-checkbox:checked');
@@ -753,6 +697,16 @@ function confirmarAprobacionConMensaje() {
 
 $('#selectAllEstudiantes').change(function() {
     $('.estudiante-checkbox').prop('checked', this.checked);
+    actualizarBotones();
+});
+
+$('.estudiante-checkbox').change(function() {
+    // Actualizar el checkbox "Seleccionar Todos"
+    const totalCheckboxes = $('.estudiante-checkbox').length;
+    const checkedCheckboxes = $('.estudiante-checkbox:checked').length;
+    $('#selectAllEstudiantes').prop('checked', totalCheckboxes === checkedCheckboxes);
+    
+    actualizarBotones();
 });
 
 $('.accion-individual').click(function() {
@@ -789,21 +743,6 @@ $('.accion-individual').click(function() {
         const mensajePredeterminado = "La nota del estudiante " + estudianteNombre + " ha sido aprobada exitosamente.";
         $('#mensajeAprobacionTexto').val(mensajePredeterminado);
     }
-});
-
-// Configurar el modal para que se pueda abrir siempre
-$(document).ready(function() {
-    // Asegurar que los modales se cierren correctamente sin afectar otros modales
-    $('#mensajeRechazoModal, #mensajeAprobacionModal, #mensajeRechazoGrupoModal, #mensajeAprobacionGrupoModal').on('show.bs.modal', function() {
-        // Limpiar el mensaje anterior al abrir el modal
-        $(this).find('textarea').val('');
-    });
-    
-    // Configurar el botón de cancelar para que solo cierre este modal
-    $('.modal .btn-secondary, .modal .close').click(function() {
-        $(this).closest('.modal').modal('hide');
-        return false; // Prevenir que se cierren otros modales
-    });
 });
 
 function accionGrupo(accion) {
@@ -877,6 +816,24 @@ function confirmarAprobacionGrupoConMensaje() {
         }
     });
 }
+
+// Configurar el modal para que se pueda abrir siempre
+$(document).ready(function() {
+    // Asegurar que los modales se cierren correctamente sin afectar otros modales
+    $('#mensajeRechazoModal, #mensajeAprobacionModal, #mensajeRechazoGrupoModal, #mensajeAprobacionGrupoModal').on('show.bs.modal', function() {
+        // Limpiar el mensaje anterior al abrir el modal
+        $(this).find('textarea').val('');
+    });
+    
+    // Configurar el botón de cancelar para que solo cierre este modal
+    $('.modal .btn-secondary, .modal .close').click(function() {
+        $(this).closest('.modal').modal('hide');
+        return false; // Prevenir que se cierren otros modales
+    });
+    
+    // Inicializar estado de los botones
+    actualizarBotones();
+});
 </script>
 
 <!-- Modal para mensaje de rechazo (INDIVIDUAL) -->
@@ -930,6 +887,60 @@ function confirmarAprobacionGrupoConMensaje() {
             <div class="modal-footer py-2">
                 <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-primary btn-sm" onclick="confirmarAprobacionConMensaje()">Enviar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para mensaje de rechazo (GRUPAL) -->
+<div class="modal fade" id="mensajeRechazoGrupoModal" tabindex="-1" role="dialog" aria-labelledby="mensajeRechazoGrupoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning py-2">
+                <h5 class="modal-title" id="tituloRechazoGrupoModal">Mensaje de Rechazo Grupal</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info py-1">
+                    <strong>Estudiantes:</strong> TODO EL GRUPO
+                </div>
+                <p>Ingrese el motivo del rechazo:</p>
+                <div class="form-group mb-2">
+                    <textarea class="form-control form-control-sm" id="mensajeRechazoGrupoTexto" rows="4" placeholder="Explique los motivos del rechazo..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="confirmarRechazoGrupoConMensaje()">Enviar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para mensaje de aprobación (GRUPAL) -->
+<div class="modal fade" id="mensajeAprobacionGrupoModal" tabindex="-1" role="dialog" aria-labelledby="mensajeAprobacionGrupoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success py-2">
+                <h5 class="modal-title" id="tituloAprobacionGrupoModal">Mensaje de Aprobación Grupal</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info py-1">
+                    <strong>Estudiantes:</strong> TODO EL GRUPO
+                </div>
+                <p>Mensaje de confirmación:</p>
+                <div class="form-group mb-2">
+                    <textarea class="form-control form-control-sm" id="mensajeAprobacionGrupoTexto" rows="4" placeholder="Mensaje de confirmación..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="confirmarAprobacionGrupoConMensaje()">Enviar</button>
             </div>
         </div>
     </div>

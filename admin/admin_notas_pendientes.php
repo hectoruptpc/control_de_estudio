@@ -142,9 +142,7 @@ $grupos_notas = obtenerGruposNotasPendientes();
                             <a href="#soporte" class="list-group-item list-group-item-action" data-toggle="tab">
                                 <i class="fas fa-paperclip"></i> Soporte
                             </a>
-                            <a href="#acciones-grupo" class="list-group-item list-group-item-action" data-toggle="tab">
-                                <i class="fas fa-cogs"></i> Acciones Grupales
-                            </a>
+                            
                         </div>
                     </div>
                     
