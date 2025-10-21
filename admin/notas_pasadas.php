@@ -570,65 +570,27 @@ $(document).ready(function() {
     });
 });
 
-// Función para generar PDF - USANDO LA FUNCIÓN DEL MEMBRETE DE functions.php
-function generarPDF(contenido, docente, materia, periodo, seccion, carrera) {
-    // Crear elemento temporal para el contenido del PDF
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = contenido;
-    tempDiv.style.padding = '20px';
-    tempDiv.style.fontFamily = 'Arial, sans-serif';
-    tempDiv.style.width = '800px';
-    tempDiv.style.margin = '0 auto';
-    document.body.appendChild(tempDiv);
+// Manejar clic en botón PDF
+$('.btn-pdf').click(function() {
+    const docenteId = $(this).data('docente-id');
+    const materiaId = $(this).data('materia-id');
+    const periodoId = $(this).data('periodo-id');
     
-    // Generar nombre del archivo
-    const filename = `notas_definitivas_${docente.replace(/[^a-zA-Z0-9]/g, '_')}_${materia.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+    // Mostrar loading
+    const $btn = $(this);
+    const originalHtml = $btn.html();
+    $btn.html('<i class="fas fa-spinner fa-spin"></i> Generando...');
+    $btn.prop('disabled', true);
     
-    // Configuración de jsPDF
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('p', 'mm', 'a4');
-    const margin = 10;
-    const pageWidth = doc.internal.pageSize.getWidth();
+    // Redirigir directamente al generador de PDF
+    window.location.href = `generar_pdf_notas_definitivas.php?docente_id=${docenteId}&materia_id=${materiaId}&periodo_id=${periodoId}`;
     
-    // Usar la función del membrete desde PHP
-    <?php echo generarMembreteJS(); ?>
-    
-    // Llamar a la función para agregar el membrete
-    agregarMembretePDF(doc, pageWidth, margin).then(startY => {
-        // Capturar el contenido HTML y agregarlo al PDF
-        html2canvas(tempDiv, {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            width: tempDiv.scrollWidth,
-            height: tempDiv.scrollHeight,
-            windowWidth: tempDiv.scrollWidth,
-            windowHeight: tempDiv.scrollHeight
-        }).then(canvas => {
-            const imgData = canvas.toDataURL('image/jpeg', 1.0);
-            const imgWidth = pageWidth - (margin * 2);
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            
-            // Agregar contenido al PDF (empezando después del membrete)
-            doc.addImage(imgData, 'JPEG', margin, startY, imgWidth, imgHeight);
-            
-            // Guardar el PDF
-            doc.save(filename);
-            
-            // Limpiar elemento temporal
-            document.body.removeChild(tempDiv);
-            
-        }).catch(error => {
-            console.error('Error al generar PDF:', error);
-            alert('Error al generar el PDF: ' + error.message);
-            document.body.removeChild(tempDiv);
-        });
-    }).catch(error => {
-        console.error('Error al cargar el membrete:', error);
-        alert('Error al generar el membrete del PDF');
-        document.body.removeChild(tempDiv);
-    });
-}
+    // Restaurar botón después de 3 segundos
+    setTimeout(() => {
+        $btn.html(originalHtml);
+        $btn.prop('disabled', false);
+    }, 3000);
+});
 
 // Función para limpiar la selección del profesor
 function limpiarProfesor() {

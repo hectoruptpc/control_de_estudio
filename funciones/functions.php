@@ -6494,10 +6494,415 @@ function obtenerEstudiantesSeccion($seccion_id) {
 
 
 
+// REPORTE DE NOTAS DEFINITIVAS ***********************************************************************
 
 
+class PDF_NotasDefinitivas {
+    private $pdf;
+    private $datos;
+    private $trayecto;
+    private $columnas_trayectos;
+    
+    function __construct() {
+        require_once('../fpdf/fpdf.php');
+        $this->pdf = new FPDF();
+    }
+    
+    function generarReporte($datos) {
+        $this->datos = $datos;
+        $this->trayecto = $datos['info_general']['numero_trayecto'];
+        $this->definirColumnasTrayecto();
+        
+        $this->pdf->AddPage();
+        $this->Header();
+        $this->Cuerpo();
+        $this->pdf->Output('D', $this->getNombreArchivo());
+        exit;
+    }
+    
+    function definirColumnasTrayecto() {
+        switch ($this->trayecto) {
+            case 0:
+                $this->columnas_trayectos = [0]; // Solo trayecto 0
+                break;
+            case 1:
+            case 2:
+                $this->columnas_trayectos = [0, 1, 2]; // Trayectos 0, 1, 2
+                break;
+            case 3:
+            case 4:
+                $this->columnas_trayectos = [0, 1, 2, 3, 4]; // Todos los trayectos
+                break;
+            default:
+                $this->columnas_trayectos = [0, 1, 2, 3, 4]; // Por defecto todos
+        }
+    }
+    
+    function Header() {
+        // Encabezado institucional
+        $this->pdf->SetFont('Arial', 'B', 14);
+        $this->pdf->Cell(0, 8, $this->codificarTexto('REPORTE DE NOTAS DEFINITIVAS'), 0, 1, 'C');
+        $this->pdf->SetFont('Arial', 'B', 10);
+        $this->pdf->Cell(0, 6, $this->codificarTexto('SISTEMA DE CONTROL DE NOTAS'), 0, 1, 'C');
+        $this->pdf->Ln(5);
+        
+        // Información general
+        $this->pdf->SetFont('Arial', '', 9);
+        
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Docente:'), 0, 0);
+        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_docente']), 0, 1);
+        
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Cédula:'), 0, 0);
+        $this->pdf->Cell(80, 5, $this->datos['info_general']['cedula_docente'], 0, 1);
+        
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Materia:'), 0, 0);
+        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_materia']), 0, 1);
+        
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Periodo:'), 0, 0);
+        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_periodo']), 0, 1);
+        
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Sección:'), 0, 0);
+        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['codigo_seccion']), 0, 1);
+        
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Programa:'), 0, 0);
+        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_carrera']), 0, 1);
+        
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Trayecto:'), 0, 0);
+        $this->pdf->Cell(80, 5, $this->trayecto, 0, 1);
+        
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Fecha:'), 0, 0);
+        $this->pdf->Cell(80, 5, date('d/m/Y H:i'), 0, 1);
+        
+        $this->pdf->Ln(8);
+    }
+    
+    function Footer() {
+        // Posición a 1.5 cm del final
+        $this->pdf->SetY(-25);
+        
+        // Firma del docente
+        $this->pdf->SetFont('Arial', '', 9);
+        $this->pdf->Cell(0, 5, $this->codificarTexto('Firma del Docente:'), 0, 1);
+        $this->pdf->Ln(3);
+        $this->pdf->Cell(60, 5, '_________________________________', 0, 1);
+        $this->pdf->Cell(60, 5, $this->codificarTexto('Nombre: ') . $this->codificarTexto($this->datos['info_general']['nombre_docente']), 0, 1);
+        $this->pdf->Cell(60, 5, $this->codificarTexto('Cédula: ') . $this->datos['info_general']['cedula_docente'], 0, 1);
+        
+        // Número de página
+        $this->pdf->SetY(-10);
+        $this->pdf->SetFont('Arial', 'I', 8);
+        $this->pdf->Cell(0, 5, $this->codificarTexto('Página ') . $this->pdf->PageNo() . ' de {nb}', 0, 0, 'C');
+    }
+    
+    function Cuerpo() {
+        // Configurar número total de páginas
+        $this->pdf->AliasNbPages();
+        
+        // Calcular ancho de columnas dinámicamente
+        $ancho_nombre = 50; // Ancho base para nombre
+        $ancho_trayecto = 12; // Ancho por cada columna de trayecto
+        $total_columnas_trayecto = count($this->columnas_trayectos);
+        
+        // Ajustar ancho del nombre según cantidad de columnas de trayecto
+        if ($total_columnas_trayecto < 3) {
+            $ancho_nombre = 60;
+        }
+        
+        // Encabezado de la tabla
+        $this->pdf->SetFillColor(200, 200, 200);
+        $this->pdf->SetFont('Arial', 'B', 8);
+        
+        $this->pdf->Cell(8, 8, 'N°', 1, 0, 'C', true);
+        $this->pdf->Cell(22, 8, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
+        $this->pdf->Cell($ancho_nombre, 8, $this->codificarTexto('Nombre del Estudiante'), 1, 0, 'C', true);
+        
+        // Columnas para trayectos (dinámicas)
+        foreach ($this->columnas_trayectos as $trayecto_num) {
+            $this->pdf->Cell($ancho_trayecto, 8, "T$trayecto_num", 1, 0, 'C', true);
+        }
+        
+        $this->pdf->Cell(12, 8, $this->codificarTexto('Final'), 1, 0, 'C', true);
+        $this->pdf->Cell(30, 8, $this->codificarTexto('En Letras'), 1, 0, 'C', true);
+        $this->pdf->Cell(25, 8, $this->codificarTexto('Fecha'), 1, 1, 'C', true);
+        
+        $this->pdf->SetFont('Arial', '', 8);
+        
+        $contador = 0;
+        foreach ($this->datos['notas'] as $nota) {
+            $contador++;
+            
+            // Verificar si necesita nueva página (cada 25 estudiantes)
+            if ($contador > 25 && ($contador - 1) % 25 == 0) {
+                $this->pdf->AddPage();
+                $this->Header();
+                
+                // Volver a dibujar el encabezado de la tabla
+                $this->pdf->SetFillColor(200, 200, 200);
+                $this->pdf->SetFont('Arial', 'B', 8);
+                $this->pdf->Cell(8, 8, 'N°', 1, 0, 'C', true);
+                $this->pdf->Cell(22, 8, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
+                $this->pdf->Cell($ancho_nombre, 8, $this->codificarTexto('Nombre del Estudiante'), 1, 0, 'C', true);
+                
+                foreach ($this->columnas_trayectos as $trayecto_num) {
+                    $this->pdf->Cell($ancho_trayecto, 8, "T$trayecto_num", 1, 0, 'C', true);
+                }
+                
+                $this->pdf->Cell(12, 8, $this->codificarTexto('Final'), 1, 0, 'C', true);
+                $this->pdf->Cell(30, 8, $this->codificarTexto('En Letras'), 1, 0, 'C', true);
+                $this->pdf->Cell(25, 8, $this->codificarTexto('Fecha'), 1, 1, 'C', true);
+                $this->pdf->SetFont('Arial', '', 8);
+            }
+            
+            $this->pdf->Cell(8, 6, $contador, 1, 0, 'C');
+            $this->pdf->Cell(22, 6, $nota['cedula_estudiante'], 1, 0, 'C');
+            
+            $nombreCompleto = $this->codificarTexto($nota['nombre_estudiante']);
+            $max_caracteres = $ancho_nombre == 60 ? 40 : 35;
+            if (strlen($nombreCompleto) > $max_caracteres) {
+                $nombreCompleto = substr($nombreCompleto, 0, $max_caracteres) . '...';
+            }
+            $this->pdf->Cell($ancho_nombre, 6, $nombreCompleto, 1, 0);
+            
+            // Mostrar solo los trayectos correspondientes
+            foreach ($this->columnas_trayectos as $trayecto_num) {
+                $trayecto = $nota["trayecto_$trayecto_num"];
+                $valor = ($trayecto !== null && $trayecto != '') ? intval($trayecto) : '-';
+                $this->pdf->Cell($ancho_trayecto, 6, $valor, 1, 0, 'C');
+            }
+            
+            // Nota final (número entero)
+            $nota_final_entero = intval($nota['nota_final']);
+            $this->pdf->Cell(12, 6, $nota_final_entero, 1, 0, 'C');
+            
+            // Nota en letras
+            $nota_letras = $this->convertirNumeroALetras($nota_final_entero);
+            $this->pdf->Cell(30, 6, $this->codificarTexto($nota_letras), 1, 0, 'C');
+            
+            // Fecha de registro
+            $fecha = date('d/m/Y', strtotime($nota['fecha_registro']));
+            $this->pdf->Cell(25, 6, $fecha, 1, 1, 'C');
+        }
+        
+        // Estadísticas al final
+        $this->pdf->Ln(10);
+        $this->pdf->SetFont('Arial', 'B', 10);
+        $this->pdf->Cell(0, 8, $this->codificarTexto('RESUMEN ESTADÍSTICO'), 0, 1, 'C');
+        
+        $this->pdf->SetFont('Arial', '', 9);
+        $this->pdf->Cell(0, 6, $this->codificarTexto('Total de Estudiantes: ') . $contador, 0, 1);
+        $this->pdf->Cell(0, 6, $this->codificarTexto('Aprobados: ') . $this->datos['estadisticas']['aprobados'], 0, 1);
+        $this->pdf->Cell(0, 6, $this->codificarTexto('Reprobados: ') . $this->datos['estadisticas']['reprobados'], 0, 1);
+        $this->pdf->Cell(0, 6, $this->codificarTexto('Promedio del Grupo: ') . intval($this->datos['estadisticas']['promedio_grupo']), 0, 1);
+    }
+    
+    /**
+     * Función para convertir números a letras
+     */
+    function convertirNumeroALetras($numero) {
+        $unidades = array(
+            '', 'UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE',
+            'DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'
+        );
+        
+        $decenas = array(
+            '', '', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'
+        );
+        
+        if ($numero == 0) {
+            return 'CERO';
+        }
+        
+        if ($numero < 20) {
+            return $unidades[$numero];
+        }
+        
+        if ($numero < 100) {
+            $decena = intval($numero / 10);
+            $unidad = $numero % 10;
+            
+            if ($decena == 2 && $unidad > 0) {
+                return 'VEINTI' . $unidades[$unidad];
+            }
+            
+            if ($unidad == 0) {
+                return $decenas[$decena];
+            } else {
+                return $decenas[$decena] . ' Y ' . $unidades[$unidad];
+            }
+        }
+        
+        if ($numero == 100) {
+            return 'CIEN';
+        }
+        
+        // Para números mayores a 100, devolvemos el número
+        return "($numero)";
+    }
+    
+    /**
+     * Función para codificar texto correctamente
+     */
+    function codificarTexto($texto) {
+        if (mb_detect_encoding($texto, 'UTF-8', true)) {
+            return utf8_decode($texto);
+        }
+        return $texto;
+    }
+    
+    function getNombreArchivo() {
+        $docente = preg_replace('/[^a-zA-Z0-9]/', '_', $this->datos['info_general']['nombre_docente']);
+        $materia = preg_replace('/[^a-zA-Z0-9]/', '_', $this->datos['info_general']['nombre_materia']);
+        $periodo = preg_replace('/[^a-zA-Z0-9]/', '_', $this->datos['info_general']['nombre_periodo']);
+        return "Notas_Definitivas_{$docente}_{$materia}_{$periodo}.pdf";
+    }
+}
 
+/**
+ * Generar PDF de notas definitivas
+ */
+function generarPDFNotasDefinitivas($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    // Obtener información general
+    $info_general = obtenerInfoNotasDefinitivas($docente_id, $materia_id, $periodo_id);
+    if (!$info_general) {
+        return false;
+    }
+    
+    // Obtener notas definitivas
+    $notas = obtenerNotasDefinitivasGrupo($docente_id, $materia_id, $periodo_id);
+    if (empty($notas)) {
+        return false;
+    }
+    
+    // Calcular estadísticas
+    $estadisticas = calcularEstadisticasNotas($notas);
+    
+    // Preparar datos para el PDF
+    $datos = [
+        'info_general' => $info_general,
+        'notas' => $notas,
+        'estadisticas' => $estadisticas
+    ];
+    
+    // Crear PDF
+    $pdf = new PDF_NotasDefinitivas();
+    $pdf->generarReporte($datos);
+    
+    return true;
+}
 
+/**
+ * Obtener información general para el reporte incluyendo el trayecto
+ */
+function obtenerInfoNotasDefinitivas($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT ud.nombre as nombre_docente, ud.idusuario as cedula_docente,
+                     m.nombre_materia, pa.nombre_periodo, 
+                     s.codigo_seccion, c.nombre_carrera, t.numero_trayecto
+              FROM notas_definitivas nd
+              INNER JOIN users ud ON nd.id_docente = ud.id
+              INNER JOIN materias m ON nd.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+              INNER JOIN docente_seccion ds ON nd.id_docente = ds.id_usuario 
+                                           AND nd.id_materia = ds.id_materia
+              INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+              WHERE nd.id_docente = ? AND nd.id_materia = ? AND nd.id_periodo = ?
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Obtener notas definitivas del grupo y calcular nota final
+ */
+function obtenerNotasDefinitivasGrupo($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT nd.id_usuario as id_estudiante,
+                     nd.trayecto_0, nd.trayecto_1, nd.trayecto_2, nd.trayecto_3, nd.trayecto_4,
+                     nd.fecha_registro,
+                     ue.idusuario as cedula_estudiante, ue.nombre as nombre_estudiante
+              FROM notas_definitivas nd
+              INNER JOIN users ue ON nd.id_usuario = ue.id
+              WHERE nd.id_docente = ? AND nd.id_materia = ? AND nd.id_periodo = ?
+              ORDER BY ue.nombre";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $notas = [];
+    while ($row = $result->fetch_assoc()) {
+        // Calcular la nota final basada en los trayectos
+        $nota_final = calcularNotaFinal($row);
+        $row['nota_final'] = $nota_final;
+        $notas[] = $row;
+    }
+    
+    return $notas;
+}
+
+/**
+ * Calcular nota final a partir de los trayectos (números enteros)
+ */
+function calcularNotaFinal($datos_nota) {
+    $trayectos = [];
+    $suma = 0;
+    $contador = 0;
+    
+    // Recolectar trayectos que tengan valor
+    for ($i = 0; $i <= 4; $i++) {
+        $campo_trayecto = "trayecto_$i";
+        if (isset($datos_nota[$campo_trayecto]) && $datos_nota[$campo_trayecto] !== null && $datos_nota[$campo_trayecto] != '') {
+            $trayectos[] = intval($datos_nota[$campo_trayecto]); // Convertir a entero
+            $suma += intval($datos_nota[$campo_trayecto]);
+            $contador++;
+        }
+    }
+    
+    // Calcular promedio si hay trayectos válidos
+    if ($contador > 0) {
+        return round($suma / $contador); // Redondear al entero más cercano
+    }
+    
+    return 0; // Si no hay trayectos con notas
+}
+
+/**
+ * Calcular estadísticas de las notas
+ */
+function calcularEstadisticasNotas($notas) {
+    $total = count($notas);
+    $aprobados = 0;
+    $suma_notas = 0;
+    
+    foreach ($notas as $nota) {
+        $suma_notas += $nota['nota_final'];
+        if ($nota['nota_final'] >= 10.0) {
+            $aprobados++;
+        }
+    }
+    
+    $promedio = $total > 0 ? $suma_notas / $total : 0;
+    $reprobados = $total - $aprobados;
+    
+    return [
+        'total' => $total,
+        'aprobados' => $aprobados,
+        'reprobados' => $reprobados,
+        'promedio_grupo' => $promedio
+    ];
+}
 
 
 
