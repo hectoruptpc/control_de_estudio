@@ -6321,7 +6321,7 @@ class PDF_PlanillaNotas {
         $this->pdf->Cell(50, 4, $this->codificarTexto($this->info['nombre_materia']), 0, 1);
         
         $this->pdf->SetX($x + 80);
-        $this->pdf->Cell(25, 4, $this->codificarTexto('Cod:'), 0, 0);
+        $this->pdf->Cell(25, 4, $this->codificarTexto('Cod materia:'), 0, 0);
         $this->pdf->Cell(50, 4, $this->codificarTexto($this->info['cod_materia']), 0, 1);
         
         $this->pdf->SetX($x + 80);
@@ -6352,13 +6352,25 @@ class PDF_PlanillaNotas {
         // Llamar Header
         $this->Header();
         
-        // Encabezado de la tabla
-        $this->agregarEncabezadoTabla();
+        // Calcular el ancho total de la tabla
+        $ancho_total_tabla = 8 + 18 + 45 + (7 * 8) + 8; // Suma de todas las columnas
         
-        // Estudiantes
+        // Calcular la posición X para centrar la tabla
+        $margen_izquierdo = ($this->pdf->GetPageWidth() - $ancho_total_tabla) / 2;
+        
+        // Establecer la posición X para centrar
+        $this->pdf->SetX($margen_izquierdo);
+        
+        // Encabezado de la tabla centrado
+        $this->agregarEncabezadoTabla($margen_izquierdo);
+        
+        // Estudiantes - tabla centrada
         $contador = 0;
         foreach ($this->estudiantes as $estudiante) {
             $contador++;
+            
+            // Establecer posición X centrada para cada fila
+            $this->pdf->SetX($margen_izquierdo);
             
             $this->pdf->SetFont('Arial', '', 7);
             $this->pdf->Cell(8, 5, $contador, 1, 0, 'C');
@@ -6384,7 +6396,10 @@ class PDF_PlanillaNotas {
         $this->Firma();
     }
     
-    function agregarEncabezadoTabla() {
+    function agregarEncabezadoTabla($margen_izquierdo = 10) {
+        // Establecer posición X para el encabezado
+        $this->pdf->SetX($margen_izquierdo);
+        
         // Encabezado de la tabla
         $this->pdf->SetFont('Arial', 'B', 7);
         $this->pdf->SetFillColor(200, 200, 200);
