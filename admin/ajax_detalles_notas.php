@@ -223,14 +223,14 @@ switch ($seccion) {
                 <table class="table table-bordered table-sm">
                     <thead class="thead-light">
                         <tr>
-                            <th width="50">
+                            <th width="40">
                                 <input type="checkbox" id="selectAllEstudiantes">
                             </th>
                             <th>Cédula</th>
                             <th>Estudiante</th>
-                            <th>Nota del Trayecto</th>
-                            <th>Estado</th>
-                            <th>Acciones</th>
+                            <th width="90">Nota</th>
+                            <th width="80">Estado</th>
+                            <th width="180">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -258,16 +258,19 @@ switch ($seccion) {
                                 </td>
                                 <td><?= htmlspecialchars($estudiante['cedula']) ?></td>
                                 <td><?= htmlspecialchars($estudiante['nombre_estudiante']) ?></td>
-                                <td>
+                                <td class="text-center">
                                     <?php if ($nota_trayecto !== null): ?>
-                                        <span class="badge badge-info">
-                                            T<?= $info_grupo['id_trayecto'] - 1 ?>: <?= $nota_trayecto ?>
-                                        </span>
+                                        <div class="nota-display">
+                                            <span class="nota-valor <?= $nota_trayecto >= 12 ? 'nota-aprobada' : 'nota-reprobada' ?>">
+                                                <?= $nota_trayecto ?>
+                                            </span>
+                                            <small class="text-muted">T<?= $info_grupo['id_trayecto'] - 1 ?></small>
+                                        </div>
                                     <?php else: ?>
-                                        <span class="badge badge-secondary">Sin nota</span>
+                                        <span class="badge badge-secondary badge-sm">Sin nota</span>
                                     <?php endif; ?>
                                 </td>
-                                <td>
+                                <td class="text-center">
                                     <span class="badge badge-<?= $color_estado ?>">
                                         <?= $estado ?>
                                     </span>
@@ -295,14 +298,49 @@ switch ($seccion) {
             </div>
             
             <div class="mt-3">
-                <button type="button" class="btn btn-success" onclick="aplicarAccion('aprobar')">
+                <button type="button" class="btn btn-success btn-sm" onclick="aplicarAccion('aprobar')">
                     <i class="fas fa-check-circle"></i> Aprobar Seleccionados
                 </button>
-                <button type="button" class="btn btn-danger" onclick="aplicarAccion('rechazar')">
+                <button type="button" class="btn btn-danger btn-sm" onclick="aplicarAccion('rechazar')">
                     <i class="fas fa-times-circle"></i> Rechazar Seleccionados
                 </button>
             </div>
         </form>
+
+        <style>
+        .nota-display {
+            text-align: center;
+            padding: 2px;
+        }
+        
+        .nota-valor {
+            display: inline-block;
+            font-size: 1rem;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 6px;
+            min-width: 40px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            color: #000000 !important; /* Texto negro */
+            font-weight: 900; /* Texto más grueso */
+        }
+        
+        .nota-aprobada {
+            background: #90EE90; /* Verde claro */
+            border: 1px solid #28a745;
+        }
+        
+        .nota-reprobada {
+            background: #FFB6C1; /* Rojo claro */
+            border: 1px solid #dc3545;
+        }
+        
+        .badge-sm {
+            font-size: 0.75rem;
+            padding: 3px 6px;
+        }
+        </style>
         <?php
         break;
         
@@ -334,40 +372,88 @@ switch ($seccion) {
                 <div class="card mb-3">
                     <div class="card-header bg-light">Estadísticas</div>
                     <div class="card-body">
-                        <p><strong>Total Estudiantes:</strong> 
-                            <span class="badge badge-primary"><?= $estadisticas['total_estudiantes'] ?></span>
-                        </p>
-                        <p><strong>Promedio General:</strong> 
-                            <span class="badge badge-<?= $estadisticas['promedio_general'] >= 12 ? 'success' : 'warning' ?>">
-                                <?= $estadisticas['promedio_general'] ?>
-                            </span>
-                        </p>
-                        <p><strong>Aprobados (≥12pts):</strong> 
-                            <span class="badge badge-success"><?= $estadisticas['aprobados'] ?></span>
-                            (<?= $estadisticas['total_estudiantes'] > 0 ? round(($estadisticas['aprobados'] / $estadisticas['total_estudiantes']) * 100, 1) : 0 ?>%)
-                        </p>
-                        <p><strong>Reprobados (<12pts):</strong> 
-                            <span class="badge badge-danger"><?= $estadisticas['reprobados'] ?></span>
-                            (<?= $estadisticas['total_estudiantes'] > 0 ? round(($estadisticas['reprobados'] / $estadisticas['total_estudiantes']) * 100, 1) : 0 ?>%)
-                        </p>
+                        <div class="stats-container">
+                            <div class="stat-item">
+                                <div class="stat-value h4 text-primary"><?= $estadisticas['total_estudiantes'] ?></div>
+                                <div class="stat-label">Total</div>
+                            </div>
+                            
+                            <div class="stat-item">
+                                <div class="stat-value h4 <?= $estadisticas['promedio_general'] >= 12 ? 'text-success' : 'text-warning' ?>">
+                                    <?= $estadisticas['promedio_general'] ?>
+                                </div>
+                                <div class="stat-label">Promedio</div>
+                            </div>
+                            
+                            <div class="stat-item">
+                                <div class="stat-value h4 text-success"><?= $estadisticas['aprobados'] ?></div>
+                                <div class="stat-label">Aprobados</div>
+                            </div>
+                            
+                            <div class="stat-item">
+                                <div class="stat-value h4 text-danger"><?= $estadisticas['reprobados'] ?></div>
+                                <div class="stat-label">Reprobados</div>
+                            </div>
+                        </div>
                         
                         <!-- Gráfico simple de progreso -->
                         <?php if ($estadisticas['total_estudiantes'] > 0): ?>
-                        <div class="progress mt-3" style="height: 20px;">
+                        <div class="progress mt-2" style="height: 18px;">
                             <div class="progress-bar bg-success" 
                                  style="width: <?= ($estadisticas['aprobados'] / $estadisticas['total_estudiantes']) * 100 ?>%">
-                                Aprobados: <?= $estadisticas['aprobados'] ?>
+                                <span class="progress-text" style="color: #000; font-weight: bold;"><?= $estadisticas['aprobados'] ?></span>
                             </div>
                             <div class="progress-bar bg-danger" 
                                  style="width: <?= ($estadisticas['reprobados'] / $estadisticas['total_estudiantes']) * 100 ?>%">
-                                Reprobados: <?= $estadisticas['reprobados'] ?>
+                                <span class="progress-text" style="color: #000; font-weight: bold;"><?= $estadisticas['reprobados'] ?></span>
                             </div>
+                        </div>
+                        <div class="text-center mt-1">
+                            <small class="text-muted">
+                                Aprobados: <?= $estadisticas['aprobados'] ?> 
+                                (<?= $estadisticas['total_estudiantes'] > 0 ? round(($estadisticas['aprobados'] / $estadisticas['total_estudiantes']) * 100, 1) : 0 ?>%) | 
+                                Reprobados: <?= $estadisticas['reprobados'] ?> 
+                                (<?= $estadisticas['total_estudiantes'] > 0 ? round(($estadisticas['reprobados'] / $estadisticas['total_estudiantes']) * 100, 1) : 0 ?>%)
+                            </small>
                         </div>
                         <?php endif; ?>
                     </div>
                 </div>
             </div>
         </div>
+
+        <style>
+        .stats-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 8px;
+            border-radius: 6px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            margin-bottom: 2px;
+            color: #000 !important; /* Texto negro en estadísticas */
+            font-weight: 700;
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+        
+        .progress-text {
+            font-weight: bold;
+            text-shadow: 1px 1px 1px rgba(255,255,255,0.5);
+        }
+        </style>
         <?php
         break;
         
@@ -388,34 +474,32 @@ switch ($seccion) {
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <p><strong>Nombre del archivo:</strong> <?= htmlspecialchars($soporte_info['soporte']) ?></p>
-                            <p><strong>Tipo de archivo:</strong> 
+                            <p><strong>Nombre:</strong> <?= htmlspecialchars($soporte_info['soporte']) ?></p>
+                            <p><strong>Tipo:</strong> 
                                 <span class="badge badge-info"><?= strtoupper($soporte_info['tipo_archivo']) ?></span>
                             </p>
-                            <p><strong>Fecha de subida:</strong> 
+                            <p><strong>Subido:</strong> 
                                 <?= date('d/m/Y H:i', strtotime($soporte_info['fecha_subida'])) ?>
                             </p>
                         </div>
                         <div class="col-md-6">
                             <div class="text-center">
                                 <?php if (in_array($soporte_info['tipo_archivo'], ['jpg', 'jpeg', 'png', 'gif', 'webp'])): ?>
-                                    <div class="img-preview mb-3">
+                                    <div class="img-preview mb-2">
                                         <img src="../soportes/<?= htmlspecialchars($soporte_info['soporte']) ?>" 
-                                             alt="Vista previa del soporte" 
+                                             alt="Vista previa" 
                                              class="img-fluid rounded border" 
-                                             style="max-height: 300px;">
+                                             style="max-height: 150px;">
                                     </div>
                                 <?php else: ?>
-                                    <div class="alert alert-info text-center">
-                                        <i class="fas fa-file-pdf fa-3x mb-3"></i>
+                                    <div class="alert alert-info text-center py-2">
+                                        <i class="fas fa-file-pdf fa-2x mb-1"></i>
                                         <br>
-                                        <strong>Archivo PDF</strong>
-                                        <br>
-                                        <small class="text-muted">Haga clic en el botón para descargar</small>
+                                        <strong>PDF</strong>
                                     </div>
                                 <?php endif; ?>
                                 
-                                <div class="btn-group">
+                                <div class="btn-group btn-group-sm">
                                     <a href="../soportes/<?= htmlspecialchars($soporte_info['soporte']) ?>" 
                                        class="btn btn-primary" 
                                        target="_blank" 
@@ -434,22 +518,21 @@ switch ($seccion) {
                 </div>
             </div>
             
-            <div class="alert alert-warning mt-3">
+            <div class="alert alert-warning mt-2">
                 <i class="fas fa-info-circle"></i>
-                <strong>Nota:</strong> Este archivo de soporte será copiado a las notas definitivas cuando se aprueben las notas.
+                Este archivo se copiará a las notas definitivas cuando se aprueben.
             </div>
         <?php else: ?>
             <div class="alert alert-warning">
                 <i class="fas fa-exclamation-triangle"></i>
-                <strong>No hay archivo de soporte disponible</strong>
-                <p class="mb-0">El docente no ha subido ningún archivo de soporte para este grupo.</p>
+                <strong>No hay archivo de soporte</strong>
             </div>
             
             <div class="card">
-                <div class="card-body text-center">
-                    <i class="fas fa-paperclip fa-3x text-muted mb-3"></i>
+                <div class="card-body text-center py-3">
+                    <i class="fas fa-paperclip fa-2x text-muted mb-2"></i>
                     <h5>Sin Soporte</h5>
-                    <p class="text-muted">No se encontró ningún archivo de soporte asociado a este grupo de notas.</p>
+                    <p class="text-muted mb-0">No se encontró archivo de soporte.</p>
                 </div>
             </div>
         <?php endif; ?>
@@ -467,23 +550,23 @@ switch ($seccion) {
         <div class="row">
             <div class="col-md-6">
                 <div class="card">
-                    <div class="card-header bg-success text-white">
-                        <i class="fas fa-check-circle"></i> Aprobar Todo el Grupo
+                    <div class="card-header bg-success text-white py-2">
+                        <i class="fas fa-check-circle"></i> Aprobar Todo
                     </div>
                     <div class="card-body">
-                        <p>Aprobará las notas de todos los estudiantes en este grupo.</p>
+                        <p class="mb-2">Aprobará las notas de todos los estudiantes.</p>
                         <?php if ($soporte_info): ?>
-                            <div class="alert alert-info">
+                            <div class="alert alert-info py-1">
                                 <i class="fas fa-paperclip"></i> 
-                                Se incluirá el archivo de soporte en las notas definitivas.
+                                Incluye soporte
                             </div>
                         <?php else: ?>
-                            <div class="alert alert-warning">
+                            <div class="alert alert-warning py-1">
                                 <i class="fas fa-exclamation-triangle"></i> 
-                                No hay archivo de soporte disponible.
+                                Sin soporte
                             </div>
                         <?php endif; ?>
-                        <button class="btn btn-success btn-block" 
+                        <button class="btn btn-success btn-sm btn-block" 
                                 onclick="accionGrupo('aprobar')">
                             Aprobar Todo
                         </button>
@@ -493,12 +576,12 @@ switch ($seccion) {
             
             <div class="col-md-6">
                 <div class="card">
-                    <div class="card-header bg-danger text-white">
-                        <i class="fas fa-times-circle"></i> Rechazar Todo el Grupo
+                    <div class="card-header bg-danger text-white py-2">
+                        <i class="fas fa-times-circle"></i> Rechazar Todo
                     </div>
                     <div class="card-body">
-                        <p>Rechazará las notas de todos los estudiantes en este grupo.</p>
-                        <button class="btn btn-danger btn-block" 
+                        <p class="mb-2">Rechazará las notas de todos los estudiantes.</p>
+                        <button class="btn btn-danger btn-sm btn-block" 
                                 onclick="accionGrupo('rechazar')">
                             Rechazar Todo
                         </button>
@@ -507,33 +590,28 @@ switch ($seccion) {
             </div>
         </div>
         
-        <!-- Modales para acciones grupales (APROBAR TODO / RECHAZAR TODO) -->
+        <!-- Modales para acciones grupales -->
         <div class="modal fade" id="mensajeRechazoGrupoModal" tabindex="-1" role="dialog" aria-labelledby="mensajeRechazoGrupoModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
-                    <div class="modal-header bg-warning">
+                    <div class="modal-header bg-warning py-2">
                         <h5 class="modal-title" id="tituloRechazoGrupoModal">Mensaje de Rechazo Grupal</h5>
                         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
                     <div class="modal-body">
-                        <div class="alert alert-info">
-                            <strong>Estudiante(s) a rechazar:</strong>
-                            <span id="estudiantesRechazadosGrupo">TODO EL GRUPO</span>
+                        <div class="alert alert-info py-1">
+                            <strong>Estudiantes:</strong> TODO EL GRUPO
                         </div>
-                        <p>Por favor, ingrese el motivo del rechazo de las notas. Este mensaje será enviado al docente.</p>
-                        <div class="form-group">
-                            <label for="mensajeRechazoGrupoTexto">Mensaje:</label>
-                            <textarea class="form-control" id="mensajeRechazoGrupoTexto" rows="5" placeholder="Explique los motivos del rechazo..."></textarea>
-                        </div>
-                        <div class="alert alert-secondary">
-                            <small><i class="fas fa-info-circle"></i> Puede editar el mensaje predeterminado según sea necesario.</small>
+                        <p>Ingrese el motivo del rechazo:</p>
+                        <div class="form-group mb-2">
+                            <textarea class="form-control form-control-sm" id="mensajeRechazoGrupoTexto" rows="4" placeholder="Explique los motivos del rechazo..."></textarea>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                        <button type="button" class="btn btn-primary" onclick="confirmarRechazoGrupoConMensaje()">Enviar Rechazo</button>
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="confirmarRechazoGrupoConMensaje()">Enviar</button>
                     </div>
                 </div>
             </div>
@@ -542,29 +620,24 @@ switch ($seccion) {
         <div class="modal fade" id="mensajeAprobacionGrupoModal" tabindex="-1" role="dialog" aria-labelledby="mensajeAprobacionGrupoModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
-                    <div class="modal-header bg-success">
+                    <div class="modal-header bg-success py-2">
                         <h5 class="modal-title" id="tituloAprobacionGrupoModal">Mensaje de Aprobación Grupal</h5>
                         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
                     <div class="modal-body">
-                        <div class="alert alert-info">
-                            <strong>Estudiante(s) a aprobar:</strong>
-                            <span id="estudiantesAprobadosGrupo">TODO EL GRUPO</span>
+                        <div class="alert alert-info py-1">
+                            <strong>Estudiantes:</strong> TODO EL GRUPO
                         </div>
-                        <p>Puede enviar un mensaje de confirmación al docente. Este mensaje será enviado al docente.</p>
-                        <div class="form-group">
-                            <label for="mensajeAprobacionGrupoTexto">Mensaje:</label>
-                            <textarea class="form-control" id="mensajeAprobacionGrupoTexto" rows="5" placeholder="Mensaje de confirmación de aprobación..."></textarea>
-                        </div>
-                        <div class="alert alert-secondary">
-                            <small><i class="fas fa-info-circle"></i> Puede editar el mensaje predeterminado según sea necesario.</small>
+                        <p>Mensaje de confirmación:</p>
+                        <div class="form-group mb-2">
+                            <textarea class="form-control form-control-sm" id="mensajeAprobacionGrupoTexto" rows="4" placeholder="Mensaje de confirmación..."></textarea>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                        <button type="button" class="btn btn-primary" onclick="confirmarAprobacionGrupoConMensaje()">Enviar Aprobación</button>
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="confirmarAprobacionGrupoConMensaje()">Enviar</button>
                     </div>
                 </div>
             </div>
@@ -574,7 +647,7 @@ switch ($seccion) {
 }
 ?>
 
-<!-- El resto del JavaScript permanece igual -->
+<!-- JavaScript -->
 <script>
 // Variables globales para almacenar la acción pendiente
 let accionPendiente = null;
@@ -607,7 +680,7 @@ function aplicarAccion(accion) {
         $('#mensajeRechazoModal').modal('show');
         
         // Actualizar el título y mensaje en el modal
-        $('#tituloRechazoModal').html('<i class="fas fa-exclamation-triangle"></i> Rechazar Notas de: ' + (nombresEstudiantes.length > 3 ? nombresEstudiantes.length + ' Estudiantes' : estudianteNombrePendiente));
+        $('#tituloRechazoModal').html('<i class="fas fa-exclamation-triangle"></i> Rechazar: ' + (nombresEstudiantes.length > 3 ? nombresEstudiantes.length + ' Estudiantes' : estudianteNombrePendiente));
         $('#estudiantesRechazados').text(estudianteNombrePendiente);
         
         // Establecer mensaje predeterminado
@@ -621,7 +694,7 @@ function aplicarAccion(accion) {
         $('#mensajeAprobacionModal').modal('show');
         
         // Actualizar el título y mensaje en el modal
-        $('#tituloAprobacionModal').html('<i class="fas fa-check-circle"></i> Aprobar Notas de: ' + (nombresEstudiantes.length > 3 ? nombresEstudiantes.length + ' Estudiantes' : estudianteNombrePendiente));
+        $('#tituloAprobacionModal').html('<i class="fas fa-check-circle"></i> Aprobar: ' + (nombresEstudiantes.length > 3 ? nombresEstudiantes.length + ' Estudiantes' : estudianteNombrePendiente));
         $('#estudiantesAprobados').text(estudianteNombrePendiente);
         
         // Establecer mensaje predeterminado
@@ -695,7 +768,7 @@ $('.accion-individual').click(function() {
         $('#mensajeRechazoModal').modal('show');
         
         // Actualizar el título y mensaje en el modal
-        $('#tituloRechazoModal').html('<i class="fas fa-exclamation-triangle"></i> Rechazar Nota de: ' + estudianteNombre);
+        $('#tituloRechazoModal').html('<i class="fas fa-exclamation-triangle"></i> Rechazar: ' + estudianteNombre);
         $('#estudiantesRechazados').text(estudianteNombrePendiente);
         
         // Establecer mensaje predeterminado
@@ -709,7 +782,7 @@ $('.accion-individual').click(function() {
         $('#mensajeAprobacionModal').modal('show');
         
         // Actualizar el título y mensaje en el modal
-        $('#tituloAprobacionModal').html('<i class="fas fa-check-circle"></i> Aprobar Nota de: ' + estudianteNombre);
+        $('#tituloAprobacionModal').html('<i class="fas fa-check-circle"></i> Aprobar: ' + estudianteNombre);
         $('#estudiantesAprobados').text(estudianteNombrePendiente);
         
         // Establecer mensaje predeterminado
@@ -810,29 +883,25 @@ function confirmarAprobacionGrupoConMensaje() {
 <div class="modal fade" id="mensajeRechazoModal" tabindex="-1" role="dialog" aria-labelledby="mensajeRechazoModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
-            <div class="modal-header bg-warning">
+            <div class="modal-header bg-warning py-2">
                 <h5 class="modal-title" id="tituloRechazoModal">Mensaje de Rechazo</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
             <div class="modal-body">
-                <div class="alert alert-info">
-                    <strong>Estudiante(s) a rechazar:</strong>
+                <div class="alert alert-info py-1">
+                    <strong>Estudiantes:</strong>
                     <span id="estudiantesRechazados"></span>
                 </div>
-                <p>Por favor, ingrese el motivo del rechazo de las notas. Este mensaje será enviado al docente.</p>
-                <div class="form-group">
-                    <label for="mensajeRechazoTexto">Mensaje:</label>
-                    <textarea class="form-control" id="mensajeRechazoTexto" rows="5" placeholder="Explique los motivos del rechazo..."></textarea>
-                </div>
-                <div class="alert alert-secondary">
-                    <small><i class="fas fa-info-circle"></i> Puede editar el mensaje predeterminado según sea necesario.</small>
+                <p>Ingrese el motivo del rechazo:</p>
+                <div class="form-group mb-2">
+                    <textarea class="form-control form-control-sm" id="mensajeRechazoTexto" rows="4" placeholder="Explique los motivos del rechazo..."></textarea>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="confirmarRechazoConMensaje()">Enviar Rechazo</button>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="confirmarRechazoConMensaje()">Enviar</button>
             </div>
         </div>
     </div>
@@ -842,29 +911,25 @@ function confirmarAprobacionGrupoConMensaje() {
 <div class="modal fade" id="mensajeAprobacionModal" tabindex="-1" role="dialog" aria-labelledby="mensajeAprobacionModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
-            <div class="modal-header bg-success">
+            <div class="modal-header bg-success py-2">
                 <h5 class="modal-title" id="tituloAprobacionModal">Mensaje de Aprobación</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
             <div class="modal-body">
-                <div class="alert alert-info">
-                    <strong>Estudiante(s) a aprobar:</strong>
+                <div class="alert alert-info py-1">
+                    <strong>Estudiantes:</strong>
                     <span id="estudiantesAprobados"></span>
                 </div>
-                <p>Puede enviar un mensaje de confirmación al docente. Este mensaje será enviado al docente.</p>
-                <div class="form-group">
-                    <label for="mensajeAprobacionTexto">Mensaje:</label>
-                    <textarea class="form-control" id="mensajeAprobacionTexto" rows="5" placeholder="Mensaje de confirmación de aprobación..."></textarea>
-                </div>
-                <div class="alert alert-secondary">
-                    <small><i class="fas fa-info-circle"></i> Puede editar el mensaje predeterminado según sea necesario.</small>
+                <p>Mensaje de confirmación:</p>
+                <div class="form-group mb-2">
+                    <textarea class="form-control form-control-sm" id="mensajeAprobacionTexto" rows="4" placeholder="Mensaje de confirmación..."></textarea>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="confirmarAprobacionConMensaje()">Enviar Aprobación</button>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="confirmarAprobacionConMensaje()">Enviar</button>
             </div>
         </div>
     </div>
