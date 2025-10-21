@@ -6514,10 +6514,41 @@ class PDF_NotasDefinitivas {
         $this->definirColumnasTrayecto();
         
         $this->pdf->AddPage();
+        $this->Membrete(); // Agregar membrete primero
         $this->Header();
         $this->Cuerpo();
         $this->pdf->Output('D', $this->getNombreArchivo());
         exit;
+    }
+    
+    function Membrete() {
+        // Configurar márgenes
+        $margin = 10;
+        $pageWidth = $this->pdf->GetPageWidth();
+        
+        // Logo (si existe)
+        $logoPath = '../images/uptpc.png';
+        if (file_exists($logoPath)) {
+            $this->pdf->Image($logoPath, $margin, 10, 20, 20);
+        }
+        
+        // Texto del membrete
+        $this->pdf->SetFont('Arial', 'B', 10);
+        $this->pdf->SetY(15);
+        $this->pdf->Cell(0, 5, $this->codificarTexto('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->pdf->SetFont('Arial', 'B', 9);
+        $this->pdf->Cell(0, 5, $this->codificarTexto('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->pdf->Cell(0, 5, $this->codificarTexto('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        
+        // Fecha
+        $this->pdf->SetFont('Arial', '', 8);
+        $this->pdf->SetXY($pageWidth - $margin - 30, 10);
+        $this->pdf->Cell(30, 5, date('d/m/Y'), 0, 0, 'R');
+        
+        // Línea separadora
+        $this->pdf->SetY(35);
+        $this->pdf->Cell(0, 0, '', 'T');
+        $this->pdf->Ln(10);
     }
     
     function definirColumnasTrayecto() {
@@ -6539,7 +6570,9 @@ class PDF_NotasDefinitivas {
     }
     
     function Header() {
-        // Encabezado institucional
+        // Título principal (después del membrete)
+        $this->pdf->SetY(45); // Posición después del membrete
+        
         $this->pdf->SetFont('Arial', 'B', 14);
         $this->pdf->Cell(0, 8, $this->codificarTexto('REPORTE DE NOTAS DEFINITIVAS'), 0, 1, 'C');
         $this->pdf->SetFont('Arial', 'B', 10);
@@ -6564,14 +6597,11 @@ class PDF_NotasDefinitivas {
         $this->pdf->Cell(25, 5, $this->codificarTexto('Sección:'), 0, 0);
         $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['codigo_seccion']), 0, 1);
         
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Programa:'), 0, 0);
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Carrera:'), 0, 0);
         $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_carrera']), 0, 1);
         
         $this->pdf->Cell(25, 5, $this->codificarTexto('Trayecto:'), 0, 0);
         $this->pdf->Cell(80, 5, $this->trayecto, 0, 1);
-        
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Fecha:'), 0, 0);
-        $this->pdf->Cell(80, 5, date('d/m/Y H:i'), 0, 1);
         
         $this->pdf->Ln(8);
     }
@@ -6634,6 +6664,7 @@ class PDF_NotasDefinitivas {
             // Verificar si necesita nueva página (cada 25 estudiantes)
             if ($contador > 25 && ($contador - 1) % 25 == 0) {
                 $this->pdf->AddPage();
+                $this->Membrete(); // Agregar membrete en cada página nueva
                 $this->Header();
                 
                 // Volver a dibujar el encabezado de la tabla
