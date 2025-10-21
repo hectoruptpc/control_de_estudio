@@ -6232,11 +6232,6 @@ function obtenerSoporteActual($id_estudiante, $id_materia, $id_periodo) {
 
 
 
-
-/**
- * Funciones específicas para la planilla PDF de notas
- */
-
 /**
  * Clase para generar PDF de planilla de notas
  */
@@ -6261,125 +6256,156 @@ class PDF_PlanillaNotas {
         exit;
     }
     
-    function Header() {
-        // Solo mostrar encabezado en la primera pagina
-        if ($this->pdf->PageNo() == 1) {
-            // Encabezado institucional
-            $this->pdf->SetFont('Arial', 'B', 14);
-            $this->pdf->Cell(0, 8, $this->codificarTexto('PLANILLA DE REGISTRO DE NOTAS'), 0, 1, 'C');
-            $this->pdf->SetFont('Arial', 'B', 10);
-            $this->pdf->Cell(0, 6, $this->codificarTexto('SISTEMA DE CONTROL DE NOTAS'), 0, 1, 'C');
-            $this->pdf->Ln(2);
-            
-            // Informacion de la seccion y materia
-            $this->pdf->SetFont('Arial', '', 9);
-            $this->pdf->Cell(25, 5, $this->codificarTexto('Sección:'), 0, 0);
-            $this->pdf->Cell(50, 5, $this->codificarTexto($this->info['codigo_seccion']), 0, 1);
-            
-            $this->pdf->Cell(25, 5, $this->codificarTexto('Carrera:'), 0, 0);
-            $this->pdf->Cell(50, 5, $this->codificarTexto($this->info['nombre_carrera']), 0, 1);
-            
-            $this->pdf->Cell(25, 5, $this->codificarTexto('Trayecto:'), 0, 0);
-            $this->pdf->Cell(50, 5, $this->codificarTexto($this->info['nombre_trayecto']), 0, 1);
-            
-            $this->pdf->Cell(25, 5, $this->codificarTexto('Materia:'), 0, 0);
-            $this->pdf->Cell(50, 5, $this->codificarTexto($this->info['nombre_materia']), 0, 1);
-            
-            $this->pdf->Cell(25, 5, $this->codificarTexto('Cod materia:'), 0, 0);
-            $this->pdf->Cell(50, 5, $this->codificarTexto($this->info['cod_materia']), 0, 1);
-            
-            $this->pdf->Cell(25, 5, $this->codificarTexto('Periodo:'), 0, 0);
-            $this->pdf->Cell(50, 5, $this->codificarTexto($this->info['nombre_periodo']), 0, 1);
-            
-            $this->pdf->Ln(3);
+    function Membrete() {
+        // Configurar márgenes
+        $margin = 10;
+        $pageWidth = $this->pdf->GetPageWidth();
+        
+        // Logo (si existe)
+        $logoPath = '../images/uptpc.png';
+        if (file_exists($logoPath)) {
+            $this->pdf->Image($logoPath, $margin, 8, 15, 15);
         }
+        
+        // Texto del membrete
+        $this->pdf->SetFont('Arial', 'B', 9);
+        $this->pdf->SetY(10);
+        $this->pdf->Cell(0, 4, $this->codificarTexto('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->pdf->SetFont('Arial', 'B', 8);
+        $this->pdf->Cell(0, 4, $this->codificarTexto('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->pdf->Cell(0, 4, $this->codificarTexto('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        
+        // Fecha
+        $this->pdf->SetFont('Arial', '', 7);
+        $this->pdf->SetXY($pageWidth - $margin - 25, 8);
+        $this->pdf->Cell(25, 4, date('d/m/Y'), 0, 0, 'R');
+        
+        // Línea separadora
+        $this->pdf->SetY(28);
+        $this->pdf->Cell(0, 0, '', 'T');
+        $this->pdf->Ln(5);
     }
     
-    function Footer() {
-        // Posicion a 1.5 cm del final
-        $this->pdf->SetY(-25);
+    function Header() {
+        $this->Membrete();
         
-        // Firma del docente en cada pagina
+        // Título principal
+        $this->pdf->SetFont('Arial', 'B', 12);
+        $this->pdf->Cell(0, 6, $this->codificarTexto('PLANILLA DE REGISTRO DE NOTAS'), 0, 1, 'C');
+        $this->pdf->SetFont('Arial', 'B', 9);
+        $this->pdf->Cell(0, 4, $this->codificarTexto('SISTEMA DE CONTROL DE NOTAS'), 0, 1, 'C');
+        $this->pdf->Ln(1);
+        
+        // Información en 2 columnas
+        $this->pdf->SetFont('Arial', '', 8);
+        
+        // Columna izquierda
+        $x = $this->pdf->GetX();
+        $y = $this->pdf->GetY();
+        
+        $this->pdf->Cell(20, 4, $this->codificarTexto('Sección:'), 0, 0);
+        $this->pdf->Cell(40, 4, $this->codificarTexto($this->info['codigo_seccion']), 0, 1);
+        
+        $this->pdf->SetX($x);
+        $this->pdf->Cell(20, 4, $this->codificarTexto('Carrera:'), 0, 0);
+        $this->pdf->Cell(40, 4, $this->codificarTexto($this->info['nombre_carrera']), 0, 1);
+        
+        $this->pdf->SetX($x);
+        $this->pdf->Cell(20, 4, $this->codificarTexto('Trayecto:'), 0, 0);
+        $this->pdf->Cell(40, 4, $this->codificarTexto($this->info['nombre_trayecto']), 0, 1);
+        
+        // Columna derecha
+        $this->pdf->SetXY($x + 80, $y);
+        
+        $this->pdf->Cell(25, 4, $this->codificarTexto('Materia:'), 0, 0);
+        $this->pdf->Cell(50, 4, $this->codificarTexto($this->info['nombre_materia']), 0, 1);
+        
+        $this->pdf->SetX($x + 80);
+        $this->pdf->Cell(25, 4, $this->codificarTexto('Cod:'), 0, 0);
+        $this->pdf->Cell(50, 4, $this->codificarTexto($this->info['cod_materia']), 0, 1);
+        
+        $this->pdf->SetX($x + 80);
+        $this->pdf->Cell(25, 4, $this->codificarTexto('Periodo:'), 0, 0);
+        $this->pdf->Cell(50, 4, $this->codificarTexto($this->info['nombre_periodo']), 0, 1);
+        
+        $this->pdf->SetX($x);
+        $this->pdf->Ln(2);
+    }
+    
+    function Firma() {
+        // FIRMA MÁS ARRIBA - justo después de la tabla
         $this->pdf->SetFont('Arial', '', 9);
-        $this->pdf->Cell(0, 5, $this->codificarTexto('Firma del Docente:'), 0, 1);
-        $this->pdf->Ln(3);
-        $this->pdf->Cell(60, 5, '_________________________________', 0, 1);
-        $this->pdf->Cell(60, 5, $this->codificarTexto('Nombre: _________________________'), 0, 1);
-        $this->pdf->Cell(60, 5, $this->codificarTexto('Cédula: _________________________'), 0, 1);
         
-        // Numero de pagina
-        $this->pdf->SetY(-10);
-        $this->pdf->SetFont('Arial', 'I', 8);
-        $this->pdf->Cell(0, 5, $this->codificarTexto('Página ') . $this->pdf->PageNo() . ' de {nb}', 0, 0, 'C');
+        // Línea para firma
+        $this->pdf->Cell(0, 4, '_________________________________', 0, 1, 'C');
+        
+        // Datos del profesor
+        $this->pdf->Cell(0, 4, $this->codificarTexto('Firma del Docente'), 0, 1, 'C');
+        
+        $this->pdf->SetFont('Arial', '', 8);
+        $this->pdf->Cell(0, 3, $this->codificarTexto('Nombre: _________________________'), 0, 1, 'C');
+        $this->pdf->Cell(0, 3, $this->codificarTexto('Cédula: _________________________'), 0, 1, 'C');
+        $this->pdf->Cell(0, 3, $this->codificarTexto('Materia: ') . $this->codificarTexto($this->info['nombre_materia']), 0, 1, 'C');
     }
     
     function Cuerpo() {
-        // Configurar numero total de paginas
-        $this->pdf->AliasNbPages();
+        // Llamar Header
+        $this->Header();
         
-        // Asignar los métodos Header y Footer a FPDF
-        $this->pdf->Header = array($this, 'Header');
-        $this->pdf->Footer = array($this, 'Footer');
+        // Encabezado de la tabla
+        $this->agregarEncabezadoTabla();
         
-        $estudiantes_por_pagina = 30;
-        $total_estudiantes = count($this->estudiantes);
-        $contador_general = 0;
-        
+        // Estudiantes
+        $contador = 0;
         foreach ($this->estudiantes as $estudiante) {
-            $contador_general++;
+            $contador++;
             
-            // Verificar si necesita nueva pagina (cada 30 estudiantes)
-            if (($contador_general - 1) % $estudiantes_por_pagina == 0) {
-                if ($contador_general > 1) {
-                    $this->pdf->AddPage();
-                }
-                
-                // Encabezado de la tabla
-                $this->pdf->SetFillColor(200, 200, 200);
-                $this->pdf->SetFont('Arial', 'B', 8);
-                
-                // Columnas ajustadas para 30 estudiantes
-                $this->pdf->Cell(8, 6, 'N°', 1, 0, 'C', true);
-                $this->pdf->Cell(20, 6, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
-                $this->pdf->Cell(55, 6, $this->codificarTexto('Nombre Completo'), 1, 0, 'C', true);
-                
-                // 8 casillas para notas
-                for ($i = 1; $i <= 8; $i++) {
-                    $this->pdf->Cell(8, 6, "N$i", 1, 0, 'C', true);
-                }
-                
-                $this->pdf->Cell(10, 6, 'Final', 1, 1, 'C', true);
-                $this->pdf->SetFont('Arial', '', 8);
+            $this->pdf->SetFont('Arial', '', 7);
+            $this->pdf->Cell(8, 5, $contador, 1, 0, 'C');
+            $this->pdf->Cell(18, 5, $estudiante['cedula'], 1, 0, 'C');
+            
+            $nombreCompleto = $this->codificarTexto($estudiante['nombre']);
+            if (strlen($nombreCompleto) > 25) {
+                $nombreCompleto = substr($nombreCompleto, 0, 25) . '...';
             }
+            $this->pdf->Cell(45, 5, $nombreCompleto, 1, 0);
             
-            // Calcular numero local en la pagina (1-30, 1-30, etc.)
-            $numero_en_pagina = (($contador_general - 1) % $estudiantes_por_pagina) + 1;
-            
-            $this->pdf->Cell(8, 5, $numero_en_pagina, 1, 0, 'C');
-            $this->pdf->Cell(20, 5, $estudiante['cedula'], 1, 0, 'C');
-            
-            $nombreCompleto = $estudiante['nombre'];
-            $nombreCompleto = $this->codificarTexto($nombreCompleto);
-            if (strlen($nombreCompleto) > 32) {
-                $nombreCompleto = substr($nombreCompleto, 0, 32) . '...';
-            }
-            $this->pdf->Cell(55, 5, $nombreCompleto, 1, 0);
-            
-            // 8 casillas vacias para llenado manual
+            // 8 casillas para notas
             for ($i = 1; $i <= 8; $i++) {
-                $this->pdf->Cell(8, 5, '', 1, 0, 'C');
+                $this->pdf->Cell(7, 5, '', 1, 0, 'C');
             }
             
             // Casilla para nota final
-            $this->pdf->Cell(10, 5, '', 1, 1, 'C');
+            $this->pdf->Cell(8, 5, '', 1, 1, 'C');
         }
+        
+        // AGREGAR FIRMA INMEDIATAMENTE DESPUÉS DE LA TABLA
+        $this->pdf->Ln(20); // Un pequeño espacio
+        $this->Firma();
+    }
+    
+    function agregarEncabezadoTabla() {
+        // Encabezado de la tabla
+        $this->pdf->SetFont('Arial', 'B', 7);
+        $this->pdf->SetFillColor(200, 200, 200);
+        
+        $this->pdf->Cell(8, 6, 'N°', 1, 0, 'C', true);
+        $this->pdf->Cell(18, 6, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
+        $this->pdf->Cell(45, 6, $this->codificarTexto('Nombre'), 1, 0, 'C', true);
+        
+        // 8 casillas para notas
+        for ($i = 1; $i <= 8; $i++) {
+            $this->pdf->Cell(7, 6, "N$i", 1, 0, 'C', true);
+        }
+        
+        $this->pdf->Cell(8, 6, 'Final', 1, 1, 'C', true);
+        $this->pdf->SetFillColor(255, 255, 255);
     }
     
     /**
-     * Funcion para codificar texto correctamente
+     * Función para codificar texto correctamente
      */
     function codificarTexto($texto) {
-        // Si el texto ya esta en UTF-8, convertirlo a ISO-8859-1 para FPDF
         if (mb_detect_encoding($texto, 'UTF-8', true)) {
             return utf8_decode($texto);
         }
@@ -6393,6 +6419,7 @@ class PDF_PlanillaNotas {
     }
 }
 
+// El resto de las funciones permanecen igual...
 /**
  * Generar planilla PDF para lista de estudiantes con casillas de notas
  */
