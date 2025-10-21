@@ -237,9 +237,9 @@ switch ($seccion) {
                     <tr>
                         <th>Cédula</th>
                         <th>Estudiante</th>
-                        <th>Nota del Trayecto</th>
-                        <th>Estado</th>
-                        <th>Fecha de Aprobación</th>
+                        <th width="90">Nota</th>
+                        <th width="80">Estado</th>
+                        <th width="120">Fecha</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -262,23 +262,26 @@ switch ($seccion) {
                         <tr>
                             <td><?= htmlspecialchars($estudiante['cedula']) ?></td>
                             <td><?= htmlspecialchars($estudiante['nombre_estudiante']) ?></td>
-                            <td>
+                            <td class="text-center">
                                 <?php if ($nota_trayecto !== null): ?>
-                                    <span class="badge badge-info">
-                                        T<?= $info_grupo['id_trayecto'] - 1 ?>: <?= $nota_trayecto ?>
-                                    </span>
+                                    <div class="nota-display">
+                                        <span class="nota-valor <?= $nota_trayecto >= 12 ? 'nota-aprobada' : 'nota-reprobada' ?>">
+                                            <?= $nota_trayecto ?>
+                                        </span>
+                                        <small class="text-muted">T<?= $info_grupo['id_trayecto'] - 1 ?></small>
+                                    </div>
                                 <?php else: ?>
-                                    <span class="badge badge-secondary">Sin nota</span>
+                                    <span class="badge badge-secondary badge-sm">Sin nota</span>
                                 <?php endif; ?>
                             </td>
-                            <td>
+                            <td class="text-center">
                                 <span class="badge badge-<?= $color_estado ?>">
                                     <?= $estado ?>
                                 </span>
                             </td>
                             <td>
                                 <small class="text-muted">
-                                    <?= date('d/m/Y H:i', strtotime($estudiante['fecha_registro'])) ?>
+                                    <?= date('d/m/Y', strtotime($estudiante['fecha_registro'])) ?>
                                 </small>
                             </td>
                         </tr>
@@ -286,6 +289,41 @@ switch ($seccion) {
                 </tbody>
             </table>
         </div>
+
+        <style>
+        .nota-display {
+            text-align: center;
+            padding: 2px;
+        }
+        
+        .nota-valor {
+            display: inline-block;
+            font-size: 1rem;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 6px;
+            min-width: 40px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            color: #000000 !important; /* Texto negro */
+            font-weight: 900; /* Texto más grueso */
+        }
+        
+        .nota-aprobada {
+            background: #90EE90; /* Verde claro */
+            border: 1px solid #28a745;
+        }
+        
+        .nota-reprobada {
+            background: #FFB6C1; /* Rojo claro */
+            border: 1px solid #dc3545;
+        }
+        
+        .badge-sm {
+            font-size: 0.75rem;
+            padding: 3px 6px;
+        }
+        </style>
         <?php
         break;
         
@@ -321,40 +359,88 @@ switch ($seccion) {
                 <div class="card mb-3">
                     <div class="card-header bg-light">Estadísticas</div>
                     <div class="card-body">
-                        <p><strong>Total Estudiantes:</strong> 
-                            <span class="badge badge-primary"><?= $estadisticas['total_estudiantes'] ?></span>
-                        </p>
-                        <p><strong>Promedio General:</strong> 
-                            <span class="badge badge-<?= $estadisticas['promedio_general'] >= 12 ? 'success' : 'warning' ?>">
-                                <?= $estadisticas['promedio_general'] ?>
-                            </span>
-                        </p>
-                        <p><strong>Aprobados (≥12pts):</strong> 
-                            <span class="badge badge-success"><?= $estadisticas['aprobados'] ?></span>
-                            (<?= $estadisticas['total_estudiantes'] > 0 ? round(($estadisticas['aprobados'] / $estadisticas['total_estudiantes']) * 100, 1) : 0 ?>%)
-                        </p>
-                        <p><strong>Reprobados (<12pts):</strong> 
-                            <span class="badge badge-danger"><?= $estadisticas['reprobados'] ?></span>
-                            (<?= $estadisticas['total_estudiantes'] > 0 ? round(($estadisticas['reprobados'] / $estadisticas['total_estudiantes']) * 100, 1) : 0 ?>%)
-                        </p>
+                        <div class="stats-container">
+                            <div class="stat-item">
+                                <div class="stat-value h4 text-primary"><?= $estadisticas['total_estudiantes'] ?></div>
+                                <div class="stat-label">Total</div>
+                            </div>
+                            
+                            <div class="stat-item">
+                                <div class="stat-value h4 <?= $estadisticas['promedio_general'] >= 12 ? 'text-success' : 'text-warning' ?>">
+                                    <?= $estadisticas['promedio_general'] ?>
+                                </div>
+                                <div class="stat-label">Promedio</div>
+                            </div>
+                            
+                            <div class="stat-item">
+                                <div class="stat-value h4 text-success"><?= $estadisticas['aprobados'] ?></div>
+                                <div class="stat-label">Aprobados</div>
+                            </div>
+                            
+                            <div class="stat-item">
+                                <div class="stat-value h4 text-danger"><?= $estadisticas['reprobados'] ?></div>
+                                <div class="stat-label">Reprobados</div>
+                            </div>
+                        </div>
                         
                         <!-- Gráfico simple de progreso -->
                         <?php if ($estadisticas['total_estudiantes'] > 0): ?>
-                        <div class="progress mt-3" style="height: 20px;">
+                        <div class="progress mt-2" style="height: 18px;">
                             <div class="progress-bar bg-success" 
                                  style="width: <?= ($estadisticas['aprobados'] / $estadisticas['total_estudiantes']) * 100 ?>%">
-                                Aprobados: <?= $estadisticas['aprobados'] ?>
+                                <span class="progress-text" style="color: #000; font-weight: bold;"><?= $estadisticas['aprobados'] ?></span>
                             </div>
                             <div class="progress-bar bg-danger" 
                                  style="width: <?= ($estadisticas['reprobados'] / $estadisticas['total_estudiantes']) * 100 ?>%">
-                                Reprobados: <?= $estadisticas['reprobados'] ?>
+                                <span class="progress-text" style="color: #000; font-weight: bold;"><?= $estadisticas['reprobados'] ?></span>
                             </div>
+                        </div>
+                        <div class="text-center mt-1">
+                            <small class="text-muted">
+                                Aprobados: <?= $estadisticas['aprobados'] ?> 
+                                (<?= $estadisticas['total_estudiantes'] > 0 ? round(($estadisticas['aprobados'] / $estadisticas['total_estudiantes']) * 100, 1) : 0 ?>%) | 
+                                Reprobados: <?= $estadisticas['reprobados'] ?> 
+                                (<?= $estadisticas['total_estudiantes'] > 0 ? round(($estadisticas['reprobados'] / $estadisticas['total_estudiantes']) * 100, 1) : 0 ?>%)
+                            </small>
                         </div>
                         <?php endif; ?>
                     </div>
                 </div>
             </div>
         </div>
+
+        <style>
+        .stats-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 8px;
+            border-radius: 6px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            margin-bottom: 2px;
+            color: #000 !important; /* Texto negro en estadísticas */
+            font-weight: 700;
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+        
+        .progress-text {
+            font-weight: bold;
+            text-shadow: 1px 1px 1px rgba(255,255,255,0.5);
+        }
+        </style>
         <?php
         break;
         
@@ -375,34 +461,32 @@ switch ($seccion) {
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <p><strong>Nombre del archivo:</strong> <?= htmlspecialchars($soporte_info['soporte']) ?></p>
-                            <p><strong>Tipo de archivo:</strong> 
+                            <p><strong>Nombre:</strong> <?= htmlspecialchars($soporte_info['soporte']) ?></p>
+                            <p><strong>Tipo:</strong> 
                                 <span class="badge badge-info"><?= strtoupper($soporte_info['tipo_archivo']) ?></span>
                             </p>
-                            <p><strong>Fecha de registro:</strong> 
+                            <p><strong>Registro:</strong> 
                                 <?= date('d/m/Y H:i', strtotime($soporte_info['fecha_registro'])) ?>
                             </p>
                         </div>
                         <div class="col-md-6">
                             <div class="text-center">
                                 <?php if (in_array($soporte_info['tipo_archivo'], ['jpg', 'jpeg', 'png', 'gif', 'webp'])): ?>
-                                    <div class="img-preview mb-3">
+                                    <div class="img-preview mb-2">
                                         <img src="../soportes/<?= htmlspecialchars($soporte_info['soporte']) ?>" 
-                                             alt="Vista previa del soporte" 
+                                             alt="Vista previa" 
                                              class="img-fluid rounded border" 
-                                             style="max-height: 300px;">
+                                             style="max-height: 150px;">
                                     </div>
                                 <?php else: ?>
-                                    <div class="alert alert-info text-center">
-                                        <i class="fas fa-file-pdf fa-3x mb-3"></i>
+                                    <div class="alert alert-info text-center py-2">
+                                        <i class="fas fa-file-pdf fa-2x mb-1"></i>
                                         <br>
-                                        <strong>Archivo PDF</strong>
-                                        <br>
-                                        <small class="text-muted">Haga clic en el botón para descargar</small>
+                                        <strong>PDF</strong>
                                     </div>
                                 <?php endif; ?>
                                 
-                                <div class="btn-group">
+                                <div class="btn-group btn-group-sm">
                                     <a href="../soportes/<?= htmlspecialchars($soporte_info['soporte']) ?>" 
                                        class="btn btn-primary" 
                                        target="_blank" 
@@ -421,22 +505,21 @@ switch ($seccion) {
                 </div>
             </div>
             
-            <div class="alert alert-info mt-3">
+            <div class="alert alert-info mt-2">
                 <i class="fas fa-info-circle"></i>
-                <strong>Nota:</strong> Este archivo de soporte fue utilizado durante la aprobación de las notas definitivas.
+                Este archivo fue utilizado durante la aprobación de las notas.
             </div>
         <?php else: ?>
             <div class="alert alert-warning">
                 <i class="fas fa-exclamation-triangle"></i>
-                <strong>No hay archivo de soporte disponible</strong>
-                <p class="mb-0">No se encontró ningún archivo de soporte asociado a este grupo de notas definitivas.</p>
+                <strong>No hay archivo de soporte</strong>
             </div>
             
             <div class="card">
-                <div class="card-body text-center">
-                    <i class="fas fa-paperclip fa-3x text-muted mb-3"></i>
+                <div class="card-body text-center py-3">
+                    <i class="fas fa-paperclip fa-2x text-muted mb-2"></i>
                     <h5>Sin Soporte</h5>
-                    <p class="text-muted">No se encontró ningún archivo de soporte asociado a este grupo de notas.</p>
+                    <p class="text-muted mb-0">No se encontró archivo de soporte.</p>
                 </div>
             </div>
         <?php endif; ?>
