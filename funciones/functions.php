@@ -311,8 +311,8 @@ function insertarEstudiante($datos) {
 
         // 1. Preparar datos del usuario
         $username = strtolower(str_replace(' ', '.', $datos['nombre']));
-        $cedulaLimpia = substr($datos['idusuario'], 2);
-        $password = md5($cedulaLimpia);
+        $cedulaLimpia = substr($datos['idusuario'], 2); // Elimina los primeros 2 caracteres (ej: "V-")
+        $password = password_hash($cedulaLimpia, PASSWORD_DEFAULT); // Hash seguro
         $fecha_act = date('Y-m-d H:i:s');
         $api_key = '';
 
