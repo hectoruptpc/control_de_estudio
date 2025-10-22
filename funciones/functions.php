@@ -1326,6 +1326,7 @@ function insertarDocente(array $datos): array {
 
         // Concatenar tipo y documento SIN guión
         $idusuario = $tipo_documento_texto . $datos['documento'];
+        $cedulaLimpia = $datos['documento']; // Usar solo el número de documento
 
         // Verificar si existe la carrera especificada o usar "No Especificado" (ID 0)
         if (isset($datos['carrera']) && $datos['carrera'] !== '') {
@@ -1346,7 +1347,7 @@ function insertarDocente(array $datos): array {
 
         // 1. Preparación de datos
         $username = strtolower(str_replace(' ', '.', $datos['nombre']));
-        $password = password_hash($datos['documento'], PASSWORD_DEFAULT);
+        $password = password_hash($cedulaLimpia, PASSWORD_DEFAULT); // Usar cedulaLimpia
         $fecha_act = date('Y-m-d H:i:s');
         $api_key = bin2hex(random_bytes(16));
 
@@ -1523,6 +1524,25 @@ function insertarDocente(array $datos): array {
             $stmtTitulos->close();
         }
 
+        // 7. REGISTRAR EN AUDITORÍA - NUEVO DOCENTE
+        $valores_nuevos = [
+            'idusuario' => $idusuario,
+            'nombre' => $datos['nombre'],
+            'email' => $datos['email'],
+            'carrera' => $datos['carrera'] ?? 0,
+            'estado_laboral' => $datos['estado_laboral']
+        ];
+        
+        registrarAuditoria(
+            "INSERT", 
+            "users", 
+            $idInsertado, 
+            null, 
+            $valores_nuevos, 
+            "Docentes", 
+            "Registro de nuevo docente"
+        );
+
         // Confirmar transacción
         $db->commit();
 
@@ -1531,13 +1551,30 @@ function insertarDocente(array $datos): array {
             'message' => 'Docente registrado exitosamente',
             'id' => $idInsertado,
             'username' => $username,
-            'password_temp' => $datos['documento']
+            'password_temp' => $cedulaLimpia // Usar cedulaLimpia en lugar del documento completo
         ];
 
     } catch(Exception $e) {
+        // Revertir transacción en caso de error
         if (isset($db) && method_exists($db, 'rollback')) {
             $db->rollback();
         }
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL REGISTRAR DOCENTE
+        registrarAuditoria(
+            "ERROR", 
+            "users", 
+            null, 
+            null, 
+            [
+                'nombre' => $datos['nombre'] ?? '',
+                'idusuario' => $idusuario ?? '',
+                'error' => $e->getMessage()
+            ], 
+            "Docentes", 
+            "Error al registrar docente"
+        );
+        
         error_log("Error en insertarDocente: " . $e->getMessage());
         return [
             'success' => false,
