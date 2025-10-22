@@ -130,6 +130,3 @@ echo "<br>";
 
   <hr>
 
-
-
-<?php include("usuario/includes/footer.php"); ?>
