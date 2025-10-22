@@ -50,6 +50,9 @@ include('funciones/functions.php') ?>
                 <a type="link" class="btn btn-outline-danger" href="recuperar_password.php">
                     <i class="fa fa-unlock-alt"></i> Recuperar Contraseña
                 </a>
+                <a type="link" class="btn btn-outline-danger" href="recuperar_password_provicional.php">
+                    <i class="fa fa-unlock-alt"></i> Recuperar Contraseña provicional
+                </a>
             </span>
             <span class="d-inline-block" data-toggle="popover" data-content="...">
                 <a id="afiliarse" class="btn btn-outline-success" href="registro.php">
