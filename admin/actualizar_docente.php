@@ -27,7 +27,8 @@ try {
         throw new Exception('Datos inválidos o ID no proporcionado');
     }
 
-    $resultado = editarDocente($data);
+    // Usar la función correcta: actualizarDocente en lugar de editarDocente
+    $resultado = actualizarDocente($data);
 
     if ($resultado['success']) {
         echo json_encode([
@@ -50,3 +51,4 @@ try {
         'message' => 'Error del servidor: ' . $e->getMessage()
     ]);
 }
+?>

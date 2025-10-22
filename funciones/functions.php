@@ -1705,34 +1705,86 @@ function actualizarDocente($datos) {
           throw new Exception("Error en la preparación: " . $db->error);
       }
       
+      // Preparar valores y prevenir notices si faltan claves
+      $nombre = $datos['nombre'] ?? '';
+      $email = $datos['email'] ?? '';
+      $tlf = $datos['tlf'] ?? '';
+      $cel = $datos['cel'] ?? '';
+      $direccion = $datos['direccion'] ?? '';
+      $estado = $datos['estado'] ?? '';
+      $municipio = $datos['municipio'] ?? '';
+      $parroquia = $datos['parroquia'] ?? '';
+      $status = $datos['status'] ?? '';
+      $carrera = $datos['carrera'] ?? '';
+      $genero = $datos['genero'] ?? '';
+      $edo_civil = $datos['edo_civil'] ?? '';
+      $fecha_nac = $datos['fecha_nac'] ?? null;
+      $num_telf_opc = $datos['num_telf_opc'] ?? '';
+      $titulos = $datos['titulos'] ?? '';
+      $institutos = $datos['institutos'] ?? '';
+      $fecha_ingreso = $datos['fecha_ingreso'] ?? null;
+      // Si no se proporcionó fecha_ingreso, intentar usar el valor actual en la BD
+      if (empty($fecha_ingreso)) {
+          try {
+              $qry = $db->prepare("SELECT fecha_ingreso FROM users WHERE id = ? AND docente = 1");
+              if ($qry) {
+                  $qry->bind_param('i', $id);
+                  if ($qry->execute()) {
+                      $res = $qry->get_result();
+                      $row = $res ? $res->fetch_assoc() : null;
+                      if (!empty($row['fecha_ingreso'])) {
+                          $fecha_ingreso = $row['fecha_ingreso'];
+                      } else {
+                          // Fallback: fecha actual en formato YYYY-MM-DD para evitar NULL
+                          $fecha_ingreso = date('Y-m-d');
+                      }
+                  } else {
+                      $fecha_ingreso = date('Y-m-d');
+                  }
+                  $qry->close();
+              } else {
+                  $fecha_ingreso = date('Y-m-d');
+              }
+          } catch (Exception $e) {
+              $fecha_ingreso = date('Y-m-d');
+          }
+      }
+      $id = isset($datos['id']) ? intval($datos['id']) : 0;
+
       // Vincula los parámetros a la sentencia preparada
-      // Los tipos de datos se especifican con una cadena:
-      // s = string, i = integer, d = double, b = blob
-      // En este caso: 16 strings (s) y 1 integer (i) al final (el ID)
-      $stmt->bind_param(
-          "ssssssssssssssssi",
-          $datos['nombre'],
-          $datos['email'],
-          $datos['tlf'],
-          $datos['cel'],
-          $datos['direccion'],
-          $datos['estado'],
-          $datos['municipio'],
-          $datos['parroquia'],
-          $datos['status'],
-          $datos['carrera'],
-          $datos['genero'],
-          $datos['edo_civil'],
-          $datos['fecha_nac'],
-          $datos['num_telf_opc'],
-          $datos['titulos'],
-          $datos['institutos'],
-          $datos['fecha_ingreso'],
-          $datos['id']
-      );
-      
+      // s = string, i = integer
+      // 17 strings (s) y 1 integer (i) al final => 18 parámetros
+      $bindTypes = "sssssssssssssssssi"; // 17 s + i
+
+      if (!$stmt->bind_param(
+          $bindTypes,
+          $nombre,
+          $email,
+          $tlf,
+          $cel,
+          $direccion,
+          $estado,
+          $municipio,
+          $parroquia,
+          $status,
+          $carrera,
+          $genero,
+          $edo_civil,
+          $fecha_nac,
+          $num_telf_opc,
+          $titulos,
+          $institutos,
+          $fecha_ingreso,
+          $id
+      )) {
+          throw new Exception("Error en bind_param: " . $stmt->error);
+      }
+
       // Ejecuta la sentencia preparada
-      $stmt->execute();
+      if (!$stmt->execute()) {
+          // Si falla la ejecución, lanzar excepción para que el catch la capture y retorne JSON limpio
+          throw new Exception("Error en execute: " . $stmt->error);
+      }
       
       // Retorna un array con el resultado de la operación
       return [

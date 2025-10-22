@@ -837,25 +837,50 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Guardar cambios en el modal de edición
-    $('#guardarCambios').click(function() {
-        var formData = $('#formEditarDocente').serialize();
-        
+    // Guardar cambios en el modal de edición: bind al submit del formulario cargado por AJAX
+    $(document).on('submit', '#formEditarDocente', function(e) {
+        e.preventDefault();
+
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: 'Procesando',
+                html: 'Actualizando datos del docente...',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+        }
+
+        var formArray = $(this).serializeArray();
+        var jsonData = {};
+        $.each(formArray, function(i, field) { jsonData[field.name] = field.value; });
+
+        if (!jsonData.fecha_nac) jsonData.fecha_nac = null;
+        if (!jsonData.fecha_ingreso) jsonData.fecha_ingreso = null;
+
         $.ajax({
             url: 'actualizar_docente.php',
             type: 'POST',
-            data: formData,
+            contentType: 'application/json',
+            data: JSON.stringify(jsonData),
+            dataType: 'json',
             success: function(response) {
-                var result = JSON.parse(response);
-                if(result.success) {
+                if (typeof Swal !== 'undefined') Swal.close();
+                if (response.success) {
                     $('#modalEditar').modal('hide');
-                    location.reload();
+                    if (typeof refreshDocentesTable === 'function') {
+                        refreshDocentesTable();
+                    } else {
+                        location.reload();
+                    }
                 } else {
-                    alert('Error: ' + result.message);
+                    alert('Error: ' + (response.message || 'No se pudo guardar'));
                 }
             },
-            error: function() {
-                alert('Error al enviar los datos.');
+            error: function(xhr) {
+                if (typeof Swal !== 'undefined') Swal.close();
+                var msg = 'Error al enviar los datos.';
+                try { var r = xhr.responseJSON || JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
+                alert(msg);
             }
         });
     });
