@@ -28,12 +28,11 @@ $estudiante = $result->fetch_assoc();
 
 // Obtener listados necesarios
 $carreras = obtenerTodasLasCarreras();
-$generos = obtenerGeneros($db);
+$generos = obtenerGeneros($db); // Tu función existente
 ?>
 
 <div class="modal-header">
     <h5 class="modal-title">Editar Estudiante</h5>
-    
 </div>
 
 <div class="modal-body">
@@ -94,9 +93,9 @@ $generos = obtenerGeneros($db);
                     <label for="genero" class="form-label">Género</label>
                     <select class="custom-select d-block w-100" id="genero" name="genero" required>
                         <option value="">Seleccionar género</option>
-                        <?php foreach ($generos as $id_genero => $nombre_genero): ?>
-                            <option value="<?php echo $id_genero; ?>"
-                                <?php echo ($estudiante['genero'] == $id_genero) ? 'selected' : ''; ?>>
+                        <?php foreach ($generos as $nombre_genero): ?>
+                            <option value="<?php echo htmlspecialchars($nombre_genero); ?>"
+                                <?php echo ($estudiante['genero'] == $nombre_genero) ? 'selected' : ''; ?>>
                                 <?php echo htmlspecialchars($nombre_genero); ?>
                             </option>
                         <?php endforeach; ?>
