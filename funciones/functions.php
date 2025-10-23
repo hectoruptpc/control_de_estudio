@@ -3695,7 +3695,6 @@ function obtenerIngresos($db) {
 //FUNCIONES PARA LAS SECCIONES ***********************************************************************
 
 
-
 // Constante para el mínimo de estudiantes requeridos
 define('MINIMO_ESTUDIANTES', 10);
 
@@ -3709,6 +3708,10 @@ function crearSeccion($db, $datos) {
     try {
         $stmt = $db->prepare("INSERT INTO secciones (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, inicia, estatus) 
                             VALUES (?, ?, ?, ?, ?, ?, 'inactiva')");
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
         $stmt->bind_param("siiiis", 
             $datos['codigo_seccion'], 
             $datos['id_carrera'], 
@@ -3716,14 +3719,67 @@ function crearSeccion($db, $datos) {
             $datos['id_periodo'], 
             $datos['capacidad_maxima'],
             $datos['inicia']);
-        $stmt->execute();
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $seccion_id = $stmt->insert_id;
         $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - NUEVA SECCIÓN CREADA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "INSERT", 
+                    "secciones", 
+                    $seccion_id, 
+                    null, 
+                    [
+                        'codigo_seccion' => $datos['codigo_seccion'],
+                        'id_carrera' => $datos['id_carrera'],
+                        'id_trayecto' => $datos['id_trayecto'],
+                        'id_periodo' => $datos['id_periodo'],
+                        'capacidad_maxima' => $datos['capacidad_maxima'],
+                        'inicia' => $datos['inicia'],
+                        'estatus' => 'inactiva'
+                    ], 
+                    "Secciones", 
+                    "Creación de nueva sección"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría crearSeccion: " . $e->getMessage());
+            }
+        }
         
         return [
             'success' => true,
-            'message' => "Sección creada exitosamente! La sección estará inactiva hasta tener al menos ".MINIMO_ESTUDIANTES." estudiantes."
+            'message' => "Sección creada exitosamente! La sección estará inactiva hasta tener al menos ".MINIMO_ESTUDIANTES." estudiantes.",
+            'id_seccion' => $seccion_id
         ];
     } catch (Exception $e) {
+        error_log("Error en crearSeccion: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL CREAR SECCIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "secciones", 
+                    null, 
+                    null, 
+                    [
+                        'codigo_seccion' => $datos['codigo_seccion'] ?? '',
+                        'error' => $e->getMessage()
+                    ], 
+                    "Secciones", 
+                    "Error al crear sección"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error crearSeccion: " . $auditError->getMessage());
+            }
+        }
+        
         return [
             'success' => false,
             'message' => "Error al crear sección: " . $e->getMessage()
@@ -3733,12 +3789,22 @@ function crearSeccion($db, $datos) {
 
 function editarSeccion($db, $datos) {
     try {
+        // Obtener datos actuales para auditoría
+        $datos_antiguos = obtenerDatosSeccion($db, $datos['id_seccion']);
+        
         // Verificar si el período está activo
         $stmt = $db->prepare("SELECT p.activo FROM periodos_academicos p
                              JOIN secciones s ON s.id_periodo = p.id_periodo
                              WHERE s.id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
         $stmt->bind_param("i", $datos['id_seccion']);
-        $stmt->execute();
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
         $result = $stmt->get_result();
         $periodo = $result->fetch_assoc();
         $stmt->close();
@@ -3755,6 +3821,10 @@ function editarSeccion($db, $datos) {
                                 capacidad_maxima = ?,
                                 inicia = ?
                             WHERE id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
         $stmt->bind_param("siiiisi", 
             $datos['codigo_seccion'], 
             $datos['id_carrera'], 
@@ -3763,14 +3833,77 @@ function editarSeccion($db, $datos) {
             $datos['capacidad_maxima'],
             $datos['inicia'],
             $datos['id_seccion']);
-        $stmt->execute();
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $affected_rows = $stmt->affected_rows;
         $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - EDICIÓN DE SECCIÓN
+        if ($affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                $valores_antiguos_audit = [];
+                $valores_nuevos_audit = [];
+                
+                // Comparar campos modificados
+                $campos_auditar = ['codigo_seccion', 'id_carrera', 'id_trayecto', 'id_periodo', 'capacidad_maxima', 'inicia'];
+                
+                foreach ($campos_auditar as $campo) {
+                    $valor_antiguo = $datos_antiguos[$campo] ?? null;
+                    $valor_nuevo = $datos[$campo] ?? null;
+                    
+                    if ($valor_antiguo != $valor_nuevo) {
+                        $valores_antiguos_audit[$campo] = $valor_antiguo;
+                        $valores_nuevos_audit[$campo] = $valor_nuevo;
+                    }
+                }
+                
+                if (!empty($valores_nuevos_audit)) {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "secciones", 
+                        $datos['id_seccion'], 
+                        $valores_antiguos_audit, 
+                        $valores_nuevos_audit, 
+                        "Secciones", 
+                        "Edición de datos de sección"
+                    );
+                }
+            } catch (Exception $e) {
+                error_log("Error en auditoría editarSeccion: " . $e->getMessage());
+            }
+        }
         
         return [
             'success' => true,
-            'message' => "Sección actualizada exitosamente!"
+            'message' => "Sección actualizada exitosamente!",
+            'affected_rows' => $affected_rows
         ];
     } catch (Exception $e) {
+        error_log("Error en editarSeccion: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL EDITAR SECCIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "secciones", 
+                    $datos['id_seccion'] ?? null, 
+                    null, 
+                    [
+                        'codigo_seccion' => $datos['codigo_seccion'] ?? '',
+                        'error' => $e->getMessage()
+                    ], 
+                    "Secciones", 
+                    "Error al editar sección"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error editarSeccion: " . $auditError->getMessage());
+            }
+        }
+        
         return [
             'success' => false,
             'message' => "Error al actualizar sección: " . $e->getMessage()
@@ -3835,9 +3968,39 @@ function asignarEstudiantes($db, $seccion_id, $estudiantes) {
         
         $db->commit();
         
+        // REGISTRAR EN AUDITORÍA - ASIGNACIÓN DE ESTUDIANTES
+        if (function_exists('registrarAuditoria')) {
+            try {
+                $estudiantes_agregados = count($nuevos_estudiantes);
+                $estudiantes_retirados = count($desactivar);
+                
+                registrarAuditoria(
+                    "UPDATE", 
+                    "estudiante_seccion", 
+                    $seccion_id, 
+                    [
+                        'estudiantes_anteriores' => count($asignados_actuales),
+                        'estudiantes_retirados' => $estudiantes_retirados
+                    ], 
+                    [
+                        'estudiantes_nuevos' => $estudiantes_agregados,
+                        'estudiantes_totales' => $count,
+                        'estudiantes_asignados' => $estudiantes
+                    ], 
+                    "Secciones", 
+                    "Asignación de estudiantes a sección"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría asignarEstudiantes: " . $e->getMessage());
+            }
+        }
+        
         $result = [
             'success' => true,
-            'message' => "Asignación de estudiantes actualizada!"
+            'message' => "Asignación de estudiantes actualizada!",
+            'estudiantes_agregados' => count($nuevos_estudiantes),
+            'estudiantes_retirados' => count($desactivar),
+            'total_estudiantes' => $count
         ];
         
         if ($count >= MINIMO_ESTUDIANTES) {
@@ -3849,6 +4012,28 @@ function asignarEstudiantes($db, $seccion_id, $estudiantes) {
         return $result;
     } catch (Exception $e) {
         $db->rollback();
+        error_log("Error en asignarEstudiantes: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ASIGNAR ESTUDIANTES
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "estudiante_seccion", 
+                    $seccion_id, 
+                    null, 
+                    [
+                        'estudiantes_intentados' => $estudiantes,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Secciones", 
+                    "Error al asignar estudiantes a sección"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error asignarEstudiantes: " . $auditError->getMessage());
+            }
+        }
+        
         return [
             'success' => false,
             'message' => "Error al asignar estudiantes: " . $e->getMessage()
@@ -3867,12 +4052,26 @@ function retirarEstudiante($db, $seccion_id, $usuario_id) {
     try {
         $db->begin_transaction();
         
+        // Obtener información del estudiante antes de retirarlo
+        $estudiante_info = null;
+        if (function_exists('obtenerEstudiantePorId')) {
+            $estudiante_info = obtenerEstudiantePorId($usuario_id);
+        }
+        
         // Desactivar al estudiante en la sección
         $stmt = $db->prepare("UPDATE estudiante_seccion 
                              SET estatus = 'retirado'
                              WHERE id_seccion = ? AND id_usuario = ?");
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
         $stmt->bind_param("ii", $seccion_id, $usuario_id);
-        $stmt->execute();
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $affected_rows = $stmt->affected_rows;
         $stmt->close();
         
         // Verificar si se debe cambiar el estado de la sección
@@ -3881,12 +4080,60 @@ function retirarEstudiante($db, $seccion_id, $usuario_id) {
         
         $db->commit();
         
+        // REGISTRAR EN AUDITORÍA - RETIRO DE ESTUDIANTE
+        if ($affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "UPDATE", 
+                    "estudiante_seccion", 
+                    $seccion_id, 
+                    [
+                        'estudiante_id' => $usuario_id,
+                        'estudiante_nombre' => $estudiante_info['nombre'] ?? 'Desconocido',
+                        'estatus_anterior' => 'activo'
+                    ], 
+                    [
+                        'estudiante_id' => $usuario_id,
+                        'estatus_nuevo' => 'retirado',
+                        'total_estudiantes' => $count
+                    ], 
+                    "Secciones", 
+                    "Retiro de estudiante de sección"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría retirarEstudiante: " . $e->getMessage());
+            }
+        }
+        
         return [
             'success' => true,
-            'message' => "Estudiante retirado exitosamente de la sección."
+            'message' => "Estudiante retirado exitosamente de la sección.",
+            'affected_rows' => $affected_rows
         ];
     } catch (Exception $e) {
         $db->rollback();
+        error_log("Error en retirarEstudiante: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL RETIRAR ESTUDIANTE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "estudiante_seccion", 
+                    $seccion_id, 
+                    null, 
+                    [
+                        'estudiante_id' => $usuario_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Secciones", 
+                    "Error al retirar estudiante de sección"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error retirarEstudiante: " . $auditError->getMessage());
+            }
+        }
+        
         return [
             'success' => false,
             'message' => "Error al retirar estudiante: " . $e->getMessage()
@@ -3905,8 +4152,17 @@ function obtenerInfoSeccionConPeriodo($db, $seccion_id) {
                          FROM secciones s
                          JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
                          WHERE s.id_seccion = ?");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerInfoSeccionConPeriodo: " . $db->error);
+        return null;
+    }
+    
     $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerInfoSeccionConPeriodo: " . $stmt->error);
+        return null;
+    }
+    
     $result = $stmt->get_result();
     $seccion = $result->fetch_assoc();
     $stmt->close();
@@ -3922,8 +4178,17 @@ function obtenerInfoSeccionConPeriodo($db, $seccion_id) {
 function obtenerEstudiantesAsignados($db, $seccion_id) {
     $asignados = [];
     $stmt = $db->prepare("SELECT id_usuario FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerEstudiantesAsignados: " . $db->error);
+        return $asignados;
+    }
+    
     $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerEstudiantesAsignados: " . $stmt->error);
+        return $asignados;
+    }
+    
     $result = $stmt->get_result();
     while ($row = $result->fetch_assoc()) {
         $asignados[] = $row['id_usuario'];
@@ -3939,6 +4204,8 @@ function obtenerEstudiantesAsignados($db, $seccion_id) {
  * @param array $estudiantes IDs de estudiantes a desactivar
  */
 function desactivarEstudiantes($db, $seccion_id, $estudiantes) {
+    if (empty($estudiantes)) return;
+    
     $placeholders = implode(',', array_fill(0, count($estudiantes), '?'));
     $types = str_repeat('i', count($estudiantes));
     
@@ -3946,10 +4213,16 @@ function desactivarEstudiantes($db, $seccion_id, $estudiantes) {
                         SET estatus = 'retirado'
                         WHERE id_seccion = ? 
                         AND id_usuario IN ($placeholders)");
+    if (!$stmt) {
+        error_log("Error en preparación desactivarEstudiantes: " . $db->error);
+        return;
+    }
     
     $params = array_merge([$seccion_id], $estudiantes);
     $stmt->bind_param(str_repeat('i', count($params)), ...$params);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución desactivarEstudiantes: " . $stmt->error);
+    }
     $stmt->close();
 }
 
@@ -3960,11 +4233,17 @@ function desactivarEstudiantes($db, $seccion_id, $estudiantes) {
  * @param array $estudiantes IDs de estudiantes a activar
  */
 function activarEstudiantes($db, $seccion_id, $estudiantes) {
+    if (empty($estudiantes)) return;
+    
     $placeholders = implode(',', array_fill(0, count($estudiantes), '(?,?,CURDATE(),\'activo\')'));
     
     $stmt = $db->prepare("INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus)
                         VALUES $placeholders
                         ON DUPLICATE KEY UPDATE estatus = 'activo'");
+    if (!$stmt) {
+        error_log("Error en preparación activarEstudiantes: " . $db->error);
+        return;
+    }
     
     $params = [];
     foreach ($estudiantes as $est_id) {
@@ -3973,7 +4252,9 @@ function activarEstudiantes($db, $seccion_id, $estudiantes) {
     }
     
     $stmt->bind_param(str_repeat('i', count($params)), ...$params);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución activarEstudiantes: " . $stmt->error);
+    }
     $stmt->close();
 }
 
@@ -3986,8 +4267,17 @@ function activarEstudiantes($db, $seccion_id, $estudiantes) {
 function contarEstudiantesActivos($db, $seccion_id) {
     $stmt = $db->prepare("SELECT COUNT(*) as total FROM estudiante_seccion 
                         WHERE id_seccion = ? AND estatus = 'activo'");
+    if (!$stmt) {
+        error_log("Error en preparación contarEstudiantesActivos: " . $db->error);
+        return 0;
+    }
+    
     $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución contarEstudiantesActivos: " . $stmt->error);
+        return 0;
+    }
+    
     $result = $stmt->get_result();
     $count = $result->fetch_assoc()['total'];
     $stmt->close();
@@ -4005,8 +4295,17 @@ function actualizarEstadoSeccion($db, $seccion_id, $count) {
     $stmt = $db->prepare("SELECT p.activo FROM secciones s
                          JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
                          WHERE s.id_seccion = ?");
+    if (!$stmt) {
+        error_log("Error en preparación actualizarEstadoSeccion: " . $db->error);
+        return;
+    }
+    
     $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución actualizarEstadoSeccion: " . $stmt->error);
+        return;
+    }
+    
     $result = $stmt->get_result();
     $periodo = $result->fetch_assoc();
     $stmt->close();
@@ -4018,14 +4317,54 @@ function actualizarEstadoSeccion($db, $seccion_id, $count) {
         $nuevo_estatus = ($count >= MINIMO_ESTUDIANTES) ? 'activa' : 'inactiva';
     }
     
+    // Obtener estado anterior para auditoría
+    $estado_anterior = null;
+    $stmt_ant = $db->prepare("SELECT estatus FROM secciones WHERE id_seccion = ?");
+    if ($stmt_ant) {
+        $stmt_ant->bind_param("i", $seccion_id);
+        if ($stmt_ant->execute()) {
+            $result_ant = $stmt_ant->get_result();
+            $row_ant = $result_ant->fetch_assoc();
+            $estado_anterior = $row_ant['estatus'];
+        }
+        $stmt_ant->close();
+    }
+    
     // Actualizar el estado de la sección
     $stmt = $db->prepare("UPDATE secciones SET estatus = ? WHERE id_seccion = ?");
+    if (!$stmt) {
+        error_log("Error en preparación actualizarEstadoSeccion: " . $db->error);
+        return;
+    }
+    
     $stmt->bind_param("si", $nuevo_estatus, $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución actualizarEstadoSeccion: " . $stmt->error);
+        return;
+    }
     $stmt->close();
+    
+    // REGISTRAR EN AUDITORÍA - CAMBIO DE ESTADO DE SECCIÓN
+    if ($estado_anterior != $nuevo_estatus && function_exists('registrarAuditoria')) {
+        try {
+            registrarAuditoria(
+                "UPDATE", 
+                "secciones", 
+                $seccion_id, 
+                ['estatus' => $estado_anterior], 
+                [
+                    'estatus' => $nuevo_estatus,
+                    'estudiantes_activos' => $count,
+                    'minimo_requerido' => MINIMO_ESTUDIANTES
+                ], 
+                "Secciones", 
+                "Cambio de estado de sección"
+            );
+        } catch (Exception $e) {
+            error_log("Error en auditoría actualizarEstadoSeccion: " . $e->getMessage());
+        }
+    }
 }
-
-
 
 /**
  * Desactiva todas las secciones de un período académico cuando este se desactiva
@@ -4034,17 +4373,17 @@ function actualizarEstadoSeccion($db, $seccion_id, $count) {
  */
 function desactivarSeccionesDePeriodo($db, $periodo_id) {
     $stmt = $db->prepare("UPDATE secciones SET estatus = 'inactiva' WHERE id_periodo = ?");
+    if (!$stmt) {
+        error_log("Error en preparación desactivarSeccionesDePeriodo: " . $db->error);
+        return;
+    }
+    
     $stmt->bind_param("i", $periodo_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución desactivarSeccionesDePeriodo: " . $stmt->error);
+    }
     $stmt->close();
 }
-
-
-
-
-
-
-
 
 /**
  * Obtiene el listado de secciones con información relevante
@@ -4070,7 +4409,16 @@ function obtenerListadoSecciones($db) {
                           LEFT JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion AND es.estatus = 'activo'
                           GROUP BY s.id_seccion
                           ORDER BY p.nombre_periodo DESC, s.codigo_seccion");
-    $stmt->execute();
+    if (!$stmt) {
+        error_log("Error en preparación obtenerListadoSecciones: " . $db->error);
+        return [];
+    }
+    
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerListadoSecciones: " . $stmt->error);
+        return [];
+    }
+    
     $result = $stmt->get_result();
     $secciones = $result->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -4085,12 +4433,21 @@ function obtenerListadoSecciones($db) {
  */
 function obtenerDatosSeccion($db, $seccion_id) {
     $stmt = $db->prepare("SELECT * FROM secciones WHERE id_seccion = ?");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerDatosSeccion: " . $db->error);
+        return [];
+    }
+    
     $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerDatosSeccion: " . $stmt->error);
+        return [];
+    }
+    
     $result = $stmt->get_result();
     $seccion = $result->fetch_assoc();
     $stmt->close();
-    return $seccion;
+    return $seccion ?: [];
 }
 
 /**
@@ -4101,24 +4458,51 @@ function obtenerDatosSeccion($db, $seccion_id) {
 function obtenerDatosSelects($db) {
     // Carreras - Excluyendo la que tiene id_carrera = 0 (No especificado)
     $stmt = $db->prepare("SELECT id_carrera, nombre_carrera FROM carreras WHERE activa = 1 AND id_carrera != 0");
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $carreras = $result->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
+    if (!$stmt) {
+        error_log("Error en preparación obtenerDatosSelects carreras: " . $db->error);
+        $carreras = [];
+    } else {
+        if (!$stmt->execute()) {
+            error_log("Error en ejecución obtenerDatosSelects carreras: " . $stmt->error);
+            $carreras = [];
+        } else {
+            $result = $stmt->get_result();
+            $carreras = $result->fetch_all(MYSQLI_ASSOC);
+        }
+        $stmt->close();
+    }
     
     // Trayectos
     $stmt = $db->prepare("SELECT id_trayecto, numero_trayecto FROM trayectos ORDER BY numero_trayecto");
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $trayectos = $result->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
+    if (!$stmt) {
+        error_log("Error en preparación obtenerDatosSelects trayectos: " . $db->error);
+        $trayectos = [];
+    } else {
+        if (!$stmt->execute()) {
+            error_log("Error en ejecución obtenerDatosSelects trayectos: " . $stmt->error);
+            $trayectos = [];
+        } else {
+            $result = $stmt->get_result();
+            $trayectos = $result->fetch_all(MYSQLI_ASSOC);
+        }
+        $stmt->close();
+    }
     
     // Periodos
     $stmt = $db->prepare("SELECT id_periodo, nombre_periodo FROM periodos_academicos WHERE activo = 1");
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $periodos = $result->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
+    if (!$stmt) {
+        error_log("Error en preparación obtenerDatosSelects periodos: " . $db->error);
+        $periodos = [];
+    } else {
+        if (!$stmt->execute()) {
+            error_log("Error en ejecución obtenerDatosSelects periodos: " . $stmt->error);
+            $periodos = [];
+        } else {
+            $result = $stmt->get_result();
+            $periodos = $result->fetch_all(MYSQLI_ASSOC);
+        }
+        $stmt->close();
+    }
     
     return [
         'carreras' => $carreras,
@@ -4144,8 +4528,17 @@ function obtenerDetalleSeccion($db, $seccion_id) {
                   LEFT JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion AND es.estatus = 'activo'
                   WHERE s.id_seccion = ?
                   GROUP BY s.id_seccion");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerDetalleSeccion: " . $db->error);
+        return [];
+    }
+    
     $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerDetalleSeccion: " . $stmt->error);
+        return [];
+    }
+    
     $result = $stmt->get_result();
     $seccion = $result->fetch_assoc();
     $stmt->close();
@@ -4154,7 +4547,7 @@ function obtenerDetalleSeccion($db, $seccion_id) {
         $seccion['inscritos'] = 0;
     }
     
-    return $seccion;
+    return $seccion ?: [];
 }
 
 /**
@@ -4169,8 +4562,17 @@ function obtenerEstudiantesDeSeccion($db, $seccion_id) {
                   JOIN estudiante_seccion es ON u.id = es.id_usuario
                   WHERE es.id_seccion = ? AND es.estatus = 'activo'
                   ORDER BY u.nombre");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerEstudiantesDeSeccion: " . $db->error);
+        return [];
+    }
+    
     $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerEstudiantesDeSeccion: " . $stmt->error);
+        return [];
+    }
+    
     $result = $stmt->get_result();
     $estudiantes = $result->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -4191,8 +4593,17 @@ function obtenerEstudiantesDisponibles($db, $seccion_id, $carrera_id) {
                   FROM users u
                   WHERE u.estudiante = 1 AND u.status = 1 AND u.carrera = ?
                   ORDER BY u.nombre");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerEstudiantesDisponibles: " . $db->error);
+        return [];
+    }
+    
     $stmt->bind_param("ii", $seccion_id, $carrera_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerEstudiantesDisponibles: " . $stmt->error);
+        return [];
+    }
+    
     $result = $stmt->get_result();
     $estudiantes = $result->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -4229,8 +4640,12 @@ function mostrarAdvertencia($mensaje) {
     }
 }
 
-
-
+/**
+ * Obtiene los horarios de una sección
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $id_seccion ID de la sección
+ * @return array Horarios de la sección
+ */
 function obtenerHorariosSeccion($db, $id_seccion) {
     // Validar entrada
     if (!is_numeric($id_seccion)) {
@@ -4299,8 +4714,13 @@ function obtenerHorariosSeccion($db, $id_seccion) {
     return $horarios ?: [];
 }
 
-
-// Función para calcular cuántas filas debe ocupar una clase
+/**
+ * Calcula cuántas filas debe ocupar una clase en la tabla de horarios
+ * @param string $hora_inicio Hora de inicio
+ * @param string $hora_fin Hora de fin
+ * @param array $horas Array de horas disponibles
+ * @return int Número de filas que debe ocupar
+ */
 function calcularRowspan($hora_inicio, $hora_fin, $horas) {
     $inicio = date('H:i', strtotime($hora_inicio));
     $fin = date('H:i', strtotime($hora_fin));
@@ -4313,6 +4733,115 @@ function calcularRowspan($hora_inicio, $hora_fin, $horas) {
     }
     
     return $fin_index - $inicio_index;
+}
+
+/**
+ * Obtiene información básica de una sección por su ID
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @return array Información básica de la sección
+ */
+function obtenerInfoBasicaSeccion($db, $seccion_id) {
+    $stmt = $db->prepare("SELECT s.codigo_seccion, c.nombre_carrera, t.numero_trayecto, p.nombre_periodo
+                         FROM secciones s
+                         JOIN carreras c ON s.id_carrera = c.id_carrera
+                         JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+                         JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
+                         WHERE s.id_seccion = ?");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerInfoBasicaSeccion: " . $db->error);
+        return [];
+    }
+    
+    $stmt->bind_param("i", $seccion_id);
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerInfoBasicaSeccion: " . $stmt->error);
+        return [];
+    }
+    
+    $result = $stmt->get_result();
+    $seccion = $result->fetch_assoc();
+    $stmt->close();
+    return $seccion ?: [];
+}
+
+/**
+ * Verifica si una sección existe y está activa
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @return bool True si la sección existe y está activa
+ */
+function seccionExisteYActiva($db, $seccion_id) {
+    $stmt = $db->prepare("SELECT COUNT(*) as total FROM secciones 
+                         WHERE id_seccion = ? AND estatus = 'activa'");
+    if (!$stmt) {
+        error_log("Error en preparación seccionExisteYActiva: " . $db->error);
+        return false;
+    }
+    
+    $stmt->bind_param("i", $seccion_id);
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución seccionExisteYActiva: " . $stmt->error);
+        return false;
+    }
+    
+    $result = $stmt->get_result();
+    $count = $result->fetch_assoc()['total'];
+    $stmt->close();
+    return $count > 0;
+}
+
+/**
+ * Obtiene el número total de secciones activas
+ * @param mysqli $db Conexión a la base de datos
+ * @return int Número total de secciones activas
+ */
+function obtenerTotalSeccionesActivas($db) {
+    $stmt = $db->prepare("SELECT COUNT(*) as total FROM secciones WHERE estatus = 'activa'");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerTotalSeccionesActivas: " . $db->error);
+        return 0;
+    }
+    
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerTotalSeccionesActivas: " . $stmt->error);
+        return 0;
+    }
+    
+    $result = $stmt->get_result();
+    $count = $result->fetch_assoc()['total'];
+    $stmt->close();
+    return $count;
+}
+
+/**
+ * Obtiene las secciones por carrera
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $carrera_id ID de la carrera
+ * @return array Secciones de la carrera
+ */
+function obtenerSeccionesPorCarrera($db, $carrera_id) {
+    $stmt = $db->prepare("SELECT s.id_seccion, s.codigo_seccion, t.numero_trayecto, p.nombre_periodo, s.estatus
+                         FROM secciones s
+                         JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+                         JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
+                         WHERE s.id_carrera = ? AND s.estatus = 'activa'
+                         ORDER BY p.nombre_periodo DESC, t.numero_trayecto, s.codigo_seccion");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerSeccionesPorCarrera: " . $db->error);
+        return [];
+    }
+    
+    $stmt->bind_param("i", $carrera_id);
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerSeccionesPorCarrera: " . $stmt->error);
+        return [];
+    }
+    
+    $result = $stmt->get_result();
+    $secciones = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $secciones;
 }
 
 
