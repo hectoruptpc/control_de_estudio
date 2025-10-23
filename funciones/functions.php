@@ -2388,6 +2388,10 @@ function updateUserStatus($user_id, $new_status) {
 
 
 
+//CARRERA-MATERIAS**********************************************************
+
+
+
 /**
  * Obtiene todas las carreras activas de la base de datos
  * 
@@ -2396,52 +2400,52 @@ function updateUserStatus($user_id, $new_status) {
  *               Array vacío si no hay resultados o en caso de error
  */
 function obtenerCarrerasActivas() {
-  global $db; // Conexión MySQLi global
-  
-  $carreras = []; // Array para almacenar resultados
-  
-  // Consulta SQL con parámetro para estado activo
-  $query = "SELECT id_carrera, nombre_carrera, cod_carrera 
-            FROM carreras 
-            WHERE activa = ? 
-            ORDER BY nombre_carrera";
-  
-  // Preparamos la sentencia
-  if ($stmt = $db->prepare($query)) {
-      try {
-          // Valor para carreras activas (1 = true)
-          $activa = 1;
-          
-          // Vinculamos parámetro (i = integer)
-          $stmt->bind_param("i", $activa);
-          
-          // Ejecutamos la consulta
-          $stmt->execute();
-          
-          // Obtenemos resultados
-          $result = $stmt->get_result();
-          
-          // Procesamos cada fila
-          while ($row = $result->fetch_assoc()) {
-              $carreras[] = $row;
-          }
-          
-          // Liberamos memoria del resultado
-          $result->free();
-          
-      } catch (Exception $e) {
-          // Registramos error sin interrumpir el flujo
-          error_log("Error en obtenerCarrerasActivas: " . $e->getMessage());
-      } finally {
-          // Cerramos el statement siempre
-          $stmt->close();
-      }
-  } else {
-      // Error en preparación de consulta
-      error_log("Error preparando consulta: " . $db->error);
-  }
-  
-  return $carreras;
+    global $db; // Conexión MySQLi global
+    
+    $carreras = []; // Array para almacenar resultados
+    
+    // Consulta SQL con parámetro para estado activo
+    $query = "SELECT id_carrera, nombre_carrera, cod_carrera 
+              FROM carreras 
+              WHERE activa = ? 
+              ORDER BY nombre_carrera";
+    
+    // Preparamos la sentencia
+    if ($stmt = $db->prepare($query)) {
+        try {
+            // Valor para carreras activas (1 = true)
+            $activa = 1;
+            
+            // Vinculamos parámetro (i = integer)
+            $stmt->bind_param("i", $activa);
+            
+            // Ejecutamos la consulta
+            $stmt->execute();
+            
+            // Obtenemos resultados
+            $result = $stmt->get_result();
+            
+            // Procesamos cada fila
+            while ($row = $result->fetch_assoc()) {
+                $carreras[] = $row;
+            }
+            
+            // Liberamos memoria del resultado
+            $result->free();
+            
+        } catch (Exception $e) {
+            // Registramos error sin interrumpir el flujo
+            error_log("Error en obtenerCarrerasActivas: " . $e->getMessage());
+        } finally {
+            // Cerramos el statement siempre
+            $stmt->close();
+        }
+    } else {
+        // Error en preparación de consulta
+        error_log("Error preparando consulta: " . $db->error);
+    }
+    
+    return $carreras;
 }
 
 /**
@@ -2453,54 +2457,54 @@ function obtenerCarrerasActivas() {
  *               Array vacío si no hay resultados o en caso de error
  */
 function obtenerMateriasDisponibles($id_carrera) {
-  global $db; // Conexión MySQLi global
-  
-  $materias = []; // Array para almacenar resultados
-  
-  // Consulta SQL con parámetros preparados
-  $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia 
-            FROM materias m
-            WHERE m.activa = 1 
-            AND m.id_materia NOT IN (
-                SELECT cm.id_materia 
-                FROM carrera_materia cm 
-                WHERE cm.id_carrera = ?
-            ) 
-            ORDER BY m.nombre_materia";
-  
-  // Preparamos la sentencia
-  if ($stmt = $db->prepare($query)) {
-      try {
-          // Vinculamos parámetro (i = integer)
-          $stmt->bind_param("i", $id_carrera);
-          
-          // Ejecutamos la consulta
-          $stmt->execute();
-          
-          // Obtenemos resultados
-          $result = $stmt->get_result();
-          
-          // Procesamos cada fila
-          while ($row = $result->fetch_assoc()) {
-              $materias[] = $row;
-          }
-          
-          // Liberamos memoria del resultado
-          $result->free();
-          
-      } catch (Exception $e) {
-          // Registramos error sin interrumpir el flujo
-          error_log("Error en obtenerMateriasDisponibles: " . $e->getMessage());
-      } finally {
-          // Cerramos el statement siempre
-          $stmt->close();
-      }
-  } else {
-      // Error en preparación de consulta
-      error_log("Error preparando consulta: " . $db->error);
-  }
-  
-  return $materias;
+    global $db; // Conexión MySQLi global
+    
+    $materias = []; // Array para almacenar resultados
+    
+    // Consulta SQL con parámetros preparados
+    $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia 
+              FROM materias m
+              WHERE m.activa = 1 
+              AND m.id_materia NOT IN (
+                  SELECT cm.id_materia 
+                  FROM carrera_materia cm 
+                  WHERE cm.id_carrera = ?
+              ) 
+              ORDER BY m.nombre_materia";
+    
+    // Preparamos la sentencia
+    if ($stmt = $db->prepare($query)) {
+        try {
+            // Vinculamos parámetro (i = integer)
+            $stmt->bind_param("i", $id_carrera);
+            
+            // Ejecutamos la consulta
+            $stmt->execute();
+            
+            // Obtenemos resultados
+            $result = $stmt->get_result();
+            
+            // Procesamos cada fila
+            while ($row = $result->fetch_assoc()) {
+                $materias[] = $row;
+            }
+            
+            // Liberamos memoria del resultado
+            $result->free();
+            
+        } catch (Exception $e) {
+            // Registramos error sin interrumpir el flujo
+            error_log("Error en obtenerMateriasDisponibles: " . $e->getMessage());
+        } finally {
+            // Cerramos el statement siempre
+            $stmt->close();
+        }
+    } else {
+        // Error en preparación de consulta
+        error_log("Error preparando consulta: " . $db->error);
+    }
+    
+    return $materias;
 }
 
 /**
@@ -2516,51 +2520,51 @@ function obtenerMateriasDisponibles($id_carrera) {
  *               Array vacío si no hay resultados o en caso de error
  */
 function obtenerMateriasAsignadas($id_carrera) {
-  global $db; // Conexión MySQLi global
-  
-  $materias = []; // Array para almacenar resultados
-  
-  // Consulta SQL con JOIN y parámetro preparado
-  $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia, 
-                   cm.semestre, cm.id_relacion
-            FROM carrera_materia cm
-            JOIN materias m ON cm.id_materia = m.id_materia
-            WHERE cm.id_carrera = ?
-            ORDER BY cm.semestre, m.nombre_materia";
-  
-  // Preparamos la sentencia
-  if ($stmt = $db->prepare($query)) {
-      try {
-          // Vinculamos parámetro (i = integer)
-          $stmt->bind_param("i", $id_carrera);
-          
-          // Ejecutamos la consulta
-          $stmt->execute();
-          
-          // Obtenemos resultados
-          $result = $stmt->get_result();
-          
-          // Procesamos cada fila
-          while ($row = $result->fetch_assoc()) {
-              $materias[] = $row;
-          }
-          
-          // Liberamos memoria del resultado
-          $result->free();
-          
-      } catch (Exception $e) {
-          // Registramos error sin interrumpir el flujo
-          error_log("Error en obtenerMateriasAsignadas: " . $e->getMessage());
-      } finally {
-          // Cerramos el statement siempre
-          $stmt->close();
-      }
-  } else {
-      // Error en preparación de consulta
-      error_log("Error preparando consulta: " . $db->error);
-  }
-  
-  return $materias;
+    global $db; // Conexión MySQLi global
+    
+    $materias = []; // Array para almacenar resultados
+    
+    // Consulta SQL con JOIN y parámetro preparado
+    $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia, 
+                     cm.semestre, cm.id_relacion
+              FROM carrera_materia cm
+              JOIN materias m ON cm.id_materia = m.id_materia
+              WHERE cm.id_carrera = ?
+              ORDER BY cm.semestre, m.nombre_materia";
+    
+    // Preparamos la sentencia
+    if ($stmt = $db->prepare($query)) {
+        try {
+            // Vinculamos parámetro (i = integer)
+            $stmt->bind_param("i", $id_carrera);
+            
+            // Ejecutamos la consulta
+            $stmt->execute();
+            
+            // Obtenemos resultados
+            $result = $stmt->get_result();
+            
+            // Procesamos cada fila
+            while ($row = $result->fetch_assoc()) {
+                $materias[] = $row;
+            }
+            
+            // Liberamos memoria del resultado
+            $result->free();
+            
+        } catch (Exception $e) {
+            // Registramos error sin interrumpir el flujo
+            error_log("Error en obtenerMateriasAsignadas: " . $e->getMessage());
+        } finally {
+            // Cerramos el statement siempre
+            $stmt->close();
+        }
+    } else {
+        // Error en preparación de consulta
+        error_log("Error preparando consulta: " . $db->error);
+    }
+    
+    return $materias;
 }
 
 /**
@@ -2574,60 +2578,113 @@ function obtenerMateriasAsignadas($id_carrera) {
  *               - 'message': string descriptivo
  */
 function asignarMateriaACarrera($id_carrera, $id_materia, $semestre) {
-  global $db;
+    global $db;
 
-  // 1. Verificar si ya existe la asignación (con prepared statement)
-  $check_query = "SELECT id_relacion FROM carrera_materia 
-                 WHERE id_carrera = ? AND id_materia = ?";
-  
-  if ($check_stmt = $db->prepare($check_query)) {
-      $check_stmt->bind_param("ii", $id_carrera, $id_materia);
-      $check_stmt->execute();
-      $check_result = $check_stmt->get_result();
-      
-      if ($check_result->num_rows > 0) {
-          $check_stmt->close();
-          return [
-              'success' => false, 
-              'message' => 'La materia ya está asignada a esta carrera'
-          ];
-      }
-      $check_stmt->close();
-  } else {
-      return [
-          'success' => false,
-          'message' => 'Error al verificar asignación: ' . $db->error
-      ];
-  }
+    try {
+        // Obtener información para auditoría
+        $carrera_info = obtenerCarreraPorId($id_carrera);
+        $materia_info = obtenerMateriaPorId($db, $id_materia);
 
-  // 2. Insertar nueva asignación (con prepared statement)
-  $insert_query = "INSERT INTO carrera_materia 
-                  (id_carrera, id_materia, semestre) 
-                  VALUES (?, ?, ?)";
-  
-  if ($insert_stmt = $db->prepare($insert_query)) {
-      $insert_stmt->bind_param("iii", $id_carrera, $id_materia, $semestre);
-      $execute_result = $insert_stmt->execute();
-      $insert_stmt->close();
-      
-      if ($execute_result) {
-          return [
-              'success' => true,
-              'message' => 'Materia asignada correctamente',
-              'insert_id' => $db->insert_id
-          ];
-      } else {
-          return [
-              'success' => false,
-              'message' => 'Error al asignar: ' . $db->error
-          ];
-      }
-  } else {
-      return [
-          'success' => false,
-          'message' => 'Error preparando consulta: ' . $db->error
-      ];
-  }
+        // 1. Verificar si ya existe la asignación (con prepared statement)
+        $check_query = "SELECT id_relacion FROM carrera_materia 
+                       WHERE id_carrera = ? AND id_materia = ?";
+        
+        if ($check_stmt = $db->prepare($check_query)) {
+            $check_stmt->bind_param("ii", $id_carrera, $id_materia);
+            $check_stmt->execute();
+            $check_result = $check_stmt->get_result();
+            
+            if ($check_result->num_rows > 0) {
+                $check_stmt->close();
+                return [
+                    'success' => false, 
+                    'message' => 'La materia ya está asignada a esta carrera'
+                ];
+            }
+            $check_stmt->close();
+        } else {
+            throw new Exception('Error al verificar asignación: ' . $db->error);
+        }
+
+        // 2. Insertar nueva asignación (con prepared statement)
+        $insert_query = "INSERT INTO carrera_materia 
+                        (id_carrera, id_materia, semestre) 
+                        VALUES (?, ?, ?)";
+        
+        if ($insert_stmt = $db->prepare($insert_query)) {
+            $insert_stmt->bind_param("iii", $id_carrera, $id_materia, $semestre);
+            $execute_result = $insert_stmt->execute();
+            $insert_id = $db->insert_id;
+            $insert_stmt->close();
+            
+            if ($execute_result) {
+                // REGISTRAR EN AUDITORÍA - ASIGNACIÓN DE MATERIA A CARRERA
+                if (function_exists('registrarAuditoria')) {
+                    try {
+                        registrarAuditoria(
+                            "INSERT", 
+                            "carrera_materia", 
+                            $insert_id, 
+                            null, 
+                            [
+                                'id_carrera' => $id_carrera,
+                                'carrera_nombre' => $carrera_info['nombre_carrera'] ?? 'Desconocida',
+                                'carrera_codigo' => $carrera_info['cod_carrera'] ?? '',
+                                'id_materia' => $id_materia,
+                                'materia_nombre' => $materia_info['nombre_materia'] ?? 'Desconocida',
+                                'materia_codigo' => $materia_info['cod_materia'] ?? '',
+                                'semestre' => $semestre
+                            ], 
+                            "Carreras-Materias", 
+                            "Asignación de materia a carrera"
+                        );
+                    } catch (Exception $e) {
+                        error_log("Error en auditoría asignarMateriaACarrera: " . $e->getMessage());
+                    }
+                }
+                
+                return [
+                    'success' => true,
+                    'message' => 'Materia asignada correctamente',
+                    'insert_id' => $insert_id
+                ];
+            } else {
+                throw new Exception('Error al asignar: ' . $db->error);
+            }
+        } else {
+            throw new Exception('Error preparando consulta: ' . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en asignarMateriaACarrera: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ASIGNAR MATERIA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carrera_materia", 
+                    null, 
+                    null, 
+                    [
+                        'id_carrera' => $id_carrera,
+                        'id_materia' => $id_materia,
+                        'semestre' => $semestre,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Carreras-Materias", 
+                    "Error al asignar materia a carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error asignarMateriaACarrera: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al asignar materia: ' . $e->getMessage()
+        ];
+    }
 }
 
 /**
@@ -2641,59 +2698,231 @@ function asignarMateriaACarrera($id_carrera, $id_materia, $semestre) {
 function eliminarAsignacionMateria($id_relacion) {
     global $db;
 
-    // 1. Verificar si existe la relación
-    $check_query = "SELECT COUNT(*) AS total FROM carrera_materia WHERE id_relacion = ?";
-    
-    if ($check_stmt = $db->prepare($check_query)) {
-        $check_stmt->bind_param("i", $id_relacion);
-        $check_stmt->execute();
-        $check_result = $check_stmt->get_result();
-        $existe_relacion = $check_result->fetch_assoc()['total'] > 0;
-        $check_stmt->close();
+    try {
+        // 1. Obtener información de la relación para auditoría
+        $info_query = "SELECT cm.*, c.nombre_carrera, c.cod_carrera, 
+                              m.nombre_materia, m.cod_materia
+                       FROM carrera_materia cm
+                       JOIN carreras c ON cm.id_carrera = c.id_carrera
+                       JOIN materias m ON cm.id_materia = m.id_materia
+                       WHERE cm.id_relacion = ?";
         
-        if (!$existe_relacion) {
+        $info_stmt = $db->prepare($info_query);
+        if (!$info_stmt) {
+            throw new Exception('Error al preparar consulta de información: ' . $db->error);
+        }
+        
+        $info_stmt->bind_param("i", $id_relacion);
+        $info_stmt->execute();
+        $info_result = $info_stmt->get_result();
+        $relacion_info = $info_result->fetch_assoc();
+        $info_stmt->close();
+        
+        if (!$relacion_info) {
             return [
                 'success' => false, 
                 'message' => 'No se encontró la relación especificada'
             ];
         }
-    } else {
-        return [
-            'success' => false,
-            'message' => 'Error al verificar la relación: ' . $db->error
-        ];
-    }
 
-    // 2. Eliminar asignación (con prepared statement)
-    $delete_query = "DELETE FROM carrera_materia WHERE id_relacion = ?";
-    
-    if ($delete_stmt = $db->prepare($delete_query)) {
-        $delete_stmt->bind_param("i", $id_relacion);
-        $execute_result = $delete_stmt->execute();
-        $affected_rows = $delete_stmt->affected_rows;
-        $delete_stmt->close();
+        // 2. Eliminar asignación (con prepared statement)
+        $delete_query = "DELETE FROM carrera_materia WHERE id_relacion = ?";
         
-        if ($execute_result && $affected_rows > 0) {
-            return [
-                'success' => true,
-                'message' => 'Asignación eliminada correctamente',
-                'affected_rows' => $affected_rows
-            ];
-        } else {
-            return [
-                'success' => false,
-                'message' => $affected_rows === 0 
+        if ($delete_stmt = $db->prepare($delete_query)) {
+            $delete_stmt->bind_param("i", $id_relacion);
+            $execute_result = $delete_stmt->execute();
+            $affected_rows = $delete_stmt->affected_rows;
+            $delete_stmt->close();
+            
+            if ($execute_result && $affected_rows > 0) {
+                // REGISTRAR EN AUDITORÍA - ELIMINACIÓN DE ASIGNACIÓN
+                if (function_exists('registrarAuditoria')) {
+                    try {
+                        registrarAuditoria(
+                            "DELETE", 
+                            "carrera_materia", 
+                            $id_relacion, 
+                            [
+                                'id_carrera' => $relacion_info['id_carrera'],
+                                'carrera_nombre' => $relacion_info['nombre_carrera'],
+                                'carrera_codigo' => $relacion_info['cod_carrera'],
+                                'id_materia' => $relacion_info['id_materia'],
+                                'materia_nombre' => $relacion_info['nombre_materia'],
+                                'materia_codigo' => $relacion_info['cod_materia'],
+                                'semestre' => $relacion_info['semestre']
+                            ], 
+                            null, 
+                            "Carreras-Materias", 
+                            "Eliminación de asignación materia-carrera"
+                        );
+                    } catch (Exception $e) {
+                        error_log("Error en auditoría eliminarAsignacionMateria: " . $e->getMessage());
+                    }
+                }
+                
+                return [
+                    'success' => true,
+                    'message' => 'Asignación eliminada correctamente',
+                    'affected_rows' => $affected_rows
+                ];
+            } else {
+                throw new Exception($affected_rows === 0 
                     ? 'No se encontró la asignación con el ID proporcionado' 
-                    : 'Error al eliminar: ' . $db->error
-            ];
+                    : 'Error al eliminar: ' . $db->error);
+            }
+        } else {
+            throw new Exception('Error preparando consulta de eliminación: ' . $db->error);
         }
-    } else {
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarAsignacionMateria: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR ASIGNACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carrera_materia", 
+                    $id_relacion, 
+                    null, 
+                    [
+                        'id_relacion' => $id_relacion,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Carreras-Materias", 
+                    "Error al eliminar asignación materia-carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarAsignacionMateria: " . $auditError->getMessage());
+            }
+        }
+        
         return [
             'success' => false,
-            'message' => 'Error preparando consulta de eliminación: ' . $db->error
+            'message' => 'Error al eliminar asignación: ' . $e->getMessage()
         ];
     }
 }
+
+/**
+ * Actualiza el semestre de una asignación materia-carrera
+ * 
+ * @param int $id_relacion ID de la relación materia-carrera
+ * @param int $nuevo_semestre Nuevo número de semestre
+ * @return array Resultado de la operación
+ */
+function actualizarSemestreAsignacion($id_relacion, $nuevo_semestre) {
+    global $db;
+
+    try {
+        // Obtener información actual para auditoría
+        $info_query = "SELECT cm.*, c.nombre_carrera, c.cod_carrera, 
+                              m.nombre_materia, m.cod_materia
+                       FROM carrera_materia cm
+                       JOIN carreras c ON cm.id_carrera = c.id_carrera
+                       JOIN materias m ON cm.id_materia = m.id_materia
+                       WHERE cm.id_relacion = ?";
+        
+        $info_stmt = $db->prepare($info_query);
+        if (!$info_stmt) {
+            throw new Exception('Error al preparar consulta de información: ' . $db->error);
+        }
+        
+        $info_stmt->bind_param("i", $id_relacion);
+        $info_stmt->execute();
+        $info_result = $info_stmt->get_result();
+        $relacion_info = $info_result->fetch_assoc();
+        $info_stmt->close();
+        
+        if (!$relacion_info) {
+            return [
+                'success' => false, 
+                'message' => 'No se encontró la relación especificada'
+            ];
+        }
+
+        // Actualizar el semestre
+        $update_query = "UPDATE carrera_materia SET semestre = ? WHERE id_relacion = ?";
+        
+        if ($update_stmt = $db->prepare($update_query)) {
+            $update_stmt->bind_param("ii", $nuevo_semestre, $id_relacion);
+            $execute_result = $update_stmt->execute();
+            $affected_rows = $update_stmt->affected_rows;
+            $update_stmt->close();
+            
+            if ($execute_result && $affected_rows > 0) {
+                // REGISTRAR EN AUDITORÍA - ACTUALIZACIÓN DE SEMESTRE
+                if (function_exists('registrarAuditoria')) {
+                    try {
+                        registrarAuditoria(
+                            "UPDATE", 
+                            "carrera_materia", 
+                            $id_relacion, 
+                            [
+                                'semestre_anterior' => $relacion_info['semestre'],
+                                'id_carrera' => $relacion_info['id_carrera'],
+                                'carrera_nombre' => $relacion_info['nombre_carrera'],
+                                'id_materia' => $relacion_info['id_materia'],
+                                'materia_nombre' => $relacion_info['nombre_materia']
+                            ], 
+                            [
+                                'semestre_nuevo' => $nuevo_semestre,
+                                'carrera_nombre' => $relacion_info['nombre_carrera'],
+                                'materia_nombre' => $relacion_info['nombre_materia']
+                            ], 
+                            "Carreras-Materias", 
+                            "Actualización de semestre en asignación materia-carrera"
+                        );
+                    } catch (Exception $e) {
+                        error_log("Error en auditoría actualizarSemestreAsignacion: " . $e->getMessage());
+                    }
+                }
+                
+                return [
+                    'success' => true,
+                    'message' => 'Semestre actualizado correctamente',
+                    'affected_rows' => $affected_rows
+                ];
+            } else {
+                throw new Exception($affected_rows === 0 
+                    ? 'No se encontró la asignación o no hubo cambios' 
+                    : 'Error al actualizar: ' . $db->error);
+            }
+        } else {
+            throw new Exception('Error preparando consulta de actualización: ' . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarSemestreAsignacion: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR SEMESTRE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carrera_materia", 
+                    $id_relacion, 
+                    null, 
+                    [
+                        'id_relacion' => $id_relacion,
+                        'nuevo_semestre' => $nuevo_semestre,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Carreras-Materias", 
+                    "Error al actualizar semestre de asignación"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error actualizarSemestreAsignacion: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al actualizar semestre: ' . $e->getMessage()
+        ];
+    }
+}
+
 
 /**
 * Verificación básica de sesión usando $db
