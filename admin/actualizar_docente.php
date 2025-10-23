@@ -1,5 +1,9 @@
 <?php
+// Evitar que includes que impriman HTML rompan la respuesta JSON
+ob_start();
 require_once '../funciones/functions.php';
+// Limpiar cualquier salida accidental proveniente de los includes
+ob_end_clean();
 
 header("Content-Type: application/json; charset=UTF-8");
 
