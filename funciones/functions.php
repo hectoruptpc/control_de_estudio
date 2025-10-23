@@ -1596,7 +1596,8 @@ function eliminarCarrera($id_carrera): array {
 
 
 
-//HACER COSAS CON LOS DOCENTES
+//DOCENTES
+
 
 function insertarDocente(array $datos): array {
     global $db;
@@ -1821,23 +1822,34 @@ function insertarDocente(array $datos): array {
         }
 
         // 7. REGISTRAR EN AUDITORÍA - NUEVO DOCENTE
-        $valores_nuevos = [
-            'idusuario' => $idusuario,
-            'nombre' => $datos['nombre'],
-            'email' => $datos['email'],
-            'carrera' => $datos['carrera'] ?? 0,
-            'estado_laboral' => $datos['estado_laboral']
-        ];
-        
-        registrarAuditoria(
-            "INSERT", 
-            "users", 
-            $idInsertado, 
-            null, 
-            $valores_nuevos, 
-            "Docentes", 
-            "Registro de nuevo docente"
-        );
+        if (function_exists('registrarAuditoria')) {
+            try {
+                $valores_nuevos = [
+                    'idusuario' => $idusuario,
+                    'nombre' => $datos['nombre'],
+                    'email' => $datos['email'],
+                    'carrera' => $datos['carrera'] ?? 0,
+                    'estado_laboral' => $datos['estado_laboral'],
+                    'tipo_documento' => $tipo_documento_texto,
+                    'documento' => $datos['documento'],
+                    'telefono' => $datos['telefono'],
+                    'genero' => $datos['genero'],
+                    'estado_civil' => $datos['estado_civil']
+                ];
+                
+                registrarAuditoria(
+                    "INSERT", 
+                    "users", 
+                    $idInsertado, 
+                    null, 
+                    $valores_nuevos, 
+                    "Docentes", 
+                    "Registro de nuevo docente"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría insertarDocente: " . $e->getMessage());
+            }
+        }
 
         // Confirmar transacción
         $db->commit();
@@ -1857,19 +1869,25 @@ function insertarDocente(array $datos): array {
         }
         
         // REGISTRAR EN AUDITORÍA - ERROR AL REGISTRAR DOCENTE
-        registrarAuditoria(
-            "ERROR", 
-            "users", 
-            null, 
-            null, 
-            [
-                'nombre' => $datos['nombre'] ?? '',
-                'idusuario' => $idusuario ?? '',
-                'error' => $e->getMessage()
-            ], 
-            "Docentes", 
-            "Error al registrar docente"
-        );
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    null, 
+                    null, 
+                    [
+                        'nombre' => $datos['nombre'] ?? '',
+                        'idusuario' => $idusuario ?? '',
+                        'error' => $e->getMessage()
+                    ], 
+                    "Docentes", 
+                    "Error al registrar docente"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error insertarDocente: " . $auditError->getMessage());
+            }
+        }
         
         error_log("Error en insertarDocente: " . $e->getMessage());
         return [
@@ -1879,47 +1897,40 @@ function insertarDocente(array $datos): array {
     }
 }
 
-
-
-
-
 function validarDocente($datos) {
-  $errores = [];
-  
-  // Validar email
-  if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
-      $errores[] = 'Por favor ingrese un correo electrónico válido';
-  }
-  
-  // Validar teléfono (al menos 10 dígitos)
-  if (strlen($datos['telefono']) < 10) {
-      $errores[] = 'El teléfono debe tener al menos 10 dígitos';
-  }
-  
-  // Validar documento
-  if (empty($datos['documento']) || !is_numeric($datos['documento'])) {
-      $errores[] = 'El documento debe ser un número válido';
-  }
-  
-  // Validar campos requeridos
-  $camposRequeridos = [
-      'tipo_documento', 'documento', 'nombre', 'potencialidades', 'genero', 
-      'estado_civil', 'estado_residencia', 'municipio', 'direccion',
-      'fecha_nacimiento', 'telefono', 'email', 'fecha_contratacion'
-  ];
-  
-  foreach ($camposRequeridos as $campo) {
-      if (empty($datos[$campo])) {
-          $nombreCampo = str_replace('_', ' ', $campo);
-          $errores[] = "El campo $nombreCampo es requerido";
-      }
-  }
-  
-  return empty($errores) ? true : $errores;
+    $errores = [];
+    
+    // Validar email
+    if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
+        $errores[] = 'Por favor ingrese un correo electrónico válido';
+    }
+    
+    // Validar teléfono (al menos 10 dígitos)
+    if (strlen($datos['telefono']) < 10) {
+        $errores[] = 'El teléfono debe tener al menos 10 dígitos';
+    }
+    
+    // Validar documento
+    if (empty($datos['documento']) || !is_numeric($datos['documento'])) {
+        $errores[] = 'El documento debe ser un número válido';
+    }
+    
+    // Validar campos requeridos
+    $camposRequeridos = [
+        'tipo_documento', 'documento', 'nombre', 'potencialidades', 'genero', 
+        'estado_civil', 'estado_residencia', 'municipio', 'direccion',
+        'fecha_nacimiento', 'telefono', 'email', 'fecha_contratacion'
+    ];
+    
+    foreach ($camposRequeridos as $campo) {
+        if (empty($datos[$campo])) {
+            $nombreCampo = str_replace('_', ' ', $campo);
+            $errores[] = "El campo $nombreCampo es requerido";
+        }
+    }
+    
+    return empty($errores) ? true : $errores;
 }
-
-
-
 
 /**
  * Obtiene los datos de un docente según su ID.
@@ -1928,35 +1939,41 @@ function validarDocente($datos) {
  * @return array|null Array asociativo con los datos del docente, o null si no se encuentra
  */
 function obtenerDocentePorId($id) {
-  // Accede a la conexión de la base de datos definida globalmente
-  global $db;
-  
-  // Consulta SQL con un parámetro placeholder (?) para prevenir inyecciones SQL
-  $query = "SELECT * FROM users WHERE id = ? AND docente = 1";
-  
-  // Prepara la sentencia SQL
-  if ($stmt = $db->prepare($query)) {
-      // Asocia el parámetro $id al placeholder, indicando que es un entero ("i")
-      $stmt->bind_param("i", $id);
-      
-      // Ejecuta la consulta preparada
-      $stmt->execute();
-      
-      // Obtiene el resultado de la consulta
-      $result = $stmt->get_result();
-      
-      // Verifica si se encontraron registros
-      if ($result->num_rows > 0) {
-          // Retorna los datos del docente como un array asociativo
-          return $result->fetch_assoc();
-      }
-      
-      // Cierra el statement para liberar recursos
-      $stmt->close();
-  }
-  
-  // Retorna null si no se encuentra el docente o hay un error
-  return null;
+    // Accede a la conexión de la base de datos definida globalmente
+    global $db;
+    
+    try {
+        // Consulta SQL con un parámetro placeholder (?) para prevenir inyecciones SQL
+        $query = "SELECT * FROM users WHERE id = ? AND docente = 1";
+        
+        // Prepara la sentencia SQL
+        if ($stmt = $db->prepare($query)) {
+            // Asocia el parámetro $id al placeholder, indicando que es un entero ("i")
+            $stmt->bind_param("i", $id);
+            
+            // Ejecuta la consulta preparada
+            $stmt->execute();
+            
+            // Obtiene el resultado de la consulta
+            $result = $stmt->get_result();
+            
+            // Verifica si se encontraron registros
+            if ($result->num_rows > 0) {
+                // Retorna los datos del docente como un array asociativo
+                return $result->fetch_assoc();
+            }
+            
+            // Cierra el statement para liberar recursos
+            $stmt->close();
+        }
+        
+        // Retorna null si no se encuentra el docente o hay un error
+        return null;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerDocentePorId: " . $e->getMessage());
+        return null;
+    }
 }
 
 /**
@@ -2191,44 +2208,44 @@ function actualizarDocente($datos) {
 }
 
 function obtenerDocentes() {
-  global $db;
-  
-  $docentes = [];
-  
-  // Preparamos la consulta
-  $stmt = $db->prepare("SELECT id, idusuario, nombre, email, tlf, status 
-                       FROM users 
-                       WHERE docente = 1 
-                       ORDER BY nombre ASC");
-  
-  if ($stmt === false) {
-      die('Error en la preparación de la consulta: ' . $db->error);
-  }
-  
-  // Ejecutamos la consulta
-  if (!$stmt->execute()) {
-      die('Error al ejecutar la consulta: ' . $stmt->error);
-  }
-  
-  // Obtenemos el resultado
-  $result = $stmt->get_result();
-  
-  // Obtenemos todos los registros como array asociativo
-  while ($row = $result->fetch_assoc()) {
-      $docentes[] = $row;
-  }
-  
-  // Cerramos el statement
-  $stmt->close();
-  
-  return $docentes;
+    global $db;
+    
+    try {
+        $docentes = [];
+        
+        // Preparamos la consulta
+        $stmt = $db->prepare("SELECT id, idusuario, nombre, email, tlf, status 
+                             FROM users 
+                             WHERE docente = 1 
+                             ORDER BY nombre ASC");
+        
+        if ($stmt === false) {
+            throw new Exception('Error en la preparación de la consulta: ' . $db->error);
+        }
+        
+        // Ejecutamos la consulta
+        if (!$stmt->execute()) {
+            throw new Exception('Error al ejecutar la consulta: ' . $stmt->error);
+        }
+        
+        // Obtenemos el resultado
+        $result = $stmt->get_result();
+        
+        // Obtenemos todos los registros como array asociativo
+        while ($row = $result->fetch_assoc()) {
+            $docentes[] = $row;
+        }
+        
+        // Cerramos el statement
+        $stmt->close();
+        
+        return $docentes;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerDocentes: " . $e->getMessage());
+        return [];
+    }
 }
-
-
-
-
-
-
 
 /**
  * Obtiene todos los registros de docentes de la base de datos.
@@ -2238,46 +2255,269 @@ function obtenerDocentes() {
  * @return array Array asociativo con todos los docentes encontrados, ordenados por nombre
  */
 function getDocentes() {
-  // Accede a la conexión de la base de datos definida globalmente
-  global $db;
-  
-  // Inicializa el array que contendrá los resultados
-  $docentes = array();
-  
-  // Consulta SQL con parámetro para docente (aunque sea fijo, lo preparamos igual)
-  $sql = "SELECT * FROM users WHERE docente = ? ORDER BY nombre ASC";
-  
-  // Prepara la sentencia SQL
-  if ($stmt = $db->prepare($sql)) {
-      // Valor fijo para docente (1 = true)
-      $docente = 1;
-      
-      // Vincula el parámetro (aunque sea fijo, se trata como parámetro)
-      $stmt->bind_param("i", $docente);
-      
-      // Ejecuta la consulta
-      $stmt->execute();
-      
-      // Obtiene el resultado
-      $result = $stmt->get_result();
-      
-      // Recorre los resultados y los agrega al array
-      while ($row = $result->fetch_assoc()) {
-          $docentes[] = $row;
-      }
-      
-      // Cierra el statement y libera memoria
-      $stmt->close();
-      
-      // Libera el resultado (no es estrictamente necesario ya que close() lo hace)
-      if (isset($result)) {
-          $result->free();
-      }
-  }
-  
-  // Retorna el array de docentes (vacío si no hay resultados)
-  return $docentes;
+    // Accede a la conexión de la base de datos definida globalmente
+    global $db;
+    
+    try {
+        // Inicializa el array que contendrá los resultados
+        $docentes = array();
+        
+        // Consulta SQL con parámetro para docente (aunque sea fijo, lo preparamos igual)
+        $sql = "SELECT * FROM users WHERE docente = ? ORDER BY nombre ASC";
+        
+        // Prepara la sentencia SQL
+        if ($stmt = $db->prepare($sql)) {
+            // Valor fijo para docente (1 = true)
+            $docente = 1;
+            
+            // Vincula el parámetro (aunque sea fijo, se trata como parámetro)
+            $stmt->bind_param("i", $docente);
+            
+            // Ejecuta la consulta
+            $stmt->execute();
+            
+            // Obtiene el resultado
+            $result = $stmt->get_result();
+            
+            // Recorre los resultados y los agrega al array
+            while ($row = $result->fetch_assoc()) {
+                $docentes[] = $row;
+            }
+            
+            // Cierra el statement y libera memoria
+            $stmt->close();
+            
+            // Libera el resultado (no es estrictamente necesario ya que close() lo hace)
+            if (isset($result)) {
+                $result->free();
+            }
+        }
+        
+        // Retorna el array de docentes (vacío si no hay resultados)
+        return $docentes;
+        
+    } catch (Exception $e) {
+        error_log("Error en getDocentes: " . $e->getMessage());
+        return [];
+    }
 }
+
+/**
+ * Cambia el estado de un docente (activo/inactivo)
+ * 
+ * @param int $docente_id ID del docente
+ * @param int $nuevo_estado Nuevo estado (1 para activo, 0 para inactivo)
+ * @return array Resultado de la operación
+ */
+function cambiarEstadoDocente($docente_id, $nuevo_estado) {
+    global $db;
+    
+    try {
+        // Obtener información actual del docente para auditoría
+        $docente_actual = obtenerDocentePorId($docente_id);
+        if (!$docente_actual) {
+            return [
+                'success' => false,
+                'message' => 'Docente no encontrado'
+            ];
+        }
+
+        $stmt = $db->prepare("UPDATE users SET status = ? WHERE id = ? AND docente = 1");
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("ii", $nuevo_estado, $docente_id);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - CAMBIO DE ESTADO DE DOCENTE
+        if ($affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                $estado_texto_anterior = $docente_actual['status'] ? 'Activo' : 'Inactivo';
+                $estado_texto_nuevo = $nuevo_estado ? 'Activo' : 'Inactivo';
+                
+                registrarAuditoria(
+                    "UPDATE", 
+                    "users", 
+                    $docente_id, 
+                    [
+                        'status' => $docente_actual['status'],
+                        'estado_anterior' => $estado_texto_anterior
+                    ], 
+                    [
+                        'status' => $nuevo_estado,
+                        'estado_nuevo' => $estado_texto_nuevo,
+                        'nombre_docente' => $docente_actual['nombre'],
+                        'idusuario' => $docente_actual['idusuario']
+                    ], 
+                    "Docentes", 
+                    "Cambio de estado de docente"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría cambiarEstadoDocente: " . $e->getMessage());
+            }
+        }
+        
+        return [
+            'success' => true,
+            'message' => 'Estado del docente actualizado exitosamente',
+            'affected_rows' => $affected_rows
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Error en cambiarEstadoDocente: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL CAMBIAR ESTADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $docente_id, 
+                    null, 
+                    [
+                        'nuevo_estado' => $nuevo_estado,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Docentes", 
+                    "Error al cambiar estado de docente"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error cambiarEstadoDocente: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al cambiar estado del docente: ' . $e->getMessage()
+        ];
+    }
+}
+
+/**
+ * Elimina un docente (eliminación lógica)
+ * 
+ * @param int $docente_id ID del docente a eliminar
+ * @return array Resultado de la operación
+ */
+function eliminarDocente($docente_id) {
+    global $db;
+    
+    try {
+        // Obtener información del docente antes de eliminar
+        $docente_info = obtenerDocentePorId($docente_id);
+        if (!$docente_info) {
+            return [
+                'success' => false,
+                'message' => 'Docente no encontrado'
+            ];
+        }
+
+        // Verificar si el docente tiene asignaciones activas
+        $check_asignaciones = $db->prepare("SELECT COUNT(*) as total FROM docente_seccion WHERE id_usuario = ? AND estatus = 1");
+        if ($check_asignaciones) {
+            $check_asignaciones->bind_param("i", $docente_id);
+            $check_asignaciones->execute();
+            $result = $check_asignaciones->get_result();
+            $asignaciones_count = $result->fetch_assoc()['total'];
+            $check_asignaciones->close();
+            
+            if ($asignaciones_count > 0) {
+                return [
+                    'success' => false,
+                    'message' => "No se puede eliminar el docente porque tiene $asignaciones_count asignación(es) activa(s)"
+                ];
+            }
+        }
+
+        // Realizar eliminación lógica (desactivar)
+        $query = "UPDATE users SET status = 0, docente = 0 WHERE id = ?";
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $docente_id);
+        $resultado = $stmt->execute();
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+        
+        if ($resultado && $affected_rows > 0) {
+            // REGISTRAR EN AUDITORÍA - ELIMINACIÓN DE DOCENTE
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "users", 
+                        $docente_id, 
+                        [
+                            'status' => $docente_info['status'],
+                            'docente' => $docente_info['docente'],
+                            'nombre_docente' => $docente_info['nombre'],
+                            'idusuario' => $docente_info['idusuario']
+                        ], 
+                        [
+                            'status' => 0,
+                            'docente' => 0,
+                            'estado' => 'Eliminado (desactivado)'
+                        ], 
+                        "Docentes", 
+                        "Eliminación lógica de docente"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarDocente: " . $e->getMessage());
+                }
+            }
+            
+            return [
+                'success' => true,
+                'message' => 'Docente eliminado exitosamente',
+                'affected_rows' => $affected_rows
+            ];
+        } else {
+            return [
+                'success' => false,
+                'message' => 'No se realizaron cambios en el docente'
+            ];
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarDocente: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR DOCENTE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $docente_id, 
+                    null, 
+                    [
+                        'docente_id' => $docente_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Docentes", 
+                    "Error al eliminar docente"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarDocente: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al eliminar docente: ' . $e->getMessage()
+        ];
+    }
+}
+
 
 
 
