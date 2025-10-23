@@ -6551,10 +6551,6 @@ function cargarPermisosUsuario() {
 
 
 
-// =============================================
-// FUNCIONES PARA GRADUACIÓN - SISTEMA COMPLETO
-// =============================================
-
 /**
  * Obtener la cantidad de registros por página
  */
@@ -6588,46 +6584,100 @@ function obtener_id_admin() {
 function obtener_estudiantes_graduacion_paginados($filtros = [], $pagina = 1, $registros_por_pagina = 20) {
     global $db;
     
-    // Primero obtener todos los estudiantes según los filtros
-    $estudiantes_data = obtener_estudiantes_graduacion($filtros);
-    $todos_estudiantes = [];
-    
-    // Convertir a array para poder manipularlo
-    if (is_array($estudiantes_data)) {
-        $todos_estudiantes = $estudiantes_data;
-    } elseif ($estudiantes_data) {
-        while ($estudiante = mysqli_fetch_assoc($estudiantes_data)) {
-            $todos_estudiantes[] = $estudiante;
-        }
-    }
-    
-    // Si no hay filtro de estado, determinar el estado real de cada estudiante
-    if (!isset($filtros['estado']) || empty($filtros['estado'])) {
-        $estudiantes_con_estado_real = [];
-        foreach ($todos_estudiantes as $estudiante) {
-            // Si el estudiante no tiene estado definido en la tabla graduados, determinar su estado real
-            if (empty($estudiante['estado']) || $estudiante['estado'] === null) {
-                $cumple_requisitos = cumple_requisitos_graduacion($estudiante['id']);
-                $estudiante['estado'] = $cumple_requisitos ? 'cumple_requisitos' : 'pendiente';
+    try {
+        // Primero obtener todos los estudiantes según los filtros
+        $estudiantes_data = obtener_estudiantes_graduacion($filtros);
+        $todos_estudiantes = [];
+        
+        // Convertir a array para poder manipularlo
+        if (is_array($estudiantes_data)) {
+            $todos_estudiantes = $estudiantes_data;
+        } elseif ($estudiantes_data) {
+            while ($estudiante = mysqli_fetch_assoc($estudiantes_data)) {
+                $todos_estudiantes[] = $estudiante;
             }
-            $estudiantes_con_estado_real[] = $estudiante;
         }
-        $todos_estudiantes = $estudiantes_con_estado_real;
+        
+        // Si no hay filtro de estado, determinar el estado real de cada estudiante
+        if (!isset($filtros['estado']) || empty($filtros['estado'])) {
+            $estudiantes_con_estado_real = [];
+            foreach ($todos_estudiantes as $estudiante) {
+                // Si el estudiante no tiene estado definido en la tabla graduados, determinar su estado real
+                if (empty($estudiante['estado']) || $estudiante['estado'] === null) {
+                    $cumple_requisitos = cumple_requisitos_graduacion($estudiante['id']);
+                    $estudiante['estado'] = $cumple_requisitos ? 'cumple_requisitos' : 'pendiente';
+                }
+                $estudiantes_con_estado_real[] = $estudiante;
+            }
+            $todos_estudiantes = $estudiantes_con_estado_real;
+        }
+        
+        $total_registros = count($todos_estudiantes);
+        $total_paginas = ceil($total_registros / $registros_por_pagina);
+        
+        // Aplicar paginación
+        $inicio = ($pagina - 1) * $registros_por_pagina;
+        $estudiantes_paginados = array_slice($todos_estudiantes, $inicio, $registros_por_pagina);
+        
+        // REGISTRAR EN AUDITORÍA - CONSULTA DE ESTUDIANTES PARA GRADUACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "SELECT", 
+                    "users", 
+                    null, 
+                    null, 
+                    [
+                        'filtros_aplicados' => $filtros,
+                        'pagina' => $pagina,
+                        'registros_por_pagina' => $registros_por_pagina,
+                        'total_registros' => $total_registros
+                    ], 
+                    "Graduación", 
+                    "Consulta de estudiantes para graduación"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría obtener_estudiantes_graduacion_paginados: " . $e->getMessage());
+            }
+        }
+        
+        return [
+            'resultados' => $estudiantes_paginados,
+            'total_registros' => $total_registros,
+            'total_paginas' => $total_paginas,
+            'pagina_actual' => $pagina
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Error en obtener_estudiantes_graduacion_paginados: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN CONSULTA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    null, 
+                    null, 
+                    [
+                        'filtros' => $filtros,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Graduación", 
+                    "Error al consultar estudiantes para graduación"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error obtener_estudiantes_graduacion_paginados: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'resultados' => [],
+            'total_registros' => 0,
+            'total_paginas' => 0,
+            'pagina_actual' => $pagina
+        ];
     }
-    
-    $total_registros = count($todos_estudiantes);
-    $total_paginas = ceil($total_registros / $registros_por_pagina);
-    
-    // Aplicar paginación
-    $inicio = ($pagina - 1) * $registros_por_pagina;
-    $estudiantes_paginados = array_slice($todos_estudiantes, $inicio, $registros_por_pagina);
-    
-    return [
-        'resultados' => $estudiantes_paginados,
-        'total_registros' => $total_registros,
-        'total_paginas' => $total_paginas,
-        'pagina_actual' => $pagina
-    ];
 }
 
 /**
@@ -6651,94 +6701,104 @@ function generar_url_paginacion($pagina) {
 function obtener_estudiantes_graduacion($filtros = []) {
     global $db;
     
-    $where = "WHERE u.estudiante = 1 AND u.status = 1";
-    
-    if (isset($filtros['buscar']) && !empty($filtros['buscar'])) {
-        $buscar = mysqli_real_escape_string($db, $filtros['buscar']);
-        $where .= " AND (u.nombre LIKE '%$buscar%' OR u.idusuario LIKE '%$buscar%')";
-    }
-    
-    if (isset($filtros['carrera']) && !empty($filtros['carrera'])) {
-        $carrera = mysqli_real_escape_string($db, $filtros['carrera']);
-        $where .= " AND c.nombre_carrera = '$carrera'";
-    }
-    
-    // Si se filtra por estado específico de graduación
-    if (isset($filtros['estado']) && !empty($filtros['estado'])) {
-        $estado = mysqli_real_escape_string($db, $filtros['estado']);
+    try {
+        $where = "WHERE u.estudiante = 1 AND u.status = 1";
         
-        if ($estado == 'cumple_requisitos') {
-            // Obtener todos los estudiantes no graduados y determinar su estado real
-            $query = "SELECT u.id, u.idusuario, u.nombre, u.carrera,
-                             c.nombre_carrera,
-                             g.id as id_graduado, g.estado, g.fecha_graduacion, 
-                             g.titulo_entregado, g.fecha_entrega_titulo
-                      FROM users u 
-                      LEFT JOIN carreras c ON u.carrera = c.id_carrera
-                      LEFT JOIN graduados g ON u.id = g.id_usuario 
-                      WHERE u.estudiante = 1 AND u.status = 1 
-                      AND (g.id_usuario IS NULL OR g.estado = 'cumple_requisitos')
-                      ORDER BY u.nombre";
+        if (isset($filtros['buscar']) && !empty($filtros['buscar'])) {
+            $buscar = mysqli_real_escape_string($db, $filtros['buscar']);
+            $where .= " AND (u.nombre LIKE '%$buscar%' OR u.idusuario LIKE '%$buscar%')";
+        }
+        
+        if (isset($filtros['carrera']) && !empty($filtros['carrera'])) {
+            $carrera = mysqli_real_escape_string($db, $filtros['carrera']);
+            $where .= " AND c.nombre_carrera = '$carrera'";
+        }
+        
+        // Si se filtra por estado específico de graduación
+        if (isset($filtros['estado']) && !empty($filtros['estado'])) {
+            $estado = mysqli_real_escape_string($db, $filtros['estado']);
+            
+            if ($estado == 'cumple_requisitos') {
+                // Obtener todos los estudiantes no graduados y determinar su estado real
+                $query = "SELECT u.id, u.idusuario, u.nombre, u.carrera,
+                                 c.nombre_carrera,
+                                 g.id as id_graduado, g.estado, g.fecha_graduacion, 
+                                 g.titulo_entregado, g.fecha_entrega_titulo
+                          FROM users u 
+                          LEFT JOIN carreras c ON u.carrera = c.id_carrera
+                          LEFT JOIN graduados g ON u.id = g.id_usuario 
+                          WHERE u.estudiante = 1 AND u.status = 1 
+                          AND (g.id_usuario IS NULL OR g.estado = 'cumple_requisitos')
+                          ORDER BY u.nombre";
+            } else {
+                // Estudiantes con estado específico en graduados
+                $query = "SELECT u.id, u.idusuario, u.nombre, u.carrera,
+                                 c.nombre_carrera,
+                                 g.id as id_graduado, g.estado, g.fecha_graduacion, 
+                                 g.titulo_entregado, g.fecha_entrega_titulo 
+                          FROM users u 
+                          INNER JOIN carreras c ON u.carrera = c.id_carrera
+                          INNER JOIN graduados g ON u.id = g.id_usuario 
+                          WHERE u.estudiante = 1 AND u.status = 1 
+                          AND g.estado = '$estado'
+                          ORDER BY u.nombre";
+            }
         } else {
-            // Estudiantes con estado específico en graduados
+            // Mostrar todos los estudiantes con su estado de graduación
             $query = "SELECT u.id, u.idusuario, u.nombre, u.carrera,
                              c.nombre_carrera,
                              g.id as id_graduado, g.estado, g.fecha_graduacion, 
                              g.titulo_entregado, g.fecha_entrega_titulo 
                       FROM users u 
-                      INNER JOIN carreras c ON u.carrera = c.id_carrera
-                      INNER JOIN graduados g ON u.id = g.id_usuario 
-                      WHERE u.estudiante = 1 AND u.status = 1 
-                      AND g.estado = '$estado'
+                      LEFT JOIN carreras c ON u.carrera = c.id_carrera
+                      LEFT JOIN graduados g ON u.id = g.id_usuario 
+                      $where 
                       ORDER BY u.nombre";
         }
-    } else {
-        // Mostrar todos los estudiantes con su estado de graduación
-        $query = "SELECT u.id, u.idusuario, u.nombre, u.carrera,
-                         c.nombre_carrera,
-                         g.id as id_graduado, g.estado, g.fecha_graduacion, 
-                         g.titulo_entregado, g.fecha_entrega_titulo 
-                  FROM users u 
-                  LEFT JOIN carreras c ON u.carrera = c.id_carrera
-                  LEFT JOIN graduados g ON u.id = g.id_usuario 
-                  $where 
-                  ORDER BY u.nombre";
-    }
-    
-    $result = mysqli_query($db, $query);
-    
-    // Si estamos filtrando por "cumple_requisitos", determinar el estado real de cada estudiante
-    if (isset($filtros['estado']) && $filtros['estado'] == 'cumple_requisitos') {
-        $estudiantes_filtrados = [];
+        
+        $result = mysqli_query($db, $query);
+        
+        if (!$result) {
+            throw new Exception("Error en consulta: " . mysqli_error($db));
+        }
+        
+        // Si estamos filtrando por "cumple_requisitos", determinar el estado real de cada estudiante
+        if (isset($filtros['estado']) && $filtros['estado'] == 'cumple_requisitos') {
+            $estudiantes_filtrados = [];
+            if ($result && mysqli_num_rows($result) > 0) {
+                while ($estudiante = mysqli_fetch_assoc($result)) {
+                    // Verificar si realmente cumple requisitos
+                    if (cumple_requisitos_graduacion($estudiante['id'])) {
+                        // Si cumple requisitos, actualizar el estado
+                        $estudiante['estado'] = 'cumple_requisitos';
+                        $estudiantes_filtrados[] = $estudiante;
+                    }
+                    // Si no cumple requisitos, NO lo incluimos en los resultados
+                }
+            }
+            return $estudiantes_filtrados;
+        }
+        
+        // Para otros casos, procesar los estados correctamente
+        $estudiantes_procesados = [];
         if ($result && mysqli_num_rows($result) > 0) {
             while ($estudiante = mysqli_fetch_assoc($result)) {
-                // Verificar si realmente cumple requisitos
-                if (cumple_requisitos_graduacion($estudiante['id'])) {
-                    // Si cumple requisitos, actualizar el estado
-                    $estudiante['estado'] = 'cumple_requisitos';
-                    $estudiantes_filtrados[] = $estudiante;
+                // Si el estudiante no tiene registro en graduados, determinar su estado real
+                if (empty($estudiante['id_graduado']) || $estudiante['estado'] === null) {
+                    $cumple_requisitos = cumple_requisitos_graduacion($estudiante['id']);
+                    $estudiante['estado'] = $cumple_requisitos ? 'cumple_requisitos' : 'pendiente';
                 }
-                // Si no cumple requisitos, NO lo incluimos en los resultados
+                $estudiantes_procesados[] = $estudiante;
             }
+            return $estudiantes_procesados;
         }
-        return $estudiantes_filtrados;
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtener_estudiantes_graduacion: " . $e->getMessage());
+        return [];
     }
-    
-    // Para otros casos, procesar los estados correctamente
-    $estudiantes_procesados = [];
-    if ($result && mysqli_num_rows($result) > 0) {
-        while ($estudiante = mysqli_fetch_assoc($result)) {
-            // Si el estudiante no tiene registro en graduados, determinar su estado real
-            if (empty($estudiante['id_graduado']) || $estudiante['estado'] === null) {
-                $cumple_requisitos = cumple_requisitos_graduacion($estudiante['id']);
-                $estudiante['estado'] = $cumple_requisitos ? 'cumple_requisitos' : 'pendiente';
-            }
-            $estudiantes_procesados[] = $estudiante;
-        }
-        return $estudiantes_procesados;
-    }
-    
-    return $result;
 }
 
 /**
@@ -6747,39 +6807,108 @@ function obtener_estudiantes_graduacion($filtros = []) {
 function marcar_como_graduado($id_usuario) {
     global $db;
     
-    $id_usuario = mysqli_real_escape_string($db, $id_usuario);
-    
-    // Obtener el ID del admin desde la sesión
-    $id_admin = obtener_id_admin();
-    
-    $observaciones = isset($_POST['observaciones']) ? mysqli_real_escape_string($db, $_POST['observaciones']) : '';
-    
-    // Verificar si ya existe registro
-    $check = mysqli_query($db, "SELECT id FROM graduados WHERE id_usuario = '$id_usuario'");
-    
-    if (mysqli_num_rows($check) > 0) {
-        // Actualizar registro existente
-        $query = "UPDATE graduados SET 
-                 estado = 'graduado', 
-                 fecha_graduacion = NOW(), 
-                 id_admin_graduacion = '$id_admin', 
-                 observaciones = '$observaciones',
-                 fecha_actualizacion = NOW() 
-                 WHERE id_usuario = '$id_usuario'";
-    } else {
-        // Insertar nuevo registro
-        $query = "INSERT INTO graduados 
-                 (id_usuario, estado, fecha_graduacion, id_admin_graduacion, observaciones) 
-                 VALUES 
-                 ('$id_usuario', 'graduado', NOW(), '$id_admin', '$observaciones')";
-    }
-    
-    if (mysqli_query($db, $query)) {
-        $_SESSION['mensaje'] = "Estudiante marcado como graduado exitosamente";
-        $_SESSION['tipo_mensaje'] = "success";
-        return true;
-    } else {
-        $_SESSION['mensaje'] = "Error al marcar como graduado: " . mysqli_error($db);
+    try {
+        $id_usuario = mysqli_real_escape_string($db, $id_usuario);
+        
+        // Obtener información del estudiante antes de la operación
+        $estudiante_info = null;
+        $query_info = "SELECT u.id, u.nombre, u.idusuario, c.nombre_carrera 
+                      FROM users u 
+                      LEFT JOIN carreras c ON u.carrera = c.id_carrera 
+                      WHERE u.id = '$id_usuario'";
+        $result_info = mysqli_query($db, $query_info);
+        if ($result_info && mysqli_num_rows($result_info) > 0) {
+            $estudiante_info = mysqli_fetch_assoc($result_info);
+        }
+        
+        // Obtener el ID del admin desde la sesión
+        $id_admin = obtener_id_admin();
+        
+        $observaciones = isset($_POST['observaciones']) ? mysqli_real_escape_string($db, $_POST['observaciones']) : '';
+        
+        // Verificar si ya existe registro
+        $check = mysqli_query($db, "SELECT id, estado FROM graduados WHERE id_usuario = '$id_usuario'");
+        $registro_existente = null;
+        if ($check && mysqli_num_rows($check) > 0) {
+            $registro_existente = mysqli_fetch_assoc($check);
+        }
+        
+        if ($registro_existente) {
+            // Actualizar registro existente
+            $query = "UPDATE graduados SET 
+                     estado = 'graduado', 
+                     fecha_graduacion = NOW(), 
+                     id_admin_graduacion = '$id_admin', 
+                     observaciones = '$observaciones',
+                     fecha_actualizacion = NOW() 
+                     WHERE id_usuario = '$id_usuario'";
+        } else {
+            // Insertar nuevo registro
+            $query = "INSERT INTO graduados 
+                     (id_usuario, estado, fecha_graduacion, id_admin_graduacion, observaciones) 
+                     VALUES 
+                     ('$id_usuario', 'graduado', NOW(), '$id_admin', '$observaciones')";
+        }
+        
+        if (mysqli_query($db, $query)) {
+            $id_graduado = $registro_existente ? $registro_existente['id'] : mysqli_insert_id($db);
+            
+            // REGISTRAR EN AUDITORÍA - MARCADO COMO GRADUADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        $registro_existente ? "UPDATE" : "INSERT", 
+                        "graduados", 
+                        $id_graduado, 
+                        $registro_existente ? ['estado' => $registro_existente['estado']] : null, 
+                        [
+                            'estado' => 'graduado',
+                            'id_usuario' => $id_usuario,
+                            'estudiante_nombre' => $estudiante_info['nombre'] ?? 'Desconocido',
+                            'estudiante_cedula' => $estudiante_info['idusuario'] ?? '',
+                            'carrera' => $estudiante_info['nombre_carrera'] ?? '',
+                            'id_admin_graduacion' => $id_admin,
+                            'observaciones' => $observaciones
+                        ], 
+                        "Graduación", 
+                        "Estudiante marcado como graduado"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría marcar_como_graduado: " . $e->getMessage());
+                }
+            }
+            
+            $_SESSION['mensaje'] = "Estudiante marcado como graduado exitosamente";
+            $_SESSION['tipo_mensaje'] = "success";
+            return true;
+        } else {
+            throw new Exception("Error en consulta: " . mysqli_error($db));
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en marcar_como_graduado: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL MARCAR COMO GRADUADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "graduados", 
+                    null, 
+                    null, 
+                    [
+                        'id_usuario' => $id_usuario,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Graduación", 
+                    "Error al marcar estudiante como graduado"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error marcar_como_graduado: " . $auditError->getMessage());
+            }
+        }
+        
+        $_SESSION['mensaje'] = "Error al marcar como graduado: " . $e->getMessage();
         $_SESSION['tipo_mensaje'] = "error";
         return false;
     }
@@ -6791,25 +6920,92 @@ function marcar_como_graduado($id_usuario) {
 function marcar_titulo_entregado($id_graduado) {
     global $db;
     
-    $id_graduado = mysqli_real_escape_string($db, $id_graduado);
-    
-    // Obtener el ID del admin desde la sesión
-    $id_admin = obtener_id_admin();
-    
-    $query = "UPDATE graduados SET 
-             titulo_entregado = 1, 
-             fecha_entrega_titulo = NOW(), 
-             id_admin_entrega_titulo = '$id_admin', 
-             estado = 'titulo_entregado',
-             fecha_actualizacion = NOW() 
-             WHERE id = '$id_graduado'";
-    
-    if (mysqli_query($db, $query)) {
-        $_SESSION['mensaje'] = "Título marcado como entregado exitosamente";
-        $_SESSION['tipo_mensaje'] = "success";
-        return true;
-    } else {
-        $_SESSION['mensaje'] = "Error al marcar título como entregado: " . mysqli_error($db);
+    try {
+        $id_graduado = mysqli_real_escape_string($db, $id_graduado);
+        
+        // Obtener información del graduado antes de la operación
+        $graduado_info = null;
+        $query_info = "SELECT g.*, u.nombre, u.idusuario, c.nombre_carrera 
+                      FROM graduados g 
+                      INNER JOIN users u ON g.id_usuario = u.id 
+                      LEFT JOIN carreras c ON u.carrera = c.id_carrera 
+                      WHERE g.id = '$id_graduado'";
+        $result_info = mysqli_query($db, $query_info);
+        if ($result_info && mysqli_num_rows($result_info) > 0) {
+            $graduado_info = mysqli_fetch_assoc($result_info);
+        }
+        
+        // Obtener el ID del admin desde la sesión
+        $id_admin = obtener_id_admin();
+        
+        $query = "UPDATE graduados SET 
+                 titulo_entregado = 1, 
+                 fecha_entrega_titulo = NOW(), 
+                 id_admin_entrega_titulo = '$id_admin', 
+                 estado = 'titulo_entregado',
+                 fecha_actualizacion = NOW() 
+                 WHERE id = '$id_graduado'";
+        
+        if (mysqli_query($db, $query)) {
+            // REGISTRAR EN AUDITORÍA - TÍTULO MARCADO COMO ENTREGADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "graduados", 
+                        $id_graduado, 
+                        [
+                            'titulo_entregado' => $graduado_info['titulo_entregado'] ?? 0,
+                            'estado' => $graduado_info['estado'] ?? ''
+                        ], 
+                        [
+                            'titulo_entregado' => 1,
+                            'estado' => 'titulo_entregado',
+                            'id_usuario' => $graduado_info['id_usuario'] ?? '',
+                            'estudiante_nombre' => $graduado_info['nombre'] ?? 'Desconocido',
+                            'estudiante_cedula' => $graduado_info['idusuario'] ?? '',
+                            'carrera' => $graduado_info['nombre_carrera'] ?? '',
+                            'id_admin_entrega_titulo' => $id_admin
+                        ], 
+                        "Graduación", 
+                        "Título marcado como entregado"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría marcar_titulo_entregado: " . $e->getMessage());
+                }
+            }
+            
+            $_SESSION['mensaje'] = "Título marcado como entregado exitosamente";
+            $_SESSION['tipo_mensaje'] = "success";
+            return true;
+        } else {
+            throw new Exception("Error en consulta: " . mysqli_error($db));
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en marcar_titulo_entregado: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL MARCAR TÍTULO COMO ENTREGADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "graduados", 
+                    $id_graduado, 
+                    null, 
+                    [
+                        'id_graduado' => $id_graduado,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Graduación", 
+                    "Error al marcar título como entregado"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error marcar_titulo_entregado: " . $auditError->getMessage());
+            }
+        }
+        
+        $_SESSION['mensaje'] = "Error al marcar título como entregado: " . $e->getMessage();
         $_SESSION['tipo_mensaje'] = "error";
         return false;
     }
@@ -6872,15 +7068,21 @@ function generar_botones_accion($estudiante) {
  */
 function obtener_carreras() {
     global $db;
-    $query = "SELECT c.id_carrera, c.nombre_carrera 
-              FROM carreras c
-              INNER JOIN users u ON c.id_carrera = u.carrera
-              WHERE u.estudiante = 1 
-              AND c.nombre_carrera IS NOT NULL 
-              AND c.nombre_carrera != '' 
-              GROUP BY c.id_carrera, c.nombre_carrera
-              ORDER BY c.nombre_carrera";
-    return mysqli_query($db, $query);
+    
+    try {
+        $query = "SELECT c.id_carrera, c.nombre_carrera 
+                  FROM carreras c
+                  INNER JOIN users u ON c.id_carrera = u.carrera
+                  WHERE u.estudiante = 1 
+                  AND c.nombre_carrera IS NOT NULL 
+                  AND c.nombre_carrera != '' 
+                  GROUP BY c.id_carrera, c.nombre_carrera
+                  ORDER BY c.nombre_carrera";
+        return mysqli_query($db, $query);
+    } catch (Exception $e) {
+        error_log("Error en obtener_carreras: " . $e->getMessage());
+        return false;
+    }
 }
 
 // =============================================
@@ -6893,143 +7095,161 @@ function obtener_carreras() {
 function es_apto_para_grado($estudiante_id) {
     global $db;
     
-    $estudiante_id = mysqli_real_escape_string($db, $estudiante_id);
-    
-    // 1. Obtener información del estudiante y su carrera - ACTUALIZADA para nombre carrera
-    $query_estudiante = "SELECT u.id, u.carrera, c.nombre_carrera 
-                        FROM users u 
-                        LEFT JOIN carreras c ON u.carrera = c.id_carrera 
-                        WHERE u.id = '$estudiante_id'";
-    $result_estudiante = mysqli_query($db, $query_estudiante);
-    
-    if (!$result_estudiante || mysqli_num_rows($result_estudiante) === 0) {
-        return [
-            'apto_tsu' => false,
-            'apto_grado_completo' => false,
-            'materias_aprobadas_tsu' => 0,
-            'total_materias_tsu' => 0,
-            'porcentaje_tsu' => 0,
-            'creditos_aprobados_tsu' => 0,
-            'materias_aprobadas_completo' => 0,
-            'total_materias_carrera' => 0,
-            'porcentaje_completo' => 0,
-            'creditos_aprobados_completo' => 0,
-            'requisitos_adicionales' => false,
-            'carrera' => 'No especificada'
-        ];
-    }
-    
-    $estudiante = mysqli_fetch_assoc($result_estudiante);
-    $carrera_id = $estudiante['carrera'];
-    $nombre_carrera = $estudiante['nombre_carrera'] ?: 'Carrera ' . $carrera_id;
-    
-    // El resto de la función se mantiene igual...
-    // 2. Obtener todas las materias de la carrera (para evaluación completa)
-    $query_materias_completo = "SELECT m.id_materia, m.trayecto, m.creditos
-                               FROM carrera_materia cm
-                               INNER JOIN materias m ON cm.id_materia = m.id_materia
-                               WHERE cm.id_carrera = '$carrera_id' 
-                               AND m.activa = 1
-                               ORDER BY m.trayecto";
-    
-    $result_materias_completo = mysqli_query($db, $query_materias_completo);
-    $total_materias_carrera = mysqli_num_rows($result_materias_completo);
-    
-    if ($total_materias_carrera === 0) {
-        return [
-            'apto_tsu' => false,
-            'apto_grado_completo' => false,
-            'materias_aprobadas_tsu' => 0,
-            'total_materias_tsu' => 0,
-            'porcentaje_tsu' => 0,
-            'creditos_aprobados_tsu' => 0,
-            'materias_aprobadas_completo' => 0,
-            'total_materias_carrera' => 0,
-            'porcentaje_completo' => 0,
-            'creditos_aprobados_completo' => 0,
-            'requisitos_adicionales' => false,
-            'carrera' => $nombre_carrera
-        ];
-    }
-    
-    // 3. Obtener solo materias de TSU (trayectos 0, 1, 2)
-    $query_materias_tsu = "SELECT m.id_materia, m.trayecto, m.creditos
-                          FROM carrera_materia cm
-                          INNER JOIN materias m ON cm.id_materia = m.id_materia
-                          WHERE cm.id_carrera = '$carrera_id' 
-                          AND m.trayecto IN (0, 1, 2)
-                          AND m.activa = 1";
-    
-    $result_materias_tsu = mysqli_query($db, $query_materias_tsu);
-    $total_materias_tsu = mysqli_num_rows($result_materias_tsu);
-    
-    // 4. Contar materias aprobadas para TSU
-    $materias_aprobadas_tsu = 0;
-    $creditos_aprobados_tsu = 0;
-    
-    if ($result_materias_tsu) {
-        mysqli_data_seek($result_materias_tsu, 0);
-        while ($materia = mysqli_fetch_assoc($result_materias_tsu)) {
+    try {
+        $estudiante_id = mysqli_real_escape_string($db, $estudiante_id);
+        
+        // 1. Obtener información del estudiante y su carrera - ACTUALIZADA para nombre carrera
+        $query_estudiante = "SELECT u.id, u.carrera, c.nombre_carrera 
+                            FROM users u 
+                            LEFT JOIN carreras c ON u.carrera = c.id_carrera 
+                            WHERE u.id = '$estudiante_id'";
+        $result_estudiante = mysqli_query($db, $query_estudiante);
+        
+        if (!$result_estudiante || mysqli_num_rows($result_estudiante) === 0) {
+            return [
+                'apto_tsu' => false,
+                'apto_grado_completo' => false,
+                'materias_aprobadas_tsu' => 0,
+                'total_materias_tsu' => 0,
+                'porcentaje_tsu' => 0,
+                'creditos_aprobados_tsu' => 0,
+                'materias_aprobadas_completo' => 0,
+                'total_materias_carrera' => 0,
+                'porcentaje_completo' => 0,
+                'creditos_aprobados_completo' => 0,
+                'requisitos_adicionales' => false,
+                'carrera' => 'No especificada'
+            ];
+        }
+        
+        $estudiante = mysqli_fetch_assoc($result_estudiante);
+        $carrera_id = $estudiante['carrera'];
+        $nombre_carrera = $estudiante['nombre_carrera'] ?: 'Carrera ' . $carrera_id;
+        
+        // 2. Obtener todas las materias de la carrera (para evaluación completa)
+        $query_materias_completo = "SELECT m.id_materia, m.trayecto, m.creditos
+                                   FROM carrera_materia cm
+                                   INNER JOIN materias m ON cm.id_materia = m.id_materia
+                                   WHERE cm.id_carrera = '$carrera_id' 
+                                   AND m.activa = 1
+                                   ORDER BY m.trayecto";
+        
+        $result_materias_completo = mysqli_query($db, $query_materias_completo);
+        $total_materias_carrera = mysqli_num_rows($result_materias_completo);
+        
+        if ($total_materias_carrera === 0) {
+            return [
+                'apto_tsu' => false,
+                'apto_grado_completo' => false,
+                'materias_aprobadas_tsu' => 0,
+                'total_materias_tsu' => 0,
+                'porcentaje_tsu' => 0,
+                'creditos_aprobados_tsu' => 0,
+                'materias_aprobadas_completo' => 0,
+                'total_materias_carrera' => 0,
+                'porcentaje_completo' => 0,
+                'creditos_aprobados_completo' => 0,
+                'requisitos_adicionales' => false,
+                'carrera' => $nombre_carrera
+            ];
+        }
+        
+        // 3. Obtener solo materias de TSU (trayectos 0, 1, 2)
+        $query_materias_tsu = "SELECT m.id_materia, m.trayecto, m.creditos
+                              FROM carrera_materia cm
+                              INNER JOIN materias m ON cm.id_materia = m.id_materia
+                              WHERE cm.id_carrera = '$carrera_id' 
+                              AND m.trayecto IN (0, 1, 2)
+                              AND m.activa = 1";
+        
+        $result_materias_tsu = mysqli_query($db, $query_materias_tsu);
+        $total_materias_tsu = mysqli_num_rows($result_materias_tsu);
+        
+        // 4. Contar materias aprobadas para TSU
+        $materias_aprobadas_tsu = 0;
+        $creditos_aprobados_tsu = 0;
+        
+        if ($result_materias_tsu) {
+            mysqli_data_seek($result_materias_tsu, 0);
+            while ($materia = mysqli_fetch_assoc($result_materias_tsu)) {
+                $materia_id = $materia['id_materia'];
+                $trayecto = $materia['trayecto'];
+                $creditos = $materia['creditos'] ?: 3;
+                
+                if (tiene_materia_aprobada($estudiante_id, $materia_id, $trayecto)) {
+                    $materias_aprobadas_tsu++;
+                    $creditos_aprobados_tsu += $creditos;
+                }
+            }
+        }
+        
+        // 5. Contar materias aprobadas para carrera completa
+        $materias_aprobadas_completo = 0;
+        $creditos_aprobados_completo = 0;
+        
+        mysqli_data_seek($result_materias_completo, 0);
+        while ($materia = mysqli_fetch_assoc($result_materias_completo)) {
             $materia_id = $materia['id_materia'];
             $trayecto = $materia['trayecto'];
             $creditos = $materia['creditos'] ?: 3;
             
             if (tiene_materia_aprobada($estudiante_id, $materia_id, $trayecto)) {
-                $materias_aprobadas_tsu++;
-                $creditos_aprobados_tsu += $creditos;
+                $materias_aprobadas_completo++;
+                $creditos_aprobados_completo += $creditos;
             }
         }
+        
+        // 6. Verificar requisitos adicionales
+        $requisitos_adicionales_cumplidos = verificar_requisitos_adicionales($estudiante_id);
+        
+        // 7. Determinar estados
+        $porcentaje_tsu = $total_materias_tsu > 0 ? ($materias_aprobadas_tsu / $total_materias_tsu) * 100 : 0;
+        $porcentaje_completo = $total_materias_carrera > 0 ? ($materias_aprobadas_completo / $total_materias_carrera) * 100 : 0;
+        
+        // Para TSU: 90% de materias aprobadas + requisitos adicionales
+        $apto_tsu = ($porcentaje_tsu >= 90) && $requisitos_adicionales_cumplidos;
+        
+        // Para Grado Completo: 100% de materias aprobadas + requisitos adicionales
+        $apto_grado_completo = ($porcentaje_completo >= 100) && $requisitos_adicionales_cumplidos;
+        
+        return [
+            'apto_tsu' => $apto_tsu,
+            'apto_grado_completo' => $apto_grado_completo,
+            
+            // Estadísticas TSU
+            'materias_aprobadas_tsu' => $materias_aprobadas_tsu,
+            'total_materias_tsu' => $total_materias_tsu,
+            'porcentaje_tsu' => round($porcentaje_tsu, 1),
+            'creditos_aprobados_tsu' => $creditos_aprobados_tsu,
+            
+            // Estadísticas carrera completa
+            'materias_aprobadas_completo' => $materias_aprobadas_completo,
+            'total_materias_carrera' => $total_materias_carrera,
+            'porcentaje_completo' => round($porcentaje_completo, 1),
+            'creditos_aprobados_completo' => $creditos_aprobados_completo,
+            
+            // Información general
+            'requisitos_adicionales' => $requisitos_adicionales_cumplidos,
+            'carrera' => $nombre_carrera
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Error en es_apto_para_grado: " . $e->getMessage());
+        return [
+            'apto_tsu' => false,
+            'apto_grado_completo' => false,
+            'materias_aprobadas_tsu' => 0,
+            'total_materias_tsu' => 0,
+            'porcentaje_tsu' => 0,
+            'creditos_aprobados_tsu' => 0,
+            'materias_aprobadas_completo' => 0,
+            'total_materias_carrera' => 0,
+            'porcentaje_completo' => 0,
+            'creditos_aprobados_completo' => 0,
+            'requisitos_adicionales' => false,
+            'carrera' => 'Error en consulta'
+        ];
     }
-    
-    // 5. Contar materias aprobadas para carrera completa
-    $materias_aprobadas_completo = 0;
-    $creditos_aprobados_completo = 0;
-    
-    mysqli_data_seek($result_materias_completo, 0);
-    while ($materia = mysqli_fetch_assoc($result_materias_completo)) {
-        $materia_id = $materia['id_materia'];
-        $trayecto = $materia['trayecto'];
-        $creditos = $materia['creditos'] ?: 3;
-        
-        if (tiene_materia_aprobada($estudiante_id, $materia_id, $trayecto)) {
-            $materias_aprobadas_completo++;
-            $creditos_aprobados_completo += $creditos;
-        }
-    }
-    
-    // 6. Verificar requisitos adicionales
-    $requisitos_adicionales_cumplidos = verificar_requisitos_adicionales($estudiante_id);
-    
-    // 7. Determinar estados
-    $porcentaje_tsu = $total_materias_tsu > 0 ? ($materias_aprobadas_tsu / $total_materias_tsu) * 100 : 0;
-    $porcentaje_completo = $total_materias_carrera > 0 ? ($materias_aprobadas_completo / $total_materias_carrera) * 100 : 0;
-    
-    // Para TSU: 90% de materias aprobadas + requisitos adicionales
-    $apto_tsu = ($porcentaje_tsu >= 90) && $requisitos_adicionales_cumplidos;
-    
-    // Para Grado Completo: 100% de materias aprobadas + requisitos adicionales
-    $apto_grado_completo = ($porcentaje_completo >= 100) && $requisitos_adicionales_cumplidos;
-    
-    return [
-        'apto_tsu' => $apto_tsu,
-        'apto_grado_completo' => $apto_grado_completo,
-        
-        // Estadísticas TSU
-        'materias_aprobadas_tsu' => $materias_aprobadas_tsu,
-        'total_materias_tsu' => $total_materias_tsu,
-        'porcentaje_tsu' => round($porcentaje_tsu, 1),
-        'creditos_aprobados_tsu' => $creditos_aprobados_tsu,
-        
-        // Estadísticas carrera completa
-        'materias_aprobadas_completo' => $materias_aprobadas_completo,
-        'total_materias_carrera' => $total_materias_carrera,
-        'porcentaje_completo' => round($porcentaje_completo, 1),
-        'creditos_aprobados_completo' => $creditos_aprobados_completo,
-        
-        // Información general
-        'requisitos_adicionales' => $requisitos_adicionales_cumplidos,
-        'carrera' => $nombre_carrera
-    ];
 }
 
 /**
@@ -7038,29 +7258,35 @@ function es_apto_para_grado($estudiante_id) {
 function tiene_materia_aprobada($estudiante_id, $materia_id, $trayecto) {
     global $db;
     
-    $estudiante_id = mysqli_real_escape_string($db, $estudiante_id);
-    $materia_id = mysqli_real_escape_string($db, $materia_id);
-    $trayecto = mysqli_real_escape_string($db, $trayecto);
-    
-    // Consulta para verificar nota aprobada
-    $campo_trayecto = 'trayecto_' . $trayecto;
-    $query_nota = "SELECT $campo_trayecto as nota 
-                  FROM notas_definitivas 
-                  WHERE id_usuario = '$estudiante_id' 
-                  AND id_materia = '$materia_id' 
-                  AND $campo_trayecto >= 12  -- Nota mínima para aprobar
-                  AND $campo_trayecto IS NOT NULL
-                  LIMIT 1";
-    
-    $result_nota = mysqli_query($db, $query_nota);
-    
-    if ($result_nota && mysqli_num_rows($result_nota) > 0) {
-        $nota_data = mysqli_fetch_assoc($result_nota);
-        // Verificar que la nota sea realmente un número y esté aprobada
-        return is_numeric($nota_data['nota']) && $nota_data['nota'] >= 10;
+    try {
+        $estudiante_id = mysqli_real_escape_string($db, $estudiante_id);
+        $materia_id = mysqli_real_escape_string($db, $materia_id);
+        $trayecto = mysqli_real_escape_string($db, $trayecto);
+        
+        // Consulta para verificar nota aprobada
+        $campo_trayecto = 'trayecto_' . $trayecto;
+        $query_nota = "SELECT $campo_trayecto as nota 
+                      FROM notas_definitivas 
+                      WHERE id_usuario = '$estudiante_id' 
+                      AND id_materia = '$materia_id' 
+                      AND $campo_trayecto >= 12  -- Nota mínima para aprobar
+                      AND $campo_trayecto IS NOT NULL
+                      LIMIT 1";
+        
+        $result_nota = mysqli_query($db, $query_nota);
+        
+        if ($result_nota && mysqli_num_rows($result_nota) > 0) {
+            $nota_data = mysqli_fetch_assoc($result_nota);
+            // Verificar que la nota sea realmente un número y esté aprobada
+            return is_numeric($nota_data['nota']) && $nota_data['nota'] >= 10;
+        }
+        
+        return false;
+        
+    } catch (Exception $e) {
+        error_log("Error en tiene_materia_aprobada: " . $e->getMessage());
+        return false;
     }
-    
-    return false;
 }
 
 /**
@@ -7069,22 +7295,35 @@ function tiene_materia_aprobada($estudiante_id, $materia_id, $trayecto) {
 function verificar_requisitos_adicionales($estudiante_id) {
     global $db;
     
-    $estudiante_id = mysqli_real_escape_string($db, $estudiante_id);
-    
-    // Por ahora, asumimos que todos los requisitos adicionales están cumplidos
-    // Debes implementar estas verificaciones según las reglas de tu universidad
-    return true;
+    try {
+        $estudiante_id = mysqli_real_escape_string($db, $estudiante_id);
+        
+        // Por ahora, asumimos que todos los requisitos adicionales están cumplidos
+        // Debes implementar estas verificaciones según las reglas de tu universidad
+        return true;
+        
+    } catch (Exception $e) {
+        error_log("Error en verificar_requisitos_adicionales: " . $e->getMessage());
+        return false;
+    }
 }
 
 /**
  * Función para verificar requisitos de graduación
  */
 function cumple_requisitos_graduacion($id_usuario) {
-    $info_aptitud = es_apto_para_grado($id_usuario);
-    
-    // Para la página de graduación, consideramos aptos tanto TSU como grado completo
-    return ($info_aptitud['apto_tsu'] || $info_aptitud['apto_grado_completo']);
+    try {
+        $info_aptitud = es_apto_para_grado($id_usuario);
+        
+        // Para la página de graduación, consideramos aptos tanto TSU como grado completo
+        return ($info_aptitud['apto_tsu'] || $info_aptitud['apto_grado_completo']);
+        
+    } catch (Exception $e) {
+        error_log("Error en cumple_requisitos_graduacion: " . $e->getMessage());
+        return false;
+    }
 }
+
 
 
 //IMAGENES SOPORTE *********************************************************************
