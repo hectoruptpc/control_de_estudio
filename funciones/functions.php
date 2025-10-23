@@ -962,84 +962,136 @@ function procesarCSVEstudiantes($tmpFilePath, $originalName) {
 
 
 
-
-
 // FUNCIONES PARA GESTIONAR CARRERAS
 
 // Función para obtener carreras desde la tabla carreras
 function obtenerListaCompletaCarreras(bool $soloActivas = false): array {
-  global $db;
-  
-  try {
-      // Construir consulta base
-      $query = "SELECT id_carrera, nombre_carrera, cod_carrera, activa FROM carreras";
-      
-      // Agregar condición si es necesario
-      if ($soloActivas) {
-          $query .= " WHERE activa = ?";
-      }
-      
-      $query .= " ORDER BY nombre_carrera";
-      
-      // Preparar la consulta
-      $stmt = $db->prepare($query);
-      if (!$stmt) {
-          throw new Exception("Error al preparar consulta: " . $db->error);
-      }
-      
-      // Vincular parámetro si es necesario
-      if ($soloActivas) {
-          $activa = 1;
-          $stmt->bind_param("i", $activa);
-      }
-      
-      // Ejecutar consulta
-      if (!$stmt->execute()) {
-          throw new Exception("Error al ejecutar consulta: " . $stmt->error);
-      }
-      
-      // Obtener resultados
-      $result = $stmt->get_result();
-      $carreras = $result->fetch_all(MYSQLI_ASSOC);
-      
-      // Liberar recursos
-      $result->free();
-      $stmt->close();
-      
-      return $carreras;
-      
-  } catch (Exception $e) {
-      error_log("Error al obtener carreras: " . $e->getMessage());
-      return [];
-  }
+    global $db;
+    
+    try {
+        // Construir consulta base
+        $query = "SELECT id_carrera, nombre_carrera, cod_carrera, activa FROM carreras";
+        
+        // Agregar condición si es necesario
+        if ($soloActivas) {
+            $query .= " WHERE activa = ?";
+        }
+        
+        $query .= " ORDER BY nombre_carrera";
+        
+        // Preparar la consulta
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error al preparar consulta: " . $db->error);
+        }
+        
+        // Vincular parámetro si es necesario
+        if ($soloActivas) {
+            $activa = 1;
+            $stmt->bind_param("i", $activa);
+        }
+        
+        // Ejecutar consulta
+        if (!$stmt->execute()) {
+            throw new Exception("Error al ejecutar consulta: " . $stmt->error);
+        }
+        
+        // Obtener resultados
+        $result = $stmt->get_result();
+        $carreras = $result->fetch_all(MYSQLI_ASSOC);
+        
+        // Liberar recursos
+        $result->free();
+        $stmt->close();
+        
+        return $carreras;
+        
+    } catch (Exception $e) {
+        error_log("Error al obtener carreras: " . $e->getMessage());
+        return [];
+    }
 }
-
 
 function cambiarEstadoCarrera($id_carrera, $estado) {
     global $db;
     
-    $query = "UPDATE carreras SET activa = ? WHERE id_carrera = ?";
-    $stmt = $db->prepare($query);
-    
-    if (!$stmt) {
-        throw new Exception("Error en la preparación de la consulta: " . $conn->error);
+    try {
+        // Obtener información actual de la carrera para auditoría
+        $carrera_actual = obtenerCarreraPorId($id_carrera);
+        
+        $query = "UPDATE carreras SET activa = ? WHERE id_carrera = ?";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en la preparación de la consulta: " . $db->error);
+        }
+        
+        $stmt->bind_param("ii", $estado, $id_carrera);
+        $resultado = $stmt->execute();
+        
+        // Verificar si realmente hubo cambios
+        if ($resultado && $stmt->affected_rows > 0) {
+            // REGISTRAR EN AUDITORÍA - CAMBIO DE ESTADO DE CARRERA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    $estado_texto_anterior = $carrera_actual['activa'] ? 'Activa' : 'Inactiva';
+                    $estado_texto_nuevo = $estado ? 'Activa' : 'Inactiva';
+                    
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "carreras", 
+                        $id_carrera, 
+                        [
+                            'activa' => $carrera_actual['activa'],
+                            'estado_anterior' => $estado_texto_anterior
+                        ], 
+                        [
+                            'activa' => $estado,
+                            'estado_nuevo' => $estado_texto_nuevo,
+                            'nombre_carrera' => $carrera_actual['nombre_carrera'] ?? '',
+                            'cod_carrera' => $carrera_actual['cod_carrera'] ?? ''
+                        ], 
+                        "Carreras", 
+                        "Cambio de estado de carrera"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría cambiarEstadoCarrera: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        }
+        
+        return false;
+        
+    } catch (Exception $e) {
+        error_log("Error en cambiarEstadoCarrera: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL CAMBIAR ESTADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carreras", 
+                    $id_carrera, 
+                    null, 
+                    [
+                        'id_carrera' => $id_carrera,
+                        'estado_solicitado' => $estado,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Carreras", 
+                    "Error al cambiar estado de carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error cambiarEstadoCarrera: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
     }
-    
-    $stmt->bind_param("ii", $estado, $id_carrera);
-    $resultado = $stmt->execute();
-    
-    // Verificar si realmente hubo cambios
-    if ($resultado && $stmt->affected_rows > 0) {
-        return true;
-    }
-    
-    return false;
 }
 
-
-
-
-// Función para agregar nuevas carreras
 // Función para agregar nuevas carreras
 function registrarNuevaCarrera(
     string $nombre, 
@@ -1132,6 +1184,32 @@ function registrarNuevaCarrera(
         
         $db->commit();
         
+        // REGISTRAR EN AUDITORÍA - NUEVA CARRERA CREADA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "INSERT", 
+                    "carreras", 
+                    $insertId, 
+                    null, 
+                    [
+                        'nombre_carrera' => $nombre,
+                        'cod_carrera' => $codigo,
+                        'tipo_formacion' => $tipo_formacion,
+                        'duracion_semestres' => $duracion_semestres,
+                        'duracion_anios' => $duracion_anios,
+                        'titulo_principal' => $titulo_principal,
+                        'titulo_opcional' => $titulo_opcional,
+                        'activa' => 1
+                    ], 
+                    "Carreras", 
+                    "Nueva carrera registrada"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría registrarNuevaCarrera: " . $e->getMessage());
+            }
+        }
+        
         return [
             'success' => true,
             'message' => 'Carrera registrada exitosamente',
@@ -1143,6 +1221,28 @@ function registrarNuevaCarrera(
             $db->rollback();
         }
         error_log("Error en registrarNuevaCarrera: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL REGISTRAR CARRERA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carreras", 
+                    null, 
+                    null, 
+                    [
+                        'nombre_carrera' => $nombre,
+                        'cod_carrera' => $codigo,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Carreras", 
+                    "Error al registrar nueva carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error registrarNuevaCarrera: " . $auditError->getMessage());
+            }
+        }
+        
         return [
             'success' => false,
             'message' => 'Error al registrar carrera: ' . $e->getMessage()
@@ -1192,7 +1292,6 @@ function obtenerCarreraPorId($id) {
     }
 }
 
-
 function actualizarCarrera(
     int $id,
     string $nombre,
@@ -1207,6 +1306,15 @@ function actualizarCarrera(
     global $db;
     
     try {
+        // Obtener datos actuales para auditoría
+        $datos_actuales = obtenerCarreraPorId($id);
+        if (!$datos_actuales) {
+            return [
+                'success' => false,
+                'message' => 'Carrera no encontrada'
+            ];
+        }
+
         // Validar título principal
         if (empty($titulo_principal)) {
             return [
@@ -1279,12 +1387,59 @@ function actualizarCarrera(
             throw new Exception("Error al actualizar carrera: " . $updateStmt->error);
         }
         
+        $affected_rows = $updateStmt->affected_rows;
         $updateStmt->close();
         $db->commit();
         
+        // REGISTRAR EN AUDITORÍA - ACTUALIZACIÓN DE CARRERA
+        if ($affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                $valores_antiguos_audit = [];
+                $valores_nuevos_audit = [];
+                
+                // Comparar campos modificados
+                $campos_auditar = [
+                    'nombre_carrera', 'cod_carrera', 'tipo_formacion', 'duracion_semestres',
+                    'titulo_otorga', 'otro_titulo', 'activa'
+                ];
+                
+                foreach ($campos_auditar as $campo) {
+                    $valor_antiguo = $datos_actuales[$campo] ?? null;
+                    $valor_nuevo = $$campo ?? null;
+                    
+                    // Para campos específicos
+                    if ($campo === 'titulo_otorga') {
+                        $valor_nuevo = $titulo_principal;
+                    } elseif ($campo === 'otro_titulo') {
+                        $valor_nuevo = $titulo_opcional;
+                    }
+                    
+                    if ($valor_antiguo != $valor_nuevo) {
+                        $valores_antiguos_audit[$campo] = $valor_antiguo;
+                        $valores_nuevos_audit[$campo] = $valor_nuevo;
+                    }
+                }
+                
+                if (!empty($valores_nuevos_audit)) {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "carreras", 
+                        $id, 
+                        $valores_antiguos_audit, 
+                        $valores_nuevos_audit, 
+                        "Carreras", 
+                        "Actualización de datos de carrera"
+                    );
+                }
+            } catch (Exception $e) {
+                error_log("Error en auditoría actualizarCarrera: " . $e->getMessage());
+            }
+        }
+        
         return [
             'success' => true,
-            'message' => 'Programa académico actualizado exitosamente'
+            'message' => 'Programa académico actualizado exitosamente',
+            'affected_rows' => $affected_rows
         ];
         
     } catch (Exception $e) {
@@ -1292,12 +1447,147 @@ function actualizarCarrera(
             $db->rollback();
         }
         error_log("Error en actualizarCarrera: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR CARRERA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carreras", 
+                    $id, 
+                    null, 
+                    [
+                        'nombre_carrera' => $nombre,
+                        'cod_carrera' => $codigo,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Carreras", 
+                    "Error al actualizar carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error actualizarCarrera: " . $auditError->getMessage());
+            }
+        }
+        
         return [
             'success' => false,
             'message' => 'Error al actualizar programa: ' . $e->getMessage()
         ];
     }
 }
+
+/**
+ * Función para eliminar carrera (eliminación lógica)
+ */
+function eliminarCarrera($id_carrera): array {
+    global $db;
+    
+    try {
+        // Obtener información de la carrera antes de eliminar
+        $carrera_info = obtenerCarreraPorId($id_carrera);
+        if (!$carrera_info) {
+            return [
+                'success' => false,
+                'message' => 'Carrera no encontrada'
+            ];
+        }
+        
+        // Verificar si hay estudiantes asociados a esta carrera
+        $check_estudiantes = $db->prepare("SELECT COUNT(*) as total FROM users WHERE carrera = ? AND estudiante = 1 AND status = 1");
+        if ($check_estudiantes) {
+            $check_estudiantes->bind_param("i", $id_carrera);
+            $check_estudiantes->execute();
+            $result = $check_estudiantes->get_result();
+            $estudiantes_count = $result->fetch_assoc()['total'];
+            $check_estudiantes->close();
+            
+            if ($estudiantes_count > 0) {
+                return [
+                    'success' => false,
+                    'message' => "No se puede eliminar la carrera porque tiene $estudiantes_count estudiante(s) asociado(s)"
+                ];
+            }
+        }
+        
+        // Realizar eliminación lógica (desactivar)
+        $query = "UPDATE carreras SET activa = 0 WHERE id_carrera = ?";
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $id_carrera);
+        $resultado = $stmt->execute();
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+        
+        if ($resultado && $affected_rows > 0) {
+            // REGISTRAR EN AUDITORÍA - ELIMINACIÓN DE CARRERA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "carreras", 
+                        $id_carrera, 
+                        [
+                            'activa' => $carrera_info['activa'],
+                            'nombre_carrera' => $carrera_info['nombre_carrera'],
+                            'cod_carrera' => $carrera_info['cod_carrera']
+                        ], 
+                        [
+                            'activa' => 0,
+                            'estado' => 'Eliminada (desactivada)'
+                        ], 
+                        "Carreras", 
+                        "Eliminación lógica de carrera"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarCarrera: " . $e->getMessage());
+                }
+            }
+            
+            return [
+                'success' => true,
+                'message' => 'Carrera eliminada exitosamente',
+                'affected_rows' => $affected_rows
+            ];
+        } else {
+            return [
+                'success' => false,
+                'message' => 'No se realizaron cambios en la carrera'
+            ];
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarCarrera: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR CARRERA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carreras", 
+                    $id_carrera, 
+                    null, 
+                    [
+                        'id_carrera' => $id_carrera,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Carreras", 
+                    "Error al eliminar carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarCarrera: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al eliminar carrera: ' . $e->getMessage()
+        ];
+    }
+}
+
 
 
 //HACER COSAS CON LOS DOCENTES
