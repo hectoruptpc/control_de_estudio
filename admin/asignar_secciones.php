@@ -5,7 +5,7 @@ ini_set('display_errors', '1');
 $titulopag = "Asignación de Secciones a Docentes";
 include('../funciones/functions.php');
 
-//CARGAR PERMISOS
+// CARGAR PERMISOS
 cargarPermisosUsuario();
 verificarPermiso('asig_secciones');
 
@@ -15,21 +15,7 @@ if(isset($_GET['ajax']) && $_GET['ajax'] == 'materias_docente_carrera' && isset(
     $id_docente = $db->real_escape_string($_GET['id_docente']);
     $id_carrera = $db->real_escape_string($_GET['id_carrera']);
     
-    $query = "SELECT DISTINCT m.id_materia, m.nombre_materia, m.cod_materia 
-              FROM docente_materia dm
-              JOIN materias m ON dm.id_materia = m.id_materia
-              JOIN carrera_materia cm ON m.id_materia = cm.id_materia
-              WHERE dm.id_usuario = '$id_docente'
-              AND cm.id_carrera = '$id_carrera'
-              ORDER BY m.nombre_materia";
-    
-    $result = $db->query($query);
-    $materias = array();
-    
-    while($row = $result->fetch_assoc()) {
-        $materias[] = $row;
-    }
-    
+    $materias = obtenerMateriasDocentePorCarrera($id_docente, $id_carrera);
     echo json_encode($materias);
     exit();
 }
@@ -40,36 +26,13 @@ if(isset($_POST['asignar'])) {
     $id_seccion = $db->real_escape_string($_POST['id_seccion']);
     $id_materia = $db->real_escape_string($_POST['id_materia']);
     
-    // Verificar si ya existe la asignación
-    $query = "SELECT * FROM docente_seccion 
-              WHERE id_usuario = '$id_usuario' 
-              AND id_seccion = '$id_seccion'
-              AND id_materia = '$id_materia'";
-    $result = $db->query($query);
-    
-    if($result->num_rows > 0) {
-        $mensaje = "<div class='alert alert-warning'>Este docente ya tiene asignada esta sección con esta materia.</div>";
-    } else {
-        // Insertar nueva asignación
-        $query = "INSERT INTO docente_seccion (id_usuario, id_seccion, id_materia) 
-                  VALUES ('$id_usuario', '$id_seccion', '$id_materia')";
-        if($db->query($query)) {
-            $mensaje = "<div class='alert alert-success'>Asignación realizada correctamente.</div>";
-        } else {
-            $mensaje = "<div class='alert alert-danger'>Error al asignar: ".$db->error."</div>";
-        }
-    }
+    $mensaje = procesarAsignacionSeccion($id_usuario, $id_seccion, $id_materia);
 }
 
 // Eliminar asignación
 if(isset($_GET['eliminar'])) {
     $id = $db->real_escape_string($_GET['eliminar']);
-    $query = "DELETE FROM docente_seccion WHERE id_docente_seccion = '$id'";
-    if($db->query($query)) {
-        $mensaje = "<div class='alert alert-success'>Asignación eliminada correctamente.</div>";
-    } else {
-        $mensaje = "<div class='alert alert-danger'>Error al eliminar: ".$db->error."</div>";
-    }
+    $mensaje = eliminarAsignacionSeccion($id);
 }
 
 include("includes/head.php");
@@ -116,10 +79,9 @@ include("includes/head.php");
                                 <select class="form-control" id="id_usuario" name="id_usuario" required onchange="cargarMateriasPorCarrera()">
                                     <option value="">Seleccione un docente</option>
                                     <?php
-                                    $query = "SELECT id, idusuario, nombre FROM users WHERE docente = 1 ORDER BY nombre";
-                                    $result = $db->query($query);
-                                    while($row = $result->fetch_assoc()) {
-                                        echo "<option value='".$row['id']."'>".$row['nombre']." (".$row['idusuario'].")</option>";
+                                    $docentes = obtenerDocentesActivos();
+                                    foreach($docentes as $docente) {
+                                        echo "<option value='".$docente['id']."'>".$docente['nombre']." (".$docente['idusuario'].")</option>";
                                     }
                                     ?>
                                 </select>
@@ -129,18 +91,12 @@ include("includes/head.php");
                                 <select class="form-control" id="id_seccion" name="id_seccion" required onchange="cargarMateriasPorCarrera()">
                                     <option value="">Seleccione una sección</option>
                                     <?php
-                                    $query = "SELECT s.id_seccion, s.codigo_seccion, c.id_carrera, c.nombre_carrera 
-                                              FROM secciones s
-                                              LEFT JOIN carreras c ON s.id_carrera = c.id_carrera
-                                              WHERE s.estatus = 'activa' AND (c.activa = 1 OR c.activa IS NULL)
-                                              ORDER BY c.nombre_carrera, s.codigo_seccion";
-                                    $result = $db->query($query);
-                                    
-                                    if($result->num_rows > 0) {
-                                        while($row = $result->fetch_assoc()) {
-                                            $id_carrera = $row['id_carrera'] ?? '0';
-                                            $nombre_carrera = $row['nombre_carrera'] ?? 'Sin carrera asignada';
-                                            echo "<option value='".$row['id_seccion']."' data-carrera='".$id_carrera."'>".$row['codigo_seccion']." - ".$nombre_carrera."</option>";
+                                    $secciones = obtenerSeccionesActivas();
+                                    if(count($secciones) > 0) {
+                                        foreach($secciones as $seccion) {
+                                            $id_carrera = $seccion['id_carrera'] ?? '0';
+                                            $nombre_carrera = $seccion['nombre_carrera'] ?? 'Sin carrera asignada';
+                                            echo "<option value='".$seccion['id_seccion']."' data-carrera='".$id_carrera."'>".$seccion['codigo_seccion']." - ".$nombre_carrera."</option>";
                                         }
                                     } else {
                                         echo "<option value=''>No hay secciones activas disponibles</option>";
@@ -180,20 +136,9 @@ include("includes/head.php");
                             </thead>
                             <tbody>
                                 <?php
-                                $query = "SELECT ds.id_docente_seccion, u.nombre AS docente, 
-                                                 s.codigo_seccion, c.nombre_carrera, ds.fecha_asignacion,
-                                                 m.nombre_materia, m.cod_materia
-                                          FROM docente_seccion ds
-                                          JOIN users u ON ds.id_usuario = u.id
-                                          JOIN secciones s ON ds.id_seccion = s.id_seccion
-                                          LEFT JOIN carreras c ON s.id_carrera = c.id_carrera
-                                          JOIN materias m ON ds.id_materia = m.id_materia
-                                          WHERE s.estatus = 'activa' AND (c.activa = 1 OR c.activa IS NULL)
-                                          ORDER BY ds.fecha_asignacion DESC";
-                                $result = $db->query($query);
-                                
-                                if($result->num_rows > 0) {
-                                    while($row = $result->fetch_assoc()) {
+                                $asignaciones = obtenerAsignacionesSecciones();
+                                if(count($asignaciones) > 0) {
+                                    foreach($asignaciones as $row) {
                                         $nombre_carrera = $row['nombre_carrera'] ?? 'Sin carrera asignada';
                                         echo "<tr>
                                                 <td>".$row['docente']."</td>

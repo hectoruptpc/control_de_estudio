@@ -5921,6 +5921,488 @@ function obtenerSeccionesPorCarrera($db, $carrera_id) {
 
 
 
+//ASIGNAR SECCIONES A DOCENTES ***********************************************************************************************
+
+
+/**
+ * Obtiene las materias de un docente por carrera
+ */
+function obtenerMateriasDocentePorCarrera($id_docente, $id_carrera) {
+    global $db;
+    
+    try {
+        $query = "SELECT DISTINCT m.id_materia, m.nombre_materia, m.cod_materia 
+                  FROM docente_materia dm
+                  JOIN materias m ON dm.id_materia = m.id_materia
+                  JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+                  WHERE dm.id_usuario = ?
+                  AND cm.id_carrera = ?
+                  ORDER BY m.nombre_materia";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("ii", $id_docente, $id_carrera);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $materias = array();
+        
+        while($row = $result->fetch_assoc()) {
+            $materias[] = $row;
+        }
+        
+        $stmt->close();
+        return $materias;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerMateriasDocentePorCarrera: " . $e->getMessage());
+        return array();
+    }
+}
+
+/**
+ * Procesa la asignación de una sección a un docente
+ */
+function procesarAsignacionSeccion($id_usuario, $id_seccion, $id_materia) {
+    global $db;
+    
+    try {
+        // Obtener información para auditoría
+        $docente_info = obtenerDocentePorId($id_usuario);
+        $seccion_info = obtenerDetalleSeccion($db, $id_seccion);
+        $materia_info = obtenerMateriaPorId($db, $id_materia);
+
+        // Verificar si ya existe la asignación
+        $query = "SELECT id_docente_seccion FROM docente_seccion 
+                  WHERE id_usuario = ? 
+                  AND id_seccion = ?
+                  AND id_materia = ?";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("iii", $id_usuario, $id_seccion, $id_materia);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if($result->num_rows > 0) {
+            $stmt->close();
+            return [
+                'success' => false,
+                'message' => 'Este docente ya tiene asignada esta sección con esta materia.',
+                'type' => 'warning'
+            ];
+        }
+        $stmt->close();
+
+        // Insertar nueva asignación
+        $query = "INSERT INTO docente_seccion (id_usuario, id_seccion, id_materia, fecha_asignacion) 
+                  VALUES (?, ?, ?, NOW())";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("iii", $id_usuario, $id_seccion, $id_materia);
+        
+        if($stmt->execute()) {
+            $id_asignacion = $stmt->insert_id;
+            $stmt->close();
+            
+            // REGISTRAR EN AUDITORÍA - ASIGNACIÓN DE SECCIÓN A DOCENTE
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "INSERT", 
+                        "docente_seccion", 
+                        $id_asignacion, 
+                        null, 
+                        [
+                            'id_usuario' => $id_usuario,
+                            'docente_nombre' => $docente_info['nombre'] ?? 'Desconocido',
+                            'docente_cedula' => $docente_info['idusuario'] ?? '',
+                            'id_seccion' => $id_seccion,
+                            'seccion_codigo' => $seccion_info['codigo_seccion'] ?? 'Desconocida',
+                            'carrera_seccion' => $seccion_info['nombre_carrera'] ?? 'Desconocida',
+                            'id_materia' => $id_materia,
+                            'materia_nombre' => $materia_info['nombre_materia'] ?? 'Desconocida',
+                            'materia_codigo' => $materia_info['cod_materia'] ?? ''
+                        ], 
+                        "Asignaciones Docentes", 
+                        "Asignación de sección a docente"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría procesarAsignacionSeccion: " . $e->getMessage());
+                }
+            }
+            
+            return [
+                'success' => true,
+                'message' => 'Asignación realizada correctamente.',
+                'type' => 'success',
+                'id_asignacion' => $id_asignacion
+            ];
+        } else {
+            throw new Exception("Error al asignar: " . $stmt->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en procesarAsignacionSeccion: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ASIGNAR SECCIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "docente_seccion", 
+                    null, 
+                    null, 
+                    [
+                        'id_usuario' => $id_usuario,
+                        'id_seccion' => $id_seccion,
+                        'id_materia' => $id_materia,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Asignaciones Docentes", 
+                    "Error al asignar sección a docente"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error procesarAsignacionSeccion: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al asignar: ' . $e->getMessage(),
+            'type' => 'danger'
+        ];
+    }
+}
+
+/**
+ * Elimina una asignación de sección
+ */
+function eliminarAsignacionSeccion($id) {
+    global $db;
+    
+    try {
+        // Obtener información de la asignación para auditoría
+        $info_query = "SELECT ds.*, u.nombre as docente_nombre, u.idusuario as docente_cedula,
+                              s.codigo_seccion, c.nombre_carrera, m.nombre_materia, m.cod_materia
+                       FROM docente_seccion ds
+                       JOIN users u ON ds.id_usuario = u.id
+                       JOIN secciones s ON ds.id_seccion = s.id_seccion
+                       LEFT JOIN carreras c ON s.id_carrera = c.id_carrera
+                       JOIN materias m ON ds.id_materia = m.id_materia
+                       WHERE ds.id_docente_seccion = ?";
+        
+        $info_stmt = $db->prepare($info_query);
+        if (!$info_stmt) {
+            throw new Exception("Error en preparación de consulta de información: " . $db->error);
+        }
+        
+        $info_stmt->bind_param("i", $id);
+        $info_stmt->execute();
+        $info_result = $info_stmt->get_result();
+        $asignacion_info = $info_result->fetch_assoc();
+        $info_stmt->close();
+        
+        if (!$asignacion_info) {
+            return [
+                'success' => false,
+                'message' => 'No se encontró la asignación especificada.',
+                'type' => 'warning'
+            ];
+        }
+
+        // Eliminar asignación
+        $query = "DELETE FROM docente_seccion WHERE id_docente_seccion = ?";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $id);
+        
+        if($stmt->execute()) {
+            $affected_rows = $stmt->affected_rows;
+            $stmt->close();
+            
+            if ($affected_rows > 0) {
+                // REGISTRAR EN AUDITORÍA - ELIMINACIÓN DE ASIGNACIÓN
+                if (function_exists('registrarAuditoria')) {
+                    try {
+                        registrarAuditoria(
+                            "DELETE", 
+                            "docente_seccion", 
+                            $id, 
+                            [
+                                'id_usuario' => $asignacion_info['id_usuario'],
+                                'docente_nombre' => $asignacion_info['docente_nombre'],
+                                'docente_cedula' => $asignacion_info['docente_cedula'],
+                                'id_seccion' => $asignacion_info['id_seccion'],
+                                'seccion_codigo' => $asignacion_info['codigo_seccion'],
+                                'carrera_seccion' => $asignacion_info['nombre_carrera'],
+                                'id_materia' => $asignacion_info['id_materia'],
+                                'materia_nombre' => $asignacion_info['nombre_materia'],
+                                'fecha_asignacion' => $asignacion_info['fecha_asignacion']
+                            ], 
+                            null, 
+                            "Asignaciones Docentes", 
+                            "Eliminación de asignación de sección a docente"
+                        );
+                    } catch (Exception $e) {
+                        error_log("Error en auditoría eliminarAsignacionSeccion: " . $e->getMessage());
+                    }
+                }
+                
+                return [
+                    'success' => true,
+                    'message' => 'Asignación eliminada correctamente.',
+                    'type' => 'success',
+                    'affected_rows' => $affected_rows
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'message' => 'No se encontró la asignación especificada.',
+                    'type' => 'warning'
+                ];
+            }
+        } else {
+            throw new Exception("Error al eliminar: " . $stmt->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarAsignacionSeccion: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR ASIGNACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "docente_seccion", 
+                    $id, 
+                    null, 
+                    [
+                        'id_asignacion' => $id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Asignaciones Docentes", 
+                    "Error al eliminar asignación de sección"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarAsignacionSeccion: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al eliminar: ' . $e->getMessage(),
+            'type' => 'danger'
+        ];
+    }
+}
+
+/**
+ * Obtiene la lista de docentes activos
+ */
+function obtenerDocentesActivos() {
+    global $db;
+    
+    try {
+        $query = "SELECT id, idusuario, nombre FROM users WHERE docente = 1 AND status = 1 ORDER BY nombre";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $docentes = array();
+        
+        while($row = $result->fetch_assoc()) {
+            $docentes[] = $row;
+        }
+        
+        $stmt->close();
+        return $docentes;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerDocentesActivos: " . $e->getMessage());
+        return array();
+    }
+}
+
+/**
+ * Obtiene las secciones activas
+ */
+function obtenerSeccionesActivas() {
+    global $db;
+    
+    try {
+        $query = "SELECT s.id_seccion, s.codigo_seccion, c.id_carrera, c.nombre_carrera 
+                  FROM secciones s
+                  LEFT JOIN carreras c ON s.id_carrera = c.id_carrera
+                  WHERE s.estatus = 'activa' AND (c.activa = 1 OR c.activa IS NULL)
+                  ORDER BY c.nombre_carrera, s.codigo_seccion";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $secciones = array();
+        
+        if($result->num_rows > 0) {
+            while($row = $result->fetch_assoc()) {
+                $secciones[] = $row;
+            }
+        }
+        
+        $stmt->close();
+        return $secciones;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerSeccionesActivas: " . $e->getMessage());
+        return array();
+    }
+}
+
+/**
+ * Obtiene todas las asignaciones de secciones
+ */
+function obtenerAsignacionesSecciones() {
+    global $db;
+    
+    try {
+        $query = "SELECT ds.id_docente_seccion, u.nombre AS docente, 
+                         s.codigo_seccion, c.nombre_carrera, ds.fecha_asignacion,
+                         m.nombre_materia, m.cod_materia, u.idusuario as docente_cedula,
+                         s.id_seccion, u.id as id_docente, m.id_materia
+                  FROM docente_seccion ds
+                  JOIN users u ON ds.id_usuario = u.id
+                  JOIN secciones s ON ds.id_seccion = s.id_seccion
+                  LEFT JOIN carreras c ON s.id_carrera = c.id_carrera
+                  JOIN materias m ON ds.id_materia = m.id_materia
+                  WHERE s.estatus = 'activa' AND (c.activa = 1 OR c.activa IS NULL)
+                  ORDER BY ds.fecha_asignacion DESC";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $asignaciones = array();
+        
+        if($result->num_rows > 0) {
+            while($row = $result->fetch_assoc()) {
+                $asignaciones[] = $row;
+            }
+        }
+        
+        $stmt->close();
+        return $asignaciones;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerAsignacionesSecciones: " . $e->getMessage());
+        return array();
+    }
+}
+
+/**
+ * Obtiene las materias disponibles para un docente en una sección específica
+ */
+function obtenerMateriasDisponiblesParaDocente($id_docente, $id_seccion) {
+    global $db;
+    
+    try {
+        // Obtener la carrera de la sección
+        $query_carrera = "SELECT id_carrera FROM secciones WHERE id_seccion = ?";
+        $stmt_carrera = $db->prepare($query_carrera);
+        $stmt_carrera->bind_param("i", $id_seccion);
+        $stmt_carrera->execute();
+        $result_carrera = $stmt_carrera->get_result();
+        $seccion_info = $result_carrera->fetch_assoc();
+        $stmt_carrera->close();
+        
+        if (!$seccion_info) {
+            return array();
+        }
+        
+        $id_carrera = $seccion_info['id_carrera'];
+        
+        // Obtener materias del docente en esa carrera que no estén ya asignadas a la sección
+        $query = "SELECT DISTINCT m.id_materia, m.nombre_materia, m.cod_materia 
+                  FROM docente_materia dm
+                  JOIN materias m ON dm.id_materia = m.id_materia
+                  JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+                  WHERE dm.id_usuario = ?
+                  AND cm.id_carrera = ?
+                  AND m.id_materia NOT IN (
+                      SELECT id_materia FROM docente_seccion 
+                      WHERE id_seccion = ? AND id_usuario = ?
+                  )
+                  AND m.activa = 1
+                  ORDER BY m.nombre_materia";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("iiii", $id_docente, $id_carrera, $id_seccion, $id_docente);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $materias = array();
+        
+        while($row = $result->fetch_assoc()) {
+            $materias[] = $row;
+        }
+        
+        $stmt->close();
+        return $materias;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerMateriasDisponiblesParaDocente: " . $e->getMessage());
+        return array();
+    }
+}
+
+
+
+
+
+
+
 
 
 
