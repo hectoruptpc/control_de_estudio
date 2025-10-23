@@ -1672,140 +1672,226 @@ function obtenerDocentePorId($id) {
  *               - 'message': string con mensaje descriptivo del resultado
  */
 function actualizarDocente($datos) {
-  // Accede a la conexión de la base de datos definida globalmente
-  global $db;
-  
-  try {
-      // Consulta SQL con placeholders (?) para todos los valores a actualizar
-      $sql = "UPDATE users SET 
-              nombre = ?,
-              email = ?,
-              tlf = ?,
-              cel = ?,
-              direccion = ?,
-              estado = ?,
-              municipio = ?,
-              parroquia = ?,
-              status = ?,
-              carrera = ?,
-              genero = ?,
-              edo_civil = ?,
-              fecha_nac = ?,
-              num_telf_opc = ?,
-              titulos = ?,
-              institutos = ?,
-              fecha_ingreso = ?
-              WHERE id = ? AND docente = 1";  // Solo actualiza si es docente
+    // Accede a la conexión de la base de datos definida globalmente
+    global $db;
+    
+    try {
+        // Obtener datos actuales del docente para auditoría
+        $docente_id = isset($datos['id']) ? intval($datos['id']) : 0;
+        $datos_antiguos = null;
+        
+        if (function_exists('obtenerDocentePorId')) {
+            $datos_antiguos = obtenerDocentePorId($docente_id);
+        }
+        
+        // Consulta SQL con placeholders (?) para todos los valores a actualizar
+        $sql = "UPDATE users SET 
+                nombre = ?,
+                email = ?,
+                tlf = ?,
+                cel = ?,
+                direccion = ?,
+                estado = ?,
+                municipio = ?,
+                parroquia = ?,
+                status = ?,
+                carrera = ?,
+                genero = ?,
+                edo_civil = ?,
+                fecha_nac = ?,
+                num_telf_opc = ?,
+                titulos = ?,
+                institutos = ?,
+                fecha_ingreso = ?
+                WHERE id = ? AND docente = 1";  // Solo actualiza si es docente
 
-      // Prepara la sentencia SQL
-      $stmt = $db->prepare($sql);
-      
-      // Verifica si la preparación fue exitosa
-      if (!$stmt) {
-          throw new Exception("Error en la preparación: " . $db->error);
-      }
-      
-      // Preparar valores y prevenir notices si faltan claves
-      $nombre = $datos['nombre'] ?? '';
-      $email = $datos['email'] ?? '';
-      $tlf = $datos['tlf'] ?? '';
-      $cel = $datos['cel'] ?? '';
-      $direccion = $datos['direccion'] ?? '';
-      $estado = $datos['estado'] ?? '';
-      $municipio = $datos['municipio'] ?? '';
-      $parroquia = $datos['parroquia'] ?? '';
-      $status = $datos['status'] ?? '';
-      $carrera = $datos['carrera'] ?? '';
-      $genero = $datos['genero'] ?? '';
-      $edo_civil = $datos['edo_civil'] ?? '';
-      $fecha_nac = $datos['fecha_nac'] ?? null;
-      $num_telf_opc = $datos['num_telf_opc'] ?? '';
-      $titulos = $datos['titulos'] ?? '';
-      $institutos = $datos['institutos'] ?? '';
-      $fecha_ingreso = $datos['fecha_ingreso'] ?? null;
-      // Si no se proporcionó fecha_ingreso, intentar usar el valor actual en la BD
-      if (empty($fecha_ingreso)) {
-          try {
-              $qry = $db->prepare("SELECT fecha_ingreso FROM users WHERE id = ? AND docente = 1");
-              if ($qry) {
-                  $qry->bind_param('i', $id);
-                  if ($qry->execute()) {
-                      $res = $qry->get_result();
-                      $row = $res ? $res->fetch_assoc() : null;
-                      if (!empty($row['fecha_ingreso'])) {
-                          $fecha_ingreso = $row['fecha_ingreso'];
-                      } else {
-                          // Fallback: fecha actual en formato YYYY-MM-DD para evitar NULL
-                          $fecha_ingreso = date('Y-m-d');
-                      }
-                  } else {
-                      $fecha_ingreso = date('Y-m-d');
-                  }
-                  $qry->close();
-              } else {
-                  $fecha_ingreso = date('Y-m-d');
-              }
-          } catch (Exception $e) {
-              $fecha_ingreso = date('Y-m-d');
-          }
-      }
-      $id = isset($datos['id']) ? intval($datos['id']) : 0;
+        // Prepara la sentencia SQL
+        $stmt = $db->prepare($sql);
+        
+        // Verifica si la preparación fue exitosa
+        if (!$stmt) {
+            throw new Exception("Error en la preparación: " . $db->error);
+        }
+        
+        // Preparar valores y prevenir notices si faltan claves
+        $nombre = $datos['nombre'] ?? '';
+        $email = $datos['email'] ?? '';
+        $tlf = $datos['tlf'] ?? '';
+        $cel = $datos['cel'] ?? '';
+        $direccion = $datos['direccion'] ?? '';
+        $estado = $datos['estado'] ?? '';
+        $municipio = $datos['municipio'] ?? '';
+        $parroquia = $datos['parroquia'] ?? '';
+        $status = $datos['status'] ?? '';
+        $carrera = $datos['carrera'] ?? '';
+        $genero = $datos['genero'] ?? '';
+        $edo_civil = $datos['edo_civil'] ?? '';
+        $fecha_nac = $datos['fecha_nac'] ?? null;
+        $num_telf_opc = $datos['num_telf_opc'] ?? '';
+        $titulos = $datos['titulos'] ?? '';
+        $institutos = $datos['institutos'] ?? '';
+        $fecha_ingreso = $datos['fecha_ingreso'] ?? null;
+        
+        // Si no se proporcionó fecha_ingreso, intentar usar el valor actual en la BD
+        if (empty($fecha_ingreso)) {
+            try {
+                $qry = $db->prepare("SELECT fecha_ingreso FROM users WHERE id = ? AND docente = 1");
+                if ($qry) {
+                    $qry->bind_param('i', $docente_id);
+                    if ($qry->execute()) {
+                        $res = $qry->get_result();
+                        $row = $res ? $res->fetch_assoc() : null;
+                        if (!empty($row['fecha_ingreso'])) {
+                            $fecha_ingreso = $row['fecha_ingreso'];
+                        } else {
+                            // Fallback: fecha actual en formato YYYY-MM-DD para evitar NULL
+                            $fecha_ingreso = date('Y-m-d');
+                        }
+                    } else {
+                        $fecha_ingreso = date('Y-m-d');
+                    }
+                    $qry->close();
+                } else {
+                    $fecha_ingreso = date('Y-m-d');
+                }
+            } catch (Exception $e) {
+                $fecha_ingreso = date('Y-m-d');
+                error_log("Error al obtener fecha_ingreso: " . $e->getMessage());
+            }
+        }
 
-      // Vincula los parámetros a la sentencia preparada
-      // s = string, i = integer
-      // 17 strings (s) y 1 integer (i) al final => 18 parámetros
-      $bindTypes = "sssssssssssssssssi"; // 17 s + i
+        // Vincula los parámetros a la sentencia preparada
+        // s = string, i = integer
+        // 17 strings (s) y 1 integer (i) al final => 18 parámetros
+        $bindTypes = "sssssssssssssssssi"; // 17 s + i
 
-      if (!$stmt->bind_param(
-          $bindTypes,
-          $nombre,
-          $email,
-          $tlf,
-          $cel,
-          $direccion,
-          $estado,
-          $municipio,
-          $parroquia,
-          $status,
-          $carrera,
-          $genero,
-          $edo_civil,
-          $fecha_nac,
-          $num_telf_opc,
-          $titulos,
-          $institutos,
-          $fecha_ingreso,
-          $id
-      )) {
-          throw new Exception("Error en bind_param: " . $stmt->error);
-      }
+        if (!$stmt->bind_param(
+            $bindTypes,
+            $nombre,
+            $email,
+            $tlf,
+            $cel,
+            $direccion,
+            $estado,
+            $municipio,
+            $parroquia,
+            $status,
+            $carrera,
+            $genero,
+            $edo_civil,
+            $fecha_nac,
+            $num_telf_opc,
+            $titulos,
+            $institutos,
+            $fecha_ingreso,
+            $docente_id
+        )) {
+            throw new Exception("Error en bind_param: " . $stmt->error);
+        }
 
-      // Ejecuta la sentencia preparada
-      if (!$stmt->execute()) {
-          // Si falla la ejecución, lanzar excepción para que el catch la capture y retorne JSON limpio
-          throw new Exception("Error en execute: " . $stmt->error);
-      }
-      
-      // Retorna un array con el resultado de la operación
-      return [
-          'success' => $stmt->affected_rows > 0,  // True si se actualizó alguna fila
-          'message' => $stmt->affected_rows > 0 
-              ? 'Docente actualizado correctamente' 
-              : 'No se realizaron cambios'  // Puede ocurrir si los datos son iguales
-      ];
-      
-  } catch(Exception $e) {
-      // Manejo de errores: retorna información sobre el error
-      return [
-          'success' => false,
-          'message' => 'Error al actualizar: ' . $e->getMessage()
-      ];
-  } finally {
-      // Asegura que el statement se cierre si existe
-      if (isset($stmt)) {
-          $stmt->close();
-      }
-  }
+        // Ejecuta la sentencia preparada
+        if (!$stmt->execute()) {
+            // Si falla la ejecución, lanzar excepción para que el catch la capture y retorne JSON limpio
+            throw new Exception("Error en execute: " . $stmt->error);
+        }
+        
+        $affected_rows = $stmt->affected_rows;
+        $success = $affected_rows > 0;
+        
+        // REGISTRAR EN AUDITORÍA - ACTUALIZACIÓN DE DOCENTE
+        if ($success && function_exists('registrarAuditoria')) {
+            try {
+                // Preparar datos para auditoría
+                $valores_antiguos_audit = [];
+                $valores_nuevos_audit = [];
+                
+                if ($datos_antiguos) {
+                    // Campos principales para auditoría
+                    $campos_auditar = [
+                        'nombre', 'email', 'tlf', 'cel', 'direccion', 'estado', 
+                        'municipio', 'parroquia', 'status', 'carrera', 'genero',
+                        'edo_civil', 'fecha_nac', 'num_telf_opc', 'titulos', 
+                        'institutos', 'fecha_ingreso'
+                    ];
+                    
+                    foreach ($campos_auditar as $campo) {
+                        $valor_antiguo = $datos_antiguos[$campo] ?? null;
+                        $valor_nuevo = $datos[$campo] ?? null;
+                        
+                        // Solo registrar si hay cambio
+                        if ($valor_antiguo != $valor_nuevo) {
+                            $valores_antiguos_audit[$campo] = $valor_antiguo;
+                            $valores_nuevos_audit[$campo] = $valor_nuevo;
+                        }
+                    }
+                } else {
+                    // Si no se pudieron obtener datos antiguos, registrar todos los nuevos
+                    $valores_nuevos_audit = [
+                        'nombre' => $nombre,
+                        'email' => $email,
+                        'status' => $status,
+                        'carrera' => $carrera
+                    ];
+                }
+                
+                registrarAuditoria(
+                    "UPDATE", 
+                    "users", 
+                    $docente_id, 
+                    $valores_antiguos_audit, 
+                    $valores_nuevos_audit, 
+                    "Docentes", 
+                    "Actualización de datos de docente"
+                );
+                
+            } catch (Exception $e) {
+                error_log("Error en auditoría actualizarDocente: " . $e->getMessage());
+            }
+        }
+        
+        // Retorna un array con el resultado de la operación
+        return [
+            'success' => $success,  // True si se actualizó alguna fila
+            'message' => $success 
+                ? 'Docente actualizado correctamente' 
+                : 'No se realizaron cambios',  // Puede ocurrir si los datos son iguales
+            'affected_rows' => $affected_rows
+        ];
+        
+    } catch(Exception $e) {
+        // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR DOCENTE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    isset($datos['id']) ? intval($datos['id']) : null, 
+                    null, 
+                    [
+                        'nombre' => $datos['nombre'] ?? '',
+                        'error' => $e->getMessage()
+                    ], 
+                    "Docentes", 
+                    "Error al actualizar docente"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error actualizarDocente: " . $auditError->getMessage());
+            }
+        }
+        
+        error_log("Error en actualizarDocente: " . $e->getMessage());
+        
+        // Manejo de errores: retorna información sobre el error
+        return [
+            'success' => false,
+            'message' => 'Error al actualizar: ' . $e->getMessage()
+        ];
+    } finally {
+        // Asegura que el statement se cierre si existe
+        if (isset($stmt)) {
+            $stmt->close();
+        }
+    }
 }
 
 function obtenerDocentes() {
