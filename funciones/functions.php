@@ -10176,6 +10176,448 @@ function calcularEstadisticasNotas($notas) {
 
 
 
+//ASIGNAR DIRECTORES DE CARRERA************************************************************************
+
+
+/**
+ * Función para asignar carrera a director
+ */
+function asignarCarreraDirector($id_usuario, $id_carrera) {
+    global $db;
+    
+    try {
+        // Obtener información para auditoría
+        $usuario_info = obtenerUsuarioPorId($id_usuario);
+        $carrera_info = obtenerCarreraPorId($id_carrera);
+        
+        if (!$usuario_info) {
+            return [
+                'success' => false,
+                'message' => 'Usuario no encontrado'
+            ];
+        }
+        
+        if (!$carrera_info) {
+            return [
+                'success' => false,
+                'message' => 'Carrera no encontrada'
+            ];
+        }
+
+        // Verificar si el usuario es tipo "usuario = 1" (posiblemente administrador/director)
+        if ($usuario_info['usuario'] != 1) {
+            return [
+                'success' => false,
+                'message' => 'El usuario no tiene permisos para ser director de carrera'
+            ];
+        }
+
+        // Verificar si ya tiene una carrera asignada
+        if (!empty($usuario_info['carrera_di']) && $usuario_info['carrera_di'] != 0) {
+            return [
+                'success' => false,
+                'message' => 'El usuario ya tiene una carrera asignada como director'
+            ];
+        }
+
+        $stmt = $db->prepare("UPDATE users SET carrera_di = ? WHERE id = ? AND usuario = 1");
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("ii", $id_carrera, $id_usuario);
+        
+        if ($stmt->execute()) {
+            $affected_rows = $stmt->affected_rows;
+            $stmt->close();
+            
+            if ($affected_rows > 0) {
+                // REGISTRAR EN AUDITORÍA - ASIGNACIÓN DE CARRERA A DIRECTOR
+                if (function_exists('registrarAuditoria')) {
+                    try {
+                        registrarAuditoria(
+                            "UPDATE", 
+                            "users", 
+                            $id_usuario, 
+                            [
+                                'carrera_di' => $usuario_info['carrera_di'] ?? null,
+                                'estado_anterior' => 'Sin carrera asignada'
+                            ], 
+                            [
+                                'carrera_di' => $id_carrera,
+                                'carrera_nombre' => $carrera_info['nombre_carrera'],
+                                'carrera_codigo' => $carrera_info['cod_carrera'],
+                                'usuario_nombre' => $usuario_info['nombre'],
+                                'usuario_username' => $usuario_info['username'],
+                                'estado_nuevo' => 'Director asignado'
+                            ], 
+                            "Directores de Carrera", 
+                            "Asignación de director de carrera"
+                        );
+                    } catch (Exception $e) {
+                        error_log("Error en auditoría asignarCarreraDirector: " . $e->getMessage());
+                    }
+                }
+                
+                return [
+                    'success' => true,
+                    'message' => 'Director asignado a la carrera exitosamente',
+                    'affected_rows' => $affected_rows
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'message' => 'No se realizaron cambios en la asignación'
+                ];
+            }
+        } else {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en asignarCarreraDirector: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ASIGNAR CARRERA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $id_usuario, 
+                    null, 
+                    [
+                        'id_usuario' => $id_usuario,
+                        'id_carrera' => $id_carrera,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Directores de Carrera", 
+                    "Error al asignar director de carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error asignarCarreraDirector: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al asignar director: ' . $e->getMessage()
+        ];
+    }
+}
+
+/**
+ * Función para eliminar asignación de carrera
+ */
+function eliminarAsignacionCarrera($id_usuario) {
+    global $db;
+    
+    try {
+        // Obtener información para auditoría
+        $usuario_info = obtenerUsuarioPorId($id_usuario);
+        
+        if (!$usuario_info) {
+            return [
+                'success' => false,
+                'message' => 'Usuario no encontrado'
+            ];
+        }
+
+        // Verificar si tiene una carrera asignada
+        if (empty($usuario_info['carrera_di']) || $usuario_info['carrera_di'] == 0) {
+            return [
+                'success' => false,
+                'message' => 'El usuario no tiene una carrera asignada como director'
+            ];
+        }
+
+        // Obtener información de la carrera asignada
+        $carrera_asignada = null;
+        if (!empty($usuario_info['carrera_di'])) {
+            $carrera_asignada = obtenerCarreraPorId($usuario_info['carrera_di']);
+        }
+
+        $stmt = $db->prepare("UPDATE users SET carrera_di = NULL WHERE id = ? AND usuario = 1");
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $id_usuario);
+        
+        if ($stmt->execute()) {
+            $affected_rows = $stmt->affected_rows;
+            $stmt->close();
+            
+            if ($affected_rows > 0) {
+                // REGISTRAR EN AUDITORÍA - ELIMINACIÓN DE ASIGNACIÓN DE CARRERA
+                if (function_exists('registrarAuditoria')) {
+                    try {
+                        registrarAuditoria(
+                            "UPDATE", 
+                            "users", 
+                            $id_usuario, 
+                            [
+                                'carrera_di' => $usuario_info['carrera_di'],
+                                'carrera_nombre' => $carrera_asignada['nombre_carrera'] ?? 'Desconocida',
+                                'carrera_codigo' => $carrera_asignada['cod_carrera'] ?? '',
+                                'estado_anterior' => 'Director asignado'
+                            ], 
+                            [
+                                'carrera_di' => null,
+                                'usuario_nombre' => $usuario_info['nombre'],
+                                'usuario_username' => $usuario_info['username'],
+                                'estado_nuevo' => 'Sin carrera asignada'
+                            ], 
+                            "Directores de Carrera", 
+                            "Eliminación de asignación de director de carrera"
+                        );
+                    } catch (Exception $e) {
+                        error_log("Error en auditoría eliminarAsignacionCarrera: " . $e->getMessage());
+                    }
+                }
+                
+                return [
+                    'success' => true,
+                    'message' => 'Asignación de director eliminada exitosamente',
+                    'affected_rows' => $affected_rows
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'message' => 'No se realizaron cambios en la asignación'
+                ];
+            }
+        } else {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarAsignacionCarrera: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR ASIGNACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $id_usuario, 
+                    null, 
+                    [
+                        'id_usuario' => $id_usuario,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Directores de Carrera", 
+                    "Error al eliminar asignación de director de carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarAsignacionCarrera: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al eliminar asignación: ' . $e->getMessage()
+        ];
+    }
+}
+
+/**
+ * Función para obtener directores de carrera (solo usuario = 1)
+ */
+function obtenerDirectoresDeCarrera() {
+    global $db;
+    
+    try {
+        $directores = [];
+        $query = "SELECT u.id, u.nombre, u.username, u.email, u.carrera_di, c.nombre_carrera, c.cod_carrera
+                  FROM users u 
+                  LEFT JOIN carreras c ON u.carrera_di = c.id_carrera 
+                  WHERE u.usuario = 1 
+                  ORDER BY u.nombre ASC";
+        
+        if ($stmt = $db->prepare($query)) {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            while ($row = $result->fetch_assoc()) {
+                $directores[] = $row;
+            }
+            
+            $stmt->close();
+            return $directores;
+        } else {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerDirectoresDeCarrera: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Función para obtener usuarios que pueden ser directores (solo usuario = 1 sin carrera asignada)
+ */
+function obtenerUsuariosParaDirectores() {
+    global $db;
+    
+    try {
+        $usuarios = [];
+        $query = "SELECT id, nombre, username, email 
+                  FROM users 
+                  WHERE usuario = 1 
+                  AND (carrera_di IS NULL OR carrera_di = '' OR carrera_di = 0)
+                  ORDER BY nombre ASC";
+        
+        if ($stmt = $db->prepare($query)) {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            while ($row = $result->fetch_assoc()) {
+                $usuarios[] = $row;
+            }
+            
+            $stmt->close();
+            return $usuarios;
+        } else {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerUsuariosParaDirectores: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Función auxiliar para obtener usuario por ID
+ */
+function obtenerUsuarioPorId($id_usuario) {
+    global $db;
+    
+    try {
+        $query = "SELECT id, nombre, username, email, usuario, carrera_di 
+                  FROM users 
+                  WHERE id = ?";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            return null;
+        }
+        
+        $stmt->bind_param("i", $id_usuario);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $usuario = $result->fetch_assoc();
+        $stmt->close();
+        
+        return $usuario;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerUsuarioPorId: " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Función para obtener carreras sin director asignado
+ */
+function obtenerCarrerasSinDirector() {
+    global $db;
+    
+    try {
+        $carreras = [];
+        $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera
+                  FROM carreras c
+                  WHERE c.activa = 1 
+                  AND c.id_carrera NOT IN (
+                      SELECT DISTINCT carrera_di 
+                      FROM users 
+                      WHERE usuario = 1 
+                      AND carrera_di IS NOT NULL 
+                      AND carrera_di != 0
+                  )
+                  ORDER BY c.nombre_carrera ASC";
+        
+        if ($stmt = $db->prepare($query)) {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            while ($row = $result->fetch_assoc()) {
+                $carreras[] = $row;
+            }
+            
+            $stmt->close();
+            return $carreras;
+        } else {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerCarrerasSinDirector: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Función para verificar si una carrera ya tiene director
+ */
+function carreraTieneDirector($id_carrera) {
+    global $db;
+    
+    try {
+        $query = "SELECT COUNT(*) as total 
+                  FROM users 
+                  WHERE usuario = 1 
+                  AND carrera_di = ?";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            return false;
+        }
+        
+        $stmt->bind_param("i", $id_carrera);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $count = $result->fetch_assoc()['total'];
+        $stmt->close();
+        
+        return $count > 0;
+        
+    } catch (Exception $e) {
+        error_log("Error en carreraTieneDirector: " . $e->getMessage());
+        return false;
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

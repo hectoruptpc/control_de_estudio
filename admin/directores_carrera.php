@@ -5,7 +5,7 @@ ini_set('display_errors', '1');
 $titulopag = "Asignar Carreras a Directores";
 include('../funciones/functions.php');
 
-//CARGAR PERMISOS
+// CARGAR PERMISOS
 cargarPermisosUsuario();
 verificarPermiso('gestion_director_carrera');
 
@@ -42,94 +42,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['eliminar_asignacion']
     
     header("Location: " . $_SERVER['PHP_SELF']);
     exit();
-}
-
-// Función para asignar carrera a director
-function asignarCarreraDirector($id_usuario, $id_carrera) {
-    global $db;
-    
-    $stmt = $db->prepare("UPDATE users SET carrera_di = ? WHERE id = ? AND usuario = 1");
-    $stmt->bind_param("ii", $id_carrera, $id_usuario);
-    
-    if ($stmt->execute()) {
-        $stmt->close();
-        return true;
-    } else {
-        error_log("Error al asignar carrera: " . $db->error);
-        $stmt->close();
-        return false;
-    }
-}
-
-// Función para eliminar asignación de carrera
-function eliminarAsignacionCarrera($id_usuario) {
-    global $db;
-    
-    $stmt = $db->prepare("UPDATE users SET carrera_di = NULL WHERE id = ? AND usuario = 1");
-    $stmt->bind_param("i", $id_usuario);
-    
-    if ($stmt->execute()) {
-        $stmt->close();
-        return true;
-    } else {
-        error_log("Error al eliminar asignación de carrera: " . $db->error);
-        $stmt->close();
-        return false;
-    }
-}
-
-// Función para obtener directores de carrera (solo usuario = 1)
-function obtenerDirectoresDeCarrera() {
-    global $db;
-    
-    $directores = [];
-    $query = "SELECT u.id, u.nombre, u.username, u.email, u.carrera_di, c.nombre_carrera 
-              FROM users u 
-              LEFT JOIN carreras c ON u.carrera_di = c.id_carrera 
-              WHERE u.usuario = 1 
-              ORDER BY u.nombre ASC";
-    
-    if ($stmt = $db->prepare($query)) {
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        while ($row = $result->fetch_assoc()) {
-            $directores[] = $row;
-        }
-        
-        $stmt->close();
-        return $directores;
-    } else {
-        error_log("Error al obtener directores: " . $db->error);
-        return [];
-    }
-}
-
-// Función para obtener usuarios que pueden ser directores (solo usuario = 1 sin carrera asignada)
-function obtenerUsuariosParaDirectores() {
-    global $db;
-    
-    $usuarios = [];
-    $query = "SELECT id, nombre, username, email 
-              FROM users 
-              WHERE usuario = 1 
-              AND (carrera_di IS NULL OR carrera_di = '' OR carrera_di = 0)
-              ORDER BY nombre ASC";
-    
-    if ($stmt = $db->prepare($query)) {
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        while ($row = $result->fetch_assoc()) {
-            $usuarios[] = $row;
-        }
-        
-        $stmt->close();
-        return $usuarios;
-    } else {
-        error_log("Error al obtener usuarios para directores: " . $db->error);
-        return [];
-    }
 }
 
 include("includes/head.php");
