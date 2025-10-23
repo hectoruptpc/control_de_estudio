@@ -81,12 +81,18 @@ if (isset($_GET['logout'])) {
 //desactivar periodos vencidos
 
 // ▼ Añade esto al inicio del archivo (después de la conexión a la BD) ▼
+if (!function_exists('desactivarPeriodosVencidos')) {
 function desactivarPeriodosVencidos($db) {
     $query = "UPDATE periodos_academicos SET activo = 0 
               WHERE fecha_fin < CURDATE() AND activo = 1";
     $stmt = $db->prepare($query);
     $stmt->execute();
-    return $db->affected_rows; // Retorna cuántos periodos desactivó
+    // Intentar devolver filas afectadas desde el statement si está disponible
+    if (isset($stmt) && property_exists($stmt, 'affected_rows')) {
+        return $stmt->affected_rows;
+    }
+    return $db->affected_rows; // Retorna cuántos periodos desactivó (fallback)
+}
 }
 
 // Ejecutar la función cada vez que alguien entre al sistema
@@ -5683,21 +5689,37 @@ function obtenerSeccionesPorCarrera($db, $carrera_id) {
 // FUNCIONES DE PERIODOS ACADEMICOS***********************************************************************
 
 
-
 /**
  * Obtiene todos los periodos académicos
  * @param mysqli $db Conexión a la base de datos
  * @return array Lista de periodos académicos
  */
 function obtenerPeriodosAcademicos($db) {
-    // Primero desactivamos cualquier periodo vencido (por si acaso)
-    desactivarPeriodosVencidos($db);
-    
-    $query = "SELECT * FROM periodos_academicos ORDER BY created_at DESC";
-    $stmt = $db->prepare($query);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->fetch_all(MYSQLI_ASSOC);
+    try {
+        // Primero desactivamos cualquier periodo vencido (por si acaso)
+        desactivarPeriodosVencidos($db);
+        
+        $query = "SELECT * FROM periodos_academicos ORDER BY created_at DESC";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $periodos = $result->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        
+        return $periodos;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerPeriodosAcademicos: " . $e->getMessage());
+        return [];
+    }
 }
 
 /**
@@ -5706,14 +5728,101 @@ function obtenerPeriodosAcademicos($db) {
  * @param string $nombre Nombre del periodo
  * @param string $fecha_inicio Fecha de inicio (YYYY-MM-DD)
  * @param string $fecha_fin Fecha de fin (YYYY-MM-DD)
- * @return bool True si se creó correctamente
+ * @return array Resultado de la operación
  */
 function crearPeriodoAcademico($db, $nombre, $fecha_inicio, $fecha_fin) {
-    $query = "INSERT INTO periodos_academicos (nombre_periodo, fecha_inicio, fecha_fin, activo, created_at) 
-              VALUES (?, ?, ?, 1, NOW())";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("sss", $nombre, $fecha_inicio, $fecha_fin);
-    return $stmt->execute();
+    try {
+        // Validar fechas
+        if (empty($nombre) || empty($fecha_inicio) || empty($fecha_fin)) {
+            return [
+                'success' => false,
+                'message' => 'Todos los campos son obligatorios'
+            ];
+        }
+
+        // Validar que la fecha de fin sea posterior a la de inicio
+        if (strtotime($fecha_fin) <= strtotime($fecha_inicio)) {
+            return [
+                'success' => false,
+                'message' => 'La fecha de fin debe ser posterior a la fecha de inicio'
+            ];
+        }
+
+        $query = "INSERT INTO periodos_academicos (nombre_periodo, fecha_inicio, fecha_fin, activo, created_at) 
+                  VALUES (?, ?, ?, 1, NOW())";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("sss", $nombre, $fecha_inicio, $fecha_fin);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $periodo_id = $stmt->insert_id;
+        $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - NUEVO PERIODO ACADÉMICO CREADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "INSERT", 
+                    "periodos_academicos", 
+                    $periodo_id, 
+                    null, 
+                    [
+                        'nombre_periodo' => $nombre,
+                        'fecha_inicio' => $fecha_inicio,
+                        'fecha_fin' => $fecha_fin,
+                        'activo' => 1
+                    ], 
+                    "Periodos Académicos", 
+                    "Nuevo período académico creado"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría crearPeriodoAcademico: " . $e->getMessage());
+            }
+        }
+        
+        return [
+            'success' => true,
+            'message' => 'Período académico creado exitosamente',
+            'id_periodo' => $periodo_id
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Error en crearPeriodoAcademico: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL CREAR PERIODO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "periodos_academicos", 
+                    null, 
+                    null, 
+                    [
+                        'nombre_periodo' => $nombre,
+                        'fecha_inicio' => $fecha_inicio,
+                        'fecha_fin' => $fecha_fin,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Periodos Académicos", 
+                    "Error al crear período académico"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error crearPeriodoAcademico: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al crear período académico: ' . $e->getMessage()
+        ];
+    }
 }
 
 /**
@@ -5723,17 +5832,126 @@ function crearPeriodoAcademico($db, $nombre, $fecha_inicio, $fecha_fin) {
  * @param string $nombre Nuevo nombre del periodo
  * @param string $fecha_inicio Nueva fecha de inicio
  * @param string $fecha_fin Nueva fecha de fin
- * @return bool True si se actualizó correctamente
+ * @return array Resultado de la operación
  */
 function actualizarPeriodoAcademico($db, $id, $nombre, $fecha_inicio, $fecha_fin) {
-    $query = "UPDATE periodos_academicos SET 
-              nombre_periodo = ?,
-              fecha_inicio = ?,
-              fecha_fin = ?
-              WHERE id_periodo = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("sssi", $nombre, $fecha_inicio, $fecha_fin, $id);
-    return $stmt->execute();
+    try {
+        // Obtener datos actuales para auditoría
+        $periodo_actual = obtenerPeriodoPorId($db, $id);
+        if (!$periodo_actual) {
+            return [
+                'success' => false,
+                'message' => 'Período académico no encontrado'
+            ];
+        }
+
+        // Validar fechas
+        if (empty($nombre) || empty($fecha_inicio) || empty($fecha_fin)) {
+            return [
+                'success' => false,
+                'message' => 'Todos los campos son obligatorios'
+            ];
+        }
+
+        // Validar que la fecha de fin sea posterior a la de inicio
+        if (strtotime($fecha_fin) <= strtotime($fecha_inicio)) {
+            return [
+                'success' => false,
+                'message' => 'La fecha de fin debe ser posterior a la fecha de inicio'
+            ];
+        }
+
+        $query = "UPDATE periodos_academicos SET 
+                  nombre_periodo = ?,
+                  fecha_inicio = ?,
+                  fecha_fin = ?
+                  WHERE id_periodo = ?";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("sssi", $nombre, $fecha_inicio, $fecha_fin, $id);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - ACTUALIZACIÓN DE PERIODO ACADÉMICO
+        if ($affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                $valores_antiguos_audit = [];
+                $valores_nuevos_audit = [];
+                
+                // Comparar campos modificados
+                $campos_auditar = ['nombre_periodo', 'fecha_inicio', 'fecha_fin'];
+                
+                foreach ($campos_auditar as $campo) {
+                    $valor_antiguo = $periodo_actual[$campo] ?? null;
+                    $valor_nuevo = $$campo ?? null;
+                    
+                    if ($valor_antiguo != $valor_nuevo) {
+                        $valores_antiguos_audit[$campo] = $valor_antiguo;
+                        $valores_nuevos_audit[$campo] = $valor_nuevo;
+                    }
+                }
+                
+                if (!empty($valores_nuevos_audit)) {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "periodos_academicos", 
+                        $id, 
+                        $valores_antiguos_audit, 
+                        $valores_nuevos_audit, 
+                        "Periodos Académicos", 
+                        "Actualización de período académico"
+                    );
+                }
+            } catch (Exception $e) {
+                error_log("Error en auditoría actualizarPeriodoAcademico: " . $e->getMessage());
+            }
+        }
+        
+        return [
+            'success' => true,
+            'message' => 'Período académico actualizado exitosamente',
+            'affected_rows' => $affected_rows
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarPeriodoAcademico: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR PERIODO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "periodos_academicos", 
+                    $id, 
+                    null, 
+                    [
+                        'nombre_periodo' => $nombre,
+                        'fecha_inicio' => $fecha_inicio,
+                        'fecha_fin' => $fecha_fin,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Periodos Académicos", 
+                    "Error al actualizar período académico"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error actualizarPeriodoAcademico: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al actualizar período académico: ' . $e->getMessage()
+        ];
+    }
 }
 
 /**
@@ -5741,21 +5959,103 @@ function actualizarPeriodoAcademico($db, $id, $nombre, $fecha_inicio, $fecha_fin
  * @param mysqli $db Conexión a la base de datos
  * @param int $periodo_id ID del período
  * @param int $nuevo_estado Nuevo estado (1 para activo, 0 para inactivo)
- * @return bool True si la operación fue exitosa
+ * @return array Resultado de la operación
  */
 function cambiarEstadoPeriodo($db, $periodo_id, $nuevo_estado) {
     try {
+        // Obtener información actual del período para auditoría
+        $periodo_actual = obtenerPeriodoPorId($db, $periodo_id);
+        if (!$periodo_actual) {
+            return [
+                'success' => false,
+                'message' => 'Período académico no encontrado'
+            ];
+        }
+
         $stmt = $db->prepare("UPDATE periodos_academicos SET activo = ? WHERE id_periodo = ?");
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
         $stmt->bind_param("ii", $nuevo_estado, $periodo_id);
-        $stmt->execute();
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $affected_rows = $stmt->affected_rows;
         $stmt->close();
-        return true;
+        
+        // Si se activó el período, actualizar estados de secciones
+        if ($nuevo_estado == 1 && $affected_rows > 0) {
+            actualizarEstadoSeccionesDePeriodo($db, $periodo_id);
+        }
+        
+        // REGISTRAR EN AUDITORÍA - CAMBIO DE ESTADO DE PERIODO
+        if ($affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                $estado_texto_anterior = $periodo_actual['activo'] ? 'Activo' : 'Inactivo';
+                $estado_texto_nuevo = $nuevo_estado ? 'Activo' : 'Inactivo';
+                
+                registrarAuditoria(
+                    "UPDATE", 
+                    "periodos_academicos", 
+                    $periodo_id, 
+                    [
+                        'activo' => $periodo_actual['activo'],
+                        'estado_anterior' => $estado_texto_anterior
+                    ], 
+                    [
+                        'activo' => $nuevo_estado,
+                        'estado_nuevo' => $estado_texto_nuevo,
+                        'nombre_periodo' => $periodo_actual['nombre_periodo'],
+                        'fecha_inicio' => $periodo_actual['fecha_inicio'],
+                        'fecha_fin' => $periodo_actual['fecha_fin']
+                    ], 
+                    "Periodos Académicos", 
+                    "Cambio de estado de período académico"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría cambiarEstadoPeriodo: " . $e->getMessage());
+            }
+        }
+        
+        return [
+            'success' => true,
+            'message' => 'Estado del período actualizado exitosamente',
+            'affected_rows' => $affected_rows
+        ];
+        
     } catch (Exception $e) {
         error_log("Error al cambiar estado del período: " . $e->getMessage());
-        return false;
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL CAMBIAR ESTADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "periodos_academicos", 
+                    $periodo_id, 
+                    null, 
+                    [
+                        'nuevo_estado' => $nuevo_estado,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Periodos Académicos", 
+                    "Error al cambiar estado de período académico"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error cambiarEstadoPeriodo: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al cambiar estado del período: ' . $e->getMessage()
+        ];
     }
 }
-
 
 /**
  * Actualiza el estado de todas las secciones de un período cuando este se activa
@@ -5763,20 +6063,170 @@ function cambiarEstadoPeriodo($db, $periodo_id, $nuevo_estado) {
  * @param int $periodo_id ID del período académico
  */
 function actualizarEstadoSeccionesDePeriodo($db, $periodo_id) {
-    // Obtener todas las secciones del período
-    $stmt = $db->prepare("SELECT id_seccion FROM secciones WHERE id_periodo = ?");
-    $stmt->bind_param("i", $periodo_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $secciones = $result->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-    
-    // Actualizar el estado de cada sección
-    foreach ($secciones as $seccion) {
-        $count = contarEstudiantesActivos($db, $seccion['id_seccion']);
-        actualizarEstadoSeccion($db, $seccion['id_seccion'], $count);
+    try {
+        // Obtener todas las secciones del período
+        $stmt = $db->prepare("SELECT id_seccion FROM secciones WHERE id_periodo = ?");
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $periodo_id);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $secciones = $result->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        
+        // Contador para auditoría
+        $secciones_actualizadas = 0;
+        
+        // Actualizar el estado de cada sección
+        foreach ($secciones as $seccion) {
+            $count = contarEstudiantesActivos($db, $seccion['id_seccion']);
+            $resultado = actualizarEstadoSeccion($db, $seccion['id_seccion'], $count);
+            
+            if ($resultado) {
+                $secciones_actualizadas++;
+            }
+        }
+        
+        // REGISTRAR EN AUDITORÍA - ACTUALIZACIÓN MASIVA DE SECCIONES
+        if ($secciones_actualizadas > 0 && function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "UPDATE", 
+                    "secciones", 
+                    null, 
+                    null, 
+                    [
+                        'periodo_id' => $periodo_id,
+                        'secciones_actualizadas' => $secciones_actualizadas,
+                        'total_secciones' => count($secciones)
+                    ], 
+                    "Periodos Académicos", 
+                    "Actualización masiva de estados de secciones por activación de período"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría actualizarEstadoSeccionesDePeriodo: " . $e->getMessage());
+            }
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarEstadoSeccionesDePeriodo: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN ACTUALIZACIÓN MASIVA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "secciones", 
+                    null, 
+                    null, 
+                    [
+                        'periodo_id' => $periodo_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Periodos Académicos", 
+                    "Error en actualización masiva de secciones"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error actualizarEstadoSeccionesDePeriodo: " . $auditError->getMessage());
+            }
+        }
     }
 }
+
+/**
+ * Obtiene un período académico por su ID
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $id ID del período
+ * @return array|null Datos del período o null si no existe
+ */
+function obtenerPeriodoPorId($db, $id) {
+    try {
+        $query = "SELECT * FROM periodos_academicos WHERE id_periodo = ?";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $id);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $periodo = $result->fetch_assoc();
+        $stmt->close();
+        
+        return $periodo;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerPeriodoPorId: " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Desactiva automáticamente los períodos académicos vencidos
+ * @param mysqli $db Conexión a la base de datos
+ * @return int Número de períodos desactivados
+ */
+function desactivarPeriodosVencidos($db) {
+    try {
+        $fecha_actual = date('Y-m-d');
+        
+        $query = "UPDATE periodos_academicos SET activo = 0 
+                  WHERE fecha_fin < ? AND activo = 1";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("s", $fecha_actual);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - DESACTIVACIÓN AUTOMÁTICA DE PERIODOS VENCIDOS
+        if ($affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "UPDATE", 
+                    "periodos_academicos", 
+                    null, 
+                    null, 
+                    [
+                        'periodos_desactivados' => $affected_rows,
+                        'fecha_actual' => $fecha_actual
+                    ], 
+                    "Periodos Académicos", 
+                    "Desactivación automática de períodos académicos vencidos"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría desactivarPeriodosVencidos: " . $e->getMessage());
+            }
+        }
+        
+        return $affected_rows;
+        
+    } catch (Exception $e) {
+        error_log("Error en desactivarPeriodosVencidos: " . $e->getMessage());
+        return 0;
+    }
+}
+
 
 
 
