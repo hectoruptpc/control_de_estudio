@@ -2735,41 +2735,41 @@ function verificarSesion() {
  * @return array Listado de todas las materias con sus datos completos
  */
 function obtenerMaterias($db) {
-  // Inicializamos el array de resultados
-  $materias = [];
-  
-  // Definimos la consulta SQL (aunque no tiene parámetros, usamos prepared statement por consistencia)
-  $query = "SELECT * FROM materias ORDER BY nombre_materia";
-  
-  // Preparamos la sentencia
-  if ($stmt = $db->prepare($query)) {
-      try {
-          // Ejecutamos la consulta (no necesita bind_param ya que no tiene parámetros)
-          $stmt->execute();
-          
-          // Obtenemos el resultado
-          $result = $stmt->get_result();
-          
-          // Recorremos los resultados
-          while ($row = $result->fetch_assoc()) {
-              $materias[] = $row;
-          }
-          
-          // Liberamos memoria
-          $result->free();
-          
-      } catch (Exception $e) {
-          // Registramos errores silenciosamente
-          error_log("Error en obtenerMaterias: " . $e->getMessage());
-      } finally {
-          // Cerramos el statement
-          $stmt->close();
-      }
-  } else {
-      error_log("Error preparando consulta: " . $db->error);
-  }
-  
-  return $materias;
+    // Inicializamos el array de resultados
+    $materias = [];
+    
+    // Definimos la consulta SQL (aunque no tiene parámetros, usamos prepared statement por consistencia)
+    $query = "SELECT * FROM materias ORDER BY nombre_materia";
+    
+    // Preparamos la sentencia
+    if ($stmt = $db->prepare($query)) {
+        try {
+            // Ejecutamos la consulta (no necesita bind_param ya que no tiene parámetros)
+            $stmt->execute();
+            
+            // Obtenemos el resultado
+            $result = $stmt->get_result();
+            
+            // Recorremos los resultados
+            while ($row = $result->fetch_assoc()) {
+                $materias[] = $row;
+            }
+            
+            // Liberamos memoria
+            $result->free();
+            
+        } catch (Exception $e) {
+            // Registramos errores silenciosamente
+            error_log("Error en obtenerMaterias: " . $e->getMessage());
+        } finally {
+            // Cerramos el statement
+            $stmt->close();
+        }
+    } else {
+        error_log("Error preparando consulta: " . $db->error);
+    }
+    
+    return $materias;
 }
 
 /**
@@ -2780,32 +2780,32 @@ function obtenerMaterias($db) {
  * @return array|null Array asociativo con los datos de la materia o null si no se encuentra
  */
 function obtenerMateriaPorId($db, $id) {
-  // Preparamos la consulta SQL con un parámetro de sustitución (?)
-  $query = "SELECT * FROM materias WHERE id_materia = ?";
-  
-  // Preparamos la sentencia
-  $stmt = $db->prepare($query);
-  
-  // Verificamos si la preparación fue exitosa
-  if (!$stmt) {
-      // En caso de error, podrías registrar el error o lanzar una excepción
-      return null;
-  }
-  
-  // Vinculamos el parámetro (i = integer)
-  $stmt->bind_param("i", $id);
-  
-  // Ejecutamos la consulta
-  $stmt->execute();
-  
-  // Obtenemos el resultado de la consulta
-  $result = $stmt->get_result();
-  
-  // Cerramos la sentencia para liberar recursos
-  $stmt->close();
-  
-  // Retornamos el resultado como array asociativo o null si no hay resultados
-  return $result->fetch_assoc() ?: null;
+    // Preparamos la consulta SQL con un parámetro de sustitución (?)
+    $query = "SELECT * FROM materias WHERE id_materia = ?";
+    
+    // Preparamos la sentencia
+    $stmt = $db->prepare($query);
+    
+    // Verificamos si la preparación fue exitosa
+    if (!$stmt) {
+        // En caso de error, podrías registrar el error o lanzar una excepción
+        return null;
+    }
+    
+    // Vinculamos el parámetro (i = integer)
+    $stmt->bind_param("i", $id);
+    
+    // Ejecutamos la consulta
+    $stmt->execute();
+    
+    // Obtenemos el resultado de la consulta
+    $result = $stmt->get_result();
+    
+    // Cerramos la sentencia para liberar recursos
+    $stmt->close();
+    
+    // Retornamos el resultado como array asociativo o null si no hay resultados
+    return $result->fetch_assoc() ?: null;
 }
 
 /**
@@ -2816,141 +2816,259 @@ function obtenerMateriaPorId($db, $id) {
  * @return bool True si la creación fue exitosa, False en caso de error
  */
 function crearMateria($db, $data) {
-  // Validación del campo trayecto (1-5)
-  $trayecto = isset($data['trayecto']) ? (int)$data['trayecto'] : 1;
-  if ($trayecto < 1 || $trayecto > 5) {
-      $trayecto = 1; // Valor por defecto si está fuera de rango
-  }
+    try {
+        // Validación del campo trayecto (1-5)
+        $trayecto = isset($data['trayecto']) ? (int)$data['trayecto'] : 1;
+        if ($trayecto < 1 || $trayecto > 5) {
+            $trayecto = 1; // Valor por defecto si está fuera de rango
+        }
 
-  // Validación de campos booleanos
-  $activa = isset($data['activa']) ? (int)(bool)$data['activa'] : 1;
+        // Validación de campos booleanos
+        $activa = isset($data['activa']) ? (int)(bool)$data['activa'] : 1;
 
-  // Consulta SQL con sentencia preparada
-  $query = "INSERT INTO materias (
-              cod_materia, 
-              nombre_materia, 
-              pnf_ptf, 
-              duracion_periodo, 
-              trayecto,
-              creditos, 
-              activa, 
-              horas_teoricas, 
-              horas_practicas, 
-              created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+        // Consulta SQL con sentencia preparada
+        $query = "INSERT INTO materias (
+                    cod_materia, 
+                    nombre_materia, 
+                    pnf_ptf, 
+                    duracion_periodo, 
+                    trayecto,
+                    creditos, 
+                    activa, 
+                    horas_teoricas, 
+                    horas_practicas, 
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
 
-  // Preparamos la sentencia
-  $stmt = $db->prepare($query);
-  
-  if (!$stmt) {
-      error_log("Error en preparación de query: " . $db->error);
-      return false;
-  }
+        // Preparamos la sentencia
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación de query: " . $db->error);
+        }
 
-  // Validación y asignación de valores
-  $cod_materia = $data['cod_materia'] ?? '';
-  $nombre_materia = $data['nombre_materia'] ?? '';
-  $pnf_ptf = $data['pnf_ptf'] ?? '';
-  $duracion_periodo = isset($data['duracion_periodo']) ? (int)$data['duracion_periodo'] : 0;
-  $creditos = isset($data['creditos']) ? (int)$data['creditos'] : 0;
-  $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
-  $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
+        // Validación y asignación de valores
+        $cod_materia = $data['cod_materia'] ?? '';
+        $nombre_materia = $data['nombre_materia'] ?? '';
+        $pnf_ptf = $data['pnf_ptf'] ?? '';
+        $duracion_periodo = isset($data['duracion_periodo']) ? (int)$data['duracion_periodo'] : 0;
+        $creditos = isset($data['creditos']) ? (int)$data['creditos'] : 0;
+        $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
+        $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
 
-  // Vinculamos parámetros (tipos: s=string, i=integer)
-  $stmt->bind_param("sssiiiiii", 
-      $cod_materia,
-      $nombre_materia,
-      $pnf_ptf,
-      $duracion_periodo,
-      $trayecto,
-      $creditos,
-      $activa,
-      $horas_teoricas,
-      $horas_practicas
-  );
-  
-  // Ejecutamos la sentencia
-  $result = $stmt->execute();
-  
-  if (!$result) {
-      error_log("Error al ejecutar query: " . $stmt->error);
-  }
-  
-  // Cerramos la sentencia
-  $stmt->close();
-  
-  return $result;
+        // Vinculamos parámetros (tipos: s=string, i=integer)
+        $stmt->bind_param("sssiiiiii", 
+            $cod_materia,
+            $nombre_materia,
+            $pnf_ptf,
+            $duracion_periodo,
+            $trayecto,
+            $creditos,
+            $activa,
+            $horas_teoricas,
+            $horas_practicas
+        );
+        
+        // Ejecutamos la sentencia
+        $result = $stmt->execute();
+        
+        if (!$result) {
+            throw new Exception("Error al ejecutar query: " . $stmt->error);
+        }
+        
+        $materia_id = $stmt->insert_id;
+        $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - NUEVA MATERIA CREADA
+        if ($result && function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "INSERT", 
+                    "materias", 
+                    $materia_id, 
+                    null, 
+                    [
+                        'cod_materia' => $cod_materia,
+                        'nombre_materia' => $nombre_materia,
+                        'pnf_ptf' => $pnf_ptf,
+                        'duracion_periodo' => $duracion_periodo,
+                        'trayecto' => $trayecto,
+                        'creditos' => $creditos,
+                        'activa' => $activa,
+                        'horas_teoricas' => $horas_teoricas,
+                        'horas_practicas' => $horas_practicas
+                    ], 
+                    "Materias", 
+                    "Nueva materia creada"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría crearMateria: " . $e->getMessage());
+            }
+        }
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        error_log("Error en crearMateria: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL CREAR MATERIA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "materias", 
+                    null, 
+                    null, 
+                    [
+                        'cod_materia' => $data['cod_materia'] ?? '',
+                        'nombre_materia' => $data['nombre_materia'] ?? '',
+                        'error' => $e->getMessage()
+                    ], 
+                    "Materias", 
+                    "Error al crear nueva materia"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error crearMateria: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
-
-
-
-
-
 function actualizarMateria($db, $id, $data) {
-  // Validar que el ID sea numérico
-  if (!is_numeric($id)) {
-      error_log("Error: ID de materia no válido");
-      return false;
-  }
+    try {
+        // Validar que el ID sea numérico
+        if (!is_numeric($id)) {
+            throw new Exception("ID de materia no válido");
+        }
 
-  // Consulta SQL con sentencia preparada
-  $query = "UPDATE materias SET 
-            cod_materia = ?, 
-            nombre_materia = ?, 
-            pnf_ptf = ?,
-            duracion_periodo = ?,
-            creditos = ?, 
-            activa = ?, 
-            horas_teoricas = ?, 
-            horas_practicas = ?,
-            trayecto = ?
-            WHERE id_materia = ?";
-  
-  // Preparamos la sentencia
-  $stmt = $db->prepare($query);
-  
-  if (!$stmt) {
-      error_log("Error en preparación de query: " . $db->error);
-      return false;
-  }
+        // Obtener datos actuales para auditoría
+        $datos_actuales = obtenerMateriaPorId($db, $id);
+        if (!$datos_actuales) {
+            throw new Exception("Materia no encontrada");
+        }
 
-  // Validación y saneamiento de datos
-  $cod_materia = $data['cod_materia'] ?? '';
-  $nombre_materia = $data['nombre_materia'] ?? '';
-  $pnf_ptf = $data['pnf_ptf'] ?? '';
-  $duracion_periodo = isset($data['duracion_periodo']) ? (int)$data['duracion_periodo'] : 0;
-  $creditos = isset($data['creditos']) ? (int)$data['creditos'] : 0;
-  $activa = isset($data['activa']) ? (int)(bool)$data['activa'] : 0;
-  $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
-  $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
-  $trayecto = isset($data['trayecto']) ? (int)$data['trayecto'] : 0; // Añadido
+        // Consulta SQL con sentencia preparada
+        $query = "UPDATE materias SET 
+                cod_materia = ?, 
+                nombre_materia = ?, 
+                pnf_ptf = ?,
+                duracion_periodo = ?,
+                creditos = ?, 
+                activa = ?, 
+                horas_teoricas = ?, 
+                horas_practicas = ?,
+                trayecto = ?
+                WHERE id_materia = ?";
+        
+        // Preparamos la sentencia
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación de query: " . $db->error);
+        }
 
-  // Vinculamos parámetros (tipos: s=string, i=integer)
-  $stmt->bind_param("sssiiiiiii", // Ahora son 10 'i's
-      $cod_materia,
-      $nombre_materia,
-      $pnf_ptf,
-      $duracion_periodo,
-      $creditos,
-      $activa,
-      $horas_teoricas,
-      $horas_practicas,
-      $trayecto, // Añadido
-      $id
-  );
-  
-  // Ejecutamos la sentencia
-  $result = $stmt->execute();
-  
-  if (!$result) {
-      error_log("Error al actualizar materia: " . $stmt->error);
-  }
-  
-  // Cerramos la sentencia
-  $stmt->close();
-  
-  return $result;
+        // Validación y saneamiento de datos
+        $cod_materia = $data['cod_materia'] ?? '';
+        $nombre_materia = $data['nombre_materia'] ?? '';
+        $pnf_ptf = $data['pnf_ptf'] ?? '';
+        $duracion_periodo = isset($data['duracion_periodo']) ? (int)$data['duracion_periodo'] : 0;
+        $creditos = isset($data['creditos']) ? (int)$data['creditos'] : 0;
+        $activa = isset($data['activa']) ? (int)(bool)$data['activa'] : 0;
+        $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
+        $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
+        $trayecto = isset($data['trayecto']) ? (int)$data['trayecto'] : 0;
+
+        // Vinculamos parámetros (tipos: s=string, i=integer)
+        $stmt->bind_param("sssiiiiiii",
+            $cod_materia,
+            $nombre_materia,
+            $pnf_ptf,
+            $duracion_periodo,
+            $creditos,
+            $activa,
+            $horas_teoricas,
+            $horas_practicas,
+            $trayecto,
+            $id
+        );
+        
+        // Ejecutamos la sentencia
+        $result = $stmt->execute();
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+        
+        if (!$result) {
+            throw new Exception("Error al actualizar materia: " . $stmt->error);
+        }
+        
+        // REGISTRAR EN AUDITORÍA - ACTUALIZACIÓN DE MATERIA
+        if ($result && $affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                $valores_antiguos_audit = [];
+                $valores_nuevos_audit = [];
+                
+                // Comparar campos modificados
+                $campos_auditar = [
+                    'cod_materia', 'nombre_materia', 'pnf_ptf', 'duracion_periodo',
+                    'creditos', 'activa', 'horas_teoricas', 'horas_practicas', 'trayecto'
+                ];
+                
+                foreach ($campos_auditar as $campo) {
+                    $valor_antiguo = $datos_actuales[$campo] ?? null;
+                    $valor_nuevo = $data[$campo] ?? null;
+                    
+                    if ($valor_antiguo != $valor_nuevo) {
+                        $valores_antiguos_audit[$campo] = $valor_antiguo;
+                        $valores_nuevos_audit[$campo] = $valor_nuevo;
+                    }
+                }
+                
+                if (!empty($valores_nuevos_audit)) {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "materias", 
+                        $id, 
+                        $valores_antiguos_audit, 
+                        $valores_nuevos_audit, 
+                        "Materias", 
+                        "Actualización de datos de materia"
+                    );
+                }
+            } catch (Exception $e) {
+                error_log("Error en auditoría actualizarMateria: " . $e->getMessage());
+            }
+        }
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarMateria: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR MATERIA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "materias", 
+                    $id, 
+                    null, 
+                    [
+                        'cod_materia' => $data['cod_materia'] ?? '',
+                        'nombre_materia' => $data['nombre_materia'] ?? '',
+                        'error' => $e->getMessage()
+                    ], 
+                    "Materias", 
+                    "Error al actualizar materia"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error actualizarMateria: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
 /**
@@ -2961,344 +3079,536 @@ function actualizarMateria($db, $id, $data) {
  * @return array|false Retorna el nuevo estado y datos básicos, o false en caso de error
  */
 function toggleMateria($db, $id) {
-    // Validación básica del ID
-    if (!is_numeric($id)) {
-        return false;
-    }
+    try {
+        // Validación básica del ID
+        if (!is_numeric($id)) {
+            throw new Exception("ID de materia no válido");
+        }
 
-    // Consulta directa para alternar el estado
-    $query = "UPDATE materias SET activa = NOT activa WHERE id_materia = ?";
-    $stmt = $db->prepare($query);
-    
-    if (!$stmt) {
+        // Obtener información actual para auditoría
+        $materia_actual = obtenerMateriaPorId($db, $id);
+        if (!$materia_actual) {
+            throw new Exception("Materia no encontrada");
+        }
+
+        // Consulta directa para alternar el estado
+        $query = "UPDATE materias SET activa = NOT activa WHERE id_materia = ?";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación de consulta");
+        }
+        
+        $stmt->bind_param("i", $id);
+        $result = $stmt->execute();
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+        
+        if (!$result) {
+            throw new Exception("Error al ejecutar consulta");
+        }
+        
+        // REGISTRAR EN AUDITORÍA - CAMBIO DE ESTADO DE MATERIA
+        if ($result && $affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                $nuevo_estado = $materia_actual['activa'] ? 0 : 1;
+                $estado_texto_anterior = $materia_actual['activa'] ? 'Activa' : 'Inactiva';
+                $estado_texto_nuevo = $nuevo_estado ? 'Activa' : 'Inactiva';
+                
+                registrarAuditoria(
+                    "UPDATE", 
+                    "materias", 
+                    $id, 
+                    [
+                        'activa' => $materia_actual['activa'],
+                        'estado_anterior' => $estado_texto_anterior
+                    ], 
+                    [
+                        'activa' => $nuevo_estado,
+                        'estado_nuevo' => $estado_texto_nuevo,
+                        'cod_materia' => $materia_actual['cod_materia'],
+                        'nombre_materia' => $materia_actual['nombre_materia']
+                    ], 
+                    "Materias", 
+                    "Cambio de estado de materia"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría toggleMateria: " . $e->getMessage());
+            }
+        }
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        error_log("Error en toggleMateria: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL CAMBIAR ESTADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "materias", 
+                    $id, 
+                    null, 
+                    [
+                        'id_materia' => $id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Materias", 
+                    "Error al cambiar estado de materia"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error toggleMateria: " . $auditError->getMessage());
+            }
+        }
+        
         return false;
     }
-    
-    $stmt->bind_param("i", $id);
-    $result = $stmt->execute();
-    $stmt->close();
-    
-    return $result;
 }
-
-
-
-
-
-
-
-
-
 
 /* ================================== */
 /* FUNCIONES PARA MANEJO DE MATERIAS */
 /* ================================== */
 
-
 if (!function_exists('getAllMaterias')) {
-  /**
-   * Obtiene todas las materias de la base de datos usando sentencias preparadas
-   * 
-   * @return array Lista de materias o array vacío si hay error
-   */
-  function getAllMaterias() {
-      global $db;
-      
-      // Consulta SQL para obtener todas las materias
-      $query = "SELECT id, cod_materia, nombre_materia, creditos, 
-                       horas_teoricas, horas_practicas, activa 
-                FROM materias 
-                ORDER BY nombre_materia ASC";
-      
-      // Preparamos la sentencia
-      $stmt = $db->prepare($query);
-      
-      // Verificamos si la preparación fue exitosa
-      if (!$stmt) {
-          error_log("Error al preparar la consulta en getAllMaterias: ".$db->error);
-          return [];
-      }
-      
-      // Ejecutamos la sentencia
-      if (!$stmt->execute()) {
-          error_log("Error al ejecutar la consulta en getAllMaterias: ".$stmt->error);
-          $stmt->close();
-          return [];
-      }
-      
-      // Obtenemos el resultado
-      $result = $stmt->get_result();
-      
-      // Verificamos si obtuvimos resultados
-      if (!$result) {
-          error_log("Error al obtener resultados en getAllMaterias: ".$stmt->error);
-          $stmt->close();
-          return [];
-      }
-      
-      // Procesamos los resultados
-      $listaMaterias = [];
-      while ($row = $result->fetch_assoc()) {
-          $listaMaterias[] = $row;
-      }
-      
-      // Cerramos la sentencia
-      $stmt->close();
-      
-      return $listaMaterias;
-  }
+    /**
+     * Obtiene todas las materias de la base de datos usando sentencias preparadas
+     * 
+     * @return array Lista de materias o array vacío si hay error
+     */
+    function getAllMaterias() {
+        global $db;
+        
+        // Consulta SQL para obtener todas las materias
+        $query = "SELECT id, cod_materia, nombre_materia, creditos, 
+                         horas_teoricas, horas_practicas, activa 
+                  FROM materias 
+                  ORDER BY nombre_materia ASC";
+        
+        // Preparamos la sentencia
+        $stmt = $db->prepare($query);
+        
+        // Verificamos si la preparación fue exitosa
+        if (!$stmt) {
+            error_log("Error al preparar la consulta en getAllMaterias: ".$db->error);
+            return [];
+        }
+        
+        // Ejecutamos la sentencia
+        if (!$stmt->execute()) {
+            error_log("Error al ejecutar la consulta en getAllMaterias: ".$stmt->error);
+            $stmt->close();
+            return [];
+        }
+        
+        // Obtenemos el resultado
+        $result = $stmt->get_result();
+        
+        // Verificamos si obtuvimos resultados
+        if (!$result) {
+            error_log("Error al obtener resultados en getAllMaterias: ".$stmt->error);
+            $stmt->close();
+            return [];
+        }
+        
+        // Procesamos los resultados
+        $listaMaterias = [];
+        while ($row = $result->fetch_assoc()) {
+            $listaMaterias[] = $row;
+        }
+        
+        // Cerramos la sentencia
+        $stmt->close();
+        
+        return $listaMaterias;
+    }
 }
 
 if (!function_exists('getMateriaById')) {
-  /**
-   * Obtiene una materia específica por su ID usando sentencias preparadas
-   * 
-   * @param int $id ID de la materia a buscar
-   * @return array|null Array asociativo con los datos de la materia o null si no se encuentra o hay error
-   */
-  function getMateriaById($id) {
-      global $db;
-      
-      // Validación básica del parámetro de entrada
-      if (!is_numeric($id) || $id <= 0) {
-          error_log("Error en getMateriaById: ID inválido");
-          return null;
-      }
-      
-      // Consulta SQL para obtener una materia por ID
-      $query = "SELECT id, cod_materia, nombre_materia, creditos, 
-                       horas_teoricas, horas_practicas, activa 
-                FROM materias 
-                WHERE id = ?";
-      
-      // Preparamos la sentencia
-      $stmt = $db->prepare($query);
-      
-      // Verificamos si la preparación fue exitosa
-      if (!$stmt) {
-          error_log("Error al preparar la consulta en getMateriaById: ".$db->error);
-          return null;
-      }
-      
-      // Vinculamos el parámetro (i = integer)
-      $bindResult = $stmt->bind_param("i", $id);
-      if (!$bindResult) {
-          error_log("Error al vincular parámetros en getMateriaById: ".$stmt->error);
-          $stmt->close();
-          return null;
-      }
-      
-      // Ejecutamos la sentencia
-      if (!$stmt->execute()) {
-          error_log("Error al ejecutar la consulta en getMateriaById: ".$stmt->error);
-          $stmt->close();
-          return null;
-      }
-      
-      // Obtenemos el resultado
-      $result = $stmt->get_result();
-      
-      // Verificamos si obtuvimos resultados
-      if (!$result) {
-          error_log("Error al obtener resultados en getMateriaById: ".$stmt->error);
-          $stmt->close();
-          return null;
-      }
-      
-      // Obtenemos la fila como array asociativo
-      $materia = $result->fetch_assoc();
-      
-      // Cerramos la sentencia
-      $stmt->close();
-      
-      // Retornamos el resultado (puede ser null si no se encontró la materia)
-      return $materia;
-  }
+    /**
+     * Obtiene una materia específica por su ID usando sentencias preparadas
+     * 
+     * @param int $id ID de la materia a buscar
+     * @return array|null Array asociativo con los datos de la materia o null si no se encuentra o hay error
+     */
+    function getMateriaById($id) {
+        global $db;
+        
+        // Validación básica del parámetro de entrada
+        if (!is_numeric($id) || $id <= 0) {
+            error_log("Error en getMateriaById: ID inválido");
+            return null;
+        }
+        
+        // Consulta SQL para obtener una materia por ID
+        $query = "SELECT id, cod_materia, nombre_materia, creditos, 
+                         horas_teoricas, horas_practicas, activa 
+                  FROM materias 
+                  WHERE id = ?";
+        
+        // Preparamos la sentencia
+        $stmt = $db->prepare($query);
+        
+        // Verificamos si la preparación fue exitosa
+        if (!$stmt) {
+            error_log("Error al preparar la consulta en getMateriaById: ".$db->error);
+            return null;
+        }
+        
+        // Vinculamos el parámetro (i = integer)
+        $bindResult = $stmt->bind_param("i", $id);
+        if (!$bindResult) {
+            error_log("Error al vincular parámetros en getMateriaById: ".$stmt->error);
+            $stmt->close();
+            return null;
+        }
+        
+        // Ejecutamos la sentencia
+        if (!$stmt->execute()) {
+            error_log("Error al ejecutar la consulta en getMateriaById: ".$stmt->error);
+            $stmt->close();
+            return null;
+        }
+        
+        // Obtenemos el resultado
+        $result = $stmt->get_result();
+        
+        // Verificamos si obtuvimos resultados
+        if (!$result) {
+            error_log("Error al obtener resultados en getMateriaById: ".$stmt->error);
+            $stmt->close();
+            return null;
+        }
+        
+        // Obtenemos la fila como array asociativo
+        $materia = $result->fetch_assoc();
+        
+        // Cerramos la sentencia
+        $stmt->close();
+        
+        // Retornamos el resultado (puede ser null si no se encontró la materia)
+        return $materia;
+    }
 }
 
 if (!function_exists('toggleMateriaStatus')) {
-  /**
-   * Cambia el estado activo/inactivo de una materia (toggle)
-   * 
-   * @param int $id ID de la materia a modificar
-   * @return array|false Retorna un array con información del resultado o false en caso de error
-   */
-  function toggleMateriaStatus($id) {
-      global $db;
-      
-      // Validación del ID de entrada
-      if (!is_numeric($id) || $id <= 0) {
-          error_log("Error en toggleMateriaStatus: ID inválido ($id)");
-          return false;
-      }
-      
-      // Preparamos la consulta para cambiar el estado
-      $query = "UPDATE materias SET activa = NOT activa WHERE id = ?";
-      $stmt = $db->prepare($query);
-      
-      // Verificamos si la preparación fue exitosa
-      if (!$stmt) {
-          error_log("Error al preparar la consulta en toggleMateriaStatus: ".$db->error);
-          return false;
-      }
-      
-      // Vinculamos el parámetro (i = integer)
-      if (!$stmt->bind_param("i", $id)) {
-          error_log("Error al vincular parámetro en toggleMateriaStatus: ".$stmt->error);
-          $stmt->close();
-          return false;
-      }
-      
-      // Ejecutamos la consulta
-      if (!$stmt->execute()) {
-          error_log("Error al ejecutar consulta en toggleMateriaStatus: ".$stmt->error);
-          $stmt->close();
-          return false;
-      }
-      
-      // Obtenemos el número de filas afectadas
-      $affectedRows = $stmt->affected_rows;
-      
-      // Cerramos la sentencia
-      $stmt->close();
-      
-      // Verificamos si realmente se actualizó algún registro
-      if ($affectedRows === 0) {
-          error_log("Advertencia en toggleMateriaStatus: Ningún registro actualizado (ID: $id)");
-          return [
-              'success' => false,
-              'message' => 'No se encontró la materia con el ID proporcionado',
-              'affected_rows' => 0
-          ];
-      }
-      
-      // Retornamos información sobre la operación exitosa
-      return [
-          'success' => true,
-          'message' => 'Estado de la materia actualizado correctamente',
-          'affected_rows' => $affectedRows
-      ];
-  }
+    /**
+     * Cambia el estado activo/inactivo de una materia (toggle)
+     * 
+     * @param int $id ID de la materia a modificar
+     * @return array|false Retorna un array con información del resultado o false en caso de error
+     */
+    function toggleMateriaStatus($id) {
+        global $db;
+        
+        try {
+            // Validación del ID de entrada
+            if (!is_numeric($id) || $id <= 0) {
+                throw new Exception("ID inválido ($id)");
+            }
+            
+            // Obtener información actual para auditoría
+            $materia_actual = getMateriaById($id);
+            if (!$materia_actual) {
+                throw new Exception("Materia no encontrada");
+            }
+            
+            // Preparamos la consulta para cambiar el estado
+            $query = "UPDATE materias SET activa = NOT activa WHERE id = ?";
+            $stmt = $db->prepare($query);
+            
+            // Verificamos si la preparación fue exitosa
+            if (!$stmt) {
+                throw new Exception("Error al preparar la consulta: ".$db->error);
+            }
+            
+            // Vinculamos el parámetro (i = integer)
+            if (!$stmt->bind_param("i", $id)) {
+                throw new Exception("Error al vincular parámetro: ".$stmt->error);
+            }
+            
+            // Ejecutamos la consulta
+            if (!$stmt->execute()) {
+                throw new Exception("Error al ejecutar consulta: ".$stmt->error);
+            }
+            
+            // Obtenemos el número de filas afectadas
+            $affectedRows = $stmt->affected_rows;
+            
+            // Cerramos la sentencia
+            $stmt->close();
+            
+            // Verificamos si realmente se actualizó algún registro
+            if ($affectedRows === 0) {
+                return [
+                    'success' => false,
+                    'message' => 'No se encontró la materia con el ID proporcionado',
+                    'affected_rows' => 0
+                ];
+            }
+            
+            // REGISTRAR EN AUDITORÍA - CAMBIO DE ESTADO DE MATERIA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    $nuevo_estado = $materia_actual['activa'] ? 0 : 1;
+                    $estado_texto_anterior = $materia_actual['activa'] ? 'Activa' : 'Inactiva';
+                    $estado_texto_nuevo = $nuevo_estado ? 'Activa' : 'Inactiva';
+                    
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "materias", 
+                        $id, 
+                        [
+                            'activa' => $materia_actual['activa'],
+                            'estado_anterior' => $estado_texto_anterior
+                        ], 
+                        [
+                            'activa' => $nuevo_estado,
+                            'estado_nuevo' => $estado_texto_nuevo,
+                            'cod_materia' => $materia_actual['cod_materia'],
+                            'nombre_materia' => $materia_actual['nombre_materia']
+                        ], 
+                        "Materias", 
+                        "Cambio de estado de materia"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría toggleMateriaStatus: " . $e->getMessage());
+                }
+            }
+            
+            // Retornamos información sobre la operación exitosa
+            return [
+                'success' => true,
+                'message' => 'Estado de la materia actualizado correctamente',
+                'affected_rows' => $affectedRows
+            ];
+            
+        } catch (Exception $e) {
+            error_log("Error en toggleMateriaStatus: " . $e->getMessage());
+            
+            // REGISTRAR EN AUDITORÍA - ERROR AL CAMBIAR ESTADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "materias", 
+                        $id, 
+                        null, 
+                        [
+                            'id_materia' => $id,
+                            'error' => $e->getMessage()
+                        ], 
+                        "Materias", 
+                        "Error al cambiar estado de materia"
+                    );
+                } catch (Exception $auditError) {
+                    error_log("Error en auditoría de error toggleMateriaStatus: " . $auditError->getMessage());
+                }
+            }
+            
+            return false;
+        }
+    }
 }
 
 if (!function_exists('guardarMateria')) {
-  /**
-   * Guarda o actualiza una materia en la base de datos
-   * 
-   * @param array $datos Array con los datos de la materia
-   *        Requeridos: cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, activa
-   *        Opcional: id (para actualización)
-   * @return array|false Retorna array con info de la operación o false en error grave
-   */
-  function guardarMateria($datos) {
-      global $db;
-      
-      // Validación de datos requeridos
-      $camposRequeridos = ['cod_materia', 'nombre_materia', 'creditos', 
-                          'horas_teoricas', 'horas_practicas', 'activa'];
-      
-      foreach ($camposRequeridos as $campo) {
-          if (!isset($datos[$campo])) {
-              error_log("Error en guardarMateria: Falta el campo requerido '$campo'");
-              return [
-                  'success' => false,
-                  'message' => "Falta el campo requerido '$campo'"
-              ];
-          }
-      }
-      
-      // Determinar si es inserción o actualización
-      $esNueva = empty($datos['id']);
-      
-      try {
-          if ($esNueva) {
-              // INSERT de nueva materia
-              $query = "INSERT INTO materias 
-                       (cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, activa) 
-                       VALUES (?, ?, ?, ?, ?, ?)";
-              $stmt = $db->prepare($query);
-              
-              if (!$stmt) {
-                  error_log("Error preparando INSERT: ".$db->error);
-                  return false;
-              }
-              
-              $stmt->bind_param("ssiiii", 
-                  $datos['cod_materia'],
-                  $datos['nombre_materia'],
-                  $datos['creditos'],
-                  $datos['horas_teoricas'],
-                  $datos['horas_practicas'],
-                  $datos['activa']);
-          } else {
-              // UPDATE de materia existente
-              $query = "UPDATE materias SET 
-                       cod_materia = ?, 
-                       nombre_materia = ?, 
-                       creditos = ?, 
-                       horas_teoricas = ?, 
-                       horas_practicas = ?, 
-                       activa = ? 
-                       WHERE id = ?";
-              $stmt = $db->prepare($query);
-              
-              if (!$stmt) {
-                  error_log("Error preparando UPDATE: ".$db->error);
-                  return false;
-              }
-              
-              $stmt->bind_param("ssiiiii", 
-                  $datos['cod_materia'],
-                  $datos['nombre_materia'],
-                  $datos['creditos'],
-                  $datos['horas_teoricas'],
-                  $datos['horas_practicas'],
-                  $datos['activa'],
-                  $datos['id']);
-          }
-          
-          // Ejecutar la consulta
-          if (!$stmt->execute()) {
-              error_log("Error ejecutando consulta: ".$stmt->error);
-              $stmt->close();
-              return [
-                  'success' => false,
-                  'message' => "Error al guardar en la base de datos"
-              ];
-          }
-          
-          // Obtener información del resultado
-          $affectedRows = $stmt->affected_rows;
-          $nuevoId = $esNueva ? $stmt->insert_id : null;
-          
-          $stmt->close();
-          
-          // Verificar si realmente se afectaron filas (especialmente en UPDATE)
-          if (!$esNueva && $affectedRows === 0) {
-              return [
-                  'success' => false,
-                  'message' => "No se encontró la materia con ID {$datos['id']} o no hubo cambios",
-                  'affected_rows' => 0
-              ];
-          }
-          
-          // Retornar resultado exitoso
-          return [
-              'success' => true,
-              'message' => $esNueva ? "Materia creada exitosamente" : "Materia actualizada exitosamente",
-              'affected_rows' => $affectedRows,
-              'id' => $esNueva ? $nuevoId : $datos['id']
-          ];
-          
-      } catch (Exception $e) {
-          error_log("Excepción en guardarMateria: ".$e->getMessage());
-          if (isset($stmt) && $stmt instanceof mysqli_stmt) {
-              $stmt->close();
-          }
-          return false;
-      }
-  }
+    /**
+     * Guarda o actualiza una materia en la base de datos
+     * 
+     * @param array $datos Array con los datos de la materia
+     *        Requeridos: cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, activa
+     *        Opcional: id (para actualización)
+     * @return array|false Retorna array con info de la operación o false en error grave
+     */
+    function guardarMateria($datos) {
+        global $db;
+        
+        try {
+            // Validación de datos requeridos
+            $camposRequeridos = ['cod_materia', 'nombre_materia', 'creditos', 
+                                'horas_teoricas', 'horas_practicas', 'activa'];
+            
+            foreach ($camposRequeridos as $campo) {
+                if (!isset($datos[$campo])) {
+                    throw new Exception("Falta el campo requerido '$campo'");
+                }
+            }
+            
+            // Determinar si es inserción o actualización
+            $esNueva = empty($datos['id']);
+            
+            // Obtener datos actuales para auditoría si es actualización
+            $datos_actuales = null;
+            if (!$esNueva) {
+                $datos_actuales = getMateriaById($datos['id']);
+                if (!$datos_actuales) {
+                    throw new Exception("No se encontró la materia con ID {$datos['id']}");
+                }
+            }
+            
+            if ($esNueva) {
+                // INSERT de nueva materia
+                $query = "INSERT INTO materias 
+                         (cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, activa) 
+                         VALUES (?, ?, ?, ?, ?, ?)";
+                $stmt = $db->prepare($query);
+                
+                if (!$stmt) {
+                    throw new Exception("Error preparando INSERT: ".$db->error);
+                }
+                
+                $stmt->bind_param("ssiiii", 
+                    $datos['cod_materia'],
+                    $datos['nombre_materia'],
+                    $datos['creditos'],
+                    $datos['horas_teoricas'],
+                    $datos['horas_practicas'],
+                    $datos['activa']);
+            } else {
+                // UPDATE de materia existente
+                $query = "UPDATE materias SET 
+                         cod_materia = ?, 
+                         nombre_materia = ?, 
+                         creditos = ?, 
+                         horas_teoricas = ?, 
+                         horas_practicas = ?, 
+                         activa = ? 
+                         WHERE id = ?";
+                $stmt = $db->prepare($query);
+                
+                if (!$stmt) {
+                    throw new Exception("Error preparando UPDATE: ".$db->error);
+                }
+                
+                $stmt->bind_param("ssiiiii", 
+                    $datos['cod_materia'],
+                    $datos['nombre_materia'],
+                    $datos['creditos'],
+                    $datos['horas_teoricas'],
+                    $datos['horas_practicas'],
+                    $datos['activa'],
+                    $datos['id']);
+            }
+            
+            // Ejecutar la consulta
+            if (!$stmt->execute()) {
+                throw new Exception("Error ejecutando consulta: ".$stmt->error);
+            }
+            
+            // Obtener información del resultado
+            $affectedRows = $stmt->affected_rows;
+            $nuevoId = $esNueva ? $stmt->insert_id : null;
+            
+            $stmt->close();
+            
+            // Verificar si realmente se afectaron filas (especialmente en UPDATE)
+            if (!$esNueva && $affectedRows === 0) {
+                return [
+                    'success' => false,
+                    'message' => "No se encontró la materia con ID {$datos['id']} o no hubo cambios",
+                    'affected_rows' => 0
+                ];
+            }
+            
+            // REGISTRAR EN AUDITORÍA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    if ($esNueva) {
+                        // Auditoría para nueva materia
+                        registrarAuditoria(
+                            "INSERT", 
+                            "materias", 
+                            $nuevoId, 
+                            null, 
+                            [
+                                'cod_materia' => $datos['cod_materia'],
+                                'nombre_materia' => $datos['nombre_materia'],
+                                'creditos' => $datos['creditos'],
+                                'horas_teoricas' => $datos['horas_teoricas'],
+                                'horas_practicas' => $datos['horas_practicas'],
+                                'activa' => $datos['activa']
+                            ], 
+                            "Materias", 
+                            "Nueva materia creada"
+                        );
+                    } else {
+                        // Auditoría para actualización
+                        $valores_antiguos_audit = [];
+                        $valores_nuevos_audit = [];
+                        
+                        $campos_auditar = ['cod_materia', 'nombre_materia', 'creditos', 'horas_teoricas', 'horas_practicas', 'activa'];
+                        
+                        foreach ($campos_auditar as $campo) {
+                            $valor_antiguo = $datos_actuales[$campo] ?? null;
+                            $valor_nuevo = $datos[$campo] ?? null;
+                            
+                            if ($valor_antiguo != $valor_nuevo) {
+                                $valores_antiguos_audit[$campo] = $valor_antiguo;
+                                $valores_nuevos_audit[$campo] = $valor_nuevo;
+                            }
+                        }
+                        
+                        if (!empty($valores_nuevos_audit)) {
+                            registrarAuditoria(
+                                "UPDATE", 
+                                "materias", 
+                                $datos['id'], 
+                                $valores_antiguos_audit, 
+                                $valores_nuevos_audit, 
+                                "Materias", 
+                                "Actualización de datos de materia"
+                            );
+                        }
+                    }
+                } catch (Exception $e) {
+                    error_log("Error en auditoría guardarMateria: " . $e->getMessage());
+                }
+            }
+            
+            // Retornar resultado exitoso
+            return [
+                'success' => true,
+                'message' => $esNueva ? "Materia creada exitosamente" : "Materia actualizada exitosamente",
+                'affected_rows' => $affectedRows,
+                'id' => $esNueva ? $nuevoId : $datos['id']
+            ];
+            
+        } catch (Exception $e) {
+            error_log("Excepción en guardarMateria: ".$e->getMessage());
+            
+            // REGISTRAR EN AUDITORÍA - ERROR
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "materias", 
+                        $datos['id'] ?? null, 
+                        null, 
+                        [
+                            'cod_materia' => $datos['cod_materia'] ?? '',
+                            'nombre_materia' => $datos['nombre_materia'] ?? '',
+                            'error' => $e->getMessage()
+                        ], 
+                        "Materias", 
+                        "Error al guardar materia"
+                    );
+                } catch (Exception $auditError) {
+                    error_log("Error en auditoría de error guardarMateria: " . $auditError->getMessage());
+                }
+            }
+            
+            if (isset($stmt) && $stmt instanceof mysqli_stmt) {
+                $stmt->close();
+            }
+            
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
+        }
+    }
 }
+
 
 
 
