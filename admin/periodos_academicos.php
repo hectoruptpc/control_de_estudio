@@ -111,7 +111,7 @@ include("includes/head.php");
                                 </span>
                             </td>
                             <td>
-                                <?php if (tienePermiso('gestionar_periodo_academico')): ?>
+                                <?php if (tienePermiso('gestion_periodo_academico')): ?>
                                 <button class="btn btn-sm btn-primary editar-periodo" 
                                         data-id="<?= $periodo['id_periodo'] ?>"
                                         data-nombre="<?= htmlspecialchars($periodo['nombre_periodo']) ?>"
