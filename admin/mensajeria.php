@@ -1,4 +1,8 @@
 <?php
+// Debug - mostrar errores
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 require_once('../funciones/functions.php');
 
 // Verificar autenticación y rol

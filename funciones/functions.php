@@ -4409,11 +4409,6 @@ function obtenerCompañerosSeccion($db, $seccion_id, $estudiante_id) {
 //AUDITORIA ***********************************************************************
 
 
-// ==============================================
-// ARCHIVO: funciones/functions.php
-// Sistema de Auditoría - Funciones adicionales
-// ==============================================
-
 /**
  * Registrar acción en el sistema de auditoría
  */
@@ -5084,6 +5079,11 @@ function determinarTrayectoAMostrar($id_trayecto_seccion) {
 // Obtener lista de usuarios para enviar mensajes con filtros
 function obtenerUsuariosMensajeria($filtro_tipo = '', $busqueda_cedula = '') {
     global $db;
+    
+    if (!isset($_SESSION['user']['id'])) {
+        return false;
+    }
+    
     $current_user_id = $_SESSION['user']['id'];
     
     $query = "SELECT id, nombre, usuario, estudiante, docente, admin, idusuario 
@@ -5114,6 +5114,10 @@ function obtenerUsuariosMensajeria($filtro_tipo = '', $busqueda_cedula = '') {
     $query .= " ORDER BY nombre";
     
     $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error en preparar consulta obtenerUsuariosMensajeria: " . $db->error);
+        return false;
+    }
     
     // Bind parameters dinámicamente
     if (count($params) > 1) {
@@ -5122,7 +5126,32 @@ function obtenerUsuariosMensajeria($filtro_tipo = '', $busqueda_cedula = '') {
         $stmt->bind_param($types, $params[0]);
     }
     
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecutar obtenerUsuariosMensajeria: " . $stmt->error);
+        return false;
+    }
+    
+    // Auditoría solo si la función existe
+    if (function_exists('registrarAuditoria')) {
+        try {
+            registrarAuditoria(
+                "SELECT", 
+                "users", 
+                null, 
+                null, 
+                [
+                    'filtro_tipo' => $filtro_tipo,
+                    'busqueda_cedula' => $busqueda_cedula,
+                    'usuario_consulta' => $current_user_id
+                ], 
+                "Mensajería", 
+                "Consulta de usuarios para mensajería"
+            );
+        } catch (Exception $e) {
+            error_log("Error en auditoría obtenerUsuariosMensajeria: " . $e->getMessage());
+        }
+    }
+    
     return $stmt->get_result();
 }
 
@@ -5146,9 +5175,40 @@ function obtenerMensajesRecibidos($user_id) {
               WHERE m.id_usuario_destinatario = ? 
               AND m.eliminado_destinatario = FALSE
               ORDER BY m.fecha_envio DESC";
+    
     $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error en preparar consulta obtenerMensajesRecibidos: " . $db->error);
+        return false;
+    }
+    
     $stmt->bind_param("i", $user_id);
-    $stmt->execute();
+    
+    if (!$stmt->execute()) {
+        error_log("Error en ejecutar obtenerMensajesRecibidos: " . $stmt->error);
+        return false;
+    }
+    
+    // Auditoría solo si la función existe
+    if (function_exists('registrarAuditoria')) {
+        try {
+            registrarAuditoria(
+                "SELECT", 
+                "mensajeria", 
+                null, 
+                null, 
+                [
+                    'usuario_id' => $user_id,
+                    'tipo_consulta' => 'mensajes_recibidos'
+                ], 
+                "Mensajería", 
+                "Consulta de mensajes recibidos"
+            );
+        } catch (Exception $e) {
+            error_log("Error en auditoría obtenerMensajesRecibidos: " . $e->getMessage());
+        }
+    }
+    
     return $stmt->get_result();
 }
 
@@ -5163,9 +5223,40 @@ function obtenerMensajesEnviados($user_id) {
               WHERE m.id_usuario_remitente = ? 
               AND m.eliminado_remitente = FALSE
               ORDER BY m.fecha_envio DESC";
+    
     $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error en preparar consulta obtenerMensajesEnviados: " . $db->error);
+        return false;
+    }
+    
     $stmt->bind_param("i", $user_id);
-    $stmt->execute();
+    
+    if (!$stmt->execute()) {
+        error_log("Error en ejecutar obtenerMensajesEnviados: " . $stmt->error);
+        return false;
+    }
+    
+    // Auditoría solo si la función existe
+    if (function_exists('registrarAuditoria')) {
+        try {
+            registrarAuditoria(
+                "SELECT", 
+                "mensajeria", 
+                null, 
+                null, 
+                [
+                    'usuario_id' => $user_id,
+                    'tipo_consulta' => 'mensajes_enviados'
+                ], 
+                "Mensajería", 
+                "Consulta de mensajes enviados"
+            );
+        } catch (Exception $e) {
+            error_log("Error en auditoría obtenerMensajesEnviados: " . $e->getMessage());
+        }
+    }
+    
     return $stmt->get_result();
 }
 
@@ -5192,32 +5283,194 @@ function obtenerMensaje($mensaje_id, $user_id, $tipo = 'recibidos') {
     }
     
     $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error en preparar consulta obtenerMensaje: " . $db->error);
+        return false;
+    }
+    
     $stmt->bind_param("ii", $mensaje_id, $user_id);
-    $stmt->execute();
-    return $stmt->get_result()->fetch_assoc();
+    
+    if (!$stmt->execute()) {
+        error_log("Error en ejecutar obtenerMensaje: " . $stmt->error);
+        return false;
+    }
+    
+    $result = $stmt->get_result();
+    $mensaje = $result->fetch_assoc();
+    
+    // Auditoría solo si la función existe y se encontró el mensaje
+    if ($mensaje && function_exists('registrarAuditoria')) {
+        try {
+            registrarAuditoria(
+                "SELECT", 
+                "mensajeria", 
+                $mensaje_id, 
+                null, 
+                [
+                    'usuario_id' => $user_id,
+                    'tipo_mensaje' => $tipo
+                ], 
+                "Mensajería", 
+                "Consulta de mensaje específico"
+            );
+        } catch (Exception $e) {
+            error_log("Error en auditoría obtenerMensaje: " . $e->getMessage());
+        }
+    }
+    
+    return $mensaje;
 }
 
 // Marcar mensaje como leído
 function marcarMensajeLeido($mensaje_id, $user_id) {
     global $db;
     
-    $query = "UPDATE mensajeria SET leido = TRUE 
-              WHERE id = ? AND id_usuario_destinatario = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("ii", $mensaje_id, $user_id);
-    return $stmt->execute();
+    try {
+        $query = "UPDATE mensajeria SET leido = TRUE 
+                  WHERE id = ? AND id_usuario_destinatario = ?";
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparar consulta: " . $db->error);
+        }
+        
+        $stmt->bind_param("ii", $mensaje_id, $user_id);
+        $result = $stmt->execute();
+        
+        if ($result && function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "UPDATE", 
+                    "mensajeria", 
+                    $mensaje_id, 
+                    ['leido' => '0'], 
+                    [
+                        'leido' => '1',
+                        'usuario_id' => $user_id
+                    ], 
+                    "Mensajería", 
+                    "Mensaje marcado como leído"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría marcarMensajeLeido: " . $e->getMessage());
+            }
+        }
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        error_log("Error en marcarMensajeLeido: " . $e->getMessage());
+        
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "mensajeria", 
+                    $mensaje_id, 
+                    null, 
+                    [
+                        'usuario_id' => $user_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Mensajería", 
+                    "Error al marcar mensaje como leído"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error marcarMensajeLeido: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
 // Enviar mensaje
 function enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje) {
     global $db;
     
-    $query = "INSERT INTO mensajeria (id_usuario_remitente, id_usuario_destinatario, titulo, mensaje)
-              VALUES (?, ?, ?, ?)";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("iiss", $remitente_id, $destinatario_id, $titulo, $mensaje);
-    
-    return $stmt->execute();
+    try {
+        // Iniciar transacción
+        $db->begin_transaction();
+
+        $query = "INSERT INTO mensajeria (id_usuario_remitente, id_usuario_destinatario, titulo, mensaje)
+                  VALUES (?, ?, ?, ?)";
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparar consulta: " . $db->error);
+        }
+        
+        $stmt->bind_param("iiss", $remitente_id, $destinatario_id, $titulo, $mensaje);
+        
+        $result = $stmt->execute();
+        
+        if ($result) {
+            $mensaje_id = $stmt->insert_id;
+            
+            // Auditoría solo si la función existe
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "INSERT", 
+                        "mensajeria", 
+                        $mensaje_id, 
+                        null, 
+                        [
+                            'id_usuario_remitente' => $remitente_id,
+                            'id_usuario_destinatario' => $destinatario_id,
+                            'titulo' => $titulo,
+                            'mensaje_length' => strlen($mensaje)
+                        ], 
+                        "Mensajería", 
+                        "Nuevo mensaje enviado"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría enviarMensaje: " . $e->getMessage());
+                }
+            }
+
+            // Confirmar transacción
+            $db->commit();
+            
+            return [
+                'success' => true,
+                'message' => 'Mensaje enviado exitosamente!',
+                'id' => $mensaje_id
+            ];
+        } else {
+            throw new Exception("Error al ejecutar: " . $stmt->error);
+        }
+        
+    } catch(Exception $e) {
+        // Revertir transacción en caso de error
+        $db->rollback();
+        
+        // Auditoría de error solo si la función existe
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "mensajeria", 
+                    null, 
+                    null, 
+                    [
+                        'remitente_id' => $remitente_id,
+                        'destinatario_id' => $destinatario_id,
+                        'titulo' => $titulo,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Mensajería", 
+                    "Error al enviar mensaje"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error enviarMensaje: " . $auditError->getMessage());
+            }
+        }
+        
+        error_log("Error en enviarMensaje: " . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => 'Error al enviar mensaje: ' . $e->getMessage()
+        ];
+    }
 }
 
 
