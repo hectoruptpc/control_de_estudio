@@ -13214,6 +13214,366 @@ function obtenerTodasMaterias() {
 }
 
 
+//TIPOS PAGO ***********************************************************************
+
+
+
+// Función para obtener todos los tipos de pago - SOLO LECTURA, SIN AUDITORÍA
+function obtenerTiposPago() {
+    global $db;
+    
+    $query = "SELECT id, tipopago FROM tipo_pago ORDER BY tipopago";
+    $result = $db->query($query);
+    
+    if ($result) {
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+    
+    return [];
+}
+
+// Función para crear un nuevo tipo de pago - CON AUDITORÍA
+function crearTipoPago($tipopago) {
+    global $db;
+    
+    try {
+        $tipopago_original = $tipopago;
+        $stmt = $db->prepare("INSERT INTO tipo_pago (tipopago) VALUES (?)");
+        $stmt->bind_param("s", $tipopago);
+        
+        if ($stmt->execute()) {
+            $id_insertado = $db->insert_id;
+            $stmt->close();
+            
+            // REGISTRAR EN AUDITORÍA - TIPO DE PAGO CREADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "INSERT", 
+                        "tipo_pago", 
+                        $id_insertado, 
+                        null, 
+                        [
+                            'tipo_pago' => $tipopago_original,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_creacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Tipos de Pago", 
+                        "Tipo de pago creado: " . $tipopago_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría crearTipoPago: " . $e->getMessage());
+                }
+            }
+            
+            return ['success' => true, 'message' => 'Tipo de pago creado exitosamente'];
+        } else {
+            $error = $stmt->error;
+            $stmt->close();
+            
+            // REGISTRAR EN AUDITORÍA - ERROR AL CREAR TIPO DE PAGO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipo_pago", 
+                        null, 
+                        null, 
+                        [
+                            'tipo_pago' => $tipopago_original,
+                            'error' => $error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Tipos de Pago", 
+                        "Error al crear tipo de pago: " . $tipopago_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error crearTipoPago: " . $e->getMessage());
+                }
+            }
+            
+            return ['success' => false, 'message' => 'Error al crear: ' . $error];
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en crearTipoPago: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL CREAR TIPO DE PAGO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipo_pago", 
+                    null, 
+                    null, 
+                    [
+                        'tipo_pago' => $tipopago_original ?? '',
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Tipos de Pago", 
+                    "Excepción al crear tipo de pago"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción crearTipoPago: " . $auditError->getMessage());
+            }
+        }
+        
+        return ['success' => false, 'message' => 'Error al crear: ' . $e->getMessage()];
+    }
+}
+
+// Función para actualizar un tipo de pago - CON AUDITORÍA
+function actualizarTipoPago($id, $tipopago) {
+    global $db;
+    
+    try {
+        // Obtener datos actuales para auditoría
+        $stmt_actual = $db->prepare("SELECT tipopago FROM tipo_pago WHERE id = ?");
+        $stmt_actual->bind_param("i", $id);
+        $stmt_actual->execute();
+        $result_actual = $stmt_actual->get_result();
+        
+        if ($result_actual->num_rows === 0) {
+            return ['success' => false, 'message' => 'Tipo de pago no encontrado'];
+        }
+        
+        $tipo_pago_actual = $result_actual->fetch_assoc();
+        $stmt_actual->close();
+        
+        $tipopago_original = $tipopago;
+        $stmt = $db->prepare("UPDATE tipo_pago SET tipopago = ? WHERE id = ?");
+        $stmt->bind_param("si", $tipopago, $id);
+        
+        if ($stmt->execute()) {
+            $stmt->close();
+            
+            // REGISTRAR EN AUDITORÍA - TIPO DE PAGO ACTUALIZADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "tipo_pago", 
+                        $id, 
+                        [
+                            'tipo_pago_anterior' => $tipo_pago_actual['tipopago']
+                        ], 
+                        [
+                            'tipo_pago_nuevo' => $tipopago_original,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_actualizacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Tipos de Pago", 
+                        "Tipo de pago actualizado: " . $tipo_pago_actual['tipopago'] . " → " . $tipopago_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría actualizarTipoPago: " . $e->getMessage());
+                }
+            }
+            
+            return ['success' => true, 'message' => 'Tipo de pago actualizado exitosamente'];
+        } else {
+            $error = $stmt->error;
+            $stmt->close();
+            
+            // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR TIPO DE PAGO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipo_pago", 
+                        $id, 
+                        null, 
+                        [
+                            'id_tipo_pago' => $id,
+                            'tipo_pago_nuevo' => $tipopago_original,
+                            'error' => $error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Tipos de Pago", 
+                        "Error al actualizar tipo de pago ID: " . $id
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error actualizarTipoPago: " . $e->getMessage());
+                }
+            }
+            
+            return ['success' => false, 'message' => 'Error al actualizar: ' . $error];
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarTipoPago: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ACTUALIZAR TIPO DE PAGO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipo_pago", 
+                    $id, 
+                    null, 
+                    [
+                        'id_tipo_pago' => $id,
+                        'tipo_pago_nuevo' => $tipopago_original ?? '',
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Tipos de Pago", 
+                    "Excepción al actualizar tipo de pago"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción actualizarTipoPago: " . $auditError->getMessage());
+            }
+        }
+        
+        return ['success' => false, 'message' => 'Error al actualizar: ' . $e->getMessage()];
+    }
+}
+
+// Función para eliminar un tipo de pago - CON AUDITORÍA
+function eliminarTipoPago($id) {
+    global $db;
+    
+    try {
+        // Obtener datos del tipo de pago para auditoría
+        $stmt_actual = $db->prepare("SELECT tipopago FROM tipo_pago WHERE id = ?");
+        $stmt_actual->bind_param("i", $id);
+        $stmt_actual->execute();
+        $result_actual = $stmt_actual->get_result();
+        
+        if ($result_actual->num_rows === 0) {
+            return ['success' => false, 'message' => 'Tipo de pago no encontrado'];
+        }
+        
+        $tipo_pago_eliminado = $result_actual->fetch_assoc();
+        $stmt_actual->close();
+        
+        $stmt = $db->prepare("DELETE FROM tipo_pago WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        
+        if ($stmt->execute()) {
+            $stmt->close();
+            
+            // REGISTRAR EN AUDITORÍA - TIPO DE PAGO ELIMINADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "DELETE", 
+                        "tipo_pago", 
+                        $id, 
+                        [
+                            'tipo_pago_eliminado' => $tipo_pago_eliminado['tipopago']
+                        ], 
+                        [
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_eliminacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Tipos de Pago", 
+                        "Tipo de pago eliminado: " . $tipo_pago_eliminado['tipopago'] . " (ID: " . $id . ")"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarTipoPago: " . $e->getMessage());
+                }
+            }
+            
+            return ['success' => true, 'message' => 'Tipo de pago eliminado exitosamente'];
+        } else {
+            $error = $stmt->error;
+            $stmt->close();
+            
+            // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR TIPO DE PAGO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipo_pago", 
+                        $id, 
+                        null, 
+                        [
+                            'id_tipo_pago' => $id,
+                            'tipo_pago' => $tipo_pago_eliminado['tipopago'],
+                            'error' => $error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Tipos de Pago", 
+                        "Error al eliminar tipo de pago: " . $tipo_pago_eliminado['tipopago']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error eliminarTipoPago: " . $e->getMessage());
+                }
+            }
+            
+            return ['success' => false, 'message' => 'Error al eliminar: ' . $error];
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarTipoPago: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ELIMINAR TIPO DE PAGO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipo_pago", 
+                    $id, 
+                    null, 
+                    [
+                        'id_tipo_pago' => $id,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Tipos de Pago", 
+                    "Excepción al eliminar tipo de pago"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción eliminarTipoPago: " . $auditError->getMessage());
+            }
+        }
+        
+        return ['success' => false, 'message' => 'Error al eliminar: ' . $e->getMessage()];
+    }
+}
+
+// Función para validar tipo de pago - SOLO VALIDACIÓN, SIN AUDITORÍA
+function validarTipoPago($tipopago) {
+    $tipopago = trim($tipopago);
+    
+    if (empty($tipopago)) {
+        return ['success' => false, 'message' => 'El tipo de pago es requerido'];
+    }
+    
+    if (strlen($tipopago) < 2) {
+        return ['success' => false, 'message' => 'El tipo de pago debe tener al menos 2 caracteres'];
+    }
+    
+    if (strlen($tipopago) > 100) {
+        return ['success' => false, 'message' => 'El tipo de pago no puede exceder los 100 caracteres'];
+    }
+    
+    return ['success' => true, 'message' => ''];
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
