@@ -5,28 +5,86 @@ ini_set('display_errors', '1');
 $titulopag = "Gestión de Tipos de Horario";
 include('../funciones/functions.php');
 
+// CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('tipos_horario');
+
+// Variables para mensajes
+$mensaje = '';
+$tipo_mensaje = ''; // success, danger, warning
+
 // Procesar formulario
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['agregar'])) {
-        $nombre = $_POST['nombre'];
-        $horas_academicas = $_POST['horas_academicas'];
-        $horas_atendiendo = $_POST['horas_atendiendo'];
+        $nombre = trim($_POST['nombre']);
+        $horas_academicas = intval($_POST['horas_academicas']);
+        $horas_atendiendo = intval($_POST['horas_atendiendo']);
         
-        $resultado = agregarTipoHorario($db, $nombre, $horas_academicas, $horas_atendiendo);
-        $mensaje = $resultado ? "Tipo de horario agregado correctamente." : "Error al agregar el tipo de horario.";
+        // Validar datos
+        $errores = validarTipoHorario($nombre, $horas_academicas, $horas_atendiendo);
+        
+        if (empty($errores)) {
+            // Verificar si ya existe un tipo de horario con el mismo nombre
+            if (existeTipoHorario($db, $nombre)) {
+                $mensaje = "Error: Ya existe un tipo de horario con el nombre '$nombre'.";
+                $tipo_mensaje = 'danger';
+            } else {
+                $resultado = agregarTipoHorario($db, $nombre, $horas_academicas, $horas_atendiendo);
+                if ($resultado) {
+                    $mensaje = "Tipo de horario agregado correctamente.";
+                    $tipo_mensaje = 'success';
+                    // Limpiar formulario
+                    $_POST = [];
+                } else {
+                    $mensaje = "Error al agregar el tipo de horario.";
+                    $tipo_mensaje = 'danger';
+                }
+            }
+        } else {
+            $mensaje = implode('<br>', $errores);
+            $tipo_mensaje = 'danger';
+        }
         
     } elseif (isset($_POST['editar'])) {
-        $id = $_POST['id'];
-        $nombre = $_POST['nombre'];
-        $horas_academicas = $_POST['horas_academicas'];
-        $horas_atendiendo = $_POST['horas_atendiendo'];
+        $id = intval($_POST['id']);
+        $nombre = trim($_POST['nombre']);
+        $horas_academicas = intval($_POST['horas_academicas']);
+        $horas_atendiendo = intval($_POST['horas_atendiendo']);
         
-        $resultado = actualizarTipoHorario($db, $id, $nombre, $horas_academicas, $horas_atendiendo);
-        $mensaje = $resultado ? "Tipo de horario actualizado correctamente." : "Error al actualizar el tipo de horario.";
+        // Validar datos
+        $errores = validarTipoHorario($nombre, $horas_academicas, $horas_atendiendo);
+        
+        if (empty($errores)) {
+            // Verificar si ya existe otro tipo de horario con el mismo nombre
+            if (existeTipoHorario($db, $nombre, $id)) {
+                $mensaje = "Error: Ya existe otro tipo de horario con el nombre '$nombre'.";
+                $tipo_mensaje = 'danger';
+            } else {
+                $resultado = actualizarTipoHorario($db, $id, $nombre, $horas_academicas, $horas_atendiendo);
+                if ($resultado) {
+                    $mensaje = "Tipo de horario actualizado correctamente.";
+                    $tipo_mensaje = 'success';
+                } else {
+                    $mensaje = "Error al actualizar el tipo de horario.";
+                    $tipo_mensaje = 'danger';
+                }
+            }
+        } else {
+            $mensaje = implode('<br>', $errores);
+            $tipo_mensaje = 'danger';
+        }
+        
     } elseif (isset($_POST['eliminar'])) {
-        $id = $_POST['id'];
+        $id = intval($_POST['id']);
+        
         $resultado = eliminarTipoHorario($db, $id);
-        $mensaje = $resultado ? "Tipo de horario eliminado correctamente." : "Error al eliminar el tipo de horario.";
+        if ($resultado) {
+            $mensaje = "Tipo de horario eliminado correctamente.";
+            $tipo_mensaje = 'success';
+        } else {
+            $mensaje = "Error al eliminar el tipo de horario. Verifique que no esté siendo utilizado.";
+            $tipo_mensaje = 'danger';
+        }
     }
 }
 
@@ -34,22 +92,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 $tipos_horario = obtenerTiposHorario($db);
 
 include("includes/head.php");
-
-// Mostrar mensaje si existe
-if (isset($mensaje)) {
-    echo '<div class="alert alert-' . (strpos($mensaje, 'Error') !== false ? 'danger' : 'success') . ' alert-dismissible fade show" role="alert">
-            ' . $mensaje . '
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-          </div>';
-}
 ?>
 
 <div class="container-fluid">
     <div class="row">
         <div class="col-md-12">
             <h1 class="mt-4">Gestión de Tipos de Horario</h1>
+            
+            <!-- Mostrar mensaje si existe -->
+            <?php if (!empty($mensaje)): ?>
+                <div class="alert alert-<?php echo $tipo_mensaje; ?> alert-dismissible fade show" role="alert">
+                    <?php echo $mensaje; ?>
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            <?php endif; ?>
             
             <!-- Formulario para agregar -->
             <div class="card mb-4">
@@ -60,21 +118,32 @@ if (isset($mensaje)) {
                     <form method="POST" action="">
                         <div class="form-group">
                             <label for="nombre">Nombre del horario:</label>
-                            <input type="text" class="form-control" id="nombre" name="nombre" required>
+                            <input type="text" class="form-control" id="nombre" name="nombre" 
+                                   value="<?php echo htmlspecialchars($_POST['nombre'] ?? ''); ?>" 
+                                   required maxlength="100">
+                            <small class="form-text text-muted">Mínimo 2 caracteres, máximo 100 caracteres</small>
                         </div>
                         
-                        <div class="form-group">
-                            <label for="horas_academicas">Horas académicas:</label>
-                            <input type="number" class="form-control" id="horas_academicas" name="horas_academicas" required min="0">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="horas_atendiendo">Horas atendiendo:</label>
-                            <input type="number" class="form-control" id="horas_atendiendo" name="horas_atendiendo" required min="0">
+                        <div class="form-row">
+                            <div class="form-group col-md-6">
+                                <label for="horas_academicas">Horas académicas:</label>
+                                <input type="number" class="form-control" id="horas_academicas" name="horas_academicas" 
+                                       value="<?php echo htmlspecialchars($_POST['horas_academicas'] ?? ''); ?>" 
+                                       required min="0" max="168">
+                                <small class="form-text text-muted">Número de horas académicas (0-168)</small>
+                            </div>
+                            
+                            <div class="form-group col-md-6">
+                                <label for="horas_atendiendo">Horas atendiendo:</label>
+                                <input type="number" class="form-control" id="horas_atendiendo" name="horas_atendiendo" 
+                                       value="<?php echo htmlspecialchars($_POST['horas_atendiendo'] ?? ''); ?>" 
+                                       required min="0" max="168">
+                                <small class="form-text text-muted">Número de horas atendiendo (0-168)</small>
+                            </div>
                         </div>
                         
                         <button type="submit" class="btn btn-primary" name="agregar">
-                            Agregar
+                            <i class="fas fa-plus"></i> Agregar
                         </button>
                     </form>
                 </div>
@@ -82,8 +151,9 @@ if (isset($mensaje)) {
             
             <!-- Tabla de tipos de horario -->
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5>Tipos de Horario Existentes</h5>
+                    <span class="badge badge-primary"><?php echo count($tipos_horario); ?> registros</span>
                 </div>
                 <div class="card-body">
                     <?php if (count($tipos_horario) > 0): ?>
@@ -111,12 +181,12 @@ if (isset($mensaje)) {
                                                         data-nombre="<?php echo htmlspecialchars($tipo['nombre']); ?>"
                                                         data-horas-academicas="<?php echo $tipo['horas_academicas']; ?>"
                                                         data-horas-atendiendo="<?php echo $tipo['horas_atendiendo']; ?>">
-                                                    Editar
+                                                    <i class="fas fa-edit"></i> Editar
                                                 </button>
                                                 <button type="button" class="btn btn-sm btn-danger" data-toggle="modal" data-target="#modalEliminar" 
                                                         data-id="<?php echo $tipo['id']; ?>"
                                                         data-nombre="<?php echo htmlspecialchars($tipo['nombre']); ?>">
-                                                    Eliminar
+                                                    <i class="fas fa-trash"></i> Eliminar
                                                 </button>
                                             </td>
                                         </tr>
@@ -125,7 +195,11 @@ if (isset($mensaje)) {
                             </table>
                         </div>
                     <?php else: ?>
-                        <div class="alert alert-info">No hay tipos de horario registrados aún.</div>
+                        <div class="alert alert-info text-center py-4">
+                            <i class="fas fa-info-circle fa-2x mb-3"></i>
+                            <h5>No hay tipos de horario registrados aún.</h5>
+                            <p class="mb-0">Utilice el formulario superior para agregar el primer tipo de horario.</p>
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -148,22 +222,29 @@ if (isset($mensaje)) {
                     <input type="hidden" name="id" id="edit_id">
                     <div class="form-group">
                         <label for="edit_nombre">Nombre del horario:</label>
-                        <input type="text" class="form-control" id="edit_nombre" name="nombre" required>
+                        <input type="text" class="form-control" id="edit_nombre" name="nombre" required maxlength="100">
+                        <small class="form-text text-muted">Mínimo 2 caracteres, máximo 100 caracteres</small>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="edit_horas_academicas">Horas académicas:</label>
-                        <input type="number" class="form-control" id="edit_horas_academicas" name="horas_academicas" required min="0">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="edit_horas_atendiendo">Horas atendiendo:</label>
-                        <input type="number" class="form-control" id="edit_horas_atendiendo" name="horas_atendiendo" required min="0">
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="edit_horas_academicas">Horas académicas:</label>
+                            <input type="number" class="form-control" id="edit_horas_academicas" name="horas_academicas" required min="0" max="168">
+                        </div>
+                        
+                        <div class="form-group col-md-6">
+                            <label for="edit_horas_atendiendo">Horas atendiendo:</label>
+                            <input type="number" class="form-control" id="edit_horas_atendiendo" name="horas_atendiendo" required min="0" max="168">
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary" name="editar">Guardar Cambios</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary" name="editar">
+                        <i class="fas fa-save"></i> Guardar Cambios
+                    </button>
                 </div>
             </form>
         </div>
@@ -183,12 +264,23 @@ if (isset($mensaje)) {
             <form method="POST" action="">
                 <div class="modal-body">
                     <input type="hidden" name="id" id="delete_id">
-                    <p>¿Estás seguro de que deseas eliminar el tipo de horario: <strong id="delete_nombre"></strong>?</p>
-                    <p class="text-danger">Esta acción no se puede deshacer.</p>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>¿Estás seguro de que deseas eliminar este tipo de horario?</strong>
+                    </div>
+                    <p>Se eliminará el tipo de horario: <strong id="delete_nombre"></strong></p>
+                    <p class="text-danger mb-0">
+                        <i class="fas fa-info-circle"></i>
+                        Esta acción no se puede deshacer.
+                    </p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-danger" name="eliminar">Eliminar</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-danger" name="eliminar">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>
                 </div>
             </form>
         </div>
