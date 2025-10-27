@@ -12199,6 +12199,106 @@ function eliminarRespaldo($id_respaldo) {
 
 
 
+// RELACIONAR TITULOS CON MATERIAS ***********************************************************************
+
+
+
+// Función para buscar títulos
+function buscarTitulos($search = '') {
+    global $db;
+    
+    $search = $db->real_escape_string($search);
+    $query = "SELECT * FROM titulos WHERE nombre LIKE '%$search%' OR descripcion LIKE '%$search%' ORDER BY nombre";
+    $result = $db->query($query);
+    
+    return $result;
+}
+
+// Función para buscar relaciones título-materia
+function buscarRelacionesTituloMateria($search = '') {
+    global $db;
+    
+    $search = $db->real_escape_string($search);
+    $query = "SELECT tm.*, t.nombre AS titulo, m.nombre_materia, m.cod_materia 
+              FROM titulo_materia tm
+              JOIN titulos t ON tm.id_titulo = t.id
+              JOIN materias m ON tm.id_materia = m.id_materia
+              WHERE t.nombre LIKE '%$search%' OR m.nombre_materia LIKE '%$search%' OR m.cod_materia LIKE '%$search%'
+              ORDER BY t.nombre";
+    $result = $db->query($query);
+    
+    return $result;
+}
+
+// Función para agregar título
+function agregarTitulo($nombre, $descripcion) {
+    global $db;
+    
+    $nombre = $db->real_escape_string($nombre);
+    $descripcion = $db->real_escape_string($descripcion);
+    
+    $query = "INSERT INTO titulos (nombre, descripcion) VALUES ('$nombre', '$descripcion')";
+    return $db->query($query);
+}
+
+// Función para editar título
+function editarTitulo($id, $nombre, $descripcion) {
+    global $db;
+    
+    $id = $db->real_escape_string($id);
+    $nombre = $db->real_escape_string($nombre);
+    $descripcion = $db->real_escape_string($descripcion);
+    
+    $query = "UPDATE titulos SET nombre = '$nombre', descripcion = '$descripcion' WHERE id = '$id'";
+    return $db->query($query);
+}
+
+// Función para eliminar título
+function eliminarTitulo($id) {
+    global $db;
+    
+    $id = $db->real_escape_string($id);
+    $query = "DELETE FROM titulos WHERE id = '$id'";
+    return $db->query($query);
+}
+
+// Función para agregar relación título-materia
+function agregarRelacionTituloMateria($id_titulo, $id_materia, $prioridad) {
+    global $db;
+    
+    $id_titulo = $db->real_escape_string($id_titulo);
+    $id_materia = $db->real_escape_string($id_materia);
+    $prioridad = $db->real_escape_string($prioridad);
+    
+    $query = "INSERT INTO titulo_materia (id_titulo, id_materia, prioridad) VALUES ('$id_titulo', '$id_materia', '$prioridad')";
+    return $db->query($query);
+}
+
+// Función para eliminar relación título-materia
+function eliminarRelacionTituloMateria($id_relacion) {
+    global $db;
+    
+    $id_relacion = $db->real_escape_string($id_relacion);
+    $query = "DELETE FROM titulo_materia WHERE id_relacion = '$id_relacion'";
+    return $db->query($query);
+}
+
+// Función para obtener todos los títulos
+function obtenerTodosTitulos() {
+    global $db;
+    
+    $query = "SELECT * FROM titulos ORDER BY nombre";
+    return $db->query($query);
+}
+
+// Función para obtener todas las materias
+function obtenerTodasMaterias() {
+    global $db;
+    
+    $query = "SELECT * FROM materias ORDER BY nombre_materia";
+    return $db->query($query);
+}
+
 
 
 
