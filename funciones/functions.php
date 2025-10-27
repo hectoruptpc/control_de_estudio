@@ -8867,6 +8867,178 @@ function cargarPermisosUsuario() {
 
 
 
+// Función para actualizar permisos de usuario
+function actualizarPermisosUsuario($user_id, $permisos) {
+    global $db;
+    
+    if (!is_numeric($user_id)) return false;
+    
+    // Campos originales - manejar NULL si no están presentes
+    $usuario = isset($permisos['usuario']) ? 1 : 0;
+    $estudiante = isset($permisos['estudiante']) ? 1 : 0;
+    $docente = isset($permisos['docente']) ? 1 : 0;
+    $admin = isset($permisos['admin']) ? 1 : 0;
+    $super_user = isset($permisos['super_user']) ? 1 : 0;
+    $editar_user = isset($permisos['editar_user']) ? 1 : 0;
+    $editar_nota = isset($permisos['editar_nota']) ? 1 : 0;
+    $editar_acceso = isset($permisos['editar_acceso']) ? 1 : 0;
+    $editar_valores = isset($permisos['editar_valores']) ? 1 : 0;
+    $editar_estudiante = isset($permisos['editar_estudiante']) ? 1 : 0;
+    $agregar_estudiante = isset($permisos['agregar_estudiante']) ? 1 : 0;
+    $agregar_docente = isset($permisos['agregar_docente']) ? 1 : 0;
+    $editar_docente = isset($permisos['editar_docente']) ? 1 : 0;
+    $agregar_carrera = isset($permisos['agregar_carrera']) ? 1 : 0;
+    $agregar_materia = isset($permisos['agregar_materia']) ? 1 : 0;
+    $editar_materia = isset($permisos['editar_materia']) ? 1 : 0;
+    
+    // Nuevos campos - manejar NULL si no están presentes
+    $pagos = isset($permisos['pagos']) ? 1 : 0;
+    $auditoria = isset($permisos['auditoria']) ? 1 : 0;
+    $secciones = isset($permisos['secciones']) ? 1 : 0;
+    $rela_materia_carrera = isset($permisos['rela_materia_carrera']) ? 1 : 0;
+    $periodos_academicos = isset($permisos['periodos_academicos']) ? 1 : 0;
+    $asig_secciones = isset($permisos['asig_secciones']) ? 1 : 0;
+    $asig_cursos = isset($permisos['asig_cursos']) ? 1 : 0;
+    $horarios = isset($permisos['horarios']) ? 1 : 0;
+    $gestion_director_carrera = isset($permisos['gestion_director_carrera']) ? 1 : 0;
+    $notas_cargadas = isset($permisos['notas_cargadas']) ? 1 : 0;
+    $consultar_notas = isset($permisos['consultar_notas']) ? 1 : 0;
+    $consultar_notas_pasadas = isset($permisos['consultar_notas_pasadas']) ? 1 : 0;
+    $tipos_pago = isset($permisos['tipos_pago']) ? 1 : 0;
+    $tipos_horario = isset($permisos['tipos_horario']) ? 1 : 0;
+    $horario_personal = isset($permisos['horario_personal']) ? 1 : 0;
+    $respaldo_bd = isset($permisos['respaldo_bd']) ? 1 : 0;
+    
+    // NUEVOS CAMPOS AGREGADOS
+    $gestionar_carrera = isset($permisos['gestionar_carrera']) ? 1 : 0;
+    $gestion_periodo_academico = isset($permisos['gestion_periodo_academico']) ? 1 : 0;
+    $gestion_asig_cursos = isset($permisos['gestion_asig_cursos']) ? 1 : 0;
+    $gestion_horario = isset($permisos['gestion_horario']) ? 1 : 0;
+    $titulos_re_materia = isset($permisos['titulos_re_materia']) ? 1 : 0;
+    
+    // NUEVOS CAMPOS GRADO Y GESTIÓN GRADO
+    $grado = isset($permisos['grado']) ? 1 : 0;
+    $gestion_grado = isset($permisos['gestion_grado']) ? 1 : 0;
+    
+    $query = "UPDATE users SET 
+             usuario = ?,
+             estudiante = ?, 
+             docente = ?, 
+             admin = ?, 
+             super_user = ?, 
+             editar_user = ?, 
+             editar_nota = ?, 
+             editar_acceso = ?,
+             editar_valores = ?,
+             editar_estudiante = ?,
+             agregar_estudiante = ?,
+             agregar_docente = ?,
+             editar_docente = ?,
+             agregar_carrera = ?,
+             agregar_materia = ?,
+             editar_materia = ?,
+             pagos = ?,
+             auditoria = ?,
+             secciones = ?,
+             rela_materia_carrera = ?,
+             periodos_academicos = ?,
+             asig_secciones = ?,
+             asig_cursos = ?,
+             horarios = ?,
+             gestion_director_carrera = ?,
+             notas_cargadas = ?,
+             consultar_notas = ?,
+             consultar_notas_pasadas = ?,
+             tipos_pago = ?,
+             tipos_horario = ?,
+             horario_personal = ?,
+             respaldo_bd = ?,
+             gestionar_carrera = ?,
+             gestion_periodo_academico = ?,
+             gestion_asig_cursos = ?,
+             gestion_horario = ?,
+             titulos_re_materia = ?,
+             grado = ?,
+             gestion_grado = ?
+             WHERE id = ?";
+    
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        // 40 campos + 1 ID = 41 parámetros
+        $stmt->bind_param("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", 
+            $usuario,                    // 1
+            $estudiante,                 // 2
+            $docente,                    // 3
+            $admin,                      // 4
+            $super_user,                 // 5
+            $editar_user,                // 6
+            $editar_nota,                // 7
+            $editar_acceso,              // 8
+            $editar_valores,             // 9
+            $editar_estudiante,          // 10
+            $agregar_estudiante,         // 11
+            $agregar_docente,            // 12
+            $editar_docente,             // 13
+            $agregar_carrera,            // 14
+            $agregar_materia,            // 15
+            $editar_materia,             // 16
+            $pagos,                      // 17
+            $auditoria,                  // 18
+            $secciones,                  // 19
+            $rela_materia_carrera,       // 20
+            $periodos_academicos,        // 21
+            $asig_secciones,             // 22
+            $asig_cursos,                // 23
+            $horarios,                   // 24
+            $gestion_director_carrera,   // 25
+            $notas_cargadas,             // 26
+            $consultar_notas,            // 27
+            $consultar_notas_pasadas,    // 28
+            $tipos_pago,                 // 29
+            $tipos_horario,              // 30
+            $horario_personal,           // 31
+            $respaldo_bd,                // 32
+            $gestionar_carrera,          // 33
+            $gestion_periodo_academico,  // 34
+            $gestion_asig_cursos,        // 35
+            $gestion_horario,            // 36
+            $titulos_re_materia,         // 37
+            $grado,                      // 38 - NUEVO CAMPO
+            $gestion_grado,              // 39 - NUEVO CAMPO
+            $user_id                     // 40 (ID)
+        );
+        
+        $result = $stmt->execute();
+        $stmt->close();
+        
+        return $result;
+    } else {
+        error_log("Error al preparar query: " . $db->error);
+        return false;
+    }
+}
+
+// Función para obtener todos los usuarios con permisos
+function obtenerUsuariosConPermisos() {
+    global $db;
+    
+    $query = "SELECT id, username, 
+             usuario, estudiante, docente, admin, super_user, editar_user, editar_nota, editar_acceso, 
+             editar_valores, editar_estudiante, agregar_estudiante, agregar_docente, editar_docente, 
+             agregar_carrera, agregar_materia, editar_materia,
+             pagos, auditoria, secciones, rela_materia_carrera, periodos_academicos, asig_secciones, 
+             asig_cursos, horarios, gestion_director_carrera, notas_cargadas, consultar_notas, 
+             consultar_notas_pasadas, tipos_pago, tipos_horario, horario_personal, respaldo_bd,
+             gestionar_carrera, gestion_periodo_academico, gestion_asig_cursos, gestion_horario, titulos_re_materia,
+             grado, gestion_grado
+             FROM users ORDER BY username";
+    
+    return $db->query($query);
+}
+
+
+
+
 
 //GRADUACION ***********************************************************************
 
