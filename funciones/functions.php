@@ -11442,6 +11442,125 @@ function obtenerGruposNotasDefinitivas($filtro_profesor = '', $filtro_fecha_desd
 
 
 
+// Obtener información del grupo para notas definitivas
+function obtenerInfoGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT ud.nombre as nombre_docente, ud.idusuario as cedula_docente, 
+                     m.nombre_materia, m.cod_materia,
+                     pa.nombre_periodo, s.codigo_seccion, c.nombre_carrera, 
+                     t.nombre_trayecto, t.id_trayecto, t.numero_trayecto,
+                     a.nombre as nombre_admin
+              FROM notas_definitivas nd
+              INNER JOIN users ud ON nd.id_docente = ud.id
+              INNER JOIN materias m ON nd.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+              INNER JOIN docente_seccion ds ON nd.id_docente = ds.id_usuario 
+                                           AND nd.id_materia = ds.id_materia
+              INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+              LEFT JOIN users a ON nd.id_admin_aprobador = a.id
+              WHERE nd.id_docente = ? 
+              AND nd.id_materia = ? 
+              AND nd.id_periodo = ?
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc();
+}
+
+// Obtener estudiantes del grupo para notas definitivas
+function obtenerEstudiantesGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT nd.*, u.nombre as nombre_estudiante, u.idusuario as cedula,
+                     nd.fecha_registro, nd.soporte, nd.tipo_archivo
+              FROM notas_definitivas nd
+              INNER JOIN users u ON nd.id_usuario = u.id
+              WHERE nd.id_docente = ? 
+              AND nd.id_materia = ? 
+              AND nd.id_periodo = ?
+              ORDER BY u.nombre";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    return $stmt->get_result();
+}
+
+// Obtener información de soporte del grupo para notas definitivas
+function obtenerSoporteGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT DISTINCT soporte, tipo_archivo, fecha_registro
+              FROM notas_definitivas 
+              WHERE id_docente = ? 
+              AND id_materia = ? 
+              AND id_periodo = ?
+              AND soporte IS NOT NULL
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    return null;
+}
+
+// Obtener estadísticas del grupo según el id_trayecto para notas definitivas
+function obtenerEstadisticasGrupoDefinitivas($docente_id, $materia_id, $periodo_id, $id_trayecto) {
+    global $db;
+    
+    $query = "SELECT nd.trayecto_0, nd.trayecto_1, nd.trayecto_2, nd.trayecto_3, nd.trayecto_4
+              FROM notas_definitivas nd
+              WHERE nd.id_docente = ? 
+              AND nd.id_materia = ? 
+              AND nd.id_periodo = ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $total_estudiantes = 0;
+    $suma_total = 0;
+    $aprobados = 0;
+    $reprobados = 0;
+    
+    while ($nota = $result->fetch_assoc()) {
+        $total_estudiantes++;
+        
+        // Calcular promedio según el id_trayecto de la sección
+        $promedio_estudiante = calcularPromedioPorTrayecto($nota, $id_trayecto);
+        $suma_total += $promedio_estudiante;
+        
+        // Aprobados desde 12 puntos
+        if ($promedio_estudiante >= 12) {
+            $aprobados++;
+        } else {
+            $reprobados++;
+        }
+    }
+    
+    $promedio_general = $total_estudiantes > 0 ? round($suma_total / $total_estudiantes, 1) : 0;
+    
+    return [
+        'total_estudiantes' => $total_estudiantes,
+        'promedio_general' => $promedio_general,
+        'aprobados' => $aprobados,
+        'reprobados' => $reprobados,
+        'id_trayecto' => $id_trayecto
+    ];
+}
+
 
 
 
