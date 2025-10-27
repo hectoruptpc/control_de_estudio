@@ -11340,9 +11340,7 @@ function obtenerCarreraPorId($carrera_id) {
 
 
 
-
-
-// Obtener lista de profesores para el filtro (docente = 1)
+// Obtener lista de profesores para el filtro (docente = 1) - SOLO LECTURA, SIN AUDITORÍA
 function obtenerProfesores() {
     global $db;
     $query = "SELECT id, idusuario, nombre 
@@ -11353,96 +11351,262 @@ function obtenerProfesores() {
     return $result;
 }
 
-// Nueva función para buscar profesores por término
+// Nueva función para buscar profesores por término - CON AUDITORÍA
 function buscarProfesores($termino) {
     global $db;
-    $query = "SELECT id, idusuario, nombre 
-              FROM users 
-              WHERE docente = 1 
-              AND (nombre LIKE ? OR idusuario LIKE ?)
-              ORDER BY nombre
-              LIMIT 10";
-    $stmt = $db->prepare($query);
-    $termino_like = "%$termino%";
-    $stmt->bind_param("ss", $termino_like, $termino_like);
-    $stmt->execute();
-    return $stmt->get_result();
+    
+    try {
+        $query = "SELECT id, idusuario, nombre 
+                  FROM users 
+                  WHERE docente = 1 
+                  AND (nombre LIKE ? OR idusuario LIKE ?)
+                  ORDER BY nombre
+                  LIMIT 10";
+        $stmt = $db->prepare($query);
+        $termino_like = "%$termino%";
+        $stmt->bind_param("ss", $termino_like, $termino_like);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        // REGISTRAR EN AUDITORÍA - BÚSQUEDA DE PROFESORES
+        if (function_exists('registrarAuditoria')) {
+            try {
+                $cantidad_resultados = $result->num_rows;
+                $resultado_busqueda = $cantidad_resultados > 0 ? 'ENCONTRADOS' : 'NO_ENCONTRADOS';
+                
+                registrarAuditoria(
+                    "CONSULTA", 
+                    "users", 
+                    null, 
+                    null, 
+                    [
+                        'termino_busqueda' => $termino,
+                        'cantidad_resultados' => $cantidad_resultados,
+                        'resultado_busqueda' => $resultado_busqueda,
+                        'tipo_consulta' => 'busqueda_profesores'
+                    ], 
+                    "Gestión de Docentes", 
+                    "Búsqueda de profesores - " . $resultado_busqueda
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría buscarProfesores: " . $e->getMessage());
+            }
+        }
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        error_log("Error en buscarProfesores: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN BÚSQUEDA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    null, 
+                    null, 
+                    [
+                        'termino_busqueda' => $termino,
+                        'error' => $e->getMessage(),
+                        'tipo_consulta' => 'busqueda_profesores'
+                    ], 
+                    "Gestión de Docentes", 
+                    "Error en búsqueda de profesores"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error buscarProfesores: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
-// Obtener información de un profesor específico
+// Obtener información de un profesor específico - CON AUDITORÍA
 function obtenerProfesorPorId($id) {
     global $db;
-    $query = "SELECT id, idusuario, nombre 
-              FROM users 
-              WHERE id = ? AND docente = 1";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->fetch_assoc();
+    
+    try {
+        $query = "SELECT id, idusuario, nombre 
+                  FROM users 
+                  WHERE id = ? AND docente = 1";
+        $stmt = $db->prepare($query);
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $profesor = $result->fetch_assoc();
+        
+        // REGISTRAR EN AUDITORÍA - CONSULTA DE PROFESOR ESPECÍFICO
+        if (function_exists('registrarAuditoria') && $profesor) {
+            try {
+                registrarAuditoria(
+                    "CONSULTA", 
+                    "users", 
+                    $id, 
+                    null, 
+                    [
+                        'id_profesor' => $profesor['id'],
+                        'cedula_profesor' => $profesor['idusuario'],
+                        'nombre_profesor' => $profesor['nombre'],
+                        'tipo_consulta' => 'obtener_profesor'
+                    ], 
+                    "Gestión de Docentes", 
+                    "Consulta de información de profesor"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría obtenerProfesorPorId: " . $e->getMessage());
+            }
+        }
+        
+        return $profesor;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerProfesorPorId: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN CONSULTA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $id, 
+                    null, 
+                    [
+                        'id_profesor' => $id,
+                        'error' => $e->getMessage(),
+                        'tipo_consulta' => 'obtener_profesor'
+                    ], 
+                    "Gestión de Docentes", 
+                    "Error al obtener información de profesor"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error obtenerProfesorPorId: " . $auditError->getMessage());
+            }
+        }
+        
+        return null;
+    }
 }
 
-// Obtener grupos de notas definitivas agrupados por docente/materia/periodo con filtros
+// Obtener grupos de notas definitivas agrupados por docente/materia/periodo con filtros - CON AUDITORÍA
 function obtenerGruposNotasDefinitivas($filtro_profesor = '', $filtro_fecha_desde = '', $filtro_fecha_hasta = '') {
     global $db;
     
-    $query = "SELECT nd.id_docente, nd.id_materia, nd.id_periodo,
-                     ud.nombre as nombre_docente, ud.idusuario as cedula_docente,
-                     m.nombre_materia, 
-                     pa.nombre_periodo, s.codigo_seccion, c.nombre_carrera,
-                     COUNT(nd.id) as total_notas, MAX(nd.fecha_registro) as ultima_fecha
-              FROM notas_definitivas nd
-              INNER JOIN users ud ON nd.id_docente = ud.id
-              INNER JOIN materias m ON nd.id_materia = m.id_materia
-              INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
-              INNER JOIN docente_seccion ds ON nd.id_docente = ds.id_usuario 
-                                           AND nd.id_materia = ds.id_materia
-              INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
-              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
-              WHERE 1=1";
-    
-    $params = array();
-    $types = '';
-    
-    // Aplicar filtro por profesor
-    if (!empty($filtro_profesor)) {
-        $query .= " AND nd.id_docente = ?";
-        $params[] = $filtro_profesor;
-        $types .= "i";
-    }
-    
-    // Aplicar filtro por fecha desde
-    if (!empty($filtro_fecha_desde)) {
-        $query .= " AND DATE(nd.fecha_registro) >= ?";
-        $params[] = $filtro_fecha_desde;
-        $types .= "s";
-    }
-    
-    // Aplicar filtro por fecha hasta
-    if (!empty($filtro_fecha_hasta)) {
-        $query .= " AND DATE(nd.fecha_registro) <= ?";
-        $params[] = $filtro_fecha_hasta;
-        $types .= "s";
-    }
-    
-    $query .= " GROUP BY nd.id_docente, nd.id_materia, nd.id_periodo, s.codigo_seccion, c.nombre_carrera
-                ORDER BY ultima_fecha DESC";
-    
-    if (!empty($params)) {
-        $stmt = $db->prepare($query);
-        $stmt->bind_param($types, ...$params);
-        $stmt->execute();
-        return $stmt->get_result();
-    } else {
-        $result = $db->query($query);
+    try {
+        $query = "SELECT nd.id_docente, nd.id_materia, nd.id_periodo,
+                         ud.nombre as nombre_docente, ud.idusuario as cedula_docente,
+                         m.nombre_materia, 
+                         pa.nombre_periodo, s.codigo_seccion, c.nombre_carrera,
+                         COUNT(nd.id) as total_notas, MAX(nd.fecha_registro) as ultima_fecha
+                  FROM notas_definitivas nd
+                  INNER JOIN users ud ON nd.id_docente = ud.id
+                  INNER JOIN materias m ON nd.id_materia = m.id_materia
+                  INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+                  INNER JOIN docente_seccion ds ON nd.id_docente = ds.id_usuario 
+                                               AND nd.id_materia = ds.id_materia
+                  INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+                  INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+                  WHERE 1=1";
+        
+        $params = array();
+        $types = '';
+        
+        // Aplicar filtro por profesor
+        if (!empty($filtro_profesor)) {
+            $query .= " AND nd.id_docente = ?";
+            $params[] = $filtro_profesor;
+            $types .= "i";
+        }
+        
+        // Aplicar filtro por fecha desde
+        if (!empty($filtro_fecha_desde)) {
+            $query .= " AND DATE(nd.fecha_registro) >= ?";
+            $params[] = $filtro_fecha_desde;
+            $types .= "s";
+        }
+        
+        // Aplicar filtro por fecha hasta
+        if (!empty($filtro_fecha_hasta)) {
+            $query .= " AND DATE(nd.fecha_registro) <= ?";
+            $params[] = $filtro_fecha_hasta;
+            $types .= "s";
+        }
+        
+        $query .= " GROUP BY nd.id_docente, nd.id_materia, nd.id_periodo, s.codigo_seccion, c.nombre_carrera
+                    ORDER BY ultima_fecha DESC";
+        
+        if (!empty($params)) {
+            $stmt = $db->prepare($query);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+        } else {
+            $result = $db->query($query);
+        }
+        
+        // REGISTRAR EN AUDITORÍA - CONSULTA DE GRUPOS DE NOTAS DEFINITIVAS
+        if (function_exists('registrarAuditoria')) {
+            try {
+                $filtros_aplicados = [];
+                if (!empty($filtro_profesor)) $filtros_aplicados[] = 'profesor';
+                if (!empty($filtro_fecha_desde)) $filtros_aplicados[] = 'fecha_desde';
+                if (!empty($filtro_fecha_hasta)) $filtros_aplicados[] = 'fecha_hasta';
+                
+                registrarAuditoria(
+                    "CONSULTA", 
+                    "notas_definitivas", 
+                    null, 
+                    null, 
+                    [
+                        'cantidad_grupos' => $result->num_rows,
+                        'filtros_aplicados' => !empty($filtros_aplicados) ? implode(', ', $filtros_aplicados) : 'ninguno',
+                        'filtro_profesor' => $filtro_profesor ?: 'todos',
+                        'filtro_fecha_desde' => $filtro_fecha_desde ?: 'sin_filtro',
+                        'filtro_fecha_hasta' => $filtro_fecha_hasta ?: 'sin_filtro',
+                        'tipo_consulta' => 'grupos_notas_definitivas'
+                    ], 
+                    "Notas Definitivas", 
+                    "Consulta de grupos de notas definitivas"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría obtenerGruposNotasDefinitivas: " . $e->getMessage());
+            }
+        }
+        
         return $result;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerGruposNotasDefinitivas: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN CONSULTA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "notas_definitivas", 
+                    null, 
+                    null, 
+                    [
+                        'filtro_profesor' => $filtro_profesor,
+                        'filtro_fecha_desde' => $filtro_fecha_desde,
+                        'filtro_fecha_hasta' => $filtro_fecha_hasta,
+                        'error' => $e->getMessage(),
+                        'tipo_consulta' => 'grupos_notas_definitivas'
+                    ], 
+                    "Notas Definitivas", 
+                    "Error en consulta de grupos de notas definitivas"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error obtenerGruposNotasDefinitivas: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
     }
 }
 
-
-
-
-// Obtener información del grupo para notas definitivas
+// Obtener información del grupo para notas definitivas - SOLO LECTURA, SIN AUDITORÍA
 function obtenerInfoGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
     global $db;
     
@@ -11472,7 +11636,7 @@ function obtenerInfoGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
     return $stmt->get_result()->fetch_assoc();
 }
 
-// Obtener estudiantes del grupo para notas definitivas
+// Obtener estudiantes del grupo para notas definitivas - SOLO LECTURA, SIN AUDITORÍA
 function obtenerEstudiantesGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
     global $db;
     
@@ -11491,7 +11655,7 @@ function obtenerEstudiantesGrupoDefinitivas($docente_id, $materia_id, $periodo_i
     return $stmt->get_result();
 }
 
-// Obtener información de soporte del grupo para notas definitivas
+// Obtener información de soporte del grupo para notas definitivas - SOLO LECTURA, SIN AUDITORÍA
 function obtenerSoporteGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
     global $db;
     
@@ -11515,7 +11679,7 @@ function obtenerSoporteGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
     return null;
 }
 
-// Obtener estadísticas del grupo según el id_trayecto para notas definitivas
+// Obtener estadísticas del grupo según el id_trayecto para notas definitivas - SOLO LECTURA, SIN AUDITORÍA
 function obtenerEstadisticasGrupoDefinitivas($docente_id, $materia_id, $periodo_id, $id_trayecto) {
     global $db;
     
