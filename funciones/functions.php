@@ -8774,6 +8774,28 @@ function verificarPermiso($pagina) {
     // Verificar que el permiso solicitado sea válido
     if (!in_array($pagina, $permisosValidos)) {
         error_log("Permiso no válido: " . $pagina);
+        
+        // REGISTRAR EN AUDITORÍA - PERMISO NO VÁLIDO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $_SESSION['user']['id'] ?? null, 
+                    null, 
+                    [
+                        'permiso_solicitado' => $pagina,
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                        'error' => 'Permiso no válido'
+                    ], 
+                    "Control de Acceso", 
+                    "Intento de acceso con permiso no válido"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría verificarPermiso (permiso inválido): " . $e->getMessage());
+            }
+        }
+        
         $_SESSION['error'] = "Error de permisos: permiso no válido.";
         header('location: ../login.php');
         exit();
@@ -8781,13 +8803,36 @@ function verificarPermiso($pagina) {
     
     // Si es super_user, tiene acceso a todo - RETORNAR EXPLÍCITAMENTE
     if (isset($_SESSION['user']['super_user']) && $_SESSION['user']['super_user'] == 1) {
-        return; // Cambiado de return true a return;
+        return;
     }
     
     // Verificar si el permiso existe en la sesión y es igual a 1
     if (!isset($_SESSION['user'][$pagina]) || $_SESSION['user'][$pagina] != 1) {
         // Registrar intento de acceso no autorizado
         error_log("Acceso denegado a " . $pagina . " para el usuario: " . $_SESSION['user']['username']);
+        
+        // REGISTRAR EN AUDITORÍA - ACCESO DENEGADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "DENEGADO", 
+                    "users", 
+                    $_SESSION['user']['id'] ?? null, 
+                    null, 
+                    [
+                        'permiso_solicitado' => $pagina,
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                        'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                        'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'Desconocida',
+                        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Desconocido'
+                    ], 
+                    "Control de Acceso", 
+                    "Acceso denegado a: " . $pagina
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría verificarPermiso (acceso denegado): " . $e->getMessage());
+            }
+        }
         
         // Redirigir a home con mensaje de error
         $_SESSION['error'] = "No tienes permisos para acceder a la página de " . $pagina . ".";
@@ -8865,160 +8910,252 @@ function cargarPermisosUsuario() {
     return false;
 }
 
-
-
-// Función para actualizar permisos de usuario
+// Función para actualizar permisos de usuario - CON AUDITORÍA SOLO PARA CAMBIOS REALES
 function actualizarPermisosUsuario($user_id, $permisos) {
     global $db;
     
-    if (!is_numeric($user_id)) return false;
-    
-    // Campos originales - manejar NULL si no están presentes
-    $usuario = isset($permisos['usuario']) ? 1 : 0;
-    $estudiante = isset($permisos['estudiante']) ? 1 : 0;
-    $docente = isset($permisos['docente']) ? 1 : 0;
-    $admin = isset($permisos['admin']) ? 1 : 0;
-    $super_user = isset($permisos['super_user']) ? 1 : 0;
-    $editar_user = isset($permisos['editar_user']) ? 1 : 0;
-    $editar_nota = isset($permisos['editar_nota']) ? 1 : 0;
-    $editar_acceso = isset($permisos['editar_acceso']) ? 1 : 0;
-    $editar_valores = isset($permisos['editar_valores']) ? 1 : 0;
-    $editar_estudiante = isset($permisos['editar_estudiante']) ? 1 : 0;
-    $agregar_estudiante = isset($permisos['agregar_estudiante']) ? 1 : 0;
-    $agregar_docente = isset($permisos['agregar_docente']) ? 1 : 0;
-    $editar_docente = isset($permisos['editar_docente']) ? 1 : 0;
-    $agregar_carrera = isset($permisos['agregar_carrera']) ? 1 : 0;
-    $agregar_materia = isset($permisos['agregar_materia']) ? 1 : 0;
-    $editar_materia = isset($permisos['editar_materia']) ? 1 : 0;
-    
-    // Nuevos campos - manejar NULL si no están presentes
-    $pagos = isset($permisos['pagos']) ? 1 : 0;
-    $auditoria = isset($permisos['auditoria']) ? 1 : 0;
-    $secciones = isset($permisos['secciones']) ? 1 : 0;
-    $rela_materia_carrera = isset($permisos['rela_materia_carrera']) ? 1 : 0;
-    $periodos_academicos = isset($permisos['periodos_academicos']) ? 1 : 0;
-    $asig_secciones = isset($permisos['asig_secciones']) ? 1 : 0;
-    $asig_cursos = isset($permisos['asig_cursos']) ? 1 : 0;
-    $horarios = isset($permisos['horarios']) ? 1 : 0;
-    $gestion_director_carrera = isset($permisos['gestion_director_carrera']) ? 1 : 0;
-    $notas_cargadas = isset($permisos['notas_cargadas']) ? 1 : 0;
-    $consultar_notas = isset($permisos['consultar_notas']) ? 1 : 0;
-    $consultar_notas_pasadas = isset($permisos['consultar_notas_pasadas']) ? 1 : 0;
-    $tipos_pago = isset($permisos['tipos_pago']) ? 1 : 0;
-    $tipos_horario = isset($permisos['tipos_horario']) ? 1 : 0;
-    $horario_personal = isset($permisos['horario_personal']) ? 1 : 0;
-    $respaldo_bd = isset($permisos['respaldo_bd']) ? 1 : 0;
-    
-    // NUEVOS CAMPOS AGREGADOS
-    $gestionar_carrera = isset($permisos['gestionar_carrera']) ? 1 : 0;
-    $gestion_periodo_academico = isset($permisos['gestion_periodo_academico']) ? 1 : 0;
-    $gestion_asig_cursos = isset($permisos['gestion_asig_cursos']) ? 1 : 0;
-    $gestion_horario = isset($permisos['gestion_horario']) ? 1 : 0;
-    $titulos_re_materia = isset($permisos['titulos_re_materia']) ? 1 : 0;
-    
-    // NUEVOS CAMPOS GRADO Y GESTIÓN GRADO
-    $grado = isset($permisos['grado']) ? 1 : 0;
-    $gestion_grado = isset($permisos['gestion_grado']) ? 1 : 0;
-    
-    $query = "UPDATE users SET 
-             usuario = ?,
-             estudiante = ?, 
-             docente = ?, 
-             admin = ?, 
-             super_user = ?, 
-             editar_user = ?, 
-             editar_nota = ?, 
-             editar_acceso = ?,
-             editar_valores = ?,
-             editar_estudiante = ?,
-             agregar_estudiante = ?,
-             agregar_docente = ?,
-             editar_docente = ?,
-             agregar_carrera = ?,
-             agregar_materia = ?,
-             editar_materia = ?,
-             pagos = ?,
-             auditoria = ?,
-             secciones = ?,
-             rela_materia_carrera = ?,
-             periodos_academicos = ?,
-             asig_secciones = ?,
-             asig_cursos = ?,
-             horarios = ?,
-             gestion_director_carrera = ?,
-             notas_cargadas = ?,
-             consultar_notas = ?,
-             consultar_notas_pasadas = ?,
-             tipos_pago = ?,
-             tipos_horario = ?,
-             horario_personal = ?,
-             respaldo_bd = ?,
-             gestionar_carrera = ?,
-             gestion_periodo_academico = ?,
-             gestion_asig_cursos = ?,
-             gestion_horario = ?,
-             titulos_re_materia = ?,
-             grado = ?,
-             gestion_grado = ?
-             WHERE id = ?";
-    
-    $stmt = $db->prepare($query);
-    if ($stmt) {
-        // 40 campos + 1 ID = 41 parámetros
+    try {
+        if (!is_numeric($user_id)) {
+            throw new Exception("ID de usuario no válido");
+        }
+        
+        // Obtener información del usuario y permisos actuales para auditoría
+        $query_actual = "SELECT username, 
+                        usuario, estudiante, docente, admin, super_user, editar_user, editar_nota, editar_acceso, 
+                        editar_valores, editar_estudiante, agregar_estudiante, agregar_docente, editar_docente, 
+                        agregar_carrera, agregar_materia, editar_materia,
+                        pagos, auditoria, secciones, rela_materia_carrera, periodos_academicos, asig_secciones, 
+                        asig_cursos, horarios, gestion_director_carrera, notas_cargadas, consultar_notas, 
+                        consultar_notas_pasadas, tipos_pago, tipos_horario, horario_personal, respaldo_bd,
+                        gestionar_carrera, gestion_periodo_academico, gestion_asig_cursos, gestion_horario, titulos_re_materia,
+                        grado, gestion_grado
+                        FROM users WHERE id = ?";
+        
+        $stmt_actual = $db->prepare($query_actual);
+        $stmt_actual->bind_param("i", $user_id);
+        $stmt_actual->execute();
+        $result_actual = $stmt_actual->get_result();
+        
+        if ($result_actual->num_rows === 0) {
+            throw new Exception("Usuario no encontrado");
+        }
+        
+        $usuario_actual = $result_actual->fetch_assoc();
+        $stmt_actual->close();
+        
+        // Preparar datos para la actualización
+        $permisos_nuevos = [
+            'usuario' => isset($permisos['usuario']) ? 1 : 0,
+            'estudiante' => isset($permisos['estudiante']) ? 1 : 0,
+            'docente' => isset($permisos['docente']) ? 1 : 0,
+            'admin' => isset($permisos['admin']) ? 1 : 0,
+            'super_user' => isset($permisos['super_user']) ? 1 : 0,
+            'editar_user' => isset($permisos['editar_user']) ? 1 : 0,
+            'editar_nota' => isset($permisos['editar_nota']) ? 1 : 0,
+            'editar_acceso' => isset($permisos['editar_acceso']) ? 1 : 0,
+            'editar_valores' => isset($permisos['editar_valores']) ? 1 : 0,
+            'editar_estudiante' => isset($permisos['editar_estudiante']) ? 1 : 0,
+            'agregar_estudiante' => isset($permisos['agregar_estudiante']) ? 1 : 0,
+            'agregar_docente' => isset($permisos['agregar_docente']) ? 1 : 0,
+            'editar_docente' => isset($permisos['editar_docente']) ? 1 : 0,
+            'agregar_carrera' => isset($permisos['agregar_carrera']) ? 1 : 0,
+            'agregar_materia' => isset($permisos['agregar_materia']) ? 1 : 0,
+            'editar_materia' => isset($permisos['editar_materia']) ? 1 : 0,
+            'pagos' => isset($permisos['pagos']) ? 1 : 0,
+            'auditoria' => isset($permisos['auditoria']) ? 1 : 0,
+            'secciones' => isset($permisos['secciones']) ? 1 : 0,
+            'rela_materia_carrera' => isset($permisos['rela_materia_carrera']) ? 1 : 0,
+            'periodos_academicos' => isset($permisos['periodos_academicos']) ? 1 : 0,
+            'asig_secciones' => isset($permisos['asig_secciones']) ? 1 : 0,
+            'asig_cursos' => isset($permisos['asig_cursos']) ? 1 : 0,
+            'horarios' => isset($permisos['horarios']) ? 1 : 0,
+            'gestion_director_carrera' => isset($permisos['gestion_director_carrera']) ? 1 : 0,
+            'notas_cargadas' => isset($permisos['notas_cargadas']) ? 1 : 0,
+            'consultar_notas' => isset($permisos['consultar_notas']) ? 1 : 0,
+            'consultar_notas_pasadas' => isset($permisos['consultar_notas_pasadas']) ? 1 : 0,
+            'tipos_pago' => isset($permisos['tipos_pago']) ? 1 : 0,
+            'tipos_horario' => isset($permisos['tipos_horario']) ? 1 : 0,
+            'horario_personal' => isset($permisos['horario_personal']) ? 1 : 0,
+            'respaldo_bd' => isset($permisos['respaldo_bd']) ? 1 : 0,
+            'gestionar_carrera' => isset($permisos['gestionar_carrera']) ? 1 : 0,
+            'gestion_periodo_academico' => isset($permisos['gestion_periodo_academico']) ? 1 : 0,
+            'gestion_asig_cursos' => isset($permisos['gestion_asig_cursos']) ? 1 : 0,
+            'gestion_horario' => isset($permisos['gestion_horario']) ? 1 : 0,
+            'titulos_re_materia' => isset($permisos['titulos_re_materia']) ? 1 : 0,
+            'grado' => isset($permisos['grado']) ? 1 : 0,
+            'gestion_grado' => isset($permisos['gestion_grado']) ? 1 : 0
+        ];
+        
+        // VERIFICAR SI HAY CAMBIOS REALES
+        $accesos_otorgados = [];
+        $accesos_quitados = [];
+        
+        foreach ($permisos_nuevos as $permiso => $nuevo_valor) {
+            $valor_anterior = $usuario_actual[$permiso] ?? 0;
+            
+            if ($valor_anterior != $nuevo_valor) {
+                if ($nuevo_valor == 1) {
+                    // Acceso otorgado
+                    $accesos_otorgados[] = $permiso;
+                } else {
+                    // Acceso quitado
+                    $accesos_quitados[] = $permiso;
+                }
+            }
+        }
+        
+        // SI NO HAY CAMBIOS, RETORNAR SIN HACER NADA
+        if (empty($accesos_otorgados) && empty($accesos_quitados)) {
+            return true; // No hay cambios, retornar sin auditoría
+        }
+        
+        // SOLO ACTUALIZAR SI HAY CAMBIOS REALES
+        $query = "UPDATE users SET 
+                 usuario = ?,
+                 estudiante = ?, 
+                 docente = ?, 
+                 admin = ?, 
+                 super_user = ?, 
+                 editar_user = ?, 
+                 editar_nota = ?, 
+                 editar_acceso = ?,
+                 editar_valores = ?,
+                 editar_estudiante = ?,
+                 agregar_estudiante = ?,
+                 agregar_docente = ?,
+                 editar_docente = ?,
+                 agregar_carrera = ?,
+                 agregar_materia = ?,
+                 editar_materia = ?,
+                 pagos = ?,
+                 auditoria = ?,
+                 secciones = ?,
+                 rela_materia_carrera = ?,
+                 periodos_academicos = ?,
+                 asig_secciones = ?,
+                 asig_cursos = ?,
+                 horarios = ?,
+                 gestion_director_carrera = ?,
+                 notas_cargadas = ?,
+                 consultar_notas = ?,
+                 consultar_notas_pasadas = ?,
+                 tipos_pago = ?,
+                 tipos_horario = ?,
+                 horario_personal = ?,
+                 respaldo_bd = ?,
+                 gestionar_carrera = ?,
+                 gestion_periodo_academico = ?,
+                 gestion_asig_cursos = ?,
+                 gestion_horario = ?,
+                 titulos_re_materia = ?,
+                 grado = ?,
+                 gestion_grado = ?
+                 WHERE id = ?";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error al preparar query: " . $db->error);
+        }
+        
         $stmt->bind_param("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", 
-            $usuario,                    // 1
-            $estudiante,                 // 2
-            $docente,                    // 3
-            $admin,                      // 4
-            $super_user,                 // 5
-            $editar_user,                // 6
-            $editar_nota,                // 7
-            $editar_acceso,              // 8
-            $editar_valores,             // 9
-            $editar_estudiante,          // 10
-            $agregar_estudiante,         // 11
-            $agregar_docente,            // 12
-            $editar_docente,             // 13
-            $agregar_carrera,            // 14
-            $agregar_materia,            // 15
-            $editar_materia,             // 16
-            $pagos,                      // 17
-            $auditoria,                  // 18
-            $secciones,                  // 19
-            $rela_materia_carrera,       // 20
-            $periodos_academicos,        // 21
-            $asig_secciones,             // 22
-            $asig_cursos,                // 23
-            $horarios,                   // 24
-            $gestion_director_carrera,   // 25
-            $notas_cargadas,             // 26
-            $consultar_notas,            // 27
-            $consultar_notas_pasadas,    // 28
-            $tipos_pago,                 // 29
-            $tipos_horario,              // 30
-            $horario_personal,           // 31
-            $respaldo_bd,                // 32
-            $gestionar_carrera,          // 33
-            $gestion_periodo_academico,  // 34
-            $gestion_asig_cursos,        // 35
-            $gestion_horario,            // 36
-            $titulos_re_materia,         // 37
-            $grado,                      // 38 - NUEVO CAMPO
-            $gestion_grado,              // 39 - NUEVO CAMPO
-            $user_id                     // 40 (ID)
+            $permisos_nuevos['usuario'], $permisos_nuevos['estudiante'], $permisos_nuevos['docente'], 
+            $permisos_nuevos['admin'], $permisos_nuevos['super_user'], $permisos_nuevos['editar_user'], 
+            $permisos_nuevos['editar_nota'], $permisos_nuevos['editar_acceso'], $permisos_nuevos['editar_valores'],
+            $permisos_nuevos['editar_estudiante'], $permisos_nuevos['agregar_estudiante'], $permisos_nuevos['agregar_docente'],
+            $permisos_nuevos['editar_docente'], $permisos_nuevos['agregar_carrera'], $permisos_nuevos['agregar_materia'],
+            $permisos_nuevos['editar_materia'], $permisos_nuevos['pagos'], $permisos_nuevos['auditoria'],
+            $permisos_nuevos['secciones'], $permisos_nuevos['rela_materia_carrera'], $permisos_nuevos['periodos_academicos'],
+            $permisos_nuevos['asig_secciones'], $permisos_nuevos['asig_cursos'], $permisos_nuevos['horarios'],
+            $permisos_nuevos['gestion_director_carrera'], $permisos_nuevos['notas_cargadas'], $permisos_nuevos['consultar_notas'],
+            $permisos_nuevos['consultar_notas_pasadas'], $permisos_nuevos['tipos_pago'], $permisos_nuevos['tipos_horario'],
+            $permisos_nuevos['horario_personal'], $permisos_nuevos['respaldo_bd'], $permisos_nuevos['gestionar_carrera'],
+            $permisos_nuevos['gestion_periodo_academico'], $permisos_nuevos['gestion_asig_cursos'], $permisos_nuevos['gestion_horario'],
+            $permisos_nuevos['titulos_re_materia'], $permisos_nuevos['grado'], $permisos_nuevos['gestion_grado'],
+            $user_id
         );
         
         $result = $stmt->execute();
         $stmt->close();
         
-        return $result;
-    } else {
-        error_log("Error al preparar query: " . $db->error);
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - SOLO SI HUBO CAMBIOS REALES
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    // Preparar mensaje descriptivo para la auditoría
+                    $mensaje_auditoria = "Permisos actualizados para usuario: " . $usuario_actual['username'];
+                    
+                    if (!empty($accesos_otorgados)) {
+                        $mensaje_auditoria .= " - Accesos OTORGADOS: " . implode(', ', $accesos_otorgados);
+                    }
+                    
+                    if (!empty($accesos_quitados)) {
+                        if (!empty($accesos_otorgados)) {
+                            $mensaje_auditoria .= " | ";
+                        }
+                        $mensaje_auditoria .= "Accesos QUITADOS: " . implode(', ', $accesos_quitados);
+                    }
+                    
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "users", 
+                        $user_id, 
+                        $usuario_actual, 
+                        [
+                            'usuario_afectado' => $usuario_actual['username'],
+                            'usuario_afectado_id' => $user_id,
+                            'usuario_editor' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_editor_id' => $_SESSION['user']['id'] ?? 0,
+                            'accesos_otorgados' => implode(', ', $accesos_otorgados),
+                            'accesos_quitados' => implode(', ', $accesos_quitados),
+                            'total_otorgados' => count($accesos_otorgados),
+                            'total_quitados' => count($accesos_quitados),
+                            'super_user_anterior' => $usuario_actual['super_user'],
+                            'super_user_nuevo' => $permisos_nuevos['super_user']
+                        ], 
+                        "Gestión de Permisos", 
+                        $mensaje_auditoria
+                    );
+                    
+                } catch (Exception $e) {
+                    error_log("Error en auditoría actualizarPermisosUsuario: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            throw new Exception("Error al ejecutar la actualización");
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarPermisosUsuario: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR PERMISOS
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $user_id, 
+                    null, 
+                    [
+                        'usuario_afectado' => $user_id,
+                        'usuario_editor' => $_SESSION['user']['username'] ?? 'Desconocido',
+                        'error' => $e->getMessage(),
+                        'permisos_solicitados' => json_encode($permisos)
+                    ], 
+                    "Gestión de Permisos", 
+                    "Error al actualizar permisos del usuario ID: " . $user_id
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error actualizarPermisosUsuario: " . $auditError->getMessage());
+            }
+        }
+        
         return false;
     }
 }
 
-// Función para obtener todos los usuarios con permisos
+// Función para obtener todos los usuarios con permisos - SOLO LECTURA, SIN AUDITORÍA
 function obtenerUsuariosConPermisos() {
     global $db;
     
