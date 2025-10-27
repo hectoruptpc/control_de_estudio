@@ -9222,26 +9222,127 @@ if (!function_exists('existeTipoHorario')) {
 //ASIGNACION TIPO HORARIO AL PERSONAL ***********************************************************************
 
 /**
- * Asignar tipo de horario a un usuario
+ * Asignar tipo de horario a un usuario - CON AUDITORÍA
  */
 function asignarTipoHorarioUsuario($db, $id_usuario, $id_tipo_horario) {
-    // Verificar si ya existe la relación
-    $query_check = "SELECT id FROM tipo_horario_personal 
-                    WHERE id_usuario = $id_usuario AND id_tipo_horario = $id_tipo_horario";
-    $result = $db->query($query_check);
-    
-    if ($result->num_rows > 0) {
-        return false; // Ya existe esta relación
+    try {
+        // Obtener información del usuario y tipo de horario para auditoría
+        $query_usuario = "SELECT nombre, username FROM users WHERE id = $id_usuario";
+        $query_horario = "SELECT nombre FROM tipos_horario WHERE id = $id_tipo_horario";
+        
+        $result_usuario = $db->query($query_usuario);
+        $result_horario = $db->query($query_horario);
+        
+        if ($result_usuario->num_rows === 0 || $result_horario->num_rows === 0) {
+            return false;
+        }
+        
+        $usuario_info = $result_usuario->fetch_assoc();
+        $horario_info = $result_horario->fetch_assoc();
+        
+        // Verificar si ya existe la relación
+        $query_check = "SELECT id FROM tipo_horario_personal 
+                        WHERE id_usuario = $id_usuario AND id_tipo_horario = $id_tipo_horario";
+        $result = $db->query($query_check);
+        
+        if ($result->num_rows > 0) {
+            return false; // Ya existe esta relación
+        }
+        
+        // Insertar nueva relación
+        $query = "INSERT INTO tipo_horario_personal (id_usuario, id_tipo_horario) 
+                  VALUES ($id_usuario, $id_tipo_horario)";
+        $result = $db->query($query);
+        
+        if ($result) {
+            $id_insertado = $db->insert_id;
+            
+            // REGISTRAR EN AUDITORÍA - ASIGNACIÓN DE HORARIO CREADA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "INSERT", 
+                        "tipo_horario_personal", 
+                        $id_insertado, 
+                        null, 
+                        [
+                            'id_usuario' => $id_usuario,
+                            'usuario_nombre' => $usuario_info['nombre'],
+                            'usuario_username' => $usuario_info['username'],
+                            'id_tipo_horario' => $id_tipo_horario,
+                            'horario_nombre' => $horario_info['nombre'],
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_asignacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Horario Personal", 
+                        "Horario asignado a usuario: " . $horario_info['nombre'] . " → " . $usuario_info['nombre']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría asignarTipoHorarioUsuario: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            // REGISTRAR EN AUDITORÍA - ERROR AL ASIGNAR HORARIO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipo_horario_personal", 
+                        null, 
+                        null, 
+                        [
+                            'id_usuario' => $id_usuario,
+                            'usuario_nombre' => $usuario_info['nombre'],
+                            'id_tipo_horario' => $id_tipo_horario,
+                            'horario_nombre' => $horario_info['nombre'],
+                            'error' => $db->error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Horario Personal", 
+                        "Error al asignar horario a usuario"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error asignarTipoHorarioUsuario: " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en asignarTipoHorarioUsuario: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ASIGNAR HORARIO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipo_horario_personal", 
+                    null, 
+                    null, 
+                    [
+                        'id_usuario' => $id_usuario,
+                        'id_tipo_horario' => $id_tipo_horario,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Horario Personal", 
+                    "Excepción al asignar horario a usuario"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción asignarTipoHorarioUsuario: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
     }
-    
-    // Insertar nueva relación
-    $query = "INSERT INTO tipo_horario_personal (id_usuario, id_tipo_horario) 
-              VALUES ($id_usuario, $id_tipo_horario)";
-    return $db->query($query);
 }
 
 /**
- * Obtener tipos de horario de un usuario
+ * Obtener tipos de horario de un usuario - SOLO LECTURA, SIN AUDITORÍA
  */
 function obtenerTiposHorarioUsuario($db, $id_usuario) {
     $query = "SELECT th.* 
@@ -9254,16 +9355,117 @@ function obtenerTiposHorarioUsuario($db, $id_usuario) {
 }
 
 /**
- * Eliminar asignación de horario de usuario
+ * Eliminar asignación de horario de usuario - CON AUDITORÍA
  */
 function eliminarTipoHorarioUsuario($db, $id_usuario, $id_tipo_horario) {
-    $query = "DELETE FROM tipo_horario_personal 
-              WHERE id_usuario = $id_usuario AND id_tipo_horario = $id_tipo_horario";
-    return $db->query($query);
+    try {
+        // Obtener información para auditoría
+        $query_info = "SELECT u.nombre as usuario_nombre, u.username, th.nombre as horario_nombre
+                       FROM tipo_horario_personal thp
+                       JOIN users u ON thp.id_usuario = u.id
+                       JOIN tipos_horario th ON thp.id_tipo_horario = th.id
+                       WHERE thp.id_usuario = $id_usuario AND thp.id_tipo_horario = $id_tipo_horario";
+        
+        $result_info = $db->query($query_info);
+        
+        if ($result_info->num_rows === 0) {
+            return false;
+        }
+        
+        $info = $result_info->fetch_assoc();
+        
+        $query = "DELETE FROM tipo_horario_personal 
+                  WHERE id_usuario = $id_usuario AND id_tipo_horario = $id_tipo_horario";
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - ASIGNACIÓN DE HORARIO ELIMINADA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "DELETE", 
+                        "tipo_horario_personal", 
+                        null, 
+                        [
+                            'id_usuario' => $id_usuario,
+                            'usuario_nombre' => $info['usuario_nombre'],
+                            'usuario_username' => $info['username'],
+                            'id_tipo_horario' => $id_tipo_horario,
+                            'horario_nombre' => $info['horario_nombre']
+                        ], 
+                        [
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_eliminacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Horario Personal", 
+                        "Horario eliminado de usuario: " . $info['horario_nombre'] . " ← " . $info['usuario_nombre']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarTipoHorarioUsuario: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR ASIGNACIÓN
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipo_horario_personal", 
+                        null, 
+                        null, 
+                        [
+                            'id_usuario' => $id_usuario,
+                            'usuario_nombre' => $info['usuario_nombre'],
+                            'id_tipo_horario' => $id_tipo_horario,
+                            'horario_nombre' => $info['horario_nombre'],
+                            'error' => $db->error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Horario Personal", 
+                        "Error al eliminar horario de usuario"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error eliminarTipoHorarioUsuario: " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarTipoHorarioUsuario: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ELIMINAR ASIGNACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipo_horario_personal", 
+                    null, 
+                    null, 
+                    [
+                        'id_usuario' => $id_usuario,
+                        'id_tipo_horario' => $id_tipo_horario,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Horario Personal", 
+                    "Excepción al eliminar horario de usuario"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción eliminarTipoHorarioUsuario: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
 /**
- * Obtener usuarios por tipo de horario
+ * Obtener usuarios por tipo de horario - SOLO LECTURA, SIN AUDITORÍA
  */
 function obtenerUsuariosPorTipoHorario($db, $id_tipo_horario) {
     $query = "SELECT u.* 
@@ -9275,11 +9477,8 @@ function obtenerUsuariosPorTipoHorario($db, $id_tipo_horario) {
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 
-
-
-
 /**
- * Obtener texto del tipo de usuario (estético)
+ * Obtener texto del tipo de usuario (estético) - SOLO LÓGICA, SIN AUDITORÍA
  */
 function obtenerTipoUsuarioTexto($usuario) {
     $tipo_usuario = [];
@@ -9292,7 +9491,7 @@ function obtenerTipoUsuarioTexto($usuario) {
 }
 
 /**
- * Obtener todas las relaciones horario-personal
+ * Obtener todas las relaciones horario-personal - SOLO LECTURA, SIN AUDITORÍA
  */
 function obtenerTodasRelacionesHorarioPersonal($db) {
     $query = "SELECT thp.id, thp.id_usuario, thp.id_tipo_horario, 
@@ -9308,19 +9507,225 @@ function obtenerTodasRelacionesHorarioPersonal($db) {
 }
 
 /**
- * Actualizar tipo de horario de usuario
+ * Actualizar tipo de horario de usuario - CON AUDITORÍA
  */
 function actualizarTipoHorarioUsuario($db, $id_relacion, $id_tipo_horario) {
-    $query = "UPDATE tipo_horario_personal SET id_tipo_horario = $id_tipo_horario WHERE id = $id_relacion";
-    return $db->query($query);
+    try {
+        // Obtener información actual para auditoría
+        $query_actual = "SELECT thp.id_usuario, thp.id_tipo_horario as id_tipo_horario_anterior, 
+                                u.nombre as usuario_nombre, u.username,
+                                th_anterior.nombre as horario_anterior_nombre,
+                                th_nuevo.nombre as horario_nuevo_nombre
+                         FROM tipo_horario_personal thp
+                         JOIN users u ON thp.id_usuario = u.id
+                         JOIN tipos_horario th_anterior ON thp.id_tipo_horario = th_anterior.id
+                         JOIN tipos_horario th_nuevo ON $id_tipo_horario = th_nuevo.id
+                         WHERE thp.id = $id_relacion";
+        
+        $result_actual = $db->query($query_actual);
+        
+        if ($result_actual->num_rows === 0) {
+            return false;
+        }
+        
+        $info_actual = $result_actual->fetch_assoc();
+        
+        $query = "UPDATE tipo_horario_personal SET id_tipo_horario = $id_tipo_horario WHERE id = $id_relacion";
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - ASIGNACIÓN DE HORARIO ACTUALIZADA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "tipo_horario_personal", 
+                        $id_relacion, 
+                        [
+                            'id_tipo_horario_anterior' => $info_actual['id_tipo_horario_anterior'],
+                            'horario_anterior_nombre' => $info_actual['horario_anterior_nombre']
+                        ], 
+                        [
+                            'id_usuario' => $info_actual['id_usuario'],
+                            'usuario_nombre' => $info_actual['usuario_nombre'],
+                            'usuario_username' => $info_actual['username'],
+                            'id_tipo_horario_nuevo' => $id_tipo_horario,
+                            'horario_nuevo_nombre' => $info_actual['horario_nuevo_nombre'],
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_actualizacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Horario Personal", 
+                        "Horario actualizado para usuario: " . $info_actual['horario_anterior_nombre'] . " → " . $info_actual['horario_nuevo_nombre'] . " (" . $info_actual['usuario_nombre'] . ")"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría actualizarTipoHorarioUsuario: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR ASIGNACIÓN
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipo_horario_personal", 
+                        $id_relacion, 
+                        null, 
+                        [
+                            'id_relacion' => $id_relacion,
+                            'id_tipo_horario_nuevo' => $id_tipo_horario,
+                            'usuario_nombre' => $info_actual['usuario_nombre'],
+                            'error' => $db->error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Horario Personal", 
+                        "Error al actualizar horario de usuario"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error actualizarTipoHorarioUsuario: " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarTipoHorarioUsuario: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ACTUALIZAR ASIGNACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipo_horario_personal", 
+                    $id_relacion, 
+                    null, 
+                    [
+                        'id_relacion' => $id_relacion,
+                        'id_tipo_horario_nuevo' => $id_tipo_horario,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Horario Personal", 
+                    "Excepción al actualizar horario de usuario"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción actualizarTipoHorarioUsuario: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
 /**
- * Eliminar relación por ID
+ * Eliminar relación por ID - CON AUDITORÍA
  */
 function eliminarTipoHorarioUsuarioPorId($db, $id_relacion) {
-    $query = "DELETE FROM tipo_horario_personal WHERE id = $id_relacion";
-    return $db->query($query);
+    try {
+        // Obtener información para auditoría
+        $query_info = "SELECT thp.id_usuario, u.nombre as usuario_nombre, u.username, 
+                              thp.id_tipo_horario, th.nombre as horario_nombre
+                       FROM tipo_horario_personal thp
+                       JOIN users u ON thp.id_usuario = u.id
+                       JOIN tipos_horario th ON thp.id_tipo_horario = th.id
+                       WHERE thp.id = $id_relacion";
+        
+        $result_info = $db->query($query_info);
+        
+        if ($result_info->num_rows === 0) {
+            return false;
+        }
+        
+        $info = $result_info->fetch_assoc();
+        
+        $query = "DELETE FROM tipo_horario_personal WHERE id = $id_relacion";
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - RELACIÓN ELIMINADA POR ID
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "DELETE", 
+                        "tipo_horario_personal", 
+                        $id_relacion, 
+                        [
+                            'id_usuario' => $info['id_usuario'],
+                            'usuario_nombre' => $info['usuario_nombre'],
+                            'usuario_username' => $info['username'],
+                            'id_tipo_horario' => $info['id_tipo_horario'],
+                            'horario_nombre' => $info['horario_nombre']
+                        ], 
+                        [
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_eliminacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Horario Personal", 
+                        "Relación horario-usuario eliminada: " . $info['horario_nombre'] . " ← " . $info['usuario_nombre']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarTipoHorarioUsuarioPorId: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR RELACIÓN
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipo_horario_personal", 
+                        $id_relacion, 
+                        null, 
+                        [
+                            'id_relacion' => $id_relacion,
+                            'usuario_nombre' => $info['usuario_nombre'],
+                            'horario_nombre' => $info['horario_nombre'],
+                            'error' => $db->error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Horario Personal", 
+                        "Error al eliminar relación horario-usuario"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error eliminarTipoHorarioUsuarioPorId: " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarTipoHorarioUsuarioPorId: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ELIMINAR RELACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipo_horario_personal", 
+                    $id_relacion, 
+                    null, 
+                    [
+                        'id_relacion' => $id_relacion,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Horario Personal", 
+                    "Excepción al eliminar relación horario-usuario"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción eliminarTipoHorarioUsuarioPorId: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
 
