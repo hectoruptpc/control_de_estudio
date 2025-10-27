@@ -11726,10 +11726,226 @@ function obtenerEstadisticasGrupoDefinitivas($docente_id, $materia_id, $periodo_
 }
 
 
+// RESPALDO BD ***********************************************************************
 
 
 
+// Función para realizar respaldo de base de datos
+function realizarRespaldo() {
+    global $db;
+    
+    // Obtener información del usuario
+    $usuario = $_SESSION['user']['nombre'];
+    $usuario_id = $_SESSION['user']['id'];
+    $fecha = date('Y-m-d_H-i-s');
+    
+    // Nombre del archivo de respaldo con formato: respaldo_(usuario)_(fecha)
+    $backup_file = 'respaldo_' . limpiarNombreArchivo($usuario) . '_' . $fecha . '.sql';
+    
+    // Registrar la descarga en la base de datos
+    $registro_id = registrarDescargaRespaldo($usuario, $backup_file);
+    
+    // Registrar auditoría
+    registrarAuditoria(
+        "BACKUP", 
+        "database", 
+        $registro_id, 
+        null, 
+        ['archivo' => $backup_file, 'usuario' => $usuario], 
+        "Sistema", 
+        "Respaldo de base de datos generado"
+    );
+    
+    // Cabecera para forzar descarga
+    header('Content-Type: application/octet-stream');
+    header('Content-Disposition: attachment; filename="' . $backup_file . '"');
+    
+    // Obtener todas las tablas
+    $tables = array();
+    $result = $db->query('SHOW TABLES');
+    while ($row = $result->fetch_row()) {
+        $tables[] = $row[0];
+    }
+    
+    // Generar el SQL del respaldo
+    $output = "-- Respaldo de Base de Datos\n";
+    $output .= "-- Generado: " . date('Y-m-d H:i:s') . "\n";
+    $output .= "-- Generado por: " . $usuario . "\n";
+    $output .= "-- MySQL Server: " . $db->server_info . "\n\n";
+    
+    // Recorrer todas las tablas
+    foreach ($tables as $table) {
+        // Estructura de la tabla
+        $output .= "--\n-- Estructura de tabla para la tabla `$table`\n--\n";
+        $output .= "DROP TABLE IF EXISTS `$table`;\n";
+        
+        $create_table = $db->query("SHOW CREATE TABLE `$table`");
+        $row = $create_table->fetch_row();
+        $output .= $row[1] . ";\n\n";
+        
+        // Datos de la tabla
+        $output .= "--\n-- Volcado de datos para la tabla `$table`\n--\n";
+        
+        $result = $db->query("SELECT * FROM `$table`");
+        if ($result->num_rows > 0) {
+            $output .= "INSERT IGNORE INTO `$table` VALUES\n";
+            
+            $rows = array();
+            while ($row = $result->fetch_assoc()) {
+                $values = array();
+                foreach ($row as $value) {
+                    if ($value === null) {
+                        $values[] = 'NULL';
+                    } else {
+                        $values[] = "'" . $db->real_escape_string($value) . "'";
+                    }
+                }
+                $rows[] = "(" . implode(', ', $values) . ")";
+            }
+            
+            $output .= implode(",\n", $rows) . ";\n\n";
+        } else {
+            $output .= "-- La tabla `$table` está vacía\n\n";
+        }
+    }
+    
+    // Escribir el output y finalizar
+    echo $output;
+    exit();
+}
 
+// Función para limpiar nombre de archivo
+function limpiarNombreArchivo($nombre) {
+    // Eliminar caracteres no permitidos en nombres de archivo
+    $nombre = preg_replace('/[^a-zA-Z0-9_-]/', '_', $nombre);
+    // Limitar la longitud
+    $nombre = substr($nombre, 0, 50);
+    return $nombre;
+}
+
+// Función para registrar descarga de respaldo
+function registrarDescargaRespaldo($usuario, $nombre_archivo) {
+    global $db;
+    
+    // Crear tabla de respaldos si no existe
+    $crear_tabla = "
+    CREATE TABLE IF NOT EXISTS respaldos_descargas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        usuario VARCHAR(100) NOT NULL,
+        nombre_archivo VARCHAR(255) NOT NULL,
+        fecha_descarga DATETIME DEFAULT CURRENT_TIMESTAMP,
+        ip_address VARCHAR(45),
+        user_agent TEXT
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ";
+    
+    $db->query($crear_tabla);
+    
+    // Insertar registro de la descarga
+    $ip = $_SERVER['REMOTE_ADDR'];
+    $user_agent = $_SERVER['HTTP_USER_AGENT'];
+    
+    $stmt = $db->prepare("INSERT INTO respaldos_descargas (usuario, nombre_archivo, ip_address, user_agent) VALUES (?, ?, ?, ?)");
+    $stmt->bind_param("ssss", $usuario, $nombre_archivo, $ip, $user_agent);
+    $stmt->execute();
+    $id_registro = $stmt->insert_id;
+    $stmt->close();
+    
+    return $id_registro;
+}
+
+// Función para obtener historial de respaldos
+function obtenerHistorialRespaldos() {
+    global $db;
+    
+    // Verificar si la tabla existe
+    $result = $db->query("SHOW TABLES LIKE 'respaldos_descargas'");
+    if ($result->num_rows == 0) {
+        return array();
+    }
+    
+    // Obtener el historial de descargas
+    $historial = array();
+    $result = $db->query("SELECT * FROM respaldos_descargas ORDER BY fecha_descarga DESC LIMIT 10");
+    
+    while ($row = $result->fetch_assoc()) {
+        $historial[] = $row;
+    }
+    
+    return $historial;
+}
+
+// Función para verificar si se puede eliminar un respaldo
+function puedeEliminarRespaldo($fecha_descarga) {
+    // Calcular si han pasado 90 días desde la fecha de descarga
+    $fecha_descarga_obj = new DateTime($fecha_descarga);
+    $fecha_actual = new DateTime();
+    $diferencia = $fecha_actual->diff($fecha_descarga_obj);
+    
+    // Verificar si han pasado al menos 90 días
+    return $diferencia->days >= 90;
+}
+
+// Función para calcular días restantes para poder eliminar
+function diasParaPoderEliminar($fecha_descarga) {
+    // Calcular cuántos días faltan para poder eliminar el respaldo
+    $fecha_descarga_obj = new DateTime($fecha_descarga);
+    $fecha_actual = new DateTime();
+    $diferencia = $fecha_actual->diff($fecha_descarga_obj);
+    
+    $dias_transcurridos = $diferencia->days;
+    $dias_restantes = 90 - $dias_transcurridos;
+    
+    return max(0, $dias_restantes);
+}
+
+// Función para eliminar respaldo
+function eliminarRespaldo($id_respaldo) {
+    global $db;
+    
+    // Primero verificar si el respaldo existe y obtener sus datos para auditoría
+    $stmt = $db->prepare("SELECT * FROM respaldos_descargas WHERE id = ?");
+    $stmt->bind_param("i", $id_respaldo);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows === 0) {
+        $_SESSION['error'] = "El respaldo no existe.";
+        return false;
+    }
+    
+    $respaldo = $result->fetch_assoc();
+    
+    // Verificar si han pasado 90 días desde la descarga
+    if (!puedeEliminarRespaldo($respaldo['fecha_descarga'])) {
+        $dias_restantes = diasParaPoderEliminar($respaldo['fecha_descarga']);
+        $_SESSION['error'] = "No se puede eliminar el respaldo. Deben pasar 90 días desde su descarga. Faltan " . $dias_restantes . " días.";
+        return false;
+    }
+    
+    // Registrar auditoría antes de eliminar
+    registrarAuditoria(
+        "DELETE", 
+        "respaldos_descargas", 
+        $id_respaldo, 
+        $respaldo, 
+        null, 
+        "Sistema", 
+        "Eliminación de registro de respaldo: " . $respaldo['nombre_archivo']
+    );
+    
+    // Eliminar el registro de la base de datos
+    $stmt = $db->prepare("DELETE FROM respaldos_descargas WHERE id = ?");
+    $stmt->bind_param("i", $id_respaldo);
+    
+    if ($stmt->execute()) {
+        $_SESSION['success'] = "Respaldo eliminado correctamente.";
+        return true;
+    } else {
+        $_SESSION['error'] = "Error al eliminar el respaldo: " . $db->error;
+        return false;
+    }
+}
 
 
 
