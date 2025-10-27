@@ -4503,7 +4503,7 @@ function obtenerListaCompletaUsuarios() {
 }
 
 
-// OBTENER LOS DATOS SIMPLES****************************************************************************************
+//DATOS PREDEFINIDOS****************************************************************************************
 
 
 /**
@@ -4544,9 +4544,6 @@ function obtenerTiposFormacion($db) {
     return $tipos;
 }
 
-
-
-
 function obtenerGeneros($db) {
     $generos = [];
     $query = "SELECT id, genero FROM genero ORDER BY id";
@@ -4567,9 +4564,6 @@ function obtenerGeneros($db) {
         return [];
     }
 }
-
-
-
 
 function obtenerTiposCedula($db) {
     $tipos = [];
@@ -4599,18 +4593,12 @@ function obtenerTiposCedula($db) {
         
         return $tipos;
     } catch (Exception $e) {
-        // Registrar el error
         error_log($e->getMessage());
-        
-        // Opcional: puedes devolver un array vacío o false según tu necesidad
         return [];
     }
 }
 
-
-
 function obtenerEstadosCiviless($db) {
-    // Validar conexión
     if (!($db instanceof mysqli)) {
         throw new InvalidArgumentException("Se esperaba una conexión MySQLi válida");
     }
@@ -4619,28 +4607,25 @@ function obtenerEstadosCiviless($db) {
     $query = "SELECT id, estado_civil FROM estado_civil ORDER BY estado_civil ASC";
     
     try {
-        // Preparar sentencia
         if (!$stmt = $db->prepare($query)) {
             throw new Exception("Error al preparar la consulta: " . $db->error);
         }
         
-        // Ejecutar
         if (!$stmt->execute()) {
             throw new Exception("Error al ejecutar la consulta: " . $stmt->error);
         }
         
-        // Obtener resultados
         $result = $stmt->get_result();
         
         while ($row = $result->fetch_assoc()) {
-            $estados[$row['id']] = $row['estado_civil']; // CORRECCIÓN AQUÍ (faltaba ])
+            $estados[$row['id']] = $row['estado_civil'];
         }
         
         return $estados;
         
     } catch (Exception $e) {
         error_log($e->getMessage());
-        return []; // Devuelve array vacío en caso de error
+        return [];
     } finally {
         if (isset($stmt)) {
             $stmt->close();
@@ -4648,9 +4633,7 @@ function obtenerEstadosCiviless($db) {
     }
 }
 
-
 function obtenerTiposVivienda($db) {
-    // Validar conexión
     if (!($db instanceof mysqli)) {
         throw new InvalidArgumentException("Se esperaba una conexión MySQLi válida");
     }
@@ -4659,17 +4642,14 @@ function obtenerTiposVivienda($db) {
     $query = "SELECT id, vivienda FROM tipo_vivienda ORDER BY vivienda ASC";
     
     try {
-        // Preparar sentencia
         if (!$stmt = $db->prepare($query)) {
             throw new Exception("Error al preparar la consulta: " . $db->error);
         }
         
-        // Ejecutar
         if (!$stmt->execute()) {
             throw new Exception("Error al ejecutar la consulta: " . $stmt->error);
         }
         
-        // Obtener resultados
         $result = $stmt->get_result();
         
         while ($row = $result->fetch_assoc()) {
@@ -4680,7 +4660,7 @@ function obtenerTiposVivienda($db) {
         
     } catch (Exception $e) {
         error_log($e->getMessage());
-        return []; // Devuelve array vacío en caso de error
+        return [];
     } finally {
         if (isset($stmt)) {
             $stmt->close();
@@ -4688,9 +4668,7 @@ function obtenerTiposVivienda($db) {
     }
 }
 
-
 function obtenerTenenciaViviendas($db) {
-    // Validar conexión
     if (!($db instanceof mysqli)) {
         throw new InvalidArgumentException("Se esperaba una conexión MySQLi válida");
     }
@@ -4699,17 +4677,14 @@ function obtenerTenenciaViviendas($db) {
     $query = "SELECT id, tenencia FROM tenencia_vivienda ORDER BY tenencia ASC";
     
     try {
-        // Preparar sentencia
         if (!$stmt = $db->prepare($query)) {
             throw new Exception("Error al preparar la consulta: " . $db->error);
         }
         
-        // Ejecutar
         if (!$stmt->execute()) {
             throw new Exception("Error al ejecutar la consulta: " . $stmt->error);
         }
         
-        // Obtener resultados
         $result = $stmt->get_result();
         
         while ($row = $result->fetch_assoc()) {
@@ -4720,7 +4695,7 @@ function obtenerTenenciaViviendas($db) {
         
     } catch (Exception $e) {
         error_log($e->getMessage());
-        return []; // Devuelve array vacío en caso de error
+        return [];
     } finally {
         if (isset($stmt)) {
             $stmt->close();
@@ -4728,33 +4703,29 @@ function obtenerTenenciaViviendas($db) {
     }
 }
 
-
-
 function obtenerOpcionesStatus($db) {
-    // Validar conexión
     if (!($db instanceof mysqli)) {
         throw new InvalidArgumentException("Se esperaba una conexión MySQLi válida");
     }
 
-  $statusOptions = [];
-  $query = "SELECT id, status FROM status ORDER BY id ASC";
-  try {
-    if ($stmt = $db->prepare($query)) {
-      $stmt->execute();
-      $result = $stmt->get_result();
-      while ($row = $result->fetch_assoc()) {
-        $statusOptions[$row['id']] = $row['status'];
-      }
-      $stmt->close();
+    $statusOptions = [];
+    $query = "SELECT id, status FROM status ORDER BY id ASC";
+    try {
+        if ($stmt = $db->prepare($query)) {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $statusOptions[$row['id']] = $row['status'];
+            }
+            $stmt->close();
+        }
+        return $statusOptions;
+    } catch (Exception $e) {
+        error_log($e->getMessage());
+        return [];
     }
-    return $statusOptions;
-  } catch (Exception $e) {
-    error_log($e->getMessage());
-    return [];
-  }
 }
 
-// Agrega esta función junto con las demás funciones de obtención de datos
 function obtenerIngresos($db) {
     $ingresos = [];
     $query = "SELECT id, ingreso FROM ingresos ORDER BY id";
@@ -4766,6 +4737,275 @@ function obtenerIngresos($db) {
     
     return $ingresos;
 }
+
+// Función para procesar operaciones CRUD en datos predefinidos - CON AUDITORÍA
+function procesarOperacionDatosPredefinidos($tabla, $accion, $id = null, $nuevo_id = null, $valor = '') {
+    global $db;
+    
+    $tablasCampos = [
+        'status' => 'status',
+        'estado_civil' => 'estado_civil',
+        'tenencia_vivienda' => 'tenencia',
+        'tipo_cedula' => 'tipo',
+        'tipo_vivienda' => 'vivienda',
+        'ingresos' => 'ingreso',
+        'genero' => 'genero',
+        'tipo_formacion' => 'tipo'
+    ];
+    
+    if (!array_key_exists($tabla, $tablasCampos)) {
+        return ['success' => false, 'message' => 'Tabla no válida'];
+    }
+    
+    $campo = $tablasCampos[$tabla];
+    $valor = trim($valor);
+    
+    try {
+        switch ($accion) {
+            case 'agregar':
+                if (empty($valor)) {
+                    return ['success' => false, 'message' => 'El valor no puede estar vacío'];
+                }
+                
+                if (!empty($nuevo_id)) {
+                    // Verificar si el ID ya existe
+                    $check = $db->prepare("SELECT id FROM $tabla WHERE id = ?");
+                    $check->bind_param("i", $nuevo_id);
+                    $check->execute();
+                    $check->store_result();
+                    
+                    if ($check->num_rows > 0) {
+                        return ['success' => false, 'message' => "Error: El ID $nuevo_id ya existe"];
+                    }
+                    
+                    $stmt = $db->prepare("INSERT INTO $tabla (id, $campo) VALUES (?, ?)");
+                    $stmt->bind_param("is", $nuevo_id, $valor);
+                } else {
+                    $stmt = $db->prepare("INSERT INTO $tabla ($campo) VALUES (?)");
+                    $stmt->bind_param("s", $valor);
+                }
+                
+                if ($stmt->execute()) {
+                    $id_insertado = $nuevo_id ?: $db->insert_id;
+                    
+                    // REGISTRAR EN AUDITORÍA - REGISTRO AGREGADO
+                    if (function_exists('registrarAuditoria')) {
+                        try {
+                            registrarAuditoria(
+                                "INSERT", 
+                                $tabla, 
+                                $id_insertado, 
+                                null, 
+                                [
+                                    'tabla' => $tabla,
+                                    'campo' => $campo,
+                                    'id' => $id_insertado,
+                                    'valor' => $valor,
+                                    'accion' => 'agregar',
+                                    'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                                    'usuario_id' => $_SESSION['user']['id'] ?? 0
+                                ], 
+                                "Datos Predefinidos", 
+                                "Registro agregado en $tabla: $valor (ID: $id_insertado)"
+                            );
+                        } catch (Exception $e) {
+                            error_log("Error en auditoría procesarOperacionDatosPredefinidos (agregar): " . $e->getMessage());
+                        }
+                    }
+                    
+                    return ['success' => true, 'message' => 'Registro agregado correctamente'];
+                } else {
+                    return ['success' => false, 'message' => 'Error al agregar registro: ' . $stmt->error];
+                }
+                break;
+                
+            case 'editar':
+                if (($id === '' || $id === null) || $valor === '') {
+                    return ['success' => false, 'message' => 'ID y valor son requeridos'];
+                }
+                
+                // Obtener valor anterior para auditoría
+                $stmt_actual = $db->prepare("SELECT $campo FROM $tabla WHERE id = ?");
+                $stmt_actual->bind_param("i", $id);
+                $stmt_actual->execute();
+                $result_actual = $stmt_actual->get_result();
+                
+                if ($result_actual->num_rows === 0) {
+                    return ['success' => false, 'message' => 'Registro no encontrado'];
+                }
+                
+                $valor_anterior = $result_actual->fetch_assoc()[$campo];
+                $stmt_actual->close();
+                
+                if ($nuevo_id != $id) {
+                    // Verificar si el nuevo ID ya existe
+                    $check = $db->prepare("SELECT id FROM $tabla WHERE id = ? AND id != ?");
+                    $check->bind_param("ii", $nuevo_id, $id);
+                    $check->execute();
+                    $check->store_result();
+                    
+                    if ($check->num_rows > 0) {
+                        return ['success' => false, 'message' => "Error: El ID $nuevo_id ya existe"];
+                    }
+                    
+                    $stmt = $db->prepare("UPDATE $tabla SET id = ?, $campo = ? WHERE id = ?");
+                    $stmt->bind_param("isi", $nuevo_id, $valor, $id);
+                } else {
+                    $stmt = $db->prepare("UPDATE $tabla SET $campo = ? WHERE id = ?");
+                    $stmt->bind_param("si", $valor, $id);
+                }
+                
+                if ($stmt->execute()) {
+                    $id_final = $nuevo_id ?: $id;
+                    
+                    // REGISTRAR EN AUDITORÍA - REGISTRO EDITADO
+                    if (function_exists('registrarAuditoria')) {
+                        try {
+                            $cambios = [];
+                            if ($nuevo_id && $nuevo_id != $id) {
+                                $cambios[] = "ID: $id → $nuevo_id";
+                            }
+                            if ($valor_anterior != $valor) {
+                                $cambios[] = "$campo: $valor_anterior → $valor";
+                            }
+                            
+                            registrarAuditoria(
+                                "UPDATE", 
+                                $tabla, 
+                                $id_final, 
+                                [
+                                    'id_anterior' => $id,
+                                    'valor_anterior' => $valor_anterior
+                                ], 
+                                [
+                                    'tabla' => $tabla,
+                                    'campo' => $campo,
+                                    'id_nuevo' => $id_final,
+                                    'valor_nuevo' => $valor,
+                                    'accion' => 'editar',
+                                    'cambios' => implode(', ', $cambios),
+                                    'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                                    'usuario_id' => $_SESSION['user']['id'] ?? 0
+                                ], 
+                                "Datos Predefinidos", 
+                                "Registro editado en $tabla: " . implode(', ', $cambios)
+                            );
+                        } catch (Exception $e) {
+                            error_log("Error en auditoría procesarOperacionDatosPredefinidos (editar): " . $e->getMessage());
+                        }
+                    }
+                    
+                    return ['success' => true, 'message' => 'Registro actualizado correctamente'];
+                } else {
+                    return ['success' => false, 'message' => 'Error al actualizar registro: ' . $stmt->error];
+                }
+                break;
+                
+            case 'eliminar':
+                if ($id === '' || $id === null) {
+                    return ['success' => false, 'message' => 'ID es requerido'];
+                }
+                
+                // Obtener datos del registro para auditoría
+                $stmt_actual = $db->prepare("SELECT $campo FROM $tabla WHERE id = ?");
+                $stmt_actual->bind_param("i", $id);
+                $stmt_actual->execute();
+                $result_actual = $stmt_actual->get_result();
+                
+                if ($result_actual->num_rows === 0) {
+                    return ['success' => false, 'message' => 'Registro no encontrado'];
+                }
+                
+                $valor_eliminado = $result_actual->fetch_assoc()[$campo];
+                $stmt_actual->close();
+                
+                $stmt = $db->prepare("DELETE FROM $tabla WHERE id = ?");
+                $stmt->bind_param("i", $id);
+                
+                if ($stmt->execute()) {
+                    // REGISTRAR EN AUDITORÍA - REGISTRO ELIMINADO
+                    if (function_exists('registrarAuditoria')) {
+                        try {
+                            registrarAuditoria(
+                                "DELETE", 
+                                $tabla, 
+                                $id, 
+                                [
+                                    'tabla' => $tabla,
+                                    'campo' => $campo,
+                                    'id' => $id,
+                                    'valor' => $valor_eliminado
+                                ], 
+                                [
+                                    'accion' => 'eliminar',
+                                    'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                                    'usuario_id' => $_SESSION['user']['id'] ?? 0
+                                ], 
+                                "Datos Predefinidos", 
+                                "Registro eliminado de $tabla: $valor_eliminado (ID: $id)"
+                            );
+                        } catch (Exception $e) {
+                            error_log("Error en auditoría procesarOperacionDatosPredefinidos (eliminar): " . $e->getMessage());
+                        }
+                    }
+                    
+                    return ['success' => true, 'message' => 'Registro eliminado correctamente'];
+                } else {
+                    return ['success' => false, 'message' => 'Error al eliminar registro: ' . $stmt->error];
+                }
+                break;
+                
+            default:
+                return ['success' => false, 'message' => 'Acción no válida'];
+        }
+    } catch (Exception $e) {
+        error_log("Error en procesarOperacionDatosPredefinidos: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN OPERACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    $tabla, 
+                    $id, 
+                    null, 
+                    [
+                        'tabla' => $tabla,
+                        'accion' => $accion,
+                        'id' => $id,
+                        'nuevo_id' => $nuevo_id,
+                        'valor' => $valor,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Datos Predefinidos", 
+                    "Error en operación $accion en tabla $tabla"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error procesarOperacionDatosPredefinidos: " . $auditError->getMessage());
+            }
+        }
+        
+        return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+    }
+}
+
+// Función para verificar si un ID existe en una tabla - SOLO LECTURA, SIN AUDITORÍA
+function verificarIdExistente($tabla, $id) {
+    global $db;
+    
+    $stmt = $db->prepare("SELECT id FROM $tabla WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $stmt->store_result();
+    
+    return $stmt->num_rows > 0;
+}
+
+
+
+
+
 
 //FUNCIONES PARA LAS SECCIONES ***********************************************************************
 

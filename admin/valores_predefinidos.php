@@ -5,102 +5,30 @@ ini_set('display_errors', '1');
 $titulopag = "Administración de Datos Predefinidos";
 include('../funciones/functions.php');
 
-//CARGAR PERMISOS
+// CARGAR PERMISOS
 cargarPermisosUsuario();
 verificarPermiso('editar_valores');
-
 
 if (!isAdmin()) {
     header('location: ../usuario/home.php');
     exit();
 }
 
-// Mapeo de tablas a sus campos correspondientes
-$tablasCampos = [
-    'status' => 'status',
-    'estado_civil' => 'estado_civil',
-    'tenencia_vivienda' => 'tenencia',
-    'tipo_cedula' => 'tipo',
-    'tipo_vivienda' => 'vivienda',
-    'ingresos' => 'ingreso',
-    'genero' => 'genero',
-    'tipo_formacion' => 'tipo'
-];
-
 // Procesar formularios
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['accion']) && isset($_POST['tabla']) && array_key_exists($_POST['tabla'], $tablasCampos)) {
+    if (isset($_POST['accion']) && isset($_POST['tabla'])) {
         $tabla = $_POST['tabla'];
-        $campo = $tablasCampos[$tabla];
+        $accion = $_POST['accion'];
         $id = $_POST['id'] ?? '';
         $nuevo_id = $_POST['nuevo_id'] ?? $id;
         $valor = trim($_POST['valor'] ?? '');
         
-        try {
-            switch ($_POST['accion']) {
-                case 'agregar':
-                    if (!empty($valor)) {
-                        if (!empty($nuevo_id)) {
-                            // Verificar si el ID ya existe
-                            $check = $db->prepare("SELECT id FROM $tabla WHERE id = ?");
-                            $check->bind_param("i", $nuevo_id);
-                            $check->execute();
-                            $check->store_result();
-                            
-                            if ($check->num_rows > 0) {
-                                $_SESSION['error'] = "Error: El ID $nuevo_id ya existe";
-                                header("Location: ".$_SERVER['PHP_SELF']);
-                                exit();
-                            }
-                            
-                            $stmt = $db->prepare("INSERT INTO $tabla (id, $campo) VALUES (?, ?)");
-                            $stmt->bind_param("is", $nuevo_id, $valor);
-                        } else {
-                            $stmt = $db->prepare("INSERT INTO $tabla ($campo) VALUES (?)");
-                            $stmt->bind_param("s", $valor);
-                        }
-                        $stmt->execute();
-                        $_SESSION['mensaje'] = "Registro agregado correctamente";
-                    }
-                    break;
-                    
-                case 'editar':
-                    if (($id !== '' && $id !== null) && $valor !== '') {
-                        if ($nuevo_id != $id) {
-                            // Verificar si el nuevo ID ya existe
-                            $check = $db->prepare("SELECT id FROM $tabla WHERE id = ? AND id != ?");
-                            $check->bind_param("ii", $nuevo_id, $id);
-                            $check->execute();
-                            $check->store_result();
-                            
-                            if ($check->num_rows > 0) {
-                                $_SESSION['error'] = "Error: El ID $nuevo_id ya existe";
-                                header("Location: ".$_SERVER['PHP_SELF']);
-                                exit();
-                            }
-                            
-                            $stmt = $db->prepare("UPDATE $tabla SET id = ?, $campo = ? WHERE id = ?");
-                            $stmt->bind_param("isi", $nuevo_id, $valor, $id);
-                        } else {
-                            $stmt = $db->prepare("UPDATE $tabla SET $campo = ? WHERE id = ?");
-                            $stmt->bind_param("si", $valor, $id);
-                        }
-                        $stmt->execute();
-                        $_SESSION['mensaje'] = "Registro actualizado correctamente";
-                    }
-                    break;
-                    
-                case 'eliminar':
-                    if ($id !== '' && $id !== null) {
-                        $stmt = $db->prepare("DELETE FROM $tabla WHERE id = ?");
-                        $stmt->bind_param("i", $id);
-                        $stmt->execute();
-                        $_SESSION['mensaje'] = "Registro eliminado correctamente";
-                    }
-                    break;
-            }
-        } catch (Exception $e) {
-            $_SESSION['error'] = "Error: " . $e->getMessage();
+        $resultado = procesarOperacionDatosPredefinidos($tabla, $accion, $id, $nuevo_id, $valor);
+        
+        if ($resultado['success']) {
+            $_SESSION['mensaje'] = $resultado['message'];
+        } else {
+            $_SESSION['error'] = $resultado['message'];
         }
         
         header("Location: ".$_SERVER['PHP_SELF']);
