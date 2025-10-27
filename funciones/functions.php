@@ -11730,91 +11730,162 @@ function obtenerEstadisticasGrupoDefinitivas($docente_id, $materia_id, $periodo_
 
 
 
-// Función para realizar respaldo de base de datos
+// Función para realizar respaldo de base de datos - CON AUDITORÍA COMPLETA
 function realizarRespaldo() {
     global $db;
     
-    // Obtener información del usuario
-    $usuario = $_SESSION['user']['nombre'];
-    $usuario_id = $_SESSION['user']['id'];
-    $fecha = date('Y-m-d_H-i-s');
-    
-    // Nombre del archivo de respaldo con formato: respaldo_(usuario)_(fecha)
-    $backup_file = 'respaldo_' . limpiarNombreArchivo($usuario) . '_' . $fecha . '.sql';
-    
-    // Registrar la descarga en la base de datos
-    $registro_id = registrarDescargaRespaldo($usuario, $backup_file);
-    
-    // Registrar auditoría
-    registrarAuditoria(
-        "BACKUP", 
-        "database", 
-        $registro_id, 
-        null, 
-        ['archivo' => $backup_file, 'usuario' => $usuario], 
-        "Sistema", 
-        "Respaldo de base de datos generado"
-    );
-    
-    // Cabecera para forzar descarga
-    header('Content-Type: application/octet-stream');
-    header('Content-Disposition: attachment; filename="' . $backup_file . '"');
-    
-    // Obtener todas las tablas
-    $tables = array();
-    $result = $db->query('SHOW TABLES');
-    while ($row = $result->fetch_row()) {
-        $tables[] = $row[0];
-    }
-    
-    // Generar el SQL del respaldo
-    $output = "-- Respaldo de Base de Datos\n";
-    $output .= "-- Generado: " . date('Y-m-d H:i:s') . "\n";
-    $output .= "-- Generado por: " . $usuario . "\n";
-    $output .= "-- MySQL Server: " . $db->server_info . "\n\n";
-    
-    // Recorrer todas las tablas
-    foreach ($tables as $table) {
-        // Estructura de la tabla
-        $output .= "--\n-- Estructura de tabla para la tabla `$table`\n--\n";
-        $output .= "DROP TABLE IF EXISTS `$table`;\n";
+    try {
+        // Obtener información del usuario
+        $usuario = $_SESSION['user']['nombre'];
+        $usuario_id = $_SESSION['user']['id'];
+        $fecha = date('Y-m-d_H-i-s');
         
-        $create_table = $db->query("SHOW CREATE TABLE `$table`");
-        $row = $create_table->fetch_row();
-        $output .= $row[1] . ";\n\n";
+        // Nombre del archivo de respaldo con formato: respaldo_(usuario)_(fecha)
+        $backup_file = 'respaldo_' . limpiarNombreArchivo($usuario) . '_' . $fecha . '.sql';
         
-        // Datos de la tabla
-        $output .= "--\n-- Volcado de datos para la tabla `$table`\n--\n";
+        // Registrar la descarga en la base de datos
+        $registro_id = registrarDescargaRespaldo($usuario, $backup_file);
         
-        $result = $db->query("SELECT * FROM `$table`");
-        if ($result->num_rows > 0) {
-            $output .= "INSERT IGNORE INTO `$table` VALUES\n";
-            
-            $rows = array();
-            while ($row = $result->fetch_assoc()) {
-                $values = array();
-                foreach ($row as $value) {
-                    if ($value === null) {
-                        $values[] = 'NULL';
-                    } else {
-                        $values[] = "'" . $db->real_escape_string($value) . "'";
-                    }
-                }
-                $rows[] = "(" . implode(', ', $values) . ")";
+        // REGISTRAR EN AUDITORÍA - INICIO DE RESPALDO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "BACKUP", 
+                    "database", 
+                    $registro_id, 
+                    null, 
+                    [
+                        'archivo' => $backup_file, 
+                        'usuario' => $usuario,
+                        'usuario_id' => $usuario_id,
+                        'fecha_generacion' => date('Y-m-d H:i:s'),
+                        'estado' => 'iniciado'
+                    ], 
+                    "Sistema", 
+                    "Inicio de respaldo de base de datos"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría realizarRespaldo (inicio): " . $e->getMessage());
             }
-            
-            $output .= implode(",\n", $rows) . ";\n\n";
-        } else {
-            $output .= "-- La tabla `$table` está vacía\n\n";
         }
+        
+        // Obtener todas las tablas
+        $tables = array();
+        $result = $db->query('SHOW TABLES');
+        while ($row = $result->fetch_row()) {
+            $tables[] = $row[0];
+        }
+        
+        // Generar el SQL del respaldo
+        $output = "-- Respaldo de Base de Datos\n";
+        $output .= "-- Generado: " . date('Y-m-d H:i:s') . "\n";
+        $output .= "-- Generado por: " . $usuario . "\n";
+        $output .= "-- MySQL Server: " . $db->server_info . "\n\n";
+        
+        // Recorrer todas las tablas
+        foreach ($tables as $table) {
+            // Estructura de la tabla
+            $output .= "--\n-- Estructura de tabla para la tabla `$table`\n--\n";
+            $output .= "DROP TABLE IF EXISTS `$table`;\n";
+            
+            $create_table = $db->query("SHOW CREATE TABLE `$table`");
+            $row = $create_table->fetch_row();
+            $output .= $row[1] . ";\n\n";
+            
+            // Datos de la tabla
+            $output .= "--\n-- Volcado de datos para la tabla `$table`\n--\n";
+            
+            $result = $db->query("SELECT * FROM `$table`");
+            if ($result->num_rows > 0) {
+                $output .= "INSERT IGNORE INTO `$table` VALUES\n";
+                
+                $rows = array();
+                while ($row = $result->fetch_assoc()) {
+                    $values = array();
+                    foreach ($row as $value) {
+                        if ($value === null) {
+                            $values[] = 'NULL';
+                        } else {
+                            $values[] = "'" . $db->real_escape_string($value) . "'";
+                        }
+                    }
+                    $rows[] = "(" . implode(', ', $values) . ")";
+                }
+                
+                $output .= implode(",\n", $rows) . ";\n\n";
+            } else {
+                $output .= "-- La tabla `$table` está vacía\n\n";
+            }
+        }
+        
+        // REGISTRAR EN AUDITORÍA - RESPALDO COMPLETADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "BACKUP", 
+                    "database", 
+                    $registro_id, 
+                    null, 
+                    [
+                        'archivo' => $backup_file, 
+                        'usuario' => $usuario,
+                        'usuario_id' => $usuario_id,
+                        'fecha_generacion' => date('Y-m-d H:i:s'),
+                        'total_tablas' => count($tables),
+                        'estado' => 'completado',
+                        'tamano_aproximado' => strlen($output) . ' bytes'
+                    ], 
+                    "Sistema", 
+                    "Respaldo de base de datos completado exitosamente"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría realizarRespaldo (completado): " . $e->getMessage());
+            }
+        }
+        
+        // Cabecera para forzar descarga
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . $backup_file . '"');
+        
+        // Escribir el output y finalizar
+        echo $output;
+        exit();
+        
+    } catch (Exception $e) {
+        error_log("Error en realizarRespaldo: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN RESPALDO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "database", 
+                    $registro_id ?? null, 
+                    null, 
+                    [
+                        'archivo' => $backup_file ?? 'desconocido',
+                        'usuario' => $usuario ?? 'desconocido',
+                        'error' => $e->getMessage(),
+                        'estado' => 'fallido'
+                    ], 
+                    "Sistema", 
+                    "Error en respaldo de base de datos"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error realizarRespaldo: " . $auditError->getMessage());
+            }
+        }
+        
+        // Mostrar error al usuario
+        if (!headers_sent()) {
+            header('Content-Type: text/html; charset=utf-8');
+            echo "<script>alert('Error al generar el respaldo: " . addslashes($e->getMessage()) . "'); history.back();</script>";
+        }
+        exit();
     }
-    
-    // Escribir el output y finalizar
-    echo $output;
-    exit();
 }
 
-// Función para limpiar nombre de archivo
+// Función para limpiar nombre de archivo - SIN AUDITORÍA (función auxiliar)
 function limpiarNombreArchivo($nombre) {
     // Eliminar caracteres no permitidos en nombres de archivo
     $nombre = preg_replace('/[^a-zA-Z0-9_-]/', '_', $nombre);
@@ -11823,38 +11894,88 @@ function limpiarNombreArchivo($nombre) {
     return $nombre;
 }
 
-// Función para registrar descarga de respaldo
+// Función para registrar descarga de respaldo - CON AUDITORÍA
 function registrarDescargaRespaldo($usuario, $nombre_archivo) {
     global $db;
     
-    // Crear tabla de respaldos si no existe
-    $crear_tabla = "
-    CREATE TABLE IF NOT EXISTS respaldos_descargas (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        usuario VARCHAR(100) NOT NULL,
-        nombre_archivo VARCHAR(255) NOT NULL,
-        fecha_descarga DATETIME DEFAULT CURRENT_TIMESTAMP,
-        ip_address VARCHAR(45),
-        user_agent TEXT
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    ";
-    
-    $db->query($crear_tabla);
-    
-    // Insertar registro de la descarga
-    $ip = $_SERVER['REMOTE_ADDR'];
-    $user_agent = $_SERVER['HTTP_USER_AGENT'];
-    
-    $stmt = $db->prepare("INSERT INTO respaldos_descargas (usuario, nombre_archivo, ip_address, user_agent) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("ssss", $usuario, $nombre_archivo, $ip, $user_agent);
-    $stmt->execute();
-    $id_registro = $stmt->insert_id;
-    $stmt->close();
-    
-    return $id_registro;
+    try {
+        // Crear tabla de respaldos si no existe
+        $crear_tabla = "
+        CREATE TABLE IF NOT EXISTS respaldos_descargas (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            usuario VARCHAR(100) NOT NULL,
+            nombre_archivo VARCHAR(255) NOT NULL,
+            fecha_descarga DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ip_address VARCHAR(45),
+            user_agent TEXT
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ";
+        
+        $db->query($crear_tabla);
+        
+        // Insertar registro de la descarga
+        $ip = $_SERVER['REMOTE_ADDR'];
+        $user_agent = $_SERVER['HTTP_USER_AGENT'];
+        
+        $stmt = $db->prepare("INSERT INTO respaldos_descargas (usuario, nombre_archivo, ip_address, user_agent) VALUES (?, ?, ?, ?)");
+        $stmt->bind_param("ssss", $usuario, $nombre_archivo, $ip, $user_agent);
+        $stmt->execute();
+        $id_registro = $stmt->insert_id;
+        $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - REGISTRO DE DESCARGA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "INSERT", 
+                    "respaldos_descargas", 
+                    $id_registro, 
+                    null, 
+                    [
+                        'usuario' => $usuario,
+                        'nombre_archivo' => $nombre_archivo,
+                        'ip_address' => $ip,
+                        'fecha_descarga' => date('Y-m-d H:i:s')
+                    ], 
+                    "Sistema", 
+                    "Registro de descarga de respaldo creado"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría registrarDescargaRespaldo: " . $e->getMessage());
+            }
+        }
+        
+        return $id_registro;
+        
+    } catch (Exception $e) {
+        error_log("Error en registrarDescargaRespaldo: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN REGISTRO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "respaldos_descargas", 
+                    null, 
+                    null, 
+                    [
+                        'usuario' => $usuario,
+                        'nombre_archivo' => $nombre_archivo,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Sistema", 
+                    "Error al registrar descarga de respaldo"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error registrarDescargaRespaldo: " . $auditError->getMessage());
+            }
+        }
+        
+        return 0; // Retornar 0 en caso de error
+    }
 }
 
-// Función para obtener historial de respaldos
+// Función para obtener historial de respaldos - SOLO LECTURA, SIN AUDITORÍA
 function obtenerHistorialRespaldos() {
     global $db;
     
@@ -11875,7 +11996,7 @@ function obtenerHistorialRespaldos() {
     return $historial;
 }
 
-// Función para verificar si se puede eliminar un respaldo
+// Función para verificar si se puede eliminar un respaldo - SOLO LÓGICA, SIN AUDITORÍA
 function puedeEliminarRespaldo($fecha_descarga) {
     // Calcular si han pasado 90 días desde la fecha de descarga
     $fecha_descarga_obj = new DateTime($fecha_descarga);
@@ -11886,7 +12007,7 @@ function puedeEliminarRespaldo($fecha_descarga) {
     return $diferencia->days >= 90;
 }
 
-// Función para calcular días restantes para poder eliminar
+// Función para calcular días restantes para poder eliminar - SOLO LÓGICA, SIN AUDITORÍA
 function diasParaPoderEliminar($fecha_descarga) {
     // Calcular cuántos días faltan para poder eliminar el respaldo
     $fecha_descarga_obj = new DateTime($fecha_descarga);
@@ -11899,50 +12020,179 @@ function diasParaPoderEliminar($fecha_descarga) {
     return max(0, $dias_restantes);
 }
 
-// Función para eliminar respaldo
+// Función para eliminar respaldo - CON AUDITORÍA COMPLETA
 function eliminarRespaldo($id_respaldo) {
     global $db;
     
-    // Primero verificar si el respaldo existe y obtener sus datos para auditoría
-    $stmt = $db->prepare("SELECT * FROM respaldos_descargas WHERE id = ?");
-    $stmt->bind_param("i", $id_respaldo);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows === 0) {
-        $_SESSION['error'] = "El respaldo no existe.";
-        return false;
-    }
-    
-    $respaldo = $result->fetch_assoc();
-    
-    // Verificar si han pasado 90 días desde la descarga
-    if (!puedeEliminarRespaldo($respaldo['fecha_descarga'])) {
-        $dias_restantes = diasParaPoderEliminar($respaldo['fecha_descarga']);
-        $_SESSION['error'] = "No se puede eliminar el respaldo. Deben pasar 90 días desde su descarga. Faltan " . $dias_restantes . " días.";
-        return false;
-    }
-    
-    // Registrar auditoría antes de eliminar
-    registrarAuditoria(
-        "DELETE", 
-        "respaldos_descargas", 
-        $id_respaldo, 
-        $respaldo, 
-        null, 
-        "Sistema", 
-        "Eliminación de registro de respaldo: " . $respaldo['nombre_archivo']
-    );
-    
-    // Eliminar el registro de la base de datos
-    $stmt = $db->prepare("DELETE FROM respaldos_descargas WHERE id = ?");
-    $stmt->bind_param("i", $id_respaldo);
-    
-    if ($stmt->execute()) {
-        $_SESSION['success'] = "Respaldo eliminado correctamente.";
-        return true;
-    } else {
-        $_SESSION['error'] = "Error al eliminar el respaldo: " . $db->error;
+    try {
+        // Primero verificar si el respaldo existe y obtener sus datos para auditoría
+        $stmt = $db->prepare("SELECT * FROM respaldos_descargas WHERE id = ?");
+        $stmt->bind_param("i", $id_respaldo);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows === 0) {
+            $_SESSION['error'] = "El respaldo no existe.";
+            
+            // REGISTRAR EN AUDITORÍA - INTENTO DE ELIMINAR RESPALDO INEXISTENTE
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "respaldos_descargas", 
+                        $id_respaldo, 
+                        null, 
+                        [
+                            'id_respaldo' => $id_respaldo,
+                            'error' => 'Respaldo no encontrado'
+                        ], 
+                        "Sistema", 
+                        "Intento de eliminar respaldo inexistente"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarRespaldo (no existe): " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+        $respaldo = $result->fetch_assoc();
+        
+        // Verificar si han pasado 90 días desde la descarga
+        if (!puedeEliminarRespaldo($respaldo['fecha_descarga'])) {
+            $dias_restantes = diasParaPoderEliminar($respaldo['fecha_descarga']);
+            $_SESSION['error'] = "No se puede eliminar el respaldo. Deben pasar 90 días desde su descarga. Faltan " . $dias_restantes . " días.";
+            
+            // REGISTRAR EN AUDITORÍA - INTENTO DE ELIMINACIÓN PREMATURA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "respaldos_descargas", 
+                        $id_respaldo, 
+                        null, 
+                        [
+                            'id_respaldo' => $id_respaldo,
+                            'nombre_archivo' => $respaldo['nombre_archivo'],
+                            'fecha_descarga' => $respaldo['fecha_descarga'],
+                            'dias_restantes' => $dias_restantes,
+                            'error' => 'Eliminación prematura'
+                        ], 
+                        "Sistema", 
+                        "Intento de eliminar respaldo antes de 90 días"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarRespaldo (prematuro): " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+        // REGISTRAR EN AUDITORÍA - ANTES DE ELIMINAR
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "DELETE", 
+                    "respaldos_descargas", 
+                    $id_respaldo, 
+                    $respaldo, 
+                    [
+                        'usuario_eliminacion' => $_SESSION['user']['nombre'] ?? 'Desconocido',
+                        'usuario_id_eliminacion' => $_SESSION['user']['id'] ?? 0,
+                        'fecha_eliminacion' => date('Y-m-d H:i:s'),
+                        'dias_transcurridos' => (new DateTime())->diff(new DateTime($respaldo['fecha_descarga']))->days
+                    ], 
+                    "Sistema", 
+                    "Eliminación de registro de respaldo: " . $respaldo['nombre_archivo']
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría eliminarRespaldo (antes): " . $e->getMessage());
+            }
+        }
+        
+        // Eliminar el registro de la base de datos
+        $stmt = $db->prepare("DELETE FROM respaldos_descargas WHERE id = ?");
+        $stmt->bind_param("i", $id_respaldo);
+        
+        if ($stmt->execute()) {
+            $_SESSION['success'] = "Respaldo eliminado correctamente.";
+            
+            // REGISTRAR EN AUDITORÍA - ELIMINACIÓN EXITOSA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "DELETE_SUCCESS", 
+                        "respaldos_descargas", 
+                        $id_respaldo, 
+                        null, 
+                        [
+                            'id_respaldo' => $id_respaldo,
+                            'nombre_archivo' => $respaldo['nombre_archivo'],
+                            'usuario_original' => $respaldo['usuario'],
+                            'fecha_descarga_original' => $respaldo['fecha_descarga']
+                        ], 
+                        "Sistema", 
+                        "Respaldo eliminado exitosamente"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarRespaldo (éxito): " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            $_SESSION['error'] = "Error al eliminar el respaldo: " . $db->error;
+            
+            // REGISTRAR EN AUDITORÍA - ERROR EN ELIMINACIÓN
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "respaldos_descargas", 
+                        $id_respaldo, 
+                        null, 
+                        [
+                            'id_respaldo' => $id_respaldo,
+                            'nombre_archivo' => $respaldo['nombre_archivo'],
+                            'error' => $db->error
+                        ], 
+                        "Sistema", 
+                        "Error al eliminar respaldo"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarRespaldo (error db): " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarRespaldo: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR GENERAL
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "respaldos_descargas", 
+                    $id_respaldo, 
+                    null, 
+                    [
+                        'id_respaldo' => $id_respaldo,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Sistema", 
+                    "Error general al eliminar respaldo"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarRespaldo: " . $auditError->getMessage());
+            }
+        }
+        
+        $_SESSION['error'] = "Error al eliminar el respaldo: " . $e->getMessage();
         return false;
     }
 }
