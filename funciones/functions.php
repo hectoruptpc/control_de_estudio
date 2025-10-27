@@ -12203,7 +12203,7 @@ function eliminarRespaldo($id_respaldo) {
 
 
 
-// Función para buscar títulos
+// Función para buscar títulos - SOLO LECTURA, SIN AUDITORÍA
 function buscarTitulos($search = '') {
     global $db;
     
@@ -12214,7 +12214,7 @@ function buscarTitulos($search = '') {
     return $result;
 }
 
-// Función para buscar relaciones título-materia
+// Función para buscar relaciones título-materia - SOLO LECTURA, SIN AUDITORÍA
 function buscarRelacionesTituloMateria($search = '') {
     global $db;
     
@@ -12230,60 +12230,425 @@ function buscarRelacionesTituloMateria($search = '') {
     return $result;
 }
 
-// Función para agregar título
+// Función para agregar título - CON AUDITORÍA
 function agregarTitulo($nombre, $descripcion) {
     global $db;
     
-    $nombre = $db->real_escape_string($nombre);
-    $descripcion = $db->real_escape_string($descripcion);
-    
-    $query = "INSERT INTO titulos (nombre, descripcion) VALUES ('$nombre', '$descripcion')";
-    return $db->query($query);
+    try {
+        $nombre_original = $nombre;
+        $descripcion_original = $descripcion;
+        
+        $nombre = $db->real_escape_string($nombre);
+        $descripcion = $db->real_escape_string($descripcion);
+        
+        $query = "INSERT INTO titulos (nombre, descripcion) VALUES ('$nombre', '$descripcion')";
+        $result = $db->query($query);
+        
+        if ($result) {
+            $id_titulo = $db->insert_id;
+            
+            // REGISTRAR EN AUDITORÍA - TÍTULO AGREGADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "INSERT", 
+                        "titulos", 
+                        $id_titulo, 
+                        null, 
+                        [
+                            'nombre' => $nombre_original,
+                            'descripcion' => $descripcion_original,
+                            'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_creacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Gestión de Títulos", 
+                        "Título agregado: " . $nombre_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría agregarTitulo: " . $e->getMessage());
+                }
+            }
+            
+            return $id_titulo;
+        } else {
+            throw new Exception("Error en la consulta: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en agregarTitulo: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL AGREGAR TÍTULO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "titulos", 
+                    null, 
+                    null, 
+                    [
+                        'nombre' => $nombre_original ?? '',
+                        'descripcion' => $descripcion_original ?? '',
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido'
+                    ], 
+                    "Gestión de Títulos", 
+                    "Error al agregar título"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error agregarTitulo: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
-// Función para editar título
+// Función para editar título - CON AUDITORÍA
 function editarTitulo($id, $nombre, $descripcion) {
     global $db;
     
-    $id = $db->real_escape_string($id);
-    $nombre = $db->real_escape_string($nombre);
-    $descripcion = $db->real_escape_string($descripcion);
-    
-    $query = "UPDATE titulos SET nombre = '$nombre', descripcion = '$descripcion' WHERE id = '$id'";
-    return $db->query($query);
+    try {
+        // Obtener datos actuales para auditoría
+        $query_actual = "SELECT nombre, descripcion FROM titulos WHERE id = '$id'";
+        $result_actual = $db->query($query_actual);
+        
+        if ($result_actual->num_rows === 0) {
+            throw new Exception("Título no encontrado");
+        }
+        
+        $titulo_actual = $result_actual->fetch_assoc();
+        
+        $nombre_original = $nombre;
+        $descripcion_original = $descripcion;
+        
+        $id = $db->real_escape_string($id);
+        $nombre = $db->real_escape_string($nombre);
+        $descripcion = $db->real_escape_string($descripcion);
+        
+        $query = "UPDATE titulos SET nombre = '$nombre', descripcion = '$descripcion' WHERE id = '$id'";
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - TÍTULO EDITADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "titulos", 
+                        $id, 
+                        [
+                            'nombre_anterior' => $titulo_actual['nombre'],
+                            'descripcion_anterior' => $titulo_actual['descripcion']
+                        ], 
+                        [
+                            'nombre_nuevo' => $nombre_original,
+                            'descripcion_nuevo' => $descripcion_original,
+                            'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_actualizacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Gestión de Títulos", 
+                        "Título actualizado: " . $titulo_actual['nombre'] . " → " . $nombre_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría editarTitulo: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            throw new Exception("Error en la consulta: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en editarTitulo: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL EDITAR TÍTULO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "titulos", 
+                    $id, 
+                    null, 
+                    [
+                        'id_titulo' => $id,
+                        'nombre_nuevo' => $nombre_original ?? '',
+                        'descripcion_nuevo' => $descripcion_original ?? '',
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido'
+                    ], 
+                    "Gestión de Títulos", 
+                    "Error al editar título"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error editarTitulo: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
-// Función para eliminar título
+// Función para eliminar título - CON AUDITORÍA
 function eliminarTitulo($id) {
     global $db;
     
-    $id = $db->real_escape_string($id);
-    $query = "DELETE FROM titulos WHERE id = '$id'";
-    return $db->query($query);
+    try {
+        // Obtener datos del título para auditoría
+        $query_actual = "SELECT nombre, descripcion FROM titulos WHERE id = '$id'";
+        $result_actual = $db->query($query_actual);
+        
+        if ($result_actual->num_rows === 0) {
+            throw new Exception("Título no encontrado");
+        }
+        
+        $titulo_actual = $result_actual->fetch_assoc();
+        
+        // Verificar si hay relaciones existentes
+        $query_relaciones = "SELECT COUNT(*) as total FROM titulo_materia WHERE id_titulo = '$id'";
+        $result_relaciones = $db->query($query_relaciones);
+        $total_relaciones = $result_relaciones->fetch_assoc()['total'];
+        
+        $id = $db->real_escape_string($id);
+        $query = "DELETE FROM titulos WHERE id = '$id'";
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - TÍTULO ELIMINADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "DELETE", 
+                        "titulos", 
+                        $id, 
+                        [
+                            'nombre' => $titulo_actual['nombre'],
+                            'descripcion' => $titulo_actual['descripcion'],
+                            'relaciones_eliminadas' => $total_relaciones
+                        ], 
+                        [
+                            'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_eliminacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Gestión de Títulos", 
+                        "Título eliminado: " . $titulo_actual['nombre']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarTitulo: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            throw new Exception("Error en la consulta: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarTitulo: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR TÍTULO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "titulos", 
+                    $id, 
+                    null, 
+                    [
+                        'id_titulo' => $id,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido'
+                    ], 
+                    "Gestión de Títulos", 
+                    "Error al eliminar título"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarTitulo: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
-// Función para agregar relación título-materia
+// Función para agregar relación título-materia - CON AUDITORÍA
 function agregarRelacionTituloMateria($id_titulo, $id_materia, $prioridad) {
     global $db;
     
-    $id_titulo = $db->real_escape_string($id_titulo);
-    $id_materia = $db->real_escape_string($id_materia);
-    $prioridad = $db->real_escape_string($prioridad);
-    
-    $query = "INSERT INTO titulo_materia (id_titulo, id_materia, prioridad) VALUES ('$id_titulo', '$id_materia', '$prioridad')";
-    return $db->query($query);
+    try {
+        // Obtener información del título y materia para auditoría
+        $query_titulo = "SELECT nombre FROM titulos WHERE id = '$id_titulo'";
+        $query_materia = "SELECT nombre_materia, cod_materia FROM materias WHERE id_materia = '$id_materia'";
+        
+        $titulo_info = $db->query($query_titulo)->fetch_assoc();
+        $materia_info = $db->query($query_materia)->fetch_assoc();
+        
+        if (!$titulo_info || !$materia_info) {
+            throw new Exception("Título o materia no encontrados");
+        }
+        
+        $id_titulo = $db->real_escape_string($id_titulo);
+        $id_materia = $db->real_escape_string($id_materia);
+        $prioridad = $db->real_escape_string($prioridad);
+        
+        $query = "INSERT INTO titulo_materia (id_titulo, id_materia, prioridad) VALUES ('$id_titulo', '$id_materia', '$prioridad')";
+        $result = $db->query($query);
+        
+        if ($result) {
+            $id_relacion = $db->insert_id;
+            
+            // REGISTRAR EN AUDITORÍA - RELACIÓN AGREGADA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "INSERT", 
+                        "titulo_materia", 
+                        $id_relacion, 
+                        null, 
+                        [
+                            'id_titulo' => $id_titulo,
+                            'titulo_nombre' => $titulo_info['nombre'],
+                            'id_materia' => $id_materia,
+                            'materia_nombre' => $materia_info['nombre_materia'],
+                            'materia_codigo' => $materia_info['cod_materia'],
+                            'prioridad' => $prioridad,
+                            'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_creacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Gestión de Títulos", 
+                        "Relación título-materia agregada: " . $titulo_info['nombre'] . " - " . $materia_info['nombre_materia']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría agregarRelacionTituloMateria: " . $e->getMessage());
+                }
+            }
+            
+            return $id_relacion;
+        } else {
+            throw new Exception("Error en la consulta: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en agregarRelacionTituloMateria: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL AGREGAR RELACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "titulo_materia", 
+                    null, 
+                    null, 
+                    [
+                        'id_titulo' => $id_titulo,
+                        'id_materia' => $id_materia,
+                        'prioridad' => $prioridad,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido'
+                    ], 
+                    "Gestión de Títulos", 
+                    "Error al agregar relación título-materia"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error agregarRelacionTituloMateria: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
-// Función para eliminar relación título-materia
+// Función para eliminar relación título-materia - CON AUDITORÍA
 function eliminarRelacionTituloMateria($id_relacion) {
     global $db;
     
-    $id_relacion = $db->real_escape_string($id_relacion);
-    $query = "DELETE FROM titulo_materia WHERE id_relacion = '$id_relacion'";
-    return $db->query($query);
+    try {
+        // Obtener información de la relación para auditoría
+        $query_relacion = "SELECT tm.*, t.nombre as titulo_nombre, m.nombre_materia, m.cod_materia 
+                          FROM titulo_materia tm
+                          JOIN titulos t ON tm.id_titulo = t.id
+                          JOIN materias m ON tm.id_materia = m.id_materia
+                          WHERE tm.id_relacion = '$id_relacion'";
+        
+        $result_relacion = $db->query($query_relacion);
+        
+        if ($result_relacion->num_rows === 0) {
+            throw new Exception("Relación no encontrada");
+        }
+        
+        $relacion_info = $result_relacion->fetch_assoc();
+        
+        $id_relacion = $db->real_escape_string($id_relacion);
+        $query = "DELETE FROM titulo_materia WHERE id_relacion = '$id_relacion'";
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - RELACIÓN ELIMINADA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "DELETE", 
+                        "titulo_materia", 
+                        $id_relacion, 
+                        [
+                            'id_titulo' => $relacion_info['id_titulo'],
+                            'titulo_nombre' => $relacion_info['titulo_nombre'],
+                            'id_materia' => $relacion_info['id_materia'],
+                            'materia_nombre' => $relacion_info['nombre_materia'],
+                            'materia_codigo' => $relacion_info['cod_materia'],
+                            'prioridad' => $relacion_info['prioridad']
+                        ], 
+                        [
+                            'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_eliminacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Gestión de Títulos", 
+                        "Relación título-materia eliminada: " . $relacion_info['titulo_nombre'] . " - " . $relacion_info['nombre_materia']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarRelacionTituloMateria: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            throw new Exception("Error en la consulta: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarRelacionTituloMateria: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR RELACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "titulo_materia", 
+                    $id_relacion, 
+                    null, 
+                    [
+                        'id_relacion' => $id_relacion,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido'
+                    ], 
+                    "Gestión de Títulos", 
+                    "Error al eliminar relación título-materia"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarRelacionTituloMateria: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
-// Función para obtener todos los títulos
+// Función para obtener todos los títulos - SOLO LECTURA, SIN AUDITORÍA
 function obtenerTodosTitulos() {
     global $db;
     
@@ -12291,7 +12656,7 @@ function obtenerTodosTitulos() {
     return $db->query($query);
 }
 
-// Función para obtener todas las materias
+// Función para obtener todas las materias - SOLO LECTURA, SIN AUDITORÍA
 function obtenerTodasMaterias() {
     global $db;
     
