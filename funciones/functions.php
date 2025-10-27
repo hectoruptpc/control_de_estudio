@@ -7490,7 +7490,7 @@ function generarPDFDesdeHTML($elementoHTML, $nombreArchivo = 'documento.pdf') {
 //CARGA DE NOTAS ***********************************************************************
 
 
-// FUNCIÓN PARA OBTENER NOTAS DEFINITIVAS
+// FUNCIÓN PARA OBTENER NOTAS DEFINITIVAS (SOLO LECTURA - SIN AUDITORÍA)
 function obtenerNotasDefinitivas($estudiante_id, $materia_id) {
     global $db;
     $query = "SELECT * FROM notas_definitivas 
@@ -7502,10 +7502,7 @@ function obtenerNotasDefinitivas($estudiante_id, $materia_id) {
     return $result->num_rows > 0 ? $result->fetch_assoc() : null;
 }
 
-
-
-
-// FUNCIÓN PARA OBTENER DATOS COMPLETOS DE notas_pendientes
+// FUNCIÓN PARA OBTENER DATOS COMPLETOS DE notas_pendientes (SOLO LECTURA - SIN AUDITORÍA)
 function obtenerNotasPendientesEstudiante($id_estudiante, $id_materia, $id_periodo, $id_docente) {
     global $db;
     
@@ -7528,12 +7525,7 @@ function obtenerNotasPendientesEstudiante($id_estudiante, $id_materia, $id_perio
     return null;
 }
 
-
-
-
-
-// FUNCIÓN MEJORADA PARA OBTENER ESTADO (CORREGIDA)
-// FUNCIÓN MEJORADA PARA OBTENER ESTADO (CORREGIDA)
+// FUNCIÓN MEJORADA PARA OBTENER ESTADO (CORREGIDA) (SOLO LECTURA - SIN AUDITORÍA)
 function obtenerEstadoCorregido($id_estudiante, $id_materia, $id_periodo, $id_docente) {
     global $db;
     
@@ -7570,13 +7562,8 @@ function obtenerEstadoCorregido($id_estudiante, $id_materia, $id_periodo, $id_do
     return 'pendiente';
 }
 
-
-
-
-
-
 /**
- * Obtiene información completa de una materia incluyendo trayecto
+ * Obtiene información completa de una materia incluyendo trayecto (SOLO LECTURA - SIN AUDITORÍA)
  */
 function obtenerInfoMateria($materia_id) {
     global $db;
@@ -7615,7 +7602,7 @@ function obtenerInfoMateria($materia_id) {
 }
 
 /**
- * Obtiene todos los estudiantes de una sección específica
+ * Obtiene todos los estudiantes de una sección específica (SOLO LECTURA - SIN AUDITORÍA)
  */
 function obtenerEstudiantesPorSeccion($seccion_id) {
     global $db;
@@ -7631,7 +7618,7 @@ function obtenerEstudiantesPorSeccion($seccion_id) {
 }
 
 /**
- * Obtiene las notas de un estudiante en una materia específica
+ * Obtiene las notas de un estudiante en una materia específica (SOLO LECTURA - SIN AUDITORÍA)
  */
 function obtenerNotasEstudiante($estudiante_id, $materia_id) {
     global $db;
@@ -7645,7 +7632,7 @@ function obtenerNotasEstudiante($estudiante_id, $materia_id) {
 }
 
 /**
- * Obtiene el período académico de una sección
+ * Obtiene el período académico de una sección (SOLO LECTURA - SIN AUDITORÍA)
  */
 function obtenerPeriodoSeccion($seccion_id) {
     global $db;
@@ -7658,7 +7645,7 @@ function obtenerPeriodoSeccion($seccion_id) {
 }
 
 /**
- * Obtiene información del trayecto de una sección
+ * Obtiene información del trayecto de una sección (SOLO LECTURA - SIN AUDITORÍA)
  */
 function obtenerTrayectoSeccion($seccion_id) {
     global $db;
@@ -7674,7 +7661,7 @@ function obtenerTrayectoSeccion($seccion_id) {
 }
 
 /**
- * Determina el trayecto a mostrar basado en el ID de trayecto de la sección
+ * Determina el trayecto a mostrar basado en el ID de trayecto de la sección (SOLO LÓGICA - SIN AUDITORÍA)
  */
 function determinarTrayectoAMostrar($id_trayecto_seccion) {
     switch ($id_trayecto_seccion) {
@@ -7686,6 +7673,339 @@ function determinarTrayectoAMostrar($id_trayecto_seccion) {
         default: return 0;
     }
 }
+
+// Obtener información del grupo (SOLO LECTURA - SIN AUDITORÍA)
+function obtenerInfoGrupo($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT ud.nombre as nombre_docente, m.nombre_materia, m.cod_materia,
+                     pa.nombre_periodo, s.codigo_seccion, c.nombre_carrera, 
+                     t.nombre_trayecto, t.id_trayecto, t.numero_trayecto
+              FROM notas_pendientes np
+              INNER JOIN users ud ON np.id_docente = ud.id
+              INNER JOIN materias m ON np.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON np.id_periodo = pa.id_periodo
+              INNER JOIN docente_seccion ds ON np.id_docente = ds.id_usuario 
+                                           AND np.id_materia = ds.id_materia
+              INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+              WHERE np.id_docente = ? 
+              AND np.id_materia = ? 
+              AND np.id_periodo = ?
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc();
+}
+
+// Obtener estudiantes del grupo (MODIFICADA para excluir rechazados) (SOLO LECTURA - SIN AUDITORÍA)
+function obtenerEstudiantesGrupo($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT np.*, u.nombre as nombre_estudiante, u.idusuario as cedula
+              FROM notas_pendientes np
+              INNER JOIN users u ON np.id_usuario = u.id
+              WHERE np.id_docente = ? 
+              AND np.id_materia = ? 
+              AND np.id_periodo = ?
+              AND np.estado = 'pendiente'  -- SOLO notas pendientes, no rechazadas
+              ORDER BY u.nombre";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    return $stmt->get_result();
+}
+
+// Obtener información de soporte del grupo (SOLO LECTURA - SIN AUDITORÍA)
+function obtenerSoporteGrupo($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT DISTINCT soporte, tipo_archivo, fecha_subida
+              FROM notas_pendientes 
+              WHERE id_docente = ? 
+              AND id_materia = ? 
+              AND id_periodo = ?
+              AND soporte IS NOT NULL
+              AND estado = 'pendiente'
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    return null;
+}
+
+// Calcular promedio según el id_trayecto de la sección (SOLO CÁLCULO - SIN AUDITORÍA)
+function calcularPromedioPorTrayecto($nota, $id_trayecto) {
+    $suma = 0;
+    $count = 0;
+    
+    // Determinar qué trayectos promediar según el id_trayecto de la sección
+    switch ($id_trayecto) {
+        case 1: // Trayecto Inicial - Solo trayecto_0
+            if ($nota['trayecto_0'] !== null) {
+                $suma = $nota['trayecto_0'];
+                $count = 1;
+            }
+            break;
+            
+        case 2: // Trayecto 1 - Solo trayecto_1
+            if ($nota['trayecto_1'] !== null) {
+                $suma = $nota['trayecto_1'];
+                $count = 1;
+            }
+            break;
+            
+        case 3: // Trayecto 2 - Solo trayecto_2
+            if ($nota['trayecto_2'] !== null) {
+                $suma = $nota['trayecto_2'];
+                $count = 1;
+            }
+            break;
+            
+        case 4: // Trayecto 3 - Solo trayecto_3
+            if ($nota['trayecto_3'] !== null) {
+                $suma = $nota['trayecto_3'];
+                $count = 1;
+            }
+            break;
+            
+        case 5: // Trayecto 4 - Solo trayecto_4
+            if ($nota['trayecto_4'] !== null) {
+                $suma = $nota['trayecto_4'];
+                $count = 1;
+            }
+            break;
+            
+        default:
+            // Por defecto, calcular todos los trayectos (no debería pasar)
+            for ($i = 0; $i <= 4; $i++) {
+                if ($nota['trayecto_' . $i] !== null) {
+                    $suma += $nota['trayecto_' . $i];
+                    $count++;
+                }
+            }
+    }
+    
+    return $count > 0 ? round($suma / $count, 1) : 0;
+}
+
+// Obtener estadísticas del grupo según el id_trayecto (MODIFICADA para excluir rechazados) (SOLO LECTURA - SIN AUDITORÍA)
+function obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id, $id_trayecto) {
+    global $db;
+    
+    $query = "SELECT np.trayecto_0, np.trayecto_1, np.trayecto_2, np.trayecto_3, np.trayecto_4
+              FROM notas_pendientes np
+              WHERE np.id_docente = ? 
+              AND np.id_materia = ? 
+              AND np.id_periodo = ?
+              AND np.estado = 'pendiente'";  // SOLO notas pendientes, no rechazadas
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $total_estudiantes = 0;
+    $suma_total = 0;
+    $aprobados = 0;
+    $reprobados = 0;
+    
+    while ($nota = $result->fetch_assoc()) {
+        $total_estudiantes++;
+        
+        // Calcular promedio según el id_trayecto de la sección
+        $promedio_estudiante = calcularPromedioPorTrayecto($nota, $id_trayecto);
+        $suma_total += $promedio_estudiante;
+        
+        // Aprobados desde 12 puntos
+        if ($promedio_estudiante >= 12) {
+            $aprobados++;
+        } else {
+            $reprobados++;
+        }
+    }
+    
+    $promedio_general = $total_estudiantes > 0 ? round($suma_total / $total_estudiantes, 1) : 0;
+    
+    return [
+        'total_estudiantes' => $total_estudiantes,
+        'promedio_general' => $promedio_general,
+        'aprobados' => $aprobados,
+        'reprobados' => $reprobados,
+        'id_trayecto' => $id_trayecto
+    ];
+}
+
+// FUNCIÓN AUXILIAR PARA OBTENER MATERIA POR ID (CON AUDITORÍA EN CASO DE ERROR)
+if (!function_exists('obtenerMateriaPorId')) {
+function obtenerMateriaPorId($materia_id) {
+    global $db;
+    
+    try {
+        $query = "SELECT id_materia, nombre_materia, cod_materia, trayecto 
+                  FROM materias 
+                  WHERE id_materia = ?";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $materia_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $materia = $result->fetch_assoc();
+        $stmt->close();
+        
+        return $materia;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerMateriaPorId: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL OBTENER MATERIA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "materias", 
+                    $materia_id, 
+                    null, 
+                    [
+                        'id_materia' => $materia_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Gestión de Notas", 
+                    "Error al obtener información de materia"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error obtenerMateriaPorId: " . $auditError->getMessage());
+            }
+        }
+        
+        return null;
+    }
+}
+}
+
+// FUNCIÓN AUXILIAR PARA OBTENER ESTUDIANTE POR ID (CON AUDITORÍA EN CASO DE ERROR)
+if (!function_exists('obtenerEstudiantePorId')) {
+function obtenerEstudiantePorId($estudiante_id) {
+    global $db;
+    
+    try {
+        $query = "SELECT id, nombre, idusuario, email 
+                  FROM users 
+                  WHERE id = ? AND estudiante = 1";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $estudiante_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $estudiante = $result->fetch_assoc();
+        $stmt->close();
+        
+        return $estudiante;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerEstudiantePorId: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL OBTENER ESTUDIANTE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $estudiante_id, 
+                    null, 
+                    [
+                        'id_estudiante' => $estudiante_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Gestión de Notas", 
+                    "Error al obtener información de estudiante"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error obtenerEstudiantePorId: " . $auditError->getMessage());
+            }
+        }
+        
+        return null;
+    }
+}
+}
+
+// FUNCIÓN AUXILIAR PARA OBTENER DOCENTE POR ID (CON AUDITORÍA EN CASO DE ERROR)
+if (!function_exists('obtenerDocentePorId')) {
+function obtenerDocentePorId($docente_id) {
+    global $db;
+    
+    try {
+        $query = "SELECT id, nombre, username, email 
+                  FROM users 
+                  WHERE id = ? AND docente = 1";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $docente_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $docente = $result->fetch_assoc();
+        $stmt->close();
+        
+        return $docente;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerDocentePorId: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL OBTENER DOCENTE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $docente_id, 
+                    null, 
+                    [
+                        'id_docente' => $docente_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Gestión de Notas", 
+                    "Error al obtener información de docente"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error obtenerDocentePorId: " . $auditError->getMessage());
+            }
+        }
+        
+        return null;
+    }
+}
+}
+
+
+
+
+
+
+
 
 
 
@@ -10598,6 +10918,526 @@ function carreraTieneDirector($id_carrera) {
 
 
 
+
+// CONSULTA DE NOTAS********************************************************
+
+
+
+
+
+// Función para buscar estudiante por cédula (CON AUDITORÍA DE BÚSQUEDA)
+function buscarEstudiantePorCedulaConsulta($cedula) {
+    global $db;
+    
+    try {
+        $query = "SELECT u.id, u.nombre, u.idusuario, u.carrera 
+                  FROM users u 
+                  WHERE u.idusuario = ? AND u.estudiante = 1";
+        $stmt = $db->prepare($query);
+        $stmt->bind_param("s", $cedula);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        $estudiante = $result->num_rows > 0 ? $result->fetch_assoc() : null;
+        
+        // REGISTRAR EN AUDITORÍA - BÚSQUEDA DE ESTUDIANTE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                $resultado_busqueda = $estudiante ? 'ENCONTRADO' : 'NO_ENCONTRADO';
+                $detalles_estudiante = $estudiante ? [
+                    'id_estudiante' => $estudiante['id'],
+                    'nombre_estudiante' => $estudiante['nombre'],
+                    'cedula' => $estudiante['idusuario'],
+                    'id_carrera' => $estudiante['carrera']
+                ] : [
+                    'cedula_buscada' => $cedula,
+                    'resultado' => 'Estudiante no encontrado'
+                ];
+                
+                registrarAuditoria(
+                    "CONSULTA", 
+                    "users", 
+                    $estudiante ? $estudiante['id'] : null, 
+                    null, 
+                    array_merge([
+                        'cedula_buscada' => $cedura,
+                        'resultado_busqueda' => $resultado_busqueda,
+                        'tipo_consulta' => 'busqueda_estudiante'
+                    ], $detalles_estudiante), 
+                    "Consulta de Estudiantes", 
+                    "Búsqueda de estudiante por cédula - " . $resultado_busqueda
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría buscarEstudiantePorCedulaConsulta: " . $e->getMessage());
+            }
+        }
+        
+        return $estudiante;
+        
+    } catch (Exception $e) {
+        error_log("Error en buscarEstudiantePorCedulaConsulta: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN BÚSQUEDA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    null, 
+                    null, 
+                    [
+                        'cedula_buscada' => $cedula,
+                        'error' => $e->getMessage(),
+                        'tipo_consulta' => 'busqueda_estudiante'
+                    ], 
+                    "Consulta de Estudiantes", 
+                    "Error en búsqueda de estudiante por cédula"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error buscarEstudiantePorCedulaConsulta: " . $auditError->getMessage());
+            }
+        }
+        
+        return null;
+    }
+}
+
+// Función para obtener la carrera del estudiante - SOLO LECTURA, SIN AUDITORÍA
+function obtenerCarreraEstudiante($estudiante_id) {
+    global $db;
+    
+    $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera 
+              FROM users u
+              INNER JOIN carreras c ON u.carrera = c.id_carrera
+              WHERE u.id = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $estudiante_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
+}
+
+// Función para obtener todas las materias de la carrera - SOLO LECTURA, SIN AUDITORÍA
+function obtenerMateriasCarrera($carrera_id) {
+    global $db;
+    
+    $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto
+              FROM carrera_materia cm
+              INNER JOIN materias m ON cm.id_materia = m.id_materia
+              WHERE cm.id_carrera = ?
+              ORDER BY m.trayecto, m.nombre_materia";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $carrera_id);
+    $stmt->execute();
+    return $stmt->get_result();
+}
+
+// Función para obtener información del trayecto desde la tabla trayectos - SOLO LECTURA, SIN AUDITORÍA
+function obtenerInfoTrayecto($numero_trayecto) {
+    global $db;
+    
+    $query = "SELECT id_trayecto, numero_trayecto, nombre_trayecto 
+              FROM trayectos 
+              WHERE numero_trayecto = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $numero_trayecto);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    // Si no encuentra el trayecto, crear uno basado en el número
+    $nombres_trayectos = [
+        0 => 'Trayecto Inicial',
+        1 => 'Trayecto 1',
+        2 => 'Trayecto 2', 
+        3 => 'Trayecto 3',
+        4 => 'Trayecto 4'
+    ];
+    
+    return [
+        'id_trayecto' => $numero_trayecto + 1,
+        'numero_trayecto' => $numero_trayecto,
+        'nombre_trayecto' => isset($nombres_trayectos[$numero_trayecto]) ? $nombres_trayectos[$numero_trayecto] : 'Trayecto ' . $numero_trayecto
+    ];
+}
+
+// Función para obtener las notas definitivas del estudiante - SOLO LECTURA, SIN AUDITORÍA
+function obtenerNotasEstudianteConsulta($estudiante_id) {
+    global $db;
+    
+    $query = "SELECT nd.*, 
+                     m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto,
+                     pa.nombre_periodo,
+                     ud.nombre as nombre_docente,
+                     ua.nombre as nombre_admin
+              FROM notas_definitivas nd
+              INNER JOIN materias m ON nd.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+              LEFT JOIN users ud ON nd.id_docente = ud.id
+              LEFT JOIN users ua ON nd.id_admin_aprobador = ua.id
+              WHERE nd.id_usuario = ?
+              ORDER BY pa.nombre_periodo, m.nombre_materia";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $estudiante_id);
+    $stmt->execute();
+    
+    // Convertir to array asociativo con id_materia como clave
+    $result = $stmt->get_result();
+    $notas = [];
+    while ($row = $result->fetch_assoc()) {
+        $notas[$row['id_materia']] = $row;
+    }
+    
+    return $notas;
+}
+
+// Función para determinar si el estudiante es apto para grado (CON AUDITORÍA PARA CASOS ESPECIALES)
+function esAptoParaGradoConsulta($estudiante_id, $carrera_id) {
+    global $db;
+    
+    try {
+        // Obtener información del estudiante para auditoría
+        $estudiante_info = obtenerEstudiantePorId($estudiante_id);
+        $carrera_info = obtenerCarreraPorId($carrera_id);
+        
+        if (!$estudiante_info) {
+            // REGISTRAR EN AUDITORÍA - ESTUDIANTE NO ENCONTRADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "users", 
+                        $estudiante_id, 
+                        null, 
+                        [
+                            'id_estudiante' => $estudiante_id,
+                            'id_carrera' => $carrera_id,
+                            'error' => 'Estudiante no encontrado'
+                        ], 
+                        "Consulta de Grado", 
+                        "Error en consulta de aptitud para grado - Estudiante no existe"
+                    );
+                } catch (Exception $auditError) {
+                    error_log("Error en auditoría esAptoParaGradoConsulta: " . $auditError->getMessage());
+                }
+            }
+            
+            return [
+                'apto_tsu' => false,
+                'apto_grado_completo' => false,
+                'materias_aprobadas_tsu' => 0,
+                'total_materias_tsu' => 0,
+                'porcentaje_tsu' => 0,
+                'materias_aprobadas_completo' => 0,
+                'total_materias_carrera' => 0,
+                'porcentaje_completo' => 0,
+                'error' => 'Estudiante no encontrado'
+            ];
+        }
+
+        // Obtener todas las materias de la carrera
+        $materias_carrera = obtenerMateriasCarrera($carrera_id);
+        $total_materias_carrera = $materias_carrera->num_rows;
+        
+        // Obtener notas del estudiante
+        $notas_estudiante = obtenerNotasEstudianteConsulta($estudiante_id);
+        
+        // Contadores para TSU (trayectos 0, 1, 2)
+        $materias_aprobadas_tsu = 0;
+        $total_materias_tsu = 0;
+        
+        // Contadores para carrera completa
+        $materias_aprobadas_completo = 0;
+        
+        // Recorrer todas las materias de la carrera
+        while ($materia = $materias_carrera->fetch_assoc()) {
+            $trayecto = (int)$materia['trayecto'];
+            $materia_id = $materia['id_materia'];
+            
+            // Verificar si es materia de TSU (trayectos 0, 1, 2)
+            if ($trayecto <= 2) {
+                $total_materias_tsu++;
+            }
+            
+            // Verificar si el estudiante aprobó esta materia
+            if (isset($notas_estudiante[$materia_id])) {
+                $nota = $notas_estudiante[$materia_id];
+                $campo_trayecto = 'trayecto_' . $trayecto;
+                
+                if (isset($nota[$campo_trayecto]) && $nota[$campo_trayecto] !== null) {
+                    $nota_valor = (float)$nota[$campo_trayecto];
+                    if ($nota_valor >= 12) {
+                        $materias_aprobadas_completo++;
+                        
+                        // Si es materia de TSU, contar para TSU también
+                        if ($trayecto <= 2) {
+                            $materias_aprobadas_tsu++;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Calcular porcentajes
+        $porcentaje_tsu = $total_materias_tsu > 0 ? round(($materias_aprobadas_tsu / $total_materias_tsu) * 100, 1) : 0;
+        $porcentaje_completo = $total_materias_carrera > 0 ? round(($materias_aprobadas_completo / $total_materias_carrera) * 100, 1) : 0;
+        
+        // Determinar si es apto
+        $apto_tsu = ($porcentaje_tsu >= 90); // 90% o más para TSU
+        $apto_grado_completo = ($porcentaje_completo >= 100); // 100% para grado completo
+        
+        $resultado = [
+            'apto_tsu' => $apto_tsu,
+            'apto_grado_completo' => $apto_grado_completo,
+            'materias_aprobadas_tsu' => $materias_aprobadas_tsu,
+            'total_materias_tsu' => $total_materias_tsu,
+            'porcentaje_tsu' => $porcentaje_tsu,
+            'materias_aprobadas_completo' => $materias_aprobadas_completo,
+            'total_materias_carrera' => $total_materias_carrera,
+            'porcentaje_completo' => $porcentaje_completo
+        ];
+        
+        // REGISTRAR EN AUDITORÍA - CONSULTA DE APTITUD PARA GRADO (SOLO SI ES APTO)
+        if (function_exists('registrarAuditoria') && ($apto_tsu || $apto_grado_completo)) {
+            try {
+                $tipo_aptitud = $apto_grado_completo ? 'GRADO_COMPLETO' : ($apto_tsu ? 'TSU' : 'NO_APTO');
+                
+                registrarAuditoria(
+                    "CONSULTA", 
+                    "notas_definitivas", 
+                    $estudiante_id, 
+                    null, 
+                    [
+                        'id_estudiante' => $estudiante_id,
+                        'cedula_estudiante' => $estudiante_info['idusuario'] ?? '',
+                        'nombre_estudiante' => $estudiante_info['nombre'] ?? '',
+                        'id_carrera' => $carrera_id,
+                        'carrera_nombre' => $carrera_info['nombre_carrera'] ?? '',
+                        'apto_tsu' => $apto_tsu,
+                        'apto_grado_completo' => $apto_grado_completo,
+                        'porcentaje_tsu' => $porcentaje_tsu,
+                        'porcentaje_completo' => $porcentaje_completo,
+                        'tipo_aptitud' => $tipo_aptitud
+                    ], 
+                    "Consulta de Grado", 
+                    "Consulta de aptitud para grado - " . $tipo_aptitud
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría esAptoParaGradoConsulta: " . $e->getMessage());
+            }
+        }
+        
+        return $resultado;
+        
+    } catch (Exception $e) {
+        error_log("Error en esAptoParaGradoConsulta: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN CONSULTA DE GRADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "notas_definitivas", 
+                    $estudiante_id, 
+                    null, 
+                    [
+                        'id_estudiante' => $estudiante_id,
+                        'id_carrera' => $carrera_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Consulta de Grado", 
+                    "Error en consulta de aptitud para grado"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error esAptoParaGradoConsulta: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'apto_tsu' => false,
+            'apto_grado_completo' => false,
+            'materias_aprobadas_tsu' => 0,
+            'total_materias_tsu' => 0,
+            'porcentaje_tsu' => 0,
+            'materias_aprobadas_completo' => 0,
+            'total_materias_carrera' => 0,
+            'porcentaje_completo' => 0,
+            'error' => 'Error en la consulta: ' . $e->getMessage()
+        ];
+    }
+}
+
+// Función para obtener el badge de estado - SOLO LÓGICA DE PRESENTACIÓN, SIN AUDITORÍA
+function obtenerBadgeEstadoConsulta($info_apto) {
+    if ($info_apto['apto_grado_completo']) {
+        return '<span class="badge badge-success">APTO - GRADO COMPLETO</span>';
+    } elseif ($info_apto['apto_tsu']) {
+        return '<span class="badge badge-warning">APTO - TSU</span>';
+    } else {
+        return '<span class="badge badge-secondary">NO APTO</span>';
+    }
+}
+
+// FUNCIÓN AUXILIAR PARA OBTENER CARRERA POR ID (CON AUDITORÍA EN CASO DE ERROR)
+if (!function_exists('obtenerCarreraPorId')) {
+function obtenerCarreraPorId($carrera_id) {
+    global $db;
+    
+    try {
+        $query = "SELECT id_carrera, nombre_carrera, cod_carrera, activa 
+                  FROM carreras 
+                  WHERE id_carrera = ?";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $carrera_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $carrera = $result->fetch_assoc();
+        $stmt->close();
+        
+        return $carrera;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerCarreraPorId: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL OBTENER CARRERA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carreras", 
+                    $carrera_id, 
+                    null, 
+                    [
+                        'id_carrera' => $carrera_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Consulta de Grado", 
+                    "Error al obtener información de carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error obtenerCarreraPorId: " . $auditError->getMessage());
+            }
+        }
+        
+        return null;
+    }
+}
+}
+
+//NOTAS PASADAS***************************************************************
+
+
+
+
+
+
+// Obtener lista de profesores para el filtro (docente = 1)
+function obtenerProfesores() {
+    global $db;
+    $query = "SELECT id, idusuario, nombre 
+              FROM users 
+              WHERE docente = 1 
+              ORDER BY nombre";
+    $result = $db->query($query);
+    return $result;
+}
+
+// Nueva función para buscar profesores por término
+function buscarProfesores($termino) {
+    global $db;
+    $query = "SELECT id, idusuario, nombre 
+              FROM users 
+              WHERE docente = 1 
+              AND (nombre LIKE ? OR idusuario LIKE ?)
+              ORDER BY nombre
+              LIMIT 10";
+    $stmt = $db->prepare($query);
+    $termino_like = "%$termino%";
+    $stmt->bind_param("ss", $termino_like, $termino_like);
+    $stmt->execute();
+    return $stmt->get_result();
+}
+
+// Obtener información de un profesor específico
+function obtenerProfesorPorId($id) {
+    global $db;
+    $query = "SELECT id, idusuario, nombre 
+              FROM users 
+              WHERE id = ? AND docente = 1";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_assoc();
+}
+
+// Obtener grupos de notas definitivas agrupados por docente/materia/periodo con filtros
+function obtenerGruposNotasDefinitivas($filtro_profesor = '', $filtro_fecha_desde = '', $filtro_fecha_hasta = '') {
+    global $db;
+    
+    $query = "SELECT nd.id_docente, nd.id_materia, nd.id_periodo,
+                     ud.nombre as nombre_docente, ud.idusuario as cedula_docente,
+                     m.nombre_materia, 
+                     pa.nombre_periodo, s.codigo_seccion, c.nombre_carrera,
+                     COUNT(nd.id) as total_notas, MAX(nd.fecha_registro) as ultima_fecha
+              FROM notas_definitivas nd
+              INNER JOIN users ud ON nd.id_docente = ud.id
+              INNER JOIN materias m ON nd.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+              INNER JOIN docente_seccion ds ON nd.id_docente = ds.id_usuario 
+                                           AND nd.id_materia = ds.id_materia
+              INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              WHERE 1=1";
+    
+    $params = array();
+    $types = '';
+    
+    // Aplicar filtro por profesor
+    if (!empty($filtro_profesor)) {
+        $query .= " AND nd.id_docente = ?";
+        $params[] = $filtro_profesor;
+        $types .= "i";
+    }
+    
+    // Aplicar filtro por fecha desde
+    if (!empty($filtro_fecha_desde)) {
+        $query .= " AND DATE(nd.fecha_registro) >= ?";
+        $params[] = $filtro_fecha_desde;
+        $types .= "s";
+    }
+    
+    // Aplicar filtro por fecha hasta
+    if (!empty($filtro_fecha_hasta)) {
+        $query .= " AND DATE(nd.fecha_registro) <= ?";
+        $params[] = $filtro_fecha_hasta;
+        $types .= "s";
+    }
+    
+    $query .= " GROUP BY nd.id_docente, nd.id_materia, nd.id_periodo, s.codigo_seccion, c.nombre_carrera
+                ORDER BY ultima_fecha DESC";
+    
+    if (!empty($params)) {
+        $stmt = $db->prepare($query);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        return $stmt->get_result();
+    } else {
+        $result = $db->query($query);
+        return $result;
+    }
+}
 
 
 
