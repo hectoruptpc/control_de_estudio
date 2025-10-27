@@ -8821,6 +8821,7 @@ function obtenerTipoPeriodoPorCarrera($id_carrera) {
 
 //TIPOS DE HORARIO ***********************************************************************
 
+// Función para obtener todos los tipos de horario - SOLO LECTURA, SIN AUDITORÍA
 function obtenerTiposHorario($db) {
     $query = "SELECT * FROM tipos_horario ORDER BY nombre";
     $result = $db->query($query);
@@ -8828,7 +8829,7 @@ function obtenerTiposHorario($db) {
 }
 
 /**
- * Obtener un tipo de horario por ID
+ * Obtener un tipo de horario por ID - SOLO LECTURA, SIN AUDITORÍA
  */
 function obtenerTipoHorarioPorId($db, $id) {
     $query = "SELECT * FROM tipos_horario WHERE id = $id";
@@ -8837,41 +8838,383 @@ function obtenerTipoHorarioPorId($db, $id) {
 }
 
 /**
- * Agregar un nuevo tipo de horario
+ * Agregar un nuevo tipo de horario - CON AUDITORÍA
  */
 function agregarTipoHorario($db, $nombre, $horas_academicas, $horas_atendiendo) {
-    $nombre = $db->real_escape_string($nombre);
-    $horas_academicas = (int)$horas_academicas;
-    $horas_atendiendo = (int)$horas_atendiendo;
-    
-    $query = "INSERT INTO tipos_horario (nombre, horas_academicas, horas_atendiendo) 
-              VALUES ('$nombre', $horas_academicas, $horas_atendiendo)";
-    return $db->query($query);
+    try {
+        $nombre_original = $nombre;
+        $horas_academicas_original = (int)$horas_academicas;
+        $horas_atendiendo_original = (int)$horas_atendiendo;
+        
+        $nombre = $db->real_escape_string($nombre);
+        $horas_academicas = (int)$horas_academicas;
+        $horas_atendiendo = (int)$horas_atendiendo;
+        
+        $query = "INSERT INTO tipos_horario (nombre, horas_academicas, horas_atendiendo) 
+                  VALUES ('$nombre', $horas_academicas, $horas_atendiendo)";
+        
+        $result = $db->query($query);
+        
+        if ($result) {
+            $id_insertado = $db->insert_id;
+            
+            // REGISTRAR EN AUDITORÍA - TIPO DE HORARIO CREADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "INSERT", 
+                        "tipos_horario", 
+                        $id_insertado, 
+                        null, 
+                        [
+                            'nombre' => $nombre_original,
+                            'horas_academicas' => $horas_academicas_original,
+                            'horas_atendiendo' => $horas_atendiendo_original,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_creacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Tipos de Horario", 
+                        "Tipo de horario creado: " . $nombre_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría agregarTipoHorario: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            // REGISTRAR EN AUDITORÍA - ERROR AL CREAR TIPO DE HORARIO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipos_horario", 
+                        null, 
+                        null, 
+                        [
+                            'nombre' => $nombre_original,
+                            'horas_academicas' => $horas_academicas_original,
+                            'horas_atendiendo' => $horas_atendiendo_original,
+                            'error' => $db->error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Tipos de Horario", 
+                        "Error al crear tipo de horario: " . $nombre_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error agregarTipoHorario: " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en agregarTipoHorario: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL CREAR TIPO DE HORARIO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipos_horario", 
+                    null, 
+                    null, 
+                    [
+                        'nombre' => $nombre_original ?? '',
+                        'horas_academicas' => $horas_academicas_original ?? 0,
+                        'horas_atendiendo' => $horas_atendiendo_original ?? 0,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Tipos de Horario", 
+                    "Excepción al crear tipo de horario"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción agregarTipoHorario: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
 /**
- * Actualizar un tipo de horario existente
+ * Actualizar un tipo de horario existente - CON AUDITORÍA
  */
 function actualizarTipoHorario($db, $id, $nombre, $horas_academicas, $horas_atendiendo) {
-    $nombre = $db->real_escape_string($nombre);
-    $horas_academicas = (int)$horas_academicas;
-    $horas_atendiendo = (int)$horas_atendiendo;
-    
-    $query = "UPDATE tipos_horario SET 
-              nombre = '$nombre', 
-              horas_academicas = $horas_academicas, 
-              horas_atendiendo = $horas_atendiendo 
-              WHERE id = $id";
-    return $db->query($query);
+    try {
+        // Obtener datos actuales para auditoría
+        $query_actual = "SELECT nombre, horas_academicas, horas_atendiendo FROM tipos_horario WHERE id = $id";
+        $result_actual = $db->query($query_actual);
+        
+        if ($result_actual->num_rows === 0) {
+            return false;
+        }
+        
+        $tipo_horario_actual = $result_actual->fetch_assoc();
+        
+        $nombre_original = $nombre;
+        $horas_academicas_original = (int)$horas_academicas;
+        $horas_atendiendo_original = (int)$horas_atendiendo;
+        
+        $nombre = $db->real_escape_string($nombre);
+        $horas_academicas = (int)$horas_academicas;
+        $horas_atendiendo = (int)$horas_atendiendo;
+        
+        $query = "UPDATE tipos_horario SET 
+                  nombre = '$nombre', 
+                  horas_academicas = $horas_academicas, 
+                  horas_atendiendo = $horas_atendiendo 
+                  WHERE id = $id";
+        
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - TIPO DE HORARIO ACTUALIZADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    $cambios = [];
+                    if ($tipo_horario_actual['nombre'] != $nombre_original) {
+                        $cambios[] = "nombre: " . $tipo_horario_actual['nombre'] . " → " . $nombre_original;
+                    }
+                    if ($tipo_horario_actual['horas_academicas'] != $horas_academicas_original) {
+                        $cambios[] = "horas_academicas: " . $tipo_horario_actual['horas_academicas'] . " → " . $horas_academicas_original;
+                    }
+                    if ($tipo_horario_actual['horas_atendiendo'] != $horas_atendiendo_original) {
+                        $cambios[] = "horas_atendiendo: " . $tipo_horario_actual['horas_atendiendo'] . " → " . $horas_atendiendo_original;
+                    }
+                    
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "tipos_horario", 
+                        $id, 
+                        [
+                            'nombre_anterior' => $tipo_horario_actual['nombre'],
+                            'horas_academicas_anterior' => $tipo_horario_actual['horas_academicas'],
+                            'horas_atendiendo_anterior' => $tipo_horario_actual['horas_atendiendo']
+                        ], 
+                        [
+                            'nombre_nuevo' => $nombre_original,
+                            'horas_academicas_nuevo' => $horas_academicas_original,
+                            'horas_atendiendo_nuevo' => $horas_atendiendo_original,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_actualizacion' => date('Y-m-d H:i:s'),
+                            'cambios' => implode('; ', $cambios)
+                        ], 
+                        "Tipos de Horario", 
+                        "Tipo de horario actualizado: " . $tipo_horario_actual['nombre'] . " → " . $nombre_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría actualizarTipoHorario: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR TIPO DE HORARIO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipos_horario", 
+                        $id, 
+                        null, 
+                        [
+                            'id_tipo_horario' => $id,
+                            'nombre_nuevo' => $nombre_original,
+                            'horas_academicas_nuevo' => $horas_academicas_original,
+                            'horas_atendiendo_nuevo' => $horas_atendiendo_original,
+                            'error' => $db->error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Tipos de Horario", 
+                        "Error al actualizar tipo de horario ID: " . $id
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error actualizarTipoHorario: " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarTipoHorario: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ACTUALIZAR TIPO DE HORARIO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipos_horario", 
+                    $id, 
+                    null, 
+                    [
+                        'id_tipo_horario' => $id,
+                        'nombre_nuevo' => $nombre_original ?? '',
+                        'horas_academicas_nuevo' => $horas_academicas_original ?? 0,
+                        'horas_atendiendo_nuevo' => $horas_atendiendo_original ?? 0,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Tipos de Horario", 
+                    "Excepción al actualizar tipo de horario"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción actualizarTipoHorario: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
 /**
- * Eliminar un tipo de horario
+ * Eliminar un tipo de horario - CON AUDITORÍA
  */
 function eliminarTipoHorario($db, $id) {
-    $query = "DELETE FROM tipos_horario WHERE id = $id";
-    return $db->query($query);
+    try {
+        // Obtener datos del tipo de horario para auditoría
+        $query_actual = "SELECT nombre, horas_academicas, horas_atendiendo FROM tipos_horario WHERE id = $id";
+        $result_actual = $db->query($query_actual);
+        
+        if ($result_actual->num_rows === 0) {
+            return false;
+        }
+        
+        $tipo_horario_eliminado = $result_actual->fetch_assoc();
+        
+        $query = "DELETE FROM tipos_horario WHERE id = $id";
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - TIPO DE HORARIO ELIMINADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "DELETE", 
+                        "tipos_horario", 
+                        $id, 
+                        [
+                            'nombre_eliminado' => $tipo_horario_eliminado['nombre'],
+                            'horas_academicas_eliminado' => $tipo_horario_eliminado['horas_academicas'],
+                            'horas_atendiendo_eliminado' => $tipo_horario_eliminado['horas_atendiendo']
+                        ], 
+                        [
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_eliminacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Tipos de Horario", 
+                        "Tipo de horario eliminado: " . $tipo_horario_eliminado['nombre'] . " (ID: " . $id . ")"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarTipoHorario: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR TIPO DE HORARIO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipos_horario", 
+                        $id, 
+                        null, 
+                        [
+                            'id_tipo_horario' => $id,
+                            'nombre' => $tipo_horario_eliminado['nombre'],
+                            'error' => $db->error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Tipos de Horario", 
+                        "Error al eliminar tipo de horario: " . $tipo_horario_eliminado['nombre']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error eliminarTipoHorario: " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarTipoHorario: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ELIMINAR TIPO DE HORARIO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipos_horario", 
+                    $id, 
+                    null, 
+                    [
+                        'id_tipo_horario' => $id,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Tipos de Horario", 
+                    "Excepción al eliminar tipo de horario"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción eliminarTipoHorario: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
+
+if (!function_exists('validarTipoHorario')) {
+    function validarTipoHorario($nombre, $horas_academicas, $horas_atendiendo) {
+        $errores = [];
+        
+        if (empty(trim($nombre))) {
+            $errores[] = "El nombre del horario es requerido";
+        } elseif (strlen(trim($nombre)) < 2) {
+            $errores[] = "El nombre debe tener al menos 2 caracteres";
+        } elseif (strlen(trim($nombre)) > 100) {
+            $errores[] = "El nombre no puede exceder los 100 caracteres";
+        }
+        
+        if (!is_numeric($horas_academicas) || $horas_academicas < 0) {
+            $errores[] = "Las horas académicas deben ser un número positivo";
+        }
+        
+        if (!is_numeric($horas_atendiendo) || $horas_atendiendo < 0) {
+            $errores[] = "Las horas atendiendo deben ser un número positivo";
+        }
+        
+        return $errores;
+    }
+}
+
+
+if (!function_exists('existeTipoHorario')) {
+    function existeTipoHorario($db, $nombre, $excluir_id = null) {
+        if ($excluir_id) {
+            $stmt = $db->prepare("SELECT id FROM tipos_horario WHERE nombre = ? AND id != ?");
+            $stmt->bind_param("si", $nombre, $excluir_id);
+        } else {
+            $stmt = $db->prepare("SELECT id FROM tipos_horario WHERE nombre = ?");
+            $stmt->bind_param("s", $nombre);
+        }
+        
+        $stmt->execute();
+        $stmt->store_result();
+        return $stmt->num_rows > 0;
+    }
+}
+
+
+
+
 
 
 
@@ -13558,397 +13901,11 @@ function validarTipoPago($tipopago) {
 
 
 
-// TIPO HORARIO ***********************************************************************
 
 
- // Función para agregar tipo de horario - CON AUDITORÍA
-if (!function_exists('agregarTipoHorario')) {
-    function agregarTipoHorario($db, $nombre, $horas_academicas, $horas_atendiendo) {
-        try {
-            $nombre_original = $nombre;
-            $horas_academicas_original = $horas_academicas;
-            $horas_atendiendo_original = $horas_atendiendo;
-            
-            $stmt = $db->prepare("INSERT INTO tipos_horario (nombre, horas_academicas, horas_atendiendo) VALUES (?, ?, ?)");
-            $stmt->bind_param("sii", $nombre, $horas_academicas, $horas_atendiendo);
-            
-            if ($stmt->execute()) {
-                $id_insertado = $db->insert_id;
-                $stmt->close();
-                
-                // REGISTRAR EN AUDITORÍA - TIPO DE HORARIO CREADO
-                if (function_exists('registrarAuditoria')) {
-                    try {
-                        registrarAuditoria(
-                            "INSERT", 
-                            "tipos_horario", 
-                            $id_insertado, 
-                            null, 
-                            [
-                                'nombre' => $nombre_original,
-                                'horas_academicas' => $horas_academicas_original,
-                                'horas_atendiendo' => $horas_atendiendo_original,
-                                'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
-                                'usuario_id' => $_SESSION['user']['id'] ?? 0,
-                                'fecha_creacion' => date('Y-m-d H:i:s')
-                            ], 
-                            "Tipos de Horario", 
-                            "Tipo de horario creado: " . $nombre_original
-                        );
-                    } catch (Exception $e) {
-                        error_log("Error en auditoría agregarTipoHorario: " . $e->getMessage());
-                    }
-                }
-                
-                return true;
-            } else {
-                $error = $stmt->error;
-                $stmt->close();
-                
-                // REGISTRAR EN AUDITORÍA - ERROR AL CREAR TIPO DE HORARIO
-                if (function_exists('registrarAuditoria')) {
-                    try {
-                        registrarAuditoria(
-                            "ERROR", 
-                            "tipos_horario", 
-                            null, 
-                            null, 
-                            [
-                                'nombre' => $nombre_original,
-                                'horas_academicas' => $horas_academicas_original,
-                                'horas_atendiendo' => $horas_atendiendo_original,
-                                'error' => $error,
-                                'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
-                            ], 
-                            "Tipos de Horario", 
-                            "Error al crear tipo de horario: " . $nombre_original
-                        );
-                    } catch (Exception $e) {
-                        error_log("Error en auditoría de error agregarTipoHorario: " . $e->getMessage());
-                    }
-                }
-                
-                return false;
-            }
-            
-        } catch (Exception $e) {
-            error_log("Error en agregarTipoHorario: " . $e->getMessage());
-            
-            // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL CREAR TIPO DE HORARIO
-            if (function_exists('registrarAuditoria')) {
-                try {
-                    registrarAuditoria(
-                        "ERROR", 
-                        "tipos_horario", 
-                        null, 
-                        null, 
-                        [
-                            'nombre' => $nombre_original ?? '',
-                            'horas_academicas' => $horas_academicas_original ?? 0,
-                            'horas_atendiendo' => $horas_atendiendo_original ?? 0,
-                            'error' => $e->getMessage(),
-                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
-                        ], 
-                        "Tipos de Horario", 
-                        "Excepción al crear tipo de horario"
-                    );
-                } catch (Exception $auditError) {
-                    error_log("Error en auditoría de excepción agregarTipoHorario: " . $auditError->getMessage());
-                }
-            }
-            
-            return false;
-        }
-    }
-}
 
-// Función para actualizar tipo de horario - CON AUDITORÍA
-if (!function_exists('actualizarTipoHorario')) {
-    function actualizarTipoHorario($db, $id, $nombre, $horas_academicas, $horas_atendiendo) {
-        try {
-            // Obtener datos actuales para auditoría
-            $stmt_actual = $db->prepare("SELECT nombre, horas_academicas, horas_atendiendo FROM tipos_horario WHERE id = ?");
-            $stmt_actual->bind_param("i", $id);
-            $stmt_actual->execute();
-            $result_actual = $stmt_actual->get_result();
-            
-            if ($result_actual->num_rows === 0) {
-                return false;
-            }
-            
-            $tipo_horario_actual = $result_actual->fetch_assoc();
-            $stmt_actual->close();
-            
-            $nombre_original = $nombre;
-            $horas_academicas_original = $horas_academicas;
-            $horas_atendiendo_original = $horas_atendiendo;
-            
-            $stmt = $db->prepare("UPDATE tipos_horario SET nombre = ?, horas_academicas = ?, horas_atendiendo = ? WHERE id = ?");
-            $stmt->bind_param("siii", $nombre, $horas_academicas, $horas_atendiendo, $id);
-            
-            if ($stmt->execute()) {
-                $stmt->close();
-                
-                // REGISTRAR EN AUDITORÍA - TIPO DE HORARIO ACTUALIZADO
-                if (function_exists('registrarAuditoria')) {
-                    try {
-                        $cambios = [];
-                        if ($tipo_horario_actual['nombre'] != $nombre_original) {
-                            $cambios[] = "nombre: " . $tipo_horario_actual['nombre'] . " → " . $nombre_original;
-                        }
-                        if ($tipo_horario_actual['horas_academicas'] != $horas_academicas_original) {
-                            $cambios[] = "horas_academicas: " . $tipo_horario_actual['horas_academicas'] . " → " . $horas_academicas_original;
-                        }
-                        if ($tipo_horario_actual['horas_atendiendo'] != $horas_atendiendo_original) {
-                            $cambios[] = "horas_atendiendo: " . $tipo_horario_actual['horas_atendiendo'] . " → " . $horas_atendiendo_original;
-                        }
-                        
-                        registrarAuditoria(
-                            "UPDATE", 
-                            "tipos_horario", 
-                            $id, 
-                            [
-                                'nombre_anterior' => $tipo_horario_actual['nombre'],
-                                'horas_academicas_anterior' => $tipo_horario_actual['horas_academicas'],
-                                'horas_atendiendo_anterior' => $tipo_horario_actual['horas_atendiendo']
-                            ], 
-                            [
-                                'nombre_nuevo' => $nombre_original,
-                                'horas_academicas_nuevo' => $horas_academicas_original,
-                                'horas_atendiendo_nuevo' => $horas_atendiendo_original,
-                                'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
-                                'usuario_id' => $_SESSION['user']['id'] ?? 0,
-                                'fecha_actualizacion' => date('Y-m-d H:i:s'),
-                                'cambios' => implode('; ', $cambios)
-                            ], 
-                            "Tipos de Horario", 
-                            "Tipo de horario actualizado: " . $tipo_horario_actual['nombre'] . " → " . $nombre_original
-                        );
-                    } catch (Exception $e) {
-                        error_log("Error en auditoría actualizarTipoHorario: " . $e->getMessage());
-                    }
-                }
-                
-                return true;
-            } else {
-                $error = $stmt->error;
-                $stmt->close();
-                
-                // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR TIPO DE HORARIO
-                if (function_exists('registrarAuditoria')) {
-                    try {
-                        registrarAuditoria(
-                            "ERROR", 
-                            "tipos_horario", 
-                            $id, 
-                            null, 
-                            [
-                                'id_tipo_horario' => $id,
-                                'nombre_nuevo' => $nombre_original,
-                                'horas_academicas_nuevo' => $horas_academicas_original,
-                                'horas_atendiendo_nuevo' => $horas_atendiendo_original,
-                                'error' => $error,
-                                'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
-                            ], 
-                            "Tipos de Horario", 
-                            "Error al actualizar tipo de horario ID: " . $id
-                        );
-                    } catch (Exception $e) {
-                        error_log("Error en auditoría de error actualizarTipoHorario: " . $e->getMessage());
-                    }
-                }
-                
-                return false;
-            }
-            
-        } catch (Exception $e) {
-            error_log("Error en actualizarTipoHorario: " . $e->getMessage());
-            
-            // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ACTUALIZAR TIPO DE HORARIO
-            if (function_exists('registrarAuditoria')) {
-                try {
-                    registrarAuditoria(
-                        "ERROR", 
-                        "tipos_horario", 
-                        $id, 
-                        null, 
-                        [
-                            'id_tipo_horario' => $id,
-                            'nombre_nuevo' => $nombre_original ?? '',
-                            'horas_academicas_nuevo' => $horas_academicas_original ?? 0,
-                            'horas_atendiendo_nuevo' => $horas_atendiendo_original ?? 0,
-                            'error' => $e->getMessage(),
-                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
-                        ], 
-                        "Tipos de Horario", 
-                        "Excepción al actualizar tipo de horario"
-                    );
-                } catch (Exception $auditError) {
-                    error_log("Error en auditoría de excepción actualizarTipoHorario: " . $auditError->getMessage());
-                }
-            }
-            
-            return false;
-        }
-    }
-}
 
-// Función para eliminar tipo de horario - CON AUDITORÍA
-if (!function_exists('eliminarTipoHorario')) {
-    function eliminarTipoHorario($db, $id) {
-        try {
-            // Obtener datos del tipo de horario para auditoría
-            $stmt_actual = $db->prepare("SELECT nombre, horas_academicas, horas_atendiendo FROM tipos_horario WHERE id = ?");
-            $stmt_actual->bind_param("i", $id);
-            $stmt_actual->execute();
-            $result_actual = $stmt_actual->get_result();
-            
-            if ($result_actual->num_rows === 0) {
-                return false;
-            }
-            
-            $tipo_horario_eliminado = $result_actual->fetch_assoc();
-            $stmt_actual->close();
-            
-            $stmt = $db->prepare("DELETE FROM tipos_horario WHERE id = ?");
-            $stmt->bind_param("i", $id);
-            
-            if ($stmt->execute()) {
-                $stmt->close();
-                
-                // REGISTRAR EN AUDITORÍA - TIPO DE HORARIO ELIMINADO
-                if (function_exists('registrarAuditoria')) {
-                    try {
-                        registrarAuditoria(
-                            "DELETE", 
-                            "tipos_horario", 
-                            $id, 
-                            [
-                                'nombre_eliminado' => $tipo_horario_eliminado['nombre'],
-                                'horas_academicas_eliminado' => $tipo_horario_eliminado['horas_academicas'],
-                                'horas_atendiendo_eliminado' => $tipo_horario_eliminado['horas_atendiendo']
-                            ], 
-                            [
-                                'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
-                                'usuario_id' => $_SESSION['user']['id'] ?? 0,
-                                'fecha_eliminacion' => date('Y-m-d H:i:s')
-                            ], 
-                            "Tipos de Horario", 
-                            "Tipo de horario eliminado: " . $tipo_horario_eliminado['nombre'] . " (ID: " . $id . ")"
-                        );
-                    } catch (Exception $e) {
-                        error_log("Error en auditoría eliminarTipoHorario: " . $e->getMessage());
-                    }
-                }
-                
-                return true;
-            } else {
-                $error = $stmt->error;
-                $stmt->close();
-                
-                // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR TIPO DE HORARIO
-                if (function_exists('registrarAuditoria')) {
-                    try {
-                        registrarAuditoria(
-                            "ERROR", 
-                            "tipos_horario", 
-                            $id, 
-                            null, 
-                            [
-                                'id_tipo_horario' => $id,
-                                'nombre' => $tipo_horario_eliminado['nombre'],
-                                'error' => $error,
-                                'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
-                            ], 
-                            "Tipos de Horario", 
-                            "Error al eliminar tipo de horario: " . $tipo_horario_eliminado['nombre']
-                        );
-                    } catch (Exception $e) {
-                        error_log("Error en auditoría de error eliminarTipoHorario: " . $e->getMessage());
-                    }
-                }
-                
-                return false;
-            }
-            
-        } catch (Exception $e) {
-            error_log("Error en eliminarTipoHorario: " . $e->getMessage());
-            
-            // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ELIMINAR TIPO DE HORARIO
-            if (function_exists('registrarAuditoria')) {
-                try {
-                    registrarAuditoria(
-                        "ERROR", 
-                        "tipos_horario", 
-                        $id, 
-                        null, 
-                        [
-                            'id_tipo_horario' => $id,
-                            'error' => $e->getMessage(),
-                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
-                        ], 
-                        "Tipos de Horario", 
-                        "Excepción al eliminar tipo de horario"
-                    );
-                } catch (Exception $auditError) {
-                    error_log("Error en auditoría de excepción eliminarTipoHorario: " . $auditError->getMessage());
-                }
-            }
-            
-            return false;
-        }
-    }
-}
 
-// Función para obtener todos los tipos de horario - SOLO LECTURA, SIN AUDITORÍA
-if (!function_exists('obtenerTiposHorario')) {
-    function obtenerTiposHorario($db) {
-        $result = $db->query("SELECT * FROM tipos_horario ORDER BY nombre");
-        return $result->fetch_all(MYSQLI_ASSOC);
-    }
-}
-
-// Función para validar tipo de horario - SOLO VALIDACIÓN, SIN AUDITORÍA
-if (!function_exists('validarTipoHorario')) {
-    function validarTipoHorario($nombre, $horas_academicas, $horas_atendiendo) {
-        $errores = [];
-        
-        if (empty(trim($nombre))) {
-            $errores[] = "El nombre del horario es requerido";
-        } elseif (strlen(trim($nombre)) < 2) {
-            $errores[] = "El nombre debe tener al menos 2 caracteres";
-        } elseif (strlen(trim($nombre)) > 100) {
-            $errores[] = "El nombre no puede exceder los 100 caracteres";
-        }
-        
-        if (!is_numeric($horas_academicas) || $horas_academicas < 0) {
-            $errores[] = "Las horas académicas deben ser un número positivo";
-        }
-        
-        if (!is_numeric($horas_atendiendo) || $horas_atendiendo < 0) {
-            $errores[] = "Las horas atendiendo deben ser un número positivo";
-        }
-        
-        return $errores;
-    }
-}
-
-// Función para verificar si existe tipo de horario con el mismo nombre - SOLO CONSULTA, SIN AUDITORÍA
-if (!function_exists('existeTipoHorario')) {
-    function existeTipoHorario($db, $nombre, $excluir_id = null) {
-        if ($excluir_id) {
-            $stmt = $db->prepare("SELECT id FROM tipos_horario WHERE nombre = ? AND id != ?");
-            $stmt->bind_param("si", $nombre, $excluir_id);
-        } else {
-            $stmt = $db->prepare("SELECT id FROM tipos_horario WHERE nombre = ?");
-            $stmt->bind_param("s", $nombre);
-        }
-        
-        $stmt->execute();
-        $stmt->store_result();
-        return $stmt->num_rows > 0;
-    }
-}
 
 
 
