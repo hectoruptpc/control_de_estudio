@@ -14307,6 +14307,51 @@ function validarTipoPago($tipopago) {
 
 
 
+// CARGA DE NOTAS DOCENTE************************************************************
+
+
+
+/**
+ * Obtener ID del usuario desde la sesión
+ */
+function obtenerIdUsuario() {
+    if (isset($_SESSION['user']['id'])) {
+        return (int)$_SESSION['user']['id'];
+    } elseif (isset($_SESSION['id'])) {
+        return (int)$_SESSION['id'];
+    } elseif (isset($_SESSION['user_id'])) {
+        return (int)$_SESSION['user_id'];
+    }
+    return false;
+}
+
+/**
+ * Obtener secciones del docente
+ */
+function obtenerSeccionesDocente($docente_id) {
+    global $db;
+    
+    $query = "SELECT s.id_seccion, s.codigo_seccion, c.nombre_carrera, 
+                     t.nombre_trayecto, pa.nombre_periodo,
+                     m.id_materia, m.nombre_materia, m.cod_materia, t.numero_trayecto
+              FROM secciones s
+              INNER JOIN docente_seccion ds ON s.id_seccion = ds.id_seccion
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+              INNER JOIN periodos_academicos pa ON s.id_periodo = pa.id_periodo
+              INNER JOIN materias m ON ds.id_materia = m.id_materia
+              WHERE ds.id_usuario = ? 
+              AND (ds.estatus = 'activo' OR ds.estatus = 1)
+              ORDER BY pa.fecha_inicio DESC, c.nombre_carrera";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $docente_id);
+    $stmt->execute();
+    
+    return $stmt->get_result();
+}
+
+
 
 
 
