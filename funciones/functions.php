@@ -4432,10 +4432,11 @@ function buscarEstudiantePorCedula($cedula) {
         
         $result = $stmt->get_result();
         $estudiantes = [];
-        
+
         while ($row = $result->fetch_assoc()) {
             $estudiantes[] = [
                 'id' => (int)$row['id'],
+                'idusuario' => $row['cedula'],
                 'cedula' => $row['cedula'],
                 'nombre' => $row['nombre'],
                 'carrera' => $row['carrera'] ?? 'No especificado',
@@ -4443,8 +4444,15 @@ function buscarEstudiantePorCedula($cedula) {
                 'email' => $row['email'] ?? 'Sin email'
             ];
         }
-        
+
         $stmt->close();
+
+        // Compatibilidad: si sólo se encontró 1 estudiante, devolverlo como asociativo
+        if (count($estudiantes) === 1) {
+            return $estudiantes[0];
+        }
+
+        // Si hay múltiples resultados, devolver el arreglo
         return $estudiantes;
         
     } catch (Exception $e) {
@@ -14583,169 +14591,405 @@ function obtenerNotasPendientes($id_estudiante, $id_materia, $id_periodo, $id_do
 
 
 
+
+if (!function_exists('buscarEstudiantePorCedula')) {
 /**
- * Generar opciones de materias para select
+ * Buscar estudiante por cédula
  */
-function generarOpcionesMaterias($selected = '') {
+function buscarEstudiantePorCedula($cedula) {
     global $db;
-    $html = '';
     
     try {
-        $query = "SELECT id, nombre_materia FROM materias WHERE estado = 1 ORDER BY nombre_materia";
-        $stmt = $db->prepare($query);
-        $stmt->execute();
+        $query = "SELECT id, idusuario, nombre, carrera 
+                  FROM users 
+                  WHERE idusuario = ? 
+                  AND estudiante = 1 
+                  AND status = 1";
         
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $isSelected = ($selected == $row['id']) ? 'selected' : '';
-            $html .= '<option value="' . $row['id'] . '" ' . $isSelected . '>' . 
-                     htmlspecialchars($row['nombre_materia']) . '</option>';
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
         }
-    } catch (PDOException $e) {
-        error_log("Error al cargar materias: " . $e->getMessage());
-    }
-    
-    return $html;
-}
 
-/**
- * Generar opciones de periodos para select
- */
-function generarOpcionesPeriodos($selected = '') {
-    global $db;
-    $html = '';
-    
-    try {
-        $query = "SELECT id, nombre_periodo FROM periodos WHERE estado = 1 ORDER BY id DESC";
-        $stmt = $db->prepare($query);
-        $stmt->execute();
-        
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $isSelected = ($selected == $row['id']) ? 'selected' : '';
-            $html .= '<option value="' . $row['id'] . '" ' . $isSelected . '>' . 
-                     htmlspecialchars($row['nombre_periodo']) . '</option>';
+        $stmt->bind_param("s", $cedula);
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
         }
-    } catch (PDOException $e) {
-        error_log("Error al cargar periodos: " . $e->getMessage());
-    }
-    
-    return $html;
-}
 
+        $result = $stmt->get_result();
+        $estudiantes = [];
+        while ($row = $result->fetch_assoc()) {
+            $estudiantes[] = $row;
+        }
 
-/**
- * Buscar notas según filtros
- */
-function buscarNotasPorFiltro($id_materia, $id_periodo, $trayecto) {
-    global $db;
-    
-    // Validar parámetros
-    if (empty($id_materia) || empty($id_periodo) || empty($trayecto)) {
-        return [];
-    }
-    
-    try {
-        $query = "SELECT nd.*, 
-                         u.nombre as nombre_estudiante, 
-                         u.cedula,
-                         m.nombre_materia,
-                         p.nombre_periodo
-                  FROM notas_definitivas nd
-                  INNER JOIN usuarios u ON nd.id_usuario = u.id
-                  INNER JOIN materias m ON nd.id_materia = m.id
-                  INNER JOIN periodos p ON nd.id_periodo = p.id
-                  WHERE nd.id_materia = :id_materia 
-                  AND nd.id_periodo = :id_periodo
-                  ORDER BY u.nombre";
+        $stmt->close();
         
-        $stmt = $db->prepare($query);
-        $stmt->execute([
-            ':id_materia' => $id_materia,
-            ':id_periodo' => $id_periodo
-        ]);
+        // Si hay múltiples resultados, devolver el array completo
+        if (count($estudiantes) > 1) {
+            return $estudiantes;
+        }
+        // Si hay un solo resultado, devolverlo directamente
+        elseif (count($estudiantes) == 1) {
+            return $estudiantes[0];
+        }
+        // Si no hay resultados
+        else {
+            return false;
+        }
         
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-    } catch (PDOException $e) {
-        error_log("Error al buscar notas: " . $e->getMessage());
+    } catch (Exception $e) {
+        error_log("Error al buscar estudiante: " . $e->getMessage());
         return false;
     }
 }
+}
+
 
 /**
- * Procesar edición de nota
+ * Función auxiliar para buscar carreras por nombre
+ */
+function obtenerCarrerasPorNombre($nombre_carrera) {
+    global $db;
+    
+    try {
+        $query = "SELECT id_carrera, nombre_carrera 
+                  FROM carreras 
+                  WHERE nombre_carrera LIKE ? 
+                  AND activa = 1";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+
+        $nombre_like = "%" . $nombre_carrera . "%";
+        $stmt->bind_param("s", $nombre_like);
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+
+        $result = $stmt->get_result();
+        $carreras = [];
+        while ($row = $result->fetch_assoc()) {
+            $carreras[] = $row;
+        }
+
+        $stmt->close();
+        return $carreras;
+        
+    } catch (Exception $e) {
+        error_log("Error al obtener carreras por nombre: " . $e->getMessage());
+        return [];
+    }
+}
+
+
+
+/**
+ * Obtener estudiante por ID
+ */
+if (!function_exists('obtenerEstudiantePorId')) {
+function obtenerEstudiantePorId($id) {
+    global $db;
+    
+    try {
+        $query = "SELECT id, idusuario, nombre, carrera 
+                  FROM users 
+                  WHERE id = ? 
+                  AND estudiante = 1 
+                  LIMIT 1";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+
+        $stmt->bind_param("i", $id);
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+
+        $result = $stmt->get_result();
+        $estudiante = $result->fetch_assoc();
+        $stmt->close();
+        
+        return $estudiante;
+        
+    } catch (Exception $e) {
+        error_log("Error al obtener estudiante: " . $e->getMessage());
+        return false;
+    }
+}
+}
+
+/**
+ * Obtener carreras del estudiante - VERSIÓN CORREGIDA CON RELACIÓN
+ */
+function obtenerCarrerasEstudiante($id_estudiante) {
+    global $db;
+    
+    try {
+        // Primero obtenemos el ID de la carrera del estudiante
+        $query_user = "SELECT carrera FROM users WHERE id = ? LIMIT 1";
+        $stmt_user = $db->prepare($query_user);
+        if (!$stmt_user) {
+            throw new Exception("Error en preparación user: " . $db->error);
+        }
+
+        $stmt_user->bind_param("i", $id_estudiante);
+        if (!$stmt_user->execute()) {
+            throw new Exception("Error en ejecución user: " . $stmt_user->error);
+        }
+
+        $result_user = $stmt_user->get_result();
+        $user = $result_user->fetch_assoc();
+        $stmt_user->close();
+
+        if (!$user || empty($user['carrera'])) {
+            return [];
+        }
+
+        $carrera_id = $user['carrera'];
+        
+        // Buscamos la carrera por ID
+        $query_carreras = "SELECT id_carrera, nombre_carrera 
+                          FROM carreras 
+                          WHERE id_carrera = ? 
+                          AND activa = 1";
+        
+        $stmt_carreras = $db->prepare($query_carreras);
+        if (!$stmt_carreras) {
+            throw new Exception("Error en preparación carreras: " . $db->error);
+        }
+
+        $stmt_carreras->bind_param("i", $carrera_id);
+        if (!$stmt_carreras->execute()) {
+            throw new Exception("Error en ejecución carreras: " . $stmt_carreras->error);
+        }
+
+        $result_carreras = $stmt_carreras->get_result();
+        $carreras = [];
+        while ($row = $result_carreras->fetch_assoc()) {
+            $carreras[] = $row;
+        }
+
+        $stmt_carreras->close();
+        
+        return $carreras;
+        
+    } catch (Exception $e) {
+        error_log("Error al obtener carreras: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Obtener materias por carrera - VERSIÓN CON TABLA DE RELACIÓN
+ */
+function obtenerMateriasPorCarrera($id_carrera) {
+    global $db;
+    
+    try {
+        // Usamos la tabla carrera_materia para obtener las materias relacionadas
+        $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia, m.trayecto, cm.semestre
+                  FROM materias m
+                  INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+                  WHERE cm.id_carrera = ? 
+                  AND m.activa = 1 
+                  ORDER BY cm.semestre, m.trayecto, m.nombre_materia";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación materias: " . $db->error);
+        }
+
+        $stmt->bind_param("i", $id_carrera);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución materias: " . $stmt->error);
+        }
+
+        $result = $stmt->get_result();
+        $materias = [];
+        while ($row = $result->fetch_assoc()) {
+            $materias[] = $row;
+        }
+
+        $stmt->close();
+        return $materias;
+        
+    } catch (Exception $e) {
+        error_log("Error al obtener materias: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Obtener notas del estudiante por materia
+ */
+function obtenerNotasEstudianteMateria($id_estudiante, $id_materia) {
+    global $db;
+    
+    try {
+        $query = "SELECT nd.*, p.nombre_periodo 
+                  FROM notas_definitivas nd
+                  INNER JOIN periodos p ON nd.id_periodo = p.id
+                  WHERE nd.id_usuario = ? 
+                  AND nd.id_materia = ?
+                  ORDER BY p.id DESC";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+
+        $stmt->bind_param("ii", $id_estudiante, $id_materia);
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+
+        $result = $stmt->get_result();
+        $notas = [];
+        while ($row = $result->fetch_assoc()) {
+            $notas[] = $row;
+        }
+
+        $stmt->close();
+        return $notas;
+        
+    } catch (Exception $e) {
+        error_log("Error al obtener notas: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Procesar edición de notas
  */
 function procesarEdicionNota() {
     global $db;
     
     $id_nota = $_POST['id_nota'] ?? '';
-    $trayecto = $_POST['trayecto'] ?? '';
-    $nueva_nota = $_POST['nueva_nota'] ?? '';
-    $justificacion = $_POST['justificacion'] ?? '';
-    $id_usuario = $_POST['id_usuario'] ?? '';
+    $justificacion = trim($_POST['justificacion'] ?? '');
     
     // Validaciones
-    if (empty($id_nota) || empty($trayecto) || $nueva_nota === '' || empty($justificacion)) {
-        return ['success' => false, 'message' => 'Complete todos los campos'];
-    }
-    
-    if (!is_numeric($nueva_nota) || $nueva_nota < 0 || $nueva_nota > 20) {
-        return ['success' => false, 'message' => 'La nota debe ser un número entre 0 y 20'];
+    if (empty($id_nota) || empty($justificacion)) {
+        return ['success' => false, 'message' => 'Complete todos los campos obligatorios'];
     }
     
     // Obtener ID del administrador desde la sesión
-    $id_admin = $_SESSION['user_id'] ?? 0; // Ajusta según tu sistema de sesiones
+    $id_admin = $_SESSION['user_id'] ?? 0;
     
     try {
         // Iniciar transacción
-        $db->beginTransaction();
+        $db->begin_transaction();
         
-        // 1. Obtener nota anterior para el historial
-        $queryNotaAnterior = "SELECT trayecto_" . $trayecto . " as nota_anterior 
-                             FROM notas_definitivas 
-                             WHERE id = :id_nota";
-        $stmtNotaAnterior = $db->prepare($queryNotaAnterior);
-        $stmtNotaAnterior->execute([':id_nota' => $id_nota]);
-        $nota_anterior = $stmtNotaAnterior->fetchColumn();
+        // 1. Obtener nota actual para el historial
+        $queryNotaActual = "SELECT * FROM notas_definitivas WHERE id = ?";
+        $stmtNotaActual = $db->prepare($queryNotaActual);
+        if (!$stmtNotaActual) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
         
-        // 2. Registrar en historial de cambios
-        $queryHistorial = "INSERT INTO historial_cambios_notas 
-                          (id_nota, trayecto, nota_anterior, nota_nueva, justificacion, id_admin, fecha_cambio) 
-                          VALUES (:id_nota, :trayecto, :nota_anterior, :nota_nueva, :justificacion, :id_admin, NOW())";
+        $stmtNotaActual->bind_param("i", $id_nota);
+        if (!$stmtNotaActual->execute()) {
+            throw new Exception("Error en ejecución: " . $stmtNotaActual->error);
+        }
         
-        $stmtHistorial = $db->prepare($queryHistorial);
-        $stmtHistorial->execute([
-            ':id_nota' => $id_nota,
-            ':trayecto' => $trayecto,
-            ':nota_anterior' => $nota_anterior,
-            ':nota_nueva' => $nueva_nota,
-            ':justificacion' => $justificacion,
-            ':id_admin' => $id_admin
-        ]);
+        $result = $stmtNotaActual->get_result();
+        $nota_actual = $result->fetch_assoc();
+        $stmtNotaActual->close();
         
-        // 3. Actualizar la nota
-        $campoTrayecto = 'trayecto_' . $trayecto;
+        if (!$nota_actual) {
+            throw new Exception("No se encontró la nota especificada");
+        }
+        
+        // 2. Registrar cambios individuales por trayecto
+        $trayectos = ['trayecto_0', 'trayecto_1', 'trayecto_2', 'trayecto_3', 'trayecto_4'];
+        $cambios_realizados = false;
+        
+        foreach ($trayectos as $trayecto) {
+            $nueva_nota = $_POST[$trayecto] ?? '';
+            $nota_anterior = $nota_actual[$trayecto];
+            
+            // Solo registrar si hay cambio y la nueva nota no está vacía
+            if ($nueva_nota !== '' && $nueva_nota != $nota_anterior) {
+                $queryHistorial = "INSERT INTO historial_cambios_notas 
+                                  (id_nota, trayecto, nota_anterior, nota_nueva, justificacion, id_admin, fecha_cambio) 
+                                  VALUES (?, ?, ?, ?, ?, ?, NOW())";
+                
+                $stmtHistorial = $db->prepare($queryHistorial);
+                if (!$stmtHistorial) {
+                    throw new Exception("Error en preparación historial: " . $db->error);
+                }
+                
+                $trayecto_num = str_replace('trayecto_', '', $trayecto);
+                $stmtHistorial->bind_param("iisdds", 
+                    $id_nota, 
+                    $trayecto_num, 
+                    $nota_anterior, 
+                    $nueva_nota, 
+                    $justificacion, 
+                    $id_admin
+                );
+                
+                if (!$stmtHistorial->execute()) {
+                    throw new Exception("Error en ejecución historial: " . $stmtHistorial->error);
+                }
+                
+                $stmtHistorial->close();
+                $cambios_realizados = true;
+            }
+        }
+        
+        if (!$cambios_realizados) {
+            throw new Exception("No se realizaron cambios en las notas");
+        }
+        
+        // 3. Actualizar las notas
         $queryActualizar = "UPDATE notas_definitivas 
-                           SET $campoTrayecto = :nueva_nota, 
-                               id_admin_aprobador = :id_admin,
+                           SET trayecto_0 = ?, trayecto_1 = ?, trayecto_2 = ?, 
+                               trayecto_3 = ?, trayecto_4 = ?, 
+                               id_admin_aprobador = ?,
                                fecha_actualizacion = NOW()
-                           WHERE id = :id_nota";
+                           WHERE id = ?";
         
         $stmtActualizar = $db->prepare($queryActualizar);
-        $stmtActualizar->execute([
-            ':nueva_nota' => $nueva_nota,
-            ':id_admin' => $id_admin,
-            ':id_nota' => $id_nota
-        ]);
+        if (!$stmtActualizar) {
+            throw new Exception("Error en preparación actualización: " . $db->error);
+        }
         
+        // Preparar valores para la actualización
+        $t0 = $_POST['trayecto_0'] ?? $nota_actual['trayecto_0'];
+        $t1 = $_POST['trayecto_1'] ?? $nota_actual['trayecto_1'];
+        $t2 = $_POST['trayecto_2'] ?? $nota_actual['trayecto_2'];
+        $t3 = $_POST['trayecto_3'] ?? $nota_actual['trayecto_3'];
+        $t4 = $_POST['trayecto_4'] ?? $nota_actual['trayecto_4'];
+        
+        $stmtActualizar->bind_param("dddddsi", $t0, $t1, $t2, $t3, $t4, $id_admin, $id_nota);
+        
+        if (!$stmtActualizar->execute()) {
+            throw new Exception("Error en ejecución actualización: " . $stmtActualizar->error);
+        }
+        
+        $stmtActualizar->close();
+        
+        // Confirmar transacción
         $db->commit();
-        return ['success' => true, 'message' => 'Nota actualizada correctamente'];
+        return ['success' => true, 'message' => 'Notas actualizadas correctamente'];
         
-    } catch (PDOException $e) {
-        $db->rollBack();
-        error_log("Error al actualizar nota: " . $e->getMessage());
-        return ['success' => false, 'message' => 'Error al actualizar la nota: ' . $e->getMessage()];
+    } catch (Exception $e) {
+        // Revertir transacción en caso de error
+        if ($db) {
+            $db->rollback();
+        }
+        error_log("Error al actualizar notas: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Error al actualizar las notas: ' . $e->getMessage()];
     }
 }
+
+
+
 
 
 
