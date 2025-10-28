@@ -383,7 +383,7 @@ include("includes/head.php");
                     <h3 class="text-gray-800">No tienes una sección asignada</h3>
                     <p class="text-muted">Actualmente no estás asignado a ninguna sección.</p>
                     <p class="text-muted">Por favor, contacta con la administración para resolver esta situación.</p>
-                    <a href="../index.php" class="btn btn-primary mt-3">
+                    <a href="index.php" class="btn btn-primary mt-3">
                         <i class="fas fa-home"></i> Volver al Inicio
                     </a>
                 </div>
