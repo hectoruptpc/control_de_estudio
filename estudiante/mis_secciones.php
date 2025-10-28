@@ -1,8 +1,12 @@
 <?php
-// 1. Iniciar sesión y configurar errores
-session_start();
+// 1. Configuración inicial
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
+
+
+$titulopag = "Mis Secciones Inscritas";
+include('../funciones/functions.php');
+include("includes/head.php");
 
 // 2. Verificación directa (si no es estudiante, va al login)
 if (empty($_SESSION['user']['estudiante']) || $_SESSION['user']['estudiante'] != 1) {
@@ -10,10 +14,7 @@ if (empty($_SESSION['user']['estudiante']) || $_SESSION['user']['estudiante'] !=
     exit();
 }
 
-// 3. Configuración de página
-$titulopag = "Mis Secciones Inscritas";
-include('../funciones/functions.php');
-include("includes/head.php");
+
 
 // 4. Obtener ID de usuario seguro
 $user_id = (int)$_SESSION['user']['id'];
