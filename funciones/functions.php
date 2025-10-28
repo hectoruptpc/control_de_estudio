@@ -14579,6 +14579,180 @@ function obtenerNotasPendientes($id_estudiante, $id_materia, $id_periodo, $id_do
 
 
 
+// CORRECCION DE NOTAS**********************************************************************
+
+
+
+/**
+ * Generar opciones de materias para select
+ */
+function generarOpcionesMaterias($selected = '') {
+    global $db;
+    $html = '';
+    
+    try {
+        $query = "SELECT id, nombre_materia FROM materias WHERE estado = 1 ORDER BY nombre_materia";
+        $stmt = $db->prepare($query);
+        $stmt->execute();
+        
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $isSelected = ($selected == $row['id']) ? 'selected' : '';
+            $html .= '<option value="' . $row['id'] . '" ' . $isSelected . '>' . 
+                     htmlspecialchars($row['nombre_materia']) . '</option>';
+        }
+    } catch (PDOException $e) {
+        error_log("Error al cargar materias: " . $e->getMessage());
+    }
+    
+    return $html;
+}
+
+/**
+ * Generar opciones de periodos para select
+ */
+function generarOpcionesPeriodos($selected = '') {
+    global $db;
+    $html = '';
+    
+    try {
+        $query = "SELECT id, nombre_periodo FROM periodos WHERE estado = 1 ORDER BY id DESC";
+        $stmt = $db->prepare($query);
+        $stmt->execute();
+        
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $isSelected = ($selected == $row['id']) ? 'selected' : '';
+            $html .= '<option value="' . $row['id'] . '" ' . $isSelected . '>' . 
+                     htmlspecialchars($row['nombre_periodo']) . '</option>';
+        }
+    } catch (PDOException $e) {
+        error_log("Error al cargar periodos: " . $e->getMessage());
+    }
+    
+    return $html;
+}
+
+
+/**
+ * Buscar notas según filtros
+ */
+function buscarNotasPorFiltro($id_materia, $id_periodo, $trayecto) {
+    global $db;
+    
+    // Validar parámetros
+    if (empty($id_materia) || empty($id_periodo) || empty($trayecto)) {
+        return [];
+    }
+    
+    try {
+        $query = "SELECT nd.*, 
+                         u.nombre as nombre_estudiante, 
+                         u.cedula,
+                         m.nombre_materia,
+                         p.nombre_periodo
+                  FROM notas_definitivas nd
+                  INNER JOIN usuarios u ON nd.id_usuario = u.id
+                  INNER JOIN materias m ON nd.id_materia = m.id
+                  INNER JOIN periodos p ON nd.id_periodo = p.id
+                  WHERE nd.id_materia = :id_materia 
+                  AND nd.id_periodo = :id_periodo
+                  ORDER BY u.nombre";
+        
+        $stmt = $db->prepare($query);
+        $stmt->execute([
+            ':id_materia' => $id_materia,
+            ':id_periodo' => $id_periodo
+        ]);
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+    } catch (PDOException $e) {
+        error_log("Error al buscar notas: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Procesar edición de nota
+ */
+function procesarEdicionNota() {
+    global $db;
+    
+    $id_nota = $_POST['id_nota'] ?? '';
+    $trayecto = $_POST['trayecto'] ?? '';
+    $nueva_nota = $_POST['nueva_nota'] ?? '';
+    $justificacion = $_POST['justificacion'] ?? '';
+    $id_usuario = $_POST['id_usuario'] ?? '';
+    
+    // Validaciones
+    if (empty($id_nota) || empty($trayecto) || $nueva_nota === '' || empty($justificacion)) {
+        return ['success' => false, 'message' => 'Complete todos los campos'];
+    }
+    
+    if (!is_numeric($nueva_nota) || $nueva_nota < 0 || $nueva_nota > 20) {
+        return ['success' => false, 'message' => 'La nota debe ser un número entre 0 y 20'];
+    }
+    
+    // Obtener ID del administrador desde la sesión
+    $id_admin = $_SESSION['user_id'] ?? 0; // Ajusta según tu sistema de sesiones
+    
+    try {
+        // Iniciar transacción
+        $db->beginTransaction();
+        
+        // 1. Obtener nota anterior para el historial
+        $queryNotaAnterior = "SELECT trayecto_" . $trayecto . " as nota_anterior 
+                             FROM notas_definitivas 
+                             WHERE id = :id_nota";
+        $stmtNotaAnterior = $db->prepare($queryNotaAnterior);
+        $stmtNotaAnterior->execute([':id_nota' => $id_nota]);
+        $nota_anterior = $stmtNotaAnterior->fetchColumn();
+        
+        // 2. Registrar en historial de cambios
+        $queryHistorial = "INSERT INTO historial_cambios_notas 
+                          (id_nota, trayecto, nota_anterior, nota_nueva, justificacion, id_admin, fecha_cambio) 
+                          VALUES (:id_nota, :trayecto, :nota_anterior, :nota_nueva, :justificacion, :id_admin, NOW())";
+        
+        $stmtHistorial = $db->prepare($queryHistorial);
+        $stmtHistorial->execute([
+            ':id_nota' => $id_nota,
+            ':trayecto' => $trayecto,
+            ':nota_anterior' => $nota_anterior,
+            ':nota_nueva' => $nueva_nota,
+            ':justificacion' => $justificacion,
+            ':id_admin' => $id_admin
+        ]);
+        
+        // 3. Actualizar la nota
+        $campoTrayecto = 'trayecto_' . $trayecto;
+        $queryActualizar = "UPDATE notas_definitivas 
+                           SET $campoTrayecto = :nueva_nota, 
+                               id_admin_aprobador = :id_admin,
+                               fecha_actualizacion = NOW()
+                           WHERE id = :id_nota";
+        
+        $stmtActualizar = $db->prepare($queryActualizar);
+        $stmtActualizar->execute([
+            ':nueva_nota' => $nueva_nota,
+            ':id_admin' => $id_admin,
+            ':id_nota' => $id_nota
+        ]);
+        
+        $db->commit();
+        return ['success' => true, 'message' => 'Nota actualizada correctamente'];
+        
+    } catch (PDOException $e) {
+        $db->rollBack();
+        error_log("Error al actualizar nota: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Error al actualizar la nota: ' . $e->getMessage()];
+    }
+}
+
+
+
+
+
+
+
 
 
 

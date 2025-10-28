@@ -289,7 +289,7 @@ if (!isLoggedIn() || !isAdmin()) {
                         </a>
                         <?php endif; ?>
 
-                        <a title="Consultar Notas Pasadas" class="dropdown-item" href="../pagina_en_construccion.php">
+                        <a title="Consultar Notas Pasadas" class="dropdown-item" href="correccion_notas.php">
                             <i class="fas fa-pencil-alt fa-fw"></i> Corrección de Notas
                         </a>
                     </div>
