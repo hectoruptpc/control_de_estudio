@@ -199,9 +199,9 @@ if (!isLoggedIn() || !isUser()) {
             echo '<p class="text-right">';
             echo $fads;
             echo "<br>";
-            echo $ip;
+       //     echo $ip;
             echo "<br>";
-            echo $nombrepag;
+       //     echo $nombrepag;
             ?>
         </div>
     </div>
