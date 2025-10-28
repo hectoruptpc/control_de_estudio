@@ -37,10 +37,19 @@ if (!isLoggedIn() || !isUser()) {
 <meta name="author" content="Sistema de Gestión">
 <title><?php echo $titulopag; ?></title>
 <?php echo $bootstrap_head;?>
+
 <style>
+    /* ESTILOS GENERALES MEJORADOS */
+    body {
+        padding-top: 80px;
+        background-color: #f8f9fc;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
     .nav-item-mensajes {
         position: relative;
     }
+    
     .badge-notificacion {
         position: absolute;
         top: 3px;
@@ -48,25 +57,76 @@ if (!isLoggedIn() || !isUser()) {
         font-size: 0.6em;
         padding: 3px 6px;
     }
+
     .user-info {
         background-color: #f8f9fa;
         border-left: 4px solid #007bff;
     }
-    /* SOLUCIÓN: Especificar que solo afecte a la navbar superior */
-    .navbar:not(.fixed-bottom) {
-        background-color: #fd7e14 !important;
+    
+    /* NAVBAR FIJO */
+    .navbar {
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
-    .navbar:not(.fixed-bottom) .navbar-brand, 
-    .navbar:not(.fixed-bottom) .nav-link {
-        color: white !important;
-    }
+
+    /* DROPDOWNS MEJORADOS */
     .dropdown-menu {
-        border: none;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        z-index: 1080;
+        border: 1px solid rgba(0,0,0,.15);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         border-radius: 10px;
     }
+
+    .dropdown-item {
+        padding: 0.75rem 1.5rem;
+        font-size: 0.9rem;
+    }
+
     .dropdown-item:hover {
         background-color: #fff5eb;
+    }
+
+    /* MEJORAS ESPECÍFICAS PARA MÓVILES */
+    @media (max-width: 991.98px) {
+        .navbar-collapse {
+            background-color: #fd7e14;
+            padding: 1rem;
+            margin-top: 1rem;
+            border-radius: 8px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .dropdown-menu {
+            background-color: rgba(255,255,255,0.9);
+            border: none;
+            box-shadow: none;
+            margin-left: 1rem;
+        }
+        
+        .dropdown-item {
+            padding: 0.6rem 1.5rem;
+        }
+        
+        /* Botón hamburguesa más grande para móviles */
+        .navbar-toggler {
+            padding: 0.4rem 0.75rem;
+            font-size: 1.25rem;
+        }
+        
+        /* Mejorar contraste en móviles */
+        .navbar-nav .nav-link {
+            color: white !important;
+            padding: 0.5rem 1rem;
+        }
+        
+        .dropdown-toggle::after {
+            border-top-color: white;
+        }
+    }
+
+    /* CONTENIDO PRINCIPAL */
+    .container {
+        margin-top: 20px;
     }
 </style>
 </head>
@@ -169,7 +229,6 @@ if (!isLoggedIn() || !isUser()) {
                 <p>Será redirigido a la página de inicio de sesión.</p>
                 <div class="user-info bg-light p-3 rounded">
                     <p class="mb-1"><strong>Usuario:</strong> <?php echo $_SESSION['user']['nombre'] ?? 'Usuario'; ?></p>
-                    
                 </div>
             </div>
             <div class="modal-footer">
@@ -183,9 +242,6 @@ if (!isLoggedIn() || !isUser()) {
         </div>
     </div>
 </div>
-
-
-
 
 <!-- Script para actualizar notificaciones cada 30 segundos -->
 <script>
@@ -219,10 +275,7 @@ function actualizarNotificaciones() {
 // Actualizar cada 30 segundos
 setInterval(actualizarNotificaciones, 30000);
 
-// Actualizar también al cargar la página
-document.addEventListener('DOMContentLoaded', actualizarNotificaciones);
-
-// Script para manejar el modal de logout
+// Script para manejar el modal de logout y mejoras móviles
 document.addEventListener('DOMContentLoaded', function() {
     // Manejar el clic en el enlace de logout
     document.getElementById('logoutLink').addEventListener('click', function(e) {
@@ -243,12 +296,42 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 500);
     });
     
+    // MEJORA PARA DROPDOWNS EN MÓVILES
+    if (window.innerWidth <= 991) {
+        // Cerrar dropdowns al hacer clic en un enlace
+        $('.dropdown-item').on('click', function() {
+            $('.dropdown-menu').removeClass('show');
+        });
+        
+        // Cerrar dropdowns al hacer clic fuera
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('.dropdown').length) {
+                $('.dropdown-menu').removeClass('show');
+            }
+        });
+        
+        // Toggle dropdown al hacer clic en el toggle
+        $('.dropdown-toggle').on('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            var $parent = $(this).closest('.dropdown');
+            var $menu = $parent.find('.dropdown-menu');
+            var isOpen = $menu.hasClass('show');
+            
+            // Cerrar todos los dropdowns
+            $('.dropdown-menu').removeClass('show');
+            
+            // Abrir solo si no estaba abierto
+            if (!isOpen) {
+                $menu.addClass('show');
+            }
+        });
+    }
+    
     // Actualizar también al cargar la página
     actualizarNotificaciones();
 });
-
-
-
 </script>
 
 </body>
