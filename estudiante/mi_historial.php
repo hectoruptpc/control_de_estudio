@@ -1,21 +1,26 @@
 <?php
+
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 require_once('../funciones/functions.php');
 
-if (!isLoggedIn()) {
-    header('location: ../login.php');
-    exit();
-}
 
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 // Verificar que el usuario es un estudiante
 if (!isset($_SESSION['user']) || $_SESSION['user']['estudiante'] != 1) {
     header('location: ../index.php');
     exit();
 }
 
+
+
 $titulopag = "Mi Historial de Notas";
 include("includes/head.php");
 
 // Función para obtener la carrera del estudiante
+if (!function_exists('obtenerCarreraEstudiante')) {
 function obtenerCarreraEstudiante($estudiante_id) {
     global $db;
     
@@ -30,8 +35,10 @@ function obtenerCarreraEstudiante($estudiante_id) {
     
     return $result->num_rows > 0 ? $result->fetch_assoc() : null;
 }
+}
 
 // Función para obtener todas las materias de la carrera
+if (!function_exists('obtenerMateriasCarrera')) {
 function obtenerMateriasCarrera($carrera_id) {
     global $db;
     
@@ -46,8 +53,10 @@ function obtenerMateriasCarrera($carrera_id) {
     $stmt->execute();
     return $stmt->get_result();
 }
+}
 
 // Función para obtener información del trayecto desde la tabla trayectos
+if (!function_exists('obtenerInfoTrayecto')) {
 function obtenerInfoTrayecto($numero_trayecto) {
     global $db;
     
@@ -78,8 +87,10 @@ function obtenerInfoTrayecto($numero_trayecto) {
         'nombre_trayecto' => isset($nombres_trayectos[$numero_trayecto]) ? $nombres_trayectos[$numero_trayecto] : 'Trayecto ' . $numero_trayecto
     ];
 }
+}
 
 // Función para obtener las notas definitivas del estudiante
+if (!function_exists('obtenerNotasEstudianteConsulta')) {
 function obtenerNotasEstudianteConsulta($estudiante_id) {
     global $db;
     
@@ -108,6 +119,7 @@ function obtenerNotasEstudianteConsulta($estudiante_id) {
     }
     
     return $notas;
+}
 }
 
 // Obtener información del estudiante actual
