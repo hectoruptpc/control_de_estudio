@@ -31,16 +31,9 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
 ?>
 
 <form id="<?php echo $formId; ?>" method="post" action="<?php echo $actionUrl; ?>"<?php echo $esModal ? ' enctype="multipart/form-data"' : ''; ?>>
-    <!-- Sección 1: Identificación -->
+    <!-- Sección 1: Identificación - CÉDULA A LA IZQUIERDA, NOMBRE A LA DERECHA -->
     <h5 class="mb-3"><i class="fas fa-id-card mr-2"></i> Identificación</h5>
     <div class="row g-3 mb-4">
-        <div class="col-md-6">
-            <div class="mb-3">
-                <label for="nombre<?php echo $prefijo; ?>" class="form-label required">Nombre Completo</label>
-                <input type="text" class="form-control" id="nombre<?php echo $prefijo; ?>" name="nombre" required>
-            </div>
-        </div>
-        
         <div class="col-md-6">
             <div class="mb-3">
                 <label for="cedula_completa<?php echo $prefijo; ?>" class="form-label required">Cédula</label>
@@ -56,6 +49,13 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
                     <input type="hidden" id="idusuario<?php echo $prefijo; ?>" name="idusuario">
                 </div>
                 <small class="text-muted">Formato: V-12345678 o E-12345678</small>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="nombre<?php echo $prefijo; ?>" class="form-label required">Nombre Completo</label>
+                <input type="text" class="form-control" id="nombre<?php echo $prefijo; ?>" name="nombre" required>
             </div>
         </div>
     </div>
