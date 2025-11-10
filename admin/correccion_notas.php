@@ -9,179 +9,6 @@ include('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('editar_nota');
 
-// NUEVA FUNCIÓN: Obtener materias con notas del estudiante
-function obtenerMateriasConNotas($id_estudiante, $id_carrera) {
-    global $db;
-    
-    $sql = "SELECT DISTINCT m.*, cm.semestre
-            FROM materias m
-            INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
-            INNER JOIN notas_definitivas nd ON m.id_materia = nd.id_materia
-            WHERE cm.id_carrera = ? 
-            AND nd.id_usuario = ?
-            AND (
-                nd.trayecto_0 IS NOT NULL OR 
-                nd.trayecto_1 IS NOT NULL OR 
-                nd.trayecto_2 IS NOT NULL OR 
-                nd.trayecto_3 IS NOT NULL OR 
-                nd.trayecto_4 IS NOT NULL
-            )
-            ORDER BY m.trayecto, cm.semestre, m.nombre_materia";
-    
-    $stmt = $db->prepare($sql);
-    $stmt->bind_param("ii", $id_carrera, $id_estudiante);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $materias = [];
-    while ($row = $result->fetch_assoc()) {
-        $materias[] = $row;
-    }
-    
-    $stmt->close();
-    return $materias;
-}
-
-// FUNCIÓN: Obtener notas del estudiante para una materia específica
-function obtenerNotasEstudianteMateria($id_estudiante, $id_materia) {
-    global $db;
-    
-    $sql = "SELECT nd.*, pa.nombre_periodo 
-            FROM notas_definitivas nd
-            LEFT JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
-            WHERE nd.id_usuario = ? AND nd.id_materia = ?
-            ORDER BY pa.nombre_periodo DESC";
-    
-    $stmt = $db->prepare($sql);
-    $stmt->bind_param("ii", $id_estudiante, $id_materia);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $notas = [];
-    while ($row = $result->fetch_assoc()) {
-        $notas[] = $row;
-    }
-    
-    $stmt->close();
-    return $notas;
-}
-
-// FUNCIÓN: Obtener historial de cambios de una nota
-function obtenerHistorialCambiosNota($id_nota) {
-    global $db;
-    
-    $sql = "SELECT h.*, u.nombre as admin_nombre 
-            FROM historial_cambios_notas h 
-            LEFT JOIN users u ON h.id_admin = u.id 
-            WHERE h.id_nota = ? 
-            ORDER BY h.fecha_cambio DESC";
-    
-    $stmt = $db->prepare($sql);
-    $stmt->bind_param("i", $id_nota);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $historial = [];
-    while ($row = $result->fetch_assoc()) {
-        $historial[] = $row;
-    }
-    
-    $stmt->close();
-    return $historial;
-}
-
-// FUNCIÓN: Procesar edición de nota
-function procesarEdicionNota() {
-    global $db;
-    
-    if (!isset($_POST['id_nota']) || !isset($_POST['trayecto']) || !isset($_POST['nueva_nota'])) {
-        return ['success' => false, 'message' => 'Datos incompletos'];
-    }
-    
-    $id_nota = intval($_POST['id_nota']);
-    $trayecto = $_POST['trayecto'];
-    $nueva_nota = $_POST['nueva_nota'];
-    $justificacion = trim($_POST['justificacion'] ?? '');
-    
-    // Obtener el ID del administrador de la sesión - CORREGIDO según la estructura del index
-    if (isset($_SESSION['user']['id'])) {
-        $id_admin = $_SESSION['user']['id'];
-    } elseif (isset($_SESSION['id'])) {
-        $id_admin = $_SESSION['id'];
-    } elseif (isset($_SESSION['user_id'])) {
-        $id_admin = $_SESSION['user_id'];
-    } else {
-        // Debug para ver qué hay en la sesión
-        error_log("Session data: " . print_r($_SESSION, true));
-        return ['success' => false, 'message' => 'No se pudo identificar al administrador. Sesión: ' . print_r($_SESSION, true)];
-    }
-    
-    // Validar que la justificación no esté vacía
-    if (empty($justificacion)) {
-        return ['success' => false, 'message' => 'La justificación es obligatoria'];
-    }
-    
-    // Validar que la nota sea numérica y esté entre 0 y 20
-    if (!is_numeric($nueva_nota) || $nueva_nota < 0 || $nueva_nota > 20) {
-        return ['success' => false, 'message' => 'La nota debe ser un número entre 0 y 20'];
-    }
-    
-    // Obtener la nota actual
-    $sql_actual = "SELECT trayecto_0, trayecto_1, trayecto_2, trayecto_3, trayecto_4 
-                   FROM notas_definitivas WHERE id = ?";
-    $stmt = $db->prepare($sql_actual);
-    $stmt->bind_param("i", $id_nota);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $nota_actual = $result->fetch_assoc();
-    $stmt->close();
-    
-    if (!$nota_actual) {
-        return ['success' => false, 'message' => 'No se encontró la nota a editar'];
-    }
-    
-    // Determinar la nota anterior según el trayecto
-    $nota_anterior = $nota_actual[$trayecto];
-    
-    // Iniciar transacción
-    $db->begin_transaction();
-    
-    try {
-        // 1. Actualizar la nota en notas_definitivas
-        $sql_update = "UPDATE notas_definitivas SET {$trayecto} = ? WHERE id = ?";
-        $stmt = $db->prepare($sql_update);
-        $stmt->bind_param("di", $nueva_nota, $id_nota);
-        
-        if (!$stmt->execute()) {
-            throw new Exception("Error al actualizar la nota");
-        }
-        $stmt->close();
-        
-        // 2. Registrar el cambio en el historial
-        $sql_historial = "INSERT INTO historial_cambios_notas 
-                         (id_nota, trayecto, nota_anterior, nota_nueva, justificacion, id_admin, fecha_cambio) 
-                         VALUES (?, ?, ?, ?, ?, ?, NOW())";
-        $stmt = $db->prepare($sql_historial);
-        $trayecto_numero = str_replace('trayecto_', '', $trayecto);
-        $stmt->bind_param("isddsi", $id_nota, $trayecto_numero, $nota_anterior, $nueva_nota, $justificacion, $id_admin);
-        
-        if (!$stmt->execute()) {
-            throw new Exception("Error al registrar en el historial");
-        }
-        $stmt->close();
-        
-        // Confirmar transacción
-        $db->commit();
-        
-        return ['success' => true, 'message' => 'Nota actualizada correctamente'];
-        
-    } catch (Exception $e) {
-        // Revertir transacción en caso de error
-        $db->rollback();
-        return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
-    }
-}
-
 // Procesar formularios
 $mensaje = '';
 $tipo_mensaje = '';
@@ -263,6 +90,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 include("includes/head.php");
 ?>
+
+<style>
+.justificacion-texto {
+    max-height: 80px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+    padding: 5px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.table-responsive {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.badge {
+    font-size: 0.8rem;
+    padding: 0.4em 0.6em;
+}
+
+.historial-table th {
+    position: sticky;
+    top: 0;
+    background-color: #343a40;
+    z-index: 10;
+}
+</style>
 
 <div class="container-fluid">
     <div class="row">
@@ -453,9 +308,7 @@ include("includes/head.php");
                                             <button type="button" class="btn btn-warning btn-sm" data-toggle="modal" data-target="#modalEditarNota<?php echo $nota['id']; ?>">
                                                 <i class="fas fa-edit"></i> Editar
                                             </button>
-                                            <button type="button" class="btn btn-info btn-sm" data-toggle="modal" data-target="#modalHistorial<?php echo $nota['id']; ?>">
-                                                <i class="fas fa-history"></i> Historial
-                                            </button>
+                                            
                                         </td>
                                     </tr>
 
@@ -523,65 +376,139 @@ include("includes/head.php");
                                         </div>
                                     </div>
 
-                                    <!-- Modal para Ver Historial - CORREGIDO -->
+                                    <!-- Modal para Ver Historial - MEJORADO -->
                                     <div class="modal fade" id="modalHistorial<?php echo $nota['id']; ?>" tabindex="-1" role="dialog" aria-labelledby="modalHistorialLabel<?php echo $nota['id']; ?>" aria-hidden="true">
-                                        <div class="modal-dialog modal-lg" role="document">
+                                        <div class="modal-dialog modal-xl" role="document">
                                             <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title" id="modalHistorialLabel<?php echo $nota['id']; ?>">Historial de Cambios - <?php echo htmlspecialchars($nota['nombre_periodo'] ?? 'Sin periodo'); ?></h5>
+                                                <div class="modal-header bg-info text-white">
+                                                    <h5 class="modal-title" id="modalHistorialLabel<?php echo $nota['id']; ?>">
+                                                        <i class="fas fa-history"></i> Historial de Cambios - 
+                                                        <?php echo htmlspecialchars($nota['nombre_periodo'] ?? 'Sin periodo'); ?>
+                                                    </h5>
                                                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                                         <span aria-hidden="true">&times;</span>
                                                     </button>
                                                 </div>
                                                 <div class="modal-body">
                                                     <?php 
-                                                    // Cargar el historial directamente aquí
+                                                    // Cargar el historial para esta nota específica
                                                     $historial = obtenerHistorialCambiosNota($nota['id']);
-                                                    echo "<!-- DEBUG Historial para nota {$nota['id']}: " . print_r($historial, true) . " -->";
+                                                    
                                                     if (!empty($historial)): 
                                                     ?>
+                                                    <div class="alert alert-info">
+                                                        <i class="fas fa-info-circle"></i> 
+                                                        Se encontraron <strong><?php echo count($historial); ?></strong> cambio(s) en esta nota.
+                                                    </div>
+                                                    
                                                     <div class="table-responsive">
-                                                        <table class="table table-bordered table-sm">
-                                                            <thead class="thead-light">
+                                                        <table class="table table-bordered table-hover table-sm historial-table">
+                                                            <thead class="thead-dark">
                                                                 <tr>
-                                                                    <th>Fecha</th>
+                                                                    <th>Fecha y Hora</th>
                                                                     <th>Administrador</th>
                                                                     <th>Trayecto</th>
                                                                     <th>Nota Anterior</th>
                                                                     <th>Nota Nueva</th>
+                                                                    <th>Cambio</th>
                                                                     <th>Justificación</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                <?php foreach ($historial as $cambio): ?>
+                                                                <?php foreach ($historial as $cambio): 
+                                                                    $diferencia = $cambio['nota_nueva'] - $cambio['nota_anterior'];
+                                                                    $clase_cambio = $diferencia > 0 ? 'text-success' : ($diferencia < 0 ? 'text-danger' : 'text-warning');
+                                                                    $icono_cambio = $diferencia > 0 ? 'fa-arrow-up' : ($diferencia < 0 ? 'fa-arrow-down' : 'fa-equals');
+                                                                ?>
                                                                 <tr>
-                                                                    <td><?php echo date('d/m/Y H:i', strtotime($cambio['fecha_cambio'])); ?></td>
-                                                                    <td><?php echo htmlspecialchars($cambio['admin_nombre'] ?? 'N/A'); ?></td>
-                                                                    <td>Trayecto <?php echo htmlspecialchars($cambio['trayecto']); ?></td>
+                                                                    <td class="font-weight-bold">
+                                                                        <i class="fas fa-calendar-alt"></i> 
+                                                                        <?php echo date('d/m/Y', strtotime($cambio['fecha_cambio'])); ?>
+                                                                        <br>
+                                                                        <small class="text-muted">
+                                                                            <i class="fas fa-clock"></i> 
+                                                                            <?php echo date('H:i:s', strtotime($cambio['fecha_cambio'])); ?>
+                                                                        </small>
+                                                                    </td>
                                                                     <td>
-                                                                        <span class="badge badge-<?php echo ($cambio['nota_anterior'] >= 10 ? 'success' : 'danger'); ?>">
+                                                                        <span class="badge badge-primary">
+                                                                            <i class="fas fa-user"></i> 
+                                                                            <?php echo htmlspecialchars($cambio['admin_nombre'] ?? 'Sistema'); ?>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td>
+                                                                        <span class="badge badge-secondary">
+                                                                            Trayecto <?php echo htmlspecialchars($cambio['trayecto']); ?>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td>
+                                                                        <span class="badge badge-<?php echo ($cambio['nota_anterior'] >= 10 ? 'success' : 'danger'); ?> p-2">
                                                                             <?php echo number_format($cambio['nota_anterior'], 2); ?>
                                                                         </span>
                                                                     </td>
                                                                     <td>
-                                                                        <span class="badge badge-<?php echo ($cambio['nota_nueva'] >= 10 ? 'success' : 'danger'); ?>">
+                                                                        <span class="badge badge-<?php echo ($cambio['nota_nueva'] >= 10 ? 'success' : 'danger'); ?> p-2">
                                                                             <?php echo number_format($cambio['nota_nueva'], 2); ?>
                                                                         </span>
                                                                     </td>
-                                                                    <td><?php echo htmlspecialchars($cambio['justificacion']); ?></td>
+                                                                    <td class="<?php echo $clase_cambio; ?> font-weight-bold">
+                                                                        <i class="fas <?php echo $icono_cambio; ?>"></i>
+                                                                        <?php echo ($diferencia > 0 ? '+' : '') . number_format($diferencia, 2); ?>
+                                                                    </td>
+                                                                    <td>
+                                                                        <div class="justificacion-texto">
+                                                                            <?php echo nl2br(htmlspecialchars($cambio['justificacion'])); ?>
+                                                                        </div>
+                                                                    </td>
                                                                 </tr>
                                                                 <?php endforeach; ?>
                                                             </tbody>
                                                         </table>
                                                     </div>
+                                                    
+                                                    <!-- Resumen del Historial -->
+                                                    <div class="row mt-3">
+                                                        <div class="col-md-4">
+                                                            <div class="card bg-light">
+                                                                <div class="card-body text-center">
+                                                                    <h6 class="card-title">Total de Cambios</h6>
+                                                                    <h3 class="text-primary"><?php echo count($historial); ?></h3>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <div class="card bg-light">
+                                                                <div class="card-body text-center">
+                                                                    <h6 class="card-title">Primer Cambio</h6>
+                                                                    <small class="text-muted">
+                                                                        <?php echo date('d/m/Y H:i', strtotime(end($historial)['fecha_cambio'])); ?>
+                                                                    </small>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <div class="card bg-light">
+                                                                <div class="card-body text-center">
+                                                                    <h6 class="card-title">Último Cambio</h6>
+                                                                    <small class="text-muted">
+                                                                        <?php echo date('d/m/Y H:i', strtotime($historial[0]['fecha_cambio'])); ?>
+                                                                    </small>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
                                                     <?php else: ?>
-                                                    <div class="alert alert-info">
-                                                        No hay historial de cambios para esta nota.
+                                                    <div class="alert alert-warning text-center">
+                                                        <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+                                                        <h5>No hay historial de cambios</h5>
+                                                        <p class="mb-0">Esta nota no ha sido modificada aún.</p>
                                                     </div>
                                                     <?php endif; ?>
                                                 </div>
                                                 <div class="modal-footer">
-                                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+                                                    
+                                                   
                                                 </div>
                                             </div>
                                         </div>
@@ -601,5 +528,47 @@ include("includes/head.php");
         </div>
     </div>
 </div>
+
+<script>
+// Función para imprimir el historial
+function imprimirHistorial(idNota) {
+    const modalContent = document.querySelector('#modalHistorial' + idNota + ' .modal-content').cloneNode(true);
+    
+    // Remover botones del footer
+    const footer = modalContent.querySelector('.modal-footer');
+    if (footer) footer.remove();
+    
+    // Crear ventana de impresión
+    const ventanaImpresion = window.open('', '_blank');
+    ventanaImpresion.document.write(`
+        <html>
+            <head>
+                <title>Historial de Cambios - Nota ${idNota}</title>
+                <link href="../vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+                <style>
+                    body { padding: 20px; }
+                    .table { font-size: 12px; }
+                    .badge { font-size: 11px; }
+                    .justificacion-texto { max-height: none; }
+                </style>
+            </head>
+            <body>
+                <h4 class="text-center">Historial de Cambios - Nota ${idNota}</h4>
+                <p class="text-center text-muted">Generado el: ${new Date().toLocaleDateString()}</p>
+                ${modalContent.innerHTML}
+            </body>
+        </html>
+    `);
+    ventanaImpresion.document.close();
+    ventanaImpresion.print();
+}
+
+// Función para mejorar la experiencia del modal
+$(document).ready(function() {
+    $('.modal').on('shown.bs.modal', function() {
+        $(this).find('.table-responsive').css('max-height', '400px');
+    });
+});
+</script>
 
 <?php include("includes/footer.php"); ?>

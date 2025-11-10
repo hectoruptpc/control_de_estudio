@@ -14826,6 +14826,178 @@ function obtenerMateriasPorCarrera($id_carrera) {
 
 
 
+// NUEVA FUNCIÓN: Obtener materias con notas del estudiante
+function obtenerMateriasConNotas($id_estudiante, $id_carrera) {
+    global $db;
+    
+    $sql = "SELECT DISTINCT m.*, cm.semestre
+            FROM materias m
+            INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+            INNER JOIN notas_definitivas nd ON m.id_materia = nd.id_materia
+            WHERE cm.id_carrera = ? 
+            AND nd.id_usuario = ?
+            AND (
+                nd.trayecto_0 IS NOT NULL OR 
+                nd.trayecto_1 IS NOT NULL OR 
+                nd.trayecto_2 IS NOT NULL OR 
+                nd.trayecto_3 IS NOT NULL OR 
+                nd.trayecto_4 IS NOT NULL
+            )
+            ORDER BY m.trayecto, cm.semestre, m.nombre_materia";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_carrera, $id_estudiante);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $materias = [];
+    while ($row = $result->fetch_assoc()) {
+        $materias[] = $row;
+    }
+    
+    $stmt->close();
+    return $materias;
+}
+
+// FUNCIÓN: Obtener notas del estudiante para una materia específica
+function obtenerNotasEstudianteMateria($id_estudiante, $id_materia) {
+    global $db;
+    
+    $sql = "SELECT nd.*, pa.nombre_periodo 
+            FROM notas_definitivas nd
+            LEFT JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+            WHERE nd.id_usuario = ? AND nd.id_materia = ?
+            ORDER BY pa.nombre_periodo DESC";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_estudiante, $id_materia);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $notas = [];
+    while ($row = $result->fetch_assoc()) {
+        $notas[] = $row;
+    }
+    
+    $stmt->close();
+    return $notas;
+}
+
+// FUNCIÓN: Obtener historial de cambios de una nota - CORREGIDA
+function obtenerHistorialCambiosNota($id_nota) {
+    global $db;
+    
+    $sql = "SELECT h.*, u.nombre as admin_nombre 
+            FROM historial_cambios_notas h 
+            LEFT JOIN users u ON h.id_admin = u.id 
+            WHERE h.id_nota = ? 
+            ORDER BY h.fecha_cambio DESC";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_nota);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $historial = [];
+    while ($row = $result->fetch_assoc()) {
+        $historial[] = $row;
+    }
+    
+    $stmt->close();
+    return $historial;
+}
+
+// FUNCIÓN: Procesar edición de nota
+function procesarEdicionNota() {
+    global $db;
+    
+    if (!isset($_POST['id_nota']) || !isset($_POST['trayecto']) || !isset($_POST['nueva_nota'])) {
+        return ['success' => false, 'message' => 'Datos incompletos'];
+    }
+    
+    $id_nota = intval($_POST['id_nota']);
+    $trayecto = $_POST['trayecto'];
+    $nueva_nota = $_POST['nueva_nota'];
+    $justificacion = trim($_POST['justificacion'] ?? '');
+    
+    // Obtener el ID del administrador de la sesión - CORREGIDO según la estructura del index
+    if (isset($_SESSION['user']['id'])) {
+        $id_admin = $_SESSION['user']['id'];
+    } elseif (isset($_SESSION['id'])) {
+        $id_admin = $_SESSION['id'];
+    } elseif (isset($_SESSION['user_id'])) {
+        $id_admin = $_SESSION['user_id'];
+    } else {
+        // Debug para ver qué hay en la sesión
+        error_log("Session data: " . print_r($_SESSION, true));
+        return ['success' => false, 'message' => 'No se pudo identificar al administrador. Sesión: ' . print_r($_SESSION, true)];
+    }
+    
+    // Validar que la justificación no esté vacía
+    if (empty($justificacion)) {
+        return ['success' => false, 'message' => 'La justificación es obligatoria'];
+    }
+    
+    // Validar que la nota sea numérica y esté entre 0 y 20
+    if (!is_numeric($nueva_nota) || $nueva_nota < 0 || $nueva_nota > 20) {
+        return ['success' => false, 'message' => 'La nota debe ser un número entre 0 y 20'];
+    }
+    
+    // Obtener la nota actual
+    $sql_actual = "SELECT trayecto_0, trayecto_1, trayecto_2, trayecto_3, trayecto_4 
+                   FROM notas_definitivas WHERE id = ?";
+    $stmt = $db->prepare($sql_actual);
+    $stmt->bind_param("i", $id_nota);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $nota_actual = $result->fetch_assoc();
+    $stmt->close();
+    
+    if (!$nota_actual) {
+        return ['success' => false, 'message' => 'No se encontró la nota a editar'];
+    }
+    
+    // Determinar la nota anterior según el trayecto
+    $nota_anterior = $nota_actual[$trayecto];
+    
+    // Iniciar transacción
+    $db->begin_transaction();
+    
+    try {
+        // 1. Actualizar la nota en notas_definitivas
+        $sql_update = "UPDATE notas_definitivas SET {$trayecto} = ? WHERE id = ?";
+        $stmt = $db->prepare($sql_update);
+        $stmt->bind_param("di", $nueva_nota, $id_nota);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error al actualizar la nota");
+        }
+        $stmt->close();
+        
+        // 2. Registrar el cambio en el historial
+        $sql_historial = "INSERT INTO historial_cambios_notas 
+                         (id_nota, trayecto, nota_anterior, nota_nueva, justificacion, id_admin, fecha_cambio) 
+                         VALUES (?, ?, ?, ?, ?, ?, NOW())";
+        $stmt = $db->prepare($sql_historial);
+        $trayecto_numero = str_replace('trayecto_', '', $trayecto);
+        $stmt->bind_param("isddsi", $id_nota, $trayecto_numero, $nota_anterior, $nueva_nota, $justificacion, $id_admin);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error al registrar en el historial");
+        }
+        $stmt->close();
+        
+        // Confirmar transacción
+        $db->commit();
+        
+        return ['success' => true, 'message' => 'Nota actualizada correctamente'];
+        
+    } catch (Exception $e) {
+        // Revertir transacción en caso de error
+        $db->rollback();
+        return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+    }
+}
 
 
 
