@@ -14644,7 +14644,6 @@ function buscarEstudiantePorCedula($cedula) {
 }
 }
 
-
 /**
  * Función auxiliar para buscar carreras por nombre
  */
@@ -14682,8 +14681,6 @@ function obtenerCarrerasPorNombre($nombre_carrera) {
         return [];
     }
 }
-
-
 
 /**
  * Obtener estudiante por ID
@@ -14823,8 +14820,6 @@ function obtenerMateriasPorCarrera($id_carrera) {
         return [];
     }
 }
-
-
 
 // NUEVA FUNCIÓN: Obtener materias con notas del estudiante
 function obtenerMateriasConNotas($id_estudiante, $id_carrera) {
@@ -14987,6 +14982,24 @@ function procesarEdicionNota() {
         }
         $stmt->close();
         
+        // 3. REGISTRAR EN AUDITORÍA - EDICIÓN EXITOSA DE NOTA
+        registrarAuditoria(
+            "UPDATE", 
+            "notas_definitivas", 
+            $id_nota, 
+            [
+                $trayecto => $nota_anterior
+            ], 
+            [
+                $trayecto => $nueva_nota,
+                'justificacion' => $justificacion,
+                'id_admin' => $id_admin,
+                'trayecto_afectado' => $trayecto
+            ], 
+            "Notas", 
+            "Edición exitosa de nota"
+        );
+        
         // Confirmar transacción
         $db->commit();
         
@@ -14995,6 +15008,24 @@ function procesarEdicionNota() {
     } catch (Exception $e) {
         // Revertir transacción en caso de error
         $db->rollback();
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN EDICIÓN
+        registrarAuditoria(
+            "ERROR", 
+            "notas_definitivas", 
+            $id_nota, 
+            null, 
+            [
+                'trayecto' => $trayecto,
+                'nota_anterior' => $nota_anterior,
+                'nueva_nota' => $nueva_nota,
+                'justificacion' => $justificacion,
+                'error' => $e->getMessage()
+            ], 
+            "Notas", 
+            "Error en edición de nota"
+        );
+        
         return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
     }
 }
