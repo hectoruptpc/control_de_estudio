@@ -9764,7 +9764,7 @@ function verificarPermiso($pagina) {
         'consultar_notas_pasadas', 'tipos_pago', 'tipos_horario', 
         'horario_personal', 'respaldo_bd',
         'gestionar_carrera', 'gestion_periodo_academico', 'gestion_asig_cursos', 
-        'gestion_horario', 'titulos_re_materia', 'grado', 'gestion_grado'
+        'gestion_horario', 'titulos_re_materia', 'grado', 'gestion_grado', 'visita'
     ];
     
     // Verificar que el permiso solicitado sea válido
@@ -9880,7 +9880,7 @@ function cargarPermisosUsuario() {
         consultar_notas_pasadas, tipos_pago, tipos_horario, 
         horario_personal, respaldo_bd,
         gestionar_carrera, gestion_periodo_academico, gestion_asig_cursos, 
-        gestion_horario, titulos_re_materia, grado, gestion_grado
+        gestion_horario, titulos_re_materia, grado, gestion_grado, visita
         FROM users WHERE id = ?";
     
     $stmt = $db->prepare($query);
@@ -9924,7 +9924,7 @@ function actualizarPermisosUsuario($user_id, $permisos) {
                         asig_cursos, horarios, gestion_director_carrera, notas_cargadas, consultar_notas, 
                         consultar_notas_pasadas, tipos_pago, tipos_horario, horario_personal, respaldo_bd,
                         gestionar_carrera, gestion_periodo_academico, gestion_asig_cursos, gestion_horario, titulos_re_materia,
-                        grado, gestion_grado
+                        grado, gestion_grado, visita
                         FROM users WHERE id = ?";
         
         $stmt_actual = $db->prepare($query_actual);
@@ -9979,7 +9979,8 @@ function actualizarPermisosUsuario($user_id, $permisos) {
             'gestion_horario' => isset($permisos['gestion_horario']) ? 1 : 0,
             'titulos_re_materia' => isset($permisos['titulos_re_materia']) ? 1 : 0,
             'grado' => isset($permisos['grado']) ? 1 : 0,
-            'gestion_grado' => isset($permisos['gestion_grado']) ? 1 : 0
+            'gestion_grado' => isset($permisos['gestion_grado']) ? 1 : 0,
+            'visita' => isset($permisos['visita']) ? 1 : 0,
         ];
         
         // VERIFICAR SI HAY CAMBIOS REALES
@@ -10045,7 +10046,8 @@ function actualizarPermisosUsuario($user_id, $permisos) {
                  gestion_horario = ?,
                  titulos_re_materia = ?,
                  grado = ?,
-                 gestion_grado = ?
+                 gestion_grado = ?,
+                 visita = ?
                  WHERE id = ?";
         
         $stmt = $db->prepare($query);
@@ -10053,7 +10055,7 @@ function actualizarPermisosUsuario($user_id, $permisos) {
             throw new Exception("Error al preparar query: " . $db->error);
         }
         
-        $stmt->bind_param("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", 
+        $stmt->bind_param("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", 
             $permisos_nuevos['usuario'], $permisos_nuevos['estudiante'], $permisos_nuevos['docente'], 
             $permisos_nuevos['admin'], $permisos_nuevos['super_user'], $permisos_nuevos['editar_user'], 
             $permisos_nuevos['editar_nota'], $permisos_nuevos['editar_acceso'], $permisos_nuevos['editar_valores'],
@@ -10067,6 +10069,7 @@ function actualizarPermisosUsuario($user_id, $permisos) {
             $permisos_nuevos['horario_personal'], $permisos_nuevos['respaldo_bd'], $permisos_nuevos['gestionar_carrera'],
             $permisos_nuevos['gestion_periodo_academico'], $permisos_nuevos['gestion_asig_cursos'], $permisos_nuevos['gestion_horario'],
             $permisos_nuevos['titulos_re_materia'], $permisos_nuevos['grado'], $permisos_nuevos['gestion_grado'],
+            $permisos_nuevos['visita'],
             $user_id
         );
         
@@ -10163,7 +10166,7 @@ function obtenerUsuariosConPermisos() {
              asig_cursos, horarios, gestion_director_carrera, notas_cargadas, consultar_notas, 
              consultar_notas_pasadas, tipos_pago, tipos_horario, horario_personal, respaldo_bd,
              gestionar_carrera, gestion_periodo_academico, gestion_asig_cursos, gestion_horario, titulos_re_materia,
-             grado, gestion_grado
+             grado, gestion_grado, visita
              FROM users ORDER BY username";
     
     return $db->query($query);

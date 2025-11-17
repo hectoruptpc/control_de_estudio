@@ -134,6 +134,8 @@ include("includes/head.php");
                         <!-- NUEVOS CAMPOS GRADO -->
                         <th>Grado</th>
                         <th>Gestión Grado</th>
+                        <!-- NUEVO CAMPO VISITA -->
+                        <th>Visita</th>
                     </tr>
                 </thead>
                 <tbody id="tabla-usuarios">
@@ -161,7 +163,8 @@ include("includes/head.php");
                                            (isset($user['gestion_horario']) && $user['gestion_horario']) || 
                                            (isset($user['titulos_re_materia']) && $user['titulos_re_materia']) ||
                                            (isset($user['grado']) && $user['grado']) || 
-                                           (isset($user['gestion_grado']) && $user['gestion_grado']);
+                                           (isset($user['gestion_grado']) && $user['gestion_grado']) ||
+                                           (isset($user['visita']) && $user['visita']);
                             
                             $clases = 'fila-usuario';
                             $clases .= $esUsuario ? ' usuario' : '';
@@ -295,13 +298,18 @@ include("includes/head.php");
                         <td class="text-center">
                             <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][gestion_grado]" <?= isset($user['gestion_grado']) && $user['gestion_grado'] ? 'checked' : '' ?>>
                         </td>
+                        
+                        <!-- NUEVO CAMPO VISITA -->
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][visita]" <?= isset($user['visita']) && $user['visita'] ? 'checked' : '' ?>>
+                        </td>
                     </tr>
                     <?php
                         endwhile;
                     else:
                     ?>
                     <tr>
-                        <td colspan="41" class="text-center">No hay usuarios registrados</td>
+                        <td colspan="42" class="text-center">No hay usuarios registrados</td>
                     </tr>
                     <?php endif; ?>
                 </tbody>
