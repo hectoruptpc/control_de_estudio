@@ -319,7 +319,7 @@ if (!isLoggedIn() || !isAdmin()) {
                         <?php endif; ?>
 
                           <!-- Visita - Seguimiento de Usuarios -->
-                        <?php if (tienePermiso('admin')): ?>
+                        <?php if (tienePermiso('visita')): ?>
                         <a title="Seguimiento de Movimientos de Usuarios" class="dropdown-item" href="visita.php">
                         <i class="fas fa-user-secret fa-fw"></i> Visita
                         </a>
