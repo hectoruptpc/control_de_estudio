@@ -12,6 +12,9 @@ if (!isLoggedIn() || !isUser()) {
     exit();
 }
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 
 ?>
 

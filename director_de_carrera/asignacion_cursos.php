@@ -13,6 +13,9 @@ if (!isLoggedIn() || !isUser()) {
     exit();
 }
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 $carrera_director = $_SESSION['user']['carrera_di'];
 
 // Obtener información de la carrera del director

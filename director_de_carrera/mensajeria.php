@@ -8,6 +8,9 @@ if (!isLoggedIn() || !isUser()) {
     exit();
 }
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 $titulopag = "Sistema de Mensajería";
 include("includes/head.php");
 
