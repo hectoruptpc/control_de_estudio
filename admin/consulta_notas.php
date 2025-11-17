@@ -10,6 +10,9 @@ if (!isLoggedIn()) {
     exit();
 }
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 $titulopag = "Consulta de Notas por Cédula";
 include("includes/head.php");
 

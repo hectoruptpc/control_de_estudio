@@ -16,6 +16,9 @@ if (!isLoggedIn()) {
     exit();
 }
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Obtener parámetros de filtro
 $filtro_profesor = $_GET['profesor'] ?? '';
 $filtro_fecha_desde = $_GET['fecha_desde'] ?? '';

@@ -15,6 +15,9 @@ if (!isAdmin()) {
     exit();
 }
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Procesar la asignación de carrera
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['asignar_carrera'])) {
     $id_usuario = intval($_POST['id_usuario']);

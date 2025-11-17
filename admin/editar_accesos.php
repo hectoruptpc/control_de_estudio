@@ -16,6 +16,9 @@ cargarPermisosUsuario();
 // Verificar permiso para editar acceso
 verificarPermiso('editar_acceso');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Verificar si es admin (esta función debe existir en functions.php)
 if (!isAdmin()) {
     $_SESSION['error'] = "No tien permisos de administrador para acceder a esta página.";

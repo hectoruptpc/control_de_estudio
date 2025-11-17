@@ -15,6 +15,9 @@ if (!isAdmin()) {
     exit();
 }
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Procesar la solicitud de respaldo
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['backup'])) {
     realizarRespaldo();

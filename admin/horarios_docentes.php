@@ -9,6 +9,9 @@ include('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('horarios');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 global $db;
 
 // Procesar solicitudes AJAX

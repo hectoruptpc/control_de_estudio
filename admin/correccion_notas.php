@@ -9,6 +9,9 @@ include('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('editar_nota');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Procesar formularios
 $mensaje = '';
 $tipo_mensaje = '';

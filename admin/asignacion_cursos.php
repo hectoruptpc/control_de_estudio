@@ -9,6 +9,9 @@ include('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('asig_cursos');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Obtener todas las carreras activas usando la función
 $carreras = obtenerTodasLasCarreras();
 

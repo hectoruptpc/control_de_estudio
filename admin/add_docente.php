@@ -10,6 +10,9 @@ include("includes/head.php");
 $permiso_agregar = isset($_SESSION['user']['agregar_docente']) && $_SESSION['user']['agregar_docente'] == 1;
 $permiso_editar = isset($_SESSION['user']['editar_docente']) && $_SESSION['user']['editar_docente'] == 1;
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Procesar el formulario cuando se envía
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Validar que el usuario tenga permiso para agregar

@@ -9,6 +9,9 @@ include('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('asig_secciones');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Manejar petición AJAX para obtener materias del docente POR CARRERA
 if(isset($_GET['ajax']) && $_GET['ajax'] == 'materias_docente_carrera' && isset($_GET['id_docente']) && isset($_GET['id_carrera'])) {
     header('Content-Type: application/json');

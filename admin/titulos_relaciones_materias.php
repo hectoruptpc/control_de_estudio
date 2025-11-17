@@ -9,6 +9,9 @@ include('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('titulos_re_materia');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // **1. Manejar solicitudes AJAX para búsqueda en tiempo real**
 if (isset($_GET['ajax_type'])) {
     header('Content-Type: application/json');

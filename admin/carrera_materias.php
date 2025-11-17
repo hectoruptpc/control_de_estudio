@@ -11,6 +11,9 @@ include('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('rela_materia_carrera');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 
 include("includes/head.php");
 

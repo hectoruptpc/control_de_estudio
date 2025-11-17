@@ -9,6 +9,9 @@ include('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('tipos_horario');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Variables para mensajes
 $mensaje = '';
 $tipo_mensaje = ''; // success, danger, warning

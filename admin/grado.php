@@ -9,6 +9,9 @@ include('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('grado');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Configuración de paginación
 $registros_por_pagina = obtener_registros_por_pagina();
 $pagina_actual = isset($_GET['pagina']) ? (int)$_GET['pagina'] : 1;

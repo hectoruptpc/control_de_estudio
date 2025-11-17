@@ -14,6 +14,9 @@ if (!isAdmin()) {
     exit();
 }
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Procesar formularios
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['accion']) && isset($_POST['tabla'])) {

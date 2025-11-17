@@ -9,6 +9,9 @@ include('../funciones/functions.php');
 $permiso_agregar = isset($_SESSION['user']['agregar_materia']) && $_SESSION['user']['agregar_materia'] == 1;
 $permiso_editar = isset($_SESSION['user']['editar_materia']) && $_SESSION['user']['editar_materia'] == 1;
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Función para obtener los trayectos desde la base de datos
 function obtenerTrayectos($db) {
     $query = "SELECT id_trayecto, numero_trayecto, nombre_trayecto, descripcion 

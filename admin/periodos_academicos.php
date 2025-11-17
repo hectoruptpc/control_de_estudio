@@ -9,6 +9,9 @@ include('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('periodos_academicos');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 
 // Procesar formularios
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {

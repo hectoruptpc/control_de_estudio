@@ -9,6 +9,9 @@ include('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('tipos_pago');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Variables
 $error = $success = '';
 $id = $tipopago = '';

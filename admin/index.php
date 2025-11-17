@@ -7,6 +7,9 @@ include('../funciones/functions.php');
 //CARGAR PERMISOS
 cargarPermisosUsuario();
 verificarPermiso('admin');
+
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
 ?>
 
 <!DOCTYPE html>
