@@ -14,6 +14,8 @@ if (empty($_SESSION['user']['estudiante']) || $_SESSION['user']['estudiante'] !=
     exit();
 }
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
 
 
 // 4. Obtener ID de usuario seguro

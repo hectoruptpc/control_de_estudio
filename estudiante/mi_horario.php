@@ -11,6 +11,10 @@ if (!isLoggedIn() || !isEstudiante()) {
     header('location: ../login.php');
     exit();
 }
+
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Obtener la sección del estudiante - CORREGIDO: usar $_SESSION['user']['id']
 $estudiante_id = (int)$_SESSION['user']['id'];
 $seccion_estudiante = obtenerSeccionEstudiante($db, $estudiante_id);

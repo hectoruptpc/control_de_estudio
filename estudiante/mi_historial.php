@@ -14,7 +14,8 @@ if (!isset($_SESSION['user']) || $_SESSION['user']['estudiante'] != 1) {
     exit();
 }
 
-
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
 
 $titulopag = "Mi Historial de Notas";
 include("includes/head.php");
