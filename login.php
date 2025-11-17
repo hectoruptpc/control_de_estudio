@@ -5,7 +5,13 @@ ini_set('display_errors', '1');
 
 
 $titulo ="Ingreso al Sistema";
-include('funciones/functions.php') ?>
+include('funciones/functions.php');
+
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
+?>
+
 <!DOCTYPE html>
 <html>
 <head>
