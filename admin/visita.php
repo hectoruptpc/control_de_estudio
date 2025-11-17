@@ -27,7 +27,7 @@ if (!isAdmin()) {
 }
 
 // Configuración de paginación
-$registros_por_pagina = 50; // Puedes ajustar este número
+$registros_por_pagina = 20; // Número de registros por página
 $pagina_actual = isset($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
 if ($pagina_actual < 1) $pagina_actual = 1;
 
@@ -96,7 +96,7 @@ function buscarUsuarioPorIdentificacion($busqueda) {
 }
 
 // Función para obtener visitas del usuario con paginación
-function obtenerVisitasUsuario($user_id, $filtros = [], $pagina = 1, $registros_por_pagina = 50) {
+function obtenerVisitasUsuario($user_id, $filtros = [], $pagina = 1, $registros_por_pagina = 20) {
     global $db;
     
     try {
@@ -130,9 +130,7 @@ function obtenerVisitasUsuario($user_id, $filtros = [], $pagina = 1, $registros_
             $params[] = $filtros['fecha_hasta'];
         }
         
-        $query .= " ORDER BY v.fecha_visita DESC 
-                   LIMIT ? OFFSET ?";
-        
+        $query .= " ORDER BY v.fecha_visita DESC LIMIT ? OFFSET ?";
         $params[0] .= "ii";
         $params[] = $registros_por_pagina;
         $params[] = $offset;
@@ -161,9 +159,7 @@ function obtenerVisitasUsuario($user_id, $filtros = [], $pagina = 1, $registros_
                 'fecha_visita' => $row['fecha_visita'],
                 'web' => $row['web'],
                 'nombre_usuario' => $row['nombre_usuario'],
-                'cedula_usuario' => $row['cedula_usuario'],
-                'fecha_formateada' => date('Y-m-d', strtotime($row['fecha_visita'])),
-                'hora_formateada' => date('H:i:s', strtotime($row['fecha_visita']))
+                'cedula_usuario' => $row['cedula_usuario']
             ];
         }
 
@@ -177,24 +173,24 @@ function obtenerVisitasUsuario($user_id, $filtros = [], $pagina = 1, $registros_
 }
 
 // Función para contar total de visitas (para paginación)
-function contarTotalVisitasUsuario($user_id, $filtros = []) {
+function contarTotalVisitas($user_id, $filtros = []) {
     global $db;
     
     try {
         $query = "SELECT COUNT(*) as total
-                  FROM visitas 
-                  WHERE id_usuario = ?";
+                  FROM visitas v
+                  WHERE v.id_usuario = ?";
         
         $params = ["i", $user_id];
         
         if (!empty($filtros['fecha_desde'])) {
-            $query .= " AND DATE(fecha_visita) >= ?";
+            $query .= " AND DATE(v.fecha_visita) >= ?";
             $params[0] .= "s";
             $params[] = $filtros['fecha_desde'];
         }
         
         if (!empty($filtros['fecha_hasta'])) {
-            $query .= " AND DATE(fecha_visita) <= ?";
+            $query .= " AND DATE(v.fecha_visita) <= ?";
             $params[0] .= "s";
             $params[] = $filtros['fecha_hasta'];
         }
@@ -219,9 +215,33 @@ function contarTotalVisitasUsuario($user_id, $filtros = []) {
         return $total;
         
     } catch (Exception $e) {
-        error_log("Error en contarTotalVisitasUsuario: " . $e->getMessage());
+        error_log("Error en contarTotalVisitas: " . $e->getMessage());
         return 0;
     }
+}
+
+// Función para agrupar visitas por día
+function agruparVisitasPorDia($visitas) {
+    $visitas_por_dia = [];
+    
+    foreach ($visitas as $visita) {
+        $fecha = date('Y-m-d', strtotime($visita['fecha_visita']));
+        $fecha_formateada = date('d/m/Y', strtotime($visita['fecha_visita']));
+        
+        if (!isset($visitas_por_dia[$fecha])) {
+            $visitas_por_dia[$fecha] = [
+                'fecha' => $fecha,
+                'fecha_formateada' => $fecha_formateada,
+                'total_visitas' => 0,
+                'visitas' => []
+            ];
+        }
+        
+        $visitas_por_dia[$fecha]['visitas'][] = $visita;
+        $visitas_por_dia[$fecha]['total_visitas']++;
+    }
+    
+    return $visitas_por_dia;
 }
 
 // Función para obtener estadísticas del usuario
@@ -285,32 +305,11 @@ function obtenerEstadisticasUsuario($user_id, $filtros = []) {
     }
 }
 
-// Función para agrupar visitas por día
-function agruparVisitasPorDia($visitas) {
-    $visitas_agrupadas = [];
-    
-    foreach ($visitas as $visita) {
-        $fecha = $visita['fecha_formateada'];
-        if (!isset($visitas_agrupadas[$fecha])) {
-            $visitas_agrupadas[$fecha] = [
-                'fecha' => $fecha,
-                'fecha_formateada' => date('d/m/Y', strtotime($fecha)),
-                'total_visitas' => 0,
-                'visitas' => []
-            ];
-        }
-        $visitas_agrupadas[$fecha]['visitas'][] = $visita;
-        $visitas_agrupadas[$fecha]['total_visitas']++;
-    }
-    
-    return $visitas_agrupadas;
-}
-
 // Procesar búsqueda
 $resultados_busqueda = [];
 $usuario_seleccionado = null;
 $visitas_usuario = [];
-$visitas_agrupadas = [];
+$visitas_por_dia = [];
 $estadisticas_usuario = [];
 $mostrar_resultados = false;
 $total_visitas = 0;
@@ -328,7 +327,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['buscar'])) {
 // Procesar selección de usuario
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['seleccionar_usuario'])) {
     $user_id = (int)$_POST['user_id'];
-    $pagina_actual = 1; // Resetear a primera página cuando se selecciona nuevo usuario
+    $pagina_actual = 1; // Resetear a primera página al seleccionar nuevo usuario
     
     // Obtener información del usuario
     $query = "SELECT id, idusuario, nombre, email, tlf, cel, usuario, estudiante, docente, admin 
@@ -350,54 +349,60 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['seleccionar_usuario'])
         $usuario_seleccionado['tipo_usuario'] = $tipo_usuario;
     }
     
-    // Guardar user_id en sesión para la paginación
-    $_SESSION['visita_user_id'] = $user_id;
-    $_SESSION['visita_filtros'] = [
+    // Obtener filtros
+    $filtros = [
         'fecha_desde' => $_POST['fecha_desde'] ?? '',
         'fecha_hasta' => $_POST['fecha_hasta'] ?? ''
     ];
-}
-
-// Si hay un usuario seleccionado (de sesión o nuevo)
-if (isset($_SESSION['visita_user_id'])) {
-    $user_id = $_SESSION['visita_user_id'];
-    $filtros = $_SESSION['visita_filtros'] ?? [];
     
-    // Obtener información del usuario si no está cargada
-    if (!$usuario_seleccionado) {
-        $query = "SELECT id, idusuario, nombre, email, tlf, cel, usuario, estudiante, docente, admin 
-                  FROM users WHERE id = ?";
-        $stmt = $db->prepare($query);
-        $stmt->bind_param("i", $user_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $usuario_seleccionado = $result->fetch_assoc();
-        
-        if ($usuario_seleccionado) {
-            $tipo_usuario = "Usuario";
-            if ($usuario_seleccionado['estudiante']) $tipo_usuario = "Estudiante";
-            if ($usuario_seleccionado['docente']) $tipo_usuario = "Docente";
-            if ($usuario_seleccionado['admin']) $tipo_usuario = "Administrador";
-            if ($usuario_seleccionado['usuario']) $tipo_usuario = "Director Carrera";
-            
-            $usuario_seleccionado['tipo_usuario'] = $tipo_usuario;
-        }
-    }
-    
-    // Obtener visitas y estadísticas con paginación
-    $total_visitas = contarTotalVisitasUsuario($user_id, $filtros);
+    // Obtener visitas y estadísticas
+    $visitas_usuario = obtenerVisitasUsuario($user_id, $filtros, $pagina_actual, $registros_por_pagina);
+    $visitas_por_dia = agruparVisitasPorDia($visitas_usuario);
+    $estadisticas_usuario = obtenerEstadisticasUsuario($user_id, $filtros);
+    $total_visitas = contarTotalVisitas($user_id, $filtros);
     $total_paginas = ceil($total_visitas / $registros_por_pagina);
     
-    // Ajustar página actual si es necesario
-    if ($pagina_actual > $total_paginas && $total_paginas > 0) {
-        $pagina_actual = $total_paginas;
-    }
-    
-    $visitas_usuario = obtenerVisitasUsuario($user_id, $filtros, $pagina_actual, $registros_por_pagina);
-    $visitas_agrupadas = agruparVisitasPorDia($visitas_usuario);
-    $estadisticas_usuario = obtenerEstadisticasUsuario($user_id, $filtros);
-    
     $mostrar_resultados = false;
+}
+
+// Procesar cambio de página (GET)
+if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['user_id']) && isset($_GET['pagina'])) {
+    $user_id = (int)$_GET['user_id'];
+    $pagina_actual = (int)$_GET['pagina'];
+    
+    if ($pagina_actual < 1) $pagina_actual = 1;
+    
+    // Obtener información del usuario
+    $query = "SELECT id, idusuario, nombre, email, tlf, cel, usuario, estudiante, docente, admin 
+              FROM users WHERE id = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $usuario_seleccionado = $result->fetch_assoc();
+    
+    if ($usuario_seleccionado) {
+        $tipo_usuario = "Usuario";
+        if ($usuario_seleccionado['estudiante']) $tipo_usuario = "Estudiante";
+        if ($usuario_seleccionado['docente']) $tipo_usuario = "Docente";
+        if ($usuario_seleccionado['admin']) $tipo_usuario = "Administrador";
+        if ($usuario_seleccionado['usuario']) $tipo_usuario = "Director Carrera";
+        
+        $usuario_seleccionado['tipo_usuario'] = $tipo_usuario;
+        
+        // Obtener filtros de la sesión o usar vacíos
+        $filtros = [
+            'fecha_desde' => $_GET['fecha_desde'] ?? '',
+            'fecha_hasta' => $_GET['fecha_hasta'] ?? ''
+        ];
+        
+        // Obtener visitas y estadísticas
+        $visitas_usuario = obtenerVisitasUsuario($user_id, $filtros, $pagina_actual, $registros_por_pagina);
+        $visitas_por_dia = agruparVisitasPorDia($visitas_usuario);
+        $estadisticas_usuario = obtenerEstadisticasUsuario($user_id, $filtros);
+        $total_visitas = contarTotalVisitas($user_id, $filtros);
+        $total_paginas = ceil($total_visitas / $registros_por_pagina);
+    }
 }
 
 include("includes/head.php");
@@ -597,13 +602,15 @@ include("includes/head.php");
                     <div class="row align-items-center">
                         <div class="col-md-6">
                             <p class="mb-0 text-muted">
-                                Mostrando <?= number_format(($pagina_actual - 1) * $registros_por_pagina + 1) ?> 
-                                a <?= number_format(min($pagina_actual * $registros_por_pagina, $total_visitas)) ?> 
-                                de <?= number_format($total_visitas) ?> visitas
+                                Mostrando <strong><?= min($registros_por_pagina, count($visitas_usuario)) ?></strong> de 
+                                <strong><?= number_format($total_visitas) ?></strong> visitas totales
                             </p>
                         </div>
                         <div class="col-md-6 text-right">
-                            <span class="text-muted">Página <?= $pagina_actual ?> de <?= $total_paginas ?></span>
+                            <p class="mb-0 text-muted">
+                                Página <strong><?= $pagina_actual ?></strong> de 
+                                <strong><?= $total_paginas ?></strong>
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -616,14 +623,14 @@ include("includes/head.php");
                     <h6 class="m-0 font-weight-bold text-primary">Historial de Visitas (Agrupado por Días)</h6>
                 </div>
                 <div class="card-body">
-                    <?php if (!empty($visitas_agrupadas)): ?>
-                        <?php foreach ($visitas_agrupadas as $grupo): ?>
+                    <?php if (!empty($visitas_por_dia)): ?>
+                        <?php foreach ($visitas_por_dia as $dia): ?>
                         <div class="card mb-4 border-left-primary">
                             <div class="card-header bg-light py-2">
                                 <h6 class="m-0 font-weight-bold text-primary">
                                     <i class="fas fa-calendar-day mr-2"></i>
-                                    <?= $grupo['fecha_formateada'] ?>
-                                    <span class="badge badge-primary ml-2"><?= $grupo['total_visitas'] ?> visitas</span>
+                                    <?= $dia['fecha_formateada'] ?>
+                                    <span class="badge badge-primary ml-2"><?= $dia['total_visitas'] ?> visitas</span>
                                 </h6>
                             </div>
                             <div class="card-body p-0">
@@ -631,25 +638,39 @@ include("includes/head.php");
                                     <table class="table table-bordered table-hover mb-0">
                                         <thead class="thead-light">
                                             <tr>
-                                                <th width="20%">Hora</th>
-                                                <th width="60%">Página Visitada</th>
-                                                <th width="20%">Dirección IP</th>
+                                                <th width="20%" class="text-center">
+                                                    <i class="fas fa-clock text-primary mr-1"></i>Hora
+                                                </th>
+                                                <th width="55%" class="text-center">
+                                                    <i class="fas fa-globe text-success mr-1"></i>Página Visitada
+                                                </th>
+                                                <th width="25%" class="text-center">
+                                                    <i class="fas fa-network-wired text-info mr-1"></i>Dirección IP
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <?php foreach ($grupo['visitas'] as $visita): ?>
+                                            <?php foreach ($dia['visitas'] as $visita): ?>
                                             <tr>
-                                                <td class="text-nowrap">
-                                                    <i class="fas fa-clock text-muted mr-1"></i>
-                                                    <?= htmlspecialchars($visita['hora_formateada']) ?>
+                                                <td class="text-center">
+                                                    <div class="d-flex align-items-center justify-content-center">
+                                                        <i class="fas fa-clock text-primary mr-2"></i>
+                                                        <span class="font-weight-bold"><?= date('H:i:s', strtotime($visita['fecha_visita'])) ?></span>
+                                                    </div>
                                                 </td>
                                                 <td>
-                                                    <i class="fas fa-file-alt text-muted mr-1"></i>
-                                                    <?= htmlspecialchars($visita['web']) ?>
+                                                    <div class="d-flex align-items-center">
+                                                        <i class="fas fa-globe text-success mr-3 ml-2"></i>
+                                                        <span class="text-truncate" style="max-width: 300px;" title="<?= htmlspecialchars($visita['web']) ?>">
+                                                            <?= htmlspecialchars($visita['web']) ?>
+                                                        </span>
+                                                    </div>
                                                 </td>
-                                                <td class="text-nowrap">
-                                                    <i class="fas fa-network-wired text-muted mr-1"></i>
-                                                    <?= htmlspecialchars($visita['ip']) ?>
+                                                <td class="text-center">
+                                                    <div class="d-flex align-items-center justify-content-center">
+                                                        <i class="fas fa-network-wired text-info mr-2"></i>
+                                                        <span class="badge badge-secondary font-weight-normal"><?= htmlspecialchars($visita['ip']) ?></span>
+                                                    </div>
                                                 </td>
                                             </tr>
                                             <?php endforeach; ?>
@@ -662,42 +683,46 @@ include("includes/head.php");
                         
                         <!-- Paginación -->
                         <?php if ($total_paginas > 1): ?>
-                        <nav aria-label="Paginación de visitas">
-                            <ul class="pagination justify-content-center">
-                                <!-- Botón Anterior -->
-                                <li class="page-item <?= $pagina_actual <= 1 ? 'disabled' : '' ?>">
-                                    <a class="page-link" 
-                                       href="?pagina=<?= $pagina_actual - 1 ?>" 
-                                       aria-label="Anterior">
-                                        <span aria-hidden="true">&laquo;</span>
-                                        <span class="sr-only">Anterior</span>
+                        <div class="d-flex justify-content-between align-items-center mt-4">
+                            <div>
+                                <?php if ($pagina_actual > 1): ?>
+                                    <a href="?user_id=<?= $usuario_seleccionado['id'] ?>&pagina=<?= $pagina_actual - 1 ?>&fecha_desde=<?= urlencode($filtros['fecha_desde']) ?>&fecha_hasta=<?= urlencode($filtros['fecha_hasta']) ?>" 
+                                       class="btn btn-outline-primary">
+                                        <i class="fas fa-chevron-left mr-1"></i> Anterior
                                     </a>
-                                </li>
-                                
-                                <!-- Números de página -->
-                                <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
-                                    <?php if ($i == 1 || $i == $total_paginas || ($i >= $pagina_actual - 2 && $i <= $pagina_actual + 2)): ?>
-                                        <li class="page-item <?= $i == $pagina_actual ? 'active' : '' ?>">
-                                            <a class="page-link" href="?pagina=<?= $i ?>"><?= $i ?></a>
-                                        </li>
-                                    <?php elseif ($i == $pagina_actual - 3 || $i == $pagina_actual + 3): ?>
-                                        <li class="page-item disabled">
-                                            <span class="page-link">...</span>
-                                        </li>
-                                    <?php endif; ?>
-                                <?php endfor; ?>
-                                
-                                <!-- Botón Siguiente -->
-                                <li class="page-item <?= $pagina_actual >= $total_paginas ? 'disabled' : '' ?>">
-                                    <a class="page-link" 
-                                       href="?pagina=<?= $pagina_actual + 1 ?>" 
-                                       aria-label="Siguiente">
-                                        <span aria-hidden="true">&raquo;</span>
-                                        <span class="sr-only">Siguiente</span>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <div class="text-center">
+                                <nav>
+                                    <ul class="pagination mb-0">
+                                        <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
+                                            <?php if ($i == $pagina_actual): ?>
+                                                <li class="page-item active">
+                                                    <span class="page-link"><?= $i ?></span>
+                                                </li>
+                                            <?php else: ?>
+                                                <li class="page-item">
+                                                    <a class="page-link" 
+                                                       href="?user_id=<?= $usuario_seleccionado['id'] ?>&pagina=<?= $i ?>&fecha_desde=<?= urlencode($filtros['fecha_desde']) ?>&fecha_hasta=<?= urlencode($filtros['fecha_hasta']) ?>">
+                                                        <?= $i ?>
+                                                    </a>
+                                                </li>
+                                            <?php endif; ?>
+                                        <?php endfor; ?>
+                                    </ul>
+                                </nav>
+                            </div>
+                            
+                            <div>
+                                <?php if ($pagina_actual < $total_paginas): ?>
+                                    <a href="?user_id=<?= $usuario_seleccionado['id'] ?>&pagina=<?= $pagina_actual + 1 ?>&fecha_desde=<?= urlencode($filtros['fecha_desde']) ?>&fecha_hasta=<?= urlencode($filtros['fecha_hasta']) ?>" 
+                                       class="btn btn-outline-primary">
+                                        Siguiente <i class="fas fa-chevron-right ml-1"></i>
                                     </a>
-                                </li>
-                            </ul>
-                        </nav>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                         <?php endif; ?>
                         
                     <?php else: ?>
