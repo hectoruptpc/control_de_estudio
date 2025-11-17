@@ -27,7 +27,7 @@ if (!isAdmin()) {
 }
 
 // Configuración de paginación
-$registros_por_pagina = 20; // Número de registros por página
+$registros_por_pagina = 50; // Número de registros por página
 $pagina_actual = isset($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
 if ($pagina_actual < 1) $pagina_actual = 1;
 
