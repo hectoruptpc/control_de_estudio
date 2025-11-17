@@ -9,6 +9,9 @@ if (!isLoggedIn() || !isDocente()) {
     exit();
 }
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Obtener ID del docente directamente de la sesión
 $docente_id = obtenerIdUsuario();
 
