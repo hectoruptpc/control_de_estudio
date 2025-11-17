@@ -1,14 +1,13 @@
 <?php
 
 error_reporting(E_ALL);
-ini_set('display_errors', '1');
+ini_set('display_errors', '0');
 
 
 $titulo ="Ingreso al Sistema";
 include('funciones/functions.php');
 
-// LLAMAR A LA FUNCIÓN DE VISITA
-visita();
+
 
 ?>
 
