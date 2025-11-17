@@ -318,6 +318,13 @@ if (!isLoggedIn() || !isAdmin()) {
                         </a>
                         <?php endif; ?>
 
+                          <!-- Visita - Seguimiento de Usuarios -->
+                        <?php if (tienePermiso('admin')): ?>
+                        <a title="Seguimiento de Movimientos de Usuarios" class="dropdown-item" href="visita.php">
+                        <i class="fas fa-user-secret fa-fw"></i> Visita
+                        </a>
+                        <?php endif; ?>
+
                         <!-- Respaldo BD -->
                         <?php if (tienePermiso('respaldo_bd')): ?>
                         <a title="Respaldo de Base de Datos" class="dropdown-item" href="respaldo_bd.php">
