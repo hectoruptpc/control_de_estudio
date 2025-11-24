@@ -100,8 +100,42 @@ desactivarPeriodosVencidos($db);
 
 
 
+//SUBIR FOTO DE PERFIL
 
-
+function subirFotoPerfil($archivo) {
+    $directorioDestino = '../foto_perfil/';
+    
+    // Verificar si el directorio existe, si no crearlo
+    if (!is_dir($directorioDestino)) {
+        mkdir($directorioDestino, 0755, true);
+    }
+    
+    // Validar tipo de archivo
+    $tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
+    $tipoArchivo = mime_content_type($archivo['tmp_name']);
+    
+    if (!in_array($tipoArchivo, $tiposPermitidos)) {
+        throw new Exception('Tipo de archivo no permitido. Solo se permiten JPG, JPEG, PNG, WEBP y PDF.');
+    }
+    
+    // Validar tamaño (5MB máximo)
+    $tamañoMaximo = 5 * 1024 * 1024; // 5MB
+    if ($archivo['size'] > $tamañoMaximo) {
+        throw new Exception('El archivo es demasiado grande. El tamaño máximo permitido es 5MB.');
+    }
+    
+    // Generar nombre único para el archivo
+    $extension = pathinfo($archivo['name'], PATHINFO_EXTENSION);
+    $nombreUnico = uniqid() . '_' . time() . '.' . strtolower($extension);
+    $rutaCompleta = $directorioDestino . $nombreUnico;
+    
+    // Mover el archivo
+    if (!move_uploaded_file($archivo['tmp_name'], $rutaCompleta)) {
+        throw new Exception('Error al subir el archivo.');
+    }
+    
+    return $nombreUnico;
+}
 
 
 
@@ -315,14 +349,20 @@ function insertarEstudiante($datos) {
         // Iniciar transacción
         $db->begin_transaction();
 
-        // 1. Preparar datos del usuario
+        // 1. Manejar la subida de la foto de perfil
+        $nombreFoto = '';
+        if (isset($_FILES['foto_perfil']) && $_FILES['foto_perfil']['error'] === UPLOAD_ERR_OK) {
+            $nombreFoto = subirFotoPerfil($_FILES['foto_perfil']);
+        }
+
+        // 2. Preparar datos del usuario
         $username = strtolower(str_replace(' ', '.', $datos['nombre']));
         $cedulaLimpia = substr($datos['idusuario'], 2); // Elimina los primeros 2 caracteres (ej: "V-")
         $password = password_hash($cedulaLimpia, PASSWORD_DEFAULT); // Hash seguro
         $fecha_act = date('Y-m-d H:i:s');
         $api_key = '';
 
-        // 2. Configurar roles y valores por defecto
+        // 3. Configurar roles y valores por defecto
         $roles = [
             'usuario' => 0,
             'estudiante' => 1,
@@ -340,29 +380,54 @@ function insertarEstudiante($datos) {
             'editar_docente' => 0,
             'agregar_carrera' => 0,
             'agregar_materia' => 0,
-            'editar_materia' => 0
+            'editar_materia' => 0,
+            'pagos' => 0,
+            'auditoria' => 0,
+            'secciones' => 0,
+            'rela_materia_carrera' => 0,
+            'periodos_academicos' => 0,
+            'asig_secciones' => 0,
+            'asig_cursos' => 0,
+            'horarios' => 0,
+            'gestion_director_carrera' => 0,
+            'notas_cargadas' => 0,
+            'consultar_notas' => 0,
+            'consultar_notas_pasadas' => 0,
+            'tipos_pago' => 0,
+            'tipos_horario' => 0,
+            'horario_personal' => 0,
+            'respaldo_bd' => 0,
+            'gestionar_carrera' => 0,
+            'gestion_periodo_academico' => 0,
+            'gestion_asig_cursos' => 0,
+            'gestion_horario' => 0,
+            'titulos_re_materia' => 0,
+            'grado' => 0,
+            'gestion_grado' => 0,
+            'visita' => 0,
+            'foto_perfil' => $nombreFoto
         ];
 
         $defaults = [
-            'cel' => '',
+            'cel' => $datos['cel'] ?? '',
             'ciudad' => $datos['municipio'] ?? '',
-            'num_telf_opc' => '',
-            'etnia' => '',
-            'casaapto' => 'No especificado',
-            'punto_referencia' => '',
-            'grupo_familiar' => 0,
-            'acargo_usted' => 0,
-            'fuente_ingresos' => '',
-            'tipo_vivienda' => '',
-            'tenencia_vivienda' => '',
-            'enfermedad' => '',
-            'discapacidad' => '',
+            'num_telf_opc' => $datos['num_telf_opc'] ?? '',
+            'etnia' => $datos['etnia'] ?? '',
+            'casaapto' => $datos['casaapto'] ?? 'No especificado',
+            'punto_referencia' => $datos['punto_referencia'] ?? '',
+            'grupo_familiar' => $datos['grupo_familiar'] ?? 0,
+            'acargo_usted' => $datos['acargo_usted'] ?? 0,
+            'fuente_ingresos' => $datos['fuente_ingresos'] ?? '',
+            'tipo_vivienda' => $datos['tipo_vivienda'] ?? '',
+            'tenencia_vivienda' => $datos['tenencia_vivienda'] ?? '',
+            'enfermedad' => $datos['enfermedad'] ?? '',
+            'discapacidad' => $datos['discapacida'] ?? '', // Nota: 'discapacida' viene del formulario
             'titulos' => '',
             'institutos' => '',
             'api_key' => $api_key
         ];
 
-        // 3. Combinar todos los valores
+        // 4. Combinar todos los valores
         $valores = array_merge(
             [
                 'idusuario' => $datos['idusuario'],
@@ -388,7 +453,7 @@ function insertarEstudiante($datos) {
             $roles
         );
 
-        // 4. Insertar en la tabla users
+        // 5. Insertar en la tabla users
         $columnas = implode(', ', array_keys($valores));
         $placeholders = implode(', ', array_fill(0, count($valores), '?'));
         $sql = "INSERT INTO users ($columnas) VALUES ($placeholders)";
@@ -398,11 +463,22 @@ function insertarEstudiante($datos) {
             throw new Exception("Error en preparación: " . $db->error);
         }
 
-        // 5. Vincular parámetros
+        // 6. Vincular parámetros
         $tipos = '';
         $valoresBind = [];
         foreach ($valores as $key => $value) {
-            if (in_array($key, ['grupo_familiar', 'acargo_usted', 'usuario', 'estudiante', 'docente', 'admin', 'super_user', 'editar_user', 'editar_nota', 'editar_acceso'])) {
+            if (in_array($key, [
+                'grupo_familiar', 'acargo_usted', 'usuario', 'estudiante', 'docente', 'admin', 
+                'super_user', 'editar_user', 'editar_nota', 'editar_acceso', 'editar_valores', 
+                'editar_estudiante', 'agregar_estudiante', 'agregar_docente', 'editar_docente', 
+                'agregar_carrera', 'agregar_materia', 'editar_materia', 'pagos', 'auditoria', 
+                'secciones', 'rela_materia_carrera', 'periodos_academicos', 'asig_secciones', 
+                'asig_cursos', 'horarios', 'gestion_director_carrera', 'notas_cargadas', 
+                'consultar_notas', 'consultar_notas_pasadas', 'tipos_pago', 'tipos_horario', 
+                'horario_personal', 'respaldo_bd', 'gestionar_carrera', 'gestion_periodo_academico', 
+                'gestion_asig_cursos', 'gestion_horario', 'titulos_re_materia', 'grado', 
+                'gestion_grado', 'visita'
+            ])) {
                 $tipos .= 'i'; // Entero
                 $valoresBind[] = (int)$value;
             } else {
@@ -420,7 +496,7 @@ function insertarEstudiante($datos) {
         $userId = $stmt->insert_id;
         $stmt->close();
 
-        // 6. Insertar títulos obtenidos si existen
+        // 7. Insertar títulos obtenidos si existen
         if (!empty($datos['titulos']) && !empty($datos['institutos'])) {
             $titulos = is_array($datos['titulos']) ? $datos['titulos'] : [$datos['titulos']];
             $institutos = is_array($datos['institutos']) ? $datos['institutos'] : [$datos['institutos']];
@@ -450,13 +526,14 @@ function insertarEstudiante($datos) {
             $stmtTitulos->close();
         }
 
-        // 7. REGISTRAR EN AUDITORÍA - NUEVO ESTUDIANTE
+        // 8. REGISTRAR EN AUDITORÍA - NUEVO ESTUDIANTE
         $valores_nuevos = [
             'idusuario' => $datos['idusuario'],
             'nombre' => $datos['nombre'],
             'email' => $datos['email'] ?? '',
             'carrera' => $datos['carrera'] ?? '',
-            'status' => $datos['status'] ?? 'Activo'
+            'status' => $datos['status'] ?? 'Activo',
+            'foto_perfil' => !empty($nombreFoto) ? 'Sí' : 'No'
         ];
         
         registrarAuditoria(
@@ -474,13 +551,22 @@ function insertarEstudiante($datos) {
 
         return [
             'success' => true,
-            'message' => 'Estudiante registrado exitosamente!',
-            'id' => $userId
+            'message' => 'Estudiante registrado exitosamente!' . (!empty($nombreFoto) ? ' Con foto de perfil.' : ''),
+            'id' => $userId,
+            'foto_perfil' => $nombreFoto
         ];
 
     } catch(Exception $e) {
         // Revertir transacción en caso de error
         $db->rollback();
+        
+        // Si hay error, eliminar la foto subida (si existe)
+        if (!empty($nombreFoto)) {
+            $rutaFoto = '../foto_perfil/' . $nombreFoto;
+            if (file_exists($rutaFoto)) {
+                unlink($rutaFoto);
+            }
+        }
         
         // REGISTRAR EN AUDITORÍA - ERROR AL REGISTRAR ESTUDIANTE
         registrarAuditoria(
@@ -504,6 +590,8 @@ function insertarEstudiante($datos) {
         ];
     }
 }
+
+// Función subirFotoPerfil ya definida anteriormente más arriba; evitamos redeclararla aquí.
 
 // Función para validar datos de estudiante
 function validarEstudiante($datos) {

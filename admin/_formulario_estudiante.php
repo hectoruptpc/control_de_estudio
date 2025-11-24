@@ -30,7 +30,7 @@ $prefijo = $esModal ? '_modal' : '';
 $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["PHP_SELF"]);
 ?>
 
-<form id="<?php echo $formId; ?>" method="post" action="<?php echo $actionUrl; ?>"<?php echo $esModal ? ' enctype="multipart/form-data"' : ''; ?>>
+<form id="<?php echo $formId; ?>" method="post" action="<?php echo $actionUrl; ?>" enctype="multipart/form-data">
     <!-- Sección 1: Identificación - CÉDULA A LA IZQUIERDA, NOMBRE A LA DERECHA -->
     <h5 class="mb-3"><i class="fas fa-id-card mr-2"></i> Identificación</h5>
     <div class="row g-3 mb-4">
@@ -64,6 +64,19 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
     <h5 class="mb-3"><i class="fas fa-user-tag mr-2"></i> Datos Personales</h5>
     <div class="row g-3 mb-4">
         <div class="col-md-6">
+
+                             <!-- AGREGAR ESTE CAMPO NUEVO PARA FOTO DE PERFIL -->
+        <div class="mb-3">
+            <label for="foto_perfil<?php echo $prefijo; ?>" class="form-label">Foto de Perfil</label>
+            <input type="file" class="form-control" id="foto_perfil<?php echo $prefijo; ?>" name="foto_perfil" 
+                   accept=".jpg,.jpeg,.png,.pdf,.webp" 
+                   onchange="previewImage(this, 'preview<?php echo $prefijo; ?>')">
+            <small class="text-muted">Formatos permitidos: JPG, JPEG, PNG, WEBP, PDF (Máx: 5MB)</small>
+            <div id="preview<?php echo $prefijo; ?>" class="mt-2" style="display:none;">
+                <img id="previewImage<?php echo $prefijo; ?>" src="#" alt="Vista previa" style="max-width: 150px; max-height: 150px; border-radius: 8px;">
+            </div>
+        </div>
+
             <div class="mb-3">
                 <label for="fecha_nac<?php echo $prefijo; ?>" class="form-label required">Fecha de Nacimiento</label>
                 <input type="date" class="form-control" id="fecha_nac<?php echo $prefijo; ?>" name="fecha_nac" required>
@@ -418,4 +431,55 @@ document.addEventListener('DOMContentLoaded', function() {
         actualizarCedulaCompleta();
     }
 });
+
+
+
+// Función para vista previa de imagen
+function previewImage(input, previewId) {
+    const preview = document.getElementById(previewId);
+    const previewImage = document.getElementById('previewImage' + '<?php echo $prefijo; ?>');
+    
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const fileType = file.type;
+        
+        // Validar tipo de archivo
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
+        if (!allowedTypes.includes(fileType)) {
+            alert('Error: Solo se permiten archivos JPG, JPEG, PNG, WEBP y PDF.');
+            input.value = '';
+            preview.style.display = 'none';
+            return;
+        }
+        
+        // Validar tamaño (5MB máximo)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Error: El archivo no debe superar los 5MB.');
+            input.value = '';
+            preview.style.display = 'none';
+            return;
+        }
+        
+        // Mostrar vista previa solo para imágenes (no para PDF)
+        if (fileType.startsWith('image/')) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                previewImage.src = e.target.result;
+                preview.style.display = 'block';
+            }
+            
+            reader.readAsDataURL(file);
+        } else {
+            // Para PDF, mostrar mensaje
+            preview.innerHTML = '<div class="alert alert-info p-2">Archivo PDF seleccionado</div>';
+            preview.style.display = 'block';
+        }
+    } else {
+        preview.style.display = 'none';
+    }
+}
+
+
+
 </script>
