@@ -457,25 +457,43 @@ $(document).ready(function() {
         $(this).tab('show');
     });
 
-// Script para manejar el campo de cédula - CORREGIDO
+
+// SOLUCIÓN ROBUSTA - Limpiar cualquier guión extra
 function actualizarCedulaCompleta() {
-    const tipoCedula = document.getElementById('tipo_cedula').value; // Solo la letra (V o E)
-    const numeroCedula = document.getElementById('numero_cedula').value.replace(/[^0-9]/g, '');
+    const tipoCedula = document.getElementById('tipo_cedula');
+    const numeroCedula = document.getElementById('numero_cedula');
     const idusuario = document.getElementById('idusuario');
     
-    // Actualizar el campo número solo con números
-    document.getElementById('numero_cedula').value = numeroCedula;
+    const tipoValue = tipoCedula.value; // Debería ser "V" o "E"
+    const numeroValue = numeroCedula.value.replace(/[^0-9]/g, '');
     
-    // Actualizar cédula completa - AGREGAR GUION MANUALMENTE
-    idusuario.value = tipoCedula + '-' + numeroCedula;
+    // Construir cédula completa
+    const cedulaCompleta = tipoValue + '-' + numeroValue;
+    
+    // Actualizar campo hidden
+    idusuario.value = cedulaCompleta;
+    
+    // Debug en consola
+    console.log('Cédula actualizada:', cedulaCompleta);
+    console.log('Campo hidden idusuario value:', idusuario.value);
 }
 
-// Event listeners para el campo cédula
-document.getElementById('tipo_cedula').addEventListener('change', actualizarCedulaCompleta);
-document.getElementById('numero_cedula').addEventListener('input', actualizarCedulaCompleta);
+// Verificar que el campo hidden existe y se está llenando
+document.addEventListener('DOMContentLoaded', function() {
+    const idusuarioField = document.getElementById('idusuario');
+    if (!idusuarioField) {
+        console.error('ERROR: No se encontró el campo hidden idusuario');
+    } else {
+        console.log('Campo idusuario encontrado, valor inicial:', idusuarioField.value);
+    }
+    
+    actualizarCedulaCompleta();
+});
 
-// Inicializar cédula al cargar
-actualizarCedulaCompleta();
+// Usar inicializar en lugar de actualizarCedulaCompleta directamente
+document.addEventListener('DOMContentLoaded', function() {
+    inicializarCedula();
+});
 
     // Vista previa de foto de perfil
     $('#foto_perfil').on('change', function(e) {
