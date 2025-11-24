@@ -712,42 +712,79 @@ function actualizarEstudiante(array $datos): array {
         $valores_antiguos = $result_antiguo->fetch_assoc();
         $stmt_antiguo->close();
 
-        // Consulta SQL con los campos correctos que estás usando
-        $sql = "UPDATE users SET 
-                nombre = ?,
-                username = ?,
-                email = ?,
-                tlf = ?,
-                num_telf_opc = ?,
-                carrera = ?,
-                genero = ?,
-                fecha_nac = ?,
-                fecha_ingreso = ?,
-                status = ?,
-                fecha_act = NOW()
-                WHERE id = ?";
-
+        // Construir consulta dinámicamente para evitar errores de tipos
+        $campos = [];
+        $valores = [];
+        $tipos = '';
+        
+        // Mapeo de campos y sus tipos
+        $camposMapeo = [
+            'nombre' => 's',
+            'username' => 's',
+            'email' => 's',
+            'tlf' => 's',
+            'cel' => 's',
+            'num_telf_opc' => 's',
+            'direccion' => 's',
+            'estado' => 's',
+            'municipio' => 's',
+            'parroquia' => 's',
+            'ciudad' => 's',
+            'etnia' => 's',
+            'casaapto' => 's',
+            'punto_referencia' => 's',
+            'grupo_familiar' => 'i',
+            'acargo_usted' => 'i',
+            'fuente_ingresos' => 's',
+            'tipo_vivienda' => 's',
+            'tenencia_vivienda' => 's',
+            'enfermedad' => 's',
+            'discapacidad' => 's',
+            'titulos' => 's',
+            'institutos' => 's',
+            'carrera' => 's',
+            'genero' => 's',
+            'edo_civil' => 's',
+            'fecha_nac' => 's',
+            'fecha_ingreso' => 's',
+            'status' => 'i',
+            'foto_perfil' => 's'
+        ];
+        
+        foreach ($camposMapeo as $campo => $tipo) {
+            if (isset($datos[$campo]) && $datos[$campo] !== '') {
+                $campos[] = "$campo = ?";
+                $valores[] = $datos[$campo];
+                $tipos .= $tipo;
+            }
+        }
+        
+        // Agregar fecha de actualización
+        $campos[] = "fecha_act = NOW()";
+        
+        if (empty($campos)) {
+            return [
+                'success' => false,
+                'message' => 'No hay campos para actualizar'
+            ];
+        }
+        
+        // Agregar WHERE condition
+        $valores[] = $datos['id'];
+        $tipos .= 'i';
+        
+        $sql = "UPDATE users SET " . implode(', ', $campos) . " WHERE id = ?";
+        
         // Preparar la sentencia
         $stmt = $db->prepare($sql);
         if (!$stmt) {
             throw new Exception("Error en la preparación: " . $db->error);
         }
 
-        // Vincular parámetros
-        $stmt->bind_param(
-            "sssssssssii", // Tipos de parámetros
-            $datos['nombre'],
-            $datos['username'],
-            $datos['email'],
-            $datos['tlf'],
-            $datos['num_telf_opc'],
-            $datos['carrera'],
-            $datos['genero'],
-            $datos['fecha_nac'],
-            $datos['fecha_ingreso'],
-            $datos['status'],
-            $datos['id']
-        );
+        // Vincular parámetros si hay valores
+        if (!empty($valores)) {
+            $stmt->bind_param($tipos, ...$valores);
+        }
 
         // Ejecutar la actualización
         if (!$stmt->execute()) {
@@ -759,32 +796,19 @@ function actualizarEstudiante(array $datos): array {
         
         // Registrar auditoría solo si hubo cambios
         if ($cambios) {
-            $valores_nuevos = [
-                'nombre' => $datos['nombre'],
-                'username' => $datos['username'],
-                'email' => $datos['email'],
-                'tlf' => $datos['tlf'],
-                'num_telf_opc' => $datos['num_telf_opc'],
-                'carrera' => $datos['carrera'],
-                'genero' => $datos['genero'],
-                'fecha_nac' => $datos['fecha_nac'],
-                'fecha_ingreso' => $datos['fecha_ingreso'],
-                'status' => $datos['status']
-            ];
-            
             registrarAuditoria(
                 "UPDATE", 
                 "users", 
                 $datos['id'], 
                 $valores_antiguos, 
-                $valores_nuevos, 
+                $datos, 
                 "Estudiantes", 
                 "Actualización de datos de estudiante"
             );
         }
         
         return [
-            'success' => $cambios,
+            'success' => true,
             'message' => $cambios 
                 ? 'Estudiante actualizado correctamente' 
                 : 'No se realizaron cambios (posiblemente los datos son iguales)',
