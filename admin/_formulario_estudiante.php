@@ -35,22 +35,26 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
     <h5 class="mb-3"><i class="fas fa-id-card mr-2"></i> Identificación</h5>
     <div class="row g-3 mb-4">
         <div class="col-md-6">
-            <div class="mb-3">
-                <label for="cedula_completa<?php echo $prefijo; ?>" class="form-label required">Cédula</label>
-                <div class="input-group">
-                    <select class="custom-select" id="tipo_cedula<?php echo $prefijo; ?>" name="tipo_cedula" style="max-width: 80px;">
-                        <?php foreach ($tiposCedula as $tipo): ?>
-                            <option value="<?php echo htmlspecialchars($tipo['tipo']); ?>">
-                                <?php echo htmlspecialchars($tipo['tipo']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <input type="text" class="form-control" id="numero_cedula<?php echo $prefijo; ?>" name="numero_cedula" placeholder="Ej: 12345678" required>
-                    <input type="hidden" id="idusuario<?php echo $prefijo; ?>" name="idusuario">
-                </div>
-                <small class="text-muted">Formato: V-12345678 o E-12345678</small>
-            </div>
+    <div class="mb-3">
+        <label for="cedula_completa<?php echo $prefijo; ?>" class="form-label required">Cédula</label>
+        <div class="input-group">
+            <select class="custom-select" id="tipo_cedula<?php echo $prefijo; ?>" name="tipo_cedula" style="max-width: 80px;">
+                <?php foreach ($tiposCedula as $tipo): ?>
+                    <?php 
+                    // Extraer solo la letra del tipo (sin guión)
+                    $tipoLetra = substr($tipo['tipo'], 0, 1);
+                    ?>
+                    <option value="<?php echo htmlspecialchars($tipoLetra); ?>">
+                        <?php echo htmlspecialchars($tipoLetra); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <input type="text" class="form-control" id="numero_cedula<?php echo $prefijo; ?>" name="numero_cedula" placeholder="Ej: 12345678" required>
+            <input type="hidden" id="idusuario<?php echo $prefijo; ?>" name="idusuario">
         </div>
+        <small class="text-muted">Formato: V-12345678 o E-12345678</small>
+    </div>
+</div>
         
         <div class="col-md-6">
             <div class="mb-3">
@@ -413,7 +417,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Manejo del campo de cédula
+// Manejo del campo de cédula - CORREGIDO
 document.addEventListener('DOMContentLoaded', function() {
     const tipoCedula = document.getElementById('tipo_cedula<?php echo $prefijo; ?>');
     const numeroCedula = document.getElementById('numero_cedula<?php echo $prefijo; ?>');
@@ -423,6 +427,7 @@ document.addEventListener('DOMContentLoaded', function() {
         function actualizarCedulaCompleta() {
             const numeroLimpio = numeroCedula.value.replace(/[^0-9]/g, '');
             numeroCedula.value = numeroLimpio;
+            // AGREGAR GUION MANUALMENTE entre tipo y número
             idUsuario.value = tipoCedula.value + '-' + numeroLimpio;
         }
         
