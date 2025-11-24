@@ -41,17 +41,7 @@ if (!empty($estudiante['foto_perfil'])) {
 if (!$tieneFoto) {
     // Puedes usar una de estas opciones:
     
-    // Opción 1: Imagen local en tu proyecto
-    $fotoPerfil = '../assets/img/default-avatar.png';
-    
-    // Opción 2: Imagen base64 integrada (elimina dependencias externas)
-    $fotoPerfil = "data:image/svg+xml;base64," . base64_encode('
-        <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
-            <circle cx="50" cy="40" r="20" fill="#6c757d"/>
-            <circle cx="50" cy="100" r="40" fill="#6c757d"/>
-            <text x="50" y="45" text-anchor="middle" fill="white" font-family="Arial" font-size="14">USER</text>
-        </svg>
-    ');
+   
     
     // Opción 3: Imagen SVG directa (recomendado)
     $fotoPerfil = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='40' r='20' fill='%236c757d'/%3E%3Ccircle cx='50' cy='100' r='40' fill='%236c757d'/%3E%3Ctext x='50' y='45' text-anchor='middle' fill='white' font-family='Arial' font-size='14'%3EUSER%3C/text%3E%3C/svg%3E";
