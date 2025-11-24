@@ -33,6 +33,11 @@ $estadosCiviles = obtenerEstadosCiviless($db);
 $tiposVivienda = obtenerTiposVivienda($db);
 $tenenciasVivienda = obtenerTenenciaViviendas($db);
 $ingresos = obtenerIngresos($db);
+$tiposCedula = obtenerTiposCedula($db);
+
+// Procesar cédula actual
+$tipoActual = substr($estudiante['idusuario'] ?? '', 0, 1);
+$numeroActual = substr($estudiante['idusuario'] ?? '', 2);
 
 // Manejo de foto de perfil
 $fotoPerfil = '';
@@ -123,6 +128,28 @@ if (empty($fotoPerfil)) {
                                 <label for="nombre" class="form-label">Nombre Completo</label>
                                 <input type="text" class="form-control" id="nombre" name="nombre" 
                                        value="<?= htmlspecialchars($estudiante['nombre'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <!-- CAMPO CÉDULA -->
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="idusuario" class="form-label">Cédula</label>
+                                <div class="input-group">
+                                    <select class="custom-select" id="tipo_cedula" name="tipo_cedula" style="max-width: 100px;">
+                                        <?php foreach ($tiposCedula as $tipo): ?>
+                                            <option value="<?= htmlspecialchars($tipo['tipo']) ?>"
+                                                <?= ($tipoActual == $tipo['tipo']) ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($tipo['tipo']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <input type="text" class="form-control" id="numero_cedula" name="numero_cedula" 
+                                           value="<?= htmlspecialchars($numeroActual) ?>" 
+                                           placeholder="Ej: 12345678">
+                                    <input type="hidden" id="idusuario" name="idusuario" value="<?= htmlspecialchars($estudiante['idusuario'] ?? '') ?>">
+                                </div>
+                                <small class="text-muted">Formato: V-12345678 o E-12345678</small>
                             </div>
                         </div>
                         
@@ -427,6 +454,26 @@ $(document).ready(function() {
         e.preventDefault();
         $(this).tab('show');
     });
+
+    // Script para manejar el campo de cédula
+    function actualizarCedulaCompleta() {
+        const tipoCedula = document.getElementById('tipo_cedula').value;
+        const numeroCedula = document.getElementById('numero_cedula').value.replace(/[^0-9]/g, '');
+        const idusuario = document.getElementById('idusuario');
+        
+        // Actualizar el campo número solo con números
+        document.getElementById('numero_cedula').value = numeroCedula;
+        
+        // Actualizar cédula completa
+        idusuario.value = tipoCedula + '-' + numeroCedula;
+    }
+
+    // Event listeners para el campo cédula
+    document.getElementById('tipo_cedula').addEventListener('change', actualizarCedulaCompleta);
+    document.getElementById('numero_cedula').addEventListener('input', actualizarCedulaCompleta);
+
+    // Inicializar cédula al cargar
+    actualizarCedulaCompleta();
 
     // Vista previa de foto de perfil
     $('#foto_perfil').on('change', function(e) {

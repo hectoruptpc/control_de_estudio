@@ -24,6 +24,7 @@ try {
     // Procesar datos - USANDO LOS NOMBRES CORRECTOS DEL FORMULARIO
     $datos = [
         'id' => $id,
+        'idusuario' => trim($_POST['idusuario'] ?? ''), // NUEVO CAMPO CÉDULA
         'nombre' => trim($_POST['nombre'] ?? ''),
         'username' => trim($_POST['username'] ?? ''),
         'email' => trim($_POST['email'] ?? ''),
@@ -54,6 +55,24 @@ try {
         'titulos' => trim($_POST['titulos'] ?? ''),
         'institutos' => trim($_POST['institutos'] ?? '')
     ];
+
+    // Validar que la cédula no esté vacía
+    if (empty($datos['idusuario'])) {
+        throw new Exception('La cédula es obligatoria');
+    }
+
+    // Verificar si la cédula ya existe en otro usuario
+    global $db;
+    $query_verificar = "SELECT id FROM users WHERE idusuario = ? AND id != ?";
+    $stmt_verificar = $db->prepare($query_verificar);
+    $stmt_verificar->bind_param("si", $datos['idusuario'], $id);
+    $stmt_verificar->execute();
+    $result_verificar = $stmt_verificar->get_result();
+    
+    if ($result_verificar->num_rows > 0) {
+        throw new Exception('La cédula ya está registrada para otro estudiante');
+    }
+    $stmt_verificar->close();
 
     // Manejar la foto de perfil si se subió
     if (isset($_FILES['foto_perfil']) && $_FILES['foto_perfil']['error'] === UPLOAD_ERR_OK) {

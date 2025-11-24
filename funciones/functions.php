@@ -717,8 +717,9 @@ function actualizarEstudiante(array $datos): array {
         $valores = [];
         $tipos = '';
         
-        // Mapeo de campos y sus tipos
+        // Mapeo de campos y sus tipos - INCLUYENDO IDUSUARIO
         $camposMapeo = [
+            'idusuario' => 's',
             'nombre' => 's',
             'username' => 's',
             'email' => 's',
