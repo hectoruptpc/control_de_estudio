@@ -35,10 +35,6 @@ $tenenciasVivienda = obtenerTenenciaViviendas($db);
 $ingresos = obtenerIngresos($db);
 $tiposCedula = obtenerTiposCedula($db);
 
-// Procesar cédula actual
-$tipoActual = substr($estudiante['idusuario'] ?? '', 0, 1);
-$numeroActual = substr($estudiante['idusuario'] ?? '', 2);
-
 // Manejo de foto de perfil
 $fotoPerfil = '';
 if (!empty($estudiante['foto_perfil'])) {
@@ -52,8 +48,6 @@ if (empty($fotoPerfil)) {
     $fotoPerfil = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='40' r='20' fill='%236c757d'/%3E%3Ccircle cx='50' cy='100' r='40' fill='%236c757d'/%3E%3Ctext x='50' y='45' text-anchor='middle' fill='white' font-family='Arial' font-size='14'%3EUSER%3C/text%3E%3C/svg%3E";
 }
 ?>
-
-
 
 <div class="modal-body p-0">
     <!-- Header con foto -->
@@ -124,36 +118,16 @@ if (empty($fotoPerfil)) {
                             </div>
                         </div>
                         
-                        <!-- CAMPO CÉDULA -->
+                        <!-- CAMPO CÉDULA SIMPLIFICADO -->
                         <div class="col-md-6">
-    <div class="form-group">
-        <label for="idusuario" class="form-label">Cédula</label>
-        <div class="input-group">
-            <select class="custom-select" id="tipo_cedula" name="tipo_cedula" style="max-width: 100px;">
-                <?php 
-                // Procesar cédula actual - EXTRAER SOLO LA LETRA
-                $tipoActual = substr($estudiante['idusuario'] ?? '', 0, 1); // Solo la letra (V o E)
-                $numeroActual = substr($estudiante['idusuario'] ?? '', 2); // El número después del guión
-                ?>
-                <?php foreach ($tiposCedula as $tipo): ?>
-                    <?php 
-                    // Extraer solo la letra del tipo (sin guión)
-                    $tipoLetra = substr($tipo['tipo'], 0, 1);
-                    ?>
-                    <option value="<?= htmlspecialchars($tipoLetra) ?>"
-                        <?= ($tipoActual == $tipoLetra) ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($tipoLetra) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            <input type="text" class="form-control" id="numero_cedula" name="numero_cedula" 
-                   value="<?= htmlspecialchars($numeroActual) ?>" 
-                   placeholder="Ej: 12345678">
-            <input type="hidden" id="idusuario" name="idusuario" value="<?= htmlspecialchars($estudiante['idusuario'] ?? '') ?>">
-        </div>
-        <small class="text-muted">Formato: V-12345678 o E-12345678</small>
-    </div>
-</div>
+                            <div class="form-group">
+                                <label for="idusuario" class="form-label">Cédula</label>
+                                <input type="text" class="form-control" id="idusuario" name="idusuario" 
+                                       value="<?= htmlspecialchars($estudiante['idusuario'] ?? '') ?>" 
+                                       placeholder="Ej: V-12345678">
+                                <small class="text-muted">Formato: V-12345678 o E-12345678</small>
+                            </div>
+                        </div>
                         
                         <div class="col-md-6">
                             <div class="form-group">
@@ -457,44 +431,6 @@ $(document).ready(function() {
         $(this).tab('show');
     });
 
-
-// SOLUCIÓN ROBUSTA - Limpiar cualquier guión extra
-function actualizarCedulaCompleta() {
-    const tipoCedula = document.getElementById('tipo_cedula');
-    const numeroCedula = document.getElementById('numero_cedula');
-    const idusuario = document.getElementById('idusuario');
-    
-    const tipoValue = tipoCedula.value; // Debería ser "V" o "E"
-    const numeroValue = numeroCedula.value.replace(/[^0-9]/g, '');
-    
-    // Construir cédula completa
-    const cedulaCompleta = tipoValue + '-' + numeroValue;
-    
-    // Actualizar campo hidden
-    idusuario.value = cedulaCompleta;
-    
-    // Debug en consola
-    console.log('Cédula actualizada:', cedulaCompleta);
-    console.log('Campo hidden idusuario value:', idusuario.value);
-}
-
-// Verificar que el campo hidden existe y se está llenando
-document.addEventListener('DOMContentLoaded', function() {
-    const idusuarioField = document.getElementById('idusuario');
-    if (!idusuarioField) {
-        console.error('ERROR: No se encontró el campo hidden idusuario');
-    } else {
-        console.log('Campo idusuario encontrado, valor inicial:', idusuarioField.value);
-    }
-    
-    actualizarCedulaCompleta();
-});
-
-// Usar inicializar en lugar de actualizarCedulaCompleta directamente
-document.addEventListener('DOMContentLoaded', function() {
-    inicializarCedula();
-});
-
     // Vista previa de foto de perfil
     $('#foto_perfil').on('change', function(e) {
         const file = e.target.files[0];
@@ -507,9 +443,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Validación del formulario - ELIMINADA LA VALIDACIÓN DE CAMPOS REQUERIDOS
+    // Validación del formulario
     $('#formEditarEstudiante').on('submit', function(e) {
         e.preventDefault();
+        
+        // Validar cédula
+        const cedula = $('#idusuario').val();
+        if (!cedula || cedula.trim() === '') {
+            alert('La cédula es obligatoria');
+            $('#idusuario').focus();
+            return;
+        }
+        
+        // Validar formato de cédula
+        if (!/^[VE]-\d+$/.test(cedula)) {
+            alert('Formato de cédula inválido. Debe ser V-12345678 o E-12345678');
+            $('#idusuario').focus();
+            return;
+        }
         
         // Solo validaciones básicas de formato (no de campos requeridos)
         const email = $('#email').val();
@@ -540,6 +491,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const submitBtn = $('#btnGuardar');
         submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i>Guardando...');
         
+        // DEBUG: Mostrar datos que se enviarán
+        console.log('Enviando cédula:', $('#idusuario').val());
+        
         // Enviar formulario via AJAX
         const formData = new FormData(this);
         
@@ -561,7 +515,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         alert(data.message || 'Error al actualizar el estudiante');
                     }
                 } catch (e) {
-                    alert('Error al procesar la respuesta del servidor');
+                    alert('Error al procesar la respuesta del servidor: ' + e.message);
                 }
             },
             error: function(xhr, status, error) {
