@@ -100,42 +100,7 @@ desactivarPeriodosVencidos($db);
 
 
 
-//SUBIR FOTO DE PERFIL
 
-function subirFotoPerfil($archivo) {
-    $directorioDestino = '../foto_perfil/';
-    
-    // Verificar si el directorio existe, si no crearlo
-    if (!is_dir($directorioDestino)) {
-        mkdir($directorioDestino, 0755, true);
-    }
-    
-    // Validar tipo de archivo
-    $tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
-    $tipoArchivo = mime_content_type($archivo['tmp_name']);
-    
-    if (!in_array($tipoArchivo, $tiposPermitidos)) {
-        throw new Exception('Tipo de archivo no permitido. Solo se permiten JPG, JPEG, PNG, WEBP y PDF.');
-    }
-    
-    // Validar tamaño (5MB máximo)
-    $tamañoMaximo = 5 * 1024 * 1024; // 5MB
-    if ($archivo['size'] > $tamañoMaximo) {
-        throw new Exception('El archivo es demasiado grande. El tamaño máximo permitido es 5MB.');
-    }
-    
-    // Generar nombre único para el archivo
-    $extension = pathinfo($archivo['name'], PATHINFO_EXTENSION);
-    $nombreUnico = uniqid() . '_' . time() . '.' . strtolower($extension);
-    $rutaCompleta = $directorioDestino . $nombreUnico;
-    
-    // Mover el archivo
-    if (!move_uploaded_file($archivo['tmp_name'], $rutaCompleta)) {
-        throw new Exception('Error al subir el archivo.');
-    }
-    
-    return $nombreUnico;
-}
 
 
 
@@ -296,74 +261,311 @@ function mostrarEstadoEstudiante($status) {
 }
 
 /**
-* Valida y sanitiza los datos de un estudiante
-*/
+ * Valida y sanitiza los datos de un estudiante (permite apóstrofes)
+ */
 function validarDatosEstudiante($data) {
-  $errors = [];
-  $validados = [];
-  
-  // Validación de cédula
-  if (empty($data['idusuario'])) {
-      $errors['idusuario'] = "La cédula es requerida";
-  } else {
-      $validados['idusuario'] = htmlspecialchars(trim($data['idusuario']));
-  }
-  
-  // Validación de nombre
-  if (empty($data['nombre'])) {
-      $errors['nombre'] = "El nombre es requerido";
-  } else {
-      $validados['nombre'] = htmlspecialchars(trim($data['nombre']));
-  }
-  
-  // Validación de correo
-  if (!empty($data['email']) && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-      $errors['email'] = "Correo electrónico no válido";
-  } else {
-      $validados['email'] = !empty($data['email']) ? htmlspecialchars(trim($data['email'])) : null;
-  }
-  
-  // Validación de teléfono
-  if (!empty($data['tlf']) && !preg_match('/^[0-9\-\+]{10,15}$/', $data['tlf'])) {
-      $errors['tlf'] = "Formato de teléfono no válido";
-  } else {
-      $validados['tlf'] = !empty($data['tlf']) ? htmlspecialchars(trim($data['tlf'])) : null;
-  }
-  
-  // Otros campos
-  $validados['carrera'] = !empty($data['carrera']) ? htmlspecialchars(trim($data['carrera'])) : null;
-  $validados['genero'] = !empty($data['genero']) ? htmlspecialchars(trim($data['genero'])) : null;
-  $validados['status'] = !empty($data['status']) ? htmlspecialchars(trim($data['status'])) : 'Activo';
-  $validados['user_type'] = 'estudiante';
-  
-  return [
-      'data' => $validados,
-      'errors' => $errors
-  ];
+    $errors = [];
+    $validados = [];
+    
+    // Validación de cédula (mantener guión)
+    if (empty($data['idusuario'])) {
+        $errors['idusuario'] = "La cédula es requerida";
+    } else {
+        // Validar formato: V-12345678 o E-12345678
+        if (!preg_match('/^[VvEe]-\d{6,9}$/', $data['idusuario'])) {
+            $errors['idusuario'] = "Formato de cédula no válido. Use: V-12345678 o E-12345678";
+        } else {
+            $validados['idusuario'] = trim($data['idusuario']);
+        }
+    }
+    
+    // Validación de nombre (permite apóstrofes y tildes)
+    if (empty($data['nombre'])) {
+        $errors['nombre'] = "El nombre es requerido";
+    } else {
+        // Permitir letras, espacios, apóstrofes y tildes
+        if (!preg_match("/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s']+$/", trim($data['nombre']))) {
+            $errors['nombre'] = "El nombre contiene caracteres no válidos";
+        } else {
+            // Usar mysqli_real_escape_string para apóstrofes (si hay conexión a BD)
+            $validados['nombre'] = mysqli_real_escape_string($GLOBALS['db'], trim($data['nombre']));
+        }
+    }
+    
+    // Validación de correo
+    if (empty($data['email'])) {
+        $errors['email'] = "El correo electrónico es requerido";
+    } elseif (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+        $errors['email'] = "Correo electrónico no válido";
+    } else {
+        $validados['email'] = trim($data['email']);
+    }
+    
+    // Validación de teléfono
+    if (empty($data['tlf'])) {
+        $errors['tlf'] = "El teléfono es requerido";
+    } elseif (!preg_match('/^[0-9]{10,11}$/', preg_replace('/\D/', '', $data['tlf']))) {
+        $errors['tlf'] = "Formato de teléfono no válido (10 u 11 dígitos)";
+    } else {
+        $validados['tlf'] = trim($data['tlf']);
+    }
+    
+    // Validación de fecha de nacimiento
+    if (empty($data['fecha_nac'])) {
+        $errors['fecha_nac'] = "La fecha de nacimiento es requerida";
+    } else {
+        // Validar que sea una fecha válida y que tenga al menos 15 años
+        $fechaNac = DateTime::createFromFormat('Y-m-d', $data['fecha_nac']);
+        $hoy = new DateTime();
+        $edadMinima = (new DateTime())->modify('-15 years');
+        
+        if (!$fechaNac) {
+            $errors['fecha_nac'] = "Fecha de nacimiento no válida";
+        } elseif ($fechaNac > $hoy) {
+            $errors['fecha_nac'] = "La fecha de nacimiento no puede ser futura";
+        } elseif ($fechaNac > $edadMinima) {
+            $errors['fecha_nac'] = "El estudiante debe tener al menos 15 años";
+        } else {
+            $validados['fecha_nac'] = $data['fecha_nac'];
+        }
+    }
+    
+    // Validación de fecha de ingreso
+    if (empty($data['fecha_ingreso'])) {
+        $errors['fecha_ingreso'] = "La fecha de ingreso es requerida";
+    } elseif (!empty($validados['fecha_nac'])) {
+        $fechaIngreso = DateTime::createFromFormat('Y-m-d', $data['fecha_ingreso']);
+        $fechaNac = DateTime::createFromFormat('Y-m-d', $validados['fecha_nac']);
+        
+        if ($fechaIngreso < $fechaNac) {
+            $errors['fecha_ingreso'] = "La fecha de ingreso no puede ser anterior a la fecha de nacimiento";
+        } else {
+            $validados['fecha_ingreso'] = $data['fecha_ingreso'];
+        }
+    } else {
+        $validados['fecha_ingreso'] = $data['fecha_ingreso'];
+    }
+    
+    // Validar campos opcionales que permiten apóstrofes
+    $camposConApostrofes = [
+        'etnia' => 'Etnia',
+        'direccion' => 'Dirección',
+        'punto_referencia' => 'Punto de referencia',
+        'enfermedad' => 'Enfermedades',
+        'discapacida' => 'Discapacidad'
+    ];
+    
+    foreach ($camposConApostrofes as $campo => $nombre) {
+        if (!empty($data[$campo])) {
+            // Permitir letras, números, espacios, apóstrofes y signos comunes
+            if (!preg_match("/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s'\",.;:¡!¿?()\-]+$/", trim($data[$campo]))) {
+                $errors[$campo] = "El campo $nombre contiene caracteres no válidos";
+            } else {
+                $validados[$campo] = mysqli_real_escape_string($GLOBALS['db'], trim($data[$campo]));
+            }
+        }
+    }
+    
+    // Validar campos requeridos adicionales
+    $camposRequeridos = [
+        'carrera' => 'Carrera',
+        'genero' => 'Género',
+        'edo_civil' => 'Estado civil',
+        'estado' => 'Estado',
+        'municipio' => 'Municipio',
+        'direccion' => 'Dirección',
+        'status' => 'Status'
+    ];
+    
+    foreach ($camposRequeridos as $campo => $nombre) {
+        if (empty($data[$campo])) {
+            $errors[$campo] = "El campo $nombre es requerido";
+        } else {
+            $validados[$campo] = trim($data[$campo]);
+        }
+    }
+    
+    // Campos adicionales
+    if (!empty($data['cel'])) {
+        if (!preg_match('/^[0-9]{10,11}$/', preg_replace('/\D/', '', $data['cel']))) {
+            $errors['cel'] = "Formato de celular no válido";
+        } else {
+            $validados['cel'] = trim($data['cel']);
+        }
+    }
+    
+    if (!empty($data['num_telf_opc'])) {
+        if (!preg_match('/^[0-9]{10,11}$/', preg_replace('/\D/', '', $data['num_telf_opc']))) {
+            $errors['num_telf_opc'] = "Formato de teléfono opcional no válido";
+        } else {
+            $validados['num_telf_opc'] = trim($data['num_telf_opc']);
+        }
+    }
+    
+    // Campos numéricos
+    $camposNumericos = ['grupo_familiar', 'acargo_usted'];
+    foreach ($camposNumericos as $campo) {
+        if (isset($data[$campo]) && $data[$campo] !== '') {
+            if (!is_numeric($data[$campo]) || $data[$campo] < 0) {
+                $errors[$campo] = "El campo " . str_replace('_', ' ', $campo) . " debe ser un número positivo";
+            } else {
+                $validados[$campo] = (int)$data[$campo];
+            }
+        }
+    }
+    
+    // Títulos e institutos (permitir apóstrofes)
+    if (!empty($data['titulos']) && is_array($data['titulos'])) {
+        $titulosValidos = [];
+        foreach ($data['titulos'] as $titulo) {
+            $titulo = trim($titulo);
+            if (!empty($titulo)) {
+                if (!preg_match("/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s'\",.;:¡!¿?()\-]+$/", $titulo)) {
+                    $errors['titulos'] = "Los títulos contienen caracteres no válidos";
+                } else {
+                    $titulosValidos[] = mysqli_real_escape_string($GLOBALS['db'], $titulo);
+                }
+            }
+        }
+        $validados['titulos'] = $titulosValidos;
+    }
+    
+    if (!empty($data['institutos']) && is_array($data['institutos'])) {
+        $institutosValidos = [];
+        foreach ($data['institutos'] as $instituto) {
+            $instituto = trim($instituto);
+            if (!empty($instituto)) {
+                if (!preg_match("/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s'\",.;:¡!¿?()\-]+$/", $instituto)) {
+                    $errors['institutos'] = "Los institutos contienen caracteres no válidos";
+                } else {
+                    $institutosValidos[] = mysqli_real_escape_string($GLOBALS['db'], $instituto);
+                }
+            }
+        }
+        $validados['institutos'] = $institutosValidos;
+    }
+    
+    // Foto de perfil
+    if (isset($_FILES['foto_perfil']) && $_FILES['foto_perfil']['error'] === UPLOAD_ERR_OK) {
+        // Validar tamaño (5MB máximo)
+        if ($_FILES['foto_perfil']['size'] > 5 * 1024 * 1024) {
+            $errors['foto_perfil'] = "La foto no debe superar los 5MB";
+        }
+        
+        // Validar tipo de archivo
+        $extensionesPermitidas = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+        $extension = strtolower(pathinfo($_FILES['foto_perfil']['name'], PATHINFO_EXTENSION));
+        if (!in_array($extension, $extensionesPermitidas)) {
+            $errors['foto_perfil'] = "Solo se permiten archivos JPG, JPEG, PNG, WEBP y PDF";
+        }
+    }
+    
+    return [
+        'data' => $validados,
+        'errors' => $errors
+    ];
 }
 
+/**
+ * Inserta un estudiante en la base de datos
+ * @param array $datos Datos del estudiante ya validados
+ * @return array Resultado de la operación
+ */
 function insertarEstudiante($datos) {
     global $db;
+    
+    if (!$db) {
+        return [
+            'success' => false,
+            'message' => 'Error de conexión a la base de datos'
+        ];
+    }
+    
+    $nombreFoto = '';
     
     try {
         // Iniciar transacción
         $db->begin_transaction();
 
-        // 1. Manejar la subida de la foto de perfil
-        $nombreFoto = '';
+        // ============================
+        // 1. MANEJAR FOTO DE PERFIL
+        // ============================
         if (isset($_FILES['foto_perfil']) && $_FILES['foto_perfil']['error'] === UPLOAD_ERR_OK) {
-            $nombreFoto = subirFotoPerfil($_FILES['foto_perfil']);
+            $resultadoFoto = subirFotoPerfil($_FILES['foto_perfil']);
+            if (isset($resultadoFoto['success']) && $resultadoFoto['success']) {
+                $nombreFoto = $resultadoFoto['nombre_archivo'];
+            }
         }
 
-        // 2. Preparar datos del usuario
-        $username = strtolower(str_replace(' ', '.', $datos['nombre']));
-        $cedulaLimpia = $datos['idusuario']; // Ya viene formateada
-        $password = password_hash($cedulaLimpia, PASSWORD_DEFAULT); // Hash seguro
+        // ============================
+        // 2. PREPARAR DATOS BÁSICOS
+        // ============================
+        $usernameBase = strtolower(preg_replace('/[^a-zA-Z0-9]/', '.', $datos['nombre']));
+        $username = preg_replace('/\.+/', '.', $usernameBase);
+        $username = trim($username, '.');
+        
+        if (strlen($username) < 3) {
+            $username = strtolower(str_replace(['-', ' '], '', $datos['idusuario']));
+        }
+        
+        $username = generarUsernameUnico($username);
+        
+        $password = password_hash($datos['idusuario'], PASSWORD_DEFAULT);
         $fecha_act = date('Y-m-d H:i:s');
-        $api_key = '';
+        $api_key = bin2hex(random_bytes(16));
 
-        // 3. Configurar roles y valores por defecto
-        $roles = [
+        // ============================
+        // 3. CONFIGURAR VALORES PARA LA TABLA users
+        // ============================
+        $valores = [
+            // Campos principales
+            'idusuario' => $datos['idusuario'],
+            'nombre' => $datos['nombre'],
+            'username' => $username,
+            'email' => !empty($datos['email']) ? $datos['email'] : null,
+            'tlf' => !empty($datos['tlf']) ? $datos['tlf'] : null,
+            'cel' => $datos['cel'] ?? '',
+            'direccion' => $datos['direccion'] ?? null,
+            'ciudad' => $datos['municipio'] ?? '',
+            'estado' => $datos['estado'] ?? null,
+            'municipio' => $datos['municipio'] ?? null,
+            'parroquia' => $datos['parroquia'] ?? null,
+            'etnia' => $datos['etnia'] ?? '',
+            'casaapto' => $datos['casaapto'] ?? 'No especificado',
+            'punto_referencia' => $datos['punto_referencia'] ?? '',
+            'grupo_familiar' => isset($datos['grupo_familiar']) ? (int)$datos['grupo_familiar'] : 0,
+            'acargo_usted' => isset($datos['acargo_usted']) ? (int)$datos['acargo_usted'] : 0,
+            'fuente_ingresos' => $datos['fuente_ingresos'] ?? '',
+            'tipo_vivienda' => $datos['tipo_vivienda'] ?? '',
+            'tenencia_vivienda' => $datos['tenencia_vivienda'] ?? '',
+            'enfermedad' => $datos['enfermedad'] ?? '',
+            'discapacidad' => $datos['discapacida'] ?? '',
+            'titulos' => !empty($datos['titulos']) ? implode('|||', $datos['titulos']) : '',
+            'institutos' => !empty($datos['institutos']) ? implode('|||', $datos['institutos']) : '',
+            'potencialidades' => $datos['potencialidades'] ?? '',
+            
+            // Campos de fechas y estado
+            'fecha_ingreso' => $datos['fecha_ingreso'] ?? null,
+            'fecha_act' => $fecha_act,
+            'status' => $datos['status'] ?? 'Activo',
+            'user_type' => 'estudiante',
+            
+            // Campos de autenticación
+            'password' => $password,
+            'api_key' => $api_key,
+            
+            // Campos académicos
+            'carrera' => $datos['carrera'] ?? null,
+            'carrera_di' => $datos['carrera'] ?? null,
+            'genero' => $datos['genero'] ?? null,
+            'edo_civil' => $datos['edo_civil'] ?? null,
+            'fecha_nac' => $datos['fecha_nac'] ?? null,
+            'num_telf_opc' => $datos['num_telf_opc'] ?? '',
+            
+            // Foto de perfil
+            'foto_perfil' => $nombreFoto,
+            
+            // Campos de permisos/roles (todos a 0 excepto estudiante)
             'usuario' => 0,
             'estudiante' => 1,
             'docente' => 0,
@@ -372,7 +574,6 @@ function insertarEstudiante($datos) {
             'editar_user' => 0,
             'editar_nota' => 0,
             'editar_acceso' => 0,
-            'potencialidades' => '',
             'editar_valores' => 0,
             'editar_estudiante' => 0,
             'agregar_estudiante' => 0,
@@ -404,75 +605,28 @@ function insertarEstudiante($datos) {
             'titulos_re_materia' => 0,
             'grado' => 0,
             'gestion_grado' => 0,
-            'visita' => 0,
-            'foto_perfil' => $nombreFoto
+            'visita' => 0
         ];
 
-        $defaults = [
-            'cel' => $datos['cel'] ?? '',
-            'ciudad' => $datos['municipio'] ?? '',
-            'num_telf_opc' => $datos['num_telf_opc'] ?? '',
-            'etnia' => $datos['etnia'] ?? '',
-            'casaapto' => $datos['casaapto'] ?? 'No especificado',
-            'punto_referencia' => $datos['punto_referencia'] ?? '',
-            'grupo_familiar' => $datos['grupo_familiar'] ?? 0,
-            'acargo_usted' => $datos['acargo_usted'] ?? 0,
-            'fuente_ingresos' => $datos['fuente_ingresos'] ?? '',
-            'tipo_vivienda' => $datos['tipo_vivienda'] ?? '',
-            'tenencia_vivienda' => $datos['tenencia_vivienda'] ?? '',
-            'enfermedad' => $datos['enfermedad'] ?? '',
-            'discapacidad' => $datos['discapacida'] ?? '', // Nota: 'discapacida' viene del formulario
-            'titulos' => '',
-            'institutos' => '',
-            'api_key' => $api_key
-        ];
-
-        // 4. Combinar todos los valores
-        $valores = array_merge(
-            [
-                'idusuario' => $datos['idusuario'],
-                'nombre' => $datos['nombre'],
-                'username' => $username,
-                'email' => $datos['email'] ?? null,
-                'tlf' => $datos['tlf'] ?? null,
-                'direccion' => $datos['direccion'] ?? null,
-                'estado' => $datos['estado'] ?? null,
-                'municipio' => $datos['municipio'] ?? null,
-                'parroquia' => $datos['parroquia'] ?? null,
-                'fecha_ingreso' => $datos['fecha_ingreso'] ?? null,
-                'status' => $datos['status'] ?? 'Activo',
-                'user_type' => 'estudiante',
-                'password' => $password,
-                'carrera' => $datos['carrera'] ?? null,
-                'genero' => $datos['genero'] ?? null,
-                'edo_civil' => $datos['edo_civil'] ?? null,
-                'fecha_nac' => $datos['fecha_nac'] ?? null,
-                'fecha_act' => $fecha_act
-            ],
-            $defaults,
-            $roles
-        );
-
-        // 5. Insertar en la tabla users
-        $columnas = implode(', ', array_keys($valores));
-        $placeholders = implode(', ', array_fill(0, count($valores), '?'));
-        $sql = "INSERT INTO users ($columnas) VALUES ($placeholders)";
-
-        $stmt = $db->prepare($sql);
-        if (!$stmt) {
-            throw new Exception("Error en preparación: " . $db->error);
-        }
-
-        // 6. Vincular parámetros
+        // ============================
+        // 4. PREPARAR CONSULTA SQL PARA users
+        // ============================
+        $columnas = [];
+        $placeholders = [];
         $tipos = '';
         $valoresBind = [];
-        foreach ($valores as $key => $value) {
-            if (in_array($key, [
+        
+        foreach ($valores as $columna => $valor) {
+            $columnas[] = $columna;
+            $placeholders[] = '?';
+            
+            // Determinar tipo de dato
+            if (in_array($columna, [
                 'grupo_familiar', 'acargo_usted', 'usuario', 'estudiante', 'docente', 'admin', 
-                'super_user', 'editar_user', 'editar_nota', 'editar_acceso', 'editar_valores', 
-                'editar_estudiante', 'agregar_estudiante', 'agregar_docente', 'editar_docente', 
-                'agregar_carrera', 'agregar_materia', 'editar_materia', 'pagos', 'auditoria', 
-                'secciones', 'rela_materia_carrera', 'periodos_academicos', 'asig_secciones', 
+                'super_user', 'editar_user', 'editar_nota', 'editar_acceso',
+                'editar_valores', 'editar_estudiante', 'agregar_estudiante', 'agregar_docente', 
+                'editar_docente', 'agregar_carrera', 'agregar_materia', 'editar_materia', 'pagos', 
+                'auditoria', 'secciones', 'rela_materia_carrera', 'periodos_academicos', 'asig_secciones', 
                 'asig_cursos', 'horarios', 'gestion_director_carrera', 'notas_cargadas', 
                 'consultar_notas', 'consultar_notas_pasadas', 'tipos_pago', 'tipos_horario', 
                 'horario_personal', 'respaldo_bd', 'gestionar_carrera', 'gestion_periodo_academico', 
@@ -480,113 +634,279 @@ function insertarEstudiante($datos) {
                 'gestion_grado', 'visita'
             ])) {
                 $tipos .= 'i'; // Entero
-                $valoresBind[] = (int)$value;
+                $valoresBind[] = (int)$valor;
             } else {
                 $tipos .= 's'; // String
-                $valoresBind[] = $value;
+                $valoresBind[] = $valor;
             }
         }
+        
+        $columnasStr = implode(', ', array_map(function($col) {
+            return "`$col`";
+        }, $columnas));
+        
+        $placeholdersStr = implode(', ', $placeholders);
+        
+        $sql = "INSERT INTO users ($columnasStr) VALUES ($placeholdersStr)";
 
+        // ============================
+        // 5. EJECUTAR INSERCIÓN EN users
+        // ============================
+        $stmt = $db->prepare($sql);
+        if (!$stmt) {
+            throw new Exception("Error al preparar consulta: " . $db->error);
+        }
+        
         $stmt->bind_param($tipos, ...$valoresBind);
         
         if (!$stmt->execute()) {
-            throw new Exception("Error al ejecutar: " . $stmt->error);
+            $error = $stmt->error;
+            $errno = $stmt->errno;
+            
+            if ($errno == 1062) { // Duplicate entry
+                if (strpos($error, 'idusuario') !== false) {
+                    throw new Exception("La cédula {$datos['idusuario']} ya está registrada en el sistema.", 409);
+                } elseif (strpos($error, 'username') !== false) {
+                    throw new Exception("El nombre de usuario ya existe.", 409);
+                } elseif (strpos($error, 'email') !== false) {
+                    throw new Exception("El correo electrónico ya está registrado.", 409);
+                } else {
+                    throw new Exception("Registro duplicado.", 409);
+                }
+            } elseif ($errno == 1452) { // Foreign key constraint
+                throw new Exception("Error: La carrera seleccionada no existe.", 400);
+            } else {
+                throw new Exception("Error al guardar en la base de datos: " . $error, 500);
+            }
         }
         
         $userId = $stmt->insert_id;
         $stmt->close();
 
-        // 7. Insertar títulos obtenidos si existen
-        if (!empty($datos['titulos']) && !empty($datos['institutos'])) {
-            $titulos = is_array($datos['titulos']) ? $datos['titulos'] : [$datos['titulos']];
-            $institutos = is_array($datos['institutos']) ? $datos['institutos'] : [$datos['institutos']];
+        // ============================
+        // 6. INSERTAR TÍTULOS OBTENIDOS (CORRECTO)
+        // ============================
+        if (!empty($datos['titulos']) && is_array($datos['titulos']) && 
+            !empty($datos['institutos']) && is_array($datos['institutos'])) {
+            
+            $titulos = array_filter(array_map('trim', $datos['titulos']));
+            $institutos = array_filter(array_map('trim', $datos['institutos']));
             
             $count = min(count($titulos), count($institutos));
             
-            $sqlTitulos = "INSERT INTO titulos_obtenidos (id_usuario, nombre, titulo_obtenido, instituto) VALUES (?, ?, ?, ?)";
-            $stmtTitulos = $db->prepare($sqlTitulos);
-            
-            if (!$stmtTitulos) {
-                throw new Exception("Error al preparar consulta de títulos: " . $db->error);
-            }
-            
-            for ($i = 0; $i < $count; $i++) {
-                $stmtTitulos->bind_param(
-                    "isss", 
-                    $userId,
-                    $datos['nombre'],
-                    $titulos[$i],
-                    $institutos[$i]
-                );
-                if (!$stmtTitulos->execute()) {
-                    throw new Exception("Error al insertar título: " . $stmtTitulos->error);
+            if ($count > 0) {
+                // CORRECTO: Solo estos 4 campos según tu estructura
+                $sqlTitulos = "INSERT INTO titulos_obtenidos (id_usuario, nombre, titulo_obtenido, instituto) 
+                               VALUES (?, ?, ?, ?)";
+                
+                $stmtTitulos = $db->prepare($sqlTitulos);
+                
+                if ($stmtTitulos) {
+                    for ($i = 0; $i < $count; $i++) {
+                        if (!empty($titulos[$i]) && !empty($institutos[$i])) {
+                            $stmtTitulos->bind_param(
+                                "isss", 
+                                $userId,
+                                $datos['nombre'],
+                                $titulos[$i],
+                                $institutos[$i]
+                            );
+                            
+                            if (!$stmtTitulos->execute()) {
+                                error_log("Error al insertar título $i: " . $stmtTitulos->error);
+                                // Continuar con los demás títulos
+                            }
+                        }
+                    }
+                    
+                    $stmtTitulos->close();
                 }
             }
-            
-            $stmtTitulos->close();
         }
 
-        // 8. REGISTRAR EN AUDITORÍA - NUEVO ESTUDIANTE
-        $valores_nuevos = [
-            'idusuario' => $datos['idusuario'],
-            'nombre' => $datos['nombre'],
-            'email' => $datos['email'] ?? '',
-            'carrera' => $datos['carrera'] ?? '',
-            'status' => $datos['status'] ?? 'Activo',
-            'foto_perfil' => !empty($nombreFoto) ? 'Sí' : 'No'
-        ];
-        
-        registrarAuditoria(
-            "INSERT", 
-            "users", 
-            $userId, 
-            null, 
-            $valores_nuevos, 
-            "Estudiantes", 
-            "Registro de nuevo estudiante"
-        );
+        // ============================
+        // 7. REGISTRAR EN AUDITORÍA
+        // ============================
+        if (function_exists('registrarAuditoria')) {
+            $valores_nuevos = [
+                'idusuario' => $datos['idusuario'],
+                'nombre' => $datos['nombre'],
+                'carrera' => $datos['carrera'] ?? '',
+                'status' => $datos['status'] ?? 'Activo'
+            ];
+            
+            registrarAuditoria(
+                "INSERT", 
+                "users", 
+                $userId, 
+                null, 
+                $valores_nuevos, 
+                "Estudiantes", 
+                "Registro de nuevo estudiante"
+            );
+        }
 
-        // Confirmar transacción
+        // ============================
+        // 8. CONFIRMAR TRANSACCIÓN
+        // ============================
         $db->commit();
 
+        // ============================
+        // 9. RESPUESTA EXITOSA
+        // ============================
         return [
             'success' => true,
-            'message' => 'Estudiante registrado exitosamente!' . (!empty($nombreFoto) ? ' Con foto de perfil.' : ''),
+            'message' => '✅ Estudiante registrado exitosamente' . 
+                        (!empty($nombreFoto) ? ' con foto de perfil.' : '.'),
             'id' => $userId,
-            'foto_perfil' => $nombreFoto
+            'username' => $username,
+            'foto_perfil' => $nombreFoto,
+            'cedula' => $datos['idusuario']
         ];
 
     } catch(Exception $e) {
-        // Revertir transacción en caso de error
-        $db->rollback();
-        
-        // Si hay error, eliminar la foto subida (si existe)
-        if (!empty($nombreFoto)) {
-            $rutaFoto = '../foto_perfil/' . $nombreFoto;
-            if (file_exists($rutaFoto)) {
-                unlink($rutaFoto);
+        // ============================
+        // 10. MANEJAR ERRORES
+        // ============================
+        if (isset($db) && method_exists($db, 'rollback')) {
+            try {
+                $db->rollback();
+            } catch (Exception $rollbackError) {
+                error_log("Error al hacer rollback: " . $rollbackError->getMessage());
             }
         }
         
-        // REGISTRAR EN AUDITORÍA - ERROR AL REGISTRAR ESTUDIANTE
-        registrarAuditoria(
-            "ERROR", 
-            "users", 
-            null, 
-            null, 
-            [
-                'nombre' => $datos['nombre'] ?? '',
-                'idusuario' => $datos['idusuario'] ?? '',
-                'error' => $e->getMessage()
-            ], 
-            "Estudiantes", 
-            "Error al registrar estudiante"
-        );
+        // Eliminar foto si se subió
+        if (!empty($nombreFoto)) {
+            $rutaFoto = '../foto_perfil/' . $nombreFoto;
+            if (file_exists($rutaFoto)) {
+                @unlink($rutaFoto);
+            }
+        }
+        
+        // Registrar error en auditoría
+        if (function_exists('registrarAuditoria')) {
+            registrarAuditoria(
+                "ERROR", 
+                "users", 
+                null, 
+                null, 
+                [
+                    'nombre' => $datos['nombre'] ?? '',
+                    'idusuario' => $datos['idusuario'] ?? '',
+                    'error' => $e->getMessage()
+                ], 
+                "Estudiantes", 
+                "Error al registrar estudiante"
+            );
+        }
         
         error_log("Error en insertarEstudiante: " . $e->getMessage());
+        
         return [
             'success' => false,
-            'message' => 'Error al registrar estudiante: ' . $e->getMessage()
+            'message' => '❌ ' . $e->getMessage(),
+            'error_code' => $e->getCode()
+        ];
+    }
+}
+
+/**
+ * Función auxiliar para generar un username único
+ */
+function generarUsernameUnico($usernameBase) {
+    global $db;
+    
+    $username = $usernameBase;
+    $contador = 1;
+    $maxIntentos = 100;
+    
+    while ($contador <= $maxIntentos) {
+        // Verificar si el username ya existe
+        $sql = "SELECT COUNT(*) as count FROM users WHERE username = ?";
+        $stmt = $db->prepare($sql);
+        if (!$stmt) {
+            // Si hay error en la consulta, retornar el username actual
+            return $username;
+        }
+        
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        $stmt->close();
+        
+        if ($row['count'] == 0) {
+            // Username disponible
+            return $username;
+        }
+        
+        // Generar nuevo username con sufijo numérico
+        $username = $usernameBase . $contador;
+        $contador++;
+    }
+    
+    // Si no se encuentra username único después de muchos intentos,
+    // usar un hash basado en timestamp
+    return $usernameBase . '_' . substr(md5(time()), 0, 6);
+}
+
+/**
+ * Función para subir foto de perfil (debes tenerla ya definida)
+ */
+function subirFotoPerfil($archivo) {
+    $directorio = '../foto_perfil/';
+    
+    // Crear directorio si no existe
+    if (!file_exists($directorio)) {
+        mkdir($directorio, 0777, true);
+    }
+    
+    // Validar error de subida
+    if ($archivo['error'] !== UPLOAD_ERR_OK) {
+        return [
+            'success' => false,
+            'message' => 'Error al subir archivo: código ' . $archivo['error']
+        ];
+    }
+    
+    // Validar tamaño (5MB máximo)
+    $tamanoMaximo = 5 * 1024 * 1024; // 5MB en bytes
+    if ($archivo['size'] > $tamanoMaximo) {
+        return [
+            'success' => false,
+            'message' => 'El archivo excede el tamaño máximo de 5MB'
+        ];
+    }
+    
+    // Validar tipo de archivo
+    $extensionesPermitidas = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+    $nombreArchivo = $archivo['name'];
+    $extension = strtolower(pathinfo($nombreArchivo, PATHINFO_EXTENSION));
+    
+    if (!in_array($extension, $extensionesPermitidas)) {
+        return [
+            'success' => false,
+            'message' => 'Formato de archivo no permitido. Use: JPG, JPEG, PNG, WEBP o PDF'
+        ];
+    }
+    
+    // Generar nombre único para el archivo
+    $nombreUnico = uniqid('foto_', true) . '.' . $extension;
+    $rutaDestino = $directorio . $nombreUnico;
+    
+    // Mover archivo subido
+    if (move_uploaded_file($archivo['tmp_name'], $rutaDestino)) {
+        return [
+            'success' => true,
+            'nombre_archivo' => $nombreUnico,
+            'ruta' => $rutaDestino,
+            'extension' => $extension
+        ];
+    } else {
+        return [
+            'success' => false,
+            'message' => 'Error al guardar el archivo en el servidor'
         ];
     }
 }

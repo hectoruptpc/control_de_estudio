@@ -1,5 +1,11 @@
+
+
+
+
+
+
 <?php
-// _formulario_estudiante.php
+
 // Obtener los datos necesarios para los select (si no se pasaron como parámetros)
 if (!isset($tiposCedula)) {
     $tiposCedula = obtenerTiposCedula($db);
@@ -484,6 +490,164 @@ function previewImage(input, previewId) {
         preview.style.display = 'none';
     }
 }
+
+
+
+
+// Validación del formulario
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('<?php echo $formId; ?>');
+    
+    form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        
+        if (validarFormulario()) {
+            // Si la validación pasa, enviar el formulario
+            form.submit();
+        }
+    });
+    
+    function validarFormulario() {
+        let isValid = true;
+        let mensajesError = [];
+        
+        // Obtener el prefijo
+        const prefijo = '<?php echo $prefijo; ?>';
+        
+        // Validar cédula
+        const numeroCedula = document.getElementById('numero_cedula' + prefijo).value;
+        if (!/^\d{6,9}$/.test(numeroCedula)) {
+            mensajesError.push('La cédula debe contener entre 6 y 9 dígitos numéricos');
+            isValid = false;
+        }
+        
+        // Validar nombre (permite apóstrofes, tildes y espacios)
+        const nombre = document.getElementById('nombre' + prefijo).value;
+        if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s']+$/.test(nombre.trim())) {
+            mensajesError.push('El nombre solo puede contener letras, espacios y apóstrofes');
+            isValid = false;
+        }
+        
+        // Validar teléfono
+        const telefono = document.getElementById('tlf' + prefijo).value;
+        if (!/^[0-9]{10,11}$/.test(telefono.replace(/\D/g, ''))) {
+            mensajesError.push('El teléfono debe contener 10 u 11 dígitos');
+            isValid = false;
+        }
+        
+        // Validar email
+        const email = document.getElementById('email' + prefijo).value;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            mensajesError.push('Ingrese un correo electrónico válido');
+            isValid = false;
+        }
+        
+        // Validar que la fecha de nacimiento sea válida
+        const fechaNac = document.getElementById('fecha_nac' + prefijo).value;
+        if (fechaNac) {
+            const fechaNacDate = new Date(fechaNac);
+            const hoy = new Date();
+            if (fechaNacDate > hoy) {
+                mensajesError.push('La fecha de nacimiento no puede ser futura');
+                isValid = false;
+            }
+            
+            // Calcular edad mínima (15 años)
+            const edadMinima = new Date();
+            edadMinima.setFullYear(edadMinima.getFullYear() - 15);
+            if (fechaNacDate > edadMinima) {
+                mensajesError.push('El estudiante debe tener al menos 15 años');
+                isValid = false;
+            }
+        }
+        
+        // Validar fecha de ingreso
+        const fechaIngreso = document.getElementById('fecha_ingreso' + prefijo).value;
+        if (fechaNac && fechaIngreso) {
+            const fechaNacDate = new Date(fechaNac);
+            const fechaIngresoDate = new Date(fechaIngreso);
+            if (fechaIngresoDate < fechaNacDate) {
+                mensajesError.push('La fecha de ingreso no puede ser anterior a la fecha de nacimiento');
+                isValid = false;
+            }
+        }
+        
+        // Validar campos de texto con apóstrofes permitidos
+        const camposTexto = [
+            'etnia' + prefijo,
+            'direccion' + prefijo,
+            'punto_referencia' + prefijo,
+            'enfermedad' + prefijo,
+            'discapacida' + prefijo
+        ];
+        
+        camposTexto.forEach(campoId => {
+            const campo = document.getElementById(campoId);
+            if (campo && campo.value.trim() !== '') {
+                // Permitir letras, números, espacios, apóstrofes, tildes y algunos signos
+                if (!/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s'",.;:¡!¿?()-]+$/.test(campo.value)) {
+                    mensajesError.push(`El campo ${campo.previousElementSibling?.textContent || campo.placeholder} contiene caracteres no permitidos`);
+                    isValid = false;
+                }
+            }
+        });
+        
+        // Mostrar errores si existen
+        if (mensajesError.length > 0) {
+            mostrarErrores(mensajesError);
+        }
+        
+        return isValid;
+    }
+    
+    function mostrarErrores(errores) {
+        // Crear o actualizar contenedor de errores
+        let errorContainer = document.getElementById('errorContainer');
+        if (!errorContainer) {
+            errorContainer = document.createElement('div');
+            errorContainer.id = 'errorContainer';
+            errorContainer.className = 'alert alert-danger';
+            form.prepend(errorContainer);
+        }
+        
+        // Limpiar contenido anterior
+        errorContainer.innerHTML = '';
+        
+        // Agregar título
+        const titulo = document.createElement('strong');
+        titulo.textContent = 'Por favor corrija los siguientes errores:';
+        errorContainer.appendChild(titulo);
+        
+        // Agregar lista de errores
+        const lista = document.createElement('ul');
+        lista.className = 'mb-0 mt-2';
+        
+        errores.forEach(error => {
+            const item = document.createElement('li');
+            item.textContent = error;
+            lista.appendChild(item);
+        });
+        
+        errorContainer.appendChild(lista);
+        
+        // Desplazar al inicio del formulario
+        errorContainer.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    // Limpiar errores al cambiar campos
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        input.addEventListener('change', function() {
+            const errorContainer = document.getElementById('errorContainer');
+            if (errorContainer) {
+                errorContainer.remove();
+            }
+        });
+    });
+});
+
+
 
 
 
