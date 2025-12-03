@@ -15763,10 +15763,415 @@ function procesarEdicionNota() {
 
 
 
+//INSCRIPCION DE MATERIAS ***********************************************************************
 
 
+/**
+ * Obtiene las materias de un trayecto específico de una carrera
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto Número del trayecto
+ * @return array Materias del trayecto
+ */
+function obtenerMateriasTrayecto($id_carrera, $trayecto) {
+    global $db;
+    
+    $sql = "SELECT m.* 
+            FROM materias m
+            INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+            WHERE cm.id_carrera = ? AND m.trayecto = ? AND m.activa = 1
+            ORDER BY cm.semestre ASC";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_carrera, $trayecto);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $materias = [];
+    while ($row = $result->fetch_assoc()) {
+        $materias[] = $row;
+    }
+    
+    return $materias;
+}
 
+/**
+ * Obtiene las materias aprobadas de un estudiante
+ * @param int $id_usuario ID del estudiante
+ * @param int $trayecto Número del trayecto (opcional)
+ * @return array Materias aprobadas
+ */
+function obtenerMateriasAprobadas($id_usuario, $trayecto = null) {
+    global $db;
+    
+    $sql = "SELECT nd.id_materia, m.nombre_materia, m.trayecto, 
+                   CASE 
+                     WHEN m.es_proyecto_socio = 1
+                     THEN MAX(CASE 
+                              WHEN nd.trayecto_0 >= 16 OR nd.trayecto_1 >= 16 OR nd.trayecto_2 >= 16 OR nd.trayecto_3 >= 16 OR nd.trayecto_4 >= 16 
+                              THEN 1 ELSE 0 END)
+                     ELSE MAX(CASE 
+                              WHEN nd.trayecto_0 >= 12 OR nd.trayecto_1 >= 12 OR nd.trayecto_2 >= 12 OR nd.trayecto_3 >= 12 OR nd.trayecto_4 >= 12 
+                              THEN 1 ELSE 0 END)
+                   END as aprobada
+            FROM notas_definitivas nd
+            INNER JOIN materias m ON nd.id_materia = m.id_materia
+            WHERE nd.id_usuario = ?";
+    
+    if ($trayecto !== null) {
+        $sql .= " AND m.trayecto = ?";
+    }
+    
+    $sql .= " GROUP BY nd.id_materia, m.nombre_materia, m.trayecto
+              HAVING aprobada = 1";
+    
+    $stmt = $db->prepare($sql);
+    
+    if ($trayecto !== null) {
+        $stmt->bind_param("ii", $id_usuario, $trayecto);
+    } else {
+        $stmt->bind_param("i", $id_usuario);
+    }
+    
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $aprobadas = [];
+    while ($row = $result->fetch_assoc()) {
+        $aprobadas[$row['id_materia']] = $row;
+    }
+    
+    return $aprobadas;
+}
 
+/**
+ * Obtiene las materias reprobadas de un estudiante
+ * @param int $id_usuario ID del estudiante
+ * @param int $trayecto Número del trayecto
+ * @return array Materias reprobadas
+ */
+function obtenerMateriasReprobadas($id_usuario, $trayecto) {
+    global $db;
+    
+    // Primero necesitamos la carrera del estudiante
+    $info_estudiante = obtenerInfoEstudiante($id_usuario);
+    $id_carrera = $info_estudiante['carrera'];
+    
+    $materias_trayecto = obtenerMateriasTrayecto($id_carrera, $trayecto);
+    $materias_aprobadas = obtenerMateriasAprobadas($id_usuario, $trayecto);
+    
+    $reprobadas = [];
+    foreach ($materias_trayecto as $materia) {
+        if (!isset($materias_aprobadas[$materia['id_materia']])) {
+            $reprobadas[] = $materia;
+        }
+    }
+    
+    return $reprobadas;
+}
+
+/**
+ * Verifica si el estudiante puede avanzar al siguiente trayecto
+ * @param int $id_usuario ID del estudiante
+ * @param int $trayecto_actual Trayecto actual
+ * @param int $id_carrera ID de la carrera
+ * @return bool True si puede avanzar, False si no
+ */
+function puedeAvanzarTrayecto($id_usuario, $trayecto_actual, $id_carrera) {
+    // Obtener todas las materias del trayecto actual
+    $materias_trayecto = obtenerMateriasTrayecto($id_carrera, $trayecto_actual);
+    $materias_aprobadas = obtenerMateriasAprobadas($id_usuario, $trayecto_actual);
+    
+    $total_materias = count($materias_trayecto);
+    $total_aprobadas = count($materias_aprobadas);
+    
+    // Para trayecto 0: necesita 50% aprobado
+    if ($trayecto_actual == 0) {
+        return ($total_aprobadas >= ceil($total_materias * 0.5));
+    }
+    
+    // Para trayecto 1 a 2 y 3 a 4: necesita aprobar proyecto socio integrador
+    if ($trayecto_actual == 1 || $trayecto_actual == 3) {
+        return haAprobadoProyectoSocio($id_usuario, $trayecto_actual);
+    }
+    
+    // Para trayecto 2 a 3: necesita aprobar todas las materias y obtener título
+    if ($trayecto_actual == 2) {
+        return ($total_aprobadas == $total_materias && tienePrimerTitulo($id_usuario));
+    }
+    
+    return false;
+}
+
+/**
+ * Verifica si el estudiante aprobó el proyecto socio integrador
+ * @param int $id_usuario ID del estudiante
+ * @param int $trayecto Trayecto del proyecto
+ * @return bool True si aprobó, False si no
+ */
+function haAprobadoProyectoSocio($id_usuario, $trayecto) {
+    global $db;
+    
+    // Versión con el campo específico
+    $sql = "SELECT nd.* 
+            FROM notas_definitivas nd
+            INNER JOIN materias m ON nd.id_materia = m.id_materia
+            WHERE nd.id_usuario = ? 
+            AND m.trayecto = ?
+            AND m.es_proyecto_socio = 1
+            AND (
+                (m.trayecto = 1 AND nd.trayecto_1 >= 16) OR
+                (m.trayecto = 3 AND nd.trayecto_3 >= 16)
+            )";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_usuario, $trayecto);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->num_rows > 0;
+}
+
+/**
+ * Verifica si el estudiante tiene el primer título de la carrera
+ * @param int $id_usuario ID del estudiante
+ * @return bool True si tiene título, False si no
+ */
+function tienePrimerTitulo($id_usuario) {
+    global $db;
+    
+    $sql = "SELECT titulos FROM users WHERE idusuario = ?";
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_usuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($row = $result->fetch_assoc()) {
+        // Asumiendo que el campo 'titulos' contiene los títulos separados por comas
+        return !empty(trim($row['titulos']));
+    }
+    
+    return false;
+}
+
+/**
+ * Obtiene el trayecto actual del estudiante
+ * @param int $id_usuario ID del estudiante
+ * @return int Trayecto actual
+ */
+function obtenerTrayectoActualEstudiante($id_usuario) {
+    global $db;
+    
+    // Buscar en la última sección inscrita
+    $sql = "SELECT s.id_trayecto 
+            FROM estudiante_seccion es
+            INNER JOIN secciones s ON es.id_seccion = s.id_seccion
+            WHERE es.id_usuario = ?
+            ORDER BY es.fecha_inscripcion DESC
+            LIMIT 1";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_usuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($row = $result->fetch_assoc()) {
+        return $row['id_trayecto'];
+    }
+    
+    // Si no está inscrito en ninguna sección, empezar desde trayecto 0
+    return 0;
+}
+
+/**
+ * Inscribe al estudiante en materias
+ * @param int $id_usuario ID del estudiante
+ * @param int $id_seccion ID de la sección
+ * @param array $materias_ids IDs de las materias a inscribir
+ * @return bool True si éxito, False si error
+ */
+function inscribirMateriasEstudiante($id_usuario, $id_seccion, $materias_ids) {
+    global $db;
+    
+    // Primero, inscribir al estudiante en la sección si no está inscrito
+    $sql_check = "SELECT * FROM estudiante_seccion WHERE id_usuario = ? AND id_seccion = ?";
+    $stmt_check = $db->prepare($sql_check);
+    $stmt_check->bind_param("ii", $id_usuario, $id_seccion);
+    $stmt_check->execute();
+    $result_check = $stmt_check->get_result();
+    
+    if ($result_check->num_rows == 0) {
+        $sql_inscripcion = "INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus) 
+                           VALUES (?, ?, NOW(), 'Activo')";
+        $stmt_inscripcion = $db->prepare($sql_inscripcion);
+        $stmt_inscripcion->bind_param("ii", $id_usuario, $id_seccion);
+        
+        if (!$stmt_inscripcion->execute()) {
+            return false;
+        }
+    }
+    
+    // Aquí deberías agregar la lógica para registrar la inscripción de materias
+    // Depende de cómo maneje tu sistema las inscripciones de materias
+    // Por ahora, solo retornamos true
+    
+    return true;
+}
+
+/**
+ * Obtiene información del estudiante
+ * @param int $id_usuario ID del estudiante
+ * @return array Información del estudiante
+ */
+function obtenerInfoEstudiante($id_usuario) {
+    global $db;
+    
+    $sql = "SELECT u.*, c.nombre_carrera 
+            FROM users u
+            LEFT JOIN carreras c ON u.carrera = c.id_carrera
+            WHERE u.idusuario = ?";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_usuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Obtiene las secciones disponibles para un trayecto
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto Trayecto
+ * @param int $id_periodo ID del período académico
+ * @return array Secciones disponibles
+ */
+function obtenerSeccionesTrayecto($id_carrera, $trayecto, $id_periodo) {
+    global $db;
+    
+    $sql = "SELECT s.* 
+            FROM secciones s
+            WHERE s.id_carrera = ? 
+            AND s.id_trayecto = ? 
+            AND s.id_periodo = ?
+            AND s.estatus = 'Activa'
+            AND (s.capacidad_maxima IS NULL OR 
+                s.capacidad_maxima > (SELECT COUNT(*) FROM estudiante_seccion es WHERE es.id_seccion = s.id_seccion))";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iii", $id_carrera, $trayecto, $id_periodo);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $secciones = [];
+    while ($row = $result->fetch_assoc()) {
+        $secciones[] = $row;
+    }
+    
+    return $secciones;
+}
+
+/**
+ * Obtiene el período académico activo
+ * @return array Información del período activo
+ */
+function obtenerPeriodoActivo() {
+    global $db;
+    
+    $sql = "SELECT * FROM periodos_academicos WHERE activo = 1 ORDER BY fecha_inicio DESC LIMIT 1";
+    $result = $db->query($sql);
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Obtiene si una materia es proyecto socio integrador
+ * @param int $id_materia ID de la materia
+ * @return bool True si es proyecto socio, False si no
+ */
+function esProyectoSocio($id_materia) {
+    global $db;
+    
+    $sql = "SELECT es_proyecto_socio FROM materias WHERE id_materia = ?";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_materia);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($row = $result->fetch_assoc()) {
+        return $row['es_proyecto_socio'] == 1;
+    }
+    
+    return false;
+}
+
+/**
+ * Obtiene la nota mínima requerida para una materia
+ * @param int $id_materia ID de la materia
+ * @return int Nota mínima requerida
+ */
+function obtenerNotaMinimaMateria($id_materia) {
+    if (esProyectoSocio($id_materia)) {
+        return 16;
+    }
+    return 12;
+}
+
+/**
+ * Script para marcar materias como Proyecto Socio Integrador
+ * Ejecutar una sola vez después de agregar el campo
+ */
+function marcarProyectosSocio() {
+    global $db;
+    
+    // Lista de palabras clave para identificar proyectos socio integradores
+    $palabras_clave = [
+        'proyecto socio integrador',
+        'proyecto sociointegrador',
+        'proyecto integrador',
+        'socio integrador',
+        'proyecto socio',
+        'sociointegrador',
+        'trabajo especial de grado',
+        'proyecto final',
+        'trabajo de grado'
+    ];
+    
+    $total_actualizadas = 0;
+    
+    foreach ($palabras_clave as $palabra) {
+        $sql = "UPDATE materias 
+                SET es_proyecto_socio = 1 
+                WHERE LOWER(nombre_materia) LIKE ? 
+                AND es_proyecto_socio = 0";
+        
+        $busqueda = "%" . $palabra . "%";
+        $stmt = $db->prepare($sql);
+        $stmt->bind_param("s", $busqueda);
+        $stmt->execute();
+        
+        $total_actualizadas += $stmt->affected_rows;
+    }
+    
+    // También marcar por códigos específicos si es necesario
+    $codigos_proyecto = ['PSI', 'PROYSOC', 'TEG', 'PROYECTO'];
+    
+    foreach ($codigos_proyecto as $codigo) {
+        $sql = "UPDATE materias 
+                SET es_proyecto_socio = 1 
+                WHERE UPPER(cod_materia) LIKE ? 
+                AND es_proyecto_socio = 0";
+        
+        $busqueda = "%" . $codigo . "%";
+        $stmt = $db->prepare($sql);
+        $stmt->bind_param("s", $busqueda);
+        $stmt->execute();
+        
+        $total_actualizadas += $stmt->affected_rows;
+    }
+    
+    return $total_actualizadas;
+}
 
 
 

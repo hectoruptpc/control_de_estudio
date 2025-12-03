@@ -179,6 +179,12 @@ if (!isLoggedIn() || !isAdmin()) {
                             </a>
                         <?php endif; ?>
 
+                         <?php if (tienePermiso('admin')): ?>
+        <a title="Inscribir Materias a Estudiantes" class="dropdown-item" href="inscripcion_materias.php">
+            <i class="fas fa-clipboard-list fa-fw"></i> Inscribir Materias
+        </a>
+        <?php endif; ?>
+
                         <?php if (tienePermiso('secciones')): ?>
                         <a title="Gestionar Secciones" class="dropdown-item" href="gestion_seccion.php">
                             <i class="fas fa-object-group fa-fw"></i> Gestionar Secciones
