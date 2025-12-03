@@ -443,88 +443,187 @@ $(document).ready(function() {
         }
     });
 
-    // Validación del formulario
-    $('#formEditarEstudiante').on('submit', function(e) {
-        e.preventDefault();
+    // VALIDACIÓN EN TIEMPO REAL
+    $('#nombre').on('blur', function() {
+        const nombre = $(this).val().trim();
+        const $feedback = $(this).siblings('.invalid-feedback');
         
-        // Validar cédula
-        const cedula = $('#idusuario').val();
-        if (!cedula || cedula.trim() === '') {
-            alert('La cédula es obligatoria');
-            $('#idusuario').focus();
-            return;
-        }
-        
-        // Validar formato de cédula
-        if (!/^[VE]-\d+$/.test(cedula)) {
-            alert('Formato de cédula inválido. Debe ser V-12345678 o E-12345678');
-            $('#idusuario').focus();
-            return;
-        }
-        
-        // Solo validaciones básicas de formato (no de campos requeridos)
-        const email = $('#email').val();
-        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            alert('Por favor ingrese un correo electrónico válido');
-            return;
-        }
-        
-        // Validar archivo de imagen
-        const fotoInput = $('#foto_perfil')[0];
-        if (fotoInput.files.length > 0) {
-            const file = fotoInput.files[0];
-            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-            const maxSize = 5 * 1024 * 1024; // 5MB
-            
-            if (!allowedTypes.includes(file.type)) {
-                alert('Solo se permiten archivos JPG, JPEG, PNG y WEBP');
-                return;
-            }
-            
-            if (file.size > maxSize) {
-                alert('El archivo no debe superar los 5MB');
-                return;
-            }
-        }
-        
-        // Mostrar loading
-        const submitBtn = $('#btnGuardar');
-        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i>Guardando...');
-        
-        // DEBUG: Mostrar datos que se enviarán
-        console.log('Enviando cédula:', $('#idusuario').val());
-        
-        // Enviar formulario via AJAX
-        const formData = new FormData(this);
-        
-        $.ajax({
-            url: 'actualizar_estudiante.php',
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                try {
-                    const data = typeof response === 'string' ? JSON.parse(response) : response;
-                    
-                    if (data.success) {
-                        alert(data.message);
-                        $('#editarEstudianteModal').modal('hide');
-                        location.reload();
-                    } else {
-                        alert(data.message || 'Error al actualizar el estudiante');
-                    }
-                } catch (e) {
-                    alert('Error al procesar la respuesta del servidor: ' + e.message);
+        if (nombre) {
+            if (/[0-9]/.test(nombre)) {
+                $(this).addClass('is-invalid');
+                if ($feedback.length === 0) {
+                    $(this).after('<div class="invalid-feedback">El nombre no puede contener números</div>');
                 }
-            },
-            error: function(xhr, status, error) {
-                alert('Ocurrió un error al procesar la solicitud: ' + error);
-            },
-            complete: function() {
-                submitBtn.prop('disabled', false).html('<i class="fas fa-save mr-1"></i>Guardar Cambios');
+            } else if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s']+$/.test(nombre)) {
+                $(this).addClass('is-invalid');
+                if ($feedback.length === 0) {
+                    $(this).after('<div class="invalid-feedback">El nombre contiene caracteres no permitidos</div>');
+                }
+            } else {
+                $(this).removeClass('is-invalid');
+                $feedback.remove();
             }
-        });
+        }
+    });
+
+    // Validar cédula en tiempo real
+    $('#idusuario').on('blur', function() {
+        const cedula = $(this).val().trim();
+        const $feedback = $(this).siblings('.invalid-feedback');
+        
+        if (cedula) {
+            if (!/^[VE]-\d{6,9}$/.test(cedula)) {
+                $(this).addClass('is-invalid');
+                if ($feedback.length === 0) {
+                    $(this).after('<div class="invalid-feedback">Formato: V-12345678 o E-12345678</div>');
+                }
+            } else {
+                $(this).removeClass('is-invalid');
+                $feedback.remove();
+            }
+        }
+    });
+
+    // Validar email en tiempo real
+    $('#email').on('blur', function() {
+        const email = $(this).val().trim();
+        const $feedback = $(this).siblings('.invalid-feedback');
+        
+        if (email) {
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                $(this).addClass('is-invalid');
+                if ($feedback.length === 0) {
+                    $(this).after('<div class="invalid-feedback">Correo electrónico no válido</div>');
+                }
+            } else {
+                $(this).removeClass('is-invalid');
+                $feedback.remove();
+            }
+        }
+    });
+
+    // VALIDACIÓN DEL FORMULARIO AL ENVIAR
+   // En el evento submit del formulario, actualiza el AJAX:
+$('#formEstudiante').on('submit', function(e) {
+    e.preventDefault();
+    
+    // Limpiar errores previos
+    $('.is-invalid').removeClass('is-invalid');
+    $('.invalid-feedback').remove();
+    
+    let errores = [];
+    
+    // Validar cédula
+    const cedula = $('#idusuario').val().trim();
+    if (!cedula) {
+        errores.push('La cédula es obligatoria');
+        $('#idusuario').addClass('is-invalid').after('<div class="invalid-feedback">La cédula es obligatoria</div>');
+    } else if (!/^[VE]-\d{6,9}$/.test(cedula)) {
+        errores.push('Formato de cédula inválido. Debe ser V-12345678 o E-12345678');
+        $('#idusuario').addClass('is-invalid').after('<div class="invalid-feedback">Formato: V-12345678 o E-12345678</div>');
+    }
+    
+    // Validar nombre
+    const nombre = $('#nombre').val().trim();
+    if (!nombre) {
+        errores.push('El nombre es obligatorio');
+        $('#nombre').addClass('is-invalid').after('<div class="invalid-feedback">El nombre es obligatorio</div>');
+    } else if (/[0-9]/.test(nombre)) {
+        errores.push('El nombre no puede contener números. Solo letras, espacios y apóstrofes (\')');
+        $('#nombre').addClass('is-invalid').after('<div class="invalid-feedback">El nombre no puede contener números</div>');
+    }
+    
+    // Mostrar errores si existen
+    if (errores.length > 0) {
+        alert('❌ Errores de validación:\n\n• ' + errores.join('\n• '));
+        $('.is-invalid').first().focus();
+        return;
+    }
+    
+    // Mostrar loading
+    const submitBtn = $('button[type="submit"]', this);
+    const originalText = submitBtn.html();
+    submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i>Guardando...');
+    
+    // Enviar formulario via AJAX
+    const formData = new FormData(this);
+    
+    $.ajax({
+        url: $(this).attr('action'),
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        dataType: 'json',
+        success: function(response) {
+            // Verificar si response es string (necesita parse)
+            if (typeof response === 'string') {
+                try {
+                    response = JSON.parse(response);
+                } catch (e) {
+                    console.error('Error al parsear JSON:', e);
+                    alert('❌ Error: Respuesta del servidor no es JSON válido.');
+                    return;
+                }
+            }
+            
+            if (response && response.success) {
+                alert(response.message || '✅ Estudiante registrado exitosamente');
+                
+                // Si es modal, cerrarlo
+                if ($('#formEstudiante').closest('.modal').length > 0) {
+                    $('#formEstudiante').closest('.modal').modal('hide');
+                }
+                
+                // Recargar o redirigir
+                setTimeout(function() {
+                    if (response.redirect_url) {
+                        window.location.href = response.redirect_url;
+                    } else {
+                        location.reload();
+                    }
+                }, 1000);
+            } else {
+                const errorMsg = response && response.message 
+                    ? response.message 
+                    : 'Error desconocido al registrar estudiante';
+                
+                // Mostrar errores específicos
+                if (errorMsg.includes('Errores de validación')) {
+                    alert(errorMsg);
+                } else {
+                    alert('❌ Error: ' + errorMsg);
+                }
+            }
+        },
+        error: function(xhr, status, error) {
+            let mensajeError = '❌ Error de conexión\n\n';
+            
+            if (xhr.status === 0) {
+                mensajeError += 'No hay conexión con el servidor.';
+            } else if (xhr.status === 500) {
+                mensajeError += 'Error interno del servidor.';
+            } else {
+                mensajeError += 'Detalles: ' + error;
+                
+                // Intentar mostrar respuesta del servidor
+                if (xhr.responseText) {
+                    try {
+                        const serverResponse = JSON.parse(xhr.responseText);
+                        if (serverResponse.message) {
+                            mensajeError += '\n\nMensaje: ' + serverResponse.message;
+                        }
+                    } catch (e) {
+                        mensajeError += '\n\nRespuesta: ' + xhr.responseText.substring(0, 200);
+                    }
+                }
+            }
+            
+            alert(mensajeError);
+        },
+        complete: function() {
+            submitBtn.prop('disabled', false).html(originalText);
+        }
     });
 });
 </script>

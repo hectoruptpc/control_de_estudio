@@ -260,90 +260,121 @@ function mostrarEstadoEstudiante($status) {
         </span>';
 }
 
-/**
- * Valida y sanitiza los datos de un estudiante (permite apóstrofes)
- */
 function validarDatosEstudiante($data) {
     $errors = [];
     $validados = [];
     
-    // Validación de cédula (mantener guión)
+    // Validación de cédula
     if (empty($data['idusuario'])) {
-        $errors['idusuario'] = "La cédula es requerida";
+        $errors['idusuario'] = "La cédula es obligatoria";
     } else {
-        // Validar formato: V-12345678 o E-12345678
-        if (!preg_match('/^[VvEe]-\d{6,9}$/', $data['idusuario'])) {
-            $errors['idusuario'] = "Formato de cédula no válido. Use: V-12345678 o E-12345678";
+        // Extraer tipo y número si viene en formato V-12345678
+        if (preg_match('/^([VE])-(\d{6,9})$/', $data['idusuario'], $matches)) {
+            $validados['idusuario'] = strtoupper($matches[1]) . '-' . $matches[2];
         } else {
-            $validados['idusuario'] = trim($data['idusuario']);
+            $errors['idusuario'] = "Formato de cédula inválido. Use: V-12345678 o E-12345678";
         }
     }
     
-    // Validación de nombre (permite apóstrofes y tildes)
+    // Validación de nombre (permite apóstrofes, NO números)
     if (empty($data['nombre'])) {
-        $errors['nombre'] = "El nombre es requerido";
+        $errors['nombre'] = "El nombre completo es obligatorio";
     } else {
-        // Permitir letras, espacios, apóstrofes y tildes
-        if (!preg_match("/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s']+$/", trim($data['nombre']))) {
-            $errors['nombre'] = "El nombre contiene caracteres no válidos";
+        $nombre = trim($data['nombre']);
+        if (preg_match("/[0-9]/", $nombre)) {
+            $errors['nombre'] = "El nombre no puede contener números";
+        } elseif (!preg_match("/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s']+$/u", $nombre)) {
+            $errors['nombre'] = "El nombre contiene caracteres no permitidos. Solo letras, espacios y apóstrofes (')";
+        } elseif (strlen($nombre) < 2) {
+            $errors['nombre'] = "El nombre es demasiado corto (mínimo 2 caracteres)";
+        } elseif (strlen($nombre) > 100) {
+            $errors['nombre'] = "El nombre es demasiado largo (máximo 100 caracteres)";
         } else {
-            // Usar mysqli_real_escape_string para apóstrofes (si hay conexión a BD)
-            $validados['nombre'] = mysqli_real_escape_string($GLOBALS['db'], trim($data['nombre']));
+            $validados['nombre'] = $nombre;
         }
     }
     
     // Validación de correo
     if (empty($data['email'])) {
-        $errors['email'] = "El correo electrónico es requerido";
+        $errors['email'] = "El correo electrónico es obligatorio";
     } elseif (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-        $errors['email'] = "Correo electrónico no válido";
+        $errors['email'] = "Correo electrónico no válido. Ejemplo: estudiante@universidad.edu";
     } else {
         $validados['email'] = trim($data['email']);
     }
     
     // Validación de teléfono
     if (empty($data['tlf'])) {
-        $errors['tlf'] = "El teléfono es requerido";
-    } elseif (!preg_match('/^[0-9]{10,11}$/', preg_replace('/\D/', '', $data['tlf']))) {
-        $errors['tlf'] = "Formato de teléfono no válido (10 u 11 dígitos)";
+        $errors['tlf'] = "El teléfono es obligatorio";
     } else {
-        $validados['tlf'] = trim($data['tlf']);
+        $telefono_limpio = preg_replace('/\D/', '', $data['tlf']);
+        if (!preg_match('/^[0-9]{10,11}$/', $telefono_limpio)) {
+            $errors['tlf'] = "Teléfono inválido. Debe tener 10 u 11 dígitos";
+        } else {
+            $validados['tlf'] = $data['tlf'];
+        }
     }
     
     // Validación de fecha de nacimiento
     if (empty($data['fecha_nac'])) {
-        $errors['fecha_nac'] = "La fecha de nacimiento es requerida";
+        $errors['fecha_nac'] = "La fecha de nacimiento es obligatoria";
     } else {
-        // Validar que sea una fecha válida y que tenga al menos 15 años
-        $fechaNac = DateTime::createFromFormat('Y-m-d', $data['fecha_nac']);
-        $hoy = new DateTime();
-        $edadMinima = (new DateTime())->modify('-15 years');
-        
-        if (!$fechaNac) {
-            $errors['fecha_nac'] = "Fecha de nacimiento no válida";
-        } elseif ($fechaNac > $hoy) {
-            $errors['fecha_nac'] = "La fecha de nacimiento no puede ser futura";
-        } elseif ($fechaNac > $edadMinima) {
-            $errors['fecha_nac'] = "El estudiante debe tener al menos 15 años";
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['fecha_nac'])) {
+            $errors['fecha_nac'] = "Formato de fecha inválido. Use: AAAA-MM-DD";
         } else {
-            $validados['fecha_nac'] = $data['fecha_nac'];
+            $fechaNac = DateTime::createFromFormat('Y-m-d', $data['fecha_nac']);
+            $hoy = new DateTime();
+            $edadMinima = (new DateTime())->modify('-15 years');
+            
+            if (!$fechaNac) {
+                $errors['fecha_nac'] = "Fecha de nacimiento no válida";
+            } elseif ($fechaNac > $hoy) {
+                $errors['fecha_nac'] = "La fecha de nacimiento no puede ser futura";
+            } elseif ($fechaNac > $edadMinima) {
+                $errors['fecha_nac'] = "El estudiante debe tener al menos 15 años";
+            } else {
+                $validados['fecha_nac'] = $data['fecha_nac'];
+            }
         }
     }
     
     // Validación de fecha de ingreso
     if (empty($data['fecha_ingreso'])) {
-        $errors['fecha_ingreso'] = "La fecha de ingreso es requerida";
-    } elseif (!empty($validados['fecha_nac'])) {
-        $fechaIngreso = DateTime::createFromFormat('Y-m-d', $data['fecha_ingreso']);
-        $fechaNac = DateTime::createFromFormat('Y-m-d', $validados['fecha_nac']);
-        
-        if ($fechaIngreso < $fechaNac) {
-            $errors['fecha_ingreso'] = "La fecha de ingreso no puede ser anterior a la fecha de nacimiento";
+        $errors['fecha_ingreso'] = "La fecha de ingreso es obligatoria";
+    } else {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['fecha_ingreso'])) {
+            $errors['fecha_ingreso'] = "Formato de fecha inválido. Use: AAAA-MM-DD";
+        } elseif (!empty($validados['fecha_nac'])) {
+            $fechaIngreso = DateTime::createFromFormat('Y-m-d', $data['fecha_ingreso']);
+            $fechaNac = DateTime::createFromFormat('Y-m-d', $validados['fecha_nac']);
+            
+            if ($fechaIngreso < $fechaNac) {
+                $errors['fecha_ingreso'] = "La fecha de ingreso no puede ser anterior a la fecha de nacimiento";
+            } else {
+                $validados['fecha_ingreso'] = $data['fecha_ingreso'];
+            }
         } else {
             $validados['fecha_ingreso'] = $data['fecha_ingreso'];
         }
-    } else {
-        $validados['fecha_ingreso'] = $data['fecha_ingreso'];
+    }
+    
+    // Validar otros campos requeridos
+    $camposRequeridos = [
+        'carrera' => 'Carrera',
+        'genero' => 'Género',
+        'edo_civil' => 'Estado civil',
+        'estado' => 'Estado',
+        'municipio' => 'Municipio',
+        'direccion' => 'Dirección',
+        'status' => 'Estado del estudiante'
+    ];
+    
+    foreach ($camposRequeridos as $campo => $nombre) {
+        if (empty($data[$campo])) {
+            $errors[$campo] = "El campo '$nombre' es requerido";
+        } else {
+            $validados[$campo] = trim($data[$campo]);
+        }
     }
     
     // Validar campos opcionales que permiten apóstrofes
@@ -357,102 +388,57 @@ function validarDatosEstudiante($data) {
     
     foreach ($camposConApostrofes as $campo => $nombre) {
         if (!empty($data[$campo])) {
-            // Permitir letras, números, espacios, apóstrofes y signos comunes
-            if (!preg_match("/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s'\",.;:¡!¿?()\-]+$/", trim($data[$campo]))) {
-                $errors[$campo] = "El campo $nombre contiene caracteres no válidos";
+            if (!preg_match("/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s'\",.;:¡!¿?()\-]+$/u", trim($data[$campo]))) {
+                $errors[$campo] = "El campo '$nombre' contiene caracteres no válidos";
             } else {
-                $validados[$campo] = mysqli_real_escape_string($GLOBALS['db'], trim($data[$campo]));
+                $validados[$campo] = trim($data[$campo]);
             }
         }
     }
     
-    // Validar campos requeridos adicionales
-    $camposRequeridos = [
-        'carrera' => 'Carrera',
-        'genero' => 'Género',
-        'edo_civil' => 'Estado civil',
-        'estado' => 'Estado',
-        'municipio' => 'Municipio',
-        'direccion' => 'Dirección',
-        'status' => 'Status'
-    ];
-    
-    foreach ($camposRequeridos as $campo => $nombre) {
-        if (empty($data[$campo])) {
-            $errors[$campo] = "El campo $nombre es requerido";
-        } else {
-            $validados[$campo] = trim($data[$campo]);
-        }
-    }
-    
-    // Campos adicionales
+    // Validar celular si existe
     if (!empty($data['cel'])) {
-        if (!preg_match('/^[0-9]{10,11}$/', preg_replace('/\D/', '', $data['cel']))) {
-            $errors['cel'] = "Formato de celular no válido";
+        $celular_limpio = preg_replace('/\D/', '', $data['cel']);
+        if (!preg_match('/^[0-9]{10,11}$/', $celular_limpio)) {
+            $errors['cel'] = "Celular inválido. Debe tener 10 u 11 dígitos";
         } else {
             $validados['cel'] = trim($data['cel']);
         }
     }
     
+    // Validar teléfono opcional si existe
     if (!empty($data['num_telf_opc'])) {
-        if (!preg_match('/^[0-9]{10,11}$/', preg_replace('/\D/', '', $data['num_telf_opc']))) {
-            $errors['num_telf_opc'] = "Formato de teléfono opcional no válido";
+        $telefono_opc_limpio = preg_replace('/\D/', '', $data['num_telf_opc']);
+        if (!preg_match('/^[0-9]{10,11}$/', $telefono_opc_limpio)) {
+            $errors['num_telf_opc'] = "Teléfono opcional inválido. Debe tener 10 u 11 dígitos";
         } else {
             $validados['num_telf_opc'] = trim($data['num_telf_opc']);
         }
     }
     
-    // Campos numéricos
-    $camposNumericos = ['grupo_familiar', 'acargo_usted'];
-    foreach ($camposNumericos as $campo) {
-        if (isset($data[$campo]) && $data[$campo] !== '') {
-            if (!is_numeric($data[$campo]) || $data[$campo] < 0) {
-                $errors[$campo] = "El campo " . str_replace('_', ' ', $campo) . " debe ser un número positivo";
-            } else {
-                $validados[$campo] = (int)$data[$campo];
-            }
+    // Validar campos numéricos
+    if (isset($data['grupo_familiar']) && $data['grupo_familiar'] !== '') {
+        if (!is_numeric($data['grupo_familiar']) || $data['grupo_familiar'] < 0) {
+            $errors['grupo_familiar'] = "El grupo familiar debe ser un número positivo";
+        } else {
+            $validados['grupo_familiar'] = (int)$data['grupo_familiar'];
         }
     }
     
-    // Títulos e institutos (permitir apóstrofes)
-    if (!empty($data['titulos']) && is_array($data['titulos'])) {
-        $titulosValidos = [];
-        foreach ($data['titulos'] as $titulo) {
-            $titulo = trim($titulo);
-            if (!empty($titulo)) {
-                if (!preg_match("/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s'\",.;:¡!¿?()\-]+$/", $titulo)) {
-                    $errors['titulos'] = "Los títulos contienen caracteres no válidos";
-                } else {
-                    $titulosValidos[] = mysqli_real_escape_string($GLOBALS['db'], $titulo);
-                }
-            }
+    if (isset($data['acargo_usted']) && $data['acargo_usted'] !== '') {
+        if (!is_numeric($data['acargo_usted']) || $data['acargo_usted'] < 0) {
+            $errors['acargo_usted'] = "Las personas a cargo deben ser un número positivo";
+        } else {
+            $validados['acargo_usted'] = (int)$data['acargo_usted'];
         }
-        $validados['titulos'] = $titulosValidos;
-    }
-    
-    if (!empty($data['institutos']) && is_array($data['institutos'])) {
-        $institutosValidos = [];
-        foreach ($data['institutos'] as $instituto) {
-            $instituto = trim($instituto);
-            if (!empty($instituto)) {
-                if (!preg_match("/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s'\",.;:¡!¿?()\-]+$/", $instituto)) {
-                    $errors['institutos'] = "Los institutos contienen caracteres no válidos";
-                } else {
-                    $institutosValidos[] = mysqli_real_escape_string($GLOBALS['db'], $instituto);
-                }
-            }
-        }
-        $validados['institutos'] = $institutosValidos;
     }
     
     // Foto de perfil
     if (isset($_FILES['foto_perfil']) && $_FILES['foto_perfil']['error'] === UPLOAD_ERR_OK) {
-        // Validar tamaño (5MB máximo)
         if ($_FILES['foto_perfil']['size'] > 5 * 1024 * 1024) {
             $errors['foto_perfil'] = "La foto no debe superar los 5MB";
         }
         
-        // Validar tipo de archivo
         $extensionesPermitidas = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
         $extension = strtolower(pathinfo($_FILES['foto_perfil']['name'], PATHINFO_EXTENSION));
         if (!in_array($extension, $extensionesPermitidas)) {
@@ -1018,26 +1004,222 @@ function obtenerEstudiantePorId($id) {
     return $estudiante;
 }
 
-// Función para actualizar estudiante
+/**
+ * Actualiza los datos de un estudiante con validación y manejo de apóstrofes
+ * @param array $datos Datos del estudiante a actualizar
+ * @return array Resultado de la operación
+ */
 function actualizarEstudiante(array $datos): array {
     global $db;
     
+    if (!$db) {
+        return [
+            'success' => false,
+            'message' => '❌ Error: No hay conexión a la base de datos. Contacte al administrador.'
+        ];
+    }
+    
+    $nombreFoto = '';
+    $fotoEliminada = false;
+    
     try {
-        // Primero obtener los valores antiguos para auditoría
+        // Iniciar transacción
+        $db->begin_transaction();
+        
+        // ============================
+        // 1. VALIDACIÓN COMPLETA DE DATOS
+        // ============================
+        $errores_validacion = [];
+        
+        // Validar ID
+        if (empty($datos['id']) || !is_numeric($datos['id'])) {
+            $errores_validacion[] = "ID de estudiante no válido";
+        }
+        
+        // Validar cédula
+        if (empty($datos['idusuario'])) {
+            $errores_validacion[] = "La cédula es obligatoria";
+        } elseif (!preg_match('/^[VE]-\d{6,9}$/', $datos['idusuario'])) {
+            $errores_validacion[] = "Formato de cédula inválido. Debe ser V-12345678 o E-12345678";
+        }
+        
+        // Validar nombre (permite apóstrofes, NO números)
+        if (empty($datos['nombre'])) {
+            $errores_validacion[] = "El nombre completo es obligatorio";
+        } else {
+            $nombre = trim($datos['nombre']);
+            if (!preg_match("/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s']+$/u", $nombre)) {
+                if (preg_match("/[0-9]/", $nombre)) {
+                    $errores_validacion[] = "El nombre no puede contener números. Solo letras, espacios y apóstrofes (')";
+                } elseif (preg_match("/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s']/u", $nombre)) {
+                    $errores_validacion[] = "El nombre contiene caracteres no permitidos. Solo letras, espacios y apóstrofes (')";
+                }
+            }
+            
+            if (strlen($nombre) < 2) {
+                $errores_validacion[] = "El nombre es demasiado corto (mínimo 2 caracteres)";
+            }
+            if (strlen($nombre) > 100) {
+                $errores_validacion[] = "El nombre es demasiado largo (máximo 100 caracteres)";
+            }
+        }
+        
+        // Validar email
+        if (!empty($datos['email'])) {
+            if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
+                $errores_validacion[] = "Correo electrónico no válido. Ejemplo: estudiante@universidad.edu";
+            }
+            if (strlen($datos['email']) > 100) {
+                $errores_validacion[] = "El correo electrónico es demasiado largo (máximo 100 caracteres)";
+            }
+        }
+        
+        // Validar teléfono
+        if (!empty($datos['tlf'])) {
+            $telefono_limpio = preg_replace('/\D/', '', $datos['tlf']);
+            if (!preg_match('/^[0-9]{10,11}$/', $telefono_limpio)) {
+                $errores_validacion[] = "Teléfono principal inválido. Debe tener 10 u 11 dígitos numéricos";
+            }
+        }
+        
+        // Validar celular
+        if (!empty($datos['cel'])) {
+            $celular_limpio = preg_replace('/\D/', '', $datos['cel']);
+            if (!preg_match('/^[0-9]{10,11}$/', $celular_limpio)) {
+                $errores_validacion[] = "Celular inválido. Debe tener 10 u 11 dígitos numéricos";
+            }
+        }
+        
+        // Validar fecha de nacimiento
+        if (!empty($datos['fecha_nac'])) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $datos['fecha_nac'])) {
+                $errores_validacion[] = "Formato de fecha de nacimiento inválido. Use: AAAA-MM-DD";
+            } else {
+                $fechaNac = DateTime::createFromFormat('Y-m-d', $datos['fecha_nac']);
+                $hoy = new DateTime();
+                $edadMinima = (new DateTime())->modify('-15 years');
+                
+                if (!$fechaNac) {
+                    $errores_validacion[] = "Fecha de nacimiento no válida";
+                } elseif ($fechaNac > $hoy) {
+                    $errores_validacion[] = "La fecha de nacimiento no puede ser futura";
+                } elseif ($fechaNac > $edadMinima) {
+                    $errores_validacion[] = "El estudiante debe tener al menos 15 años";
+                }
+            }
+        }
+        
+        // Validar fecha de ingreso
+        if (!empty($datos['fecha_ingreso'])) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $datos['fecha_ingreso'])) {
+                $errores_validacion[] = "Formato de fecha de ingreso inválido. Use: AAAA-MM-DD";
+            } elseif (!empty($datos['fecha_nac'])) {
+                $fechaIngreso = DateTime::createFromFormat('Y-m-d', $datos['fecha_ingreso']);
+                $fechaNac = DateTime::createFromFormat('Y-m-d', $datos['fecha_nac']);
+                
+                if ($fechaIngreso < $fechaNac) {
+                    $errores_validacion[] = "La fecha de ingreso no puede ser anterior a la fecha de nacimiento";
+                }
+            }
+        }
+        
+        // Validar campos de texto con caracteres permitidos
+        $camposTexto = [
+            'etnia' => 'Etnia',
+            'direccion' => 'Dirección',
+            'punto_referencia' => 'Punto de referencia',
+            'enfermedad' => 'Enfermedades',
+            'discapacidad' => 'Discapacidad',
+            'titulos' => 'Títulos obtenidos',
+            'institutos' => 'Instituciones'
+        ];
+        
+        foreach ($camposTexto as $campo => $nombre) {
+            if (!empty($datos[$campo])) {
+                if (!preg_match("/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\s'\".,;:¡!¿?()\-]+$/u", $datos[$campo])) {
+                    $errores_validacion[] = "El campo '$nombre' contiene caracteres no permitidos. Solo letras, números, espacios y signos comunes";
+                }
+                
+                if (strlen($datos[$campo]) > 255) {
+                    $errores_validacion[] = "El campo '$nombre' es demasiado largo (máximo 255 caracteres)";
+                }
+            }
+        }
+        
+        // Validar campos numéricos
+        if (isset($datos['grupo_familiar']) && $datos['grupo_familiar'] < 0) {
+            $errores_validacion[] = "El grupo familiar no puede ser negativo";
+        }
+        
+        if (isset($datos['acargo_usted']) && $datos['acargo_usted'] < 0) {
+            $errores_validacion[] = "Las personas a cargo no pueden ser negativas";
+        }
+        
+        // Si hay errores de validación, lanzar excepción
+        if (!empty($errores_validacion)) {
+            $mensajeError = "❌ ERRORES DE VALIDACIÓN:\n\n• " . implode("\n• ", $errores_validacion);
+            throw new Exception($mensajeError, 400);
+        }
+        
+        // ============================
+        // 2. OBTENER VALORES ANTIGUOS PARA AUDITORÍA
+        // ============================
         $query_antiguo = "SELECT * FROM users WHERE id = ?";
         $stmt_antiguo = $db->prepare($query_antiguo);
         $stmt_antiguo->bind_param("i", $datos['id']);
         $stmt_antiguo->execute();
         $result_antiguo = $stmt_antiguo->get_result();
+        
+        if ($result_antiguo->num_rows === 0) {
+            throw new Exception("❌ Estudiante no encontrado en la base de datos", 404);
+        }
+        
         $valores_antiguos = $result_antiguo->fetch_assoc();
         $stmt_antiguo->close();
-
-        // Construir consulta dinámicamente para evitar errores de tipos
+        
+        // ============================
+        // 3. VERIFICAR QUE LA CÉDULA NO EXISTA EN OTRO USUARIO
+        // ============================
+        $query_verificar = "SELECT id, nombre FROM users WHERE idusuario = ? AND id != ?";
+        $stmt_verificar = $db->prepare($query_verificar);
+        $stmt_verificar->bind_param("si", $datos['idusuario'], $datos['id']);
+        $stmt_verificar->execute();
+        $result_verificar = $stmt_verificar->get_result();
+        
+        if ($result_verificar->num_rows > 0) {
+            $usuario_existente = $result_verificar->fetch_assoc();
+            throw new Exception("❌ La cédula ya está registrada para el estudiante: " . $usuario_existente['nombre'], 409);
+        }
+        $stmt_verificar->close();
+        
+        // ============================
+        // 4. MANEJAR FOTO DE PERFIL
+        // ============================
+        if (isset($_FILES['foto_perfil']) && $_FILES['foto_perfil']['error'] === UPLOAD_ERR_OK) {
+            $resultadoFoto = subirFotoPerfil($_FILES['foto_perfil']);
+            if (isset($resultadoFoto['success']) && $resultadoFoto['success']) {
+                $nombreFoto = $resultadoFoto['nombre_archivo'];
+                $datos['foto_perfil'] = $nombreFoto;
+                
+                if (!empty($valores_antiguos['foto_perfil'])) {
+                    $rutaFotoAntigua = '../foto_perfil/' . $valores_antiguos['foto_perfil'];
+                    if (file_exists($rutaFotoAntigua)) {
+                        unlink($rutaFotoAntigua);
+                        $fotoEliminada = true;
+                    }
+                }
+            } else {
+                throw new Exception('❌ Error al subir foto: ' . ($resultadoFoto['message'] ?? 'Error desconocido'), 400);
+            }
+        }
+        
+        // ============================
+        // 5. CONSTRUIR CONSULTA DE ACTUALIZACIÓN
+        // ============================
         $campos = [];
-        $valores = [];
+        $valores_bind = [];
         $tipos = '';
         
-        // Mapeo de campos y sus tipos - INCLUYENDO IDUSUARIO
         $camposMapeo = [
             'idusuario' => 's',
             'nombre' => 's',
@@ -1073,79 +1255,191 @@ function actualizarEstudiante(array $datos): array {
         ];
         
         foreach ($camposMapeo as $campo => $tipo) {
-            if (isset($datos[$campo]) && $datos[$campo] !== '') {
-                $campos[] = "$campo = ?";
-                $valores[] = $datos[$campo];
+            if (array_key_exists($campo, $datos)) {
+                $campos[] = "`$campo` = ?";
+                $valores_bind[] = $datos[$campo];
                 $tipos .= $tipo;
             }
         }
         
-        // Agregar fecha de actualización
         $campos[] = "fecha_act = NOW()";
         
         if (empty($campos)) {
-            return [
-                'success' => false,
-                'message' => 'No hay campos para actualizar'
-            ];
+            throw new Exception('❌ No hay campos para actualizar', 400);
         }
         
-        // Agregar WHERE condition
-        $valores[] = $datos['id'];
+        $valores_bind[] = $datos['id'];
         $tipos .= 'i';
         
         $sql = "UPDATE users SET " . implode(', ', $campos) . " WHERE id = ?";
         
-        // Preparar la sentencia
+        // ============================
+        // 6. EJECUTAR ACTUALIZACIÓN
+        // ============================
         $stmt = $db->prepare($sql);
         if (!$stmt) {
-            throw new Exception("Error en la preparación: " . $db->error);
+            throw new Exception("❌ Error en la preparación de la consulta: " . $db->error, 500);
         }
-
-        // Vincular parámetros si hay valores
-        if (!empty($valores)) {
-            $stmt->bind_param($tipos, ...$valores);
-        }
-
-        // Ejecutar la actualización
-        if (!$stmt->execute()) {
-            throw new Exception("Error al ejecutar: " . $stmt->error);
-        }
-
-        // Verificar si se realizaron cambios
-        $cambios = $stmt->affected_rows > 0;
         
-        // Registrar auditoría solo si hubo cambios
-        if ($cambios) {
+        $stmt->bind_param($tipos, ...$valores_bind);
+        
+        if (!$stmt->execute()) {
+            $error = $stmt->error;
+            $errno = $stmt->errno;
+            
+            if ($errno == 1062) {
+                throw new Exception("❌ Error: Registro duplicado. La cédula o correo ya existe.", 409);
+            } else {
+                throw new Exception("❌ Error al ejecutar la consulta: " . $error, 500);
+            }
+        }
+        
+        $affectedRows = $stmt->affected_rows;
+        $stmt->close();
+        
+        // ============================
+        // 7. ACTUALIZAR TÍTULOS OBTENIDOS EN TABLA SEPARADA
+        // ============================
+        $sqlEliminarTitulos = "DELETE FROM titulos_obtenidos WHERE id_usuario = ?";
+        $stmtEliminar = $db->prepare($sqlEliminarTitulos);
+        $stmtEliminar->bind_param("i", $datos['id']);
+        $stmtEliminar->execute();
+        $stmtEliminar->close();
+        
+        if (!empty($datos['titulos']) && !empty($datos['institutos'])) {
+            if (is_string($datos['titulos'])) {
+                $titulos = explode('|||', $datos['titulos']);
+                $institutos = explode('|||', $datos['institutos']);
+            } else {
+                $titulos = $datos['titulos'];
+                $institutos = $datos['institutos'];
+            }
+            
+            $titulos = array_filter(array_map('trim', (array)$titulos));
+            $institutos = array_filter(array_map('trim', (array)$institutos));
+            
+            $count = min(count($titulos), count($institutos));
+            
+            if ($count > 0) {
+                $sqlTitulos = "INSERT INTO titulos_obtenidos (id_usuario, nombre, titulo_obtenido, instituto) 
+                               VALUES (?, ?, ?, ?)";
+                
+                $stmtTitulos = $db->prepare($sqlTitulos);
+                
+                if ($stmtTitulos) {
+                    for ($i = 0; $i < $count; $i++) {
+                        if (!empty($titulos[$i]) && !empty($institutos[$i])) {
+                            $stmtTitulos->bind_param(
+                                "isss", 
+                                $datos['id'],
+                                $datos['nombre'],
+                                $titulos[$i],
+                                $institutos[$i]
+                            );
+                            
+                            if (!$stmtTitulos->execute()) {
+                                error_log("Error al insertar título $i: " . $stmtTitulos->error);
+                            }
+                        }
+                    }
+                    
+                    $stmtTitulos->close();
+                }
+            }
+        }
+        
+        // ============================
+        // 8. REGISTRAR AUDITORÍA
+        // ============================
+        if (function_exists('registrarAuditoria')) {
+            $cambios = [];
+            foreach ($datos as $key => $valor) {
+                if (isset($valores_antiguos[$key]) && $valores_antiguos[$key] != $valor) {
+                    $cambios[$key] = [
+                        'antiguo' => $valores_antiguos[$key],
+                        'nuevo' => $valor
+                    ];
+                }
+            }
+            
+            if (!empty($cambios) || $fotoEliminada) {
+                $descripcion = "Actualización de datos de estudiante";
+                if ($fotoEliminada) {
+                    $descripcion .= " (foto actualizada)";
+                }
+                
+                registrarAuditoria(
+                    "UPDATE", 
+                    "users", 
+                    $datos['id'], 
+                    $valores_antiguos, 
+                    $datos, 
+                    "Estudiantes", 
+                    $descripcion
+                );
+            }
+        }
+        
+        // ============================
+        // 9. CONFIRMAR TRANSACCIÓN
+        // ============================
+        $db->commit();
+        
+        // ============================
+        // 10. PREPARAR RESPUESTA
+        // ============================
+        return [
+            'success' => true,
+            'message' => $affectedRows > 0 
+                ? '✅ Estudiante actualizado exitosamente' 
+                : 'ℹ️ No se realizaron cambios (los datos son iguales)',
+            'affected_rows' => $affectedRows,
+            'cambios' => $cambios ?? [],
+            'foto_actualizada' => !empty($nombreFoto)
+        ];
+        
+    } catch(Exception $e) {
+        if (isset($db) && method_exists($db, 'rollback')) {
+            try {
+                $db->rollback();
+            } catch (Exception $rollbackError) {
+                error_log("Error al hacer rollback: " . $rollbackError->getMessage());
+            }
+        }
+        
+        if (!empty($nombreFoto)) {
+            $rutaFoto = '../foto_perfil/' . $nombreFoto;
+            if (file_exists($rutaFoto)) {
+                @unlink($rutaFoto);
+            }
+        }
+        
+        $mensajeUsuario = $e->getMessage();
+        $codigoError = $e->getCode();
+        
+        if (function_exists('registrarAuditoria')) {
             registrarAuditoria(
-                "UPDATE", 
+                "ERROR", 
                 "users", 
-                $datos['id'], 
-                $valores_antiguos, 
-                $datos, 
+                $datos['id'] ?? null, 
+                null, 
+                [
+                    'nombre' => $datos['nombre'] ?? '',
+                    'idusuario' => $datos['idusuario'] ?? '',
+                    'error' => substr($e->getMessage(), 0, 200)
+                ], 
                 "Estudiantes", 
-                "Actualización de datos de estudiante"
+                "Error al actualizar estudiante"
             );
         }
         
-        return [
-            'success' => true,
-            'message' => $cambios 
-                ? 'Estudiante actualizado correctamente' 
-                : 'No se realizaron cambios (posiblemente los datos son iguales)',
-            'affected_rows' => $stmt->affected_rows
-        ];
-
-    } catch(Exception $e) {
         error_log("Error en actualizarEstudiante: " . $e->getMessage());
+        
         return [
             'success' => false,
-            'message' => 'Error al actualizar estudiante: ' . $e->getMessage()
+            'message' => $mensajeUsuario,
+            'error_code' => $codigoError
         ];
-    } finally {
-        if (isset($stmt)) {
-            $stmt->close();
-        }
     }
 }
 
