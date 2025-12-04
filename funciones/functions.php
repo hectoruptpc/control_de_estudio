@@ -15766,6 +15766,7 @@ function procesarEdicionNota() {
 //INSCRIPCION DE MATERIAS ***********************************************************************
 
 
+
 /**
  * Obtiene las materias de un trayecto específico de una carrera
  * @param int $id_carrera ID de la carrera
@@ -15796,7 +15797,7 @@ function obtenerMateriasTrayecto($id_carrera, $trayecto) {
 
 /**
  * Obtiene las materias aprobadas de un estudiante
- * @param int $id_usuario ID del estudiante
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
  * @param int $trayecto Número del trayecto (opcional)
  * @return array Materias aprobadas
  */
@@ -15845,17 +15846,12 @@ function obtenerMateriasAprobadas($id_usuario, $trayecto = null) {
 
 /**
  * Obtiene las materias reprobadas de un estudiante
- * @param int $id_usuario ID del estudiante
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
  * @param int $trayecto Número del trayecto
+ * @param int $id_carrera ID de la carrera
  * @return array Materias reprobadas
  */
-function obtenerMateriasReprobadas($id_usuario, $trayecto) {
-    global $db;
-    
-    // Primero necesitamos la carrera del estudiante
-    $info_estudiante = obtenerInfoEstudiante($id_usuario);
-    $id_carrera = $info_estudiante['carrera'];
-    
+function obtenerMateriasReprobadas($id_usuario, $trayecto, $id_carrera) {
     $materias_trayecto = obtenerMateriasTrayecto($id_carrera, $trayecto);
     $materias_aprobadas = obtenerMateriasAprobadas($id_usuario, $trayecto);
     
@@ -15871,12 +15867,32 @@ function obtenerMateriasReprobadas($id_usuario, $trayecto) {
 
 /**
  * Verifica si el estudiante puede avanzar al siguiente trayecto
- * @param int $id_usuario ID del estudiante
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
  * @param int $trayecto_actual Trayecto actual
  * @param int $id_carrera ID de la carrera
- * @return bool True si puede avanzar, False si no
+ * @return array Resultado con estado y detalles
  */
 function puedeAvanzarTrayecto($id_usuario, $trayecto_actual, $id_carrera) {
+    // Verificar si ya existe un registro de control
+    $control = obtenerControlAvance($id_usuario, $id_carrera, $trayecto_actual);
+    
+    if ($control && $control['puede_avanzar'] == 1) {
+        // Ya fue aprobado para avanzar
+        $info_aprobador = obtenerInfoUsuarioPorId($control['aprobado_por']);
+        
+        return [
+            'puede_avanzar' => true,
+            'aprobado_manualmente' => true,
+            'cumple_requisitos' => true,
+            'aprobado_por' => $control['aprobado_por'],
+            'nombre_aprobador' => $info_aprobador ? $info_aprobador['nombre'] : 'Administrador',
+            'fecha_aprobacion' => $control['fecha_aprobacion'],
+            'motivo' => $control['motivo'],
+            'detalles' => 'Aprobación manual previa',
+            'control_id' => $control['id']
+        ];
+    }
+    
     // Obtener todas las materias del trayecto actual
     $materias_trayecto = obtenerMateriasTrayecto($id_carrera, $trayecto_actual);
     $materias_aprobadas = obtenerMateriasAprobadas($id_usuario, $trayecto_actual);
@@ -15884,34 +15900,133 @@ function puedeAvanzarTrayecto($id_usuario, $trayecto_actual, $id_carrera) {
     $total_materias = count($materias_trayecto);
     $total_aprobadas = count($materias_aprobadas);
     
+    $resultado = [
+        'puede_avanzar' => false,
+        'aprobado_manualmente' => false,
+        'cumple_requisitos' => false,
+        'detalles' => '',
+        'total_materias' => $total_materias,
+        'total_aprobadas' => $total_aprobadas,
+        'control_id' => null
+    ];
+    
     // Para trayecto 0: necesita 50% aprobado
     if ($trayecto_actual == 0) {
-        return ($total_aprobadas >= ceil($total_materias * 0.5));
+        $cumple_requisitos = ($total_aprobadas >= ceil($total_materias * 0.5));
+        $resultado['puede_avanzar'] = $cumple_requisitos;
+        $resultado['cumple_requisitos'] = $cumple_requisitos;
+        $resultado['detalles'] = "Aprobado {$total_aprobadas} de {$total_materias} materias (" . ceil($total_materias * 0.5) . " mínimas)";
+        $resultado['porcentaje_aprobado'] = $total_materias > 0 ? ($total_aprobadas / $total_materias) * 100 : 0;
+        $resultado['minimo_requerido'] = ceil($total_materias * 0.5);
     }
     
     // Para trayecto 1 a 2 y 3 a 4: necesita aprobar proyecto socio integrador
-    if ($trayecto_actual == 1 || $trayecto_actual == 3) {
-        return haAprobadoProyectoSocio($id_usuario, $trayecto_actual);
+    elseif ($trayecto_actual == 1 || $trayecto_actual == 3) {
+        $aprobado_proyecto = haAprobadoProyectoSocio($id_usuario, $trayecto_actual);
+        $resultado['puede_avanzar'] = $aprobado_proyecto;
+        $resultado['cumple_requisitos'] = $aprobado_proyecto;
+        $resultado['detalles'] = $aprobado_proyecto ? 
+            "Proyecto Socio Integrador aprobado (nota ≥ 16)" : 
+            "Proyecto Socio Integrador no aprobado (nota < 16)";
+        $resultado['proyecto_aprobado'] = $aprobado_proyecto;
     }
     
     // Para trayecto 2 a 3: necesita aprobar todas las materias y obtener título
-    if ($trayecto_actual == 2) {
-        return ($total_aprobadas == $total_materias && tienePrimerTitulo($id_usuario));
+    elseif ($trayecto_actual == 2) {
+        $todas_aprobadas = ($total_aprobadas == $total_materias);
+        $tiene_titulo = tienePrimerTitulo($id_usuario);
+        $cumple_requisitos = ($todas_aprobadas && $tiene_titulo);
+        
+        $resultado['puede_avanzar'] = $cumple_requisitos;
+        $resultado['cumple_requisitos'] = $cumple_requisitos;
+        $resultado['detalles'] = $todas_aprobadas ? 
+            "Todas las materias aprobadas" . ($tiene_titulo ? " y título obtenido" : " pero falta título") :
+            "Faltan materias por aprobar ({$total_aprobadas}/{$total_materias})";
+        $resultado['todas_aprobadas'] = $todas_aprobadas;
+        $resultado['tiene_titulo'] = $tiene_titulo;
     }
     
-    return false;
+    return $resultado;
+}
+
+/**
+ * Obtiene el control de avance de trayecto
+ * @param int $id_usuario ID del usuario
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto Trayecto actual
+ * @return array|false Información del control o false si no existe
+ */
+function obtenerControlAvance($id_usuario, $id_carrera, $trayecto) {
+    global $db;
+    
+    $sql = "SELECT * FROM control_avance_trayecto 
+            WHERE id_usuario = ? 
+            AND id_carrera = ? 
+            AND trayecto_actual = ?
+            ORDER BY created_at DESC LIMIT 1";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iii", $id_usuario, $id_carrera, $trayecto);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
+
+
+
+/**
+ * Rechaza o elimina la aprobación de avance
+ * @param int $id_usuario ID del usuario
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto_actual Trayecto actual
+ * @return bool True si éxito, False si error
+ */
+function rechazarAvanceTrayecto($id_usuario, $id_carrera, $trayecto_actual) {
+    global $db;
+    
+    $sql = "DELETE FROM control_avance_trayecto 
+            WHERE id_usuario = ? 
+            AND id_carrera = ? 
+            AND trayecto_actual = ?";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iii", $id_usuario, $id_carrera, $trayecto_actual);
+    
+    return $stmt->execute();
+}
+
+/**
+ * Obtiene información de usuario por ID
+ * @param int $id_usuario ID del usuario
+ * @return array Información del usuario
+ */
+function obtenerInfoUsuarioPorId($id_usuario) {
+    global $db;
+    
+    if ($id_usuario <= 0) {
+        return null;
+    }
+    
+    $sql = "SELECT id, nombre FROM users WHERE id = ?";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_usuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
 }
 
 /**
  * Verifica si el estudiante aprobó el proyecto socio integrador
- * @param int $id_usuario ID del estudiante
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
  * @param int $trayecto Trayecto del proyecto
  * @return bool True si aprobó, False si no
  */
 function haAprobadoProyectoSocio($id_usuario, $trayecto) {
     global $db;
     
-    // Versión con el campo específico
     $sql = "SELECT nd.* 
             FROM notas_definitivas nd
             INNER JOIN materias m ON nd.id_materia = m.id_materia
@@ -15933,20 +16048,19 @@ function haAprobadoProyectoSocio($id_usuario, $trayecto) {
 
 /**
  * Verifica si el estudiante tiene el primer título de la carrera
- * @param int $id_usuario ID del estudiante
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
  * @return bool True si tiene título, False si no
  */
 function tienePrimerTitulo($id_usuario) {
     global $db;
     
-    $sql = "SELECT titulos FROM users WHERE idusuario = ?";
+    $sql = "SELECT titulos FROM users WHERE id = ?";
     $stmt = $db->prepare($sql);
     $stmt->bind_param("i", $id_usuario);
     $stmt->execute();
     $result = $stmt->get_result();
     
     if ($row = $result->fetch_assoc()) {
-        // Asumiendo que el campo 'titulos' contiene los títulos separados por comas
         return !empty(trim($row['titulos']));
     }
     
@@ -15954,19 +16068,184 @@ function tienePrimerTitulo($id_usuario) {
 }
 
 /**
- * Obtiene el trayecto actual del estudiante
- * @param int $id_usuario ID del estudiante
- * @return int Trayecto actual
+ * Obtiene el trayecto actual REAL del estudiante basado en sus notas
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
+ * @param int $id_carrera ID de la carrera
+ * @return int Trayecto actual (0, 1, 2, 3, 4)
  */
-function obtenerTrayectoActualEstudiante($id_usuario) {
+function obtenerTrayectoActualReal($id_usuario, $id_carrera) {
     global $db;
     
-    // Buscar en la última sección inscrita
-    $sql = "SELECT s.id_trayecto 
+    // Primero, verificar si el estudiante tiene notas registradas
+    $sql = "SELECT MAX(m.trayecto) as max_trayecto_con_notas
+            FROM notas_definitivas nd
+            INNER JOIN materias m ON nd.id_materia = m.id_materia
+            WHERE nd.id_usuario = ? 
+            AND m.id_materia IN (
+                SELECT cm.id_materia 
+                FROM carrera_materia cm 
+                WHERE cm.id_carrera = ?
+            )";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_usuario, $id_carrera);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $row = $result->fetch_assoc();
+    $max_trayecto_con_notas = $row['max_trayecto_con_notas'] ?? -1;
+    
+    // Si no tiene notas, empezar desde trayecto 0
+    if ($max_trayecto_con_notas === -1 || $max_trayecto_con_notas === null) {
+        return 0;
+    }
+    
+    // Ahora determinar en qué trayecto está realmente
+    for ($trayecto = $max_trayecto_con_notas; $trayecto >= 0; $trayecto--) {
+        // Verificar si puede avanzar desde este trayecto
+        $resultado = puedeAvanzarTrayecto($id_usuario, $trayecto, $id_carrera);
+        if ($resultado['puede_avanzar']) {
+            // Si puede avanzar, está en el siguiente trayecto
+            return $trayecto + 1;
+        }
+    }
+    
+    // Si no puede avanzar desde ningún trayecto, está en el último con notas
+    return $max_trayecto_con_notas;
+}
+
+/**
+ * Obtiene las materias en las que el estudiante está actualmente inscrito
+ * VERSIÓN SIMPLIFICADA - Corregida para evitar el error de parámetros
+ * @param int $id_usuario ID del usuario
+ * @return array Materias inscritas
+ */
+function obtenerMateriasInscritas($id_usuario) {
+    global $db;
+    
+    // Primero, obtener el período activo
+    $periodo_activo = obtenerPeriodoActivo();
+    if (!$periodo_activo) {
+        return [];
+    }
+    
+    // Consulta simplificada y corregida
+    $sql = "SELECT DISTINCT m.*, s.codigo_seccion
+            FROM notas_definitivas nd
+            INNER JOIN materias m ON nd.id_materia = m.id_materia
+            LEFT JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+            LEFT JOIN secciones s ON cm.id_carrera = s.id_carrera AND s.id_periodo = ?
+            WHERE nd.id_usuario = ?
+            AND (
+                (nd.trayecto_0 IS NOT NULL AND m.trayecto = 0 AND (
+                    (m.es_proyecto_socio = 0 AND nd.trayecto_0 < 12) OR
+                    (m.es_proyecto_socio = 1 AND nd.trayecto_0 < 16)
+                )) OR
+                (nd.trayecto_1 IS NOT NULL AND m.trayecto = 1 AND (
+                    (m.es_proyecto_socio = 0 AND nd.trayecto_1 < 12) OR
+                    (m.es_proyecto_socio = 1 AND nd.trayecto_1 < 16)
+                )) OR
+                (nd.trayecto_2 IS NOT NULL AND m.trayecto = 2 AND (
+                    (m.es_proyecto_socio = 0 AND nd.trayecto_2 < 12) OR
+                    (m.es_proyecto_socio = 1 AND nd.trayecto_2 < 16)
+                )) OR
+                (nd.trayecto_3 IS NOT NULL AND m.trayecto = 3 AND (
+                    (m.es_proyecto_socio = 0 AND nd.trayecto_3 < 12) OR
+                    (m.es_proyecto_socio = 1 AND nd.trayecto_3 < 16)
+                )) OR
+                (nd.trayecto_4 IS NOT NULL AND m.trayecto = 4 AND (
+                    (m.es_proyecto_socio = 0 AND nd.trayecto_4 < 12) OR
+                    (m.es_proyecto_socio = 1 AND nd.trayecto_4 < 16)
+                ))
+            )";
+    
+    $stmt = $db->prepare($sql);
+    if (!$stmt) {
+        error_log("Error preparando consulta: " . $db->error);
+        return [];
+    }
+    
+    $stmt->bind_param("ii", $periodo_activo['id_periodo'], $id_usuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $materias_inscritas = [];
+    while ($row = $result->fetch_assoc()) {
+        $materias_inscritas[] = $row;
+    }
+    
+    return $materias_inscritas;
+}
+
+/**
+ * Obtiene el historial de secciones del estudiante
+ * @param int $id_usuario ID del usuario
+ * @return array Historial de secciones
+ */
+function obtenerHistorialSecciones($id_usuario) {
+    global $db;
+    
+    $sql = "SELECT es.*, s.codigo_seccion, s.id_trayecto, s.id_periodo, p.nombre_periodo
             FROM estudiante_seccion es
             INNER JOIN secciones s ON es.id_seccion = s.id_seccion
+            INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
             WHERE es.id_usuario = ?
-            ORDER BY es.fecha_inscripcion DESC
+            ORDER BY p.fecha_inicio DESC, es.fecha_inscripcion DESC";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_usuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $historial = [];
+    while ($row = $result->fetch_assoc()) {
+        $historial[] = $row;
+    }
+    
+    return $historial;
+}
+
+/**
+ * Verifica si el estudiante ya está inscrito en el período actual
+ * @param int $id_usuario ID del usuario
+ * @return bool True si ya está inscrito
+ */
+function estaInscritoEnPeriodo($id_usuario) {
+    global $db;
+    
+    $periodo_activo = obtenerPeriodoActivo();
+    if (!$periodo_activo) {
+        return false;
+    }
+    
+    $sql = "SELECT COUNT(*) as total
+            FROM estudiante_seccion es
+            INNER JOIN secciones s ON es.id_seccion = s.id_seccion
+            WHERE es.id_usuario = ? AND s.id_periodo = ?";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_usuario, $periodo_activo['id_periodo']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    
+    return $row['total'] > 0;
+}
+
+/**
+ * Obtiene el último período en el que el estudiante estuvo inscrito
+ * @param int $id_usuario ID del usuario
+ * @return array Información del último período
+ */
+function obtenerUltimoPeriodoInscrito($id_usuario) {
+    global $db;
+    
+    $sql = "SELECT p.*
+            FROM periodos_academicos p
+            INNER JOIN secciones s ON p.id_periodo = s.id_periodo
+            INNER JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion
+            WHERE es.id_usuario = ?
+            ORDER BY p.fecha_inicio DESC
             LIMIT 1";
     
     $stmt = $db->prepare($sql);
@@ -15974,17 +16253,39 @@ function obtenerTrayectoActualEstudiante($id_usuario) {
     $stmt->execute();
     $result = $stmt->get_result();
     
-    if ($row = $result->fetch_assoc()) {
-        return $row['id_trayecto'];
-    }
+    return $result->fetch_assoc();
+}
+
+/**
+ * Determina si el estudiante es nuevo (sin historial académico)
+ * @param int $id_usuario ID del usuario
+ * @return bool True si es nuevo
+ */
+function esEstudianteNuevo($id_usuario) {
+    global $db;
     
-    // Si no está inscrito en ninguna sección, empezar desde trayecto 0
-    return 0;
+    // Verificar si tiene notas registradas
+    $sql_notas = "SELECT COUNT(*) as total FROM notas_definitivas WHERE id_usuario = ?";
+    $stmt_notas = $db->prepare($sql_notas);
+    $stmt_notas->bind_param("i", $id_usuario);
+    $stmt_notas->execute();
+    $result_notas = $stmt_notas->get_result();
+    $row_notas = $result_notas->fetch_assoc();
+    
+    // Verificar si tiene inscripciones en secciones
+    $sql_inscripciones = "SELECT COUNT(*) as total FROM estudiante_seccion WHERE id_usuario = ?";
+    $stmt_inscripciones = $db->prepare($sql_inscripciones);
+    $stmt_inscripciones->bind_param("i", $id_usuario);
+    $stmt_inscripciones->execute();
+    $result_inscripciones = $stmt_inscripciones->get_result();
+    $row_inscripciones = $result_inscripciones->fetch_assoc();
+    
+    return ($row_notas['total'] == 0 && $row_inscripciones['total'] == 0);
 }
 
 /**
  * Inscribe al estudiante en materias
- * @param int $id_usuario ID del estudiante
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
  * @param int $id_seccion ID de la sección
  * @param array $materias_ids IDs de las materias a inscribir
  * @return bool True si éxito, False si error
@@ -16006,29 +16307,31 @@ function inscribirMateriasEstudiante($id_usuario, $id_seccion, $materias_ids) {
         $stmt_inscripcion->bind_param("ii", $id_usuario, $id_seccion);
         
         if (!$stmt_inscripcion->execute()) {
+            error_log("Error al inscribir estudiante en sección: " . $stmt_inscripcion->error);
             return false;
         }
     }
     
     // Aquí deberías agregar la lógica para registrar la inscripción de materias
-    // Depende de cómo maneje tu sistema las inscripciones de materias
-    // Por ahora, solo retornamos true
+    // Por ahora, solo retornamos true y registramos en log
+    
+    error_log("Estudiante ID {$id_usuario} inscrito en sección {$id_seccion} con " . count($materias_ids) . " materias");
     
     return true;
 }
 
 /**
- * Obtiene información del estudiante
- * @param int $id_usuario ID del estudiante
+ * Obtiene información completa del estudiante por ID
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
  * @return array Información del estudiante
  */
-function obtenerInfoEstudiante($id_usuario) {
+function obtenerInfoEstudiantePorId($id_usuario) {
     global $db;
     
-    $sql = "SELECT u.*, c.nombre_carrera 
+    $sql = "SELECT u.*, c.nombre_carrera, c.id_carrera
             FROM users u
             LEFT JOIN carreras c ON u.carrera = c.id_carrera
-            WHERE u.idusuario = ?";
+            WHERE u.id = ? AND u.estudiante = 1";
     
     $stmt = $db->prepare($sql);
     $stmt->bind_param("i", $id_usuario);
@@ -16124,7 +16427,6 @@ function obtenerNotaMinimaMateria($id_materia) {
 function marcarProyectosSocio() {
     global $db;
     
-    // Lista de palabras clave para identificar proyectos socio integradores
     $palabras_clave = [
         'proyecto socio integrador',
         'proyecto sociointegrador',
@@ -16153,7 +16455,6 @@ function marcarProyectosSocio() {
         $total_actualizadas += $stmt->affected_rows;
     }
     
-    // También marcar por códigos específicos si es necesario
     $codigos_proyecto = ['PSI', 'PROYSOC', 'TEG', 'PROYECTO'];
     
     foreach ($codigos_proyecto as $codigo) {
@@ -16174,13 +16475,374 @@ function marcarProyectosSocio() {
 }
 
 
+/**
+ * Obtiene el trayecto actual del estudiante
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
+ * @param int $id_carrera ID de la carrera
+ * @return int Trayecto actual (0, 1, 2, 3, 4)
+ */
+function obtenerTrayectoActual($id_usuario, $id_carrera) {
+    global $db;
+    
+    // Verificar si existe un registro en control_avance_trayecto
+    $sql = "SELECT MAX(trayecto_actual) as max_trayecto_aprobado
+            FROM control_avance_trayecto 
+            WHERE id_usuario = ? 
+            AND id_carrera = ?
+            AND puede_avanzar = 1";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_usuario, $id_carrera);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    
+    // Si tiene un trayecto aprobado, está en el siguiente
+    if ($row && $row['max_trayecto_aprobado'] !== null) {
+        return $row['max_trayecto_aprobado'] + 1;
+    }
+    
+    // Si no tiene aprobaciones, está en trayecto 0
+    return 0;
+}
+
+/**
+ * Verifica si el estudiante cumple requisitos para avanzar de trayecto
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
+ * @param int $trayecto_actual Trayecto actual
+ * @param int $id_carrera ID de la carrera
+ * @return array Resultado con estado y detalles
+ */
+function verificarRequisitosTrayecto($id_usuario, $trayecto_actual, $id_carrera) {
+    // Obtener todas las materias del trayecto actual
+    $materias_trayecto = obtenerMateriasTrayecto($id_carrera, $trayecto_actual);
+    $materias_aprobadas = obtenerMateriasAprobadas($id_usuario, $trayecto_actual);
+    
+    $total_materias = count($materias_trayecto);
+    $total_aprobadas = count($materias_aprobadas);
+    
+    $resultado = [
+        'cumple_requisitos' => false,
+        'detalles' => '',
+        'total_materias' => $total_materias,
+        'total_aprobadas' => $total_aprobadas,
+        'materias_aprobadas' => $materias_aprobadas,
+        'materias_trayecto' => $materias_trayecto
+    ];
+    
+    // Para trayecto 0: necesita 50% aprobado
+    if ($trayecto_actual == 0) {
+        $minimo_requerido = ceil($total_materias * 0.5);
+        $cumple_requisitos = ($total_aprobadas >= $minimo_requerido);
+        
+        $resultado['cumple_requisitos'] = $cumple_requisitos;
+        $resultado['minimo_requerido'] = $minimo_requerido;
+        $resultado['detalles'] = "Aprobado {$total_aprobadas} de {$total_materias} materias (mínimo requerido: {$minimo_requerido})";
+        $resultado['porcentaje_aprobado'] = $total_materias > 0 ? ($total_aprobadas / $total_materias) * 100 : 0;
+    }
+    
+    // Para trayecto 1 y 3: necesita aprobar proyecto socio integrador
+    elseif ($trayecto_actual == 1 || $trayecto_actual == 3) {
+        $aprobado_proyecto = haAprobadoProyectoSocio($id_usuario, $trayecto_actual);
+        
+        $resultado['cumple_requisitos'] = $aprobado_proyecto;
+        $resultado['detalles'] = $aprobado_proyecto ? 
+            "Proyecto Socio Integrador aprobado (nota ≥ 16)" : 
+            "Proyecto Socio Integrador no aprobado (nota < 16)";
+        $resultado['proyecto_aprobado'] = $aprobado_proyecto;
+    }
+    
+    // Para trayecto 2: necesita aprobar todas las materias y obtener título
+    elseif ($trayecto_actual == 2) {
+        $todas_aprobadas = ($total_aprobadas == $total_materias);
+        $tiene_titulo = tienePrimerTitulo($id_usuario);
+        $cumple_requisitos = ($todas_aprobadas && $tiene_titulo);
+        
+        $resultado['cumple_requisitos'] = $cumple_requisitos;
+        $resultado['detalles'] = $todas_aprobadas ? 
+            "Todas las materias aprobadas" . ($tiene_titulo ? " y título obtenido" : " pero falta título") :
+            "Faltan materias por aprobar ({$total_aprobadas}/{$total_materias})";
+        $resultado['todas_aprobadas'] = $todas_aprobadas;
+        $resultado['tiene_titulo'] = $tiene_titulo;
+    }
+    
+    // Para trayecto 4: es el último, no puede avanzar
+    elseif ($trayecto_actual == 4) {
+        $resultado['cumple_requisitos'] = false;
+        $resultado['detalles'] = "Último trayecto, no puede avanzar más";
+    }
+    
+    return $resultado;
+}
+
+/**
+ * Verifica si ya existe una aprobación para avanzar de trayecto
+ * @param int $id_usuario ID del usuario
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto_actual Trayecto actual
+ * @return array|false Información de la aprobación o false si no existe
+ */
+function verificarAprobacionExistente($id_usuario, $id_carrera, $trayecto_actual) {
+    global $db;
+    
+    $sql = "SELECT * FROM control_avance_trayecto 
+            WHERE id_usuario = ? 
+            AND id_carrera = ? 
+            AND trayecto_actual = ?
+            AND puede_avanzar = 1
+            ORDER BY created_at DESC LIMIT 1";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iii", $id_usuario, $id_carrera, $trayecto_actual);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $aprobacion = $result->fetch_assoc();
+    
+    if ($aprobacion) {
+        // Obtener información del aprobador
+        $info_aprobador = obtenerInfoUsuarioPorId($aprobacion['aprobado_por']);
+        $aprobacion['nombre_aprobador'] = $info_aprobador ? $info_aprobador['nombre'] : 'Administrador';
+        return $aprobacion;
+    }
+    
+    return false;
+}
+
+/**
+ * Obtiene el historial de aprobaciones de trayecto
+ * @param int $id_usuario ID del usuario
+ * @param int $id_carrera ID de la carrera
+ * @return array Historial de aprobaciones
+ */
+function obtenerHistorialAprobaciones($id_usuario, $id_carrera) {
+    global $db;
+    
+    $sql = "SELECT cat.*, u.nombre as nombre_aprobador
+            FROM control_avance_trayecto cat
+            LEFT JOIN users u ON cat.aprobado_por = u.id
+            WHERE cat.id_usuario = ? 
+            AND cat.id_carrera = ?
+            AND cat.puede_avanzar = 1
+            ORDER BY cat.trayecto_actual ASC, cat.fecha_aprobacion ASC";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_usuario, $id_carrera);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $historial = [];
+    while ($row = $result->fetch_assoc()) {
+        $historial[] = $row;
+    }
+    
+    return $historial;
+}
+
+/**
+ * Aprueba el avance de trayecto manualmente
+ * @param int $id_usuario ID del usuario
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto_actual Trayecto actual
+ * @param string $motivo Motivo de la aprobación
+ * @return array Resultado de la operación
+ */
+function aprobarAvanceTrayecto($id_usuario, $id_carrera, $trayecto_actual, $motivo = '') {
+    global $db;
+    
+    // Verificar que el trayecto no sea el último (4)
+    if ($trayecto_actual >= 4) {
+        return [
+            'success' => false,
+            'message' => 'No se puede aprobar avance desde el último trayecto (4)'
+        ];
+    }
+    
+    // Obtener ID del administrador actual desde la sesión
+    // Primero, asegurar que la sesión esté iniciada
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    $aprobado_por = 0;
+    
+    // PRIMERA OPCIÓN: Usar la misma estructura que en mensajeria.php
+    if (isset($_SESSION['user']['id']) && $_SESSION['user']['id'] > 0) {
+        $aprobado_por = $_SESSION['user']['id'];
+    }
+    // SEGUNDA OPCIÓN: Buscar por username en la sesión
+    elseif (isset($_SESSION['username']) && !empty($_SESSION['username'])) {
+        $username = $_SESSION['username'];
+        
+        $sql_usuario = "SELECT id FROM users WHERE username = ? LIMIT 1";
+        $stmt_usuario = $db->prepare($sql_usuario);
+        $stmt_usuario->bind_param("s", $username);
+        $stmt_usuario->execute();
+        $result_usuario = $stmt_usuario->get_result();
+        
+        if ($row_usuario = $result_usuario->fetch_assoc()) {
+            $aprobado_por = $row_usuario['id'];
+        }
+    }
+    // TERCERA OPCIÓN: Buscar por email en la sesión
+    elseif (isset($_SESSION['email']) && !empty($_SESSION['email'])) {
+        $email = $_SESSION['email'];
+        
+        $sql_email = "SELECT id FROM users WHERE email = ? LIMIT 1";
+        $stmt_email = $db->prepare($sql_email);
+        $stmt_email->bind_param("s", $email);
+        $stmt_email->execute();
+        $result_email = $stmt_email->get_result();
+        
+        if ($row_email = $result_email->fetch_assoc()) {
+            $aprobado_por = $row_email['id'];
+        }
+    }
+    // CUARTA OPCIÓN: Variables de sesión directas
+    elseif (isset($_SESSION['user_id']) && $_SESSION['user_id'] > 0) {
+        $aprobado_por = $_SESSION['user_id'];
+    } elseif (isset($_SESSION['id']) && $_SESSION['id'] > 0) {
+        $aprobado_por = $_SESSION['id'];
+    } elseif (isset($_SESSION['idusuario']) && $_SESSION['idusuario'] > 0) {
+        $aprobado_por = $_SESSION['idusuario'];
+    }
+    
+    // DEBUG: Si no encontramos el ID, podemos loguear la sesión para ver qué hay
+    if ($aprobado_por <= 0) {
+        error_log("DEBUG SESSION: No se pudo obtener ID del aprobador. Session data: " . json_encode($_SESSION));
+        return [
+            'success' => false,
+            'message' => 'No se pudo identificar al usuario que realiza la aprobación. Session: ' . json_encode($_SESSION)
+        ];
+    }
+    
+    $sql = "INSERT INTO control_avance_trayecto 
+            (id_usuario, id_carrera, trayecto_actual, puede_avanzar, aprobado_por, fecha_aprobacion, motivo, created_at, updated_at)
+            VALUES (?, ?, ?, 1, ?, NOW(), ?, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE 
+            puede_avanzar = VALUES(puede_avanzar),
+            aprobado_por = VALUES(aprobado_por),
+            fecha_aprobacion = VALUES(fecha_aprobacion),
+            motivo = VALUES(motivo),
+            updated_at = NOW()";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iiiiss", $id_usuario, $id_carrera, $trayecto_actual, $aprobado_por, $motivo);
+    
+    if ($stmt->execute()) {
+        return [
+            'success' => true,
+            'message' => 'Avance de trayecto aprobado exitosamente'
+        ];
+    } else {
+        return [
+            'success' => false,
+            'message' => 'Error al aprobar avance: ' . $stmt->error
+        ];
+    }
+}
+
+/**
+ * Obtiene el ID del usuario actual de sesión
+ * @return int ID del usuario o 0 si no está definido
+ */
+function obtenerUsuarioActualId() {
+    global $db;
+    
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // Si tenemos un username en sesión, buscar el ID en la base de datos
+    if (isset($_SESSION['username']) && !empty($_SESSION['username'])) {
+        $username = $_SESSION['username'];
+        
+        $sql = "SELECT id FROM users WHERE username = ? LIMIT 1";
+        $stmt = $db->prepare($sql);
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($row = $result->fetch_assoc()) {
+            return $row['id'];
+        }
+    }
+    
+    // Si tenemos email en sesión, buscar el ID
+    if (isset($_SESSION['email']) && !empty($_SESSION['email'])) {
+        $email = $_SESSION['email'];
+        
+        $sql = "SELECT id FROM users WHERE email = ? LIMIT 1";
+        $stmt = $db->prepare($sql);
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($row = $result->fetch_assoc()) {
+            return $row['id'];
+        }
+    }
+    
+    // Intentar obtener directamente de variables de sesión
+    if (isset($_SESSION['user_id']) && $_SESSION['user_id'] > 0) {
+        return $_SESSION['user_id'];
+    } elseif (isset($_SESSION['id']) && $_SESSION['id'] > 0) {
+        return $_SESSION['id'];
+    } elseif (isset($_SESSION['idusuario']) && $_SESSION['idusuario'] > 0) {
+        return $_SESSION['idusuario'];
+    }
+    
+    return 0;
+}
 
 
 
 
-
-
-
+/**
+ * Aprueba el avance de trayecto manualmente con ID de aprobador
+ * @param int $id_usuario ID del usuario
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto_actual Trayecto actual
+ * @param int $aprobado_por ID del usuario que aprueba
+ * @param string $motivo Motivo de la aprobación
+ * @return array Resultado de la operación
+ */
+function aprobarAvanceTrayectoConAprobador($id_usuario, $id_carrera, $trayecto_actual, $aprobado_por, $motivo = '') {
+    global $db;
+    
+    // Verificar que el trayecto no sea el último (4)
+    if ($trayecto_actual >= 4) {
+        return [
+            'success' => false,
+            'message' => 'No se puede aprobar avance desde el último trayecto (4)'
+        ];
+    }
+    
+    $sql = "INSERT INTO control_avance_trayecto 
+            (id_usuario, id_carrera, trayecto_actual, puede_avanzar, aprobado_por, fecha_aprobacion, motivo, created_at, updated_at)
+            VALUES (?, ?, ?, 1, ?, NOW(), ?, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE 
+            puede_avanzar = VALUES(puede_avanzar),
+            aprobado_por = VALUES(aprobado_por),
+            fecha_aprobacion = VALUES(fecha_aprobacion),
+            motivo = VALUES(motivo),
+            updated_at = NOW()";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iiiiss", $id_usuario, $id_carrera, $trayecto_actual, $aprobado_por, $motivo);
+    
+    if ($stmt->execute()) {
+        return [
+            'success' => true,
+            'message' => 'Avance de trayecto aprobado exitosamente'
+        ];
+    } else {
+        return [
+            'success' => false,
+            'message' => 'Error al aprobar avance: ' . $stmt->error
+        ];
+    }
+}
 
 
 
