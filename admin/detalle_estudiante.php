@@ -24,6 +24,101 @@ if(isset($estudiante['carrera']) && !empty($estudiante['carrera'])) {
     }
 }
 
+// =============================================
+// OBTENER NOMBRES DE UBICACIÓN
+// =============================================
+$nombresUbicacion = [
+    'estado_nombre' => 'No especificado',
+    'municipio_nombre' => 'No especificado',
+    'parroquia_nombre' => 'No especificado',
+    'ciudad_nombre' => 'No especificado'
+];
+
+// Verificar si tenemos IDs de ubicación
+if (isset($estudiante['estado']) && !empty($estudiante['estado'])) {
+    
+    // Obtener nombre del estado
+    if (is_numeric($estudiante['estado'])) {
+        $sql_estado = "SELECT estado FROM estados WHERE id_estado = ?";
+        $stmt_estado = $db->prepare($sql_estado);
+        if ($stmt_estado) {
+            $stmt_estado->bind_param("i", $estudiante['estado']);
+            $stmt_estado->execute();
+            $stmt_estado->bind_result($estado_nombre);
+            if ($stmt_estado->fetch()) {
+                $nombresUbicacion['estado_nombre'] = $estado_nombre;
+            }
+            $stmt_estado->close();
+        }
+    } else {
+        // Si no es numérico, usar el valor directamente
+        $nombresUbicacion['estado_nombre'] = $estudiante['estado'];
+    }
+}
+
+if (isset($estudiante['municipio']) && !empty($estudiante['municipio'])) {
+    
+    // Obtener nombre del municipio
+    if (is_numeric($estudiante['municipio'])) {
+        $sql_municipio = "SELECT municipio FROM municipios WHERE id_municipio = ?";
+        $stmt_municipio = $db->prepare($sql_municipio);
+        if ($stmt_municipio) {
+            $stmt_municipio->bind_param("i", $estudiante['municipio']);
+            $stmt_municipio->execute();
+            $stmt_municipio->bind_result($municipio_nombre);
+            if ($stmt_municipio->fetch()) {
+                $nombresUbicacion['municipio_nombre'] = $municipio_nombre;
+            }
+            $stmt_municipio->close();
+        }
+    } else {
+        // Si no es numérico, usar el valor directamente
+        $nombresUbicacion['municipio_nombre'] = $estudiante['municipio'];
+    }
+}
+
+if (isset($estudiante['parroquia']) && !empty($estudiante['parroquia'])) {
+    
+    // Obtener nombre de la parroquia
+    if (is_numeric($estudiante['parroquia'])) {
+        $sql_parroquia = "SELECT parroquia FROM parroquias WHERE id_parroquia = ?";
+        $stmt_parroquia = $db->prepare($sql_parroquia);
+        if ($stmt_parroquia) {
+            $stmt_parroquia->bind_param("i", $estudiante['parroquia']);
+            $stmt_parroquia->execute();
+            $stmt_parroquia->bind_result($parroquia_nombre);
+            if ($stmt_parroquia->fetch()) {
+                $nombresUbicacion['parroquia_nombre'] = $parroquia_nombre;
+            }
+            $stmt_parroquia->close();
+        }
+    } else {
+        // Si no es numérico, usar el valor directamente
+        $nombresUbicacion['parroquia_nombre'] = $estudiante['parroquia'];
+    }
+}
+
+if (isset($estudiante['ciudad']) && !empty($estudiante['ciudad'])) {
+    
+    // Obtener nombre de la ciudad
+    if (is_numeric($estudiante['ciudad'])) {
+        $sql_ciudad = "SELECT ciudad FROM ciudades WHERE id_ciudad = ?";
+        $stmt_ciudad = $db->prepare($sql_ciudad);
+        if ($stmt_ciudad) {
+            $stmt_ciudad->bind_param("i", $estudiante['ciudad']);
+            $stmt_ciudad->execute();
+            $stmt_ciudad->bind_result($ciudad_nombre);
+            if ($stmt_ciudad->fetch()) {
+                $nombresUbicacion['ciudad_nombre'] = $ciudad_nombre;
+            }
+            $stmt_ciudad->close();
+        }
+    } else {
+        // Si no es numérico, usar el valor directamente
+        $nombresUbicacion['ciudad_nombre'] = $estudiante['ciudad'];
+    }
+}
+
 // Manejo robusto de la foto de perfil
 $fotoPerfil = '';
 $tieneFoto = false;
@@ -39,11 +134,6 @@ if (!empty($estudiante['foto_perfil'])) {
 
 // Si no hay foto válida, usar una predeterminada
 if (!$tieneFoto) {
-    // Puedes usar una de estas opciones:
-    
-   
-    
-    // Opción 3: Imagen SVG directa (recomendado)
     $fotoPerfil = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='40' r='20' fill='%236c757d'/%3E%3Ccircle cx='50' cy='100' r='40' fill='%236c757d'/%3E%3Ctext x='50' y='45' text-anchor='middle' fill='white' font-family='Arial' font-size='14'%3EUSER%3C/text%3E%3C/svg%3E";
 }
 ?>
@@ -87,7 +177,6 @@ if (!$tieneFoto) {
         </div>
     </div>
 
-    <!-- El resto del contenido permanece igual -->
     <div class="container-fluid py-4">
         <!-- Primera fila: Información personal y académica -->
         <div class="row g-4 mb-4">
@@ -150,7 +239,6 @@ if (!$tieneFoto) {
             </div>
         </div>
 
-        <!-- Las demás secciones permanecen igual -->
         <!-- Segunda fila: Contacto y Salud -->
         <div class="row g-4 mb-4">
             <!-- Información de Contacto -->
@@ -217,7 +305,7 @@ if (!$tieneFoto) {
             </div>
         </div>
 
-        <!-- Tercera fila: Dirección y Ubicación -->
+        <!-- Tercera fila: Dirección y Ubicación (CORREGIDA) -->
         <div class="row g-4 mb-4">
             <!-- Dirección Residencial -->
             <div class="col-lg-6">
@@ -246,7 +334,7 @@ if (!$tieneFoto) {
                 </div>
             </div>
 
-            <!-- Ubicación Geográfica -->
+            <!-- Ubicación Geográfica (CORREGIDA - solo nombres, sin IDs) -->
             <div class="col-lg-6">
                 <div class="card h-100 shadow-sm">
                     <div class="card-header bg-light-cyan text-dark">
@@ -258,19 +346,31 @@ if (!$tieneFoto) {
                         <div class="row g-3">
                             <div class="col-sm-6">
                                 <label class="form-label small text-muted mb-1">Estado</label>
-                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($estudiante['estado'] ?? 'No especificado') ?></p>
+                                <p class="mb-0 fw-semibold">
+                                    <i class="fas fa-flag me-1 text-primary"></i>
+                                    <?= htmlspecialchars($nombresUbicacion['estado_nombre']) ?>
+                                </p>
                             </div>
                             <div class="col-sm-6">
                                 <label class="form-label small text-muted mb-1">Municipio</label>
-                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($estudiante['municipio'] ?? 'No especificado') ?></p>
+                                <p class="mb-0 fw-semibold">
+                                    <i class="fas fa-city me-1 text-success"></i>
+                                    <?= htmlspecialchars($nombresUbicacion['municipio_nombre']) ?>
+                                </p>
                             </div>
                             <div class="col-sm-6">
                                 <label class="form-label small text-muted mb-1">Parroquia</label>
-                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($estudiante['parroquia'] ?? 'No especificado') ?></p>
+                                <p class="mb-0 fw-semibold">
+                                    <i class="fas fa-map-pin me-1 text-info"></i>
+                                    <?= htmlspecialchars($nombresUbicacion['parroquia_nombre']) ?>
+                                </p>
                             </div>
                             <div class="col-sm-6">
                                 <label class="form-label small text-muted mb-1">Ciudad</label>
-                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($estudiante['ciudad'] ?? 'No especificado') ?></p>
+                                <p class="mb-0 fw-semibold">
+                                    <i class="fas fa-building me-1 text-warning"></i>
+                                    <?= htmlspecialchars($nombresUbicacion['ciudad_nombre']) ?>
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -292,11 +392,11 @@ if (!$tieneFoto) {
                         <div class="row g-3">
                             <div class="col-sm-6">
                                 <label class="form-label small text-muted mb-1">Grupo Familiar</label>
-                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($estudiante['grupo_familiar'] ?? 'No especificado') ?> personas</p>
+                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($estudiante['grupo_familiar'] ?? '0') ?> personas</p>
                             </div>
                             <div class="col-sm-6">
                                 <label class="form-label small text-muted mb-1">Personas a Cargo</label>
-                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($estudiante['acargo_usted'] ?? 'No especificado') ?> personas</p>
+                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($estudiante['acargo_usted'] ?? '0') ?> personas</p>
                             </div>
                             <div class="col-12">
                                 <label class="form-label small text-muted mb-1">Fuente de Ingresos</label>
@@ -330,10 +430,49 @@ if (!$tieneFoto) {
                 </div>
             </div>
         </div>
+
+        <!-- Quinta fila: Títulos Obtenidos (OPCIONAL) -->
+        <?php if (!empty($estudiante['titulos']) && $estudiante['titulos'] !== '|||'): ?>
+        <div class="row g-4 mt-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light-indigo text-dark">
+                        <h6 class="mb-0">
+                            <i class="fas fa-award me-2"></i>Títulos Obtenidos
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <?php 
+                        $titulos = explode('|||', $estudiante['titulos'] ?? '');
+                        $institutos = explode('|||', $estudiante['institutos'] ?? '');
+                        ?>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Título</th>
+                                        <th>Institución</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php for ($i = 0; $i < count($titulos); $i++): ?>
+                                        <?php if (!empty($titulos[$i]) && trim($titulos[$i]) !== ''): ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars(trim($titulos[$i])) ?></td>
+                                                <td><?= isset($institutos[$i]) ? htmlspecialchars(trim($institutos[$i])) : 'No especificado' ?></td>
+                                            </tr>
+                                        <?php endif; ?>
+                                    <?php endfor; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
-
-
 
 <script>
 // JavaScript adicional para manejar errores de imagen
@@ -383,6 +522,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .bg-light-cyan { background-color: #e0f2f1 !important; }
 .bg-light-yellow { background-color: #fffde7 !important; }
 .bg-light-teal { background-color: #e0f2f1 !important; }
+.bg-light-indigo { background-color: #e8eaf6 !important; }
 
 .card {
     border: 1px solid #e0e0e0;
@@ -400,5 +540,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .fw-semibold {
     font-weight: 600;
+}
+
+/* Estilos para la tabla de títulos */
+.table-responsive {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.table-sm th,
+.table-sm td {
+    padding: 0.5rem;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f5f5f5;
 }
 </style>

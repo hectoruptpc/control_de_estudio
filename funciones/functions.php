@@ -16976,6 +16976,67 @@ function obtenerNombresUbicacion($id_estado, $id_municipio, $id_parroquia) {
 
 
 
+// Función directa en detalle_estudiante.php (solo si no tienes la función en functions.php)
+function obtenerNombresUbicacionDirecto($id_estado, $id_municipio, $id_parroquia = null) {
+    global $db;
+    $ubicacion = [
+        'estado_nombre' => 'No especificado',
+        'municipio_nombre' => 'No especificado',
+        'parroquia_nombre' => 'No especificado'
+    ];
+    
+    if ($id_estado && is_numeric($id_estado)) {
+        $sql = "SELECT estado FROM estados WHERE id_estado = ?";
+        $stmt = $db->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("i", $id_estado);
+            $stmt->execute();
+            $stmt->bind_result($nombre);
+            if ($stmt->fetch()) {
+                $ubicacion['estado_nombre'] = $nombre;
+            }
+            $stmt->close();
+        }
+    }
+    
+    if ($id_municipio && is_numeric($id_municipio)) {
+        $sql = "SELECT municipio FROM municipios WHERE id_municipio = ?";
+        $stmt = $db->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("i", $id_municipio);
+            $stmt->execute();
+            $stmt->bind_result($nombre);
+            if ($stmt->fetch()) {
+                $ubicacion['municipio_nombre'] = $nombre;
+            }
+            $stmt->close();
+        }
+    }
+    
+    if ($id_parroquia && is_numeric($id_parroquia)) {
+        $sql = "SELECT parroquia FROM parroquias WHERE id_parroquia = ?";
+        $stmt = $db->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("i", $id_parroquia);
+            $stmt->execute();
+            $stmt->bind_result($nombre);
+            if ($stmt->fetch()) {
+                $ubicacion['parroquia_nombre'] = $nombre;
+            }
+            $stmt->close();
+        }
+    }
+    
+    return $ubicacion;
+}
+
+// Luego en tu código principal, usa:
+$nombresUbicacion = obtenerNombresUbicacionDirecto(
+    $estudiante['estado'] ?? null,
+    $estudiante['municipio'] ?? null,
+    $estudiante['parroquia'] ?? null
+);
+
 
 
 
