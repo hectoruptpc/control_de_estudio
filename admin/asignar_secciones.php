@@ -46,7 +46,17 @@ include("includes/head.php");
         <div class="col-md-12">
             <h1 class="mt-4"><?php echo $titulopag; ?></h1>
             
-            <?php if(isset($mensaje)) echo $mensaje; ?>
+            <?php
+            if(isset($mensaje)) {
+                if(is_array($mensaje)) {
+                    foreach($mensaje as $m) {
+                        echo $m;
+                    }
+                } else {
+                    echo $mensaje;
+                }
+            }
+            ?>
             
             <!-- Modal de Confirmación para Eliminar -->
             <div class="modal fade" id="confirmDeleteModal" tabindex="-1" role="dialog" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
