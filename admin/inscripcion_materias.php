@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             error_log("Sección ID: $id_seccion");
             error_log("Materias IDs: " . implode(', ', $materias_ids));
             
-            if ($id_estudiante > 0 && $id_seccion > 0 && !empty($materias_ids)) {
+            if ($id_estudiante > 0 && !empty($materias_ids)) {
                 // Obtener información del estudiante para debug
                 $info_temp = obtenerInfoEstudiantePorId($id_estudiante);
                 error_log("Info estudiante: " . json_encode($info_temp));
@@ -158,7 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $info_estudiante = obtenerInfoEstudiantePorId($id_estudiante);
                     
                     // Actualizar listas
-                    $materias_inscritas = obtenerMateriasInscritas($id_estudiante);
+                    $materias_inscritas = obtenerMateriasInscritasActuales($id_estudiante);
                     
                     // Volver a obtener datos actualizados
                     if ($info_estudiante) {
@@ -188,11 +188,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                         
                         if ($id_carrera > 0) {
-                            $materias_disponibles = obtenerMateriasReprobadas($info_estudiante['id'], $trayecto_actual, $id_carrera);
-                            
-                            if (empty($materias_disponibles) && $trayecto_actual == 0 && $es_estudiante_nuevo) {
-                                $materias_disponibles = obtenerMateriasTrayecto($id_carrera, $trayecto_actual);
-                            }
+                            $materias_disponibles = obtenerMateriasParaInscripcion(
+                                $info_estudiante['id'], 
+                                $trayecto_actual, 
+                                $id_carrera, 
+                                $es_estudiante_nuevo
+                            );
                         }
                         
                         $historial_secciones = obtenerHistorialSecciones($info_estudiante['id']);
@@ -205,12 +206,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     error_log("❌ Inscripción fallida");
                 }
             } else {
-                $mensaje = "⚠️ Debe seleccionar una sección y al menos una materia para inscribir.";
+                $mensaje = "⚠️ Debe seleccionar al menos una materia para inscribir.";
                 $tipo_mensaje = 'warning';
                 
                 // Debug de qué falta
                 if ($id_estudiante <= 0) error_log("⚠️ Falta estudiante ID");
-                if ($id_seccion <= 0) error_log("⚠️ Falta sección ID");
                 if (empty($materias_ids)) error_log("⚠️ Falta materias");
             }
         }
@@ -270,13 +270,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             }
                             
                             if ($id_carrera > 0) {
-                                $materias_disponibles = obtenerMateriasReprobadas($info_estudiante['id'], $trayecto_actual, $id_carrera);
-                                
-                                if (empty($materias_disponibles) && $trayecto_actual == 0 && $es_estudiante_nuevo) {
-                                    $materias_disponibles = obtenerMateriasTrayecto($id_carrera, $trayecto_actual);
-                                }
+                                $materias_disponibles = obtenerMateriasParaInscripcion(
+                                    $info_estudiante['id'], 
+                                    $trayecto_actual, 
+                                    $id_carrera, 
+                                    $es_estudiante_nuevo
+                                );
                             }
                             
+                            $materias_inscritas = obtenerMateriasInscritasActuales($info_estudiante['id']);
                             $historial_secciones = obtenerHistorialSecciones($info_estudiante['id']);
                         }
                     } else {
@@ -345,13 +347,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             }
                             
                             if ($id_carrera > 0) {
-                                $materias_disponibles = obtenerMateriasReprobadas($info_estudiante['id'], $trayecto_actual, $id_carrera);
-                                
-                                if (empty($materias_disponibles) && $trayecto_actual == 0 && $es_estudiante_nuevo) {
-                                    $materias_disponibles = obtenerMateriasTrayecto($id_carrera, $trayecto_actual);
-                                }
+                                $materias_disponibles = obtenerMateriasParaInscripcion(
+                                    $info_estudiante['id'], 
+                                    $trayecto_actual, 
+                                    $id_carrera, 
+                                    $es_estudiante_nuevo
+                                );
                             }
                             
+                            $materias_inscritas = obtenerMateriasInscritasActuales($info_estudiante['id']);
                             $historial_secciones = obtenerHistorialSecciones($info_estudiante['id']);
                         }
                     } else {
@@ -413,18 +417,18 @@ if ($info_estudiante) {
         $secciones_disponibles = obtenerSeccionesTrayecto($id_carrera, $trayecto_inscripcion, $periodo_activo['id_periodo']);
     }
     
-    // Obtener materias para inscripción (siempre del trayecto actual, solo reprobadas)
+    // Obtener materias para inscripción (solo las NO inscritas actualmente)
     if ($id_carrera > 0) {
-        $materias_disponibles = obtenerMateriasReprobadas($info_estudiante['id'], $trayecto_actual, $id_carrera);
-        
-        // Si no tiene reprobadas, mostrar todas las materias del trayecto
-        if (empty($materias_disponibles) && $trayecto_actual == 0 && $es_estudiante_nuevo) {
-            $materias_disponibles = obtenerMateriasTrayecto($id_carrera, $trayecto_actual);
-        }
+        $materias_disponibles = obtenerMateriasParaInscripcion(
+            $info_estudiante['id'], 
+            $trayecto_actual, 
+            $id_carrera, 
+            $es_estudiante_nuevo
+        );
     }
     
-    // Obtener materias inscritas actualmente
-    $materias_inscritas = obtenerMateriasInscritas($info_estudiante['id']);
+    // Obtener materias inscritas actualmente en el período activo
+    $materias_inscritas = obtenerMateriasInscritasActuales($info_estudiante['id']);
     
     // Obtener historial de secciones
     $historial_secciones = obtenerHistorialSecciones($info_estudiante['id']);
@@ -690,7 +694,7 @@ if (!empty($mensaje)) {
             <div class="card mb-4">
                 <div class="card-header bg-warning">
                     <i class="fas fa-clipboard-check mr-1"></i>
-                    Materias Actualmente Inscritas (<?php echo htmlspecialchars($periodo_activo['nombre_periodo']); ?>)
+                    Materias Inscritas en el Período Actual (<?php echo htmlspecialchars($periodo_activo['nombre_periodo']); ?>)
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -701,22 +705,30 @@ if (!empty($mensaje)) {
                                     <th>Nombre</th>
                                     <th>Trayecto</th>
                                     <th>Créditos</th>
-                                    <th>Sección</th>
                                     <th>Nota Mínima</th>
                                     <th>Tipo</th>
+                                    <th>Estado</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($materias_inscritas as $materia): 
                                     $nota_minima = obtenerNotaMinimaMateria($materia['id_materia']);
                                     $es_proyecto = esProyectoSocio($materia['id_materia']);
+                                    
+                                    // Obtener información de la nota actual si existe
+                                    $nota_actual = obtenerNotaMateriaActual($info_estudiante['id'], $materia['id_materia']);
+                                    $estado_nota = ($nota_actual === null) ? 'Sin calificar' : 
+                                        ((($es_proyecto && $nota_actual >= 16) || (!$es_proyecto && $nota_actual >= 12)) 
+                                            ? 'Aprobada' 
+                                            : 'Reprobada');
+                                    $badge_color = ($estado_nota == 'Aprobada') ? 'success' : 
+                                                 (($estado_nota == 'Reprobada') ? 'danger' : 'secondary');
                                 ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($materia['cod_materia']); ?></td>
                                     <td><?php echo htmlspecialchars($materia['nombre_materia']); ?></td>
                                     <td><?php echo $materia['trayecto']; ?></td>
                                     <td><?php echo $materia['creditos']; ?></td>
-                                    <td><?php echo htmlspecialchars($materia['codigo_seccion'] ?? 'No asignada'); ?></td>
                                     <td><?php echo $nota_minima; ?></td>
                                     <td>
                                         <?php if ($es_proyecto): ?>
@@ -725,13 +737,23 @@ if (!empty($mensaje)) {
                                             <span class="badge badge-info">NORMAL</span>
                                         <?php endif; ?>
                                     </td>
+                                    <td>
+                                        <span class="badge badge-<?php echo $badge_color; ?>">
+                                            <?php echo $estado_nota; ?>
+                                            <?php if ($nota_actual !== null): ?>
+                                                (<?php echo $nota_actual; ?>)
+                                            <?php endif; ?>
+                                        </span>
+                                    </td>
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
                     <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> Estas materias ya están inscritas en el período actual. No se pueden volver a inscribir.
+                        <i class="fas fa-info-circle"></i> 
+                        Estas materias ya están inscritas en el período actual. 
+                        Aparecerán aquí hasta que se cierre el período o se aprueben.
                     </div>
                 </div>
             </div>
@@ -848,7 +870,7 @@ if (!empty($mensaje)) {
                                 <li class="list-group-item list-group-item-success d-flex justify-content-between align-items-center">
                                     <?php echo htmlspecialchars($materia['nombre_materia']); ?>
                                     <?php if (esProyectoSocio($materia['id_materia'])): ?>
-                                        <span class="badge badge-warning badge-pill">PROYECTO</span>
+                                        <span class="badge badge-warning">PROYECTO</span>
                                     <?php endif; ?>
                                 </li>
                                 <?php endforeach; ?>
@@ -913,10 +935,6 @@ if (!empty($mensaje)) {
                         <div class="alert alert-danger">
                             <i class="fas fa-exclamation-triangle"></i> No hay un período académico activo. Contacte al administrador.
                         </div>
-                    <?php elseif (empty($secciones_disponibles)): ?>
-                        <div class="alert alert-warning">
-                            <i class="fas fa-exclamation-circle"></i> No hay secciones disponibles para el Trayecto <?php echo $trayecto_inscripcion; ?> en este período.
-                        </div>
                     <?php elseif ($info_estudiante['carrera'] <= 0): ?>
                         <div class="alert alert-danger">
                             <i class="fas fa-exclamation-triangle"></i> El estudiante no tiene una carrera asignada.
@@ -935,9 +953,9 @@ if (!empty($mensaje)) {
                             <input type="hidden" name="id_estudiante" value="<?php echo $info_estudiante['id']; ?>">
                             
                             <div class="form-group">
-                                <label for="id_seccion">Seleccionar Sección (Trayecto <?php echo $trayecto_inscripcion; ?>)</label>
-                                <select class="form-control" id="id_seccion" name="id_seccion" required>
-                                    <option value="">Seleccione una sección...</option>
+                                <label for="id_seccion">Seleccionar Sección (Trayecto <?php echo $trayecto_inscripcion; ?>) <small class="text-muted">(Opcional)</small></label>
+                                <select class="form-control" id="id_seccion" name="id_seccion">
+                                    <option value="">Sin sección (inscripción general)</option>
                                     <?php foreach ($secciones_disponibles as $seccion): ?>
                                     <option value="<?php echo $seccion['id_seccion']; ?>">
                                         <?php echo htmlspecialchars($seccion['codigo_seccion']); ?> - 
@@ -950,7 +968,7 @@ if (!empty($mensaje)) {
                                     <?php endforeach; ?>
                                 </select>
                                 <small class="form-text text-muted">
-                                    Secciones disponibles para el Trayecto <?php echo $trayecto_inscripcion; ?>.
+                                    Secciones disponibles para el Trayecto <?php echo $trayecto_inscripcion; ?> (opcional).
                                 </small>
                             </div>
                             
@@ -962,7 +980,7 @@ if (!empty($mensaje)) {
                                             <i class="fas fa-info-circle"></i>
                                             <?php 
                                             if ($trayecto_inscripcion == $trayecto_actual && !$es_estudiante_nuevo) {
-                                                echo "¡Felicidades! Ya aprobó todas las materias de este trayecto.";
+                                                echo "¡Felicidades! Ya está inscrito en todas las materias de este trayecto.";
                                             } elseif ($es_estudiante_nuevo) {
                                                 echo "Se mostrarán todas las materias del Trayecto 0 para inscripción inicial.";
                                             } else {
@@ -982,8 +1000,15 @@ if (!empty($mensaje)) {
                                             $nota_minima = obtenerNotaMinimaMateria($materia['id_materia']);
                                             $es_proyecto = esProyectoSocio($materia['id_materia']);
                                             
-                                            // Verificar si ya está inscrita usando la función materiaYaInscrita
+                                            // Verificar si ya está inscrita
                                             $ya_inscrita = materiaYaInscrita($info_estudiante['id'], $materia['id_materia']);
+                                            
+                                            // Verificar si ya fue cursada pero reprobada
+                                            $nota_actual = obtenerNotaMateriaActual($info_estudiante['id'], $materia['id_materia']);
+                                            $reprobada = ($nota_actual !== null && 
+                                                         (($es_proyecto && $nota_actual < 16) || 
+                                                          (!$es_proyecto && $nota_actual < 12)));
+                                            $nueva = ($nota_actual === null);
                                         ?>
                                         <div class="form-check mb-2">
                                             <input class="form-check-input materia-checkbox" type="checkbox" 
@@ -999,11 +1024,18 @@ if (!empty($mensaje)) {
                                                 <?php endif; ?>
                                                 <?php if ($ya_inscrita): ?>
                                                     <span class="badge badge-secondary">YA INSCRITA</span>
+                                                <?php elseif ($reprobada): ?>
+                                                    <span class="badge badge-danger">REPROBADA</span>
+                                                <?php elseif ($nueva): ?>
+                                                    <span class="badge badge-primary">NUEVA</span>
                                                 <?php endif; ?>
                                                 <small class="text-muted d-block">
                                                     Créditos: <?php echo $materia['creditos']; ?> | 
                                                     Nota mínima: <?php echo $nota_minima; ?> | 
                                                     Trayecto: <?php echo $materia['trayecto']; ?>
+                                                    <?php if ($reprobada && $nota_actual !== null): ?>
+                                                        | Nota anterior: <?php echo $nota_actual; ?>
+                                                    <?php endif; ?>
                                                 </small>
                                             </label>
                                         </div>
@@ -1013,7 +1045,7 @@ if (!empty($mensaje)) {
                             </div>
                             
                             <button type="submit" name="inscribir_materias" class="btn btn-success btn-lg" 
-                                    <?php echo (empty($materias_disponibles) || empty($secciones_disponibles)) ? 'disabled' : ''; ?>>
+                                    <?php echo (empty($materias_disponibles)) ? 'disabled' : ''; ?>>
                                 <i class="fas fa-save mr-1"></i> Inscribir Materias Seleccionadas
                             </button>
                             
@@ -1057,7 +1089,7 @@ if (!empty($mensaje)) {
                                 <li class="mb-2"><strong>Avance manual:</strong> Requiere aprobación explícita del administrador</li>
                                 <li class="mb-2"><strong>Nota mínima aprobatoria:</strong> 12 puntos</li>
                                 <li class="mb-2"><strong>Nota mínima para proyectos:</strong> 16 puntos</li>
-                                <li class="mb-2"><strong>Reinscripción:</strong> Solo se inscriben materias reprobadas</li>
+                                <li class="mb-2"><strong>Reinscripción:</strong> Solo se inscriben materias NO inscritas actualmente</li>
                                 <li class="mb-2"><strong>Ya inscritas:</strong> No se pueden volver a inscribir en mismo período</li>
                                 <li class="mb-2"><strong>Nuevos estudiantes:</strong> Pueden inscribir todas las materias del Trayecto 0</li>
                             </ul>
@@ -1094,19 +1126,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         function actualizarEstadoBoton() {
             const inscribirBtn = document.querySelector('button[name="inscribir_materias"]');
-            const idSeccion = document.getElementById('id_seccion');
             
             if (inscribirBtn) {
                 const algunaSeleccionada = Array.from(materiaCheckboxes).some(cb => cb.checked);
-                const seccionSeleccionada = idSeccion && idSeccion.value !== '';
-                
-                inscribirBtn.disabled = !(algunaSeleccionada && seccionSeleccionada);
+                inscribirBtn.disabled = !algunaSeleccionada;
             }
-        }
-        
-        const idSeccion = document.getElementById('id_seccion');
-        if (idSeccion) {
-            idSeccion.addEventListener('change', actualizarEstadoBoton);
         }
         
         actualizarEstadoBoton();
@@ -1119,71 +1143,28 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // SOLUCIÓN: Validación SOLO para el formulario de inscripción de materias
-    // Buscamos específicamente el formulario que contiene el botón "inscribir_materias"
-    const btnInscribirMaterias = document.querySelector('button[name="inscribir_materias"]');
-    if (btnInscribirMaterias) {
-        const formInscripcion = btnInscribirMaterias.closest('form');
-        
-        if (formInscripcion) {
-            formInscripcion.addEventListener('submit', function(e) {
-                // Verificar si el botón presionado es "inscribir_materias"
-                const submitter = e.submitter || document.activeElement;
-                
-                if (submitter && submitter.name === 'inscribir_materias') {
-                    const idSeccion = document.getElementById('id_seccion');
-                    const checkboxesMaterias = document.querySelectorAll('input[name="materias[]"]:checked:not(:disabled)');
-                    
-                    if (!idSeccion || !idSeccion.value) {
-                        e.preventDefault();
-                        alert('⚠️ Por favor seleccione una sección.');
-                        return false;
-                    }
-                    
-                    if (checkboxesMaterias.length === 0) {
-                        e.preventDefault();
-                        alert('⚠️ Por favor seleccione al menos una materia.');
-                        return false;
-                    }
-                    
-                    // Confirmar la inscripción
-                    const confirmar = confirm(`¿Está seguro de inscribir ${checkboxesMaterias.length} materia(s) en la sección seleccionada?`);
-                    if (!confirmar) {
-                        e.preventDefault();
-                        return false;
-                    }
-                    
-                    return true;
-                }
-                // Si no es el botón de inscribir materias, permitir el envío sin validación
-                return true;
-            });
-        }
+    // Validación SOLO para el botón de inscribir materias
+    const btnInscribir = document.querySelector('button[name="inscribir_materias"]');
+    if (btnInscribir) {
+        btnInscribir.addEventListener('click', function(e) {
+            const checkboxesMaterias = document.querySelectorAll('input[name="materias[]"]:checked:not(:disabled)');
+            
+            if (checkboxesMaterias.length === 0) {
+                e.preventDefault();
+                alert('⚠️ Por favor seleccione al menos una materia.');
+                return false;
+            }
+            
+            // Confirmar la inscripción
+            const confirmar = confirm(`¿Está seguro de inscribir ${checkboxesMaterias.length} materia(s)?`);
+            if (!confirmar) {
+                e.preventDefault();
+                return false;
+            }
+            
+            return true;
+        });
     }
-    
-    // También podemos agregar una solución alternativa:
-    // Agregar una clase específica al formulario de inscripción para identificarlo mejor
-    const forms = document.querySelectorAll('form');
-    forms.forEach(form => {
-        // Si el formulario tiene un botón de inscribir materias, agregarle una clase
-        const hasInscribirBtn = form.querySelector('button[name="inscribir_materias"]');
-        if (hasInscribirBtn) {
-            form.classList.add('form-inscripcion-materias');
-        }
-    });
-    
-    // Otra solución: Remover validación de otros botones específicamente
-    const botonesCambiarEstudiante = document.querySelectorAll('button[name="seleccionar_estudiante"]');
-    botonesCambiarEstudiante.forEach(boton => {
-        const form = boton.closest('form');
-        if (form) {
-            // Eliminar cualquier listener de submit que pueda interferir
-            form.addEventListener('submit', function(e) {
-                // Permitir siempre el envío de este formulario
-                return true;
-            }, false);
-        }
-    });
 });
 </script>
 
