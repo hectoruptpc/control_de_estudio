@@ -819,7 +819,7 @@ if (!empty($mensaje)) {
                                         <input type="hidden" name="trayecto_actual" value="<?php echo $trayecto_actual; ?>">
                                         
                                         <button type="submit" name="rechazar_avance" class="btn btn-warning btn-sm" 
-                                                onclick="return confirm('¿Está seguro de revocar la aprobación de avance al Trayecto ' + (<?php echo $trayecto_actual; ?> + 1) + '?')">
+                                                >
                                             <i class="fas fa-times-circle mr-1"></i> REVOCAR APROBACIÓN
                                         </button>
                                         <small class="d-block text-muted mt-1">
@@ -1142,27 +1142,161 @@ document.addEventListener('DOMContentLoaded', function() {
             this.value = this.value.replace(/[^0-9]/g, '');
         });
     }
-    
-    // Validación SOLO para el botón de inscribir materias
+});
+</script>
+
+<!-- Modal de confirmación genérico -->
+<div class="modal fade" id="confirmActionModal" tabindex="-1" role="dialog" aria-labelledby="confirmActionModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmActionModalLabel">Confirmar acción</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body" id="confirmActionModalBody">
+        ¿Desea continuar?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal" id="confirmActionCancel">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="confirmActionConfirm">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Función genérica para mostrar modal de confirmación
+    function showConfirm(options) {
+        const title = options.title || 'Confirmar acción';
+        const message = options.message || '¿Está seguro?';
+        const confirmText = options.confirmText || 'Confirmar';
+        const cancelText = options.cancelText || 'Cancelar';
+        const showCancel = (typeof options.showCancel === 'undefined') ? true : options.showCancel;
+
+        document.getElementById('confirmActionModalLabel').textContent = title;
+        document.getElementById('confirmActionModalBody').innerHTML = message;
+        const btnConfirm = document.getElementById('confirmActionConfirm');
+        const btnCancel = document.getElementById('confirmActionCancel');
+
+        btnConfirm.textContent = confirmText;
+        btnCancel.textContent = cancelText;
+
+        if (!showCancel) {
+            btnCancel.style.display = 'none';
+        } else {
+            btnCancel.style.display = '';
+        }
+
+        // Limpiar eventos previos
+        btnConfirm.onclick = null;
+
+        if (options.onConfirm && typeof options.onConfirm === 'function') {
+            btnConfirm.onclick = function() {
+                options.onConfirm();
+                if (window.jQuery && $('#confirmActionModal').modal) {
+                    $('#confirmActionModal').modal('hide');
+                }
+            };
+        }
+
+        if (window.jQuery && $('#confirmActionModal').modal) {
+            $('#confirmActionModal').modal('show');
+        }
+    }
+
+    // Manejar inscripción de materias
     const btnInscribir = document.querySelector('button[name="inscribir_materias"]');
     if (btnInscribir) {
         btnInscribir.addEventListener('click', function(e) {
+            e.preventDefault();
+            const form = this.closest('form');
+            const clickedBtn = this;
             const checkboxesMaterias = document.querySelectorAll('input[name="materias[]"]:checked:not(:disabled)');
-            
+
             if (checkboxesMaterias.length === 0) {
-                e.preventDefault();
-                alert('⚠️ Por favor seleccione al menos una materia.');
-                return false;
+                showConfirm({
+                    title: 'Atención',
+                    message: '⚠️ Por favor seleccione al menos una materia.',
+                    confirmText: 'OK',
+                    showCancel: false
+                });
+                return;
             }
-            
-            // Confirmar la inscripción
-            const confirmar = confirm(`¿Está seguro de inscribir ${checkboxesMaterias.length} materia(s)?`);
-            if (!confirmar) {
-                e.preventDefault();
-                return false;
-            }
-            
-            return true;
+
+            showConfirm({
+                title: 'Confirmar Inscripción',
+                message: `¿Está seguro de inscribir ${checkboxesMaterias.length} materia(s)?`,
+                confirmText: 'Inscribir',
+                onConfirm: function() {
+                    if (clickedBtn && clickedBtn.name) {
+                        const hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = clickedBtn.name;
+                        hidden.value = clickedBtn.value || '1';
+                        form.appendChild(hidden);
+                    }
+                    form.submit();
+                }
+            });
+        });
+    }
+
+    // Manejar aprobación de avance
+    const btnAprobar = document.querySelector('button[name="aprobar_avance"]');
+    if (btnAprobar) {
+        btnAprobar.addEventListener('click', function(e) {
+            e.preventDefault();
+            const form = this.closest('form');
+            const clickedBtn = this;
+            const trayectoActual = form.querySelector('input[name="trayecto_actual"]') ? parseInt(form.querySelector('input[name="trayecto_actual"]').value, 10) : null;
+            const siguiente = (trayectoActual !== null) ? (trayectoActual + 1) : '';
+
+            showConfirm({
+                title: 'Aprobar Avance',
+                message: `¿Confirma aprobar el avance del estudiante al Trayecto ${siguiente}?`,
+                confirmText: 'Aprobar',
+                onConfirm: function() {
+                    if (clickedBtn && clickedBtn.name) {
+                        const hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = clickedBtn.name;
+                        hidden.value = clickedBtn.value || '1';
+                        form.appendChild(hidden);
+                    }
+                    form.submit();
+                }
+            });
+        });
+    }
+
+    // Manejar revocación/rechazo de avance
+    const btnRechazar = document.querySelector('button[name="rechazar_avance"]');
+    if (btnRechazar) {
+        btnRechazar.addEventListener('click', function(e) {
+            e.preventDefault();
+            const form = this.closest('form');
+            const clickedBtn = this;
+            const trayectoActual = form.querySelector('input[name="trayecto_actual"]') ? parseInt(form.querySelector('input[name="trayecto_actual"]').value, 10) : null;
+            const siguiente = (trayectoActual !== null) ? (trayectoActual + 1) : '';
+
+            showConfirm({
+                title: 'Revocar Aprobación',
+                message: `¿Está seguro de revocar la aprobación de avance al Trayecto ${siguiente}?`,
+                confirmText: 'Revocar',
+                onConfirm: function() {
+                    if (clickedBtn && clickedBtn.name) {
+                        const hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = clickedBtn.name;
+                        hidden.value = clickedBtn.value || '1';
+                        form.appendChild(hidden);
+                    }
+                    form.submit();
+                }
+            });
         });
     }
 });
