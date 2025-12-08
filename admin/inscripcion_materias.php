@@ -136,20 +136,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id_seccion = intval($_POST['id_seccion'] ?? 0);
             $materias_ids = isset($_POST['materias']) ? array_map('intval', $_POST['materias']) : [];
             
+            // Debug logging
+            error_log("=== PROCESANDO INSCRIPCIÓN ===");
+            error_log("Estudiante ID: $id_estudiante");
+            error_log("Sección ID: $id_seccion");
+            error_log("Materias IDs: " . implode(', ', $materias_ids));
+            
             if ($id_estudiante > 0 && $id_seccion > 0 && !empty($materias_ids)) {
-                if (inscribirMateriasEstudiante($id_estudiante, $id_seccion, $materias_ids)) {
+                // Obtener información del estudiante para debug
+                $info_temp = obtenerInfoEstudiantePorId($id_estudiante);
+                error_log("Info estudiante: " . json_encode($info_temp));
+                
+                // Llamar a la función de inscripción
+                $resultado = inscribirMateriasEstudiante($id_estudiante, $id_seccion, $materias_ids);
+                
+                if ($resultado) {
                     $mensaje = "✅ Materias inscritas correctamente para el estudiante.";
                     $tipo_mensaje = 'success';
                     
                     // Actualizar información del estudiante
                     $info_estudiante = obtenerInfoEstudiantePorId($id_estudiante);
+                    
+                    // Actualizar listas
+                    $materias_inscritas = obtenerMateriasInscritas($id_estudiante);
+                    
+                    // Volver a obtener datos actualizados
+                    if ($info_estudiante) {
+                        $id_carrera = $info_estudiante['carrera'] ?? $info_estudiante['id_carrera'] ?? 0;
+                        $es_estudiante_nuevo = esEstudianteNuevo($info_estudiante['id']);
+                        $trayecto_actual = obtenerTrayectoActual($info_estudiante['id'], $id_carrera);
+                        
+                        // Obtener datos actualizados
+                        if ($id_carrera > 0) {
+                            $resultado_requisitos = verificarRequisitosTrayecto($info_estudiante['id'], $trayecto_actual, $id_carrera);
+                            $cumple_requisitos = $resultado_requisitos['cumple_requisitos'];
+                            $detalles_requisitos = $resultado_requisitos['detalles'];
+                            $total_materias = $resultado_requisitos['total_materias'];
+                            $total_aprobadas = $resultado_requisitos['total_aprobadas'];
+                            $minimo_requerido = $resultado_requisitos['minimo_requerido'] ?? 0;
+                            
+                            $aprobacion_existente = verificarAprobacionExistente($info_estudiante['id'], $id_carrera, $trayecto_actual);
+                            $info_aprobacion = $aprobacion_existente ? $aprobacion_existente : null;
+                            $historial_aprobaciones = obtenerHistorialAprobaciones($info_estudiante['id'], $id_carrera);
+                        }
+                        
+                        $materias_aprobadas = obtenerMateriasAprobadas($info_estudiante['id'], $trayecto_actual);
+                        $trayecto_inscripcion = $trayecto_actual;
+                        
+                        if ($periodo_activo && $id_carrera > 0) {
+                            $secciones_disponibles = obtenerSeccionesTrayecto($id_carrera, $trayecto_inscripcion, $periodo_activo['id_periodo']);
+                        }
+                        
+                        if ($id_carrera > 0) {
+                            $materias_disponibles = obtenerMateriasReprobadas($info_estudiante['id'], $trayecto_actual, $id_carrera);
+                            
+                            if (empty($materias_disponibles) && $trayecto_actual == 0 && $es_estudiante_nuevo) {
+                                $materias_disponibles = obtenerMateriasTrayecto($id_carrera, $trayecto_actual);
+                            }
+                        }
+                        
+                        $historial_secciones = obtenerHistorialSecciones($info_estudiante['id']);
+                    }
+                    
+                    error_log("✅ Inscripción completada exitosamente");
                 } else {
                     $mensaje = "❌ Error al inscribir las materias. Por favor intente nuevamente.";
                     $tipo_mensaje = 'danger';
+                    error_log("❌ Inscripción fallida");
                 }
             } else {
                 $mensaje = "⚠️ Debe seleccionar una sección y al menos una materia para inscribir.";
                 $tipo_mensaje = 'warning';
+                
+                // Debug de qué falta
+                if ($id_estudiante <= 0) error_log("⚠️ Falta estudiante ID");
+                if ($id_seccion <= 0) error_log("⚠️ Falta sección ID");
+                if (empty($materias_ids)) error_log("⚠️ Falta materias");
             }
         }
     }
@@ -179,6 +241,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         // Actualizar información del estudiante
                         $info_estudiante = $info_estudiante_temp;
+                        
+                        // Recargar datos actualizados
+                        if ($info_estudiante) {
+                            $id_carrera = $info_estudiante['carrera'] ?? $info_estudiante['id_carrera'] ?? 0;
+                            $es_estudiante_nuevo = esEstudianteNuevo($info_estudiante['id']);
+                            $trayecto_actual = obtenerTrayectoActual($info_estudiante['id'], $id_carrera);
+                            
+                            // Obtener datos actualizados
+                            if ($id_carrera > 0) {
+                                $resultado_requisitos = verificarRequisitosTrayecto($info_estudiante['id'], $trayecto_actual, $id_carrera);
+                                $cumple_requisitos = $resultado_requisitos['cumple_requisitos'];
+                                $detalles_requisitos = $resultado_requisitos['detalles'];
+                                $total_materias = $resultado_requisitos['total_materias'];
+                                $total_aprobadas = $resultado_requisitos['total_aprobadas'];
+                                $minimo_requerido = $resultado_requisitos['minimo_requerido'] ?? 0;
+                                
+                                $aprobacion_existente = verificarAprobacionExistente($info_estudiante['id'], $id_carrera, $trayecto_actual);
+                                $info_aprobacion = $aprobacion_existente ? $aprobacion_existente : null;
+                                $historial_aprobaciones = obtenerHistorialAprobaciones($info_estudiante['id'], $id_carrera);
+                            }
+                            
+                            $materias_aprobadas = obtenerMateriasAprobadas($info_estudiante['id'], $trayecto_actual);
+                            $trayecto_inscripcion = $trayecto_actual;
+                            
+                            if ($periodo_activo && $id_carrera > 0) {
+                                $secciones_disponibles = obtenerSeccionesTrayecto($id_carrera, $trayecto_inscripcion, $periodo_activo['id_periodo']);
+                            }
+                            
+                            if ($id_carrera > 0) {
+                                $materias_disponibles = obtenerMateriasReprobadas($info_estudiante['id'], $trayecto_actual, $id_carrera);
+                                
+                                if (empty($materias_disponibles) && $trayecto_actual == 0 && $es_estudiante_nuevo) {
+                                    $materias_disponibles = obtenerMateriasTrayecto($id_carrera, $trayecto_actual);
+                                }
+                            }
+                            
+                            $historial_secciones = obtenerHistorialSecciones($info_estudiante['id']);
+                        }
                     } else {
                         $mensaje = "❌ " . $resultado['message'];
                         $tipo_mensaje = 'danger';
@@ -216,6 +316,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         // Actualizar información del estudiante
                         $info_estudiante = $info_estudiante_temp;
+                        
+                        // Recargar datos actualizados
+                        if ($info_estudiante) {
+                            $id_carrera = $info_estudiante['carrera'] ?? $info_estudiante['id_carrera'] ?? 0;
+                            $es_estudiante_nuevo = esEstudianteNuevo($info_estudiante['id']);
+                            $trayecto_actual = obtenerTrayectoActual($info_estudiante['id'], $id_carrera);
+                            
+                            // Obtener datos actualizados
+                            if ($id_carrera > 0) {
+                                $resultado_requisitos = verificarRequisitosTrayecto($info_estudiante['id'], $trayecto_actual, $id_carrera);
+                                $cumple_requisitos = $resultado_requisitos['cumple_requisitos'];
+                                $detalles_requisitos = $resultado_requisitos['detalles'];
+                                $total_materias = $resultado_requisitos['total_materias'];
+                                $total_aprobadas = $resultado_requisitos['total_aprobadas'];
+                                $minimo_requerido = $resultado_requisitos['minimo_requerido'] ?? 0;
+                                
+                                $aprobacion_existente = verificarAprobacionExistente($info_estudiante['id'], $id_carrera, $trayecto_actual);
+                                $info_aprobacion = $aprobacion_existente ? $aprobacion_existente : null;
+                                $historial_aprobaciones = obtenerHistorialAprobaciones($info_estudiante['id'], $id_carrera);
+                            }
+                            
+                            $materias_aprobadas = obtenerMateriasAprobadas($info_estudiante['id'], $trayecto_actual);
+                            $trayecto_inscripcion = $trayecto_actual;
+                            
+                            if ($periodo_activo && $id_carrera > 0) {
+                                $secciones_disponibles = obtenerSeccionesTrayecto($id_carrera, $trayecto_inscripcion, $periodo_activo['id_periodo']);
+                            }
+                            
+                            if ($id_carrera > 0) {
+                                $materias_disponibles = obtenerMateriasReprobadas($info_estudiante['id'], $trayecto_actual, $id_carrera);
+                                
+                                if (empty($materias_disponibles) && $trayecto_actual == 0 && $es_estudiante_nuevo) {
+                                    $materias_disponibles = obtenerMateriasTrayecto($id_carrera, $trayecto_actual);
+                                }
+                            }
+                            
+                            $historial_secciones = obtenerHistorialSecciones($info_estudiante['id']);
+                        }
                     } else {
                         $mensaje = "❌ Error al eliminar la aprobación de avance.";
                         $tipo_mensaje = 'danger';
@@ -844,14 +982,8 @@ if (!empty($mensaje)) {
                                             $nota_minima = obtenerNotaMinimaMateria($materia['id_materia']);
                                             $es_proyecto = esProyectoSocio($materia['id_materia']);
                                             
-                                            // Verificar si ya está inscrita
-                                            $ya_inscrita = false;
-                                            foreach ($materias_inscritas as $inscrita) {
-                                                if ($inscrita['id_materia'] == $materia['id_materia']) {
-                                                    $ya_inscrita = true;
-                                                    break;
-                                                }
-                                            }
+                                            // Verificar si ya está inscrita usando la función materiaYaInscrita
+                                            $ya_inscrita = materiaYaInscrita($info_estudiante['id'], $materia['id_materia']);
                                         ?>
                                         <div class="form-check mb-2">
                                             <input class="form-check-input materia-checkbox" type="checkbox" 
@@ -986,6 +1118,72 @@ document.addEventListener('DOMContentLoaded', function() {
             this.value = this.value.replace(/[^0-9]/g, '');
         });
     }
+    
+    // SOLUCIÓN: Validación SOLO para el formulario de inscripción de materias
+    // Buscamos específicamente el formulario que contiene el botón "inscribir_materias"
+    const btnInscribirMaterias = document.querySelector('button[name="inscribir_materias"]');
+    if (btnInscribirMaterias) {
+        const formInscripcion = btnInscribirMaterias.closest('form');
+        
+        if (formInscripcion) {
+            formInscripcion.addEventListener('submit', function(e) {
+                // Verificar si el botón presionado es "inscribir_materias"
+                const submitter = e.submitter || document.activeElement;
+                
+                if (submitter && submitter.name === 'inscribir_materias') {
+                    const idSeccion = document.getElementById('id_seccion');
+                    const checkboxesMaterias = document.querySelectorAll('input[name="materias[]"]:checked:not(:disabled)');
+                    
+                    if (!idSeccion || !idSeccion.value) {
+                        e.preventDefault();
+                        alert('⚠️ Por favor seleccione una sección.');
+                        return false;
+                    }
+                    
+                    if (checkboxesMaterias.length === 0) {
+                        e.preventDefault();
+                        alert('⚠️ Por favor seleccione al menos una materia.');
+                        return false;
+                    }
+                    
+                    // Confirmar la inscripción
+                    const confirmar = confirm(`¿Está seguro de inscribir ${checkboxesMaterias.length} materia(s) en la sección seleccionada?`);
+                    if (!confirmar) {
+                        e.preventDefault();
+                        return false;
+                    }
+                    
+                    return true;
+                }
+                // Si no es el botón de inscribir materias, permitir el envío sin validación
+                return true;
+            });
+        }
+    }
+    
+    // También podemos agregar una solución alternativa:
+    // Agregar una clase específica al formulario de inscripción para identificarlo mejor
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        // Si el formulario tiene un botón de inscribir materias, agregarle una clase
+        const hasInscribirBtn = form.querySelector('button[name="inscribir_materias"]');
+        if (hasInscribirBtn) {
+            form.classList.add('form-inscripcion-materias');
+        }
+    });
+    
+    // Otra solución: Remover validación de otros botones específicamente
+    const botonesCambiarEstudiante = document.querySelectorAll('button[name="seleccionar_estudiante"]');
+    botonesCambiarEstudiante.forEach(boton => {
+        const form = boton.closest('form');
+        if (form) {
+            // Eliminar cualquier listener de submit que pueda interferir
+            form.addEventListener('submit', function(e) {
+                // Permitir siempre el envío de este formulario
+                return true;
+            }, false);
+        }
+    });
 });
 </script>
 

@@ -16116,7 +16116,7 @@ function obtenerTrayectoActualReal($id_usuario, $id_carrera) {
 
 /**
  * Obtiene las materias en las que el estudiante está actualmente inscrito
- * VERSIÓN SIMPLIFICADA - Corregida para evitar el error de parámetros
+ * VERSIÓN PARA TU ESTRUCTURA DE TABLAS
  * @param int $id_usuario ID del usuario
  * @return array Materias inscritas
  */
@@ -16129,35 +16129,25 @@ function obtenerMateriasInscritas($id_usuario) {
         return [];
     }
     
-    // Consulta simplificada y corregida
-    $sql = "SELECT DISTINCT m.*, s.codigo_seccion
+    // Consulta para obtener materias inscritas en el período activo
+    $sql = "SELECT DISTINCT m.*, s.codigo_seccion, nd.id_periodo,
+                   CASE 
+                     WHEN nd.trayecto_0 IS NOT NULL THEN nd.trayecto_0
+                     WHEN nd.trayecto_1 IS NOT NULL THEN nd.trayecto_1
+                     WHEN nd.trayecto_2 IS NOT NULL THEN nd.trayecto_2
+                     WHEN nd.trayecto_3 IS NOT NULL THEN nd.trayecto_3
+                     WHEN nd.trayecto_4 IS NOT NULL THEN nd.trayecto_4
+                     ELSE NULL
+                   END as nota_actual
             FROM notas_definitivas nd
             INNER JOIN materias m ON nd.id_materia = m.id_materia
             LEFT JOIN carrera_materia cm ON m.id_materia = cm.id_materia
-            LEFT JOIN secciones s ON cm.id_carrera = s.id_carrera AND s.id_periodo = ?
+            LEFT JOIN secciones s ON cm.id_carrera = s.id_carrera AND s.id_periodo = nd.id_periodo
+            LEFT JOIN estudiante_seccion es ON nd.id_usuario = es.id_usuario AND s.id_seccion = es.id_seccion
             WHERE nd.id_usuario = ?
-            AND (
-                (nd.trayecto_0 IS NOT NULL AND m.trayecto = 0 AND (
-                    (m.es_proyecto_socio = 0 AND nd.trayecto_0 < 12) OR
-                    (m.es_proyecto_socio = 1 AND nd.trayecto_0 < 16)
-                )) OR
-                (nd.trayecto_1 IS NOT NULL AND m.trayecto = 1 AND (
-                    (m.es_proyecto_socio = 0 AND nd.trayecto_1 < 12) OR
-                    (m.es_proyecto_socio = 1 AND nd.trayecto_1 < 16)
-                )) OR
-                (nd.trayecto_2 IS NOT NULL AND m.trayecto = 2 AND (
-                    (m.es_proyecto_socio = 0 AND nd.trayecto_2 < 12) OR
-                    (m.es_proyecto_socio = 1 AND nd.trayecto_2 < 16)
-                )) OR
-                (nd.trayecto_3 IS NOT NULL AND m.trayecto = 3 AND (
-                    (m.es_proyecto_socio = 0 AND nd.trayecto_3 < 12) OR
-                    (m.es_proyecto_socio = 1 AND nd.trayecto_3 < 16)
-                )) OR
-                (nd.trayecto_4 IS NOT NULL AND m.trayecto = 4 AND (
-                    (m.es_proyecto_socio = 0 AND nd.trayecto_4 < 12) OR
-                    (m.es_proyecto_socio = 1 AND nd.trayecto_4 < 16)
-                ))
-            )";
+            AND nd.id_periodo = ?
+            AND es.estatus = 'Activo'
+            ORDER BY m.trayecto, m.nombre_materia";
     
     $stmt = $db->prepare($sql);
     if (!$stmt) {
@@ -16165,7 +16155,7 @@ function obtenerMateriasInscritas($id_usuario) {
         return [];
     }
     
-    $stmt->bind_param("ii", $periodo_activo['id_periodo'], $id_usuario);
+    $stmt->bind_param("ii", $id_usuario, $periodo_activo['id_periodo']);
     $stmt->execute();
     $result = $stmt->get_result();
     
@@ -16293,31 +16283,169 @@ function esEstudianteNuevo($id_usuario) {
 function inscribirMateriasEstudiante($id_usuario, $id_seccion, $materias_ids) {
     global $db;
     
-    // Primero, inscribir al estudiante en la sección si no está inscrito
-    $sql_check = "SELECT * FROM estudiante_seccion WHERE id_usuario = ? AND id_seccion = ?";
-    $stmt_check = $db->prepare($sql_check);
-    $stmt_check->bind_param("ii", $id_usuario, $id_seccion);
-    $stmt_check->execute();
-    $result_check = $stmt_check->get_result();
-    
-    if ($result_check->num_rows == 0) {
-        $sql_inscripcion = "INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus) 
-                           VALUES (?, ?, NOW(), 'Activo')";
-        $stmt_inscripcion = $db->prepare($sql_inscripcion);
-        $stmt_inscripcion->bind_param("ii", $id_usuario, $id_seccion);
-        
-        if (!$stmt_inscripcion->execute()) {
-            error_log("Error al inscribir estudiante en sección: " . $stmt_inscripcion->error);
-            return false;
-        }
+    if (empty($materias_ids)) {
+        error_log("Error: No se proporcionaron materias para inscribir.");
+        return false;
     }
     
-    // Aquí deberías agregar la lógica para registrar la inscripción de materias
-    // Por ahora, solo retornamos true y registramos en log
+    // Obtener información de la sección
+    $sql_seccion = "SELECT * FROM secciones WHERE id_seccion = ?";
+    $stmt_seccion = $db->prepare($sql_seccion);
+    $stmt_seccion->bind_param("i", $id_seccion);
+    $stmt_seccion->execute();
+    $result_seccion = $stmt_seccion->get_result();
+    $seccion = $result_seccion->fetch_assoc();
     
-    error_log("Estudiante ID {$id_usuario} inscrito en sección {$id_seccion} con " . count($materias_ids) . " materias");
+    if (!$seccion) {
+        error_log("Error: Sección no encontrada - ID: $id_seccion");
+        return false;
+    }
     
-    return true;
+    // Obtener el período activo para verificar
+    $periodo_activo = obtenerPeriodoActivo();
+    if (!$periodo_activo) {
+        error_log("Error: No hay período académico activo.");
+        return false;
+    }
+    
+    // Verificar que la sección pertenezca al período activo
+    if ($seccion['id_periodo'] != $periodo_activo['id_periodo']) {
+        error_log("Error: La sección no pertenece al período activo.");
+        return false;
+    }
+    
+    // Obtener el trayecto de la sección
+    $trayecto_seccion = $seccion['id_trayecto'];
+    $id_carrera = $seccion['id_carrera'];
+    
+    // Iniciar transacción
+    $db->begin_transaction();
+    
+    try {
+        // 1. Verificar capacidad de la sección
+        if ($seccion['capacidad_maxima'] > 0) {
+            $sql_capacidad = "SELECT COUNT(*) as total_inscritos 
+                             FROM estudiante_seccion 
+                             WHERE id_seccion = ? AND estatus = 'Activo'";
+            $stmt_capacidad = $db->prepare($sql_capacidad);
+            $stmt_capacidad->bind_param("i", $id_seccion);
+            $stmt_capacidad->execute();
+            $result_capacidad = $stmt_capacidad->get_result();
+            $row_capacidad = $result_capacidad->fetch_assoc();
+            
+            if ($row_capacidad['total_inscritos'] >= $seccion['capacidad_maxima']) {
+                throw new Exception("La sección ha alcanzado su capacidad máxima.");
+            }
+        }
+        
+        // 2. Verificar si el estudiante ya está inscrito en esta sección
+        $sql_check_seccion = "SELECT * FROM estudiante_seccion WHERE id_usuario = ? AND id_seccion = ?";
+        $stmt_check_seccion = $db->prepare($sql_check_seccion);
+        $stmt_check_seccion->bind_param("ii", $id_usuario, $id_seccion);
+        $stmt_check_seccion->execute();
+        $result_check_seccion = $stmt_check_seccion->get_result();
+        
+        if ($result_check_seccion->num_rows == 0) {
+            // Inscribir al estudiante en la sección
+            $sql_inscripcion_seccion = "INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus) 
+                                       VALUES (?, ?, NOW(), 'Activo')";
+            $stmt_inscripcion_seccion = $db->prepare($sql_inscripcion_seccion);
+            $stmt_inscripcion_seccion->bind_param("ii", $id_usuario, $id_seccion);
+            
+            if (!$stmt_inscripcion_seccion->execute()) {
+                throw new Exception("Error al inscribir estudiante en sección: " . $stmt_inscripcion_seccion->error);
+            }
+        } else {
+            // Ya está inscrito, verificar estado
+            $row_seccion = $result_check_seccion->fetch_assoc();
+            if ($row_seccion['estatus'] != 'Activo') {
+                // Reactivar inscripción
+                $sql_update_seccion = "UPDATE estudiante_seccion SET estatus = 'Activo' 
+                                      WHERE id_usuario = ? AND id_seccion = ?";
+                $stmt_update_seccion = $db->prepare($sql_update_seccion);
+                $stmt_update_seccion->bind_param("ii", $id_usuario, $id_seccion);
+                $stmt_update_seccion->execute();
+            }
+        }
+        
+        // 3. Verificar que las materias pertenezcan al trayecto correcto
+        $materias_validadas = [];
+        foreach ($materias_ids as $id_materia) {
+            $sql_materia = "SELECT m.* 
+                           FROM materias m
+                           INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+                           WHERE m.id_materia = ? 
+                           AND cm.id_carrera = ? 
+                           AND m.trayecto = ?
+                           AND m.activa = 1";
+            
+            $stmt_materia = $db->prepare($sql_materia);
+            $stmt_materia->bind_param("iii", $id_materia, $id_carrera, $trayecto_seccion);
+            $stmt_materia->execute();
+            $result_materia = $stmt_materia->get_result();
+            
+            if ($result_materia->num_rows > 0) {
+                $materia_data = $result_materia->fetch_assoc();
+                $materias_validadas[$id_materia] = $materia_data;
+            } else {
+                error_log("Advertencia: Materia ID $id_materia no pertenece al trayecto $trayecto_seccion o no está activa.");
+            }
+        }
+        
+        if (empty($materias_validadas)) {
+            throw new Exception("No hay materias válidas para inscribir.");
+        }
+        
+        // 4. Inscribir cada materia en notas_definitivas
+        $inscripciones_exitosas = 0;
+        
+        foreach ($materias_validadas as $id_materia => $materia_data) {
+            // Verificar si ya está inscrito en esta materia en el mismo período
+            $sql_check_materia = "SELECT * FROM notas_definitivas 
+                                 WHERE id_usuario = ? 
+                                 AND id_materia = ? 
+                                 AND id_periodo = ?";
+            $stmt_check_materia = $db->prepare($sql_check_materia);
+            $stmt_check_materia->bind_param("iii", $id_usuario, $id_materia, $periodo_activo['id_periodo']);
+            $stmt_check_materia->execute();
+            $result_check_materia = $stmt_check_materia->get_result();
+            
+            if ($result_check_materia->num_rows == 0) {
+                // Crear registro en notas_definitivas
+                // Determinar qué columna de trayecto usar según el trayecto de la materia
+                $columna_trayecto = "trayecto_" . $materia_data['trayecto'];
+                
+                $sql_notas = "INSERT INTO notas_definitivas 
+                             (id_usuario, id_materia, id_periodo, fecha_registro, $columna_trayecto) 
+                             VALUES (?, ?, ?, NOW(), NULL)";
+                $stmt_notas = $db->prepare($sql_notas);
+                $stmt_notas->bind_param("iii", $id_usuario, $id_materia, $periodo_activo['id_periodo']);
+                
+                if (!$stmt_notas->execute()) {
+                    throw new Exception("Error al crear registro de notas para materia ID $id_materia: " . $stmt_notas->error);
+                }
+                
+                $inscripciones_exitosas++;
+                
+                error_log("✅ Estudiante ID $id_usuario inscrito en materia ID $id_materia (Trayecto {$materia_data['trayecto']}) para período ID " . $periodo_activo['id_periodo']);
+            } else {
+                error_log("ℹ️ Advertencia: Estudiante ID $id_usuario ya está inscrito en materia ID $id_materia para este período.");
+            }
+        }
+        
+        // 5. Confirmar transacción
+        $db->commit();
+        
+        error_log("✅ Inscripción exitosa: Estudiante ID $id_usuario inscrito en sección $id_seccion con $inscripciones_exitosas materias.");
+        
+        return true;
+        
+    } catch (Exception $e) {
+        // Revertir transacción en caso de error
+        $db->rollback();
+        error_log("❌ Error en inscripción: " . $e->getMessage());
+        return false;
+    }
 }
 
 /**
@@ -16846,6 +16974,50 @@ function aprobarAvanceTrayectoConAprobador($id_usuario, $id_carrera, $trayecto_a
         ];
     }
 }
+
+
+
+
+/**
+ * Verifica si una materia ya está inscrita para el estudiante en el período actual
+ * @param int $id_usuario ID del usuario
+ * @param int $id_materia ID de la materia
+ * @return bool True si ya está inscrita
+ */
+function materiaYaInscrita($id_usuario, $id_materia) {
+    global $db;
+    
+    $periodo_activo = obtenerPeriodoActivo();
+    if (!$periodo_activo) {
+        return false;
+    }
+    
+    $sql = "SELECT COUNT(*) as total 
+            FROM notas_definitivas 
+            WHERE id_usuario = ? 
+            AND id_materia = ? 
+            AND id_periodo = ?";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iii", $id_usuario, $id_materia, $periodo_activo['id_periodo']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    
+    return $row['total'] > 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
