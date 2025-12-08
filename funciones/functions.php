@@ -16847,9 +16847,132 @@ function aprobarAvanceTrayectoConAprobador($id_usuario, $id_carrera, $trayecto_a
 
 
 
+//UBICACION************************************************************************************************
 
 
 
+/**
+ * Obtener todos los estados
+ */
+function obtenerEstados() {
+    global $db;
+    $estados = [];
+    $sql = "SELECT id_estado, estado FROM estados ORDER BY estado";
+    $result = $db->query($sql);
+    if ($result && $result->num_rows > 0) {
+        while($row = $result->fetch_assoc()) {
+            $estados[] = $row;
+        }
+    }
+    return $estados;
+}
+
+/**
+ * Obtener municipios por estado
+ */
+function obtenerMunicipiosPorEstado($id_estado) {
+    global $db;
+    $municipios = [];
+    if (empty($id_estado) || !is_numeric($id_estado)) {
+        return $municipios;
+    }
+    
+    $sql = "SELECT id_municipio, municipio FROM municipios 
+            WHERE id_estado = ? ORDER BY municipio";
+    $stmt = $db->prepare($sql);
+    if (!$stmt) {
+        return $municipios;
+    }
+    
+    $stmt->bind_param("i", $id_estado);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while($row = $result->fetch_assoc()) {
+        $municipios[] = $row;
+    }
+    $stmt->close();
+    return $municipios;
+}
+
+/**
+ * Obtener parroquias por municipio
+ */
+function obtenerParroquiasPorMunicipio($id_municipio) {
+    global $db;
+    $parroquias = [];
+    if (empty($id_municipio) || !is_numeric($id_municipio)) {
+        return $parroquias;
+    }
+    
+    $sql = "SELECT id_parroquia, parroquia FROM parroquias 
+            WHERE id_municipio = ? ORDER BY parroquia";
+    $stmt = $db->prepare($sql);
+    if (!$stmt) {
+        return $parroquias;
+    }
+    
+    $stmt->bind_param("i", $id_municipio);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while($row = $result->fetch_assoc()) {
+        $parroquias[] = $row;
+    }
+    $stmt->close();
+    return $parroquias;
+}
+
+/**
+ * Obtener nombres de ubicación por IDs
+ */
+function obtenerNombresUbicacion($id_estado, $id_municipio, $id_parroquia) {
+    global $db;
+    $ubicacion = [
+        'estado_nombre' => '',
+        'municipio_nombre' => '',
+        'parroquia_nombre' => ''
+    ];
+    
+    // Obtener nombre del estado
+    if ($id_estado && is_numeric($id_estado)) {
+        $sql = "SELECT estado FROM estados WHERE id_estado = ?";
+        $stmt = $db->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("i", $id_estado);
+            $stmt->execute();
+            $stmt->bind_result($ubicacion['estado_nombre']);
+            $stmt->fetch();
+            $stmt->close();
+        }
+    }
+    
+    // Obtener nombre del municipio
+    if ($id_municipio && is_numeric($id_municipio)) {
+        $sql = "SELECT municipio FROM municipios WHERE id_municipio = ?";
+        $stmt = $db->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("i", $id_municipio);
+            $stmt->execute();
+            $stmt->bind_result($ubicacion['municipio_nombre']);
+            $stmt->fetch();
+            $stmt->close();
+        }
+    }
+    
+    // Obtener nombre de la parroquia
+    if ($id_parroquia && is_numeric($id_parroquia)) {
+        $sql = "SELECT parroquia FROM parroquias WHERE id_parroquia = ?";
+        $stmt = $db->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("i", $id_parroquia);
+            $stmt->execute();
+            $stmt->bind_result($ubicacion['parroquia_nombre']);
+            $stmt->fetch();
+            $stmt->close();
+        }
+    }
+    
+    return $ubicacion;
+}
 
 
 
