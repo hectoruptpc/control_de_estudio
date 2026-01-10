@@ -5,151 +5,51 @@ ini_set('display_errors', '1');
 $titulopag = "Gestión de Niveles de Acceso";
 include('../funciones/functions.php');
 
-//CARGAR PERMISOS
-cargarPermisosUsuario();
-verificarPermiso('editar_acceso');
-
-
-if (!isAdmin()) {
-    header('location: ../usuario/home.php');
+// Iniciar sesión si no está iniciada
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
+// CARGAR PERMISOS - hacerlo ANTES de verificar
+cargarPermisosUsuario();
+
+// Verificar permiso para editar acceso
+verificarPermiso('editar_acceso');
+
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
+// Verificar si es admin (esta función debe existir en functions.php)
+if (!isAdmin()) {
+    $_SESSION['error'] = "No tien permisos de administrador para acceder a esta página.";
+    header('location: ../login.php');
+    exit();
+}
 
 // Procesar formulario de permisos
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
-    global $db;
-    
     if (isset($_POST['permisos']) && is_array($_POST['permisos'])) {
+        $actualizaciones_exitosas = 0;
+        $total_usuarios = count($_POST['permisos']);
+        
         foreach ($_POST['permisos'] as $user_id => $permisos) {
-            if (!is_numeric($user_id)) continue;
-            
-            // Campos originales - manejar NULL si no están presentes
-            $usuario = isset($permisos['usuario']) ? 1 : 0;
-            $estudiante = isset($permisos['estudiante']) ? 1 : 0;
-            $docente = isset($permisos['docente']) ? 1 : 0;
-            $admin = isset($permisos['admin']) ? 1 : 0;
-            $super_user = isset($permisos['super_user']) ? 1 : 0;
-            $editar_user = isset($permisos['editar_user']) ? 1 : 0;
-            $editar_nota = isset($permisos['editar_nota']) ? 1 : 0;
-            $editar_acceso = isset($permisos['editar_acceso']) ? 1 : 0;
-            $editar_valores = isset($permisos['editar_valores']) ? 1 : 0;
-            $editar_estudiante = isset($permisos['editar_estudiante']) ? 1 : 0;
-            $agregar_estudiante = isset($permisos['agregar_estudiante']) ? 1 : 0;
-            $agregar_docente = isset($permisos['agregar_docente']) ? 1 : 0;
-            $editar_docente = isset($permisos['editar_docente']) ? 1 : 0;
-            $agregar_carrera = isset($permisos['agregar_carrera']) ? 1 : 0;
-            $agregar_materia = isset($permisos['agregar_materia']) ? 1 : 0;
-            $editar_materia = isset($permisos['editar_materia']) ? 1 : 0;
-            
-            // Nuevos campos - manejar NULL si no están presentes
-            $pagos = isset($permisos['pagos']) ? 1 : 0;
-            $auditoria = isset($permisos['auditoria']) ? 1 : 0;
-            $secciones = isset($permisos['secciones']) ? 1 : 0;
-            $rela_materia_carrera = isset($permisos['rela_materia_carrera']) ? 1 : 0;
-            $periodos_academicos = isset($permisos['periodos_academicos']) ? 1 : 0;
-            $asig_secciones = isset($permisos['asig_secciones']) ? 1 : 0;
-            $asig_cursos = isset($permisos['asig_cursos']) ? 1 : 0;
-            $horarios = isset($permisos['horarios']) ? 1 : 0;
-            $gestion_director_carrera = isset($permisos['gestion_director_carrera']) ? 1 : 0;
-            $notas_cargadas = isset($permisos['notas_cargadas']) ? 1 : 0;
-            $consultar_notas = isset($permisos['consultar_notas']) ? 1 : 0;
-            $consultar_notas_pasadas = isset($permisos['consultar_notas_pasadas']) ? 1 : 0;
-            $tipos_pago = isset($permisos['tipos_pago']) ? 1 : 0;
-            $tipos_horario = isset($permisos['tipos_horario']) ? 1 : 0;
-            $horario_personal = isset($permisos['horario_personal']) ? 1 : 0;
-            $respaldo_bd = isset($permisos['respaldo_bd']) ? 1 : 0;
-            
-            $query = "UPDATE users SET 
-                     usuario = ?,
-                     estudiante = ?, 
-                     docente = ?, 
-                     admin = ?, 
-                     super_user = ?, 
-                     editar_user = ?, 
-                     editar_nota = ?, 
-                     editar_acceso = ?,
-                     editar_valores = ?,
-                     editar_estudiante = ?,
-                     agregar_estudiante = ?,
-                     agregar_docente = ?,
-                     editar_docente = ?,
-                     agregar_carrera = ?,
-                     agregar_materia = ?,
-                     editar_materia = ?,
-                     pagos = ?,
-                     auditoria = ?,
-                     secciones = ?,
-                     rela_materia_carrera = ?,
-                     periodos_academicos = ?,
-                     asig_secciones = ?,
-                     asig_cursos = ?,
-                     horarios = ?,
-                     gestion_director_carrera = ?,
-                     notas_cargadas = ?,
-                     consultar_notas = ?,
-                     consultar_notas_pasadas = ?,
-                     tipos_pago = ?,
-                     tipos_horario = ?,
-                     horario_personal = ?,
-                     respaldo_bd = ?
-                     WHERE id = ?";
-            
-            $stmt = $db->prepare($query);
-            if ($stmt) {
-                // Contamos correctamente: 17 campos originales + 16 nuevos + 1 ID = 34 parámetros
-                $stmt->bind_param("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", 
-                    $usuario,
-                    $estudiante, 
-                    $docente, 
-                    $admin, 
-                    $super_user, 
-                    $editar_user, 
-                    $editar_nota, 
-                    $editar_acceso,
-                    $editar_valores,
-                    $editar_estudiante,
-                    $agregar_estudiante,
-                    $agregar_docente,
-                    $editar_docente,
-                    $agregar_carrera,
-                    $agregar_materia,
-                    $editar_materia,
-                    $pagos,
-                    $auditoria,
-                    $secciones,
-                    $rela_materia_carrera,
-                    $periodos_academicos,
-                    $asig_secciones,
-                    $asig_cursos,
-                    $horarios,
-                    $gestion_director_carrera,
-                    $notas_cargadas,
-                    $consultar_notas,
-                    $consultar_notas_pasadas,
-                    $tipos_pago,
-                    $tipos_horario,
-                    $horario_personal,
-                    $respaldo_bd,
-                    $user_id
-                );
-                
-                if ($stmt->execute()) {
-                    // Éxito
-                } else {
-                    error_log("Error al ejecutar query: " . $stmt->error);
-                }
-                $stmt->close();
-            } else {
-                error_log("Error al preparar query: " . $db->error);
+            if (actualizarPermisosUsuario($user_id, $permisos)) {
+                $actualizaciones_exitosas++;
             }
         }
         
-        $_SESSION['msg'] = "Permisos actualizados correctamente";
+        if ($actualizaciones_exitosas > 0) {
+            $_SESSION['msg'] = "Permisos actualizados correctamente para los usuarios";
+        } else {
+            $_SESSION['msg'] = "Error al actualizar los permisos";
+        }
+        
         header('Location: editar_accesos.php');
         exit();
     }
 }
 
+// El resto del código HTML permanece igual...
 include("includes/head.php");
 ?>
 
@@ -208,7 +108,7 @@ include("includes/head.php");
                         <th>Agregar Carrera</th>
                         <th>Agregar Materia</th>
                         <th>Editar Materia</th>
-                        <!-- Nuevos campos -->
+                        <!-- Campos existentes -->
                         <th>Pagos</th>
                         <th>Auditoría</th>
                         <th>Secciones</th>
@@ -225,20 +125,22 @@ include("includes/head.php");
                         <th>Tipos de Horario</th>
                         <th>Horario Personal</th>
                         <th>Respaldo BD</th>
+                        <!-- NUEVOS CAMPOS AGREGADOS -->
+                        <th>Gestión Carrera</th>
+                        <th>Gestión Periodo Académico</th>
+                        <th>Gestión Asignar Cursos</th>
+                        <th>Gestión Horario</th>
+                        <th>Títulos RE Materia</th>
+                        <!-- NUEVOS CAMPOS GRADO -->
+                        <th>Grado</th>
+                        <th>Gestión Grado</th>
+                        <!-- NUEVO CAMPO VISITA -->
+                        <th>Visita</th>
                     </tr>
                 </thead>
                 <tbody id="tabla-usuarios">
                     <?php
-                    global $db;
-                    $query = "SELECT id, username, 
-                             usuario, estudiante, docente, admin, super_user, editar_user, editar_nota, editar_acceso, 
-                             editar_valores, editar_estudiante, agregar_estudiante, agregar_docente, editar_docente, 
-                             agregar_carrera, agregar_materia, editar_materia,
-                             pagos, auditoria, secciones, rela_materia_carrera, periodos_academicos, asig_secciones, 
-                             asig_cursos, horarios, gestion_director_carrera, notas_cargadas, consultar_notas, 
-                             consultar_notas_pasadas, tipos_pago, tipos_horario, horario_personal, respaldo_bd 
-                             FROM users ORDER BY username";
-                    $result = $db->query($query);
+                    $result = obtenerUsuariosConPermisos();
                     
                     if ($result && $result->num_rows > 0):
                         while ($user = $result->fetch_assoc()):
@@ -254,7 +156,15 @@ include("includes/head.php");
                                            $user['periodos_academicos'] || $user['asig_secciones'] || $user['asig_cursos'] || 
                                            $user['horarios'] || $user['gestion_director_carrera'] || $user['notas_cargadas'] || 
                                            $user['consultar_notas'] || $user['consultar_notas_pasadas'] || $user['tipos_pago'] || 
-                                           $user['tipos_horario'] || $user['horario_personal'] || $user['respaldo_bd'];
+                                           $user['tipos_horario'] || $user['horario_personal'] || $user['respaldo_bd'] ||
+                                           (isset($user['gestionar_carrera']) && $user['gestionar_carrera']) || 
+                                           (isset($user['gestion_periodo_academico']) && $user['gestion_periodo_academico']) || 
+                                           (isset($user['gestion_asig_cursos']) && $user['gestion_asig_cursos']) || 
+                                           (isset($user['gestion_horario']) && $user['gestion_horario']) || 
+                                           (isset($user['titulos_re_materia']) && $user['titulos_re_materia']) ||
+                                           (isset($user['grado']) && $user['grado']) || 
+                                           (isset($user['gestion_grado']) && $user['gestion_grado']) ||
+                                           (isset($user['visita']) && $user['visita']);
                             
                             $clases = 'fila-usuario';
                             $clases .= $esUsuario ? ' usuario' : '';
@@ -314,7 +224,7 @@ include("includes/head.php");
                             <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][editar_materia]" <?= $user['editar_materia'] ? 'checked' : '' ?>>
                         </td>
                         
-                        <!-- Nuevos campos -->
+                        <!-- Campos existentes -->
                         <td class="text-center">
                             <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][pagos]" <?= isset($user['pagos']) && $user['pagos'] ? 'checked' : '' ?>>
                         </td>
@@ -363,13 +273,43 @@ include("includes/head.php");
                         <td class="text-center">
                             <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][respaldo_bd]" <?= isset($user['respaldo_bd']) && $user['respaldo_bd'] ? 'checked' : '' ?>>
                         </td>
+                        
+                        <!-- NUEVOS CAMPOS AGREGADOS -->
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][gestionar_carrera]" <?= isset($user['gestionar_carrera']) && $user['gestionar_carrera'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][gestion_periodo_academico]" <?= isset($user['gestion_periodo_academico']) && $user['gestion_periodo_academico'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][gestion_asig_cursos]" <?= isset($user['gestion_asig_cursos']) && $user['gestion_asig_cursos'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][gestion_horario]" <?= isset($user['gestion_horario']) && $user['gestion_horario'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][titulos_re_materia]" <?= isset($user['titulos_re_materia']) && $user['titulos_re_materia'] ? 'checked' : '' ?>>
+                        </td>
+                        
+                        <!-- NUEVOS CAMPOS GRADO -->
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][grado]" <?= isset($user['grado']) && $user['grado'] ? 'checked' : '' ?>>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][gestion_grado]" <?= isset($user['gestion_grado']) && $user['gestion_grado'] ? 'checked' : '' ?>>
+                        </td>
+                        
+                        <!-- NUEVO CAMPO VISITA -->
+                        <td class="text-center">
+                            <input type="checkbox" name="permisos[<?= (int)$user['id'] ?>][visita]" <?= isset($user['visita']) && $user['visita'] ? 'checked' : '' ?>>
+                        </td>
                     </tr>
                     <?php
                         endwhile;
                     else:
                     ?>
                     <tr>
-                        <td colspan="34" class="text-center">No hay usuarios registrados</td>
+                        <td colspan="42" class="text-center">No hay usuarios registrados</td>
                     </tr>
                     <?php endif; ?>
                 </tbody>

@@ -12,6 +12,9 @@ if (!isLoggedIn() || !isDocente()) {
     exit();
 }
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Obtener el horario del docente
 $docente_id = (int)$_SESSION['user']['id'];
 $horarios_docente = obtenerHorariosDocente($db, $docente_id);

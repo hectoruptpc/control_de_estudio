@@ -1,0 +1,10 @@
+[2025-08-11 16:32:11] Inicio de actualización de carrera
+[2025-08-11 16:32:11] Datos recibidos: {"id_carrera":"1","nombre_carrera":"Informatica","cod_carrera":"123","tipo_formacion":"PNF","duracion_anios":"4","titulo_principal":"TSU Informatica","otro_titulo":"Ing. Informatica","activa":"1","descripcion":""}
+[2025-08-11 16:32:11] Datos validados. ID: 1, Nombre: Informatica, Código: 123
+[2025-08-11 16:32:11] Error al ejecutar actualizarCarrera()
+[2025-08-11 16:32:11] Error: No se pudo completar la actualización. Por favor, verifique que los datos sean correctos y no esté duplicando un código existente.
+[2025-08-11 16:32:19] Inicio de actualización de carrera
+[2025-08-11 16:32:19] Datos recibidos: {"id_carrera":"1","nombre_carrera":"Informatica","cod_carrera":"123","tipo_formacion":"PNF","duracion_anios":"4","titulo_principal":"TSU Informatica","otro_titulo":"Ing. Informatica","activa":"1","descripcion":"mcdw\u00f1nc"}
+[2025-08-11 16:32:19] Datos validados. ID: 1, Nombre: Informatica, Código: 123
+[2025-08-11 16:32:19] Error al ejecutar actualizarCarrera()
+[2025-08-11 16:32:19] Error: No se pudo completar la actualización. Por favor, verifique que los datos sean correctos y no esté duplicando un código existente.

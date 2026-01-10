@@ -11,6 +11,9 @@ if (!isLoggedIn() || !isEstudiante()) {
     header('location: ../login.php');
     exit();
 }
+
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
 ?>
 
 <!DOCTYPE html>

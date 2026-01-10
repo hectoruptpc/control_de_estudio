@@ -5,6 +5,9 @@ ini_set('display_errors', '1');
 $titulopag = "Agregar Nueva Carrera";
 require_once '../funciones/functions.php';
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Procesar el formulario
 $mensaje = '';
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {

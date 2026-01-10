@@ -12,6 +12,9 @@ if (!isLoggedIn() || !isEstudiante()) {
     exit();
 }
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // 2. Obtener información del estudiante y su carrera
 $user_id = (int)$_SESSION['user']['id'];
 $query_estudiante = "SELECT carrera FROM users WHERE id = ? LIMIT 1";

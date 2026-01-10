@@ -10,6 +10,9 @@ include("includes/head.php");
 $permiso_agregar = isset($_SESSION['user']['agregar_docente']) && $_SESSION['user']['agregar_docente'] == 1;
 $permiso_editar = isset($_SESSION['user']['editar_docente']) && $_SESSION['user']['editar_docente'] == 1;
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Procesar el formulario cuando se envía
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Validar que el usuario tenga permiso para agregar
@@ -57,15 +60,15 @@ if ($stmt = $db->prepare($query)) {
              <?php if (tienePermiso('agregar_docente')): ?>
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
-                    <h5 class="mb-0"><i class="fas fa-chalkboard-teacher me-2"></i>Agregar Nuevo Docente</h5>
+                    <h5 class="mb-0"><i class="fas fa-chalkboard-teacher mr-2"></i>Agregar Nuevo Docente</h5>
                 </div>
                 <div class="card-body">
                     <form id="formDocente" method="post" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
                         <!-- Sección 1: Identificación -->
-                        <h5 class="mb-3"><i class="fas fa-id-card me-2"></i> Identificación</h5>
-                        <div class="row g-3 mb-4">
+                        <h5 class="mb-3"><i class="fas fa-id-card mr-2"></i> Identificación</h5>
+                        <div class="row mb-4">
                             <div class="col-12 col-md-6 col-lg-4">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="nombre" class="form-label required">Nombre Completo</label>
                                     <input type="text" class="form-control" id="nombre" name="nombre" 
                                            value="<?= htmlspecialchars($_POST['nombre'] ?? '') ?>" required>
@@ -73,9 +76,9 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                            <div class="col-12 col-md-6 col-lg-4">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="tipo_documento" class="form-label required">Tipo de Documento</label>
-                                    <select class="form-select" id="tipo_documento" name="tipo_documento" required>
+                                    <select class="form-control" id="tipo_documento" name="tipo_documento" required>
                                         <option value="">Seleccione...</option>
                                         <?php
                                         $query = "SELECT id, tipo FROM tipo_cedula ORDER BY tipo";
@@ -97,7 +100,7 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                             <div class="col-12 col-md-6 col-lg-4">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="documento" class="form-label required">Número de Documento</label>
                                     <input type="text" class="form-control" id="documento" name="documento" 
                                            value="<?= htmlspecialchars($_POST['documento'] ?? '') ?>" required>
@@ -106,10 +109,10 @@ if ($stmt = $db->prepare($query)) {
                         </div>
 
                         <!-- Sección 2: Datos Personales -->
-                        <h5 class="mb-3"><i class="fas fa-user-tag me-2"></i> Datos Personales</h5>
-                        <div class="row g-3 mb-4">
+                        <h5 class="mb-3"><i class="fas fa-user-tag mr-2"></i> Datos Personales</h5>
+                        <div class="row mb-4">
                             <div class="col-12 col-md-6 col-lg-3">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="fecha_nacimiento" class="form-label required">Fecha de Nacimiento</label>
                                     <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento" 
                                            value="<?= htmlspecialchars($_POST['fecha_nacimiento'] ?? '') ?>" required>
@@ -117,10 +120,10 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                             <div class="col-12 col-md-6 col-lg-3">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label class="form-label required">Género</label>
-                                    <div class="d-flex flex-wrap gap-3">
-                                        <div class="form-check">
+                                    <div class="d-flex flex-wrap">
+                                        <div class="form-check mr-3">
                                             <input class="form-check-input" type="radio" name="genero" id="genero_m" 
                                                    value="Masculino" <?= ($_POST['genero'] ?? '') == 'Masculino' ? 'checked' : '' ?> required>
                                             <label class="form-check-label" for="genero_m">Masculino</label>
@@ -135,9 +138,9 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                             <div class="col-12 col-md-6 col-lg-3">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="estado_civil" class="form-label required">Estado Civil</label>
-                                    <select class="form-select" id="estado_civil" name="estado_civil" required>
+                                    <select class="form-control" id="estado_civil" name="estado_civil" required>
                                         <option value="">Seleccione...</option>
                                         <?php
                                         // Consulta para obtener los estados civiles desde la base de datos
@@ -162,7 +165,7 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                             <div class="col-12 col-md-6 col-lg-3">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="etnia" class="form-label">Etnia</label>
                                     <input type="text" class="form-control" id="etnia" name="etnia" 
                                            value="<?= htmlspecialchars($_POST['etnia'] ?? '') ?>">
@@ -171,30 +174,34 @@ if ($stmt = $db->prepare($query)) {
                         </div>
 
                         <!-- Sección 3: Datos Profesionales -->
-                        <h5 class="mb-3"><i class="fas fa-briefcase me-2"></i> Datos Profesionales</h5>
-                        <div class="row g-3 mb-4">
+                        <h5 class="mb-3"><i class="fas fa-briefcase mr-2"></i> Datos Profesionales</h5>
+                        <div class="row mb-4">
                             <!-- Potencialidades -->
                             <div class="col-12 col-lg-6">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="especialidad" class="form-label required">Especialidad / Potencialidades</label>
                                     <div class="input-group">
                                         <input type="text" class="form-control" id="especialidad" name="potencialidades[]" 
                                                value="<?= htmlspecialchars($_POST['potencialidades'][0] ?? '') ?>" required>
-                                        <button type="button" class="btn btn-outline-primary" id="addPotencialidad">
-                                            <i class="fas fa-plus"></i>
-                                        </button>
+                                        <div class="input-group-append">
+                                            <button type="button" class="btn btn-outline-primary" id="addPotencialidad">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div id="potencialidadesContainer">
                                     <?php if(!empty($_POST['potencialidades']) && count($_POST['potencialidades']) > 1): ?>
                                         <?php for($i = 1; $i < count($_POST['potencialidades']); $i++): ?>
-                                            <div class="mb-3">
+                                            <div class="form-group">
                                                 <div class="input-group">
                                                     <input type="text" class="form-control" name="potencialidades[]" 
                                                            value="<?= htmlspecialchars($_POST['potencialidades'][$i] ?? '') ?>">
-                                                    <button type="button" class="btn btn-outline-danger remove-field">
-                                                        <i class="fas fa-minus"></i>
-                                                    </button>
+                                                    <div class="input-group-append">
+                                                        <button type="button" class="btn btn-outline-danger remove-field">
+                                                            <i class="fas fa-minus"></i>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         <?php endfor; ?>
@@ -204,11 +211,11 @@ if ($stmt = $db->prepare($query)) {
                             
                            <!-- Títulos Obtenidos e Instituciones -->
 <div class="col-12">
-    <div class="mb-3">
+    <div class="form-group">
         <label class="form-label">Títulos Obtenidos e Instituciones</label>
-        <div class="row g-2 mb-3">
+        <div class="row mb-3">
             <div class="col-12 col-md-5">
-                <select class="form-select" id="titulos" name="titulos_main">
+                <select class="form-control" id="titulos" name="titulos_main">
                     <option value="">Seleccione un título...</option>
                     <?php foreach ($titulos_db as $titulo): ?>
                         <option value="<?= htmlspecialchars($titulo['nombre']) ?>" <?= isset($_POST['titulos_main']) && $_POST['titulos_main'] == $titulo['nombre'] ? 'selected' : '' ?>>
@@ -223,14 +230,14 @@ if ($stmt = $db->prepare($query)) {
             </div>
             <div class="col-12 col-md-2">
                 <button type="button" class="btn btn-outline-primary w-100" id="addTituloInstituto">
-                    <i class="fas fa-plus me-1"></i> Agregar
+                    <i class="fas fa-plus mr-1"></i> Agregar
                 </button>
             </div>
         </div>
         <div id="titulosInstitutosContainer">
             <?php if(!empty($_POST['titulos_institutos'])): ?>
                 <?php foreach($_POST['titulos_institutos'] as $index => $pair): ?>
-                    <div class="row g-2 mb-2">
+                    <div class="row mb-2">
                         <div class="col-12 col-md-5">
                             <input type="text" class="form-control" name="titulos[]" 
                                    value="<?= htmlspecialchars($pair['titulo']) ?>">
@@ -252,7 +259,7 @@ if ($stmt = $db->prepare($query)) {
 </div>
                             
                             <div class="col-12 col-md-6">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="fecha_contratacion" class="form-label required">Fecha de Contratación</label>
                                     <input type="date" class="form-control" id="fecha_contratacion" name="fecha_contratacion" 
                                            value="<?= htmlspecialchars($_POST['fecha_contratacion'] ?? '') ?>" required>
@@ -260,9 +267,9 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                             <div class="col-12 col-md-6">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="estado_laboral" class="form-label required">Estado Laboral</label>
-                                    <select class="form-select" id="estado_laboral" name="estado_laboral" required>
+                                    <select class="form-control" id="estado_laboral" name="estado_laboral" required>
                                         <option value="Activo" <?= ($_POST['estado_laboral'] ?? '') == 'Activo' ? 'selected' : '' ?>>Activo</option>
                                         <option value="Inactivo" <?= ($_POST['estado_laboral'] ?? '') == 'Inactivo' ? 'selected' : '' ?>>Inactivo</option>
                                     </select>
@@ -271,10 +278,10 @@ if ($stmt = $db->prepare($query)) {
                         </div>
 
                         <!-- Sección 4: Ubicación y Vivienda -->
-                        <h5 class="mb-3"><i class="fas fa-home me-2"></i> Vivienda</h5>
-                        <div class="row g-3 mb-4">
+                        <h5 class="mb-3"><i class="fas fa-home mr-2"></i> Vivienda</h5>
+                        <div class="row mb-4">
                             <div class="col-12 col-md-6 col-lg-4">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="estado_residencia" class="form-label required">Estado</label>
                                     <input type="text" class="form-control" id="estado_residencia" name="estado_residencia" 
                                            value="<?= htmlspecialchars($_POST['estado_residencia'] ?? '') ?>" required>
@@ -282,7 +289,7 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                             <div class="col-12 col-md-6 col-lg-4">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="municipio" class="form-label required">Municipio</label>
                                     <input type="text" class="form-control" id="municipio" name="municipio" 
                                            value="<?= htmlspecialchars($_POST['municipio'] ?? '') ?>" required>
@@ -290,7 +297,7 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                             <div class="col-12 col-md-6 col-lg-4">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="parroquia" class="form-label">Parroquia</label>
                                     <input type="text" class="form-control" id="parroquia" name="parroquia" 
                                            value="<?= htmlspecialchars($_POST['parroquia'] ?? '') ?>">
@@ -298,7 +305,7 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                             <div class="col-12 col-lg-6">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="direccion" class="form-label required">Dirección</label>
                                     <textarea class="form-control" id="direccion" name="direccion" rows="2" required><?= 
                                         htmlspecialchars($_POST['direccion'] ?? '') ?></textarea>
@@ -306,7 +313,7 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                             <div class="col-12 col-lg-6">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="punto_referencia" class="form-label">Punto de Referencia</label>
                                     <input type="text" class="form-control" id="punto_referencia" name="punto_referencia" 
                                            value="<?= htmlspecialchars($_POST['punto_referencia'] ?? '') ?>">
@@ -314,9 +321,9 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                             <div class="col-12 col-md-6 col-lg-4">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="tipo_vivienda" class="form-label">Tipo de Vivienda</label>
-                                    <select class="form-select" id="tipo_vivienda" name="tipo_vivienda">
+                                    <select class="form-control" id="tipo_vivienda" name="tipo_vivienda">
                                         <option value="">Seleccione...</option>
                                         <?php
                                         $query = "SELECT id, vivienda FROM tipo_vivienda ORDER BY vivienda";
@@ -338,9 +345,9 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                             <div class="col-12 col-md-6 col-lg-4">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="tenencia_vivienda" class="form-label">Tenencia de Vivienda</label>
-                                    <select class="form-select" id="tenencia_vivienda" name="tenencia_vivienda">
+                                    <select class="form-control" id="tenencia_vivienda" name="tenencia_vivienda">
                                         <option value="">Seleccione...</option>
                                         <?php
                                         try {
@@ -370,10 +377,10 @@ if ($stmt = $db->prepare($query)) {
                         </div>
 
                         <!-- Sección 5: Situación Familiar -->
-                        <h5 class="mb-3"><i class="fas fa-users me-2"></i> Situación Familiar</h5>
-                        <div class="row g-3 mb-4">
+                        <h5 class="mb-3"><i class="fas fa-users mr-2"></i> Situación Familiar</h5>
+                        <div class="row mb-4">
                             <div class="col-12 col-md-6 col-lg-4">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="grupo_familiar" class="form-label">Grupo Familiar</label>
                                     <input type="number" class="form-control" id="grupo_familiar" name="grupo_familiar" 
                                            value="<?= htmlspecialchars($_POST['grupo_familiar'] ?? '') ?>" min="1" placeholder="Número de personas">
@@ -381,7 +388,7 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                             <div class="col-12 col-md-6 col-lg-4">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="personas_a_cargo" class="form-label">Personas a su cargo</label>
                                     <input type="number" class="form-control" id="personas_a_cargo" name="personas_a_cargo" 
                                            value="<?= htmlspecialchars($_POST['personas_a_cargo'] ?? '') ?>" min="0">
@@ -389,9 +396,9 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                             <div class="col-12 col-md-6 col-lg-4">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="fuente_ingresos" class="form-label">Fuente de Ingresos</label>
-                                    <select class="form-select" id="fuente_ingresos" name="fuente_ingresos">
+                                    <select class="form-control" id="fuente_ingresos" name="fuente_ingresos">
                                         <option value="">Seleccione una opción</option>
                                         <?php 
                                         $ingresos = obtenerIngresos($db);
@@ -404,10 +411,10 @@ if ($stmt = $db->prepare($query)) {
                         </div>
 
                         <!-- Sección 6: Salud -->
-                        <h5 class="mb-3"><i class="fas fa-heartbeat me-2"></i> Salud</h5>
-                        <div class="row g-3 mb-4">
+                        <h5 class="mb-3"><i class="fas fa-heartbeat mr-2"></i> Salud</h5>
+                        <div class="row mb-4">
                             <div class="col-12 col-md-6">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="enfermedades" class="form-label">Enfermedades</label>
                                     <input type="text" class="form-control" id="enfermedades" name="enfermedades" 
                                            value="<?= htmlspecialchars($_POST['enfermedades'] ?? '') ?>" placeholder="Enfermedades conocidas">
@@ -415,7 +422,7 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                             <div class="col-12 col-md-6">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="discapacidad" class="form-label">Discapacidad</label>
                                     <input type="text" class="form-control" id="discapacidad" name="discapacidad" 
                                            value="<?= htmlspecialchars($_POST['discapacidad'] ?? '') ?>" placeholder="Tipo de discapacidad si aplica">
@@ -424,16 +431,16 @@ if ($stmt = $db->prepare($query)) {
                         </div>
 
                         <!-- Sección 7: Contacto -->
-                        <h5 class="mb-3"><i class="fas fa-address-book me-2"></i> Contacto</h5>
-                        <div class="row g-3 mb-4">
+                        <h5 class="mb-3"><i class="fas fa-address-book mr-2"></i> Contacto</h5>
+                        <div class="row mb-4">
                             <div class="col-12 col-md-6">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="telefono" class="form-label required">Teléfono Principal</label>
                                     <input type="tel" class="form-control" id="telefono" name="telefono" 
                                            value="<?= htmlspecialchars($_POST['telefono'] ?? '') ?>" required>
                                 </div>
                                 
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="celular" class="form-label">Teléfono Celular</label>
                                     <input type="tel" class="form-control" id="celular" name="celular" 
                                            value="<?= htmlspecialchars($_POST['celular'] ?? '') ?>">
@@ -441,13 +448,13 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                             
                             <div class="col-12 col-md-6">
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="email" class="form-label required">Correo Electrónico</label>
                                     <input type="email" class="form-control" id="email" name="email" 
                                            value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required>
                                 </div>
                                 
-                                <div class="mb-3">
+                                <div class="form-group">
                                     <label for="telefono_opcional" class="form-label">Teléfono Opcional</label>
                                     <input type="tel" class="form-control" id="telefono_opcional" name="telefono_opcional" 
                                            value="<?= htmlspecialchars($_POST['telefono_opcional'] ?? '') ?>">
@@ -455,17 +462,17 @@ if ($stmt = $db->prepare($query)) {
                             </div>
                         </div>
 
-                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mt-4 gap-3">
-                            <button type="button" onclick="history.back()" class="btn btn-outline-secondary order-2 order-md-1 w-100 w-md-auto">
-                                <i class="fas fa-arrow-left me-1"></i> Regresar
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mt-4">
+                            <button type="button" onclick="history.back()" class="btn btn-outline-secondary order-2 order-md-1 w-100 w-md-auto mb-2 mb-md-0">
+                                <i class="fas fa-arrow-left mr-1"></i> Regresar
                             </button>
                             
-                            <div class="d-flex flex-column flex-md-row gap-2 order-1 order-md-2 w-100 w-md-auto">
-                                <button type="reset" class="btn btn-secondary">
-                                    <i class="fas fa-eraser me-1"></i> Limpiar
+                            <div class="d-flex flex-column flex-md-row order-1 order-md-2 w-100 w-md-auto">
+                                <button type="reset" class="btn btn-secondary mb-2 mb-md-0 mr-md-2">
+                                    <i class="fas fa-eraser mr-1"></i> Limpiar
                                 </button>
                                 <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save me-1"></i> Guardar Docente
+                                    <i class="fas fa-save mr-1"></i> Guardar Docente
                                 </button>
                             </div>
                         </div>
@@ -482,7 +489,7 @@ if ($stmt = $db->prepare($query)) {
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-striped table-hover mb-0" id="tablaDocentes">
-                            <thead class="table-dark">
+                            <thead class="thead-dark">
                                 <tr>
                                     <th width="70">ID</th>
                                     <th>Documento</th>
@@ -498,13 +505,13 @@ if ($stmt = $db->prepare($query)) {
                             <tbody>
                                 <?php foreach ($docentes as $docente): ?>
                                 <tr>
-                                    <td class="fw-bold"><?= $docente['id'] ?></td>
+                                    <td class="font-weight-bold"><?= $docente['id'] ?></td>
                                     <td><?= $docente['idusuario'] ?></td>
                                     <td><?= $docente['nombre'] ?></td>
                                     <td><?= $docente['email'] ?></td>
                                     <td><?= $docente['tlf'] ?></td>
                                     <td>
-                                        <span class="badge <?= ($docente['status'] == 1) ? 'bg-success' : 'bg-warning' ?>">
+                                        <span class="badge <?= ($docente['status'] == 1) ? 'badge-success' : 'badge-warning' ?>">
                                             <?= ($docente['status'] == 1) ? 'Activo' : 'Inactivo' ?>
                                         </span>
                                     </td>
@@ -513,15 +520,15 @@ if ($stmt = $db->prepare($query)) {
                                         <div class="btn-group btn-group-sm">
                                             <button class="btn btn-outline-primary btn-editar" 
                                                     data-id="<?= $docente['id'] ?>" 
-                                                    data-bs-toggle="modal" 
-                                                    data-bs-target="#modalEditar">
+                                                    data-toggle="modal" 
+                                                    data-target="#modalEditar">
                                                 <i class="fas fa-edit"></i>
                                             </button>
                                             <button class="btn btn-outline-<?= ($docente['status'] == 1) ? 'warning' : 'success' ?> btn-estado" 
                                                     data-id="<?= $docente['id'] ?>" 
                                                     data-status="<?= $docente['status'] ?>"
-                                                    data-bs-toggle="modal" 
-                                                    data-bs-target="#modalEstado">
+                                                    data-toggle="modal" 
+                                                    data-target="#modalEstado">
                                                 <i class="fas <?= ($docente['status'] == 1) ? 'fa-ban' : 'fa-check' ?>"></i>
                                             </button>
                                         </div>
@@ -545,13 +552,15 @@ if ($stmt = $db->prepare($query)) {
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="modalEditarLabel">Editar Docente</h5>
-               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+               <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                   <span aria-hidden="true">&times;</span>
+               </button>
             </div>
             <div class="modal-body" id="contenidoModalEditar">
                 <!-- El contenido se cargará aquí via AJAX -->
                 <div class="text-center py-5">
                     <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Cargando...</span>
+                        <span class="sr-only">Cargando...</span>
                     </div>
                     <p>Cargando información del docente...</p>
                 </div>
@@ -566,7 +575,9 @@ if ($stmt = $db->prepare($query)) {
         <div class="modal-content">
             <div class="modal-header bg-warning text-white">
                 <h5 class="modal-title" id="modalEstadoLabel">Cambiar Estado del Docente</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <div class="modal-body">
                 <p id="textoConfirmacion">¿Está seguro que desea cambiar el estado de este docente?</p>
@@ -574,7 +585,7 @@ if ($stmt = $db->prepare($query)) {
                 <input type="hidden" id="nuevoEstado">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-warning" id="confirmarCambioEstado">Confirmar</button>
             </div>
         </div>
@@ -640,14 +651,10 @@ if ($stmt = $db->prepare($query)) {
     .d-flex.flex-md-row {
         flex-direction: column !important;
     }
-    
-    .gap-3 {
-        gap: 1rem !important;
-    }
 }
 
 /* Mejoras generales */
-.form-select, .form-control {
+.form-control, .form-select {
     border-radius: 0.375rem;
 }
 
@@ -663,6 +670,11 @@ if ($stmt = $db->prepare($query)) {
 .btn-group-sm > .btn {
     padding: 0.25rem 0.5rem;
     font-size: 0.875rem;
+}
+
+.required:after {
+    content: " *";
+    color: red;
 }
 </style>
 
@@ -682,7 +694,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById('titulosInstitutosContainer');
         
         const newRow = document.createElement('div');
-        newRow.className = 'row g-2 mb-2';
+        newRow.className = 'row mb-2';
         newRow.innerHTML = `
             <div class="col-12 col-md-5">
                 <input type="text" class="form-control" name="titulos[]" value="${titulo.replace(/"/g, '&quot;')}">
@@ -721,14 +733,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if(value === '') return;
         
         const newField = document.createElement('div');
-        newField.className = 'mb-3';
+        newField.className = 'form-group';
         newField.innerHTML = `
             <div class="input-group">
                 <input type="text" class="form-control" name="${namePrefix}[]" 
                        value="${value}" placeholder="${placeholder}">
-                <button type="button" class="btn btn-outline-danger remove-field">
-                    <i class="fas fa-minus"></i>
-                </button>
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-danger remove-field">
+                        <i class="fas fa-minus"></i>
+                    </button>
+                </div>
             </div>
         `;
         container.appendChild(newField);
@@ -810,7 +824,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const container = $('#titulosInstitutosContainerEdit');
             
             const newRow = $(`
-                <div class="row g-2 mb-2">
+                <div class="row mb-2">
                     <div class="col-12 col-md-5">
                         <input type="text" class="form-control" name="titulos[]" value="${titulo.replace(/"/g, '&quot;')}">
                     </div>
@@ -833,29 +847,57 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Eliminar campos en el modal
         $(document).on('click', '.remove-field', function() {
-            $(this).closest('.row, .mb-3').remove();
+            $(this).closest('.row, .form-group').remove();
         });
     }
     
-    // Guardar cambios en el modal de edición
-    $('#guardarCambios').click(function() {
-        var formData = $('#formEditarDocente').serialize();
-        
+    // Guardar cambios en el modal de edición: bind al submit del formulario cargado por AJAX
+    // usamos delegación para que funcione aunque el formulario se inserte dinámicamente
+    $(document).on('submit', '#formEditarDocente', function(e) {
+        e.preventDefault();
+
+        // Mostrar loader (si SweetAlert2 está disponible)
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: 'Procesando',
+                html: 'Actualizando datos del docente...',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+        }
+
+        var formArray = $(this).serializeArray();
+        var jsonData = {};
+        $.each(formArray, function(i, field) { jsonData[field.name] = field.value; });
+
+        // Normalizar campos opcionales (evita enviar cadenas vacías si se desea)
+        if (!jsonData.fecha_nac) jsonData.fecha_nac = null;
+        if (!jsonData.fecha_ingreso) jsonData.fecha_ingreso = null;
+
         $.ajax({
             url: 'actualizar_docente.php',
             type: 'POST',
-            data: formData,
+            contentType: 'application/json',
+            data: JSON.stringify(jsonData),
+            dataType: 'json',
             success: function(response) {
-                var result = JSON.parse(response);
-                if(result.success) {
+                if (typeof Swal !== 'undefined') Swal.close();
+                if (response.success) {
                     $('#modalEditar').modal('hide');
-                    location.reload();
+                    if (typeof refreshDocentesTable === 'function') {
+                        refreshDocentesTable();
+                    } else {
+                        location.reload();
+                    }
                 } else {
-                    alert('Error: ' + result.message);
+                    alert('Error: ' + (response.message || 'No se pudo guardar'));
                 }
             },
-            error: function() {
-                alert('Error al enviar los datos.');
+            error: function(xhr, status, error) {
+                if (typeof Swal !== 'undefined') Swal.close();
+                var msg = 'Error al enviar los datos.';
+                try { var r = xhr.responseJSON || JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
+                alert(msg);
             }
         });
     });

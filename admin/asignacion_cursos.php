@@ -5,6 +5,13 @@ ini_set('display_errors', '1');
 $titulopag = "Asignación de Materias a Docentes";
 include('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('asig_cursos');
+
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Obtener todas las carreras activas usando la función
 $carreras = obtenerTodasLasCarreras();
 
@@ -333,6 +340,8 @@ include("includes/head.php");
                                         <td><?php echo htmlspecialchars($asignacion['nombre_carrera'] ?? 'N/A'); ?></td>
                                         <td><?php echo date('d/m/Y', strtotime($asignacion['fecha_asignacion'])); ?></td>
                                         <td class="action-buttons">
+
+                                        <?php if (tienePermiso('gestion_asig_cursos')): ?>
                                             <button class="btn btn-sm btn-primary editar-asignacion" 
                                                     data-toggle="modal" 
                                                     data-target="#modalEditar"
@@ -342,13 +351,16 @@ include("includes/head.php");
                                                     data-id-materia="<?php echo $asignacion['id_materia']; ?>">
                                                 <i class="fas fa-edit"></i> Cambiar
                                             </button>
+                                            <?php endif; ?>
                                             
+                                            <?php if (tienePermiso('gestion_asig_cursos')): ?>
                                             <button class="btn btn-sm btn-danger eliminar-asignacion" 
                                                     data-toggle="modal" 
                                                     data-target="#confirmDeleteModal"
                                                     data-id="<?php echo $asignacion['id']; ?>">
                                                 <i class="fas fa-trash"></i> Eliminar
                                             </button>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                     <?php endwhile; ?>
@@ -413,6 +425,7 @@ include("includes/head.php");
                 </div>
             </div>
 
+            <?php if (tienePermiso('gestion_asig_cursos')): ?>
             <!-- Sección para Asignar Nueva Materia -->
             <div class="card mb-4">
                 <div class="card-header bg-success text-white">
@@ -497,6 +510,9 @@ include("includes/head.php");
                         <!-- Aquí se cargarán las recomendaciones via AJAX -->
                     </div>
                 </div>
+
+            <?php endif; ?>
+
             </div>
         </div>
     </div>

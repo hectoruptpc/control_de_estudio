@@ -8,6 +8,9 @@ if (!isLoggedIn() || !isEstudiante()) {
     exit();
 }
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 $titulopag = "Sistema de Mensajería - Estudiante";
 include("includes/head.php");
 

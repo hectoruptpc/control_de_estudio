@@ -5,6 +5,13 @@ ini_set('display_errors', '1');
 $titulopag = "Gestión de Horarios por Personal";
 include('../funciones/functions.php');
 
+//CARGAR PERMISOS
+cargarPermisosUsuario();
+verificarPermiso('horario_personal');
+
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Procesar formulario
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['asignar'])) {

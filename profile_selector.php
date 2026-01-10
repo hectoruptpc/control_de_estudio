@@ -69,6 +69,27 @@ function sanitizeValue($value) {
     }
     return htmlspecialchars((string)$value);
 }
+
+// Procesar cierre de sesión
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['logout'])) {
+    // Destruir todas las variables de sesión
+    $_SESSION = array();
+    
+    // Destruir la sesión
+    if (ini_get("session.use_cookies")) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000,
+            $params["path"], $params["domain"],
+            $params["secure"], $params["httponly"]
+        );
+    }
+    
+    session_destroy();
+    
+    // Redirigir a login.php
+    header('Location: login.php');
+    exit();
+}
 ?>
 
 <!DOCTYPE html>
@@ -103,10 +124,36 @@ function sanitizeValue($value) {
         .card-header h4 {
             margin: 0;
         }
+        .btn-logout {
+            background-color: #dc3545;
+            border-color: #dc3545;
+            color: white;
+        }
+        .btn-logout:hover {
+            background-color: #c82333;
+            border-color: #bd2130;
+        }
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
         @media (max-width: 768px) {
             .btn-back-container {
                 margin-left: 0;
                 text-align: center;
+            }
+            .header-actions {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .logout-form {
+                width: 100%;
+            }
+            .btn-logout {
+                width: 100%;
             }
         }
     </style>
@@ -114,13 +161,25 @@ function sanitizeValue($value) {
 <body>
     <!-- Contenedor fluid para que ocupe todo el ancho disponible -->
     <div class="container-fluid px-4">
-        <!-- Botón de volver atrás dentro del contenedor principal y más cerca del contenido -->
+        <!-- Botones de acción en el header -->
         <div class="row mt-3">
             <div class="col-12">
-                <div class="btn-back-container">
-                    <a href="javascript:history.back()" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Volver Atrás
-                    </a>
+                <div class="header-actions">
+                    <!-- Botón de volver atrás -->
+                    <div class="btn-back-container">
+                        <a href="javascript:history.back()" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Volver Atrás
+                        </a>
+                    </div>
+                    
+                    <!-- Botón de salir del sistema -->
+                    <div class="logout-form">
+                        <form method="POST" action="profile_selector.php">
+                            <button type="submit" name="logout" value="1" class="btn btn-logout">
+                                <i class="fas fa-sign-out-alt"></i> Salir del Sistema
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -211,6 +270,19 @@ function sanitizeValue($value) {
                             </div>
                         </form>
                     </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Botón adicional de salir en la parte inferior para móviles -->
+        <div class="row mt-4 d-md-none">
+            <div class="col-12">
+                <div class="d-grid">
+                    <form method="POST" action="profile_selector.php">
+                        <button type="submit" name="logout" value="1" class="btn btn-logout btn-lg">
+                            <i class="fas fa-sign-out-alt"></i> Salir del Sistema
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>

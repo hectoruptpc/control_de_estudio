@@ -1,11 +1,16 @@
 <?php
 
 error_reporting(E_ALL);
-ini_set('display_errors', '1');
+ini_set('display_errors', '0');
 
 
 $titulo ="Ingreso al Sistema";
-include('funciones/functions.php') ?>
+include('funciones/functions.php');
+
+
+
+?>
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -49,6 +54,9 @@ include('funciones/functions.php') ?>
             <span class="d-inline-block" data-toggle="popover" data-content="...">
                 <a type="link" class="btn btn-outline-danger" href="recuperar_password.php">
                     <i class="fa fa-unlock-alt"></i> Recuperar Contraseña
+                </a>
+                <a type="link" class="btn btn-outline-danger" href="recuperar_password_provicional.php">
+                    <i class="fa fa-unlock-alt"></i> Recuperar Contraseña provicional
                 </a>
             </span>
             <span class="d-inline-block" data-toggle="popover" data-content="...">

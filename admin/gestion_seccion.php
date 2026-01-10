@@ -9,6 +9,9 @@ include('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('secciones');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Obtener parámetros de acción
 $action = $_POST['action'] ?? ($_GET['action'] ?? 'list');
 $seccion_id = $_POST['id'] ?? ($_GET['id'] ?? 0);

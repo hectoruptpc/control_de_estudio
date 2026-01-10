@@ -8,6 +8,9 @@ include('../funciones/functions.php');
 // Verificar permiso de edición de estudiantes
 $puedeEditar = isset($_SESSION['user']['editar_estudiante']) && $_SESSION['user']['editar_estudiante'] == 1;
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Obtener lista de estudiantes
 $estudiantes = obtenerEstudiantes();
 

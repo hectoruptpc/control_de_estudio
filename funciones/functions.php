@@ -81,17 +81,22 @@ if (isset($_GET['logout'])) {
 //desactivar periodos vencidos
 
 // ▼ Añade esto al inicio del archivo (después de la conexión a la BD) ▼
+if (!function_exists('desactivarPeriodosVencidos')) {
 function desactivarPeriodosVencidos($db) {
     $query = "UPDATE periodos_academicos SET activo = 0 
               WHERE fecha_fin < CURDATE() AND activo = 1";
     $stmt = $db->prepare($query);
     $stmt->execute();
-    return $db->affected_rows; // Retorna cuántos periodos desactivó
+    // Intentar devolver filas afectadas desde el statement si está disponible
+    if (isset($stmt) && property_exists($stmt, 'affected_rows')) {
+        return $stmt->affected_rows;
+    }
+    return $db->affected_rows; // Retorna cuántos periodos desactivó (fallback)
+}
 }
 
 // Ejecutar la función cada vez que alguien entre al sistema
 desactivarPeriodosVencidos($db);
-
 
 
 
@@ -255,69 +260,298 @@ function mostrarEstadoEstudiante($status) {
         </span>';
 }
 
-/**
-* Valida y sanitiza los datos de un estudiante
-*/
 function validarDatosEstudiante($data) {
-  $errors = [];
-  $validados = [];
-  
-  // Validación de cédula
-  if (empty($data['idusuario'])) {
-      $errors['idusuario'] = "La cédula es requerida";
-  } else {
-      $validados['idusuario'] = htmlspecialchars(trim($data['idusuario']));
-  }
-  
-  // Validación de nombre
-  if (empty($data['nombre'])) {
-      $errors['nombre'] = "El nombre es requerido";
-  } else {
-      $validados['nombre'] = htmlspecialchars(trim($data['nombre']));
-  }
-  
-  // Validación de correo
-  if (!empty($data['email']) && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-      $errors['email'] = "Correo electrónico no válido";
-  } else {
-      $validados['email'] = !empty($data['email']) ? htmlspecialchars(trim($data['email'])) : null;
-  }
-  
-  // Validación de teléfono
-  if (!empty($data['tlf']) && !preg_match('/^[0-9\-\+]{10,15}$/', $data['tlf'])) {
-      $errors['tlf'] = "Formato de teléfono no válido";
-  } else {
-      $validados['tlf'] = !empty($data['tlf']) ? htmlspecialchars(trim($data['tlf'])) : null;
-  }
-  
-  // Otros campos
-  $validados['carrera'] = !empty($data['carrera']) ? htmlspecialchars(trim($data['carrera'])) : null;
-  $validados['genero'] = !empty($data['genero']) ? htmlspecialchars(trim($data['genero'])) : null;
-  $validados['status'] = !empty($data['status']) ? htmlspecialchars(trim($data['status'])) : 'Activo';
-  $validados['user_type'] = 'estudiante';
-  
-  return [
-      'data' => $validados,
-      'errors' => $errors
-  ];
+    $errors = [];
+    $validados = [];
+    
+    // Validación de cédula
+    if (empty($data['idusuario'])) {
+        $errors['idusuario'] = "La cédula es obligatoria";
+    } else {
+        // Extraer tipo y número si viene en formato V-12345678
+        if (preg_match('/^([VE])-(\d{6,9})$/', $data['idusuario'], $matches)) {
+            $validados['idusuario'] = strtoupper($matches[1]) . '-' . $matches[2];
+        } else {
+            $errors['idusuario'] = "Formato de cédula inválido. Use: V-12345678 o E-12345678";
+        }
+    }
+    
+    // Validación de nombre (permite apóstrofes, NO números)
+    if (empty($data['nombre'])) {
+        $errors['nombre'] = "El nombre completo es obligatorio";
+    } else {
+        $nombre = trim($data['nombre']);
+        if (preg_match("/[0-9]/", $nombre)) {
+            $errors['nombre'] = "El nombre no puede contener números";
+        } elseif (!preg_match("/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s']+$/u", $nombre)) {
+            $errors['nombre'] = "El nombre contiene caracteres no permitidos. Solo letras, espacios y apóstrofes (')";
+        } elseif (strlen($nombre) < 2) {
+            $errors['nombre'] = "El nombre es demasiado corto (mínimo 2 caracteres)";
+        } elseif (strlen($nombre) > 100) {
+            $errors['nombre'] = "El nombre es demasiado largo (máximo 100 caracteres)";
+        } else {
+            $validados['nombre'] = $nombre;
+        }
+    }
+    
+    // Validación de correo
+    if (empty($data['email'])) {
+        $errors['email'] = "El correo electrónico es obligatorio";
+    } elseif (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+        $errors['email'] = "Correo electrónico no válido. Ejemplo: estudiante@universidad.edu";
+    } else {
+        $validados['email'] = trim($data['email']);
+    }
+    
+    // Validación de teléfono
+    if (empty($data['tlf'])) {
+        $errors['tlf'] = "El teléfono es obligatorio";
+    } else {
+        $telefono_limpio = preg_replace('/\D/', '', $data['tlf']);
+        if (!preg_match('/^[0-9]{10,11}$/', $telefono_limpio)) {
+            $errors['tlf'] = "Teléfono inválido. Debe tener 10 u 11 dígitos";
+        } else {
+            $validados['tlf'] = $data['tlf'];
+        }
+    }
+    
+    // Validación de fecha de nacimiento
+    if (empty($data['fecha_nac'])) {
+        $errors['fecha_nac'] = "La fecha de nacimiento es obligatoria";
+    } else {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['fecha_nac'])) {
+            $errors['fecha_nac'] = "Formato de fecha inválido. Use: AAAA-MM-DD";
+        } else {
+            $fechaNac = DateTime::createFromFormat('Y-m-d', $data['fecha_nac']);
+            $hoy = new DateTime();
+            $edadMinima = (new DateTime())->modify('-15 years');
+            
+            if (!$fechaNac) {
+                $errors['fecha_nac'] = "Fecha de nacimiento no válida";
+            } elseif ($fechaNac > $hoy) {
+                $errors['fecha_nac'] = "La fecha de nacimiento no puede ser futura";
+            } elseif ($fechaNac > $edadMinima) {
+                $errors['fecha_nac'] = "El estudiante debe tener al menos 15 años";
+            } else {
+                $validados['fecha_nac'] = $data['fecha_nac'];
+            }
+        }
+    }
+    
+    // Validación de fecha de ingreso
+    if (empty($data['fecha_ingreso'])) {
+        $errors['fecha_ingreso'] = "La fecha de ingreso es obligatoria";
+    } else {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['fecha_ingreso'])) {
+            $errors['fecha_ingreso'] = "Formato de fecha inválido. Use: AAAA-MM-DD";
+        } elseif (!empty($validados['fecha_nac'])) {
+            $fechaIngreso = DateTime::createFromFormat('Y-m-d', $data['fecha_ingreso']);
+            $fechaNac = DateTime::createFromFormat('Y-m-d', $validados['fecha_nac']);
+            
+            if ($fechaIngreso < $fechaNac) {
+                $errors['fecha_ingreso'] = "La fecha de ingreso no puede ser anterior a la fecha de nacimiento";
+            } else {
+                $validados['fecha_ingreso'] = $data['fecha_ingreso'];
+            }
+        } else {
+            $validados['fecha_ingreso'] = $data['fecha_ingreso'];
+        }
+    }
+    
+    // Validar otros campos requeridos
+    $camposRequeridos = [
+        'carrera' => 'Carrera',
+        'genero' => 'Género',
+        'edo_civil' => 'Estado civil',
+        'estado' => 'Estado',
+        'municipio' => 'Municipio',
+        'direccion' => 'Dirección',
+        'status' => 'Estado del estudiante'
+    ];
+    
+    foreach ($camposRequeridos as $campo => $nombre) {
+        if (empty($data[$campo])) {
+            $errors[$campo] = "El campo '$nombre' es requerido";
+        } else {
+            $validados[$campo] = trim($data[$campo]);
+        }
+    }
+    
+    // Validar campos opcionales que permiten apóstrofes
+    $camposConApostrofes = [
+        'etnia' => 'Etnia',
+        'direccion' => 'Dirección',
+        'punto_referencia' => 'Punto de referencia',
+        'enfermedad' => 'Enfermedades',
+        'discapacida' => 'Discapacidad'
+    ];
+    
+    foreach ($camposConApostrofes as $campo => $nombre) {
+        if (!empty($data[$campo])) {
+            if (!preg_match("/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s'\",.;:¡!¿?()\-]+$/u", trim($data[$campo]))) {
+                $errors[$campo] = "El campo '$nombre' contiene caracteres no válidos";
+            } else {
+                $validados[$campo] = trim($data[$campo]);
+            }
+        }
+    }
+    
+    // Validar celular si existe
+    if (!empty($data['cel'])) {
+        $celular_limpio = preg_replace('/\D/', '', $data['cel']);
+        if (!preg_match('/^[0-9]{10,11}$/', $celular_limpio)) {
+            $errors['cel'] = "Celular inválido. Debe tener 10 u 11 dígitos";
+        } else {
+            $validados['cel'] = trim($data['cel']);
+        }
+    }
+    
+    // Validar teléfono opcional si existe
+    if (!empty($data['num_telf_opc'])) {
+        $telefono_opc_limpio = preg_replace('/\D/', '', $data['num_telf_opc']);
+        if (!preg_match('/^[0-9]{10,11}$/', $telefono_opc_limpio)) {
+            $errors['num_telf_opc'] = "Teléfono opcional inválido. Debe tener 10 u 11 dígitos";
+        } else {
+            $validados['num_telf_opc'] = trim($data['num_telf_opc']);
+        }
+    }
+    
+    // Validar campos numéricos
+    if (isset($data['grupo_familiar']) && $data['grupo_familiar'] !== '') {
+        if (!is_numeric($data['grupo_familiar']) || $data['grupo_familiar'] < 0) {
+            $errors['grupo_familiar'] = "El grupo familiar debe ser un número positivo";
+        } else {
+            $validados['grupo_familiar'] = (int)$data['grupo_familiar'];
+        }
+    }
+    
+    if (isset($data['acargo_usted']) && $data['acargo_usted'] !== '') {
+        if (!is_numeric($data['acargo_usted']) || $data['acargo_usted'] < 0) {
+            $errors['acargo_usted'] = "Las personas a cargo deben ser un número positivo";
+        } else {
+            $validados['acargo_usted'] = (int)$data['acargo_usted'];
+        }
+    }
+    
+    // Foto de perfil
+    if (isset($_FILES['foto_perfil']) && $_FILES['foto_perfil']['error'] === UPLOAD_ERR_OK) {
+        if ($_FILES['foto_perfil']['size'] > 5 * 1024 * 1024) {
+            $errors['foto_perfil'] = "La foto no debe superar los 5MB";
+        }
+        
+        $extensionesPermitidas = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+        $extension = strtolower(pathinfo($_FILES['foto_perfil']['name'], PATHINFO_EXTENSION));
+        if (!in_array($extension, $extensionesPermitidas)) {
+            $errors['foto_perfil'] = "Solo se permiten archivos JPG, JPEG, PNG, WEBP y PDF";
+        }
+    }
+    
+    return [
+        'data' => $validados,
+        'errors' => $errors
+    ];
 }
 
+/**
+ * Inserta un estudiante en la base de datos
+ * @param array $datos Datos del estudiante ya validados
+ * @return array Resultado de la operación
+ */
 function insertarEstudiante($datos) {
     global $db;
+    
+    if (!$db) {
+        return [
+            'success' => false,
+            'message' => 'Error de conexión a la base de datos'
+        ];
+    }
+    
+    $nombreFoto = '';
     
     try {
         // Iniciar transacción
         $db->begin_transaction();
 
-        // 1. Preparar datos del usuario
-        $username = strtolower(str_replace(' ', '.', $datos['nombre']));
-        $cedulaLimpia = substr($datos['idusuario'], 2);
-        $password = md5($cedulaLimpia);
-        $fecha_act = date('Y-m-d H:i:s');
-        $api_key = '';
+        // ============================
+        // 1. MANEJAR FOTO DE PERFIL
+        // ============================
+        if (isset($_FILES['foto_perfil']) && $_FILES['foto_perfil']['error'] === UPLOAD_ERR_OK) {
+            $resultadoFoto = subirFotoPerfil($_FILES['foto_perfil']);
+            if (isset($resultadoFoto['success']) && $resultadoFoto['success']) {
+                $nombreFoto = $resultadoFoto['nombre_archivo'];
+            }
+        }
 
-        // 2. Configurar roles y valores por defecto
-        $roles = [
+        // ============================
+        // 2. PREPARAR DATOS BÁSICOS
+        // ============================
+        $usernameBase = strtolower(preg_replace('/[^a-zA-Z0-9]/', '.', $datos['nombre']));
+        $username = preg_replace('/\.+/', '.', $usernameBase);
+        $username = trim($username, '.');
+        
+        if (strlen($username) < 3) {
+            $username = strtolower(str_replace(['-', ' '], '', $datos['idusuario']));
+        }
+        
+        $username = generarUsernameUnico($username);
+        
+        $password = password_hash($datos['idusuario'], PASSWORD_DEFAULT);
+        $fecha_act = date('Y-m-d H:i:s');
+        $api_key = bin2hex(random_bytes(16));
+
+        // ============================
+        // 3. CONFIGURAR VALORES PARA LA TABLA users
+        // ============================
+        $valores = [
+            // Campos principales
+            'idusuario' => $datos['idusuario'],
+            'nombre' => $datos['nombre'],
+            'username' => $username,
+            'email' => !empty($datos['email']) ? $datos['email'] : null,
+            'tlf' => !empty($datos['tlf']) ? $datos['tlf'] : null,
+            'cel' => $datos['cel'] ?? '',
+            'direccion' => $datos['direccion'] ?? null,
+            'ciudad' => $datos['municipio'] ?? '',
+            'estado' => $datos['estado'] ?? null,
+            'municipio' => $datos['municipio'] ?? null,
+            'parroquia' => $datos['parroquia'] ?? null,
+            'etnia' => $datos['etnia'] ?? '',
+            'casaapto' => $datos['casaapto'] ?? 'No especificado',
+            'punto_referencia' => $datos['punto_referencia'] ?? '',
+            'grupo_familiar' => isset($datos['grupo_familiar']) ? (int)$datos['grupo_familiar'] : 0,
+            'acargo_usted' => isset($datos['acargo_usted']) ? (int)$datos['acargo_usted'] : 0,
+            'fuente_ingresos' => $datos['fuente_ingresos'] ?? '',
+            'tipo_vivienda' => $datos['tipo_vivienda'] ?? '',
+            'tenencia_vivienda' => $datos['tenencia_vivienda'] ?? '',
+            'enfermedad' => $datos['enfermedad'] ?? '',
+            'discapacidad' => $datos['discapacida'] ?? '',
+            'titulos' => !empty($datos['titulos']) ? implode('|||', $datos['titulos']) : '',
+            'institutos' => !empty($datos['institutos']) ? implode('|||', $datos['institutos']) : '',
+            'potencialidades' => $datos['potencialidades'] ?? '',
+            
+            // Campos de fechas y estado
+            'fecha_ingreso' => $datos['fecha_ingreso'] ?? null,
+            'fecha_act' => $fecha_act,
+            'status' => $datos['status'] ?? 'Activo',
+            'user_type' => 'estudiante',
+            
+            // Campos de autenticación
+            'password' => $password,
+            'api_key' => $api_key,
+            
+            // Campos académicos
+            'carrera' => $datos['carrera'] ?? null,
+            'carrera_di' => $datos['carrera'] ?? null,
+            'genero' => $datos['genero'] ?? null,
+            'edo_civil' => $datos['edo_civil'] ?? null,
+            'fecha_nac' => $datos['fecha_nac'] ?? null,
+            'num_telf_opc' => $datos['num_telf_opc'] ?? '',
+            
+            // Foto de perfil
+            'foto_perfil' => $nombreFoto,
+            
+            // Campos de permisos/roles (todos a 0 excepto estudiante)
             'usuario' => 0,
             'estudiante' => 1,
             'docente' => 0,
@@ -326,7 +560,6 @@ function insertarEstudiante($datos) {
             'editar_user' => 0,
             'editar_nota' => 0,
             'editar_acceso' => 0,
-            'potencialidades' => '',
             'editar_valores' => 0,
             'editar_estudiante' => 0,
             'agregar_estudiante' => 0,
@@ -334,170 +567,337 @@ function insertarEstudiante($datos) {
             'editar_docente' => 0,
             'agregar_carrera' => 0,
             'agregar_materia' => 0,
-            'editar_materia' => 0
+            'editar_materia' => 0,
+            'pagos' => 0,
+            'auditoria' => 0,
+            'secciones' => 0,
+            'rela_materia_carrera' => 0,
+            'periodos_academicos' => 0,
+            'asig_secciones' => 0,
+            'asig_cursos' => 0,
+            'horarios' => 0,
+            'gestion_director_carrera' => 0,
+            'notas_cargadas' => 0,
+            'consultar_notas' => 0,
+            'consultar_notas_pasadas' => 0,
+            'tipos_pago' => 0,
+            'tipos_horario' => 0,
+            'horario_personal' => 0,
+            'respaldo_bd' => 0,
+            'gestionar_carrera' => 0,
+            'gestion_periodo_academico' => 0,
+            'gestion_asig_cursos' => 0,
+            'gestion_horario' => 0,
+            'titulos_re_materia' => 0,
+            'grado' => 0,
+            'gestion_grado' => 0,
+            'visita' => 0
         ];
 
-        $defaults = [
-            'cel' => '',
-            'ciudad' => $datos['municipio'] ?? '',
-            'num_telf_opc' => '',
-            'etnia' => '',
-            'casaapto' => 'No especificado',
-            'punto_referencia' => '',
-            'grupo_familiar' => 0,
-            'acargo_usted' => 0,
-            'fuente_ingresos' => '',
-            'tipo_vivienda' => '',
-            'tenencia_vivienda' => '',
-            'enfermedad' => '',
-            'discapacidad' => '',
-            'titulos' => '',
-            'institutos' => '',
-            'api_key' => $api_key
-        ];
-
-        // 3. Combinar todos los valores
-        $valores = array_merge(
-            [
-                'idusuario' => $datos['idusuario'],
-                'nombre' => $datos['nombre'],
-                'username' => $username,
-                'email' => $datos['email'] ?? null,
-                'tlf' => $datos['tlf'] ?? null,
-                'direccion' => $datos['direccion'] ?? null,
-                'estado' => $datos['estado'] ?? null,
-                'municipio' => $datos['municipio'] ?? null,
-                'parroquia' => $datos['parroquia'] ?? null,
-                'fecha_ingreso' => $datos['fecha_ingreso'] ?? null,
-                'status' => $datos['status'] ?? 'Activo',
-                'user_type' => 'estudiante',
-                'password' => $password,
-                'carrera' => $datos['carrera'] ?? null,
-                'genero' => $datos['genero'] ?? null,
-                'edo_civil' => $datos['edo_civil'] ?? null,
-                'fecha_nac' => $datos['fecha_nac'] ?? null,
-                'fecha_act' => $fecha_act
-            ],
-            $defaults,
-            $roles
-        );
-
-        // 4. Insertar en la tabla users
-        $columnas = implode(', ', array_keys($valores));
-        $placeholders = implode(', ', array_fill(0, count($valores), '?'));
-        $sql = "INSERT INTO users ($columnas) VALUES ($placeholders)";
-
-        $stmt = $db->prepare($sql);
-        if (!$stmt) {
-            throw new Exception("Error en preparación: " . $db->error);
-        }
-
-        // 5. Vincular parámetros
+        // ============================
+        // 4. PREPARAR CONSULTA SQL PARA users
+        // ============================
+        $columnas = [];
+        $placeholders = [];
         $tipos = '';
         $valoresBind = [];
-        foreach ($valores as $key => $value) {
-            if (in_array($key, ['grupo_familiar', 'acargo_usted', 'usuario', 'estudiante', 'docente', 'admin', 'super_user', 'editar_user', 'editar_nota', 'editar_acceso'])) {
+        
+        foreach ($valores as $columna => $valor) {
+            $columnas[] = $columna;
+            $placeholders[] = '?';
+            
+            // Determinar tipo de dato
+            if (in_array($columna, [
+                'grupo_familiar', 'acargo_usted', 'usuario', 'estudiante', 'docente', 'admin', 
+                'super_user', 'editar_user', 'editar_nota', 'editar_acceso',
+                'editar_valores', 'editar_estudiante', 'agregar_estudiante', 'agregar_docente', 
+                'editar_docente', 'agregar_carrera', 'agregar_materia', 'editar_materia', 'pagos', 
+                'auditoria', 'secciones', 'rela_materia_carrera', 'periodos_academicos', 'asig_secciones', 
+                'asig_cursos', 'horarios', 'gestion_director_carrera', 'notas_cargadas', 
+                'consultar_notas', 'consultar_notas_pasadas', 'tipos_pago', 'tipos_horario', 
+                'horario_personal', 'respaldo_bd', 'gestionar_carrera', 'gestion_periodo_academico', 
+                'gestion_asig_cursos', 'gestion_horario', 'titulos_re_materia', 'grado', 
+                'gestion_grado', 'visita'
+            ])) {
                 $tipos .= 'i'; // Entero
-                $valoresBind[] = (int)$value;
+                $valoresBind[] = (int)$valor;
             } else {
                 $tipos .= 's'; // String
-                $valoresBind[] = $value;
+                $valoresBind[] = $valor;
             }
         }
+        
+        $columnasStr = implode(', ', array_map(function($col) {
+            return "`$col`";
+        }, $columnas));
+        
+        $placeholdersStr = implode(', ', $placeholders);
+        
+        $sql = "INSERT INTO users ($columnasStr) VALUES ($placeholdersStr)";
 
+        // ============================
+        // 5. EJECUTAR INSERCIÓN EN users
+        // ============================
+        $stmt = $db->prepare($sql);
+        if (!$stmt) {
+            throw new Exception("Error al preparar consulta: " . $db->error);
+        }
+        
         $stmt->bind_param($tipos, ...$valoresBind);
         
         if (!$stmt->execute()) {
-            throw new Exception("Error al ejecutar: " . $stmt->error);
+            $error = $stmt->error;
+            $errno = $stmt->errno;
+            
+            if ($errno == 1062) { // Duplicate entry
+                if (strpos($error, 'idusuario') !== false) {
+                    throw new Exception("La cédula {$datos['idusuario']} ya está registrada en el sistema.", 409);
+                } elseif (strpos($error, 'username') !== false) {
+                    throw new Exception("El nombre de usuario ya existe.", 409);
+                } elseif (strpos($error, 'email') !== false) {
+                    throw new Exception("El correo electrónico ya está registrado.", 409);
+                } else {
+                    throw new Exception("Registro duplicado.", 409);
+                }
+            } elseif ($errno == 1452) { // Foreign key constraint
+                throw new Exception("Error: La carrera seleccionada no existe.", 400);
+            } else {
+                throw new Exception("Error al guardar en la base de datos: " . $error, 500);
+            }
         }
         
         $userId = $stmt->insert_id;
         $stmt->close();
 
-        // 6. Insertar títulos obtenidos si existen
-        if (!empty($datos['titulos']) && !empty($datos['institutos'])) {
-            $titulos = is_array($datos['titulos']) ? $datos['titulos'] : [$datos['titulos']];
-            $institutos = is_array($datos['institutos']) ? $datos['institutos'] : [$datos['institutos']];
+        // ============================
+        // 6. INSERTAR TÍTULOS OBTENIDOS (CORRECTO)
+        // ============================
+        if (!empty($datos['titulos']) && is_array($datos['titulos']) && 
+            !empty($datos['institutos']) && is_array($datos['institutos'])) {
+            
+            $titulos = array_filter(array_map('trim', $datos['titulos']));
+            $institutos = array_filter(array_map('trim', $datos['institutos']));
             
             $count = min(count($titulos), count($institutos));
             
-            $sqlTitulos = "INSERT INTO titulos_obtenidos (id_usuario, nombre, titulo_obtenido, instituto) VALUES (?, ?, ?, ?)";
-            $stmtTitulos = $db->prepare($sqlTitulos);
-            
-            if (!$stmtTitulos) {
-                throw new Exception("Error al preparar consulta de títulos: " . $db->error);
-            }
-            
-            for ($i = 0; $i < $count; $i++) {
-                $stmtTitulos->bind_param(
-                    "isss", 
-                    $userId,
-                    $datos['nombre'],
-                    $titulos[$i],
-                    $institutos[$i]
-                );
-                if (!$stmtTitulos->execute()) {
-                    throw new Exception("Error al insertar título: " . $stmtTitulos->error);
+            if ($count > 0) {
+                // CORRECTO: Solo estos 4 campos según tu estructura
+                $sqlTitulos = "INSERT INTO titulos_obtenidos (id_usuario, nombre, titulo_obtenido, instituto) 
+                               VALUES (?, ?, ?, ?)";
+                
+                $stmtTitulos = $db->prepare($sqlTitulos);
+                
+                if ($stmtTitulos) {
+                    for ($i = 0; $i < $count; $i++) {
+                        if (!empty($titulos[$i]) && !empty($institutos[$i])) {
+                            $stmtTitulos->bind_param(
+                                "isss", 
+                                $userId,
+                                $datos['nombre'],
+                                $titulos[$i],
+                                $institutos[$i]
+                            );
+                            
+                            if (!$stmtTitulos->execute()) {
+                                error_log("Error al insertar título $i: " . $stmtTitulos->error);
+                                // Continuar con los demás títulos
+                            }
+                        }
+                    }
+                    
+                    $stmtTitulos->close();
                 }
             }
-            
-            $stmtTitulos->close();
         }
 
-        // 7. REGISTRAR EN AUDITORÍA - NUEVO ESTUDIANTE
-        $valores_nuevos = [
-            'idusuario' => $datos['idusuario'],
-            'nombre' => $datos['nombre'],
-            'email' => $datos['email'] ?? '',
-            'carrera' => $datos['carrera'] ?? '',
-            'status' => $datos['status'] ?? 'Activo'
-        ];
-        
-        registrarAuditoria(
-            "INSERT", 
-            "users", 
-            $userId, 
-            null, 
-            $valores_nuevos, 
-            "Estudiantes", 
-            "Registro de nuevo estudiante"
-        );
+        // ============================
+        // 7. REGISTRAR EN AUDITORÍA
+        // ============================
+        if (function_exists('registrarAuditoria')) {
+            $valores_nuevos = [
+                'idusuario' => $datos['idusuario'],
+                'nombre' => $datos['nombre'],
+                'carrera' => $datos['carrera'] ?? '',
+                'status' => $datos['status'] ?? 'Activo'
+            ];
+            
+            registrarAuditoria(
+                "INSERT", 
+                "users", 
+                $userId, 
+                null, 
+                $valores_nuevos, 
+                "Estudiantes", 
+                "Registro de nuevo estudiante"
+            );
+        }
 
-        // Confirmar transacción
+        // ============================
+        // 8. CONFIRMAR TRANSACCIÓN
+        // ============================
         $db->commit();
 
+        // ============================
+        // 9. RESPUESTA EXITOSA
+        // ============================
         return [
             'success' => true,
-            'message' => 'Estudiante registrado exitosamente!',
-            'id' => $userId
+            'message' => '✅ Estudiante registrado exitosamente' . 
+                        (!empty($nombreFoto) ? ' con foto de perfil.' : '.'),
+            'id' => $userId,
+            'username' => $username,
+            'foto_perfil' => $nombreFoto,
+            'cedula' => $datos['idusuario']
         ];
 
     } catch(Exception $e) {
-        // Revertir transacción en caso de error
-        $db->rollback();
+        // ============================
+        // 10. MANEJAR ERRORES
+        // ============================
+        if (isset($db) && method_exists($db, 'rollback')) {
+            try {
+                $db->rollback();
+            } catch (Exception $rollbackError) {
+                error_log("Error al hacer rollback: " . $rollbackError->getMessage());
+            }
+        }
         
-        // REGISTRAR EN AUDITORÍA - ERROR AL REGISTRAR ESTUDIANTE
-        registrarAuditoria(
-            "ERROR", 
-            "users", 
-            null, 
-            null, 
-            [
-                'nombre' => $datos['nombre'] ?? '',
-                'idusuario' => $datos['idusuario'] ?? '',
-                'error' => $e->getMessage()
-            ], 
-            "Estudiantes", 
-            "Error al registrar estudiante"
-        );
+        // Eliminar foto si se subió
+        if (!empty($nombreFoto)) {
+            $rutaFoto = '../foto_perfil/' . $nombreFoto;
+            if (file_exists($rutaFoto)) {
+                @unlink($rutaFoto);
+            }
+        }
+        
+        // Registrar error en auditoría
+        if (function_exists('registrarAuditoria')) {
+            registrarAuditoria(
+                "ERROR", 
+                "users", 
+                null, 
+                null, 
+                [
+                    'nombre' => $datos['nombre'] ?? '',
+                    'idusuario' => $datos['idusuario'] ?? '',
+                    'error' => $e->getMessage()
+                ], 
+                "Estudiantes", 
+                "Error al registrar estudiante"
+            );
+        }
         
         error_log("Error en insertarEstudiante: " . $e->getMessage());
+        
         return [
             'success' => false,
-            'message' => 'Error al registrar estudiante: ' . $e->getMessage()
+            'message' => '❌ ' . $e->getMessage(),
+            'error_code' => $e->getCode()
         ];
     }
 }
+
+/**
+ * Función auxiliar para generar un username único
+ */
+function generarUsernameUnico($usernameBase) {
+    global $db;
+    
+    $username = $usernameBase;
+    $contador = 1;
+    $maxIntentos = 100;
+    
+    while ($contador <= $maxIntentos) {
+        // Verificar si el username ya existe
+        $sql = "SELECT COUNT(*) as count FROM users WHERE username = ?";
+        $stmt = $db->prepare($sql);
+        if (!$stmt) {
+            // Si hay error en la consulta, retornar el username actual
+            return $username;
+        }
+        
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        $stmt->close();
+        
+        if ($row['count'] == 0) {
+            // Username disponible
+            return $username;
+        }
+        
+        // Generar nuevo username con sufijo numérico
+        $username = $usernameBase . $contador;
+        $contador++;
+    }
+    
+    // Si no se encuentra username único después de muchos intentos,
+    // usar un hash basado en timestamp
+    return $usernameBase . '_' . substr(md5(time()), 0, 6);
+}
+
+/**
+ * Función para subir foto de perfil (debes tenerla ya definida)
+ */
+function subirFotoPerfil($archivo) {
+    $directorio = '../foto_perfil/';
+    
+    // Crear directorio si no existe
+    if (!file_exists($directorio)) {
+        mkdir($directorio, 0777, true);
+    }
+    
+    // Validar error de subida
+    if ($archivo['error'] !== UPLOAD_ERR_OK) {
+        return [
+            'success' => false,
+            'message' => 'Error al subir archivo: código ' . $archivo['error']
+        ];
+    }
+    
+    // Validar tamaño (5MB máximo)
+    $tamanoMaximo = 5 * 1024 * 1024; // 5MB en bytes
+    if ($archivo['size'] > $tamanoMaximo) {
+        return [
+            'success' => false,
+            'message' => 'El archivo excede el tamaño máximo de 5MB'
+        ];
+    }
+    
+    // Validar tipo de archivo
+    $extensionesPermitidas = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+    $nombreArchivo = $archivo['name'];
+    $extension = strtolower(pathinfo($nombreArchivo, PATHINFO_EXTENSION));
+    
+    if (!in_array($extension, $extensionesPermitidas)) {
+        return [
+            'success' => false,
+            'message' => 'Formato de archivo no permitido. Use: JPG, JPEG, PNG, WEBP o PDF'
+        ];
+    }
+    
+    // Generar nombre único para el archivo
+    $nombreUnico = uniqid('foto_', true) . '.' . $extension;
+    $rutaDestino = $directorio . $nombreUnico;
+    
+    // Mover archivo subido
+    if (move_uploaded_file($archivo['tmp_name'], $rutaDestino)) {
+        return [
+            'success' => true,
+            'nombre_archivo' => $nombreUnico,
+            'ruta' => $rutaDestino,
+            'extension' => $extension
+        ];
+    } else {
+        return [
+            'success' => false,
+            'message' => 'Error al guardar el archivo en el servidor'
+        ];
+    }
+}
+
+// Función subirFotoPerfil ya definida anteriormente más arriba; evitamos redeclararla aquí.
 
 // Función para validar datos de estudiante
 function validarEstudiante($datos) {
@@ -604,109 +1004,442 @@ function obtenerEstudiantePorId($id) {
     return $estudiante;
 }
 
-// Función para actualizar estudiante
+/**
+ * Actualiza los datos de un estudiante con validación y manejo de apóstrofes
+ * @param array $datos Datos del estudiante a actualizar
+ * @return array Resultado de la operación
+ */
 function actualizarEstudiante(array $datos): array {
     global $db;
     
+    if (!$db) {
+        return [
+            'success' => false,
+            'message' => '❌ Error: No hay conexión a la base de datos. Contacte al administrador.'
+        ];
+    }
+    
+    $nombreFoto = '';
+    $fotoEliminada = false;
+    
     try {
-        // Primero obtener los valores antiguos para auditoría
+        // Iniciar transacción
+        $db->begin_transaction();
+        
+        // ============================
+        // 1. VALIDACIÓN COMPLETA DE DATOS
+        // ============================
+        $errores_validacion = [];
+        
+        // Validar ID
+        if (empty($datos['id']) || !is_numeric($datos['id'])) {
+            $errores_validacion[] = "ID de estudiante no válido";
+        }
+        
+        // Validar cédula
+        if (empty($datos['idusuario'])) {
+            $errores_validacion[] = "La cédula es obligatoria";
+        } elseif (!preg_match('/^[VE]-\d{6,9}$/', $datos['idusuario'])) {
+            $errores_validacion[] = "Formato de cédula inválido. Debe ser V-12345678 o E-12345678";
+        }
+        
+        // Validar nombre (permite apóstrofes, NO números)
+        if (empty($datos['nombre'])) {
+            $errores_validacion[] = "El nombre completo es obligatorio";
+        } else {
+            $nombre = trim($datos['nombre']);
+            if (!preg_match("/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s']+$/u", $nombre)) {
+                if (preg_match("/[0-9]/", $nombre)) {
+                    $errores_validacion[] = "El nombre no puede contener números. Solo letras, espacios y apóstrofes (')";
+                } elseif (preg_match("/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s']/u", $nombre)) {
+                    $errores_validacion[] = "El nombre contiene caracteres no permitidos. Solo letras, espacios y apóstrofes (')";
+                }
+            }
+            
+            if (strlen($nombre) < 2) {
+                $errores_validacion[] = "El nombre es demasiado corto (mínimo 2 caracteres)";
+            }
+            if (strlen($nombre) > 100) {
+                $errores_validacion[] = "El nombre es demasiado largo (máximo 100 caracteres)";
+            }
+        }
+        
+        // Validar email
+        if (!empty($datos['email'])) {
+            if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
+                $errores_validacion[] = "Correo electrónico no válido. Ejemplo: estudiante@universidad.edu";
+            }
+            if (strlen($datos['email']) > 100) {
+                $errores_validacion[] = "El correo electrónico es demasiado largo (máximo 100 caracteres)";
+            }
+        }
+        
+        // Validar teléfono
+        if (!empty($datos['tlf'])) {
+            $telefono_limpio = preg_replace('/\D/', '', $datos['tlf']);
+            if (!preg_match('/^[0-9]{10,11}$/', $telefono_limpio)) {
+                $errores_validacion[] = "Teléfono principal inválido. Debe tener 10 u 11 dígitos numéricos";
+            }
+        }
+        
+        // Validar celular
+        if (!empty($datos['cel'])) {
+            $celular_limpio = preg_replace('/\D/', '', $datos['cel']);
+            if (!preg_match('/^[0-9]{10,11}$/', $celular_limpio)) {
+                $errores_validacion[] = "Celular inválido. Debe tener 10 u 11 dígitos numéricos";
+            }
+        }
+        
+        // Validar fecha de nacimiento
+        if (!empty($datos['fecha_nac'])) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $datos['fecha_nac'])) {
+                $errores_validacion[] = "Formato de fecha de nacimiento inválido. Use: AAAA-MM-DD";
+            } else {
+                $fechaNac = DateTime::createFromFormat('Y-m-d', $datos['fecha_nac']);
+                $hoy = new DateTime();
+                $edadMinima = (new DateTime())->modify('-15 years');
+                
+                if (!$fechaNac) {
+                    $errores_validacion[] = "Fecha de nacimiento no válida";
+                } elseif ($fechaNac > $hoy) {
+                    $errores_validacion[] = "La fecha de nacimiento no puede ser futura";
+                } elseif ($fechaNac > $edadMinima) {
+                    $errores_validacion[] = "El estudiante debe tener al menos 15 años";
+                }
+            }
+        }
+        
+        // Validar fecha de ingreso
+        if (!empty($datos['fecha_ingreso'])) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $datos['fecha_ingreso'])) {
+                $errores_validacion[] = "Formato de fecha de ingreso inválido. Use: AAAA-MM-DD";
+            } elseif (!empty($datos['fecha_nac'])) {
+                $fechaIngreso = DateTime::createFromFormat('Y-m-d', $datos['fecha_ingreso']);
+                $fechaNac = DateTime::createFromFormat('Y-m-d', $datos['fecha_nac']);
+                
+                if ($fechaIngreso < $fechaNac) {
+                    $errores_validacion[] = "La fecha de ingreso no puede ser anterior a la fecha de nacimiento";
+                }
+            }
+        }
+        
+        // Validar campos de texto con caracteres permitidos
+        $camposTexto = [
+            'etnia' => 'Etnia',
+            'direccion' => 'Dirección',
+            'punto_referencia' => 'Punto de referencia',
+            'enfermedad' => 'Enfermedades',
+            'discapacidad' => 'Discapacidad',
+            'titulos' => 'Títulos obtenidos',
+            'institutos' => 'Instituciones'
+        ];
+        
+        foreach ($camposTexto as $campo => $nombre) {
+            if (!empty($datos[$campo])) {
+                if (!preg_match("/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\s'\".,;:¡!¿?()\-]+$/u", $datos[$campo])) {
+                    $errores_validacion[] = "El campo '$nombre' contiene caracteres no permitidos. Solo letras, números, espacios y signos comunes";
+                }
+                
+                if (strlen($datos[$campo]) > 255) {
+                    $errores_validacion[] = "El campo '$nombre' es demasiado largo (máximo 255 caracteres)";
+                }
+            }
+        }
+        
+        // Validar campos numéricos
+        if (isset($datos['grupo_familiar']) && $datos['grupo_familiar'] < 0) {
+            $errores_validacion[] = "El grupo familiar no puede ser negativo";
+        }
+        
+        if (isset($datos['acargo_usted']) && $datos['acargo_usted'] < 0) {
+            $errores_validacion[] = "Las personas a cargo no pueden ser negativas";
+        }
+        
+        // Si hay errores de validación, lanzar excepción
+        if (!empty($errores_validacion)) {
+            $mensajeError = "❌ ERRORES DE VALIDACIÓN:\n\n• " . implode("\n• ", $errores_validacion);
+            throw new Exception($mensajeError, 400);
+        }
+        
+        // ============================
+        // 2. OBTENER VALORES ANTIGUOS PARA AUDITORÍA
+        // ============================
         $query_antiguo = "SELECT * FROM users WHERE id = ?";
         $stmt_antiguo = $db->prepare($query_antiguo);
         $stmt_antiguo->bind_param("i", $datos['id']);
         $stmt_antiguo->execute();
         $result_antiguo = $stmt_antiguo->get_result();
+        
+        if ($result_antiguo->num_rows === 0) {
+            throw new Exception("❌ Estudiante no encontrado en la base de datos", 404);
+        }
+        
         $valores_antiguos = $result_antiguo->fetch_assoc();
         $stmt_antiguo->close();
-
-        // Consulta SQL con los campos correctos que estás usando
-        $sql = "UPDATE users SET 
-                nombre = ?,
-                username = ?,
-                email = ?,
-                tlf = ?,
-                num_telf_opc = ?,
-                carrera = ?,
-                genero = ?,
-                fecha_nac = ?,
-                fecha_ingreso = ?,
-                status = ?,
-                fecha_act = NOW()
-                WHERE id = ?";
-
-        // Preparar la sentencia
+        
+        // ============================
+        // 3. VERIFICAR QUE LA CÉDULA NO EXISTA EN OTRO USUARIO
+        // ============================
+        $query_verificar = "SELECT id, nombre FROM users WHERE idusuario = ? AND id != ?";
+        $stmt_verificar = $db->prepare($query_verificar);
+        $stmt_verificar->bind_param("si", $datos['idusuario'], $datos['id']);
+        $stmt_verificar->execute();
+        $result_verificar = $stmt_verificar->get_result();
+        
+        if ($result_verificar->num_rows > 0) {
+            $usuario_existente = $result_verificar->fetch_assoc();
+            throw new Exception("❌ La cédula ya está registrada para el estudiante: " . $usuario_existente['nombre'], 409);
+        }
+        $stmt_verificar->close();
+        
+        // ============================
+        // 4. MANEJAR FOTO DE PERFIL
+        // ============================
+        if (isset($_FILES['foto_perfil']) && $_FILES['foto_perfil']['error'] === UPLOAD_ERR_OK) {
+            $resultadoFoto = subirFotoPerfil($_FILES['foto_perfil']);
+            if (isset($resultadoFoto['success']) && $resultadoFoto['success']) {
+                $nombreFoto = $resultadoFoto['nombre_archivo'];
+                $datos['foto_perfil'] = $nombreFoto;
+                
+                if (!empty($valores_antiguos['foto_perfil'])) {
+                    $rutaFotoAntigua = '../foto_perfil/' . $valores_antiguos['foto_perfil'];
+                    if (file_exists($rutaFotoAntigua)) {
+                        unlink($rutaFotoAntigua);
+                        $fotoEliminada = true;
+                    }
+                }
+            } else {
+                throw new Exception('❌ Error al subir foto: ' . ($resultadoFoto['message'] ?? 'Error desconocido'), 400);
+            }
+        }
+        
+        // ============================
+        // 5. CONSTRUIR CONSULTA DE ACTUALIZACIÓN
+        // ============================
+        $campos = [];
+        $valores_bind = [];
+        $tipos = '';
+        
+        $camposMapeo = [
+            'idusuario' => 's',
+            'nombre' => 's',
+            'username' => 's',
+            'email' => 's',
+            'tlf' => 's',
+            'cel' => 's',
+            'num_telf_opc' => 's',
+            'direccion' => 's',
+            'estado' => 's',
+            'municipio' => 's',
+            'parroquia' => 's',
+            'ciudad' => 's',
+            'etnia' => 's',
+            'casaapto' => 's',
+            'punto_referencia' => 's',
+            'grupo_familiar' => 'i',
+            'acargo_usted' => 'i',
+            'fuente_ingresos' => 's',
+            'tipo_vivienda' => 's',
+            'tenencia_vivienda' => 's',
+            'enfermedad' => 's',
+            'discapacidad' => 's',
+            'titulos' => 's',
+            'institutos' => 's',
+            'carrera' => 's',
+            'genero' => 's',
+            'edo_civil' => 's',
+            'fecha_nac' => 's',
+            'fecha_ingreso' => 's',
+            'status' => 'i',
+            'foto_perfil' => 's'
+        ];
+        
+        foreach ($camposMapeo as $campo => $tipo) {
+            if (array_key_exists($campo, $datos)) {
+                $campos[] = "`$campo` = ?";
+                $valores_bind[] = $datos[$campo];
+                $tipos .= $tipo;
+            }
+        }
+        
+        $campos[] = "fecha_act = NOW()";
+        
+        if (empty($campos)) {
+            throw new Exception('❌ No hay campos para actualizar', 400);
+        }
+        
+        $valores_bind[] = $datos['id'];
+        $tipos .= 'i';
+        
+        $sql = "UPDATE users SET " . implode(', ', $campos) . " WHERE id = ?";
+        
+        // ============================
+        // 6. EJECUTAR ACTUALIZACIÓN
+        // ============================
         $stmt = $db->prepare($sql);
         if (!$stmt) {
-            throw new Exception("Error en la preparación: " . $db->error);
+            throw new Exception("❌ Error en la preparación de la consulta: " . $db->error, 500);
         }
-
-        // Vincular parámetros
-        $stmt->bind_param(
-            "sssssssssii", // Tipos de parámetros
-            $datos['nombre'],
-            $datos['username'],
-            $datos['email'],
-            $datos['tlf'],
-            $datos['num_telf_opc'],
-            $datos['carrera'],
-            $datos['genero'],
-            $datos['fecha_nac'],
-            $datos['fecha_ingreso'],
-            $datos['status'],
-            $datos['id']
-        );
-
-        // Ejecutar la actualización
-        if (!$stmt->execute()) {
-            throw new Exception("Error al ejecutar: " . $stmt->error);
-        }
-
-        // Verificar si se realizaron cambios
-        $cambios = $stmt->affected_rows > 0;
         
-        // Registrar auditoría solo si hubo cambios
-        if ($cambios) {
-            $valores_nuevos = [
-                'nombre' => $datos['nombre'],
-                'username' => $datos['username'],
-                'email' => $datos['email'],
-                'tlf' => $datos['tlf'],
-                'num_telf_opc' => $datos['num_telf_opc'],
-                'carrera' => $datos['carrera'],
-                'genero' => $datos['genero'],
-                'fecha_nac' => $datos['fecha_nac'],
-                'fecha_ingreso' => $datos['fecha_ingreso'],
-                'status' => $datos['status']
-            ];
+        $stmt->bind_param($tipos, ...$valores_bind);
+        
+        if (!$stmt->execute()) {
+            $error = $stmt->error;
+            $errno = $stmt->errno;
             
+            if ($errno == 1062) {
+                throw new Exception("❌ Error: Registro duplicado. La cédula o correo ya existe.", 409);
+            } else {
+                throw new Exception("❌ Error al ejecutar la consulta: " . $error, 500);
+            }
+        }
+        
+        $affectedRows = $stmt->affected_rows;
+        $stmt->close();
+        
+        // ============================
+        // 7. ACTUALIZAR TÍTULOS OBTENIDOS EN TABLA SEPARADA
+        // ============================
+        $sqlEliminarTitulos = "DELETE FROM titulos_obtenidos WHERE id_usuario = ?";
+        $stmtEliminar = $db->prepare($sqlEliminarTitulos);
+        $stmtEliminar->bind_param("i", $datos['id']);
+        $stmtEliminar->execute();
+        $stmtEliminar->close();
+        
+        if (!empty($datos['titulos']) && !empty($datos['institutos'])) {
+            if (is_string($datos['titulos'])) {
+                $titulos = explode('|||', $datos['titulos']);
+                $institutos = explode('|||', $datos['institutos']);
+            } else {
+                $titulos = $datos['titulos'];
+                $institutos = $datos['institutos'];
+            }
+            
+            $titulos = array_filter(array_map('trim', (array)$titulos));
+            $institutos = array_filter(array_map('trim', (array)$institutos));
+            
+            $count = min(count($titulos), count($institutos));
+            
+            if ($count > 0) {
+                $sqlTitulos = "INSERT INTO titulos_obtenidos (id_usuario, nombre, titulo_obtenido, instituto) 
+                               VALUES (?, ?, ?, ?)";
+                
+                $stmtTitulos = $db->prepare($sqlTitulos);
+                
+                if ($stmtTitulos) {
+                    for ($i = 0; $i < $count; $i++) {
+                        if (!empty($titulos[$i]) && !empty($institutos[$i])) {
+                            $stmtTitulos->bind_param(
+                                "isss", 
+                                $datos['id'],
+                                $datos['nombre'],
+                                $titulos[$i],
+                                $institutos[$i]
+                            );
+                            
+                            if (!$stmtTitulos->execute()) {
+                                error_log("Error al insertar título $i: " . $stmtTitulos->error);
+                            }
+                        }
+                    }
+                    
+                    $stmtTitulos->close();
+                }
+            }
+        }
+        
+        // ============================
+        // 8. REGISTRAR AUDITORÍA
+        // ============================
+        if (function_exists('registrarAuditoria')) {
+            $cambios = [];
+            foreach ($datos as $key => $valor) {
+                if (isset($valores_antiguos[$key]) && $valores_antiguos[$key] != $valor) {
+                    $cambios[$key] = [
+                        'antiguo' => $valores_antiguos[$key],
+                        'nuevo' => $valor
+                    ];
+                }
+            }
+            
+            if (!empty($cambios) || $fotoEliminada) {
+                $descripcion = "Actualización de datos de estudiante";
+                if ($fotoEliminada) {
+                    $descripcion .= " (foto actualizada)";
+                }
+                
+                registrarAuditoria(
+                    "UPDATE", 
+                    "users", 
+                    $datos['id'], 
+                    $valores_antiguos, 
+                    $datos, 
+                    "Estudiantes", 
+                    $descripcion
+                );
+            }
+        }
+        
+        // ============================
+        // 9. CONFIRMAR TRANSACCIÓN
+        // ============================
+        $db->commit();
+        
+        // ============================
+        // 10. PREPARAR RESPUESTA
+        // ============================
+        return [
+            'success' => true,
+            'message' => $affectedRows > 0 
+                ? '✅ Estudiante actualizado exitosamente' 
+                : 'ℹ️ No se realizaron cambios (los datos son iguales)',
+            'affected_rows' => $affectedRows,
+            'cambios' => $cambios ?? [],
+            'foto_actualizada' => !empty($nombreFoto)
+        ];
+        
+    } catch(Exception $e) {
+        if (isset($db) && method_exists($db, 'rollback')) {
+            try {
+                $db->rollback();
+            } catch (Exception $rollbackError) {
+                error_log("Error al hacer rollback: " . $rollbackError->getMessage());
+            }
+        }
+        
+        if (!empty($nombreFoto)) {
+            $rutaFoto = '../foto_perfil/' . $nombreFoto;
+            if (file_exists($rutaFoto)) {
+                @unlink($rutaFoto);
+            }
+        }
+        
+        $mensajeUsuario = $e->getMessage();
+        $codigoError = $e->getCode();
+        
+        if (function_exists('registrarAuditoria')) {
             registrarAuditoria(
-                "UPDATE", 
+                "ERROR", 
                 "users", 
-                $datos['id'], 
-                $valores_antiguos, 
-                $valores_nuevos, 
+                $datos['id'] ?? null, 
+                null, 
+                [
+                    'nombre' => $datos['nombre'] ?? '',
+                    'idusuario' => $datos['idusuario'] ?? '',
+                    'error' => substr($e->getMessage(), 0, 200)
+                ], 
                 "Estudiantes", 
-                "Actualización de datos de estudiante"
+                "Error al actualizar estudiante"
             );
         }
         
-        return [
-            'success' => $cambios,
-            'message' => $cambios 
-                ? 'Estudiante actualizado correctamente' 
-                : 'No se realizaron cambios (posiblemente los datos son iguales)',
-            'affected_rows' => $stmt->affected_rows
-        ];
-
-    } catch(Exception $e) {
         error_log("Error en actualizarEstudiante: " . $e->getMessage());
+        
         return [
             'success' => false,
-            'message' => 'Error al actualizar estudiante: ' . $e->getMessage()
+            'message' => $mensajeUsuario,
+            'error_code' => $codigoError
         ];
-    } finally {
-        if (isset($stmt)) {
-            $stmt->close();
-        }
     }
 }
 
@@ -962,84 +1695,136 @@ function procesarCSVEstudiantes($tmpFilePath, $originalName) {
 
 
 
-
-
 // FUNCIONES PARA GESTIONAR CARRERAS
 
 // Función para obtener carreras desde la tabla carreras
 function obtenerListaCompletaCarreras(bool $soloActivas = false): array {
-  global $db;
-  
-  try {
-      // Construir consulta base
-      $query = "SELECT id_carrera, nombre_carrera, cod_carrera, activa FROM carreras";
-      
-      // Agregar condición si es necesario
-      if ($soloActivas) {
-          $query .= " WHERE activa = ?";
-      }
-      
-      $query .= " ORDER BY nombre_carrera";
-      
-      // Preparar la consulta
-      $stmt = $db->prepare($query);
-      if (!$stmt) {
-          throw new Exception("Error al preparar consulta: " . $db->error);
-      }
-      
-      // Vincular parámetro si es necesario
-      if ($soloActivas) {
-          $activa = 1;
-          $stmt->bind_param("i", $activa);
-      }
-      
-      // Ejecutar consulta
-      if (!$stmt->execute()) {
-          throw new Exception("Error al ejecutar consulta: " . $stmt->error);
-      }
-      
-      // Obtener resultados
-      $result = $stmt->get_result();
-      $carreras = $result->fetch_all(MYSQLI_ASSOC);
-      
-      // Liberar recursos
-      $result->free();
-      $stmt->close();
-      
-      return $carreras;
-      
-  } catch (Exception $e) {
-      error_log("Error al obtener carreras: " . $e->getMessage());
-      return [];
-  }
+    global $db;
+    
+    try {
+        // Construir consulta base
+        $query = "SELECT id_carrera, nombre_carrera, cod_carrera, activa FROM carreras";
+        
+        // Agregar condición si es necesario
+        if ($soloActivas) {
+            $query .= " WHERE activa = ?";
+        }
+        
+        $query .= " ORDER BY nombre_carrera";
+        
+        // Preparar la consulta
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error al preparar consulta: " . $db->error);
+        }
+        
+        // Vincular parámetro si es necesario
+        if ($soloActivas) {
+            $activa = 1;
+            $stmt->bind_param("i", $activa);
+        }
+        
+        // Ejecutar consulta
+        if (!$stmt->execute()) {
+            throw new Exception("Error al ejecutar consulta: " . $stmt->error);
+        }
+        
+        // Obtener resultados
+        $result = $stmt->get_result();
+        $carreras = $result->fetch_all(MYSQLI_ASSOC);
+        
+        // Liberar recursos
+        $result->free();
+        $stmt->close();
+        
+        return $carreras;
+        
+    } catch (Exception $e) {
+        error_log("Error al obtener carreras: " . $e->getMessage());
+        return [];
+    }
 }
-
 
 function cambiarEstadoCarrera($id_carrera, $estado) {
     global $db;
     
-    $query = "UPDATE carreras SET activa = ? WHERE id_carrera = ?";
-    $stmt = $db->prepare($query);
-    
-    if (!$stmt) {
-        throw new Exception("Error en la preparación de la consulta: " . $conn->error);
+    try {
+        // Obtener información actual de la carrera para auditoría
+        $carrera_actual = obtenerCarreraPorId($id_carrera);
+        
+        $query = "UPDATE carreras SET activa = ? WHERE id_carrera = ?";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en la preparación de la consulta: " . $db->error);
+        }
+        
+        $stmt->bind_param("ii", $estado, $id_carrera);
+        $resultado = $stmt->execute();
+        
+        // Verificar si realmente hubo cambios
+        if ($resultado && $stmt->affected_rows > 0) {
+            // REGISTRAR EN AUDITORÍA - CAMBIO DE ESTADO DE CARRERA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    $estado_texto_anterior = $carrera_actual['activa'] ? 'Activa' : 'Inactiva';
+                    $estado_texto_nuevo = $estado ? 'Activa' : 'Inactiva';
+                    
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "carreras", 
+                        $id_carrera, 
+                        [
+                            'activa' => $carrera_actual['activa'],
+                            'estado_anterior' => $estado_texto_anterior
+                        ], 
+                        [
+                            'activa' => $estado,
+                            'estado_nuevo' => $estado_texto_nuevo,
+                            'nombre_carrera' => $carrera_actual['nombre_carrera'] ?? '',
+                            'cod_carrera' => $carrera_actual['cod_carrera'] ?? ''
+                        ], 
+                        "Carreras", 
+                        "Cambio de estado de carrera"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría cambiarEstadoCarrera: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        }
+        
+        return false;
+        
+    } catch (Exception $e) {
+        error_log("Error en cambiarEstadoCarrera: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL CAMBIAR ESTADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carreras", 
+                    $id_carrera, 
+                    null, 
+                    [
+                        'id_carrera' => $id_carrera,
+                        'estado_solicitado' => $estado,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Carreras", 
+                    "Error al cambiar estado de carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error cambiarEstadoCarrera: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
     }
-    
-    $stmt->bind_param("ii", $estado, $id_carrera);
-    $resultado = $stmt->execute();
-    
-    // Verificar si realmente hubo cambios
-    if ($resultado && $stmt->affected_rows > 0) {
-        return true;
-    }
-    
-    return false;
 }
 
-
-
-
-// Función para agregar nuevas carreras
 // Función para agregar nuevas carreras
 function registrarNuevaCarrera(
     string $nombre, 
@@ -1132,6 +1917,32 @@ function registrarNuevaCarrera(
         
         $db->commit();
         
+        // REGISTRAR EN AUDITORÍA - NUEVA CARRERA CREADA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "INSERT", 
+                    "carreras", 
+                    $insertId, 
+                    null, 
+                    [
+                        'nombre_carrera' => $nombre,
+                        'cod_carrera' => $codigo,
+                        'tipo_formacion' => $tipo_formacion,
+                        'duracion_semestres' => $duracion_semestres,
+                        'duracion_anios' => $duracion_anios,
+                        'titulo_principal' => $titulo_principal,
+                        'titulo_opcional' => $titulo_opcional,
+                        'activa' => 1
+                    ], 
+                    "Carreras", 
+                    "Nueva carrera registrada"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría registrarNuevaCarrera: " . $e->getMessage());
+            }
+        }
+        
         return [
             'success' => true,
             'message' => 'Carrera registrada exitosamente',
@@ -1143,6 +1954,28 @@ function registrarNuevaCarrera(
             $db->rollback();
         }
         error_log("Error en registrarNuevaCarrera: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL REGISTRAR CARRERA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carreras", 
+                    null, 
+                    null, 
+                    [
+                        'nombre_carrera' => $nombre,
+                        'cod_carrera' => $codigo,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Carreras", 
+                    "Error al registrar nueva carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error registrarNuevaCarrera: " . $auditError->getMessage());
+            }
+        }
+        
         return [
             'success' => false,
             'message' => 'Error al registrar carrera: ' . $e->getMessage()
@@ -1192,7 +2025,6 @@ function obtenerCarreraPorId($id) {
     }
 }
 
-
 function actualizarCarrera(
     int $id,
     string $nombre,
@@ -1207,6 +2039,15 @@ function actualizarCarrera(
     global $db;
     
     try {
+        // Obtener datos actuales para auditoría
+        $datos_actuales = obtenerCarreraPorId($id);
+        if (!$datos_actuales) {
+            return [
+                'success' => false,
+                'message' => 'Carrera no encontrada'
+            ];
+        }
+
         // Validar título principal
         if (empty($titulo_principal)) {
             return [
@@ -1279,12 +2120,59 @@ function actualizarCarrera(
             throw new Exception("Error al actualizar carrera: " . $updateStmt->error);
         }
         
+        $affected_rows = $updateStmt->affected_rows;
         $updateStmt->close();
         $db->commit();
         
+        // REGISTRAR EN AUDITORÍA - ACTUALIZACIÓN DE CARRERA
+        if ($affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                $valores_antiguos_audit = [];
+                $valores_nuevos_audit = [];
+                
+                // Comparar campos modificados
+                $campos_auditar = [
+                    'nombre_carrera', 'cod_carrera', 'tipo_formacion', 'duracion_semestres',
+                    'titulo_otorga', 'otro_titulo', 'activa'
+                ];
+                
+                foreach ($campos_auditar as $campo) {
+                    $valor_antiguo = $datos_actuales[$campo] ?? null;
+                    $valor_nuevo = $$campo ?? null;
+                    
+                    // Para campos específicos
+                    if ($campo === 'titulo_otorga') {
+                        $valor_nuevo = $titulo_principal;
+                    } elseif ($campo === 'otro_titulo') {
+                        $valor_nuevo = $titulo_opcional;
+                    }
+                    
+                    if ($valor_antiguo != $valor_nuevo) {
+                        $valores_antiguos_audit[$campo] = $valor_antiguo;
+                        $valores_nuevos_audit[$campo] = $valor_nuevo;
+                    }
+                }
+                
+                if (!empty($valores_nuevos_audit)) {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "carreras", 
+                        $id, 
+                        $valores_antiguos_audit, 
+                        $valores_nuevos_audit, 
+                        "Carreras", 
+                        "Actualización de datos de carrera"
+                    );
+                }
+            } catch (Exception $e) {
+                error_log("Error en auditoría actualizarCarrera: " . $e->getMessage());
+            }
+        }
+        
         return [
             'success' => true,
-            'message' => 'Programa académico actualizado exitosamente'
+            'message' => 'Programa académico actualizado exitosamente',
+            'affected_rows' => $affected_rows
         ];
         
     } catch (Exception $e) {
@@ -1292,6 +2180,28 @@ function actualizarCarrera(
             $db->rollback();
         }
         error_log("Error en actualizarCarrera: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR CARRERA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carreras", 
+                    $id, 
+                    null, 
+                    [
+                        'nombre_carrera' => $nombre,
+                        'cod_carrera' => $codigo,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Carreras", 
+                    "Error al actualizar carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error actualizarCarrera: " . $auditError->getMessage());
+            }
+        }
+        
         return [
             'success' => false,
             'message' => 'Error al actualizar programa: ' . $e->getMessage()
@@ -1299,8 +2209,122 @@ function actualizarCarrera(
     }
 }
 
+/**
+ * Función para eliminar carrera (eliminación lógica)
+ */
+function eliminarCarrera($id_carrera): array {
+    global $db;
+    
+    try {
+        // Obtener información de la carrera antes de eliminar
+        $carrera_info = obtenerCarreraPorId($id_carrera);
+        if (!$carrera_info) {
+            return [
+                'success' => false,
+                'message' => 'Carrera no encontrada'
+            ];
+        }
+        
+        // Verificar si hay estudiantes asociados a esta carrera
+        $check_estudiantes = $db->prepare("SELECT COUNT(*) as total FROM users WHERE carrera = ? AND estudiante = 1 AND status = 1");
+        if ($check_estudiantes) {
+            $check_estudiantes->bind_param("i", $id_carrera);
+            $check_estudiantes->execute();
+            $result = $check_estudiantes->get_result();
+            $estudiantes_count = $result->fetch_assoc()['total'];
+            $check_estudiantes->close();
+            
+            if ($estudiantes_count > 0) {
+                return [
+                    'success' => false,
+                    'message' => "No se puede eliminar la carrera porque tiene $estudiantes_count estudiante(s) asociado(s)"
+                ];
+            }
+        }
+        
+        // Realizar eliminación lógica (desactivar)
+        $query = "UPDATE carreras SET activa = 0 WHERE id_carrera = ?";
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $id_carrera);
+        $resultado = $stmt->execute();
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+        
+        if ($resultado && $affected_rows > 0) {
+            // REGISTRAR EN AUDITORÍA - ELIMINACIÓN DE CARRERA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "carreras", 
+                        $id_carrera, 
+                        [
+                            'activa' => $carrera_info['activa'],
+                            'nombre_carrera' => $carrera_info['nombre_carrera'],
+                            'cod_carrera' => $carrera_info['cod_carrera']
+                        ], 
+                        [
+                            'activa' => 0,
+                            'estado' => 'Eliminada (desactivada)'
+                        ], 
+                        "Carreras", 
+                        "Eliminación lógica de carrera"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarCarrera: " . $e->getMessage());
+                }
+            }
+            
+            return [
+                'success' => true,
+                'message' => 'Carrera eliminada exitosamente',
+                'affected_rows' => $affected_rows
+            ];
+        } else {
+            return [
+                'success' => false,
+                'message' => 'No se realizaron cambios en la carrera'
+            ];
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarCarrera: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR CARRERA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carreras", 
+                    $id_carrera, 
+                    null, 
+                    [
+                        'id_carrera' => $id_carrera,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Carreras", 
+                    "Error al eliminar carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarCarrera: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al eliminar carrera: ' . $e->getMessage()
+        ];
+    }
+}
 
-//HACER COSAS CON LOS DOCENTES
+
+
+//DOCENTES
+
 
 function insertarDocente(array $datos): array {
     global $db;
@@ -1326,6 +2350,7 @@ function insertarDocente(array $datos): array {
 
         // Concatenar tipo y documento SIN guión
         $idusuario = $tipo_documento_texto . $datos['documento'];
+        $cedulaLimpia = $datos['documento']; // Usar solo el número de documento
 
         // Verificar si existe la carrera especificada o usar "No Especificado" (ID 0)
         if (isset($datos['carrera']) && $datos['carrera'] !== '') {
@@ -1346,7 +2371,7 @@ function insertarDocente(array $datos): array {
 
         // 1. Preparación de datos
         $username = strtolower(str_replace(' ', '.', $datos['nombre']));
-        $password = password_hash($datos['documento'], PASSWORD_DEFAULT);
+        $password = password_hash($cedulaLimpia, PASSWORD_DEFAULT); // Usar cedulaLimpia
         $fecha_act = date('Y-m-d H:i:s');
         $api_key = bin2hex(random_bytes(16));
 
@@ -1523,6 +2548,36 @@ function insertarDocente(array $datos): array {
             $stmtTitulos->close();
         }
 
+        // 7. REGISTRAR EN AUDITORÍA - NUEVO DOCENTE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                $valores_nuevos = [
+                    'idusuario' => $idusuario,
+                    'nombre' => $datos['nombre'],
+                    'email' => $datos['email'],
+                    'carrera' => $datos['carrera'] ?? 0,
+                    'estado_laboral' => $datos['estado_laboral'],
+                    'tipo_documento' => $tipo_documento_texto,
+                    'documento' => $datos['documento'],
+                    'telefono' => $datos['telefono'],
+                    'genero' => $datos['genero'],
+                    'estado_civil' => $datos['estado_civil']
+                ];
+                
+                registrarAuditoria(
+                    "INSERT", 
+                    "users", 
+                    $idInsertado, 
+                    null, 
+                    $valores_nuevos, 
+                    "Docentes", 
+                    "Registro de nuevo docente"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría insertarDocente: " . $e->getMessage());
+            }
+        }
+
         // Confirmar transacción
         $db->commit();
 
@@ -1531,13 +2586,36 @@ function insertarDocente(array $datos): array {
             'message' => 'Docente registrado exitosamente',
             'id' => $idInsertado,
             'username' => $username,
-            'password_temp' => $datos['documento']
+            'password_temp' => $cedulaLimpia // Usar cedulaLimpia en lugar del documento completo
         ];
 
     } catch(Exception $e) {
+        // Revertir transacción en caso de error
         if (isset($db) && method_exists($db, 'rollback')) {
             $db->rollback();
         }
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL REGISTRAR DOCENTE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    null, 
+                    null, 
+                    [
+                        'nombre' => $datos['nombre'] ?? '',
+                        'idusuario' => $idusuario ?? '',
+                        'error' => $e->getMessage()
+                    ], 
+                    "Docentes", 
+                    "Error al registrar docente"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error insertarDocente: " . $auditError->getMessage());
+            }
+        }
+        
         error_log("Error en insertarDocente: " . $e->getMessage());
         return [
             'success' => false,
@@ -1546,47 +2624,40 @@ function insertarDocente(array $datos): array {
     }
 }
 
-
-
-
-
 function validarDocente($datos) {
-  $errores = [];
-  
-  // Validar email
-  if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
-      $errores[] = 'Por favor ingrese un correo electrónico válido';
-  }
-  
-  // Validar teléfono (al menos 10 dígitos)
-  if (strlen($datos['telefono']) < 10) {
-      $errores[] = 'El teléfono debe tener al menos 10 dígitos';
-  }
-  
-  // Validar documento
-  if (empty($datos['documento']) || !is_numeric($datos['documento'])) {
-      $errores[] = 'El documento debe ser un número válido';
-  }
-  
-  // Validar campos requeridos
-  $camposRequeridos = [
-      'tipo_documento', 'documento', 'nombre', 'potencialidades', 'genero', 
-      'estado_civil', 'estado_residencia', 'municipio', 'direccion',
-      'fecha_nacimiento', 'telefono', 'email', 'fecha_contratacion'
-  ];
-  
-  foreach ($camposRequeridos as $campo) {
-      if (empty($datos[$campo])) {
-          $nombreCampo = str_replace('_', ' ', $campo);
-          $errores[] = "El campo $nombreCampo es requerido";
-      }
-  }
-  
-  return empty($errores) ? true : $errores;
+    $errores = [];
+    
+    // Validar email
+    if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
+        $errores[] = 'Por favor ingrese un correo electrónico válido';
+    }
+    
+    // Validar teléfono (al menos 10 dígitos)
+    if (strlen($datos['telefono']) < 10) {
+        $errores[] = 'El teléfono debe tener al menos 10 dígitos';
+    }
+    
+    // Validar documento
+    if (empty($datos['documento']) || !is_numeric($datos['documento'])) {
+        $errores[] = 'El documento debe ser un número válido';
+    }
+    
+    // Validar campos requeridos
+    $camposRequeridos = [
+        'tipo_documento', 'documento', 'nombre', 'potencialidades', 'genero', 
+        'estado_civil', 'estado_residencia', 'municipio', 'direccion',
+        'fecha_nacimiento', 'telefono', 'email', 'fecha_contratacion'
+    ];
+    
+    foreach ($camposRequeridos as $campo) {
+        if (empty($datos[$campo])) {
+            $nombreCampo = str_replace('_', ' ', $campo);
+            $errores[] = "El campo $nombreCampo es requerido";
+        }
+    }
+    
+    return empty($errores) ? true : $errores;
 }
-
-
-
 
 /**
  * Obtiene los datos de un docente según su ID.
@@ -1595,35 +2666,41 @@ function validarDocente($datos) {
  * @return array|null Array asociativo con los datos del docente, o null si no se encuentra
  */
 function obtenerDocentePorId($id) {
-  // Accede a la conexión de la base de datos definida globalmente
-  global $db;
-  
-  // Consulta SQL con un parámetro placeholder (?) para prevenir inyecciones SQL
-  $query = "SELECT * FROM users WHERE id = ? AND docente = 1";
-  
-  // Prepara la sentencia SQL
-  if ($stmt = $db->prepare($query)) {
-      // Asocia el parámetro $id al placeholder, indicando que es un entero ("i")
-      $stmt->bind_param("i", $id);
-      
-      // Ejecuta la consulta preparada
-      $stmt->execute();
-      
-      // Obtiene el resultado de la consulta
-      $result = $stmt->get_result();
-      
-      // Verifica si se encontraron registros
-      if ($result->num_rows > 0) {
-          // Retorna los datos del docente como un array asociativo
-          return $result->fetch_assoc();
-      }
-      
-      // Cierra el statement para liberar recursos
-      $stmt->close();
-  }
-  
-  // Retorna null si no se encuentra el docente o hay un error
-  return null;
+    // Accede a la conexión de la base de datos definida globalmente
+    global $db;
+    
+    try {
+        // Consulta SQL con un parámetro placeholder (?) para prevenir inyecciones SQL
+        $query = "SELECT * FROM users WHERE id = ? AND docente = 1";
+        
+        // Prepara la sentencia SQL
+        if ($stmt = $db->prepare($query)) {
+            // Asocia el parámetro $id al placeholder, indicando que es un entero ("i")
+            $stmt->bind_param("i", $id);
+            
+            // Ejecuta la consulta preparada
+            $stmt->execute();
+            
+            // Obtiene el resultado de la consulta
+            $result = $stmt->get_result();
+            
+            // Verifica si se encontraron registros
+            if ($result->num_rows > 0) {
+                // Retorna los datos del docente como un array asociativo
+                return $result->fetch_assoc();
+            }
+            
+            // Cierra el statement para liberar recursos
+            $stmt->close();
+        }
+        
+        // Retorna null si no se encuentra el docente o hay un error
+        return null;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerDocentePorId: " . $e->getMessage());
+        return null;
+    }
 }
 
 /**
@@ -1635,129 +2712,267 @@ function obtenerDocentePorId($id) {
  *               - 'message': string con mensaje descriptivo del resultado
  */
 function actualizarDocente($datos) {
-  // Accede a la conexión de la base de datos definida globalmente
-  global $db;
-  
-  try {
-      // Consulta SQL con placeholders (?) para todos los valores a actualizar
-      $sql = "UPDATE users SET 
-              nombre = ?,
-              email = ?,
-              tlf = ?,
-              cel = ?,
-              direccion = ?,
-              estado = ?,
-              municipio = ?,
-              parroquia = ?,
-              status = ?,
-              carrera = ?,
-              genero = ?,
-              edo_civil = ?,
-              fecha_nac = ?,
-              num_telf_opc = ?,
-              titulos = ?,
-              institutos = ?,
-              fecha_ingreso = ?
-              WHERE id = ? AND docente = 1";  // Solo actualiza si es docente
+    // Accede a la conexión de la base de datos definida globalmente
+    global $db;
+    
+    try {
+        // Obtener datos actuales del docente para auditoría
+        $docente_id = isset($datos['id']) ? intval($datos['id']) : 0;
+        $datos_antiguos = null;
+        
+        if (function_exists('obtenerDocentePorId')) {
+            $datos_antiguos = obtenerDocentePorId($docente_id);
+        }
+        
+        // Consulta SQL con placeholders (?) para todos los valores a actualizar
+        $sql = "UPDATE users SET 
+                nombre = ?,
+                email = ?,
+                tlf = ?,
+                cel = ?,
+                direccion = ?,
+                estado = ?,
+                municipio = ?,
+                parroquia = ?,
+                status = ?,
+                carrera = ?,
+                genero = ?,
+                edo_civil = ?,
+                fecha_nac = ?,
+                num_telf_opc = ?,
+                titulos = ?,
+                institutos = ?,
+                fecha_ingreso = ?
+                WHERE id = ? AND docente = 1";  // Solo actualiza si es docente
 
-      // Prepara la sentencia SQL
-      $stmt = $db->prepare($sql);
-      
-      // Verifica si la preparación fue exitosa
-      if (!$stmt) {
-          throw new Exception("Error en la preparación: " . $db->error);
-      }
-      
-      // Vincula los parámetros a la sentencia preparada
-      // Los tipos de datos se especifican con una cadena:
-      // s = string, i = integer, d = double, b = blob
-      // En este caso: 16 strings (s) y 1 integer (i) al final (el ID)
-      $stmt->bind_param(
-          "ssssssssssssssssi",
-          $datos['nombre'],
-          $datos['email'],
-          $datos['tlf'],
-          $datos['cel'],
-          $datos['direccion'],
-          $datos['estado'],
-          $datos['municipio'],
-          $datos['parroquia'],
-          $datos['status'],
-          $datos['carrera'],
-          $datos['genero'],
-          $datos['edo_civil'],
-          $datos['fecha_nac'],
-          $datos['num_telf_opc'],
-          $datos['titulos'],
-          $datos['institutos'],
-          $datos['fecha_ingreso'],
-          $datos['id']
-      );
-      
-      // Ejecuta la sentencia preparada
-      $stmt->execute();
-      
-      // Retorna un array con el resultado de la operación
-      return [
-          'success' => $stmt->affected_rows > 0,  // True si se actualizó alguna fila
-          'message' => $stmt->affected_rows > 0 
-              ? 'Docente actualizado correctamente' 
-              : 'No se realizaron cambios'  // Puede ocurrir si los datos son iguales
-      ];
-      
-  } catch(Exception $e) {
-      // Manejo de errores: retorna información sobre el error
-      return [
-          'success' => false,
-          'message' => 'Error al actualizar: ' . $e->getMessage()
-      ];
-  } finally {
-      // Asegura que el statement se cierre si existe
-      if (isset($stmt)) {
-          $stmt->close();
-      }
-  }
+        // Prepara la sentencia SQL
+        $stmt = $db->prepare($sql);
+        
+        // Verifica si la preparación fue exitosa
+        if (!$stmt) {
+            throw new Exception("Error en la preparación: " . $db->error);
+        }
+        
+        // Preparar valores y prevenir notices si faltan claves
+        $nombre = $datos['nombre'] ?? '';
+        $email = $datos['email'] ?? '';
+        $tlf = $datos['tlf'] ?? '';
+        $cel = $datos['cel'] ?? '';
+        $direccion = $datos['direccion'] ?? '';
+        $estado = $datos['estado'] ?? '';
+        $municipio = $datos['municipio'] ?? '';
+        $parroquia = $datos['parroquia'] ?? '';
+        $status = $datos['status'] ?? '';
+        $carrera = $datos['carrera'] ?? '';
+        $genero = $datos['genero'] ?? '';
+        $edo_civil = $datos['edo_civil'] ?? '';
+        $fecha_nac = $datos['fecha_nac'] ?? null;
+        $num_telf_opc = $datos['num_telf_opc'] ?? '';
+        $titulos = $datos['titulos'] ?? '';
+        $institutos = $datos['institutos'] ?? '';
+        $fecha_ingreso = $datos['fecha_ingreso'] ?? null;
+        
+        // Si no se proporcionó fecha_ingreso, intentar usar el valor actual en la BD
+        if (empty($fecha_ingreso)) {
+            try {
+                $qry = $db->prepare("SELECT fecha_ingreso FROM users WHERE id = ? AND docente = 1");
+                if ($qry) {
+                    $qry->bind_param('i', $docente_id);
+                    if ($qry->execute()) {
+                        $res = $qry->get_result();
+                        $row = $res ? $res->fetch_assoc() : null;
+                        if (!empty($row['fecha_ingreso'])) {
+                            $fecha_ingreso = $row['fecha_ingreso'];
+                        } else {
+                            // Fallback: fecha actual en formato YYYY-MM-DD para evitar NULL
+                            $fecha_ingreso = date('Y-m-d');
+                        }
+                    } else {
+                        $fecha_ingreso = date('Y-m-d');
+                    }
+                    $qry->close();
+                } else {
+                    $fecha_ingreso = date('Y-m-d');
+                }
+            } catch (Exception $e) {
+                $fecha_ingreso = date('Y-m-d');
+                error_log("Error al obtener fecha_ingreso: " . $e->getMessage());
+            }
+        }
+
+        // Vincula los parámetros a la sentencia preparada
+        // s = string, i = integer
+        // 17 strings (s) y 1 integer (i) al final => 18 parámetros
+        $bindTypes = "sssssssssssssssssi"; // 17 s + i
+
+        if (!$stmt->bind_param(
+            $bindTypes,
+            $nombre,
+            $email,
+            $tlf,
+            $cel,
+            $direccion,
+            $estado,
+            $municipio,
+            $parroquia,
+            $status,
+            $carrera,
+            $genero,
+            $edo_civil,
+            $fecha_nac,
+            $num_telf_opc,
+            $titulos,
+            $institutos,
+            $fecha_ingreso,
+            $docente_id
+        )) {
+            throw new Exception("Error en bind_param: " . $stmt->error);
+        }
+
+        // Ejecuta la sentencia preparada
+        if (!$stmt->execute()) {
+            // Si falla la ejecución, lanzar excepción para que el catch la capture y retorne JSON limpio
+            throw new Exception("Error en execute: " . $stmt->error);
+        }
+        
+        $affected_rows = $stmt->affected_rows;
+        $success = $affected_rows > 0;
+        
+        // REGISTRAR EN AUDITORÍA - ACTUALIZACIÓN DE DOCENTE
+        if ($success && function_exists('registrarAuditoria')) {
+            try {
+                // Preparar datos para auditoría
+                $valores_antiguos_audit = [];
+                $valores_nuevos_audit = [];
+                
+                if ($datos_antiguos) {
+                    // Campos principales para auditoría
+                    $campos_auditar = [
+                        'nombre', 'email', 'tlf', 'cel', 'direccion', 'estado', 
+                        'municipio', 'parroquia', 'status', 'carrera', 'genero',
+                        'edo_civil', 'fecha_nac', 'num_telf_opc', 'titulos', 
+                        'institutos', 'fecha_ingreso'
+                    ];
+                    
+                    foreach ($campos_auditar as $campo) {
+                        $valor_antiguo = $datos_antiguos[$campo] ?? null;
+                        $valor_nuevo = $datos[$campo] ?? null;
+                        
+                        // Solo registrar si hay cambio
+                        if ($valor_antiguo != $valor_nuevo) {
+                            $valores_antiguos_audit[$campo] = $valor_antiguo;
+                            $valores_nuevos_audit[$campo] = $valor_nuevo;
+                        }
+                    }
+                } else {
+                    // Si no se pudieron obtener datos antiguos, registrar todos los nuevos
+                    $valores_nuevos_audit = [
+                        'nombre' => $nombre,
+                        'email' => $email,
+                        'status' => $status,
+                        'carrera' => $carrera
+                    ];
+                }
+                
+                registrarAuditoria(
+                    "UPDATE", 
+                    "users", 
+                    $docente_id, 
+                    $valores_antiguos_audit, 
+                    $valores_nuevos_audit, 
+                    "Docentes", 
+                    "Actualización de datos de docente"
+                );
+                
+            } catch (Exception $e) {
+                error_log("Error en auditoría actualizarDocente: " . $e->getMessage());
+            }
+        }
+        
+        // Retorna un array con el resultado de la operación
+        return [
+            'success' => $success,  // True si se actualizó alguna fila
+            'message' => $success 
+                ? 'Docente actualizado correctamente' 
+                : 'No se realizaron cambios',  // Puede ocurrir si los datos son iguales
+            'affected_rows' => $affected_rows
+        ];
+        
+    } catch(Exception $e) {
+        // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR DOCENTE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    isset($datos['id']) ? intval($datos['id']) : null, 
+                    null, 
+                    [
+                        'nombre' => $datos['nombre'] ?? '',
+                        'error' => $e->getMessage()
+                    ], 
+                    "Docentes", 
+                    "Error al actualizar docente"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error actualizarDocente: " . $auditError->getMessage());
+            }
+        }
+        
+        error_log("Error en actualizarDocente: " . $e->getMessage());
+        
+        // Manejo de errores: retorna información sobre el error
+        return [
+            'success' => false,
+            'message' => 'Error al actualizar: ' . $e->getMessage()
+        ];
+    } finally {
+        // Asegura que el statement se cierre si existe
+        if (isset($stmt)) {
+            $stmt->close();
+        }
+    }
 }
 
 function obtenerDocentes() {
-  global $db;
-  
-  $docentes = [];
-  
-  // Preparamos la consulta
-  $stmt = $db->prepare("SELECT id, idusuario, nombre, email, tlf, status 
-                       FROM users 
-                       WHERE docente = 1 
-                       ORDER BY nombre ASC");
-  
-  if ($stmt === false) {
-      die('Error en la preparación de la consulta: ' . $db->error);
-  }
-  
-  // Ejecutamos la consulta
-  if (!$stmt->execute()) {
-      die('Error al ejecutar la consulta: ' . $stmt->error);
-  }
-  
-  // Obtenemos el resultado
-  $result = $stmt->get_result();
-  
-  // Obtenemos todos los registros como array asociativo
-  while ($row = $result->fetch_assoc()) {
-      $docentes[] = $row;
-  }
-  
-  // Cerramos el statement
-  $stmt->close();
-  
-  return $docentes;
+    global $db;
+    
+    try {
+        $docentes = [];
+        
+        // Preparamos la consulta
+        $stmt = $db->prepare("SELECT id, idusuario, nombre, email, tlf, status 
+                             FROM users 
+                             WHERE docente = 1 
+                             ORDER BY nombre ASC");
+        
+        if ($stmt === false) {
+            throw new Exception('Error en la preparación de la consulta: ' . $db->error);
+        }
+        
+        // Ejecutamos la consulta
+        if (!$stmt->execute()) {
+            throw new Exception('Error al ejecutar la consulta: ' . $stmt->error);
+        }
+        
+        // Obtenemos el resultado
+        $result = $stmt->get_result();
+        
+        // Obtenemos todos los registros como array asociativo
+        while ($row = $result->fetch_assoc()) {
+            $docentes[] = $row;
+        }
+        
+        // Cerramos el statement
+        $stmt->close();
+        
+        return $docentes;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerDocentes: " . $e->getMessage());
+        return [];
+    }
 }
-
-
-
-
-
-
 
 /**
  * Obtiene todos los registros de docentes de la base de datos.
@@ -1767,46 +2982,269 @@ function obtenerDocentes() {
  * @return array Array asociativo con todos los docentes encontrados, ordenados por nombre
  */
 function getDocentes() {
-  // Accede a la conexión de la base de datos definida globalmente
-  global $db;
-  
-  // Inicializa el array que contendrá los resultados
-  $docentes = array();
-  
-  // Consulta SQL con parámetro para docente (aunque sea fijo, lo preparamos igual)
-  $sql = "SELECT * FROM users WHERE docente = ? ORDER BY nombre ASC";
-  
-  // Prepara la sentencia SQL
-  if ($stmt = $db->prepare($sql)) {
-      // Valor fijo para docente (1 = true)
-      $docente = 1;
-      
-      // Vincula el parámetro (aunque sea fijo, se trata como parámetro)
-      $stmt->bind_param("i", $docente);
-      
-      // Ejecuta la consulta
-      $stmt->execute();
-      
-      // Obtiene el resultado
-      $result = $stmt->get_result();
-      
-      // Recorre los resultados y los agrega al array
-      while ($row = $result->fetch_assoc()) {
-          $docentes[] = $row;
-      }
-      
-      // Cierra el statement y libera memoria
-      $stmt->close();
-      
-      // Libera el resultado (no es estrictamente necesario ya que close() lo hace)
-      if (isset($result)) {
-          $result->free();
-      }
-  }
-  
-  // Retorna el array de docentes (vacío si no hay resultados)
-  return $docentes;
+    // Accede a la conexión de la base de datos definida globalmente
+    global $db;
+    
+    try {
+        // Inicializa el array que contendrá los resultados
+        $docentes = array();
+        
+        // Consulta SQL con parámetro para docente (aunque sea fijo, lo preparamos igual)
+        $sql = "SELECT * FROM users WHERE docente = ? ORDER BY nombre ASC";
+        
+        // Prepara la sentencia SQL
+        if ($stmt = $db->prepare($sql)) {
+            // Valor fijo para docente (1 = true)
+            $docente = 1;
+            
+            // Vincula el parámetro (aunque sea fijo, se trata como parámetro)
+            $stmt->bind_param("i", $docente);
+            
+            // Ejecuta la consulta
+            $stmt->execute();
+            
+            // Obtiene el resultado
+            $result = $stmt->get_result();
+            
+            // Recorre los resultados y los agrega al array
+            while ($row = $result->fetch_assoc()) {
+                $docentes[] = $row;
+            }
+            
+            // Cierra el statement y libera memoria
+            $stmt->close();
+            
+            // Libera el resultado (no es estrictamente necesario ya que close() lo hace)
+            if (isset($result)) {
+                $result->free();
+            }
+        }
+        
+        // Retorna el array de docentes (vacío si no hay resultados)
+        return $docentes;
+        
+    } catch (Exception $e) {
+        error_log("Error en getDocentes: " . $e->getMessage());
+        return [];
+    }
 }
+
+/**
+ * Cambia el estado de un docente (activo/inactivo)
+ * 
+ * @param int $docente_id ID del docente
+ * @param int $nuevo_estado Nuevo estado (1 para activo, 0 para inactivo)
+ * @return array Resultado de la operación
+ */
+function cambiarEstadoDocente($docente_id, $nuevo_estado) {
+    global $db;
+    
+    try {
+        // Obtener información actual del docente para auditoría
+        $docente_actual = obtenerDocentePorId($docente_id);
+        if (!$docente_actual) {
+            return [
+                'success' => false,
+                'message' => 'Docente no encontrado'
+            ];
+        }
+
+        $stmt = $db->prepare("UPDATE users SET status = ? WHERE id = ? AND docente = 1");
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("ii", $nuevo_estado, $docente_id);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - CAMBIO DE ESTADO DE DOCENTE
+        if ($affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                $estado_texto_anterior = $docente_actual['status'] ? 'Activo' : 'Inactivo';
+                $estado_texto_nuevo = $nuevo_estado ? 'Activo' : 'Inactivo';
+                
+                registrarAuditoria(
+                    "UPDATE", 
+                    "users", 
+                    $docente_id, 
+                    [
+                        'status' => $docente_actual['status'],
+                        'estado_anterior' => $estado_texto_anterior
+                    ], 
+                    [
+                        'status' => $nuevo_estado,
+                        'estado_nuevo' => $estado_texto_nuevo,
+                        'nombre_docente' => $docente_actual['nombre'],
+                        'idusuario' => $docente_actual['idusuario']
+                    ], 
+                    "Docentes", 
+                    "Cambio de estado de docente"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría cambiarEstadoDocente: " . $e->getMessage());
+            }
+        }
+        
+        return [
+            'success' => true,
+            'message' => 'Estado del docente actualizado exitosamente',
+            'affected_rows' => $affected_rows
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Error en cambiarEstadoDocente: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL CAMBIAR ESTADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $docente_id, 
+                    null, 
+                    [
+                        'nuevo_estado' => $nuevo_estado,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Docentes", 
+                    "Error al cambiar estado de docente"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error cambiarEstadoDocente: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al cambiar estado del docente: ' . $e->getMessage()
+        ];
+    }
+}
+
+/**
+ * Elimina un docente (eliminación lógica)
+ * 
+ * @param int $docente_id ID del docente a eliminar
+ * @return array Resultado de la operación
+ */
+function eliminarDocente($docente_id) {
+    global $db;
+    
+    try {
+        // Obtener información del docente antes de eliminar
+        $docente_info = obtenerDocentePorId($docente_id);
+        if (!$docente_info) {
+            return [
+                'success' => false,
+                'message' => 'Docente no encontrado'
+            ];
+        }
+
+        // Verificar si el docente tiene asignaciones activas
+        $check_asignaciones = $db->prepare("SELECT COUNT(*) as total FROM docente_seccion WHERE id_usuario = ? AND estatus = 1");
+        if ($check_asignaciones) {
+            $check_asignaciones->bind_param("i", $docente_id);
+            $check_asignaciones->execute();
+            $result = $check_asignaciones->get_result();
+            $asignaciones_count = $result->fetch_assoc()['total'];
+            $check_asignaciones->close();
+            
+            if ($asignaciones_count > 0) {
+                return [
+                    'success' => false,
+                    'message' => "No se puede eliminar el docente porque tiene $asignaciones_count asignación(es) activa(s)"
+                ];
+            }
+        }
+
+        // Realizar eliminación lógica (desactivar)
+        $query = "UPDATE users SET status = 0, docente = 0 WHERE id = ?";
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $docente_id);
+        $resultado = $stmt->execute();
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+        
+        if ($resultado && $affected_rows > 0) {
+            // REGISTRAR EN AUDITORÍA - ELIMINACIÓN DE DOCENTE
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "users", 
+                        $docente_id, 
+                        [
+                            'status' => $docente_info['status'],
+                            'docente' => $docente_info['docente'],
+                            'nombre_docente' => $docente_info['nombre'],
+                            'idusuario' => $docente_info['idusuario']
+                        ], 
+                        [
+                            'status' => 0,
+                            'docente' => 0,
+                            'estado' => 'Eliminado (desactivado)'
+                        ], 
+                        "Docentes", 
+                        "Eliminación lógica de docente"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarDocente: " . $e->getMessage());
+                }
+            }
+            
+            return [
+                'success' => true,
+                'message' => 'Docente eliminado exitosamente',
+                'affected_rows' => $affected_rows
+            ];
+        } else {
+            return [
+                'success' => false,
+                'message' => 'No se realizaron cambios en el docente'
+            ];
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarDocente: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR DOCENTE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $docente_id, 
+                    null, 
+                    [
+                        'docente_id' => $docente_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Docentes", 
+                    "Error al eliminar docente"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarDocente: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al eliminar docente: ' . $e->getMessage()
+        ];
+    }
+}
+
 
 
 
@@ -1923,6 +3361,10 @@ function updateUserStatus($user_id, $new_status) {
 
 
 
+//CARRERA-MATERIAS**********************************************************
+
+
+
 /**
  * Obtiene todas las carreras activas de la base de datos
  * 
@@ -1931,52 +3373,52 @@ function updateUserStatus($user_id, $new_status) {
  *               Array vacío si no hay resultados o en caso de error
  */
 function obtenerCarrerasActivas() {
-  global $db; // Conexión MySQLi global
-  
-  $carreras = []; // Array para almacenar resultados
-  
-  // Consulta SQL con parámetro para estado activo
-  $query = "SELECT id_carrera, nombre_carrera, cod_carrera 
-            FROM carreras 
-            WHERE activa = ? 
-            ORDER BY nombre_carrera";
-  
-  // Preparamos la sentencia
-  if ($stmt = $db->prepare($query)) {
-      try {
-          // Valor para carreras activas (1 = true)
-          $activa = 1;
-          
-          // Vinculamos parámetro (i = integer)
-          $stmt->bind_param("i", $activa);
-          
-          // Ejecutamos la consulta
-          $stmt->execute();
-          
-          // Obtenemos resultados
-          $result = $stmt->get_result();
-          
-          // Procesamos cada fila
-          while ($row = $result->fetch_assoc()) {
-              $carreras[] = $row;
-          }
-          
-          // Liberamos memoria del resultado
-          $result->free();
-          
-      } catch (Exception $e) {
-          // Registramos error sin interrumpir el flujo
-          error_log("Error en obtenerCarrerasActivas: " . $e->getMessage());
-      } finally {
-          // Cerramos el statement siempre
-          $stmt->close();
-      }
-  } else {
-      // Error en preparación de consulta
-      error_log("Error preparando consulta: " . $db->error);
-  }
-  
-  return $carreras;
+    global $db; // Conexión MySQLi global
+    
+    $carreras = []; // Array para almacenar resultados
+    
+    // Consulta SQL con parámetro para estado activo
+    $query = "SELECT id_carrera, nombre_carrera, cod_carrera 
+              FROM carreras 
+              WHERE activa = ? 
+              ORDER BY nombre_carrera";
+    
+    // Preparamos la sentencia
+    if ($stmt = $db->prepare($query)) {
+        try {
+            // Valor para carreras activas (1 = true)
+            $activa = 1;
+            
+            // Vinculamos parámetro (i = integer)
+            $stmt->bind_param("i", $activa);
+            
+            // Ejecutamos la consulta
+            $stmt->execute();
+            
+            // Obtenemos resultados
+            $result = $stmt->get_result();
+            
+            // Procesamos cada fila
+            while ($row = $result->fetch_assoc()) {
+                $carreras[] = $row;
+            }
+            
+            // Liberamos memoria del resultado
+            $result->free();
+            
+        } catch (Exception $e) {
+            // Registramos error sin interrumpir el flujo
+            error_log("Error en obtenerCarrerasActivas: " . $e->getMessage());
+        } finally {
+            // Cerramos el statement siempre
+            $stmt->close();
+        }
+    } else {
+        // Error en preparación de consulta
+        error_log("Error preparando consulta: " . $db->error);
+    }
+    
+    return $carreras;
 }
 
 /**
@@ -1988,54 +3430,54 @@ function obtenerCarrerasActivas() {
  *               Array vacío si no hay resultados o en caso de error
  */
 function obtenerMateriasDisponibles($id_carrera) {
-  global $db; // Conexión MySQLi global
-  
-  $materias = []; // Array para almacenar resultados
-  
-  // Consulta SQL con parámetros preparados
-  $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia 
-            FROM materias m
-            WHERE m.activa = 1 
-            AND m.id_materia NOT IN (
-                SELECT cm.id_materia 
-                FROM carrera_materia cm 
-                WHERE cm.id_carrera = ?
-            ) 
-            ORDER BY m.nombre_materia";
-  
-  // Preparamos la sentencia
-  if ($stmt = $db->prepare($query)) {
-      try {
-          // Vinculamos parámetro (i = integer)
-          $stmt->bind_param("i", $id_carrera);
-          
-          // Ejecutamos la consulta
-          $stmt->execute();
-          
-          // Obtenemos resultados
-          $result = $stmt->get_result();
-          
-          // Procesamos cada fila
-          while ($row = $result->fetch_assoc()) {
-              $materias[] = $row;
-          }
-          
-          // Liberamos memoria del resultado
-          $result->free();
-          
-      } catch (Exception $e) {
-          // Registramos error sin interrumpir el flujo
-          error_log("Error en obtenerMateriasDisponibles: " . $e->getMessage());
-      } finally {
-          // Cerramos el statement siempre
-          $stmt->close();
-      }
-  } else {
-      // Error en preparación de consulta
-      error_log("Error preparando consulta: " . $db->error);
-  }
-  
-  return $materias;
+    global $db; // Conexión MySQLi global
+    
+    $materias = []; // Array para almacenar resultados
+    
+    // Consulta SQL con parámetros preparados
+    $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia 
+              FROM materias m
+              WHERE m.activa = 1 
+              AND m.id_materia NOT IN (
+                  SELECT cm.id_materia 
+                  FROM carrera_materia cm 
+                  WHERE cm.id_carrera = ?
+              ) 
+              ORDER BY m.nombre_materia";
+    
+    // Preparamos la sentencia
+    if ($stmt = $db->prepare($query)) {
+        try {
+            // Vinculamos parámetro (i = integer)
+            $stmt->bind_param("i", $id_carrera);
+            
+            // Ejecutamos la consulta
+            $stmt->execute();
+            
+            // Obtenemos resultados
+            $result = $stmt->get_result();
+            
+            // Procesamos cada fila
+            while ($row = $result->fetch_assoc()) {
+                $materias[] = $row;
+            }
+            
+            // Liberamos memoria del resultado
+            $result->free();
+            
+        } catch (Exception $e) {
+            // Registramos error sin interrumpir el flujo
+            error_log("Error en obtenerMateriasDisponibles: " . $e->getMessage());
+        } finally {
+            // Cerramos el statement siempre
+            $stmt->close();
+        }
+    } else {
+        // Error en preparación de consulta
+        error_log("Error preparando consulta: " . $db->error);
+    }
+    
+    return $materias;
 }
 
 /**
@@ -2051,51 +3493,51 @@ function obtenerMateriasDisponibles($id_carrera) {
  *               Array vacío si no hay resultados o en caso de error
  */
 function obtenerMateriasAsignadas($id_carrera) {
-  global $db; // Conexión MySQLi global
-  
-  $materias = []; // Array para almacenar resultados
-  
-  // Consulta SQL con JOIN y parámetro preparado
-  $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia, 
-                   cm.semestre, cm.id_relacion
-            FROM carrera_materia cm
-            JOIN materias m ON cm.id_materia = m.id_materia
-            WHERE cm.id_carrera = ?
-            ORDER BY cm.semestre, m.nombre_materia";
-  
-  // Preparamos la sentencia
-  if ($stmt = $db->prepare($query)) {
-      try {
-          // Vinculamos parámetro (i = integer)
-          $stmt->bind_param("i", $id_carrera);
-          
-          // Ejecutamos la consulta
-          $stmt->execute();
-          
-          // Obtenemos resultados
-          $result = $stmt->get_result();
-          
-          // Procesamos cada fila
-          while ($row = $result->fetch_assoc()) {
-              $materias[] = $row;
-          }
-          
-          // Liberamos memoria del resultado
-          $result->free();
-          
-      } catch (Exception $e) {
-          // Registramos error sin interrumpir el flujo
-          error_log("Error en obtenerMateriasAsignadas: " . $e->getMessage());
-      } finally {
-          // Cerramos el statement siempre
-          $stmt->close();
-      }
-  } else {
-      // Error en preparación de consulta
-      error_log("Error preparando consulta: " . $db->error);
-  }
-  
-  return $materias;
+    global $db; // Conexión MySQLi global
+    
+    $materias = []; // Array para almacenar resultados
+    
+    // Consulta SQL con JOIN y parámetro preparado
+    $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia, 
+                     cm.semestre, cm.id_relacion
+              FROM carrera_materia cm
+              JOIN materias m ON cm.id_materia = m.id_materia
+              WHERE cm.id_carrera = ?
+              ORDER BY cm.semestre, m.nombre_materia";
+    
+    // Preparamos la sentencia
+    if ($stmt = $db->prepare($query)) {
+        try {
+            // Vinculamos parámetro (i = integer)
+            $stmt->bind_param("i", $id_carrera);
+            
+            // Ejecutamos la consulta
+            $stmt->execute();
+            
+            // Obtenemos resultados
+            $result = $stmt->get_result();
+            
+            // Procesamos cada fila
+            while ($row = $result->fetch_assoc()) {
+                $materias[] = $row;
+            }
+            
+            // Liberamos memoria del resultado
+            $result->free();
+            
+        } catch (Exception $e) {
+            // Registramos error sin interrumpir el flujo
+            error_log("Error en obtenerMateriasAsignadas: " . $e->getMessage());
+        } finally {
+            // Cerramos el statement siempre
+            $stmt->close();
+        }
+    } else {
+        // Error en preparación de consulta
+        error_log("Error preparando consulta: " . $db->error);
+    }
+    
+    return $materias;
 }
 
 /**
@@ -2109,60 +3551,113 @@ function obtenerMateriasAsignadas($id_carrera) {
  *               - 'message': string descriptivo
  */
 function asignarMateriaACarrera($id_carrera, $id_materia, $semestre) {
-  global $db;
+    global $db;
 
-  // 1. Verificar si ya existe la asignación (con prepared statement)
-  $check_query = "SELECT id_relacion FROM carrera_materia 
-                 WHERE id_carrera = ? AND id_materia = ?";
-  
-  if ($check_stmt = $db->prepare($check_query)) {
-      $check_stmt->bind_param("ii", $id_carrera, $id_materia);
-      $check_stmt->execute();
-      $check_result = $check_stmt->get_result();
-      
-      if ($check_result->num_rows > 0) {
-          $check_stmt->close();
-          return [
-              'success' => false, 
-              'message' => 'La materia ya está asignada a esta carrera'
-          ];
-      }
-      $check_stmt->close();
-  } else {
-      return [
-          'success' => false,
-          'message' => 'Error al verificar asignación: ' . $db->error
-      ];
-  }
+    try {
+        // Obtener información para auditoría
+        $carrera_info = obtenerCarreraPorId($id_carrera);
+        $materia_info = obtenerMateriaPorId($db, $id_materia);
 
-  // 2. Insertar nueva asignación (con prepared statement)
-  $insert_query = "INSERT INTO carrera_materia 
-                  (id_carrera, id_materia, semestre) 
-                  VALUES (?, ?, ?)";
-  
-  if ($insert_stmt = $db->prepare($insert_query)) {
-      $insert_stmt->bind_param("iii", $id_carrera, $id_materia, $semestre);
-      $execute_result = $insert_stmt->execute();
-      $insert_stmt->close();
-      
-      if ($execute_result) {
-          return [
-              'success' => true,
-              'message' => 'Materia asignada correctamente',
-              'insert_id' => $db->insert_id
-          ];
-      } else {
-          return [
-              'success' => false,
-              'message' => 'Error al asignar: ' . $db->error
-          ];
-      }
-  } else {
-      return [
-          'success' => false,
-          'message' => 'Error preparando consulta: ' . $db->error
-      ];
-  }
+        // 1. Verificar si ya existe la asignación (con prepared statement)
+        $check_query = "SELECT id_relacion FROM carrera_materia 
+                       WHERE id_carrera = ? AND id_materia = ?";
+        
+        if ($check_stmt = $db->prepare($check_query)) {
+            $check_stmt->bind_param("ii", $id_carrera, $id_materia);
+            $check_stmt->execute();
+            $check_result = $check_stmt->get_result();
+            
+            if ($check_result->num_rows > 0) {
+                $check_stmt->close();
+                return [
+                    'success' => false, 
+                    'message' => 'La materia ya está asignada a esta carrera'
+                ];
+            }
+            $check_stmt->close();
+        } else {
+            throw new Exception('Error al verificar asignación: ' . $db->error);
+        }
+
+        // 2. Insertar nueva asignación (con prepared statement)
+        $insert_query = "INSERT INTO carrera_materia 
+                        (id_carrera, id_materia, semestre) 
+                        VALUES (?, ?, ?)";
+        
+        if ($insert_stmt = $db->prepare($insert_query)) {
+            $insert_stmt->bind_param("iii", $id_carrera, $id_materia, $semestre);
+            $execute_result = $insert_stmt->execute();
+            $insert_id = $db->insert_id;
+            $insert_stmt->close();
+            
+            if ($execute_result) {
+                // REGISTRAR EN AUDITORÍA - ASIGNACIÓN DE MATERIA A CARRERA
+                if (function_exists('registrarAuditoria')) {
+                    try {
+                        registrarAuditoria(
+                            "INSERT", 
+                            "carrera_materia", 
+                            $insert_id, 
+                            null, 
+                            [
+                                'id_carrera' => $id_carrera,
+                                'carrera_nombre' => $carrera_info['nombre_carrera'] ?? 'Desconocida',
+                                'carrera_codigo' => $carrera_info['cod_carrera'] ?? '',
+                                'id_materia' => $id_materia,
+                                'materia_nombre' => $materia_info['nombre_materia'] ?? 'Desconocida',
+                                'materia_codigo' => $materia_info['cod_materia'] ?? '',
+                                'semestre' => $semestre
+                            ], 
+                            "Carreras-Materias", 
+                            "Asignación de materia a carrera"
+                        );
+                    } catch (Exception $e) {
+                        error_log("Error en auditoría asignarMateriaACarrera: " . $e->getMessage());
+                    }
+                }
+                
+                return [
+                    'success' => true,
+                    'message' => 'Materia asignada correctamente',
+                    'insert_id' => $insert_id
+                ];
+            } else {
+                throw new Exception('Error al asignar: ' . $db->error);
+            }
+        } else {
+            throw new Exception('Error preparando consulta: ' . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en asignarMateriaACarrera: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ASIGNAR MATERIA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carrera_materia", 
+                    null, 
+                    null, 
+                    [
+                        'id_carrera' => $id_carrera,
+                        'id_materia' => $id_materia,
+                        'semestre' => $semestre,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Carreras-Materias", 
+                    "Error al asignar materia a carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error asignarMateriaACarrera: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al asignar materia: ' . $e->getMessage()
+        ];
+    }
 }
 
 /**
@@ -2176,59 +3671,231 @@ function asignarMateriaACarrera($id_carrera, $id_materia, $semestre) {
 function eliminarAsignacionMateria($id_relacion) {
     global $db;
 
-    // 1. Verificar si existe la relación
-    $check_query = "SELECT COUNT(*) AS total FROM carrera_materia WHERE id_relacion = ?";
-    
-    if ($check_stmt = $db->prepare($check_query)) {
-        $check_stmt->bind_param("i", $id_relacion);
-        $check_stmt->execute();
-        $check_result = $check_stmt->get_result();
-        $existe_relacion = $check_result->fetch_assoc()['total'] > 0;
-        $check_stmt->close();
+    try {
+        // 1. Obtener información de la relación para auditoría
+        $info_query = "SELECT cm.*, c.nombre_carrera, c.cod_carrera, 
+                              m.nombre_materia, m.cod_materia
+                       FROM carrera_materia cm
+                       JOIN carreras c ON cm.id_carrera = c.id_carrera
+                       JOIN materias m ON cm.id_materia = m.id_materia
+                       WHERE cm.id_relacion = ?";
         
-        if (!$existe_relacion) {
+        $info_stmt = $db->prepare($info_query);
+        if (!$info_stmt) {
+            throw new Exception('Error al preparar consulta de información: ' . $db->error);
+        }
+        
+        $info_stmt->bind_param("i", $id_relacion);
+        $info_stmt->execute();
+        $info_result = $info_stmt->get_result();
+        $relacion_info = $info_result->fetch_assoc();
+        $info_stmt->close();
+        
+        if (!$relacion_info) {
             return [
                 'success' => false, 
                 'message' => 'No se encontró la relación especificada'
             ];
         }
-    } else {
-        return [
-            'success' => false,
-            'message' => 'Error al verificar la relación: ' . $db->error
-        ];
-    }
 
-    // 2. Eliminar asignación (con prepared statement)
-    $delete_query = "DELETE FROM carrera_materia WHERE id_relacion = ?";
-    
-    if ($delete_stmt = $db->prepare($delete_query)) {
-        $delete_stmt->bind_param("i", $id_relacion);
-        $execute_result = $delete_stmt->execute();
-        $affected_rows = $delete_stmt->affected_rows;
-        $delete_stmt->close();
+        // 2. Eliminar asignación (con prepared statement)
+        $delete_query = "DELETE FROM carrera_materia WHERE id_relacion = ?";
         
-        if ($execute_result && $affected_rows > 0) {
-            return [
-                'success' => true,
-                'message' => 'Asignación eliminada correctamente',
-                'affected_rows' => $affected_rows
-            ];
-        } else {
-            return [
-                'success' => false,
-                'message' => $affected_rows === 0 
+        if ($delete_stmt = $db->prepare($delete_query)) {
+            $delete_stmt->bind_param("i", $id_relacion);
+            $execute_result = $delete_stmt->execute();
+            $affected_rows = $delete_stmt->affected_rows;
+            $delete_stmt->close();
+            
+            if ($execute_result && $affected_rows > 0) {
+                // REGISTRAR EN AUDITORÍA - ELIMINACIÓN DE ASIGNACIÓN
+                if (function_exists('registrarAuditoria')) {
+                    try {
+                        registrarAuditoria(
+                            "DELETE", 
+                            "carrera_materia", 
+                            $id_relacion, 
+                            [
+                                'id_carrera' => $relacion_info['id_carrera'],
+                                'carrera_nombre' => $relacion_info['nombre_carrera'],
+                                'carrera_codigo' => $relacion_info['cod_carrera'],
+                                'id_materia' => $relacion_info['id_materia'],
+                                'materia_nombre' => $relacion_info['nombre_materia'],
+                                'materia_codigo' => $relacion_info['cod_materia'],
+                                'semestre' => $relacion_info['semestre']
+                            ], 
+                            null, 
+                            "Carreras-Materias", 
+                            "Eliminación de asignación materia-carrera"
+                        );
+                    } catch (Exception $e) {
+                        error_log("Error en auditoría eliminarAsignacionMateria: " . $e->getMessage());
+                    }
+                }
+                
+                return [
+                    'success' => true,
+                    'message' => 'Asignación eliminada correctamente',
+                    'affected_rows' => $affected_rows
+                ];
+            } else {
+                throw new Exception($affected_rows === 0 
                     ? 'No se encontró la asignación con el ID proporcionado' 
-                    : 'Error al eliminar: ' . $db->error
-            ];
+                    : 'Error al eliminar: ' . $db->error);
+            }
+        } else {
+            throw new Exception('Error preparando consulta de eliminación: ' . $db->error);
         }
-    } else {
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarAsignacionMateria: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR ASIGNACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carrera_materia", 
+                    $id_relacion, 
+                    null, 
+                    [
+                        'id_relacion' => $id_relacion,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Carreras-Materias", 
+                    "Error al eliminar asignación materia-carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarAsignacionMateria: " . $auditError->getMessage());
+            }
+        }
+        
         return [
             'success' => false,
-            'message' => 'Error preparando consulta de eliminación: ' . $db->error
+            'message' => 'Error al eliminar asignación: ' . $e->getMessage()
         ];
     }
 }
+
+/**
+ * Actualiza el semestre de una asignación materia-carrera
+ * 
+ * @param int $id_relacion ID de la relación materia-carrera
+ * @param int $nuevo_semestre Nuevo número de semestre
+ * @return array Resultado de la operación
+ */
+function actualizarSemestreAsignacion($id_relacion, $nuevo_semestre) {
+    global $db;
+
+    try {
+        // Obtener información actual para auditoría
+        $info_query = "SELECT cm.*, c.nombre_carrera, c.cod_carrera, 
+                              m.nombre_materia, m.cod_materia
+                       FROM carrera_materia cm
+                       JOIN carreras c ON cm.id_carrera = c.id_carrera
+                       JOIN materias m ON cm.id_materia = m.id_materia
+                       WHERE cm.id_relacion = ?";
+        
+        $info_stmt = $db->prepare($info_query);
+        if (!$info_stmt) {
+            throw new Exception('Error al preparar consulta de información: ' . $db->error);
+        }
+        
+        $info_stmt->bind_param("i", $id_relacion);
+        $info_stmt->execute();
+        $info_result = $info_stmt->get_result();
+        $relacion_info = $info_result->fetch_assoc();
+        $info_stmt->close();
+        
+        if (!$relacion_info) {
+            return [
+                'success' => false, 
+                'message' => 'No se encontró la relación especificada'
+            ];
+        }
+
+        // Actualizar el semestre
+        $update_query = "UPDATE carrera_materia SET semestre = ? WHERE id_relacion = ?";
+        
+        if ($update_stmt = $db->prepare($update_query)) {
+            $update_stmt->bind_param("ii", $nuevo_semestre, $id_relacion);
+            $execute_result = $update_stmt->execute();
+            $affected_rows = $update_stmt->affected_rows;
+            $update_stmt->close();
+            
+            if ($execute_result && $affected_rows > 0) {
+                // REGISTRAR EN AUDITORÍA - ACTUALIZACIÓN DE SEMESTRE
+                if (function_exists('registrarAuditoria')) {
+                    try {
+                        registrarAuditoria(
+                            "UPDATE", 
+                            "carrera_materia", 
+                            $id_relacion, 
+                            [
+                                'semestre_anterior' => $relacion_info['semestre'],
+                                'id_carrera' => $relacion_info['id_carrera'],
+                                'carrera_nombre' => $relacion_info['nombre_carrera'],
+                                'id_materia' => $relacion_info['id_materia'],
+                                'materia_nombre' => $relacion_info['nombre_materia']
+                            ], 
+                            [
+                                'semestre_nuevo' => $nuevo_semestre,
+                                'carrera_nombre' => $relacion_info['nombre_carrera'],
+                                'materia_nombre' => $relacion_info['nombre_materia']
+                            ], 
+                            "Carreras-Materias", 
+                            "Actualización de semestre en asignación materia-carrera"
+                        );
+                    } catch (Exception $e) {
+                        error_log("Error en auditoría actualizarSemestreAsignacion: " . $e->getMessage());
+                    }
+                }
+                
+                return [
+                    'success' => true,
+                    'message' => 'Semestre actualizado correctamente',
+                    'affected_rows' => $affected_rows
+                ];
+            } else {
+                throw new Exception($affected_rows === 0 
+                    ? 'No se encontró la asignación o no hubo cambios' 
+                    : 'Error al actualizar: ' . $db->error);
+            }
+        } else {
+            throw new Exception('Error preparando consulta de actualización: ' . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarSemestreAsignacion: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR SEMESTRE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carrera_materia", 
+                    $id_relacion, 
+                    null, 
+                    [
+                        'id_relacion' => $id_relacion,
+                        'nuevo_semestre' => $nuevo_semestre,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Carreras-Materias", 
+                    "Error al actualizar semestre de asignación"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error actualizarSemestreAsignacion: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al actualizar semestre: ' . $e->getMessage()
+        ];
+    }
+}
+
 
 /**
 * Verificación básica de sesión usando $db
@@ -2270,41 +3937,41 @@ function verificarSesion() {
  * @return array Listado de todas las materias con sus datos completos
  */
 function obtenerMaterias($db) {
-  // Inicializamos el array de resultados
-  $materias = [];
-  
-  // Definimos la consulta SQL (aunque no tiene parámetros, usamos prepared statement por consistencia)
-  $query = "SELECT * FROM materias ORDER BY nombre_materia";
-  
-  // Preparamos la sentencia
-  if ($stmt = $db->prepare($query)) {
-      try {
-          // Ejecutamos la consulta (no necesita bind_param ya que no tiene parámetros)
-          $stmt->execute();
-          
-          // Obtenemos el resultado
-          $result = $stmt->get_result();
-          
-          // Recorremos los resultados
-          while ($row = $result->fetch_assoc()) {
-              $materias[] = $row;
-          }
-          
-          // Liberamos memoria
-          $result->free();
-          
-      } catch (Exception $e) {
-          // Registramos errores silenciosamente
-          error_log("Error en obtenerMaterias: " . $e->getMessage());
-      } finally {
-          // Cerramos el statement
-          $stmt->close();
-      }
-  } else {
-      error_log("Error preparando consulta: " . $db->error);
-  }
-  
-  return $materias;
+    // Inicializamos el array de resultados
+    $materias = [];
+    
+    // Definimos la consulta SQL (aunque no tiene parámetros, usamos prepared statement por consistencia)
+    $query = "SELECT * FROM materias ORDER BY nombre_materia";
+    
+    // Preparamos la sentencia
+    if ($stmt = $db->prepare($query)) {
+        try {
+            // Ejecutamos la consulta (no necesita bind_param ya que no tiene parámetros)
+            $stmt->execute();
+            
+            // Obtenemos el resultado
+            $result = $stmt->get_result();
+            
+            // Recorremos los resultados
+            while ($row = $result->fetch_assoc()) {
+                $materias[] = $row;
+            }
+            
+            // Liberamos memoria
+            $result->free();
+            
+        } catch (Exception $e) {
+            // Registramos errores silenciosamente
+            error_log("Error en obtenerMaterias: " . $e->getMessage());
+        } finally {
+            // Cerramos el statement
+            $stmt->close();
+        }
+    } else {
+        error_log("Error preparando consulta: " . $db->error);
+    }
+    
+    return $materias;
 }
 
 /**
@@ -2315,32 +3982,32 @@ function obtenerMaterias($db) {
  * @return array|null Array asociativo con los datos de la materia o null si no se encuentra
  */
 function obtenerMateriaPorId($db, $id) {
-  // Preparamos la consulta SQL con un parámetro de sustitución (?)
-  $query = "SELECT * FROM materias WHERE id_materia = ?";
-  
-  // Preparamos la sentencia
-  $stmt = $db->prepare($query);
-  
-  // Verificamos si la preparación fue exitosa
-  if (!$stmt) {
-      // En caso de error, podrías registrar el error o lanzar una excepción
-      return null;
-  }
-  
-  // Vinculamos el parámetro (i = integer)
-  $stmt->bind_param("i", $id);
-  
-  // Ejecutamos la consulta
-  $stmt->execute();
-  
-  // Obtenemos el resultado de la consulta
-  $result = $stmt->get_result();
-  
-  // Cerramos la sentencia para liberar recursos
-  $stmt->close();
-  
-  // Retornamos el resultado como array asociativo o null si no hay resultados
-  return $result->fetch_assoc() ?: null;
+    // Preparamos la consulta SQL con un parámetro de sustitución (?)
+    $query = "SELECT * FROM materias WHERE id_materia = ?";
+    
+    // Preparamos la sentencia
+    $stmt = $db->prepare($query);
+    
+    // Verificamos si la preparación fue exitosa
+    if (!$stmt) {
+        // En caso de error, podrías registrar el error o lanzar una excepción
+        return null;
+    }
+    
+    // Vinculamos el parámetro (i = integer)
+    $stmt->bind_param("i", $id);
+    
+    // Ejecutamos la consulta
+    $stmt->execute();
+    
+    // Obtenemos el resultado de la consulta
+    $result = $stmt->get_result();
+    
+    // Cerramos la sentencia para liberar recursos
+    $stmt->close();
+    
+    // Retornamos el resultado como array asociativo o null si no hay resultados
+    return $result->fetch_assoc() ?: null;
 }
 
 /**
@@ -2351,141 +4018,259 @@ function obtenerMateriaPorId($db, $id) {
  * @return bool True si la creación fue exitosa, False en caso de error
  */
 function crearMateria($db, $data) {
-  // Validación del campo trayecto (1-5)
-  $trayecto = isset($data['trayecto']) ? (int)$data['trayecto'] : 1;
-  if ($trayecto < 1 || $trayecto > 5) {
-      $trayecto = 1; // Valor por defecto si está fuera de rango
-  }
+    try {
+        // Validación del campo trayecto (1-5)
+        $trayecto = isset($data['trayecto']) ? (int)$data['trayecto'] : 1;
+        if ($trayecto < 1 || $trayecto > 5) {
+            $trayecto = 1; // Valor por defecto si está fuera de rango
+        }
 
-  // Validación de campos booleanos
-  $activa = isset($data['activa']) ? (int)(bool)$data['activa'] : 1;
+        // Validación de campos booleanos
+        $activa = isset($data['activa']) ? (int)(bool)$data['activa'] : 1;
 
-  // Consulta SQL con sentencia preparada
-  $query = "INSERT INTO materias (
-              cod_materia, 
-              nombre_materia, 
-              pnf_ptf, 
-              duracion_periodo, 
-              trayecto,
-              creditos, 
-              activa, 
-              horas_teoricas, 
-              horas_practicas, 
-              created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+        // Consulta SQL con sentencia preparada
+        $query = "INSERT INTO materias (
+                    cod_materia, 
+                    nombre_materia, 
+                    pnf_ptf, 
+                    duracion_periodo, 
+                    trayecto,
+                    creditos, 
+                    activa, 
+                    horas_teoricas, 
+                    horas_practicas, 
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
 
-  // Preparamos la sentencia
-  $stmt = $db->prepare($query);
-  
-  if (!$stmt) {
-      error_log("Error en preparación de query: " . $db->error);
-      return false;
-  }
+        // Preparamos la sentencia
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación de query: " . $db->error);
+        }
 
-  // Validación y asignación de valores
-  $cod_materia = $data['cod_materia'] ?? '';
-  $nombre_materia = $data['nombre_materia'] ?? '';
-  $pnf_ptf = $data['pnf_ptf'] ?? '';
-  $duracion_periodo = isset($data['duracion_periodo']) ? (int)$data['duracion_periodo'] : 0;
-  $creditos = isset($data['creditos']) ? (int)$data['creditos'] : 0;
-  $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
-  $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
+        // Validación y asignación de valores
+        $cod_materia = $data['cod_materia'] ?? '';
+        $nombre_materia = $data['nombre_materia'] ?? '';
+        $pnf_ptf = $data['pnf_ptf'] ?? '';
+        $duracion_periodo = isset($data['duracion_periodo']) ? (int)$data['duracion_periodo'] : 0;
+        $creditos = isset($data['creditos']) ? (int)$data['creditos'] : 0;
+        $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
+        $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
 
-  // Vinculamos parámetros (tipos: s=string, i=integer)
-  $stmt->bind_param("sssiiiiii", 
-      $cod_materia,
-      $nombre_materia,
-      $pnf_ptf,
-      $duracion_periodo,
-      $trayecto,
-      $creditos,
-      $activa,
-      $horas_teoricas,
-      $horas_practicas
-  );
-  
-  // Ejecutamos la sentencia
-  $result = $stmt->execute();
-  
-  if (!$result) {
-      error_log("Error al ejecutar query: " . $stmt->error);
-  }
-  
-  // Cerramos la sentencia
-  $stmt->close();
-  
-  return $result;
+        // Vinculamos parámetros (tipos: s=string, i=integer)
+        $stmt->bind_param("sssiiiiii", 
+            $cod_materia,
+            $nombre_materia,
+            $pnf_ptf,
+            $duracion_periodo,
+            $trayecto,
+            $creditos,
+            $activa,
+            $horas_teoricas,
+            $horas_practicas
+        );
+        
+        // Ejecutamos la sentencia
+        $result = $stmt->execute();
+        
+        if (!$result) {
+            throw new Exception("Error al ejecutar query: " . $stmt->error);
+        }
+        
+        $materia_id = $stmt->insert_id;
+        $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - NUEVA MATERIA CREADA
+        if ($result && function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "INSERT", 
+                    "materias", 
+                    $materia_id, 
+                    null, 
+                    [
+                        'cod_materia' => $cod_materia,
+                        'nombre_materia' => $nombre_materia,
+                        'pnf_ptf' => $pnf_ptf,
+                        'duracion_periodo' => $duracion_periodo,
+                        'trayecto' => $trayecto,
+                        'creditos' => $creditos,
+                        'activa' => $activa,
+                        'horas_teoricas' => $horas_teoricas,
+                        'horas_practicas' => $horas_practicas
+                    ], 
+                    "Materias", 
+                    "Nueva materia creada"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría crearMateria: " . $e->getMessage());
+            }
+        }
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        error_log("Error en crearMateria: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL CREAR MATERIA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "materias", 
+                    null, 
+                    null, 
+                    [
+                        'cod_materia' => $data['cod_materia'] ?? '',
+                        'nombre_materia' => $data['nombre_materia'] ?? '',
+                        'error' => $e->getMessage()
+                    ], 
+                    "Materias", 
+                    "Error al crear nueva materia"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error crearMateria: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
-
-
-
-
-
 function actualizarMateria($db, $id, $data) {
-  // Validar que el ID sea numérico
-  if (!is_numeric($id)) {
-      error_log("Error: ID de materia no válido");
-      return false;
-  }
+    try {
+        // Validar que el ID sea numérico
+        if (!is_numeric($id)) {
+            throw new Exception("ID de materia no válido");
+        }
 
-  // Consulta SQL con sentencia preparada
-  $query = "UPDATE materias SET 
-            cod_materia = ?, 
-            nombre_materia = ?, 
-            pnf_ptf = ?,
-            duracion_periodo = ?,
-            creditos = ?, 
-            activa = ?, 
-            horas_teoricas = ?, 
-            horas_practicas = ?,
-            trayecto = ?
-            WHERE id_materia = ?";
-  
-  // Preparamos la sentencia
-  $stmt = $db->prepare($query);
-  
-  if (!$stmt) {
-      error_log("Error en preparación de query: " . $db->error);
-      return false;
-  }
+        // Obtener datos actuales para auditoría
+        $datos_actuales = obtenerMateriaPorId($db, $id);
+        if (!$datos_actuales) {
+            throw new Exception("Materia no encontrada");
+        }
 
-  // Validación y saneamiento de datos
-  $cod_materia = $data['cod_materia'] ?? '';
-  $nombre_materia = $data['nombre_materia'] ?? '';
-  $pnf_ptf = $data['pnf_ptf'] ?? '';
-  $duracion_periodo = isset($data['duracion_periodo']) ? (int)$data['duracion_periodo'] : 0;
-  $creditos = isset($data['creditos']) ? (int)$data['creditos'] : 0;
-  $activa = isset($data['activa']) ? (int)(bool)$data['activa'] : 0;
-  $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
-  $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
-  $trayecto = isset($data['trayecto']) ? (int)$data['trayecto'] : 0; // Añadido
+        // Consulta SQL con sentencia preparada
+        $query = "UPDATE materias SET 
+                cod_materia = ?, 
+                nombre_materia = ?, 
+                pnf_ptf = ?,
+                duracion_periodo = ?,
+                creditos = ?, 
+                activa = ?, 
+                horas_teoricas = ?, 
+                horas_practicas = ?,
+                trayecto = ?
+                WHERE id_materia = ?";
+        
+        // Preparamos la sentencia
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación de query: " . $db->error);
+        }
 
-  // Vinculamos parámetros (tipos: s=string, i=integer)
-  $stmt->bind_param("sssiiiiiii", // Ahora son 10 'i's
-      $cod_materia,
-      $nombre_materia,
-      $pnf_ptf,
-      $duracion_periodo,
-      $creditos,
-      $activa,
-      $horas_teoricas,
-      $horas_practicas,
-      $trayecto, // Añadido
-      $id
-  );
-  
-  // Ejecutamos la sentencia
-  $result = $stmt->execute();
-  
-  if (!$result) {
-      error_log("Error al actualizar materia: " . $stmt->error);
-  }
-  
-  // Cerramos la sentencia
-  $stmt->close();
-  
-  return $result;
+        // Validación y saneamiento de datos
+        $cod_materia = $data['cod_materia'] ?? '';
+        $nombre_materia = $data['nombre_materia'] ?? '';
+        $pnf_ptf = $data['pnf_ptf'] ?? '';
+        $duracion_periodo = isset($data['duracion_periodo']) ? (int)$data['duracion_periodo'] : 0;
+        $creditos = isset($data['creditos']) ? (int)$data['creditos'] : 0;
+        $activa = isset($data['activa']) ? (int)(bool)$data['activa'] : 0;
+        $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
+        $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
+        $trayecto = isset($data['trayecto']) ? (int)$data['trayecto'] : 0;
+
+        // Vinculamos parámetros (tipos: s=string, i=integer)
+        $stmt->bind_param("sssiiiiiii",
+            $cod_materia,
+            $nombre_materia,
+            $pnf_ptf,
+            $duracion_periodo,
+            $creditos,
+            $activa,
+            $horas_teoricas,
+            $horas_practicas,
+            $trayecto,
+            $id
+        );
+        
+        // Ejecutamos la sentencia
+        $result = $stmt->execute();
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+        
+        if (!$result) {
+            throw new Exception("Error al actualizar materia: " . $stmt->error);
+        }
+        
+        // REGISTRAR EN AUDITORÍA - ACTUALIZACIÓN DE MATERIA
+        if ($result && $affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                $valores_antiguos_audit = [];
+                $valores_nuevos_audit = [];
+                
+                // Comparar campos modificados
+                $campos_auditar = [
+                    'cod_materia', 'nombre_materia', 'pnf_ptf', 'duracion_periodo',
+                    'creditos', 'activa', 'horas_teoricas', 'horas_practicas', 'trayecto'
+                ];
+                
+                foreach ($campos_auditar as $campo) {
+                    $valor_antiguo = $datos_actuales[$campo] ?? null;
+                    $valor_nuevo = $data[$campo] ?? null;
+                    
+                    if ($valor_antiguo != $valor_nuevo) {
+                        $valores_antiguos_audit[$campo] = $valor_antiguo;
+                        $valores_nuevos_audit[$campo] = $valor_nuevo;
+                    }
+                }
+                
+                if (!empty($valores_nuevos_audit)) {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "materias", 
+                        $id, 
+                        $valores_antiguos_audit, 
+                        $valores_nuevos_audit, 
+                        "Materias", 
+                        "Actualización de datos de materia"
+                    );
+                }
+            } catch (Exception $e) {
+                error_log("Error en auditoría actualizarMateria: " . $e->getMessage());
+            }
+        }
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarMateria: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR MATERIA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "materias", 
+                    $id, 
+                    null, 
+                    [
+                        'cod_materia' => $data['cod_materia'] ?? '',
+                        'nombre_materia' => $data['nombre_materia'] ?? '',
+                        'error' => $e->getMessage()
+                    ], 
+                    "Materias", 
+                    "Error al actualizar materia"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error actualizarMateria: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
 /**
@@ -2496,344 +4281,536 @@ function actualizarMateria($db, $id, $data) {
  * @return array|false Retorna el nuevo estado y datos básicos, o false en caso de error
  */
 function toggleMateria($db, $id) {
-    // Validación básica del ID
-    if (!is_numeric($id)) {
-        return false;
-    }
+    try {
+        // Validación básica del ID
+        if (!is_numeric($id)) {
+            throw new Exception("ID de materia no válido");
+        }
 
-    // Consulta directa para alternar el estado
-    $query = "UPDATE materias SET activa = NOT activa WHERE id_materia = ?";
-    $stmt = $db->prepare($query);
-    
-    if (!$stmt) {
+        // Obtener información actual para auditoría
+        $materia_actual = obtenerMateriaPorId($db, $id);
+        if (!$materia_actual) {
+            throw new Exception("Materia no encontrada");
+        }
+
+        // Consulta directa para alternar el estado
+        $query = "UPDATE materias SET activa = NOT activa WHERE id_materia = ?";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación de consulta");
+        }
+        
+        $stmt->bind_param("i", $id);
+        $result = $stmt->execute();
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+        
+        if (!$result) {
+            throw new Exception("Error al ejecutar consulta");
+        }
+        
+        // REGISTRAR EN AUDITORÍA - CAMBIO DE ESTADO DE MATERIA
+        if ($result && $affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                $nuevo_estado = $materia_actual['activa'] ? 0 : 1;
+                $estado_texto_anterior = $materia_actual['activa'] ? 'Activa' : 'Inactiva';
+                $estado_texto_nuevo = $nuevo_estado ? 'Activa' : 'Inactiva';
+                
+                registrarAuditoria(
+                    "UPDATE", 
+                    "materias", 
+                    $id, 
+                    [
+                        'activa' => $materia_actual['activa'],
+                        'estado_anterior' => $estado_texto_anterior
+                    ], 
+                    [
+                        'activa' => $nuevo_estado,
+                        'estado_nuevo' => $estado_texto_nuevo,
+                        'cod_materia' => $materia_actual['cod_materia'],
+                        'nombre_materia' => $materia_actual['nombre_materia']
+                    ], 
+                    "Materias", 
+                    "Cambio de estado de materia"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría toggleMateria: " . $e->getMessage());
+            }
+        }
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        error_log("Error en toggleMateria: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL CAMBIAR ESTADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "materias", 
+                    $id, 
+                    null, 
+                    [
+                        'id_materia' => $id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Materias", 
+                    "Error al cambiar estado de materia"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error toggleMateria: " . $auditError->getMessage());
+            }
+        }
+        
         return false;
     }
-    
-    $stmt->bind_param("i", $id);
-    $result = $stmt->execute();
-    $stmt->close();
-    
-    return $result;
 }
-
-
-
-
-
-
-
-
-
 
 /* ================================== */
 /* FUNCIONES PARA MANEJO DE MATERIAS */
 /* ================================== */
 
-
 if (!function_exists('getAllMaterias')) {
-  /**
-   * Obtiene todas las materias de la base de datos usando sentencias preparadas
-   * 
-   * @return array Lista de materias o array vacío si hay error
-   */
-  function getAllMaterias() {
-      global $db;
-      
-      // Consulta SQL para obtener todas las materias
-      $query = "SELECT id, cod_materia, nombre_materia, creditos, 
-                       horas_teoricas, horas_practicas, activa 
-                FROM materias 
-                ORDER BY nombre_materia ASC";
-      
-      // Preparamos la sentencia
-      $stmt = $db->prepare($query);
-      
-      // Verificamos si la preparación fue exitosa
-      if (!$stmt) {
-          error_log("Error al preparar la consulta en getAllMaterias: ".$db->error);
-          return [];
-      }
-      
-      // Ejecutamos la sentencia
-      if (!$stmt->execute()) {
-          error_log("Error al ejecutar la consulta en getAllMaterias: ".$stmt->error);
-          $stmt->close();
-          return [];
-      }
-      
-      // Obtenemos el resultado
-      $result = $stmt->get_result();
-      
-      // Verificamos si obtuvimos resultados
-      if (!$result) {
-          error_log("Error al obtener resultados en getAllMaterias: ".$stmt->error);
-          $stmt->close();
-          return [];
-      }
-      
-      // Procesamos los resultados
-      $listaMaterias = [];
-      while ($row = $result->fetch_assoc()) {
-          $listaMaterias[] = $row;
-      }
-      
-      // Cerramos la sentencia
-      $stmt->close();
-      
-      return $listaMaterias;
-  }
+    /**
+     * Obtiene todas las materias de la base de datos usando sentencias preparadas
+     * 
+     * @return array Lista de materias o array vacío si hay error
+     */
+    function getAllMaterias() {
+        global $db;
+        
+        // Consulta SQL para obtener todas las materias
+        $query = "SELECT id, cod_materia, nombre_materia, creditos, 
+                         horas_teoricas, horas_practicas, activa 
+                  FROM materias 
+                  ORDER BY nombre_materia ASC";
+        
+        // Preparamos la sentencia
+        $stmt = $db->prepare($query);
+        
+        // Verificamos si la preparación fue exitosa
+        if (!$stmt) {
+            error_log("Error al preparar la consulta en getAllMaterias: ".$db->error);
+            return [];
+        }
+        
+        // Ejecutamos la sentencia
+        if (!$stmt->execute()) {
+            error_log("Error al ejecutar la consulta en getAllMaterias: ".$stmt->error);
+            $stmt->close();
+            return [];
+        }
+        
+        // Obtenemos el resultado
+        $result = $stmt->get_result();
+        
+        // Verificamos si obtuvimos resultados
+        if (!$result) {
+            error_log("Error al obtener resultados en getAllMaterias: ".$stmt->error);
+            $stmt->close();
+            return [];
+        }
+        
+        // Procesamos los resultados
+        $listaMaterias = [];
+        while ($row = $result->fetch_assoc()) {
+            $listaMaterias[] = $row;
+        }
+        
+        // Cerramos la sentencia
+        $stmt->close();
+        
+        return $listaMaterias;
+    }
 }
 
 if (!function_exists('getMateriaById')) {
-  /**
-   * Obtiene una materia específica por su ID usando sentencias preparadas
-   * 
-   * @param int $id ID de la materia a buscar
-   * @return array|null Array asociativo con los datos de la materia o null si no se encuentra o hay error
-   */
-  function getMateriaById($id) {
-      global $db;
-      
-      // Validación básica del parámetro de entrada
-      if (!is_numeric($id) || $id <= 0) {
-          error_log("Error en getMateriaById: ID inválido");
-          return null;
-      }
-      
-      // Consulta SQL para obtener una materia por ID
-      $query = "SELECT id, cod_materia, nombre_materia, creditos, 
-                       horas_teoricas, horas_practicas, activa 
-                FROM materias 
-                WHERE id = ?";
-      
-      // Preparamos la sentencia
-      $stmt = $db->prepare($query);
-      
-      // Verificamos si la preparación fue exitosa
-      if (!$stmt) {
-          error_log("Error al preparar la consulta en getMateriaById: ".$db->error);
-          return null;
-      }
-      
-      // Vinculamos el parámetro (i = integer)
-      $bindResult = $stmt->bind_param("i", $id);
-      if (!$bindResult) {
-          error_log("Error al vincular parámetros en getMateriaById: ".$stmt->error);
-          $stmt->close();
-          return null;
-      }
-      
-      // Ejecutamos la sentencia
-      if (!$stmt->execute()) {
-          error_log("Error al ejecutar la consulta en getMateriaById: ".$stmt->error);
-          $stmt->close();
-          return null;
-      }
-      
-      // Obtenemos el resultado
-      $result = $stmt->get_result();
-      
-      // Verificamos si obtuvimos resultados
-      if (!$result) {
-          error_log("Error al obtener resultados en getMateriaById: ".$stmt->error);
-          $stmt->close();
-          return null;
-      }
-      
-      // Obtenemos la fila como array asociativo
-      $materia = $result->fetch_assoc();
-      
-      // Cerramos la sentencia
-      $stmt->close();
-      
-      // Retornamos el resultado (puede ser null si no se encontró la materia)
-      return $materia;
-  }
+    /**
+     * Obtiene una materia específica por su ID usando sentencias preparadas
+     * 
+     * @param int $id ID de la materia a buscar
+     * @return array|null Array asociativo con los datos de la materia o null si no se encuentra o hay error
+     */
+    function getMateriaById($id) {
+        global $db;
+        
+        // Validación básica del parámetro de entrada
+        if (!is_numeric($id) || $id <= 0) {
+            error_log("Error en getMateriaById: ID inválido");
+            return null;
+        }
+        
+        // Consulta SQL para obtener una materia por ID
+        $query = "SELECT id, cod_materia, nombre_materia, creditos, 
+                         horas_teoricas, horas_practicas, activa 
+                  FROM materias 
+                  WHERE id = ?";
+        
+        // Preparamos la sentencia
+        $stmt = $db->prepare($query);
+        
+        // Verificamos si la preparación fue exitosa
+        if (!$stmt) {
+            error_log("Error al preparar la consulta en getMateriaById: ".$db->error);
+            return null;
+        }
+        
+        // Vinculamos el parámetro (i = integer)
+        $bindResult = $stmt->bind_param("i", $id);
+        if (!$bindResult) {
+            error_log("Error al vincular parámetros en getMateriaById: ".$stmt->error);
+            $stmt->close();
+            return null;
+        }
+        
+        // Ejecutamos la sentencia
+        if (!$stmt->execute()) {
+            error_log("Error al ejecutar la consulta en getMateriaById: ".$stmt->error);
+            $stmt->close();
+            return null;
+        }
+        
+        // Obtenemos el resultado
+        $result = $stmt->get_result();
+        
+        // Verificamos si obtuvimos resultados
+        if (!$result) {
+            error_log("Error al obtener resultados en getMateriaById: ".$stmt->error);
+            $stmt->close();
+            return null;
+        }
+        
+        // Obtenemos la fila como array asociativo
+        $materia = $result->fetch_assoc();
+        
+        // Cerramos la sentencia
+        $stmt->close();
+        
+        // Retornamos el resultado (puede ser null si no se encontró la materia)
+        return $materia;
+    }
 }
 
 if (!function_exists('toggleMateriaStatus')) {
-  /**
-   * Cambia el estado activo/inactivo de una materia (toggle)
-   * 
-   * @param int $id ID de la materia a modificar
-   * @return array|false Retorna un array con información del resultado o false en caso de error
-   */
-  function toggleMateriaStatus($id) {
-      global $db;
-      
-      // Validación del ID de entrada
-      if (!is_numeric($id) || $id <= 0) {
-          error_log("Error en toggleMateriaStatus: ID inválido ($id)");
-          return false;
-      }
-      
-      // Preparamos la consulta para cambiar el estado
-      $query = "UPDATE materias SET activa = NOT activa WHERE id = ?";
-      $stmt = $db->prepare($query);
-      
-      // Verificamos si la preparación fue exitosa
-      if (!$stmt) {
-          error_log("Error al preparar la consulta en toggleMateriaStatus: ".$db->error);
-          return false;
-      }
-      
-      // Vinculamos el parámetro (i = integer)
-      if (!$stmt->bind_param("i", $id)) {
-          error_log("Error al vincular parámetro en toggleMateriaStatus: ".$stmt->error);
-          $stmt->close();
-          return false;
-      }
-      
-      // Ejecutamos la consulta
-      if (!$stmt->execute()) {
-          error_log("Error al ejecutar consulta en toggleMateriaStatus: ".$stmt->error);
-          $stmt->close();
-          return false;
-      }
-      
-      // Obtenemos el número de filas afectadas
-      $affectedRows = $stmt->affected_rows;
-      
-      // Cerramos la sentencia
-      $stmt->close();
-      
-      // Verificamos si realmente se actualizó algún registro
-      if ($affectedRows === 0) {
-          error_log("Advertencia en toggleMateriaStatus: Ningún registro actualizado (ID: $id)");
-          return [
-              'success' => false,
-              'message' => 'No se encontró la materia con el ID proporcionado',
-              'affected_rows' => 0
-          ];
-      }
-      
-      // Retornamos información sobre la operación exitosa
-      return [
-          'success' => true,
-          'message' => 'Estado de la materia actualizado correctamente',
-          'affected_rows' => $affectedRows
-      ];
-  }
+    /**
+     * Cambia el estado activo/inactivo de una materia (toggle)
+     * 
+     * @param int $id ID de la materia a modificar
+     * @return array|false Retorna un array con información del resultado o false en caso de error
+     */
+    function toggleMateriaStatus($id) {
+        global $db;
+        
+        try {
+            // Validación del ID de entrada
+            if (!is_numeric($id) || $id <= 0) {
+                throw new Exception("ID inválido ($id)");
+            }
+            
+            // Obtener información actual para auditoría
+            $materia_actual = getMateriaById($id);
+            if (!$materia_actual) {
+                throw new Exception("Materia no encontrada");
+            }
+            
+            // Preparamos la consulta para cambiar el estado
+            $query = "UPDATE materias SET activa = NOT activa WHERE id = ?";
+            $stmt = $db->prepare($query);
+            
+            // Verificamos si la preparación fue exitosa
+            if (!$stmt) {
+                throw new Exception("Error al preparar la consulta: ".$db->error);
+            }
+            
+            // Vinculamos el parámetro (i = integer)
+            if (!$stmt->bind_param("i", $id)) {
+                throw new Exception("Error al vincular parámetro: ".$stmt->error);
+            }
+            
+            // Ejecutamos la consulta
+            if (!$stmt->execute()) {
+                throw new Exception("Error al ejecutar consulta: ".$stmt->error);
+            }
+            
+            // Obtenemos el número de filas afectadas
+            $affectedRows = $stmt->affected_rows;
+            
+            // Cerramos la sentencia
+            $stmt->close();
+            
+            // Verificamos si realmente se actualizó algún registro
+            if ($affectedRows === 0) {
+                return [
+                    'success' => false,
+                    'message' => 'No se encontró la materia con el ID proporcionado',
+                    'affected_rows' => 0
+                ];
+            }
+            
+            // REGISTRAR EN AUDITORÍA - CAMBIO DE ESTADO DE MATERIA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    $nuevo_estado = $materia_actual['activa'] ? 0 : 1;
+                    $estado_texto_anterior = $materia_actual['activa'] ? 'Activa' : 'Inactiva';
+                    $estado_texto_nuevo = $nuevo_estado ? 'Activa' : 'Inactiva';
+                    
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "materias", 
+                        $id, 
+                        [
+                            'activa' => $materia_actual['activa'],
+                            'estado_anterior' => $estado_texto_anterior
+                        ], 
+                        [
+                            'activa' => $nuevo_estado,
+                            'estado_nuevo' => $estado_texto_nuevo,
+                            'cod_materia' => $materia_actual['cod_materia'],
+                            'nombre_materia' => $materia_actual['nombre_materia']
+                        ], 
+                        "Materias", 
+                        "Cambio de estado de materia"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría toggleMateriaStatus: " . $e->getMessage());
+                }
+            }
+            
+            // Retornamos información sobre la operación exitosa
+            return [
+                'success' => true,
+                'message' => 'Estado de la materia actualizado correctamente',
+                'affected_rows' => $affectedRows
+            ];
+            
+        } catch (Exception $e) {
+            error_log("Error en toggleMateriaStatus: " . $e->getMessage());
+            
+            // REGISTRAR EN AUDITORÍA - ERROR AL CAMBIAR ESTADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "materias", 
+                        $id, 
+                        null, 
+                        [
+                            'id_materia' => $id,
+                            'error' => $e->getMessage()
+                        ], 
+                        "Materias", 
+                        "Error al cambiar estado de materia"
+                    );
+                } catch (Exception $auditError) {
+                    error_log("Error en auditoría de error toggleMateriaStatus: " . $auditError->getMessage());
+                }
+            }
+            
+            return false;
+        }
+    }
 }
 
 if (!function_exists('guardarMateria')) {
-  /**
-   * Guarda o actualiza una materia en la base de datos
-   * 
-   * @param array $datos Array con los datos de la materia
-   *        Requeridos: cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, activa
-   *        Opcional: id (para actualización)
-   * @return array|false Retorna array con info de la operación o false en error grave
-   */
-  function guardarMateria($datos) {
-      global $db;
-      
-      // Validación de datos requeridos
-      $camposRequeridos = ['cod_materia', 'nombre_materia', 'creditos', 
-                          'horas_teoricas', 'horas_practicas', 'activa'];
-      
-      foreach ($camposRequeridos as $campo) {
-          if (!isset($datos[$campo])) {
-              error_log("Error en guardarMateria: Falta el campo requerido '$campo'");
-              return [
-                  'success' => false,
-                  'message' => "Falta el campo requerido '$campo'"
-              ];
-          }
-      }
-      
-      // Determinar si es inserción o actualización
-      $esNueva = empty($datos['id']);
-      
-      try {
-          if ($esNueva) {
-              // INSERT de nueva materia
-              $query = "INSERT INTO materias 
-                       (cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, activa) 
-                       VALUES (?, ?, ?, ?, ?, ?)";
-              $stmt = $db->prepare($query);
-              
-              if (!$stmt) {
-                  error_log("Error preparando INSERT: ".$db->error);
-                  return false;
-              }
-              
-              $stmt->bind_param("ssiiii", 
-                  $datos['cod_materia'],
-                  $datos['nombre_materia'],
-                  $datos['creditos'],
-                  $datos['horas_teoricas'],
-                  $datos['horas_practicas'],
-                  $datos['activa']);
-          } else {
-              // UPDATE de materia existente
-              $query = "UPDATE materias SET 
-                       cod_materia = ?, 
-                       nombre_materia = ?, 
-                       creditos = ?, 
-                       horas_teoricas = ?, 
-                       horas_practicas = ?, 
-                       activa = ? 
-                       WHERE id = ?";
-              $stmt = $db->prepare($query);
-              
-              if (!$stmt) {
-                  error_log("Error preparando UPDATE: ".$db->error);
-                  return false;
-              }
-              
-              $stmt->bind_param("ssiiiii", 
-                  $datos['cod_materia'],
-                  $datos['nombre_materia'],
-                  $datos['creditos'],
-                  $datos['horas_teoricas'],
-                  $datos['horas_practicas'],
-                  $datos['activa'],
-                  $datos['id']);
-          }
-          
-          // Ejecutar la consulta
-          if (!$stmt->execute()) {
-              error_log("Error ejecutando consulta: ".$stmt->error);
-              $stmt->close();
-              return [
-                  'success' => false,
-                  'message' => "Error al guardar en la base de datos"
-              ];
-          }
-          
-          // Obtener información del resultado
-          $affectedRows = $stmt->affected_rows;
-          $nuevoId = $esNueva ? $stmt->insert_id : null;
-          
-          $stmt->close();
-          
-          // Verificar si realmente se afectaron filas (especialmente en UPDATE)
-          if (!$esNueva && $affectedRows === 0) {
-              return [
-                  'success' => false,
-                  'message' => "No se encontró la materia con ID {$datos['id']} o no hubo cambios",
-                  'affected_rows' => 0
-              ];
-          }
-          
-          // Retornar resultado exitoso
-          return [
-              'success' => true,
-              'message' => $esNueva ? "Materia creada exitosamente" : "Materia actualizada exitosamente",
-              'affected_rows' => $affectedRows,
-              'id' => $esNueva ? $nuevoId : $datos['id']
-          ];
-          
-      } catch (Exception $e) {
-          error_log("Excepción en guardarMateria: ".$e->getMessage());
-          if (isset($stmt) && $stmt instanceof mysqli_stmt) {
-              $stmt->close();
-          }
-          return false;
-      }
-  }
+    /**
+     * Guarda o actualiza una materia en la base de datos
+     * 
+     * @param array $datos Array con los datos de la materia
+     *        Requeridos: cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, activa
+     *        Opcional: id (para actualización)
+     * @return array|false Retorna array con info de la operación o false en error grave
+     */
+    function guardarMateria($datos) {
+        global $db;
+        
+        try {
+            // Validación de datos requeridos
+            $camposRequeridos = ['cod_materia', 'nombre_materia', 'creditos', 
+                                'horas_teoricas', 'horas_practicas', 'activa'];
+            
+            foreach ($camposRequeridos as $campo) {
+                if (!isset($datos[$campo])) {
+                    throw new Exception("Falta el campo requerido '$campo'");
+                }
+            }
+            
+            // Determinar si es inserción o actualización
+            $esNueva = empty($datos['id']);
+            
+            // Obtener datos actuales para auditoría si es actualización
+            $datos_actuales = null;
+            if (!$esNueva) {
+                $datos_actuales = getMateriaById($datos['id']);
+                if (!$datos_actuales) {
+                    throw new Exception("No se encontró la materia con ID {$datos['id']}");
+                }
+            }
+            
+            if ($esNueva) {
+                // INSERT de nueva materia
+                $query = "INSERT INTO materias 
+                         (cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, activa) 
+                         VALUES (?, ?, ?, ?, ?, ?)";
+                $stmt = $db->prepare($query);
+                
+                if (!$stmt) {
+                    throw new Exception("Error preparando INSERT: ".$db->error);
+                }
+                
+                $stmt->bind_param("ssiiii", 
+                    $datos['cod_materia'],
+                    $datos['nombre_materia'],
+                    $datos['creditos'],
+                    $datos['horas_teoricas'],
+                    $datos['horas_practicas'],
+                    $datos['activa']);
+            } else {
+                // UPDATE de materia existente
+                $query = "UPDATE materias SET 
+                         cod_materia = ?, 
+                         nombre_materia = ?, 
+                         creditos = ?, 
+                         horas_teoricas = ?, 
+                         horas_practicas = ?, 
+                         activa = ? 
+                         WHERE id = ?";
+                $stmt = $db->prepare($query);
+                
+                if (!$stmt) {
+                    throw new Exception("Error preparando UPDATE: ".$db->error);
+                }
+                
+                $stmt->bind_param("ssiiiii", 
+                    $datos['cod_materia'],
+                    $datos['nombre_materia'],
+                    $datos['creditos'],
+                    $datos['horas_teoricas'],
+                    $datos['horas_practicas'],
+                    $datos['activa'],
+                    $datos['id']);
+            }
+            
+            // Ejecutar la consulta
+            if (!$stmt->execute()) {
+                throw new Exception("Error ejecutando consulta: ".$stmt->error);
+            }
+            
+            // Obtener información del resultado
+            $affectedRows = $stmt->affected_rows;
+            $nuevoId = $esNueva ? $stmt->insert_id : null;
+            
+            $stmt->close();
+            
+            // Verificar si realmente se afectaron filas (especialmente en UPDATE)
+            if (!$esNueva && $affectedRows === 0) {
+                return [
+                    'success' => false,
+                    'message' => "No se encontró la materia con ID {$datos['id']} o no hubo cambios",
+                    'affected_rows' => 0
+                ];
+            }
+            
+            // REGISTRAR EN AUDITORÍA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    if ($esNueva) {
+                        // Auditoría para nueva materia
+                        registrarAuditoria(
+                            "INSERT", 
+                            "materias", 
+                            $nuevoId, 
+                            null, 
+                            [
+                                'cod_materia' => $datos['cod_materia'],
+                                'nombre_materia' => $datos['nombre_materia'],
+                                'creditos' => $datos['creditos'],
+                                'horas_teoricas' => $datos['horas_teoricas'],
+                                'horas_practicas' => $datos['horas_practicas'],
+                                'activa' => $datos['activa']
+                            ], 
+                            "Materias", 
+                            "Nueva materia creada"
+                        );
+                    } else {
+                        // Auditoría para actualización
+                        $valores_antiguos_audit = [];
+                        $valores_nuevos_audit = [];
+                        
+                        $campos_auditar = ['cod_materia', 'nombre_materia', 'creditos', 'horas_teoricas', 'horas_practicas', 'activa'];
+                        
+                        foreach ($campos_auditar as $campo) {
+                            $valor_antiguo = $datos_actuales[$campo] ?? null;
+                            $valor_nuevo = $datos[$campo] ?? null;
+                            
+                            if ($valor_antiguo != $valor_nuevo) {
+                                $valores_antiguos_audit[$campo] = $valor_antiguo;
+                                $valores_nuevos_audit[$campo] = $valor_nuevo;
+                            }
+                        }
+                        
+                        if (!empty($valores_nuevos_audit)) {
+                            registrarAuditoria(
+                                "UPDATE", 
+                                "materias", 
+                                $datos['id'], 
+                                $valores_antiguos_audit, 
+                                $valores_nuevos_audit, 
+                                "Materias", 
+                                "Actualización de datos de materia"
+                            );
+                        }
+                    }
+                } catch (Exception $e) {
+                    error_log("Error en auditoría guardarMateria: " . $e->getMessage());
+                }
+            }
+            
+            // Retornar resultado exitoso
+            return [
+                'success' => true,
+                'message' => $esNueva ? "Materia creada exitosamente" : "Materia actualizada exitosamente",
+                'affected_rows' => $affectedRows,
+                'id' => $esNueva ? $nuevoId : $datos['id']
+            ];
+            
+        } catch (Exception $e) {
+            error_log("Excepción en guardarMateria: ".$e->getMessage());
+            
+            // REGISTRAR EN AUDITORÍA - ERROR
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "materias", 
+                        $datos['id'] ?? null, 
+                        null, 
+                        [
+                            'cod_materia' => $datos['cod_materia'] ?? '',
+                            'nombre_materia' => $datos['nombre_materia'] ?? '',
+                            'error' => $e->getMessage()
+                        ], 
+                        "Materias", 
+                        "Error al guardar materia"
+                    );
+                } catch (Exception $auditError) {
+                    error_log("Error en auditoría de error guardarMateria: " . $auditError->getMessage());
+                }
+            }
+            
+            if (isset($stmt) && $stmt instanceof mysqli_stmt) {
+                $stmt->close();
+            }
+            
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
+        }
+    }
 }
+
 
 
 
@@ -3182,10 +5159,11 @@ function buscarEstudiantePorCedula($cedula) {
         
         $result = $stmt->get_result();
         $estudiantes = [];
-        
+
         while ($row = $result->fetch_assoc()) {
             $estudiantes[] = [
                 'id' => (int)$row['id'],
+                'idusuario' => $row['cedula'],
                 'cedula' => $row['cedula'],
                 'nombre' => $row['nombre'],
                 'carrera' => $row['carrera'] ?? 'No especificado',
@@ -3193,8 +5171,15 @@ function buscarEstudiantePorCedula($cedula) {
                 'email' => $row['email'] ?? 'Sin email'
             ];
         }
-        
+
         $stmt->close();
+
+        // Compatibilidad: si sólo se encontró 1 estudiante, devolverlo como asociativo
+        if (count($estudiantes) === 1) {
+            return $estudiantes[0];
+        }
+
+        // Si hay múltiples resultados, devolver el arreglo
         return $estudiantes;
         
     } catch (Exception $e) {
@@ -3253,7 +5238,7 @@ function obtenerListaCompletaUsuarios() {
 }
 
 
-// OBTENER LOS DATOS SIMPLES****************************************************************************************
+//DATOS PREDEFINIDOS****************************************************************************************
 
 
 /**
@@ -3294,9 +5279,6 @@ function obtenerTiposFormacion($db) {
     return $tipos;
 }
 
-
-
-
 function obtenerGeneros($db) {
     $generos = [];
     $query = "SELECT id, genero FROM genero ORDER BY id";
@@ -3317,9 +5299,6 @@ function obtenerGeneros($db) {
         return [];
     }
 }
-
-
-
 
 function obtenerTiposCedula($db) {
     $tipos = [];
@@ -3349,18 +5328,12 @@ function obtenerTiposCedula($db) {
         
         return $tipos;
     } catch (Exception $e) {
-        // Registrar el error
         error_log($e->getMessage());
-        
-        // Opcional: puedes devolver un array vacío o false según tu necesidad
         return [];
     }
 }
 
-
-
 function obtenerEstadosCiviless($db) {
-    // Validar conexión
     if (!($db instanceof mysqli)) {
         throw new InvalidArgumentException("Se esperaba una conexión MySQLi válida");
     }
@@ -3369,28 +5342,25 @@ function obtenerEstadosCiviless($db) {
     $query = "SELECT id, estado_civil FROM estado_civil ORDER BY estado_civil ASC";
     
     try {
-        // Preparar sentencia
         if (!$stmt = $db->prepare($query)) {
             throw new Exception("Error al preparar la consulta: " . $db->error);
         }
         
-        // Ejecutar
         if (!$stmt->execute()) {
             throw new Exception("Error al ejecutar la consulta: " . $stmt->error);
         }
         
-        // Obtener resultados
         $result = $stmt->get_result();
         
         while ($row = $result->fetch_assoc()) {
-            $estados[$row['id']] = $row['estado_civil']; // CORRECCIÓN AQUÍ (faltaba ])
+            $estados[$row['id']] = $row['estado_civil'];
         }
         
         return $estados;
         
     } catch (Exception $e) {
         error_log($e->getMessage());
-        return []; // Devuelve array vacío en caso de error
+        return [];
     } finally {
         if (isset($stmt)) {
             $stmt->close();
@@ -3398,9 +5368,7 @@ function obtenerEstadosCiviless($db) {
     }
 }
 
-
 function obtenerTiposVivienda($db) {
-    // Validar conexión
     if (!($db instanceof mysqli)) {
         throw new InvalidArgumentException("Se esperaba una conexión MySQLi válida");
     }
@@ -3409,17 +5377,14 @@ function obtenerTiposVivienda($db) {
     $query = "SELECT id, vivienda FROM tipo_vivienda ORDER BY vivienda ASC";
     
     try {
-        // Preparar sentencia
         if (!$stmt = $db->prepare($query)) {
             throw new Exception("Error al preparar la consulta: " . $db->error);
         }
         
-        // Ejecutar
         if (!$stmt->execute()) {
             throw new Exception("Error al ejecutar la consulta: " . $stmt->error);
         }
         
-        // Obtener resultados
         $result = $stmt->get_result();
         
         while ($row = $result->fetch_assoc()) {
@@ -3430,7 +5395,7 @@ function obtenerTiposVivienda($db) {
         
     } catch (Exception $e) {
         error_log($e->getMessage());
-        return []; // Devuelve array vacío en caso de error
+        return [];
     } finally {
         if (isset($stmt)) {
             $stmt->close();
@@ -3438,9 +5403,7 @@ function obtenerTiposVivienda($db) {
     }
 }
 
-
 function obtenerTenenciaViviendas($db) {
-    // Validar conexión
     if (!($db instanceof mysqli)) {
         throw new InvalidArgumentException("Se esperaba una conexión MySQLi válida");
     }
@@ -3449,17 +5412,14 @@ function obtenerTenenciaViviendas($db) {
     $query = "SELECT id, tenencia FROM tenencia_vivienda ORDER BY tenencia ASC";
     
     try {
-        // Preparar sentencia
         if (!$stmt = $db->prepare($query)) {
             throw new Exception("Error al preparar la consulta: " . $db->error);
         }
         
-        // Ejecutar
         if (!$stmt->execute()) {
             throw new Exception("Error al ejecutar la consulta: " . $stmt->error);
         }
         
-        // Obtener resultados
         $result = $stmt->get_result();
         
         while ($row = $result->fetch_assoc()) {
@@ -3470,7 +5430,7 @@ function obtenerTenenciaViviendas($db) {
         
     } catch (Exception $e) {
         error_log($e->getMessage());
-        return []; // Devuelve array vacío en caso de error
+        return [];
     } finally {
         if (isset($stmt)) {
             $stmt->close();
@@ -3478,33 +5438,29 @@ function obtenerTenenciaViviendas($db) {
     }
 }
 
-
-
 function obtenerOpcionesStatus($db) {
-    // Validar conexión
     if (!($db instanceof mysqli)) {
         throw new InvalidArgumentException("Se esperaba una conexión MySQLi válida");
     }
 
-  $statusOptions = [];
-  $query = "SELECT id, status FROM status ORDER BY id ASC";
-  try {
-    if ($stmt = $db->prepare($query)) {
-      $stmt->execute();
-      $result = $stmt->get_result();
-      while ($row = $result->fetch_assoc()) {
-        $statusOptions[$row['id']] = $row['status'];
-      }
-      $stmt->close();
+    $statusOptions = [];
+    $query = "SELECT id, status FROM status ORDER BY id ASC";
+    try {
+        if ($stmt = $db->prepare($query)) {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $statusOptions[$row['id']] = $row['status'];
+            }
+            $stmt->close();
+        }
+        return $statusOptions;
+    } catch (Exception $e) {
+        error_log($e->getMessage());
+        return [];
     }
-    return $statusOptions;
-  } catch (Exception $e) {
-    error_log($e->getMessage());
-    return [];
-  }
 }
 
-// Agrega esta función junto con las demás funciones de obtención de datos
 function obtenerIngresos($db) {
     $ingresos = [];
     $query = "SELECT id, ingreso FROM ingresos ORDER BY id";
@@ -3517,8 +5473,276 @@ function obtenerIngresos($db) {
     return $ingresos;
 }
 
-//FUNCIONES PARA LAS SECCIONES ***********************************************************************
+// Función para procesar operaciones CRUD en datos predefinidos - CON AUDITORÍA
+function procesarOperacionDatosPredefinidos($tabla, $accion, $id = null, $nuevo_id = null, $valor = '') {
+    global $db;
+    
+    $tablasCampos = [
+        'status' => 'status',
+        'estado_civil' => 'estado_civil',
+        'tenencia_vivienda' => 'tenencia',
+        'tipo_cedula' => 'tipo',
+        'tipo_vivienda' => 'vivienda',
+        'ingresos' => 'ingreso',
+        'genero' => 'genero',
+        'tipo_formacion' => 'tipo'
+    ];
+    
+    if (!array_key_exists($tabla, $tablasCampos)) {
+        return ['success' => false, 'message' => 'Tabla no válida'];
+    }
+    
+    $campo = $tablasCampos[$tabla];
+    $valor = trim($valor);
+    
+    try {
+        switch ($accion) {
+            case 'agregar':
+                if (empty($valor)) {
+                    return ['success' => false, 'message' => 'El valor no puede estar vacío'];
+                }
+                
+                if (!empty($nuevo_id)) {
+                    // Verificar si el ID ya existe
+                    $check = $db->prepare("SELECT id FROM $tabla WHERE id = ?");
+                    $check->bind_param("i", $nuevo_id);
+                    $check->execute();
+                    $check->store_result();
+                    
+                    if ($check->num_rows > 0) {
+                        return ['success' => false, 'message' => "Error: El ID $nuevo_id ya existe"];
+                    }
+                    
+                    $stmt = $db->prepare("INSERT INTO $tabla (id, $campo) VALUES (?, ?)");
+                    $stmt->bind_param("is", $nuevo_id, $valor);
+                } else {
+                    $stmt = $db->prepare("INSERT INTO $tabla ($campo) VALUES (?)");
+                    $stmt->bind_param("s", $valor);
+                }
+                
+                if ($stmt->execute()) {
+                    $id_insertado = $nuevo_id ?: $db->insert_id;
+                    
+                    // REGISTRAR EN AUDITORÍA - REGISTRO AGREGADO
+                    if (function_exists('registrarAuditoria')) {
+                        try {
+                            registrarAuditoria(
+                                "INSERT", 
+                                $tabla, 
+                                $id_insertado, 
+                                null, 
+                                [
+                                    'tabla' => $tabla,
+                                    'campo' => $campo,
+                                    'id' => $id_insertado,
+                                    'valor' => $valor,
+                                    'accion' => 'agregar',
+                                    'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                                    'usuario_id' => $_SESSION['user']['id'] ?? 0
+                                ], 
+                                "Datos Predefinidos", 
+                                "Registro agregado en $tabla: $valor (ID: $id_insertado)"
+                            );
+                        } catch (Exception $e) {
+                            error_log("Error en auditoría procesarOperacionDatosPredefinidos (agregar): " . $e->getMessage());
+                        }
+                    }
+                    
+                    return ['success' => true, 'message' => 'Registro agregado correctamente'];
+                } else {
+                    return ['success' => false, 'message' => 'Error al agregar registro: ' . $stmt->error];
+                }
+                break;
+                
+            case 'editar':
+                if (($id === '' || $id === null) || $valor === '') {
+                    return ['success' => false, 'message' => 'ID y valor son requeridos'];
+                }
+                
+                // Obtener valor anterior para auditoría
+                $stmt_actual = $db->prepare("SELECT $campo FROM $tabla WHERE id = ?");
+                $stmt_actual->bind_param("i", $id);
+                $stmt_actual->execute();
+                $result_actual = $stmt_actual->get_result();
+                
+                if ($result_actual->num_rows === 0) {
+                    return ['success' => false, 'message' => 'Registro no encontrado'];
+                }
+                
+                $valor_anterior = $result_actual->fetch_assoc()[$campo];
+                $stmt_actual->close();
+                
+                if ($nuevo_id != $id) {
+                    // Verificar si el nuevo ID ya existe
+                    $check = $db->prepare("SELECT id FROM $tabla WHERE id = ? AND id != ?");
+                    $check->bind_param("ii", $nuevo_id, $id);
+                    $check->execute();
+                    $check->store_result();
+                    
+                    if ($check->num_rows > 0) {
+                        return ['success' => false, 'message' => "Error: El ID $nuevo_id ya existe"];
+                    }
+                    
+                    $stmt = $db->prepare("UPDATE $tabla SET id = ?, $campo = ? WHERE id = ?");
+                    $stmt->bind_param("isi", $nuevo_id, $valor, $id);
+                } else {
+                    $stmt = $db->prepare("UPDATE $tabla SET $campo = ? WHERE id = ?");
+                    $stmt->bind_param("si", $valor, $id);
+                }
+                
+                if ($stmt->execute()) {
+                    $id_final = $nuevo_id ?: $id;
+                    
+                    // REGISTRAR EN AUDITORÍA - REGISTRO EDITADO
+                    if (function_exists('registrarAuditoria')) {
+                        try {
+                            $cambios = [];
+                            if ($nuevo_id && $nuevo_id != $id) {
+                                $cambios[] = "ID: $id → $nuevo_id";
+                            }
+                            if ($valor_anterior != $valor) {
+                                $cambios[] = "$campo: $valor_anterior → $valor";
+                            }
+                            
+                            registrarAuditoria(
+                                "UPDATE", 
+                                $tabla, 
+                                $id_final, 
+                                [
+                                    'id_anterior' => $id,
+                                    'valor_anterior' => $valor_anterior
+                                ], 
+                                [
+                                    'tabla' => $tabla,
+                                    'campo' => $campo,
+                                    'id_nuevo' => $id_final,
+                                    'valor_nuevo' => $valor,
+                                    'accion' => 'editar',
+                                    'cambios' => implode(', ', $cambios),
+                                    'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                                    'usuario_id' => $_SESSION['user']['id'] ?? 0
+                                ], 
+                                "Datos Predefinidos", 
+                                "Registro editado en $tabla: " . implode(', ', $cambios)
+                            );
+                        } catch (Exception $e) {
+                            error_log("Error en auditoría procesarOperacionDatosPredefinidos (editar): " . $e->getMessage());
+                        }
+                    }
+                    
+                    return ['success' => true, 'message' => 'Registro actualizado correctamente'];
+                } else {
+                    return ['success' => false, 'message' => 'Error al actualizar registro: ' . $stmt->error];
+                }
+                break;
+                
+            case 'eliminar':
+                if ($id === '' || $id === null) {
+                    return ['success' => false, 'message' => 'ID es requerido'];
+                }
+                
+                // Obtener datos del registro para auditoría
+                $stmt_actual = $db->prepare("SELECT $campo FROM $tabla WHERE id = ?");
+                $stmt_actual->bind_param("i", $id);
+                $stmt_actual->execute();
+                $result_actual = $stmt_actual->get_result();
+                
+                if ($result_actual->num_rows === 0) {
+                    return ['success' => false, 'message' => 'Registro no encontrado'];
+                }
+                
+                $valor_eliminado = $result_actual->fetch_assoc()[$campo];
+                $stmt_actual->close();
+                
+                $stmt = $db->prepare("DELETE FROM $tabla WHERE id = ?");
+                $stmt->bind_param("i", $id);
+                
+                if ($stmt->execute()) {
+                    // REGISTRAR EN AUDITORÍA - REGISTRO ELIMINADO
+                    if (function_exists('registrarAuditoria')) {
+                        try {
+                            registrarAuditoria(
+                                "DELETE", 
+                                $tabla, 
+                                $id, 
+                                [
+                                    'tabla' => $tabla,
+                                    'campo' => $campo,
+                                    'id' => $id,
+                                    'valor' => $valor_eliminado
+                                ], 
+                                [
+                                    'accion' => 'eliminar',
+                                    'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                                    'usuario_id' => $_SESSION['user']['id'] ?? 0
+                                ], 
+                                "Datos Predefinidos", 
+                                "Registro eliminado de $tabla: $valor_eliminado (ID: $id)"
+                            );
+                        } catch (Exception $e) {
+                            error_log("Error en auditoría procesarOperacionDatosPredefinidos (eliminar): " . $e->getMessage());
+                        }
+                    }
+                    
+                    return ['success' => true, 'message' => 'Registro eliminado correctamente'];
+                } else {
+                    return ['success' => false, 'message' => 'Error al eliminar registro: ' . $stmt->error];
+                }
+                break;
+                
+            default:
+                return ['success' => false, 'message' => 'Acción no válida'];
+        }
+    } catch (Exception $e) {
+        error_log("Error en procesarOperacionDatosPredefinidos: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN OPERACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    $tabla, 
+                    $id, 
+                    null, 
+                    [
+                        'tabla' => $tabla,
+                        'accion' => $accion,
+                        'id' => $id,
+                        'nuevo_id' => $nuevo_id,
+                        'valor' => $valor,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Datos Predefinidos", 
+                    "Error en operación $accion en tabla $tabla"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error procesarOperacionDatosPredefinidos: " . $auditError->getMessage());
+            }
+        }
+        
+        return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+    }
+}
 
+// Función para verificar si un ID existe en una tabla - SOLO LECTURA, SIN AUDITORÍA
+function verificarIdExistente($tabla, $id) {
+    global $db;
+    
+    $stmt = $db->prepare("SELECT id FROM $tabla WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $stmt->store_result();
+    
+    return $stmt->num_rows > 0;
+}
+
+
+
+
+
+
+//FUNCIONES PARA LAS SECCIONES ***********************************************************************
 
 
 // Constante para el mínimo de estudiantes requeridos
@@ -3534,6 +5758,10 @@ function crearSeccion($db, $datos) {
     try {
         $stmt = $db->prepare("INSERT INTO secciones (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, inicia, estatus) 
                             VALUES (?, ?, ?, ?, ?, ?, 'inactiva')");
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
         $stmt->bind_param("siiiis", 
             $datos['codigo_seccion'], 
             $datos['id_carrera'], 
@@ -3541,14 +5769,67 @@ function crearSeccion($db, $datos) {
             $datos['id_periodo'], 
             $datos['capacidad_maxima'],
             $datos['inicia']);
-        $stmt->execute();
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $seccion_id = $stmt->insert_id;
         $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - NUEVA SECCIÓN CREADA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "INSERT", 
+                    "secciones", 
+                    $seccion_id, 
+                    null, 
+                    [
+                        'codigo_seccion' => $datos['codigo_seccion'],
+                        'id_carrera' => $datos['id_carrera'],
+                        'id_trayecto' => $datos['id_trayecto'],
+                        'id_periodo' => $datos['id_periodo'],
+                        'capacidad_maxima' => $datos['capacidad_maxima'],
+                        'inicia' => $datos['inicia'],
+                        'estatus' => 'inactiva'
+                    ], 
+                    "Secciones", 
+                    "Creación de nueva sección"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría crearSeccion: " . $e->getMessage());
+            }
+        }
         
         return [
             'success' => true,
-            'message' => "Sección creada exitosamente! La sección estará inactiva hasta tener al menos ".MINIMO_ESTUDIANTES." estudiantes."
+            'message' => "Sección creada exitosamente! La sección estará inactiva hasta tener al menos ".MINIMO_ESTUDIANTES." estudiantes.",
+            'id_seccion' => $seccion_id
         ];
     } catch (Exception $e) {
+        error_log("Error en crearSeccion: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL CREAR SECCIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "secciones", 
+                    null, 
+                    null, 
+                    [
+                        'codigo_seccion' => $datos['codigo_seccion'] ?? '',
+                        'error' => $e->getMessage()
+                    ], 
+                    "Secciones", 
+                    "Error al crear sección"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error crearSeccion: " . $auditError->getMessage());
+            }
+        }
+        
         return [
             'success' => false,
             'message' => "Error al crear sección: " . $e->getMessage()
@@ -3558,12 +5839,22 @@ function crearSeccion($db, $datos) {
 
 function editarSeccion($db, $datos) {
     try {
+        // Obtener datos actuales para auditoría
+        $datos_antiguos = obtenerDatosSeccion($db, $datos['id_seccion']);
+        
         // Verificar si el período está activo
         $stmt = $db->prepare("SELECT p.activo FROM periodos_academicos p
                              JOIN secciones s ON s.id_periodo = p.id_periodo
                              WHERE s.id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
         $stmt->bind_param("i", $datos['id_seccion']);
-        $stmt->execute();
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
         $result = $stmt->get_result();
         $periodo = $result->fetch_assoc();
         $stmt->close();
@@ -3580,6 +5871,10 @@ function editarSeccion($db, $datos) {
                                 capacidad_maxima = ?,
                                 inicia = ?
                             WHERE id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
         $stmt->bind_param("siiiisi", 
             $datos['codigo_seccion'], 
             $datos['id_carrera'], 
@@ -3588,14 +5883,77 @@ function editarSeccion($db, $datos) {
             $datos['capacidad_maxima'],
             $datos['inicia'],
             $datos['id_seccion']);
-        $stmt->execute();
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $affected_rows = $stmt->affected_rows;
         $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - EDICIÓN DE SECCIÓN
+        if ($affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                $valores_antiguos_audit = [];
+                $valores_nuevos_audit = [];
+                
+                // Comparar campos modificados
+                $campos_auditar = ['codigo_seccion', 'id_carrera', 'id_trayecto', 'id_periodo', 'capacidad_maxima', 'inicia'];
+                
+                foreach ($campos_auditar as $campo) {
+                    $valor_antiguo = $datos_antiguos[$campo] ?? null;
+                    $valor_nuevo = $datos[$campo] ?? null;
+                    
+                    if ($valor_antiguo != $valor_nuevo) {
+                        $valores_antiguos_audit[$campo] = $valor_antiguo;
+                        $valores_nuevos_audit[$campo] = $valor_nuevo;
+                    }
+                }
+                
+                if (!empty($valores_nuevos_audit)) {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "secciones", 
+                        $datos['id_seccion'], 
+                        $valores_antiguos_audit, 
+                        $valores_nuevos_audit, 
+                        "Secciones", 
+                        "Edición de datos de sección"
+                    );
+                }
+            } catch (Exception $e) {
+                error_log("Error en auditoría editarSeccion: " . $e->getMessage());
+            }
+        }
         
         return [
             'success' => true,
-            'message' => "Sección actualizada exitosamente!"
+            'message' => "Sección actualizada exitosamente!",
+            'affected_rows' => $affected_rows
         ];
     } catch (Exception $e) {
+        error_log("Error en editarSeccion: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL EDITAR SECCIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "secciones", 
+                    $datos['id_seccion'] ?? null, 
+                    null, 
+                    [
+                        'codigo_seccion' => $datos['codigo_seccion'] ?? '',
+                        'error' => $e->getMessage()
+                    ], 
+                    "Secciones", 
+                    "Error al editar sección"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error editarSeccion: " . $auditError->getMessage());
+            }
+        }
+        
         return [
             'success' => false,
             'message' => "Error al actualizar sección: " . $e->getMessage()
@@ -3660,9 +6018,39 @@ function asignarEstudiantes($db, $seccion_id, $estudiantes) {
         
         $db->commit();
         
+        // REGISTRAR EN AUDITORÍA - ASIGNACIÓN DE ESTUDIANTES
+        if (function_exists('registrarAuditoria')) {
+            try {
+                $estudiantes_agregados = count($nuevos_estudiantes);
+                $estudiantes_retirados = count($desactivar);
+                
+                registrarAuditoria(
+                    "UPDATE", 
+                    "estudiante_seccion", 
+                    $seccion_id, 
+                    [
+                        'estudiantes_anteriores' => count($asignados_actuales),
+                        'estudiantes_retirados' => $estudiantes_retirados
+                    ], 
+                    [
+                        'estudiantes_nuevos' => $estudiantes_agregados,
+                        'estudiantes_totales' => $count,
+                        'estudiantes_asignados' => $estudiantes
+                    ], 
+                    "Secciones", 
+                    "Asignación de estudiantes a sección"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría asignarEstudiantes: " . $e->getMessage());
+            }
+        }
+        
         $result = [
             'success' => true,
-            'message' => "Asignación de estudiantes actualizada!"
+            'message' => "Asignación de estudiantes actualizada!",
+            'estudiantes_agregados' => count($nuevos_estudiantes),
+            'estudiantes_retirados' => count($desactivar),
+            'total_estudiantes' => $count
         ];
         
         if ($count >= MINIMO_ESTUDIANTES) {
@@ -3674,6 +6062,28 @@ function asignarEstudiantes($db, $seccion_id, $estudiantes) {
         return $result;
     } catch (Exception $e) {
         $db->rollback();
+        error_log("Error en asignarEstudiantes: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ASIGNAR ESTUDIANTES
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "estudiante_seccion", 
+                    $seccion_id, 
+                    null, 
+                    [
+                        'estudiantes_intentados' => $estudiantes,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Secciones", 
+                    "Error al asignar estudiantes a sección"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error asignarEstudiantes: " . $auditError->getMessage());
+            }
+        }
+        
         return [
             'success' => false,
             'message' => "Error al asignar estudiantes: " . $e->getMessage()
@@ -3692,12 +6102,26 @@ function retirarEstudiante($db, $seccion_id, $usuario_id) {
     try {
         $db->begin_transaction();
         
+        // Obtener información del estudiante antes de retirarlo
+        $estudiante_info = null;
+        if (function_exists('obtenerEstudiantePorId')) {
+            $estudiante_info = obtenerEstudiantePorId($usuario_id);
+        }
+        
         // Desactivar al estudiante en la sección
         $stmt = $db->prepare("UPDATE estudiante_seccion 
                              SET estatus = 'retirado'
                              WHERE id_seccion = ? AND id_usuario = ?");
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
         $stmt->bind_param("ii", $seccion_id, $usuario_id);
-        $stmt->execute();
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $affected_rows = $stmt->affected_rows;
         $stmt->close();
         
         // Verificar si se debe cambiar el estado de la sección
@@ -3706,12 +6130,60 @@ function retirarEstudiante($db, $seccion_id, $usuario_id) {
         
         $db->commit();
         
+        // REGISTRAR EN AUDITORÍA - RETIRO DE ESTUDIANTE
+        if ($affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "UPDATE", 
+                    "estudiante_seccion", 
+                    $seccion_id, 
+                    [
+                        'estudiante_id' => $usuario_id,
+                        'estudiante_nombre' => $estudiante_info['nombre'] ?? 'Desconocido',
+                        'estatus_anterior' => 'activo'
+                    ], 
+                    [
+                        'estudiante_id' => $usuario_id,
+                        'estatus_nuevo' => 'retirado',
+                        'total_estudiantes' => $count
+                    ], 
+                    "Secciones", 
+                    "Retiro de estudiante de sección"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría retirarEstudiante: " . $e->getMessage());
+            }
+        }
+        
         return [
             'success' => true,
-            'message' => "Estudiante retirado exitosamente de la sección."
+            'message' => "Estudiante retirado exitosamente de la sección.",
+            'affected_rows' => $affected_rows
         ];
     } catch (Exception $e) {
         $db->rollback();
+        error_log("Error en retirarEstudiante: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL RETIRAR ESTUDIANTE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "estudiante_seccion", 
+                    $seccion_id, 
+                    null, 
+                    [
+                        'estudiante_id' => $usuario_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Secciones", 
+                    "Error al retirar estudiante de sección"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error retirarEstudiante: " . $auditError->getMessage());
+            }
+        }
+        
         return [
             'success' => false,
             'message' => "Error al retirar estudiante: " . $e->getMessage()
@@ -3730,8 +6202,17 @@ function obtenerInfoSeccionConPeriodo($db, $seccion_id) {
                          FROM secciones s
                          JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
                          WHERE s.id_seccion = ?");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerInfoSeccionConPeriodo: " . $db->error);
+        return null;
+    }
+    
     $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerInfoSeccionConPeriodo: " . $stmt->error);
+        return null;
+    }
+    
     $result = $stmt->get_result();
     $seccion = $result->fetch_assoc();
     $stmt->close();
@@ -3747,8 +6228,17 @@ function obtenerInfoSeccionConPeriodo($db, $seccion_id) {
 function obtenerEstudiantesAsignados($db, $seccion_id) {
     $asignados = [];
     $stmt = $db->prepare("SELECT id_usuario FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerEstudiantesAsignados: " . $db->error);
+        return $asignados;
+    }
+    
     $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerEstudiantesAsignados: " . $stmt->error);
+        return $asignados;
+    }
+    
     $result = $stmt->get_result();
     while ($row = $result->fetch_assoc()) {
         $asignados[] = $row['id_usuario'];
@@ -3764,6 +6254,8 @@ function obtenerEstudiantesAsignados($db, $seccion_id) {
  * @param array $estudiantes IDs de estudiantes a desactivar
  */
 function desactivarEstudiantes($db, $seccion_id, $estudiantes) {
+    if (empty($estudiantes)) return;
+    
     $placeholders = implode(',', array_fill(0, count($estudiantes), '?'));
     $types = str_repeat('i', count($estudiantes));
     
@@ -3771,10 +6263,16 @@ function desactivarEstudiantes($db, $seccion_id, $estudiantes) {
                         SET estatus = 'retirado'
                         WHERE id_seccion = ? 
                         AND id_usuario IN ($placeholders)");
+    if (!$stmt) {
+        error_log("Error en preparación desactivarEstudiantes: " . $db->error);
+        return;
+    }
     
     $params = array_merge([$seccion_id], $estudiantes);
     $stmt->bind_param(str_repeat('i', count($params)), ...$params);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución desactivarEstudiantes: " . $stmt->error);
+    }
     $stmt->close();
 }
 
@@ -3785,11 +6283,17 @@ function desactivarEstudiantes($db, $seccion_id, $estudiantes) {
  * @param array $estudiantes IDs de estudiantes a activar
  */
 function activarEstudiantes($db, $seccion_id, $estudiantes) {
+    if (empty($estudiantes)) return;
+    
     $placeholders = implode(',', array_fill(0, count($estudiantes), '(?,?,CURDATE(),\'activo\')'));
     
     $stmt = $db->prepare("INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus)
                         VALUES $placeholders
                         ON DUPLICATE KEY UPDATE estatus = 'activo'");
+    if (!$stmt) {
+        error_log("Error en preparación activarEstudiantes: " . $db->error);
+        return;
+    }
     
     $params = [];
     foreach ($estudiantes as $est_id) {
@@ -3798,7 +6302,9 @@ function activarEstudiantes($db, $seccion_id, $estudiantes) {
     }
     
     $stmt->bind_param(str_repeat('i', count($params)), ...$params);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución activarEstudiantes: " . $stmt->error);
+    }
     $stmt->close();
 }
 
@@ -3811,8 +6317,17 @@ function activarEstudiantes($db, $seccion_id, $estudiantes) {
 function contarEstudiantesActivos($db, $seccion_id) {
     $stmt = $db->prepare("SELECT COUNT(*) as total FROM estudiante_seccion 
                         WHERE id_seccion = ? AND estatus = 'activo'");
+    if (!$stmt) {
+        error_log("Error en preparación contarEstudiantesActivos: " . $db->error);
+        return 0;
+    }
+    
     $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución contarEstudiantesActivos: " . $stmt->error);
+        return 0;
+    }
+    
     $result = $stmt->get_result();
     $count = $result->fetch_assoc()['total'];
     $stmt->close();
@@ -3830,8 +6345,17 @@ function actualizarEstadoSeccion($db, $seccion_id, $count) {
     $stmt = $db->prepare("SELECT p.activo FROM secciones s
                          JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
                          WHERE s.id_seccion = ?");
+    if (!$stmt) {
+        error_log("Error en preparación actualizarEstadoSeccion: " . $db->error);
+        return;
+    }
+    
     $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución actualizarEstadoSeccion: " . $stmt->error);
+        return;
+    }
+    
     $result = $stmt->get_result();
     $periodo = $result->fetch_assoc();
     $stmt->close();
@@ -3843,14 +6367,54 @@ function actualizarEstadoSeccion($db, $seccion_id, $count) {
         $nuevo_estatus = ($count >= MINIMO_ESTUDIANTES) ? 'activa' : 'inactiva';
     }
     
+    // Obtener estado anterior para auditoría
+    $estado_anterior = null;
+    $stmt_ant = $db->prepare("SELECT estatus FROM secciones WHERE id_seccion = ?");
+    if ($stmt_ant) {
+        $stmt_ant->bind_param("i", $seccion_id);
+        if ($stmt_ant->execute()) {
+            $result_ant = $stmt_ant->get_result();
+            $row_ant = $result_ant->fetch_assoc();
+            $estado_anterior = $row_ant['estatus'];
+        }
+        $stmt_ant->close();
+    }
+    
     // Actualizar el estado de la sección
     $stmt = $db->prepare("UPDATE secciones SET estatus = ? WHERE id_seccion = ?");
+    if (!$stmt) {
+        error_log("Error en preparación actualizarEstadoSeccion: " . $db->error);
+        return;
+    }
+    
     $stmt->bind_param("si", $nuevo_estatus, $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución actualizarEstadoSeccion: " . $stmt->error);
+        return;
+    }
     $stmt->close();
+    
+    // REGISTRAR EN AUDITORÍA - CAMBIO DE ESTADO DE SECCIÓN
+    if ($estado_anterior != $nuevo_estatus && function_exists('registrarAuditoria')) {
+        try {
+            registrarAuditoria(
+                "UPDATE", 
+                "secciones", 
+                $seccion_id, 
+                ['estatus' => $estado_anterior], 
+                [
+                    'estatus' => $nuevo_estatus,
+                    'estudiantes_activos' => $count,
+                    'minimo_requerido' => MINIMO_ESTUDIANTES
+                ], 
+                "Secciones", 
+                "Cambio de estado de sección"
+            );
+        } catch (Exception $e) {
+            error_log("Error en auditoría actualizarEstadoSeccion: " . $e->getMessage());
+        }
+    }
 }
-
-
 
 /**
  * Desactiva todas las secciones de un período académico cuando este se desactiva
@@ -3859,17 +6423,17 @@ function actualizarEstadoSeccion($db, $seccion_id, $count) {
  */
 function desactivarSeccionesDePeriodo($db, $periodo_id) {
     $stmt = $db->prepare("UPDATE secciones SET estatus = 'inactiva' WHERE id_periodo = ?");
+    if (!$stmt) {
+        error_log("Error en preparación desactivarSeccionesDePeriodo: " . $db->error);
+        return;
+    }
+    
     $stmt->bind_param("i", $periodo_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución desactivarSeccionesDePeriodo: " . $stmt->error);
+    }
     $stmt->close();
 }
-
-
-
-
-
-
-
 
 /**
  * Obtiene el listado de secciones con información relevante
@@ -3895,7 +6459,16 @@ function obtenerListadoSecciones($db) {
                           LEFT JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion AND es.estatus = 'activo'
                           GROUP BY s.id_seccion
                           ORDER BY p.nombre_periodo DESC, s.codigo_seccion");
-    $stmt->execute();
+    if (!$stmt) {
+        error_log("Error en preparación obtenerListadoSecciones: " . $db->error);
+        return [];
+    }
+    
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerListadoSecciones: " . $stmt->error);
+        return [];
+    }
+    
     $result = $stmt->get_result();
     $secciones = $result->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -3910,12 +6483,21 @@ function obtenerListadoSecciones($db) {
  */
 function obtenerDatosSeccion($db, $seccion_id) {
     $stmt = $db->prepare("SELECT * FROM secciones WHERE id_seccion = ?");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerDatosSeccion: " . $db->error);
+        return [];
+    }
+    
     $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerDatosSeccion: " . $stmt->error);
+        return [];
+    }
+    
     $result = $stmt->get_result();
     $seccion = $result->fetch_assoc();
     $stmt->close();
-    return $seccion;
+    return $seccion ?: [];
 }
 
 /**
@@ -3926,24 +6508,51 @@ function obtenerDatosSeccion($db, $seccion_id) {
 function obtenerDatosSelects($db) {
     // Carreras - Excluyendo la que tiene id_carrera = 0 (No especificado)
     $stmt = $db->prepare("SELECT id_carrera, nombre_carrera FROM carreras WHERE activa = 1 AND id_carrera != 0");
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $carreras = $result->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
+    if (!$stmt) {
+        error_log("Error en preparación obtenerDatosSelects carreras: " . $db->error);
+        $carreras = [];
+    } else {
+        if (!$stmt->execute()) {
+            error_log("Error en ejecución obtenerDatosSelects carreras: " . $stmt->error);
+            $carreras = [];
+        } else {
+            $result = $stmt->get_result();
+            $carreras = $result->fetch_all(MYSQLI_ASSOC);
+        }
+        $stmt->close();
+    }
     
     // Trayectos
     $stmt = $db->prepare("SELECT id_trayecto, numero_trayecto FROM trayectos ORDER BY numero_trayecto");
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $trayectos = $result->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
+    if (!$stmt) {
+        error_log("Error en preparación obtenerDatosSelects trayectos: " . $db->error);
+        $trayectos = [];
+    } else {
+        if (!$stmt->execute()) {
+            error_log("Error en ejecución obtenerDatosSelects trayectos: " . $stmt->error);
+            $trayectos = [];
+        } else {
+            $result = $stmt->get_result();
+            $trayectos = $result->fetch_all(MYSQLI_ASSOC);
+        }
+        $stmt->close();
+    }
     
     // Periodos
     $stmt = $db->prepare("SELECT id_periodo, nombre_periodo FROM periodos_academicos WHERE activo = 1");
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $periodos = $result->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
+    if (!$stmt) {
+        error_log("Error en preparación obtenerDatosSelects periodos: " . $db->error);
+        $periodos = [];
+    } else {
+        if (!$stmt->execute()) {
+            error_log("Error en ejecución obtenerDatosSelects periodos: " . $stmt->error);
+            $periodos = [];
+        } else {
+            $result = $stmt->get_result();
+            $periodos = $result->fetch_all(MYSQLI_ASSOC);
+        }
+        $stmt->close();
+    }
     
     return [
         'carreras' => $carreras,
@@ -3969,8 +6578,17 @@ function obtenerDetalleSeccion($db, $seccion_id) {
                   LEFT JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion AND es.estatus = 'activo'
                   WHERE s.id_seccion = ?
                   GROUP BY s.id_seccion");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerDetalleSeccion: " . $db->error);
+        return [];
+    }
+    
     $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerDetalleSeccion: " . $stmt->error);
+        return [];
+    }
+    
     $result = $stmt->get_result();
     $seccion = $result->fetch_assoc();
     $stmt->close();
@@ -3979,7 +6597,7 @@ function obtenerDetalleSeccion($db, $seccion_id) {
         $seccion['inscritos'] = 0;
     }
     
-    return $seccion;
+    return $seccion ?: [];
 }
 
 /**
@@ -3994,8 +6612,17 @@ function obtenerEstudiantesDeSeccion($db, $seccion_id) {
                   JOIN estudiante_seccion es ON u.id = es.id_usuario
                   WHERE es.id_seccion = ? AND es.estatus = 'activo'
                   ORDER BY u.nombre");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerEstudiantesDeSeccion: " . $db->error);
+        return [];
+    }
+    
     $stmt->bind_param("i", $seccion_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerEstudiantesDeSeccion: " . $stmt->error);
+        return [];
+    }
+    
     $result = $stmt->get_result();
     $estudiantes = $result->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -4016,8 +6643,17 @@ function obtenerEstudiantesDisponibles($db, $seccion_id, $carrera_id) {
                   FROM users u
                   WHERE u.estudiante = 1 AND u.status = 1 AND u.carrera = ?
                   ORDER BY u.nombre");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerEstudiantesDisponibles: " . $db->error);
+        return [];
+    }
+    
     $stmt->bind_param("ii", $seccion_id, $carrera_id);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerEstudiantesDisponibles: " . $stmt->error);
+        return [];
+    }
+    
     $result = $stmt->get_result();
     $estudiantes = $result->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -4054,8 +6690,12 @@ function mostrarAdvertencia($mensaje) {
     }
 }
 
-
-
+/**
+ * Obtiene los horarios de una sección
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $id_seccion ID de la sección
+ * @return array Horarios de la sección
+ */
 function obtenerHorariosSeccion($db, $id_seccion) {
     // Validar entrada
     if (!is_numeric($id_seccion)) {
@@ -4124,8 +6764,13 @@ function obtenerHorariosSeccion($db, $id_seccion) {
     return $horarios ?: [];
 }
 
-
-// Función para calcular cuántas filas debe ocupar una clase
+/**
+ * Calcula cuántas filas debe ocupar una clase en la tabla de horarios
+ * @param string $hora_inicio Hora de inicio
+ * @param string $hora_fin Hora de fin
+ * @param array $horas Array de horas disponibles
+ * @return int Número de filas que debe ocupar
+ */
 function calcularRowspan($hora_inicio, $hora_fin, $horas) {
     $inicio = date('H:i', strtotime($hora_inicio));
     $fin = date('H:i', strtotime($hora_fin));
@@ -4140,6 +6785,597 @@ function calcularRowspan($hora_inicio, $hora_fin, $horas) {
     return $fin_index - $inicio_index;
 }
 
+/**
+ * Obtiene información básica de una sección por su ID
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @return array Información básica de la sección
+ */
+function obtenerInfoBasicaSeccion($db, $seccion_id) {
+    $stmt = $db->prepare("SELECT s.codigo_seccion, c.nombre_carrera, t.numero_trayecto, p.nombre_periodo
+                         FROM secciones s
+                         JOIN carreras c ON s.id_carrera = c.id_carrera
+                         JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+                         JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
+                         WHERE s.id_seccion = ?");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerInfoBasicaSeccion: " . $db->error);
+        return [];
+    }
+    
+    $stmt->bind_param("i", $seccion_id);
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerInfoBasicaSeccion: " . $stmt->error);
+        return [];
+    }
+    
+    $result = $stmt->get_result();
+    $seccion = $result->fetch_assoc();
+    $stmt->close();
+    return $seccion ?: [];
+}
+
+/**
+ * Verifica si una sección existe y está activa
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $seccion_id ID de la sección
+ * @return bool True si la sección existe y está activa
+ */
+function seccionExisteYActiva($db, $seccion_id) {
+    $stmt = $db->prepare("SELECT COUNT(*) as total FROM secciones 
+                         WHERE id_seccion = ? AND estatus = 'activa'");
+    if (!$stmt) {
+        error_log("Error en preparación seccionExisteYActiva: " . $db->error);
+        return false;
+    }
+    
+    $stmt->bind_param("i", $seccion_id);
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución seccionExisteYActiva: " . $stmt->error);
+        return false;
+    }
+    
+    $result = $stmt->get_result();
+    $count = $result->fetch_assoc()['total'];
+    $stmt->close();
+    return $count > 0;
+}
+
+/**
+ * Obtiene el número total de secciones activas
+ * @param mysqli $db Conexión a la base de datos
+ * @return int Número total de secciones activas
+ */
+function obtenerTotalSeccionesActivas($db) {
+    $stmt = $db->prepare("SELECT COUNT(*) as total FROM secciones WHERE estatus = 'activa'");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerTotalSeccionesActivas: " . $db->error);
+        return 0;
+    }
+    
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerTotalSeccionesActivas: " . $stmt->error);
+        return 0;
+    }
+    
+    $result = $stmt->get_result();
+    $count = $result->fetch_assoc()['total'];
+    $stmt->close();
+    return $count;
+}
+
+/**
+ * Obtiene las secciones por carrera
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $carrera_id ID de la carrera
+ * @return array Secciones de la carrera
+ */
+function obtenerSeccionesPorCarrera($db, $carrera_id) {
+    $stmt = $db->prepare("SELECT s.id_seccion, s.codigo_seccion, t.numero_trayecto, p.nombre_periodo, s.estatus
+                         FROM secciones s
+                         JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+                         JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
+                         WHERE s.id_carrera = ? AND s.estatus = 'activa'
+                         ORDER BY p.nombre_periodo DESC, t.numero_trayecto, s.codigo_seccion");
+    if (!$stmt) {
+        error_log("Error en preparación obtenerSeccionesPorCarrera: " . $db->error);
+        return [];
+    }
+    
+    $stmt->bind_param("i", $carrera_id);
+    if (!$stmt->execute()) {
+        error_log("Error en ejecución obtenerSeccionesPorCarrera: " . $stmt->error);
+        return [];
+    }
+    
+    $result = $stmt->get_result();
+    $secciones = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $secciones;
+}
+
+
+
+//ASIGNAR SECCIONES A DOCENTES ***********************************************************************************************
+
+
+/**
+ * Obtiene las materias de un docente por carrera
+ */
+function obtenerMateriasDocentePorCarrera($id_docente, $id_carrera) {
+    global $db;
+    
+    try {
+        $query = "SELECT DISTINCT m.id_materia, m.nombre_materia, m.cod_materia 
+                  FROM docente_materia dm
+                  JOIN materias m ON dm.id_materia = m.id_materia
+                  JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+                  WHERE dm.id_usuario = ?
+                  AND cm.id_carrera = ?
+                  ORDER BY m.nombre_materia";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("ii", $id_docente, $id_carrera);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $materias = array();
+        
+        while($row = $result->fetch_assoc()) {
+            $materias[] = $row;
+        }
+        
+        $stmt->close();
+        return $materias;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerMateriasDocentePorCarrera: " . $e->getMessage());
+        return array();
+    }
+}
+
+/**
+ * Procesa la asignación de una sección a un docente
+ */
+function procesarAsignacionSeccion($id_usuario, $id_seccion, $id_materia) {
+    global $db;
+    
+    try {
+        // Obtener información para auditoría
+        $docente_info = obtenerDocentePorId($id_usuario);
+        $seccion_info = obtenerDetalleSeccion($db, $id_seccion);
+        $materia_info = obtenerMateriaPorId($db, $id_materia);
+
+        // Verificar si ya existe la asignación
+        $query = "SELECT id_docente_seccion FROM docente_seccion 
+                  WHERE id_usuario = ? 
+                  AND id_seccion = ?
+                  AND id_materia = ?";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("iii", $id_usuario, $id_seccion, $id_materia);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if($result->num_rows > 0) {
+            $stmt->close();
+            return [
+                'success' => false,
+                'message' => 'Este docente ya tiene asignada esta sección con esta materia.',
+                'type' => 'warning'
+            ];
+        }
+        $stmt->close();
+
+        // Insertar nueva asignación
+        $query = "INSERT INTO docente_seccion (id_usuario, id_seccion, id_materia, fecha_asignacion) 
+                  VALUES (?, ?, ?, NOW())";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("iii", $id_usuario, $id_seccion, $id_materia);
+        
+        if($stmt->execute()) {
+            $id_asignacion = $stmt->insert_id;
+            $stmt->close();
+            
+            // REGISTRAR EN AUDITORÍA - ASIGNACIÓN DE SECCIÓN A DOCENTE
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "INSERT", 
+                        "docente_seccion", 
+                        $id_asignacion, 
+                        null, 
+                        [
+                            'id_usuario' => $id_usuario,
+                            'docente_nombre' => $docente_info['nombre'] ?? 'Desconocido',
+                            'docente_cedula' => $docente_info['idusuario'] ?? '',
+                            'id_seccion' => $id_seccion,
+                            'seccion_codigo' => $seccion_info['codigo_seccion'] ?? 'Desconocida',
+                            'carrera_seccion' => $seccion_info['nombre_carrera'] ?? 'Desconocida',
+                            'id_materia' => $id_materia,
+                            'materia_nombre' => $materia_info['nombre_materia'] ?? 'Desconocida',
+                            'materia_codigo' => $materia_info['cod_materia'] ?? ''
+                        ], 
+                        "Asignaciones Docentes", 
+                        "Asignación de sección a docente"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría procesarAsignacionSeccion: " . $e->getMessage());
+                }
+            }
+            
+            return [
+                'success' => true,
+                'message' => 'Asignación realizada correctamente.',
+                'type' => 'success',
+                'id_asignacion' => $id_asignacion
+            ];
+        } else {
+            throw new Exception("Error al asignar: " . $stmt->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en procesarAsignacionSeccion: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ASIGNAR SECCIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "docente_seccion", 
+                    null, 
+                    null, 
+                    [
+                        'id_usuario' => $id_usuario,
+                        'id_seccion' => $id_seccion,
+                        'id_materia' => $id_materia,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Asignaciones Docentes", 
+                    "Error al asignar sección a docente"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error procesarAsignacionSeccion: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al asignar: ' . $e->getMessage(),
+            'type' => 'danger'
+        ];
+    }
+}
+
+/**
+ * Elimina una asignación de sección
+ */
+function eliminarAsignacionSeccion($id) {
+    global $db;
+    
+    try {
+        // Obtener información de la asignación para auditoría
+        $info_query = "SELECT ds.*, u.nombre as docente_nombre, u.idusuario as docente_cedula,
+                              s.codigo_seccion, c.nombre_carrera, m.nombre_materia, m.cod_materia
+                       FROM docente_seccion ds
+                       JOIN users u ON ds.id_usuario = u.id
+                       JOIN secciones s ON ds.id_seccion = s.id_seccion
+                       LEFT JOIN carreras c ON s.id_carrera = c.id_carrera
+                       JOIN materias m ON ds.id_materia = m.id_materia
+                       WHERE ds.id_docente_seccion = ?";
+        
+        $info_stmt = $db->prepare($info_query);
+        if (!$info_stmt) {
+            throw new Exception("Error en preparación de consulta de información: " . $db->error);
+        }
+        
+        $info_stmt->bind_param("i", $id);
+        $info_stmt->execute();
+        $info_result = $info_stmt->get_result();
+        $asignacion_info = $info_result->fetch_assoc();
+        $info_stmt->close();
+        
+        if (!$asignacion_info) {
+            return [
+                'success' => false,
+                'message' => 'No se encontró la asignación especificada.',
+                'type' => 'warning'
+            ];
+        }
+
+        // Eliminar asignación
+        $query = "DELETE FROM docente_seccion WHERE id_docente_seccion = ?";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $id);
+        
+        if($stmt->execute()) {
+            $affected_rows = $stmt->affected_rows;
+            $stmt->close();
+            
+            if ($affected_rows > 0) {
+                // REGISTRAR EN AUDITORÍA - ELIMINACIÓN DE ASIGNACIÓN
+                if (function_exists('registrarAuditoria')) {
+                    try {
+                        registrarAuditoria(
+                            "DELETE", 
+                            "docente_seccion", 
+                            $id, 
+                            [
+                                'id_usuario' => $asignacion_info['id_usuario'],
+                                'docente_nombre' => $asignacion_info['docente_nombre'],
+                                'docente_cedula' => $asignacion_info['docente_cedula'],
+                                'id_seccion' => $asignacion_info['id_seccion'],
+                                'seccion_codigo' => $asignacion_info['codigo_seccion'],
+                                'carrera_seccion' => $asignacion_info['nombre_carrera'],
+                                'id_materia' => $asignacion_info['id_materia'],
+                                'materia_nombre' => $asignacion_info['nombre_materia'],
+                                'fecha_asignacion' => $asignacion_info['fecha_asignacion']
+                            ], 
+                            null, 
+                            "Asignaciones Docentes", 
+                            "Eliminación de asignación de sección a docente"
+                        );
+                    } catch (Exception $e) {
+                        error_log("Error en auditoría eliminarAsignacionSeccion: " . $e->getMessage());
+                    }
+                }
+                
+                return [
+                    'success' => true,
+                    'message' => 'Asignación eliminada correctamente.',
+                    'type' => 'success',
+                    'affected_rows' => $affected_rows
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'message' => 'No se encontró la asignación especificada.',
+                    'type' => 'warning'
+                ];
+            }
+        } else {
+            throw new Exception("Error al eliminar: " . $stmt->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarAsignacionSeccion: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR ASIGNACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "docente_seccion", 
+                    $id, 
+                    null, 
+                    [
+                        'id_asignacion' => $id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Asignaciones Docentes", 
+                    "Error al eliminar asignación de sección"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarAsignacionSeccion: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al eliminar: ' . $e->getMessage(),
+            'type' => 'danger'
+        ];
+    }
+}
+
+/**
+ * Obtiene la lista de docentes activos
+ */
+function obtenerDocentesActivos() {
+    global $db;
+    
+    try {
+        $query = "SELECT id, idusuario, nombre FROM users WHERE docente = 1 AND status = 1 ORDER BY nombre";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $docentes = array();
+        
+        while($row = $result->fetch_assoc()) {
+            $docentes[] = $row;
+        }
+        
+        $stmt->close();
+        return $docentes;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerDocentesActivos: " . $e->getMessage());
+        return array();
+    }
+}
+
+/**
+ * Obtiene las secciones activas
+ */
+function obtenerSeccionesActivas() {
+    global $db;
+    
+    try {
+        $query = "SELECT s.id_seccion, s.codigo_seccion, c.id_carrera, c.nombre_carrera 
+                  FROM secciones s
+                  LEFT JOIN carreras c ON s.id_carrera = c.id_carrera
+                  WHERE s.estatus = 'activa' AND (c.activa = 1 OR c.activa IS NULL)
+                  ORDER BY c.nombre_carrera, s.codigo_seccion";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $secciones = array();
+        
+        if($result->num_rows > 0) {
+            while($row = $result->fetch_assoc()) {
+                $secciones[] = $row;
+            }
+        }
+        
+        $stmt->close();
+        return $secciones;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerSeccionesActivas: " . $e->getMessage());
+        return array();
+    }
+}
+
+/**
+ * Obtiene todas las asignaciones de secciones
+ */
+function obtenerAsignacionesSecciones() {
+    global $db;
+    
+    try {
+        $query = "SELECT ds.id_docente_seccion, u.nombre AS docente, 
+                         s.codigo_seccion, c.nombre_carrera, ds.fecha_asignacion,
+                         m.nombre_materia, m.cod_materia, u.idusuario as docente_cedula,
+                         s.id_seccion, u.id as id_docente, m.id_materia
+                  FROM docente_seccion ds
+                  JOIN users u ON ds.id_usuario = u.id
+                  JOIN secciones s ON ds.id_seccion = s.id_seccion
+                  LEFT JOIN carreras c ON s.id_carrera = c.id_carrera
+                  JOIN materias m ON ds.id_materia = m.id_materia
+                  WHERE s.estatus = 'activa' AND (c.activa = 1 OR c.activa IS NULL)
+                  ORDER BY ds.fecha_asignacion DESC";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $asignaciones = array();
+        
+        if($result->num_rows > 0) {
+            while($row = $result->fetch_assoc()) {
+                $asignaciones[] = $row;
+            }
+        }
+        
+        $stmt->close();
+        return $asignaciones;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerAsignacionesSecciones: " . $e->getMessage());
+        return array();
+    }
+}
+
+/**
+ * Obtiene las materias disponibles para un docente en una sección específica
+ */
+function obtenerMateriasDisponiblesParaDocente($id_docente, $id_seccion) {
+    global $db;
+    
+    try {
+        // Obtener la carrera de la sección
+        $query_carrera = "SELECT id_carrera FROM secciones WHERE id_seccion = ?";
+        $stmt_carrera = $db->prepare($query_carrera);
+        $stmt_carrera->bind_param("i", $id_seccion);
+        $stmt_carrera->execute();
+        $result_carrera = $stmt_carrera->get_result();
+        $seccion_info = $result_carrera->fetch_assoc();
+        $stmt_carrera->close();
+        
+        if (!$seccion_info) {
+            return array();
+        }
+        
+        $id_carrera = $seccion_info['id_carrera'];
+        
+        // Obtener materias del docente en esa carrera que no estén ya asignadas a la sección
+        $query = "SELECT DISTINCT m.id_materia, m.nombre_materia, m.cod_materia 
+                  FROM docente_materia dm
+                  JOIN materias m ON dm.id_materia = m.id_materia
+                  JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+                  WHERE dm.id_usuario = ?
+                  AND cm.id_carrera = ?
+                  AND m.id_materia NOT IN (
+                      SELECT id_materia FROM docente_seccion 
+                      WHERE id_seccion = ? AND id_usuario = ?
+                  )
+                  AND m.activa = 1
+                  ORDER BY m.nombre_materia";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("iiii", $id_docente, $id_carrera, $id_seccion, $id_docente);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $materias = array();
+        
+        while($row = $result->fetch_assoc()) {
+            $materias[] = $row;
+        }
+        
+        $stmt->close();
+        return $materias;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerMateriasDisponiblesParaDocente: " . $e->getMessage());
+        return array();
+    }
+}
+
+
+
+
+
 
 
 
@@ -4150,21 +7386,37 @@ function calcularRowspan($hora_inicio, $hora_fin, $horas) {
 // FUNCIONES DE PERIODOS ACADEMICOS***********************************************************************
 
 
-
 /**
  * Obtiene todos los periodos académicos
  * @param mysqli $db Conexión a la base de datos
  * @return array Lista de periodos académicos
  */
 function obtenerPeriodosAcademicos($db) {
-    // Primero desactivamos cualquier periodo vencido (por si acaso)
-    desactivarPeriodosVencidos($db);
-    
-    $query = "SELECT * FROM periodos_academicos ORDER BY created_at DESC";
-    $stmt = $db->prepare($query);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->fetch_all(MYSQLI_ASSOC);
+    try {
+        // Primero desactivamos cualquier periodo vencido (por si acaso)
+        desactivarPeriodosVencidos($db);
+        
+        $query = "SELECT * FROM periodos_academicos ORDER BY created_at DESC";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $periodos = $result->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        
+        return $periodos;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerPeriodosAcademicos: " . $e->getMessage());
+        return [];
+    }
 }
 
 /**
@@ -4173,14 +7425,101 @@ function obtenerPeriodosAcademicos($db) {
  * @param string $nombre Nombre del periodo
  * @param string $fecha_inicio Fecha de inicio (YYYY-MM-DD)
  * @param string $fecha_fin Fecha de fin (YYYY-MM-DD)
- * @return bool True si se creó correctamente
+ * @return array Resultado de la operación
  */
 function crearPeriodoAcademico($db, $nombre, $fecha_inicio, $fecha_fin) {
-    $query = "INSERT INTO periodos_academicos (nombre_periodo, fecha_inicio, fecha_fin, activo, created_at) 
-              VALUES (?, ?, ?, 1, NOW())";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("sss", $nombre, $fecha_inicio, $fecha_fin);
-    return $stmt->execute();
+    try {
+        // Validar fechas
+        if (empty($nombre) || empty($fecha_inicio) || empty($fecha_fin)) {
+            return [
+                'success' => false,
+                'message' => 'Todos los campos son obligatorios'
+            ];
+        }
+
+        // Validar que la fecha de fin sea posterior a la de inicio
+        if (strtotime($fecha_fin) <= strtotime($fecha_inicio)) {
+            return [
+                'success' => false,
+                'message' => 'La fecha de fin debe ser posterior a la fecha de inicio'
+            ];
+        }
+
+        $query = "INSERT INTO periodos_academicos (nombre_periodo, fecha_inicio, fecha_fin, activo, created_at) 
+                  VALUES (?, ?, ?, 1, NOW())";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("sss", $nombre, $fecha_inicio, $fecha_fin);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $periodo_id = $stmt->insert_id;
+        $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - NUEVO PERIODO ACADÉMICO CREADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "INSERT", 
+                    "periodos_academicos", 
+                    $periodo_id, 
+                    null, 
+                    [
+                        'nombre_periodo' => $nombre,
+                        'fecha_inicio' => $fecha_inicio,
+                        'fecha_fin' => $fecha_fin,
+                        'activo' => 1
+                    ], 
+                    "Periodos Académicos", 
+                    "Nuevo período académico creado"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría crearPeriodoAcademico: " . $e->getMessage());
+            }
+        }
+        
+        return [
+            'success' => true,
+            'message' => 'Período académico creado exitosamente',
+            'id_periodo' => $periodo_id
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Error en crearPeriodoAcademico: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL CREAR PERIODO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "periodos_academicos", 
+                    null, 
+                    null, 
+                    [
+                        'nombre_periodo' => $nombre,
+                        'fecha_inicio' => $fecha_inicio,
+                        'fecha_fin' => $fecha_fin,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Periodos Académicos", 
+                    "Error al crear período académico"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error crearPeriodoAcademico: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al crear período académico: ' . $e->getMessage()
+        ];
+    }
 }
 
 /**
@@ -4190,17 +7529,126 @@ function crearPeriodoAcademico($db, $nombre, $fecha_inicio, $fecha_fin) {
  * @param string $nombre Nuevo nombre del periodo
  * @param string $fecha_inicio Nueva fecha de inicio
  * @param string $fecha_fin Nueva fecha de fin
- * @return bool True si se actualizó correctamente
+ * @return array Resultado de la operación
  */
 function actualizarPeriodoAcademico($db, $id, $nombre, $fecha_inicio, $fecha_fin) {
-    $query = "UPDATE periodos_academicos SET 
-              nombre_periodo = ?,
-              fecha_inicio = ?,
-              fecha_fin = ?
-              WHERE id_periodo = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("sssi", $nombre, $fecha_inicio, $fecha_fin, $id);
-    return $stmt->execute();
+    try {
+        // Obtener datos actuales para auditoría
+        $periodo_actual = obtenerPeriodoPorId($db, $id);
+        if (!$periodo_actual) {
+            return [
+                'success' => false,
+                'message' => 'Período académico no encontrado'
+            ];
+        }
+
+        // Validar fechas
+        if (empty($nombre) || empty($fecha_inicio) || empty($fecha_fin)) {
+            return [
+                'success' => false,
+                'message' => 'Todos los campos son obligatorios'
+            ];
+        }
+
+        // Validar que la fecha de fin sea posterior a la de inicio
+        if (strtotime($fecha_fin) <= strtotime($fecha_inicio)) {
+            return [
+                'success' => false,
+                'message' => 'La fecha de fin debe ser posterior a la fecha de inicio'
+            ];
+        }
+
+        $query = "UPDATE periodos_academicos SET 
+                  nombre_periodo = ?,
+                  fecha_inicio = ?,
+                  fecha_fin = ?
+                  WHERE id_periodo = ?";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("sssi", $nombre, $fecha_inicio, $fecha_fin, $id);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - ACTUALIZACIÓN DE PERIODO ACADÉMICO
+        if ($affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                $valores_antiguos_audit = [];
+                $valores_nuevos_audit = [];
+                
+                // Comparar campos modificados
+                $campos_auditar = ['nombre_periodo', 'fecha_inicio', 'fecha_fin'];
+                
+                foreach ($campos_auditar as $campo) {
+                    $valor_antiguo = $periodo_actual[$campo] ?? null;
+                    $valor_nuevo = $$campo ?? null;
+                    
+                    if ($valor_antiguo != $valor_nuevo) {
+                        $valores_antiguos_audit[$campo] = $valor_antiguo;
+                        $valores_nuevos_audit[$campo] = $valor_nuevo;
+                    }
+                }
+                
+                if (!empty($valores_nuevos_audit)) {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "periodos_academicos", 
+                        $id, 
+                        $valores_antiguos_audit, 
+                        $valores_nuevos_audit, 
+                        "Periodos Académicos", 
+                        "Actualización de período académico"
+                    );
+                }
+            } catch (Exception $e) {
+                error_log("Error en auditoría actualizarPeriodoAcademico: " . $e->getMessage());
+            }
+        }
+        
+        return [
+            'success' => true,
+            'message' => 'Período académico actualizado exitosamente',
+            'affected_rows' => $affected_rows
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarPeriodoAcademico: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR PERIODO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "periodos_academicos", 
+                    $id, 
+                    null, 
+                    [
+                        'nombre_periodo' => $nombre,
+                        'fecha_inicio' => $fecha_inicio,
+                        'fecha_fin' => $fecha_fin,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Periodos Académicos", 
+                    "Error al actualizar período académico"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error actualizarPeriodoAcademico: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al actualizar período académico: ' . $e->getMessage()
+        ];
+    }
 }
 
 /**
@@ -4208,21 +7656,103 @@ function actualizarPeriodoAcademico($db, $id, $nombre, $fecha_inicio, $fecha_fin
  * @param mysqli $db Conexión a la base de datos
  * @param int $periodo_id ID del período
  * @param int $nuevo_estado Nuevo estado (1 para activo, 0 para inactivo)
- * @return bool True si la operación fue exitosa
+ * @return array Resultado de la operación
  */
 function cambiarEstadoPeriodo($db, $periodo_id, $nuevo_estado) {
     try {
+        // Obtener información actual del período para auditoría
+        $periodo_actual = obtenerPeriodoPorId($db, $periodo_id);
+        if (!$periodo_actual) {
+            return [
+                'success' => false,
+                'message' => 'Período académico no encontrado'
+            ];
+        }
+
         $stmt = $db->prepare("UPDATE periodos_academicos SET activo = ? WHERE id_periodo = ?");
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
         $stmt->bind_param("ii", $nuevo_estado, $periodo_id);
-        $stmt->execute();
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $affected_rows = $stmt->affected_rows;
         $stmt->close();
-        return true;
+        
+        // Si se activó el período, actualizar estados de secciones
+        if ($nuevo_estado == 1 && $affected_rows > 0) {
+            actualizarEstadoSeccionesDePeriodo($db, $periodo_id);
+        }
+        
+        // REGISTRAR EN AUDITORÍA - CAMBIO DE ESTADO DE PERIODO
+        if ($affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                $estado_texto_anterior = $periodo_actual['activo'] ? 'Activo' : 'Inactivo';
+                $estado_texto_nuevo = $nuevo_estado ? 'Activo' : 'Inactivo';
+                
+                registrarAuditoria(
+                    "UPDATE", 
+                    "periodos_academicos", 
+                    $periodo_id, 
+                    [
+                        'activo' => $periodo_actual['activo'],
+                        'estado_anterior' => $estado_texto_anterior
+                    ], 
+                    [
+                        'activo' => $nuevo_estado,
+                        'estado_nuevo' => $estado_texto_nuevo,
+                        'nombre_periodo' => $periodo_actual['nombre_periodo'],
+                        'fecha_inicio' => $periodo_actual['fecha_inicio'],
+                        'fecha_fin' => $periodo_actual['fecha_fin']
+                    ], 
+                    "Periodos Académicos", 
+                    "Cambio de estado de período académico"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría cambiarEstadoPeriodo: " . $e->getMessage());
+            }
+        }
+        
+        return [
+            'success' => true,
+            'message' => 'Estado del período actualizado exitosamente',
+            'affected_rows' => $affected_rows
+        ];
+        
     } catch (Exception $e) {
         error_log("Error al cambiar estado del período: " . $e->getMessage());
-        return false;
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL CAMBIAR ESTADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "periodos_academicos", 
+                    $periodo_id, 
+                    null, 
+                    [
+                        'nuevo_estado' => $nuevo_estado,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Periodos Académicos", 
+                    "Error al cambiar estado de período académico"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error cambiarEstadoPeriodo: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al cambiar estado del período: ' . $e->getMessage()
+        ];
     }
 }
-
 
 /**
  * Actualiza el estado de todas las secciones de un período cuando este se activa
@@ -4230,20 +7760,170 @@ function cambiarEstadoPeriodo($db, $periodo_id, $nuevo_estado) {
  * @param int $periodo_id ID del período académico
  */
 function actualizarEstadoSeccionesDePeriodo($db, $periodo_id) {
-    // Obtener todas las secciones del período
-    $stmt = $db->prepare("SELECT id_seccion FROM secciones WHERE id_periodo = ?");
-    $stmt->bind_param("i", $periodo_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $secciones = $result->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-    
-    // Actualizar el estado de cada sección
-    foreach ($secciones as $seccion) {
-        $count = contarEstudiantesActivos($db, $seccion['id_seccion']);
-        actualizarEstadoSeccion($db, $seccion['id_seccion'], $count);
+    try {
+        // Obtener todas las secciones del período
+        $stmt = $db->prepare("SELECT id_seccion FROM secciones WHERE id_periodo = ?");
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $periodo_id);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $secciones = $result->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        
+        // Contador para auditoría
+        $secciones_actualizadas = 0;
+        
+        // Actualizar el estado de cada sección
+        foreach ($secciones as $seccion) {
+            $count = contarEstudiantesActivos($db, $seccion['id_seccion']);
+            $resultado = actualizarEstadoSeccion($db, $seccion['id_seccion'], $count);
+            
+            if ($resultado) {
+                $secciones_actualizadas++;
+            }
+        }
+        
+        // REGISTRAR EN AUDITORÍA - ACTUALIZACIÓN MASIVA DE SECCIONES
+        if ($secciones_actualizadas > 0 && function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "UPDATE", 
+                    "secciones", 
+                    null, 
+                    null, 
+                    [
+                        'periodo_id' => $periodo_id,
+                        'secciones_actualizadas' => $secciones_actualizadas,
+                        'total_secciones' => count($secciones)
+                    ], 
+                    "Periodos Académicos", 
+                    "Actualización masiva de estados de secciones por activación de período"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría actualizarEstadoSeccionesDePeriodo: " . $e->getMessage());
+            }
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarEstadoSeccionesDePeriodo: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN ACTUALIZACIÓN MASIVA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "secciones", 
+                    null, 
+                    null, 
+                    [
+                        'periodo_id' => $periodo_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Periodos Académicos", 
+                    "Error en actualización masiva de secciones"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error actualizarEstadoSeccionesDePeriodo: " . $auditError->getMessage());
+            }
+        }
     }
 }
+
+/**
+ * Obtiene un período académico por su ID
+ * @param mysqli $db Conexión a la base de datos
+ * @param int $id ID del período
+ * @return array|null Datos del período o null si no existe
+ */
+function obtenerPeriodoPorId($db, $id) {
+    try {
+        $query = "SELECT * FROM periodos_academicos WHERE id_periodo = ?";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $id);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $periodo = $result->fetch_assoc();
+        $stmt->close();
+        
+        return $periodo;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerPeriodoPorId: " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Desactiva automáticamente los períodos académicos vencidos
+ * @param mysqli $db Conexión a la base de datos
+ * @return int Número de períodos desactivados
+ */
+function desactivarPeriodosVencidos($db) {
+    try {
+        $fecha_actual = date('Y-m-d');
+        
+        $query = "UPDATE periodos_academicos SET activo = 0 
+                  WHERE fecha_fin < ? AND activo = 1";
+        $stmt = $db->prepare($query);
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("s", $fecha_actual);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+        $affected_rows = $stmt->affected_rows;
+        $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - DESACTIVACIÓN AUTOMÁTICA DE PERIODOS VENCIDOS
+        if ($affected_rows > 0 && function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "UPDATE", 
+                    "periodos_academicos", 
+                    null, 
+                    null, 
+                    [
+                        'periodos_desactivados' => $affected_rows,
+                        'fecha_actual' => $fecha_actual
+                    ], 
+                    "Periodos Académicos", 
+                    "Desactivación automática de períodos académicos vencidos"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría desactivarPeriodosVencidos: " . $e->getMessage());
+            }
+        }
+        
+        return $affected_rows;
+        
+    } catch (Exception $e) {
+        error_log("Error en desactivarPeriodosVencidos: " . $e->getMessage());
+        return 0;
+    }
+}
+
 
 
 
@@ -4319,11 +7999,6 @@ function obtenerCompañerosSeccion($db, $seccion_id, $estudiante_id) {
 
 //AUDITORIA ***********************************************************************
 
-
-// ==============================================
-// ARCHIVO: funciones/functions.php
-// Sistema de Auditoría - Funciones adicionales
-// ==============================================
 
 /**
  * Registrar acción en el sistema de auditoría
@@ -4702,7 +8377,6 @@ function contarAccionesPorTipo($tipo) {
 //MEMBRETES Y REPORTES PDF  ***********************************************************************
 
 
-// Función para generar membrete en PDF
 // Función para generar el código JavaScript del membrete
 function generarMembreteJS() {
     $hoy = new DateTime();
@@ -4720,14 +8394,15 @@ function generarMembreteJS() {
                 // Agregar logo (arriba a la izquierda)
                 doc.addImage(logoImg, 'PNG', margin, 10, 20, 20);
                 
-                // Agregar texto del membrete
-                doc.setFontSize(12);
+                // Agregar texto del membrete con fuente más pequeña
+                doc.setFontSize(10); // Reducido de 12 a 10
                 doc.setFont(undefined, 'bold');
                 doc.text('REPÚBLICA BOLIVARIANA DE VENEZUELA', pageWidth / 2, 15, { align: 'center' });
                 doc.text('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA', pageWidth / 2, 20, { align: 'center' });
                 doc.text('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO', pageWidth / 2, 25, { align: 'center' });
                 
-                // Agregar fecha
+                // Agregar fecha con fuente más pequeña
+                doc.setFontSize(9); // Reducido para la fecha
                 doc.setFont(undefined, 'normal');
                 doc.text('$fecha', pageWidth - margin, 15, { align: 'right' });
                 
@@ -4735,12 +8410,14 @@ function generarMembreteJS() {
             };
             
             logoImg.onerror = function() {
-                // Fallback sin imagen
-                doc.setFontSize(12);
+                // Fallback sin imagen con fuente más pequeña
+                doc.setFontSize(10); // Reducido de 12 a 10
                 doc.setFont(undefined, 'bold');
                 doc.text('República Bolivariana de Venezuela', pageWidth / 2, 15, { align: 'center' });
                 doc.text('Ministerio del Poder Popular para la Educación Universitaria', pageWidth / 2, 20, { align: 'center' });
                 doc.text('Universidad Politécnica Territorial de Puerto Cabello', pageWidth / 2, 25, { align: 'center' });
+                
+                doc.setFontSize(9); // Reducido para la fecha
                 doc.setFont(undefined, 'normal');
                 doc.text('$fecha', pageWidth / 2, 32, { align: 'center' });
                 
@@ -4787,8 +8464,81 @@ function generarPDFDesdeHTML($elementoHTML, $nombreArchivo = 'documento.pdf') {
 
 //CARGA DE NOTAS ***********************************************************************
 
+
+// FUNCIÓN PARA OBTENER NOTAS DEFINITIVAS (SOLO LECTURA - SIN AUDITORÍA)
+function obtenerNotasDefinitivas($estudiante_id, $materia_id) {
+    global $db;
+    $query = "SELECT * FROM notas_definitivas 
+              WHERE id_usuario = ? AND id_materia = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("ii", $estudiante_id, $materia_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
+}
+
+// FUNCIÓN PARA OBTENER DATOS COMPLETOS DE notas_pendientes (SOLO LECTURA - SIN AUDITORÍA)
+function obtenerNotasPendientesEstudiante($id_estudiante, $id_materia, $id_periodo, $id_docente) {
+    global $db;
+    
+    $query = "SELECT * FROM notas_pendientes 
+              WHERE id_usuario = ? 
+              AND id_materia = ? 
+              AND id_periodo = ? 
+              AND id_docente = ? 
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iiii", $id_estudiante, $id_materia, $id_periodo, $id_docente);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    return null;
+}
+
+// FUNCIÓN MEJORADA PARA OBTENER ESTADO (CORREGIDA) (SOLO LECTURA - SIN AUDITORÍA)
+function obtenerEstadoCorregido($id_estudiante, $id_materia, $id_periodo, $id_docente) {
+    global $db;
+    
+    // PRIMERO: Verificar si está en notas_definitivas (APROBADA)
+    $query_definitivas = "SELECT id FROM notas_definitivas 
+                         WHERE id_usuario = ? AND id_materia = ?";
+    $stmt = $db->prepare($query_definitivas);
+    $stmt->bind_param("ii", $id_estudiante, $id_materia);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return 'aprobada'; // Está en notas_definitivas = APROBADA
+    }
+    
+    // SEGUNDO: Verificar si existe en notas_pendientes
+    $query_pendientes = "SELECT id, estado FROM notas_pendientes 
+                        WHERE id_usuario = ? AND id_materia = ? AND id_periodo = ? AND id_docente = ?";
+    $stmt = $db->prepare($query_pendientes);
+    $stmt->bind_param("iiii", $id_estudiante, $id_materia, $id_periodo, $id_docente);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        // Si tiene campo estado, usarlo; si no, asumir "en_revision"
+        if (isset($row['estado']) && $row['estado'] === 'rechazada') {
+            return 'rechazada';
+        }
+        return 'en_revision'; // SIEMPRE muestra como "En Revisión" si está en pendientes
+    }
+    
+    // No existe en ninguna tabla
+    return 'pendiente';
+}
+
 /**
- * Obtiene información completa de una materia incluyendo trayecto
+ * Obtiene información completa de una materia incluyendo trayecto (SOLO LECTURA - SIN AUDITORÍA)
  */
 function obtenerInfoMateria($materia_id) {
     global $db;
@@ -4827,7 +8577,7 @@ function obtenerInfoMateria($materia_id) {
 }
 
 /**
- * Obtiene todos los estudiantes de una sección específica
+ * Obtiene todos los estudiantes de una sección específica (SOLO LECTURA - SIN AUDITORÍA)
  */
 function obtenerEstudiantesPorSeccion($seccion_id) {
     global $db;
@@ -4843,7 +8593,7 @@ function obtenerEstudiantesPorSeccion($seccion_id) {
 }
 
 /**
- * Obtiene las notas de un estudiante en una materia específica
+ * Obtiene las notas de un estudiante en una materia específica (SOLO LECTURA - SIN AUDITORÍA)
  */
 function obtenerNotasEstudiante($estudiante_id, $materia_id) {
     global $db;
@@ -4857,7 +8607,7 @@ function obtenerNotasEstudiante($estudiante_id, $materia_id) {
 }
 
 /**
- * Obtiene el período académico de una sección
+ * Obtiene el período académico de una sección (SOLO LECTURA - SIN AUDITORÍA)
  */
 function obtenerPeriodoSeccion($seccion_id) {
     global $db;
@@ -4870,7 +8620,7 @@ function obtenerPeriodoSeccion($seccion_id) {
 }
 
 /**
- * Obtiene información del trayecto de una sección
+ * Obtiene información del trayecto de una sección (SOLO LECTURA - SIN AUDITORÍA)
  */
 function obtenerTrayectoSeccion($seccion_id) {
     global $db;
@@ -4886,7 +8636,7 @@ function obtenerTrayectoSeccion($seccion_id) {
 }
 
 /**
- * Determina el trayecto a mostrar basado en el ID de trayecto de la sección
+ * Determina el trayecto a mostrar basado en el ID de trayecto de la sección (SOLO LÓGICA - SIN AUDITORÍA)
  */
 function determinarTrayectoAMostrar($id_trayecto_seccion) {
     switch ($id_trayecto_seccion) {
@@ -4899,6 +8649,339 @@ function determinarTrayectoAMostrar($id_trayecto_seccion) {
     }
 }
 
+// Obtener información del grupo (SOLO LECTURA - SIN AUDITORÍA)
+function obtenerInfoGrupo($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT ud.nombre as nombre_docente, m.nombre_materia, m.cod_materia,
+                     pa.nombre_periodo, s.codigo_seccion, c.nombre_carrera, 
+                     t.nombre_trayecto, t.id_trayecto, t.numero_trayecto
+              FROM notas_pendientes np
+              INNER JOIN users ud ON np.id_docente = ud.id
+              INNER JOIN materias m ON np.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON np.id_periodo = pa.id_periodo
+              INNER JOIN docente_seccion ds ON np.id_docente = ds.id_usuario 
+                                           AND np.id_materia = ds.id_materia
+              INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+              WHERE np.id_docente = ? 
+              AND np.id_materia = ? 
+              AND np.id_periodo = ?
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc();
+}
+
+// Obtener estudiantes del grupo (MODIFICADA para excluir rechazados) (SOLO LECTURA - SIN AUDITORÍA)
+function obtenerEstudiantesGrupo($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT np.*, u.nombre as nombre_estudiante, u.idusuario as cedula
+              FROM notas_pendientes np
+              INNER JOIN users u ON np.id_usuario = u.id
+              WHERE np.id_docente = ? 
+              AND np.id_materia = ? 
+              AND np.id_periodo = ?
+              AND np.estado = 'pendiente'  -- SOLO notas pendientes, no rechazadas
+              ORDER BY u.nombre";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    return $stmt->get_result();
+}
+
+// Obtener información de soporte del grupo (SOLO LECTURA - SIN AUDITORÍA)
+function obtenerSoporteGrupo($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT DISTINCT soporte, tipo_archivo, fecha_subida
+              FROM notas_pendientes 
+              WHERE id_docente = ? 
+              AND id_materia = ? 
+              AND id_periodo = ?
+              AND soporte IS NOT NULL
+              AND estado = 'pendiente'
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    return null;
+}
+
+// Calcular promedio según el id_trayecto de la sección (SOLO CÁLCULO - SIN AUDITORÍA)
+function calcularPromedioPorTrayecto($nota, $id_trayecto) {
+    $suma = 0;
+    $count = 0;
+    
+    // Determinar qué trayectos promediar según el id_trayecto de la sección
+    switch ($id_trayecto) {
+        case 1: // Trayecto Inicial - Solo trayecto_0
+            if ($nota['trayecto_0'] !== null) {
+                $suma = $nota['trayecto_0'];
+                $count = 1;
+            }
+            break;
+            
+        case 2: // Trayecto 1 - Solo trayecto_1
+            if ($nota['trayecto_1'] !== null) {
+                $suma = $nota['trayecto_1'];
+                $count = 1;
+            }
+            break;
+            
+        case 3: // Trayecto 2 - Solo trayecto_2
+            if ($nota['trayecto_2'] !== null) {
+                $suma = $nota['trayecto_2'];
+                $count = 1;
+            }
+            break;
+            
+        case 4: // Trayecto 3 - Solo trayecto_3
+            if ($nota['trayecto_3'] !== null) {
+                $suma = $nota['trayecto_3'];
+                $count = 1;
+            }
+            break;
+            
+        case 5: // Trayecto 4 - Solo trayecto_4
+            if ($nota['trayecto_4'] !== null) {
+                $suma = $nota['trayecto_4'];
+                $count = 1;
+            }
+            break;
+            
+        default:
+            // Por defecto, calcular todos los trayectos (no debería pasar)
+            for ($i = 0; $i <= 4; $i++) {
+                if ($nota['trayecto_' . $i] !== null) {
+                    $suma += $nota['trayecto_' . $i];
+                    $count++;
+                }
+            }
+    }
+    
+    return $count > 0 ? round($suma / $count, 1) : 0;
+}
+
+// Obtener estadísticas del grupo según el id_trayecto (MODIFICADA para excluir rechazados) (SOLO LECTURA - SIN AUDITORÍA)
+function obtenerEstadisticasGrupo($docente_id, $materia_id, $periodo_id, $id_trayecto) {
+    global $db;
+    
+    $query = "SELECT np.trayecto_0, np.trayecto_1, np.trayecto_2, np.trayecto_3, np.trayecto_4
+              FROM notas_pendientes np
+              WHERE np.id_docente = ? 
+              AND np.id_materia = ? 
+              AND np.id_periodo = ?
+              AND np.estado = 'pendiente'";  // SOLO notas pendientes, no rechazadas
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $total_estudiantes = 0;
+    $suma_total = 0;
+    $aprobados = 0;
+    $reprobados = 0;
+    
+    while ($nota = $result->fetch_assoc()) {
+        $total_estudiantes++;
+        
+        // Calcular promedio según el id_trayecto de la sección
+        $promedio_estudiante = calcularPromedioPorTrayecto($nota, $id_trayecto);
+        $suma_total += $promedio_estudiante;
+        
+        // Aprobados desde 12 puntos
+        if ($promedio_estudiante >= 12) {
+            $aprobados++;
+        } else {
+            $reprobados++;
+        }
+    }
+    
+    $promedio_general = $total_estudiantes > 0 ? round($suma_total / $total_estudiantes, 1) : 0;
+    
+    return [
+        'total_estudiantes' => $total_estudiantes,
+        'promedio_general' => $promedio_general,
+        'aprobados' => $aprobados,
+        'reprobados' => $reprobados,
+        'id_trayecto' => $id_trayecto
+    ];
+}
+
+// FUNCIÓN AUXILIAR PARA OBTENER MATERIA POR ID (CON AUDITORÍA EN CASO DE ERROR)
+if (!function_exists('obtenerMateriaPorId')) {
+function obtenerMateriaPorId($materia_id) {
+    global $db;
+    
+    try {
+        $query = "SELECT id_materia, nombre_materia, cod_materia, trayecto 
+                  FROM materias 
+                  WHERE id_materia = ?";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $materia_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $materia = $result->fetch_assoc();
+        $stmt->close();
+        
+        return $materia;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerMateriaPorId: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL OBTENER MATERIA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "materias", 
+                    $materia_id, 
+                    null, 
+                    [
+                        'id_materia' => $materia_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Gestión de Notas", 
+                    "Error al obtener información de materia"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error obtenerMateriaPorId: " . $auditError->getMessage());
+            }
+        }
+        
+        return null;
+    }
+}
+}
+
+// FUNCIÓN AUXILIAR PARA OBTENER ESTUDIANTE POR ID (CON AUDITORÍA EN CASO DE ERROR)
+if (!function_exists('obtenerEstudiantePorId')) {
+function obtenerEstudiantePorId($estudiante_id) {
+    global $db;
+    
+    try {
+        $query = "SELECT id, nombre, idusuario, email 
+                  FROM users 
+                  WHERE id = ? AND estudiante = 1";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $estudiante_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $estudiante = $result->fetch_assoc();
+        $stmt->close();
+        
+        return $estudiante;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerEstudiantePorId: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL OBTENER ESTUDIANTE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $estudiante_id, 
+                    null, 
+                    [
+                        'id_estudiante' => $estudiante_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Gestión de Notas", 
+                    "Error al obtener información de estudiante"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error obtenerEstudiantePorId: " . $auditError->getMessage());
+            }
+        }
+        
+        return null;
+    }
+}
+}
+
+// FUNCIÓN AUXILIAR PARA OBTENER DOCENTE POR ID (CON AUDITORÍA EN CASO DE ERROR)
+if (!function_exists('obtenerDocentePorId')) {
+function obtenerDocentePorId($docente_id) {
+    global $db;
+    
+    try {
+        $query = "SELECT id, nombre, username, email 
+                  FROM users 
+                  WHERE id = ? AND docente = 1";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $docente_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $docente = $result->fetch_assoc();
+        $stmt->close();
+        
+        return $docente;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerDocentePorId: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL OBTENER DOCENTE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $docente_id, 
+                    null, 
+                    [
+                        'id_docente' => $docente_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Gestión de Notas", 
+                    "Error al obtener información de docente"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error obtenerDocentePorId: " . $auditError->getMessage());
+            }
+        }
+        
+        return null;
+    }
+}
+}
+
+
+
+
+
+
+
+
 
 
 
@@ -4907,6 +8990,11 @@ function determinarTrayectoAMostrar($id_trayecto_seccion) {
 // Obtener lista de usuarios para enviar mensajes con filtros
 function obtenerUsuariosMensajeria($filtro_tipo = '', $busqueda_cedula = '') {
     global $db;
+    
+    if (!isset($_SESSION['user']['id'])) {
+        return false;
+    }
+    
     $current_user_id = $_SESSION['user']['id'];
     
     $query = "SELECT id, nombre, usuario, estudiante, docente, admin, idusuario 
@@ -4937,6 +9025,10 @@ function obtenerUsuariosMensajeria($filtro_tipo = '', $busqueda_cedula = '') {
     $query .= " ORDER BY nombre";
     
     $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error en preparar consulta obtenerUsuariosMensajeria: " . $db->error);
+        return false;
+    }
     
     // Bind parameters dinámicamente
     if (count($params) > 1) {
@@ -4945,7 +9037,32 @@ function obtenerUsuariosMensajeria($filtro_tipo = '', $busqueda_cedula = '') {
         $stmt->bind_param($types, $params[0]);
     }
     
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        error_log("Error en ejecutar obtenerUsuariosMensajeria: " . $stmt->error);
+        return false;
+    }
+    
+    // Auditoría solo si la función existe
+    if (function_exists('registrarAuditoria')) {
+        try {
+            registrarAuditoria(
+                "SELECT", 
+                "users", 
+                null, 
+                null, 
+                [
+                    'filtro_tipo' => $filtro_tipo,
+                    'busqueda_cedula' => $busqueda_cedula,
+                    'usuario_consulta' => $current_user_id
+                ], 
+                "Mensajería", 
+                "Consulta de usuarios para mensajería"
+            );
+        } catch (Exception $e) {
+            error_log("Error en auditoría obtenerUsuariosMensajeria: " . $e->getMessage());
+        }
+    }
+    
     return $stmt->get_result();
 }
 
@@ -4969,9 +9086,40 @@ function obtenerMensajesRecibidos($user_id) {
               WHERE m.id_usuario_destinatario = ? 
               AND m.eliminado_destinatario = FALSE
               ORDER BY m.fecha_envio DESC";
+    
     $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error en preparar consulta obtenerMensajesRecibidos: " . $db->error);
+        return false;
+    }
+    
     $stmt->bind_param("i", $user_id);
-    $stmt->execute();
+    
+    if (!$stmt->execute()) {
+        error_log("Error en ejecutar obtenerMensajesRecibidos: " . $stmt->error);
+        return false;
+    }
+    
+    // Auditoría solo si la función existe
+    if (function_exists('registrarAuditoria')) {
+        try {
+            registrarAuditoria(
+                "SELECT", 
+                "mensajeria", 
+                null, 
+                null, 
+                [
+                    'usuario_id' => $user_id,
+                    'tipo_consulta' => 'mensajes_recibidos'
+                ], 
+                "Mensajería", 
+                "Consulta de mensajes recibidos"
+            );
+        } catch (Exception $e) {
+            error_log("Error en auditoría obtenerMensajesRecibidos: " . $e->getMessage());
+        }
+    }
+    
     return $stmt->get_result();
 }
 
@@ -4986,9 +9134,40 @@ function obtenerMensajesEnviados($user_id) {
               WHERE m.id_usuario_remitente = ? 
               AND m.eliminado_remitente = FALSE
               ORDER BY m.fecha_envio DESC";
+    
     $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error en preparar consulta obtenerMensajesEnviados: " . $db->error);
+        return false;
+    }
+    
     $stmt->bind_param("i", $user_id);
-    $stmt->execute();
+    
+    if (!$stmt->execute()) {
+        error_log("Error en ejecutar obtenerMensajesEnviados: " . $stmt->error);
+        return false;
+    }
+    
+    // Auditoría solo si la función existe
+    if (function_exists('registrarAuditoria')) {
+        try {
+            registrarAuditoria(
+                "SELECT", 
+                "mensajeria", 
+                null, 
+                null, 
+                [
+                    'usuario_id' => $user_id,
+                    'tipo_consulta' => 'mensajes_enviados'
+                ], 
+                "Mensajería", 
+                "Consulta de mensajes enviados"
+            );
+        } catch (Exception $e) {
+            error_log("Error en auditoría obtenerMensajesEnviados: " . $e->getMessage());
+        }
+    }
+    
     return $stmt->get_result();
 }
 
@@ -5015,32 +9194,194 @@ function obtenerMensaje($mensaje_id, $user_id, $tipo = 'recibidos') {
     }
     
     $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error en preparar consulta obtenerMensaje: " . $db->error);
+        return false;
+    }
+    
     $stmt->bind_param("ii", $mensaje_id, $user_id);
-    $stmt->execute();
-    return $stmt->get_result()->fetch_assoc();
+    
+    if (!$stmt->execute()) {
+        error_log("Error en ejecutar obtenerMensaje: " . $stmt->error);
+        return false;
+    }
+    
+    $result = $stmt->get_result();
+    $mensaje = $result->fetch_assoc();
+    
+    // Auditoría solo si la función existe y se encontró el mensaje
+    if ($mensaje && function_exists('registrarAuditoria')) {
+        try {
+            registrarAuditoria(
+                "SELECT", 
+                "mensajeria", 
+                $mensaje_id, 
+                null, 
+                [
+                    'usuario_id' => $user_id,
+                    'tipo_mensaje' => $tipo
+                ], 
+                "Mensajería", 
+                "Consulta de mensaje específico"
+            );
+        } catch (Exception $e) {
+            error_log("Error en auditoría obtenerMensaje: " . $e->getMessage());
+        }
+    }
+    
+    return $mensaje;
 }
 
 // Marcar mensaje como leído
 function marcarMensajeLeido($mensaje_id, $user_id) {
     global $db;
     
-    $query = "UPDATE mensajeria SET leido = TRUE 
-              WHERE id = ? AND id_usuario_destinatario = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("ii", $mensaje_id, $user_id);
-    return $stmt->execute();
+    try {
+        $query = "UPDATE mensajeria SET leido = TRUE 
+                  WHERE id = ? AND id_usuario_destinatario = ?";
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparar consulta: " . $db->error);
+        }
+        
+        $stmt->bind_param("ii", $mensaje_id, $user_id);
+        $result = $stmt->execute();
+        
+        if ($result && function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "UPDATE", 
+                    "mensajeria", 
+                    $mensaje_id, 
+                    ['leido' => '0'], 
+                    [
+                        'leido' => '1',
+                        'usuario_id' => $user_id
+                    ], 
+                    "Mensajería", 
+                    "Mensaje marcado como leído"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría marcarMensajeLeido: " . $e->getMessage());
+            }
+        }
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        error_log("Error en marcarMensajeLeido: " . $e->getMessage());
+        
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "mensajeria", 
+                    $mensaje_id, 
+                    null, 
+                    [
+                        'usuario_id' => $user_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Mensajería", 
+                    "Error al marcar mensaje como leído"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error marcarMensajeLeido: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
 // Enviar mensaje
 function enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje) {
     global $db;
     
-    $query = "INSERT INTO mensajeria (id_usuario_remitente, id_usuario_destinatario, titulo, mensaje)
-              VALUES (?, ?, ?, ?)";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("iiss", $remitente_id, $destinatario_id, $titulo, $mensaje);
-    
-    return $stmt->execute();
+    try {
+        // Iniciar transacción
+        $db->begin_transaction();
+
+        $query = "INSERT INTO mensajeria (id_usuario_remitente, id_usuario_destinatario, titulo, mensaje)
+                  VALUES (?, ?, ?, ?)";
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparar consulta: " . $db->error);
+        }
+        
+        $stmt->bind_param("iiss", $remitente_id, $destinatario_id, $titulo, $mensaje);
+        
+        $result = $stmt->execute();
+        
+        if ($result) {
+            $mensaje_id = $stmt->insert_id;
+            
+            // Auditoría solo si la función existe
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "INSERT", 
+                        "mensajeria", 
+                        $mensaje_id, 
+                        null, 
+                        [
+                            'id_usuario_remitente' => $remitente_id,
+                            'id_usuario_destinatario' => $destinatario_id,
+                            'titulo' => $titulo,
+                            'mensaje_length' => strlen($mensaje)
+                        ], 
+                        "Mensajería", 
+                        "Nuevo mensaje enviado"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría enviarMensaje: " . $e->getMessage());
+                }
+            }
+
+            // Confirmar transacción
+            $db->commit();
+            
+            return [
+                'success' => true,
+                'message' => 'Mensaje enviado exitosamente!',
+                'id' => $mensaje_id
+            ];
+        } else {
+            throw new Exception("Error al ejecutar: " . $stmt->error);
+        }
+        
+    } catch(Exception $e) {
+        // Revertir transacción en caso de error
+        $db->rollback();
+        
+        // Auditoría de error solo si la función existe
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "mensajeria", 
+                    null, 
+                    null, 
+                    [
+                        'remitente_id' => $remitente_id,
+                        'destinatario_id' => $destinatario_id,
+                        'titulo' => $titulo,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Mensajería", 
+                    "Error al enviar mensaje"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error enviarMensaje: " . $auditError->getMessage());
+            }
+        }
+        
+        error_log("Error en enviarMensaje: " . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => 'Error al enviar mensaje: ' . $e->getMessage()
+        ];
+    }
 }
 
 
@@ -5215,6 +9556,7 @@ function obtenerTipoPeriodoPorCarrera($id_carrera) {
 
 //TIPOS DE HORARIO ***********************************************************************
 
+// Función para obtener todos los tipos de horario - SOLO LECTURA, SIN AUDITORÍA
 function obtenerTiposHorario($db) {
     $query = "SELECT * FROM tipos_horario ORDER BY nombre";
     $result = $db->query($query);
@@ -5222,7 +9564,7 @@ function obtenerTiposHorario($db) {
 }
 
 /**
- * Obtener un tipo de horario por ID
+ * Obtener un tipo de horario por ID - SOLO LECTURA, SIN AUDITORÍA
  */
 function obtenerTipoHorarioPorId($db, $id) {
     $query = "SELECT * FROM tipos_horario WHERE id = $id";
@@ -5231,41 +9573,383 @@ function obtenerTipoHorarioPorId($db, $id) {
 }
 
 /**
- * Agregar un nuevo tipo de horario
+ * Agregar un nuevo tipo de horario - CON AUDITORÍA
  */
 function agregarTipoHorario($db, $nombre, $horas_academicas, $horas_atendiendo) {
-    $nombre = $db->real_escape_string($nombre);
-    $horas_academicas = (int)$horas_academicas;
-    $horas_atendiendo = (int)$horas_atendiendo;
-    
-    $query = "INSERT INTO tipos_horario (nombre, horas_academicas, horas_atendiendo) 
-              VALUES ('$nombre', $horas_academicas, $horas_atendiendo)";
-    return $db->query($query);
+    try {
+        $nombre_original = $nombre;
+        $horas_academicas_original = (int)$horas_academicas;
+        $horas_atendiendo_original = (int)$horas_atendiendo;
+        
+        $nombre = $db->real_escape_string($nombre);
+        $horas_academicas = (int)$horas_academicas;
+        $horas_atendiendo = (int)$horas_atendiendo;
+        
+        $query = "INSERT INTO tipos_horario (nombre, horas_academicas, horas_atendiendo) 
+                  VALUES ('$nombre', $horas_academicas, $horas_atendiendo)";
+        
+        $result = $db->query($query);
+        
+        if ($result) {
+            $id_insertado = $db->insert_id;
+            
+            // REGISTRAR EN AUDITORÍA - TIPO DE HORARIO CREADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "INSERT", 
+                        "tipos_horario", 
+                        $id_insertado, 
+                        null, 
+                        [
+                            'nombre' => $nombre_original,
+                            'horas_academicas' => $horas_academicas_original,
+                            'horas_atendiendo' => $horas_atendiendo_original,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_creacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Tipos de Horario", 
+                        "Tipo de horario creado: " . $nombre_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría agregarTipoHorario: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            // REGISTRAR EN AUDITORÍA - ERROR AL CREAR TIPO DE HORARIO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipos_horario", 
+                        null, 
+                        null, 
+                        [
+                            'nombre' => $nombre_original,
+                            'horas_academicas' => $horas_academicas_original,
+                            'horas_atendiendo' => $horas_atendiendo_original,
+                            'error' => $db->error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Tipos de Horario", 
+                        "Error al crear tipo de horario: " . $nombre_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error agregarTipoHorario: " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en agregarTipoHorario: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL CREAR TIPO DE HORARIO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipos_horario", 
+                    null, 
+                    null, 
+                    [
+                        'nombre' => $nombre_original ?? '',
+                        'horas_academicas' => $horas_academicas_original ?? 0,
+                        'horas_atendiendo' => $horas_atendiendo_original ?? 0,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Tipos de Horario", 
+                    "Excepción al crear tipo de horario"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción agregarTipoHorario: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
 /**
- * Actualizar un tipo de horario existente
+ * Actualizar un tipo de horario existente - CON AUDITORÍA
  */
 function actualizarTipoHorario($db, $id, $nombre, $horas_academicas, $horas_atendiendo) {
-    $nombre = $db->real_escape_string($nombre);
-    $horas_academicas = (int)$horas_academicas;
-    $horas_atendiendo = (int)$horas_atendiendo;
-    
-    $query = "UPDATE tipos_horario SET 
-              nombre = '$nombre', 
-              horas_academicas = $horas_academicas, 
-              horas_atendiendo = $horas_atendiendo 
-              WHERE id = $id";
-    return $db->query($query);
+    try {
+        // Obtener datos actuales para auditoría
+        $query_actual = "SELECT nombre, horas_academicas, horas_atendiendo FROM tipos_horario WHERE id = $id";
+        $result_actual = $db->query($query_actual);
+        
+        if ($result_actual->num_rows === 0) {
+            return false;
+        }
+        
+        $tipo_horario_actual = $result_actual->fetch_assoc();
+        
+        $nombre_original = $nombre;
+        $horas_academicas_original = (int)$horas_academicas;
+        $horas_atendiendo_original = (int)$horas_atendiendo;
+        
+        $nombre = $db->real_escape_string($nombre);
+        $horas_academicas = (int)$horas_academicas;
+        $horas_atendiendo = (int)$horas_atendiendo;
+        
+        $query = "UPDATE tipos_horario SET 
+                  nombre = '$nombre', 
+                  horas_academicas = $horas_academicas, 
+                  horas_atendiendo = $horas_atendiendo 
+                  WHERE id = $id";
+        
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - TIPO DE HORARIO ACTUALIZADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    $cambios = [];
+                    if ($tipo_horario_actual['nombre'] != $nombre_original) {
+                        $cambios[] = "nombre: " . $tipo_horario_actual['nombre'] . " → " . $nombre_original;
+                    }
+                    if ($tipo_horario_actual['horas_academicas'] != $horas_academicas_original) {
+                        $cambios[] = "horas_academicas: " . $tipo_horario_actual['horas_academicas'] . " → " . $horas_academicas_original;
+                    }
+                    if ($tipo_horario_actual['horas_atendiendo'] != $horas_atendiendo_original) {
+                        $cambios[] = "horas_atendiendo: " . $tipo_horario_actual['horas_atendiendo'] . " → " . $horas_atendiendo_original;
+                    }
+                    
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "tipos_horario", 
+                        $id, 
+                        [
+                            'nombre_anterior' => $tipo_horario_actual['nombre'],
+                            'horas_academicas_anterior' => $tipo_horario_actual['horas_academicas'],
+                            'horas_atendiendo_anterior' => $tipo_horario_actual['horas_atendiendo']
+                        ], 
+                        [
+                            'nombre_nuevo' => $nombre_original,
+                            'horas_academicas_nuevo' => $horas_academicas_original,
+                            'horas_atendiendo_nuevo' => $horas_atendiendo_original,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_actualizacion' => date('Y-m-d H:i:s'),
+                            'cambios' => implode('; ', $cambios)
+                        ], 
+                        "Tipos de Horario", 
+                        "Tipo de horario actualizado: " . $tipo_horario_actual['nombre'] . " → " . $nombre_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría actualizarTipoHorario: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR TIPO DE HORARIO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipos_horario", 
+                        $id, 
+                        null, 
+                        [
+                            'id_tipo_horario' => $id,
+                            'nombre_nuevo' => $nombre_original,
+                            'horas_academicas_nuevo' => $horas_academicas_original,
+                            'horas_atendiendo_nuevo' => $horas_atendiendo_original,
+                            'error' => $db->error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Tipos de Horario", 
+                        "Error al actualizar tipo de horario ID: " . $id
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error actualizarTipoHorario: " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarTipoHorario: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ACTUALIZAR TIPO DE HORARIO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipos_horario", 
+                    $id, 
+                    null, 
+                    [
+                        'id_tipo_horario' => $id,
+                        'nombre_nuevo' => $nombre_original ?? '',
+                        'horas_academicas_nuevo' => $horas_academicas_original ?? 0,
+                        'horas_atendiendo_nuevo' => $horas_atendiendo_original ?? 0,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Tipos de Horario", 
+                    "Excepción al actualizar tipo de horario"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción actualizarTipoHorario: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
 /**
- * Eliminar un tipo de horario
+ * Eliminar un tipo de horario - CON AUDITORÍA
  */
 function eliminarTipoHorario($db, $id) {
-    $query = "DELETE FROM tipos_horario WHERE id = $id";
-    return $db->query($query);
+    try {
+        // Obtener datos del tipo de horario para auditoría
+        $query_actual = "SELECT nombre, horas_academicas, horas_atendiendo FROM tipos_horario WHERE id = $id";
+        $result_actual = $db->query($query_actual);
+        
+        if ($result_actual->num_rows === 0) {
+            return false;
+        }
+        
+        $tipo_horario_eliminado = $result_actual->fetch_assoc();
+        
+        $query = "DELETE FROM tipos_horario WHERE id = $id";
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - TIPO DE HORARIO ELIMINADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "DELETE", 
+                        "tipos_horario", 
+                        $id, 
+                        [
+                            'nombre_eliminado' => $tipo_horario_eliminado['nombre'],
+                            'horas_academicas_eliminado' => $tipo_horario_eliminado['horas_academicas'],
+                            'horas_atendiendo_eliminado' => $tipo_horario_eliminado['horas_atendiendo']
+                        ], 
+                        [
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_eliminacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Tipos de Horario", 
+                        "Tipo de horario eliminado: " . $tipo_horario_eliminado['nombre'] . " (ID: " . $id . ")"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarTipoHorario: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR TIPO DE HORARIO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipos_horario", 
+                        $id, 
+                        null, 
+                        [
+                            'id_tipo_horario' => $id,
+                            'nombre' => $tipo_horario_eliminado['nombre'],
+                            'error' => $db->error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Tipos de Horario", 
+                        "Error al eliminar tipo de horario: " . $tipo_horario_eliminado['nombre']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error eliminarTipoHorario: " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarTipoHorario: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ELIMINAR TIPO DE HORARIO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipos_horario", 
+                    $id, 
+                    null, 
+                    [
+                        'id_tipo_horario' => $id,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Tipos de Horario", 
+                    "Excepción al eliminar tipo de horario"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción eliminarTipoHorario: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
+
+if (!function_exists('validarTipoHorario')) {
+    function validarTipoHorario($nombre, $horas_academicas, $horas_atendiendo) {
+        $errores = [];
+        
+        if (empty(trim($nombre))) {
+            $errores[] = "El nombre del horario es requerido";
+        } elseif (strlen(trim($nombre)) < 2) {
+            $errores[] = "El nombre debe tener al menos 2 caracteres";
+        } elseif (strlen(trim($nombre)) > 100) {
+            $errores[] = "El nombre no puede exceder los 100 caracteres";
+        }
+        
+        if (!is_numeric($horas_academicas) || $horas_academicas < 0) {
+            $errores[] = "Las horas académicas deben ser un número positivo";
+        }
+        
+        if (!is_numeric($horas_atendiendo) || $horas_atendiendo < 0) {
+            $errores[] = "Las horas atendiendo deben ser un número positivo";
+        }
+        
+        return $errores;
+    }
+}
+
+
+if (!function_exists('existeTipoHorario')) {
+    function existeTipoHorario($db, $nombre, $excluir_id = null) {
+        if ($excluir_id) {
+            $stmt = $db->prepare("SELECT id FROM tipos_horario WHERE nombre = ? AND id != ?");
+            $stmt->bind_param("si", $nombre, $excluir_id);
+        } else {
+            $stmt = $db->prepare("SELECT id FROM tipos_horario WHERE nombre = ?");
+            $stmt->bind_param("s", $nombre);
+        }
+        
+        $stmt->execute();
+        $stmt->store_result();
+        return $stmt->num_rows > 0;
+    }
+}
+
+
+
+
 
 
 
@@ -5273,26 +9957,127 @@ function eliminarTipoHorario($db, $id) {
 //ASIGNACION TIPO HORARIO AL PERSONAL ***********************************************************************
 
 /**
- * Asignar tipo de horario a un usuario
+ * Asignar tipo de horario a un usuario - CON AUDITORÍA
  */
 function asignarTipoHorarioUsuario($db, $id_usuario, $id_tipo_horario) {
-    // Verificar si ya existe la relación
-    $query_check = "SELECT id FROM tipo_horario_personal 
-                    WHERE id_usuario = $id_usuario AND id_tipo_horario = $id_tipo_horario";
-    $result = $db->query($query_check);
-    
-    if ($result->num_rows > 0) {
-        return false; // Ya existe esta relación
+    try {
+        // Obtener información del usuario y tipo de horario para auditoría
+        $query_usuario = "SELECT nombre, username FROM users WHERE id = $id_usuario";
+        $query_horario = "SELECT nombre FROM tipos_horario WHERE id = $id_tipo_horario";
+        
+        $result_usuario = $db->query($query_usuario);
+        $result_horario = $db->query($query_horario);
+        
+        if ($result_usuario->num_rows === 0 || $result_horario->num_rows === 0) {
+            return false;
+        }
+        
+        $usuario_info = $result_usuario->fetch_assoc();
+        $horario_info = $result_horario->fetch_assoc();
+        
+        // Verificar si ya existe la relación
+        $query_check = "SELECT id FROM tipo_horario_personal 
+                        WHERE id_usuario = $id_usuario AND id_tipo_horario = $id_tipo_horario";
+        $result = $db->query($query_check);
+        
+        if ($result->num_rows > 0) {
+            return false; // Ya existe esta relación
+        }
+        
+        // Insertar nueva relación
+        $query = "INSERT INTO tipo_horario_personal (id_usuario, id_tipo_horario) 
+                  VALUES ($id_usuario, $id_tipo_horario)";
+        $result = $db->query($query);
+        
+        if ($result) {
+            $id_insertado = $db->insert_id;
+            
+            // REGISTRAR EN AUDITORÍA - ASIGNACIÓN DE HORARIO CREADA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "INSERT", 
+                        "tipo_horario_personal", 
+                        $id_insertado, 
+                        null, 
+                        [
+                            'id_usuario' => $id_usuario,
+                            'usuario_nombre' => $usuario_info['nombre'],
+                            'usuario_username' => $usuario_info['username'],
+                            'id_tipo_horario' => $id_tipo_horario,
+                            'horario_nombre' => $horario_info['nombre'],
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_asignacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Horario Personal", 
+                        "Horario asignado a usuario: " . $horario_info['nombre'] . " → " . $usuario_info['nombre']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría asignarTipoHorarioUsuario: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            // REGISTRAR EN AUDITORÍA - ERROR AL ASIGNAR HORARIO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipo_horario_personal", 
+                        null, 
+                        null, 
+                        [
+                            'id_usuario' => $id_usuario,
+                            'usuario_nombre' => $usuario_info['nombre'],
+                            'id_tipo_horario' => $id_tipo_horario,
+                            'horario_nombre' => $horario_info['nombre'],
+                            'error' => $db->error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Horario Personal", 
+                        "Error al asignar horario a usuario"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error asignarTipoHorarioUsuario: " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en asignarTipoHorarioUsuario: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ASIGNAR HORARIO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipo_horario_personal", 
+                    null, 
+                    null, 
+                    [
+                        'id_usuario' => $id_usuario,
+                        'id_tipo_horario' => $id_tipo_horario,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Horario Personal", 
+                    "Excepción al asignar horario a usuario"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción asignarTipoHorarioUsuario: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
     }
-    
-    // Insertar nueva relación
-    $query = "INSERT INTO tipo_horario_personal (id_usuario, id_tipo_horario) 
-              VALUES ($id_usuario, $id_tipo_horario)";
-    return $db->query($query);
 }
 
 /**
- * Obtener tipos de horario de un usuario
+ * Obtener tipos de horario de un usuario - SOLO LECTURA, SIN AUDITORÍA
  */
 function obtenerTiposHorarioUsuario($db, $id_usuario) {
     $query = "SELECT th.* 
@@ -5305,16 +10090,117 @@ function obtenerTiposHorarioUsuario($db, $id_usuario) {
 }
 
 /**
- * Eliminar asignación de horario de usuario
+ * Eliminar asignación de horario de usuario - CON AUDITORÍA
  */
 function eliminarTipoHorarioUsuario($db, $id_usuario, $id_tipo_horario) {
-    $query = "DELETE FROM tipo_horario_personal 
-              WHERE id_usuario = $id_usuario AND id_tipo_horario = $id_tipo_horario";
-    return $db->query($query);
+    try {
+        // Obtener información para auditoría
+        $query_info = "SELECT u.nombre as usuario_nombre, u.username, th.nombre as horario_nombre
+                       FROM tipo_horario_personal thp
+                       JOIN users u ON thp.id_usuario = u.id
+                       JOIN tipos_horario th ON thp.id_tipo_horario = th.id
+                       WHERE thp.id_usuario = $id_usuario AND thp.id_tipo_horario = $id_tipo_horario";
+        
+        $result_info = $db->query($query_info);
+        
+        if ($result_info->num_rows === 0) {
+            return false;
+        }
+        
+        $info = $result_info->fetch_assoc();
+        
+        $query = "DELETE FROM tipo_horario_personal 
+                  WHERE id_usuario = $id_usuario AND id_tipo_horario = $id_tipo_horario";
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - ASIGNACIÓN DE HORARIO ELIMINADA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "DELETE", 
+                        "tipo_horario_personal", 
+                        null, 
+                        [
+                            'id_usuario' => $id_usuario,
+                            'usuario_nombre' => $info['usuario_nombre'],
+                            'usuario_username' => $info['username'],
+                            'id_tipo_horario' => $id_tipo_horario,
+                            'horario_nombre' => $info['horario_nombre']
+                        ], 
+                        [
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_eliminacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Horario Personal", 
+                        "Horario eliminado de usuario: " . $info['horario_nombre'] . " ← " . $info['usuario_nombre']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarTipoHorarioUsuario: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR ASIGNACIÓN
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipo_horario_personal", 
+                        null, 
+                        null, 
+                        [
+                            'id_usuario' => $id_usuario,
+                            'usuario_nombre' => $info['usuario_nombre'],
+                            'id_tipo_horario' => $id_tipo_horario,
+                            'horario_nombre' => $info['horario_nombre'],
+                            'error' => $db->error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Horario Personal", 
+                        "Error al eliminar horario de usuario"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error eliminarTipoHorarioUsuario: " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarTipoHorarioUsuario: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ELIMINAR ASIGNACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipo_horario_personal", 
+                    null, 
+                    null, 
+                    [
+                        'id_usuario' => $id_usuario,
+                        'id_tipo_horario' => $id_tipo_horario,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Horario Personal", 
+                    "Excepción al eliminar horario de usuario"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción eliminarTipoHorarioUsuario: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
 /**
- * Obtener usuarios por tipo de horario
+ * Obtener usuarios por tipo de horario - SOLO LECTURA, SIN AUDITORÍA
  */
 function obtenerUsuariosPorTipoHorario($db, $id_tipo_horario) {
     $query = "SELECT u.* 
@@ -5326,11 +10212,8 @@ function obtenerUsuariosPorTipoHorario($db, $id_tipo_horario) {
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 
-
-
-
 /**
- * Obtener texto del tipo de usuario (estético)
+ * Obtener texto del tipo de usuario (estético) - SOLO LÓGICA, SIN AUDITORÍA
  */
 function obtenerTipoUsuarioTexto($usuario) {
     $tipo_usuario = [];
@@ -5343,7 +10226,7 @@ function obtenerTipoUsuarioTexto($usuario) {
 }
 
 /**
- * Obtener todas las relaciones horario-personal
+ * Obtener todas las relaciones horario-personal - SOLO LECTURA, SIN AUDITORÍA
  */
 function obtenerTodasRelacionesHorarioPersonal($db) {
     $query = "SELECT thp.id, thp.id_usuario, thp.id_tipo_horario, 
@@ -5359,19 +10242,225 @@ function obtenerTodasRelacionesHorarioPersonal($db) {
 }
 
 /**
- * Actualizar tipo de horario de usuario
+ * Actualizar tipo de horario de usuario - CON AUDITORÍA
  */
 function actualizarTipoHorarioUsuario($db, $id_relacion, $id_tipo_horario) {
-    $query = "UPDATE tipo_horario_personal SET id_tipo_horario = $id_tipo_horario WHERE id = $id_relacion";
-    return $db->query($query);
+    try {
+        // Obtener información actual para auditoría
+        $query_actual = "SELECT thp.id_usuario, thp.id_tipo_horario as id_tipo_horario_anterior, 
+                                u.nombre as usuario_nombre, u.username,
+                                th_anterior.nombre as horario_anterior_nombre,
+                                th_nuevo.nombre as horario_nuevo_nombre
+                         FROM tipo_horario_personal thp
+                         JOIN users u ON thp.id_usuario = u.id
+                         JOIN tipos_horario th_anterior ON thp.id_tipo_horario = th_anterior.id
+                         JOIN tipos_horario th_nuevo ON $id_tipo_horario = th_nuevo.id
+                         WHERE thp.id = $id_relacion";
+        
+        $result_actual = $db->query($query_actual);
+        
+        if ($result_actual->num_rows === 0) {
+            return false;
+        }
+        
+        $info_actual = $result_actual->fetch_assoc();
+        
+        $query = "UPDATE tipo_horario_personal SET id_tipo_horario = $id_tipo_horario WHERE id = $id_relacion";
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - ASIGNACIÓN DE HORARIO ACTUALIZADA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "tipo_horario_personal", 
+                        $id_relacion, 
+                        [
+                            'id_tipo_horario_anterior' => $info_actual['id_tipo_horario_anterior'],
+                            'horario_anterior_nombre' => $info_actual['horario_anterior_nombre']
+                        ], 
+                        [
+                            'id_usuario' => $info_actual['id_usuario'],
+                            'usuario_nombre' => $info_actual['usuario_nombre'],
+                            'usuario_username' => $info_actual['username'],
+                            'id_tipo_horario_nuevo' => $id_tipo_horario,
+                            'horario_nuevo_nombre' => $info_actual['horario_nuevo_nombre'],
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_actualizacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Horario Personal", 
+                        "Horario actualizado para usuario: " . $info_actual['horario_anterior_nombre'] . " → " . $info_actual['horario_nuevo_nombre'] . " (" . $info_actual['usuario_nombre'] . ")"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría actualizarTipoHorarioUsuario: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR ASIGNACIÓN
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipo_horario_personal", 
+                        $id_relacion, 
+                        null, 
+                        [
+                            'id_relacion' => $id_relacion,
+                            'id_tipo_horario_nuevo' => $id_tipo_horario,
+                            'usuario_nombre' => $info_actual['usuario_nombre'],
+                            'error' => $db->error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Horario Personal", 
+                        "Error al actualizar horario de usuario"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error actualizarTipoHorarioUsuario: " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarTipoHorarioUsuario: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ACTUALIZAR ASIGNACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipo_horario_personal", 
+                    $id_relacion, 
+                    null, 
+                    [
+                        'id_relacion' => $id_relacion,
+                        'id_tipo_horario_nuevo' => $id_tipo_horario,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Horario Personal", 
+                    "Excepción al actualizar horario de usuario"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción actualizarTipoHorarioUsuario: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
 /**
- * Eliminar relación por ID
+ * Eliminar relación por ID - CON AUDITORÍA
  */
 function eliminarTipoHorarioUsuarioPorId($db, $id_relacion) {
-    $query = "DELETE FROM tipo_horario_personal WHERE id = $id_relacion";
-    return $db->query($query);
+    try {
+        // Obtener información para auditoría
+        $query_info = "SELECT thp.id_usuario, u.nombre as usuario_nombre, u.username, 
+                              thp.id_tipo_horario, th.nombre as horario_nombre
+                       FROM tipo_horario_personal thp
+                       JOIN users u ON thp.id_usuario = u.id
+                       JOIN tipos_horario th ON thp.id_tipo_horario = th.id
+                       WHERE thp.id = $id_relacion";
+        
+        $result_info = $db->query($query_info);
+        
+        if ($result_info->num_rows === 0) {
+            return false;
+        }
+        
+        $info = $result_info->fetch_assoc();
+        
+        $query = "DELETE FROM tipo_horario_personal WHERE id = $id_relacion";
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - RELACIÓN ELIMINADA POR ID
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "DELETE", 
+                        "tipo_horario_personal", 
+                        $id_relacion, 
+                        [
+                            'id_usuario' => $info['id_usuario'],
+                            'usuario_nombre' => $info['usuario_nombre'],
+                            'usuario_username' => $info['username'],
+                            'id_tipo_horario' => $info['id_tipo_horario'],
+                            'horario_nombre' => $info['horario_nombre']
+                        ], 
+                        [
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_eliminacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Horario Personal", 
+                        "Relación horario-usuario eliminada: " . $info['horario_nombre'] . " ← " . $info['usuario_nombre']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarTipoHorarioUsuarioPorId: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR RELACIÓN
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipo_horario_personal", 
+                        $id_relacion, 
+                        null, 
+                        [
+                            'id_relacion' => $id_relacion,
+                            'usuario_nombre' => $info['usuario_nombre'],
+                            'horario_nombre' => $info['horario_nombre'],
+                            'error' => $db->error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Horario Personal", 
+                        "Error al eliminar relación horario-usuario"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error eliminarTipoHorarioUsuarioPorId: " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarTipoHorarioUsuarioPorId: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ELIMINAR RELACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipo_horario_personal", 
+                    $id_relacion, 
+                    null, 
+                    [
+                        'id_relacion' => $id_relacion,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Horario Personal", 
+                    "Excepción al eliminar relación horario-usuario"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción eliminarTipoHorarioUsuarioPorId: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
 }
 
 
@@ -5390,7 +10479,7 @@ function verificarPermiso($pagina) {
         exit();
     }
     
-    // Lista de permisos válidos en la base de datos
+    // Lista de permisos válidos en la base de datos (actualizada con los nuevos)
     $permisosValidos = [
         'usuario', 'estudiante', 'docente', 'admin', 'super_user', 
         'editar_user', 'editar_nota', 'editar_acceso', 'editar_valores', 
@@ -5400,20 +10489,44 @@ function verificarPermiso($pagina) {
         'periodos_academicos', 'asig_secciones', 'asig_cursos', 'horarios', 
         'gestion_director_carrera', 'notas_cargadas', 'consultar_notas', 
         'consultar_notas_pasadas', 'tipos_pago', 'tipos_horario', 
-        'horario_personal', 'respaldo_bd'
+        'horario_personal', 'respaldo_bd',
+        'gestionar_carrera', 'gestion_periodo_academico', 'gestion_asig_cursos', 
+        'gestion_horario', 'titulos_re_materia', 'grado', 'gestion_grado', 'visita'
     ];
     
     // Verificar que el permiso solicitado sea válido
     if (!in_array($pagina, $permisosValidos)) {
         error_log("Permiso no válido: " . $pagina);
+        
+        // REGISTRAR EN AUDITORÍA - PERMISO NO VÁLIDO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $_SESSION['user']['id'] ?? null, 
+                    null, 
+                    [
+                        'permiso_solicitado' => $pagina,
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                        'error' => 'Permiso no válido'
+                    ], 
+                    "Control de Acceso", 
+                    "Intento de acceso con permiso no válido"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría verificarPermiso (permiso inválido): " . $e->getMessage());
+            }
+        }
+        
         $_SESSION['error'] = "Error de permisos: permiso no válido.";
         header('location: ../login.php');
         exit();
     }
     
-    // Si es super_user, tiene acceso a todo
+    // Si es super_user, tiene acceso a todo - RETORNAR EXPLÍCITAMENTE
     if (isset($_SESSION['user']['super_user']) && $_SESSION['user']['super_user'] == 1) {
-        return true;
+        return;
     }
     
     // Verificar si el permiso existe en la sesión y es igual a 1
@@ -5421,13 +10534,34 @@ function verificarPermiso($pagina) {
         // Registrar intento de acceso no autorizado
         error_log("Acceso denegado a " . $pagina . " para el usuario: " . $_SESSION['user']['username']);
         
+        // REGISTRAR EN AUDITORÍA - ACCESO DENEGADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "DENEGADO", 
+                    "users", 
+                    $_SESSION['user']['id'] ?? null, 
+                    null, 
+                    [
+                        'permiso_solicitado' => $pagina,
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                        'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                        'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'Desconocida',
+                        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Desconocido'
+                    ], 
+                    "Control de Acceso", 
+                    "Acceso denegado a: " . $pagina
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría verificarPermiso (acceso denegado): " . $e->getMessage());
+            }
+        }
+        
         // Redirigir a home con mensaje de error
         $_SESSION['error'] = "No tienes permisos para acceder a la página de " . $pagina . ".";
         header('location: ../login.php');
         exit();
     }
-    
-    return true;
 }
 
 /**
@@ -5471,7 +10605,9 @@ function cargarPermisosUsuario() {
         periodos_academicos, asig_secciones, asig_cursos, horarios, 
         gestion_director_carrera, notas_cargadas, consultar_notas, 
         consultar_notas_pasadas, tipos_pago, tipos_horario, 
-        horario_personal, respaldo_bd 
+        horario_personal, respaldo_bd,
+        gestionar_carrera, gestion_periodo_academico, gestion_asig_cursos, 
+        gestion_horario, titulos_re_materia, grado, gestion_grado, visita
         FROM users WHERE id = ?";
     
     $stmt = $db->prepare($query);
@@ -5496,6 +10632,6745 @@ function cargarPermisosUsuario() {
     
     return false;
 }
+
+// Función para actualizar permisos de usuario - CON AUDITORÍA SOLO PARA CAMBIOS REALES
+function actualizarPermisosUsuario($user_id, $permisos) {
+    global $db;
+    
+    try {
+        if (!is_numeric($user_id)) {
+            throw new Exception("ID de usuario no válido");
+        }
+        
+        // Obtener información del usuario y permisos actuales para auditoría
+        $query_actual = "SELECT username, 
+                        usuario, estudiante, docente, admin, super_user, editar_user, editar_nota, editar_acceso, 
+                        editar_valores, editar_estudiante, agregar_estudiante, agregar_docente, editar_docente, 
+                        agregar_carrera, agregar_materia, editar_materia,
+                        pagos, auditoria, secciones, rela_materia_carrera, periodos_academicos, asig_secciones, 
+                        asig_cursos, horarios, gestion_director_carrera, notas_cargadas, consultar_notas, 
+                        consultar_notas_pasadas, tipos_pago, tipos_horario, horario_personal, respaldo_bd,
+                        gestionar_carrera, gestion_periodo_academico, gestion_asig_cursos, gestion_horario, titulos_re_materia,
+                        grado, gestion_grado, visita
+                        FROM users WHERE id = ?";
+        
+        $stmt_actual = $db->prepare($query_actual);
+        $stmt_actual->bind_param("i", $user_id);
+        $stmt_actual->execute();
+        $result_actual = $stmt_actual->get_result();
+        
+        if ($result_actual->num_rows === 0) {
+            throw new Exception("Usuario no encontrado");
+        }
+        
+        $usuario_actual = $result_actual->fetch_assoc();
+        $stmt_actual->close();
+        
+        // Preparar datos para la actualización
+        $permisos_nuevos = [
+            'usuario' => isset($permisos['usuario']) ? 1 : 0,
+            'estudiante' => isset($permisos['estudiante']) ? 1 : 0,
+            'docente' => isset($permisos['docente']) ? 1 : 0,
+            'admin' => isset($permisos['admin']) ? 1 : 0,
+            'super_user' => isset($permisos['super_user']) ? 1 : 0,
+            'editar_user' => isset($permisos['editar_user']) ? 1 : 0,
+            'editar_nota' => isset($permisos['editar_nota']) ? 1 : 0,
+            'editar_acceso' => isset($permisos['editar_acceso']) ? 1 : 0,
+            'editar_valores' => isset($permisos['editar_valores']) ? 1 : 0,
+            'editar_estudiante' => isset($permisos['editar_estudiante']) ? 1 : 0,
+            'agregar_estudiante' => isset($permisos['agregar_estudiante']) ? 1 : 0,
+            'agregar_docente' => isset($permisos['agregar_docente']) ? 1 : 0,
+            'editar_docente' => isset($permisos['editar_docente']) ? 1 : 0,
+            'agregar_carrera' => isset($permisos['agregar_carrera']) ? 1 : 0,
+            'agregar_materia' => isset($permisos['agregar_materia']) ? 1 : 0,
+            'editar_materia' => isset($permisos['editar_materia']) ? 1 : 0,
+            'pagos' => isset($permisos['pagos']) ? 1 : 0,
+            'auditoria' => isset($permisos['auditoria']) ? 1 : 0,
+            'secciones' => isset($permisos['secciones']) ? 1 : 0,
+            'rela_materia_carrera' => isset($permisos['rela_materia_carrera']) ? 1 : 0,
+            'periodos_academicos' => isset($permisos['periodos_academicos']) ? 1 : 0,
+            'asig_secciones' => isset($permisos['asig_secciones']) ? 1 : 0,
+            'asig_cursos' => isset($permisos['asig_cursos']) ? 1 : 0,
+            'horarios' => isset($permisos['horarios']) ? 1 : 0,
+            'gestion_director_carrera' => isset($permisos['gestion_director_carrera']) ? 1 : 0,
+            'notas_cargadas' => isset($permisos['notas_cargadas']) ? 1 : 0,
+            'consultar_notas' => isset($permisos['consultar_notas']) ? 1 : 0,
+            'consultar_notas_pasadas' => isset($permisos['consultar_notas_pasadas']) ? 1 : 0,
+            'tipos_pago' => isset($permisos['tipos_pago']) ? 1 : 0,
+            'tipos_horario' => isset($permisos['tipos_horario']) ? 1 : 0,
+            'horario_personal' => isset($permisos['horario_personal']) ? 1 : 0,
+            'respaldo_bd' => isset($permisos['respaldo_bd']) ? 1 : 0,
+            'gestionar_carrera' => isset($permisos['gestionar_carrera']) ? 1 : 0,
+            'gestion_periodo_academico' => isset($permisos['gestion_periodo_academico']) ? 1 : 0,
+            'gestion_asig_cursos' => isset($permisos['gestion_asig_cursos']) ? 1 : 0,
+            'gestion_horario' => isset($permisos['gestion_horario']) ? 1 : 0,
+            'titulos_re_materia' => isset($permisos['titulos_re_materia']) ? 1 : 0,
+            'grado' => isset($permisos['grado']) ? 1 : 0,
+            'gestion_grado' => isset($permisos['gestion_grado']) ? 1 : 0,
+            'visita' => isset($permisos['visita']) ? 1 : 0,
+        ];
+        
+        // VERIFICAR SI HAY CAMBIOS REALES
+        $accesos_otorgados = [];
+        $accesos_quitados = [];
+        
+        foreach ($permisos_nuevos as $permiso => $nuevo_valor) {
+            $valor_anterior = $usuario_actual[$permiso] ?? 0;
+            
+            if ($valor_anterior != $nuevo_valor) {
+                if ($nuevo_valor == 1) {
+                    // Acceso otorgado
+                    $accesos_otorgados[] = $permiso;
+                } else {
+                    // Acceso quitado
+                    $accesos_quitados[] = $permiso;
+                }
+            }
+        }
+        
+        // SI NO HAY CAMBIOS, RETORNAR SIN HACER NADA
+        if (empty($accesos_otorgados) && empty($accesos_quitados)) {
+            return true; // No hay cambios, retornar sin auditoría
+        }
+        
+        // SOLO ACTUALIZAR SI HAY CAMBIOS REALES
+        $query = "UPDATE users SET 
+                 usuario = ?,
+                 estudiante = ?, 
+                 docente = ?, 
+                 admin = ?, 
+                 super_user = ?, 
+                 editar_user = ?, 
+                 editar_nota = ?, 
+                 editar_acceso = ?,
+                 editar_valores = ?,
+                 editar_estudiante = ?,
+                 agregar_estudiante = ?,
+                 agregar_docente = ?,
+                 editar_docente = ?,
+                 agregar_carrera = ?,
+                 agregar_materia = ?,
+                 editar_materia = ?,
+                 pagos = ?,
+                 auditoria = ?,
+                 secciones = ?,
+                 rela_materia_carrera = ?,
+                 periodos_academicos = ?,
+                 asig_secciones = ?,
+                 asig_cursos = ?,
+                 horarios = ?,
+                 gestion_director_carrera = ?,
+                 notas_cargadas = ?,
+                 consultar_notas = ?,
+                 consultar_notas_pasadas = ?,
+                 tipos_pago = ?,
+                 tipos_horario = ?,
+                 horario_personal = ?,
+                 respaldo_bd = ?,
+                 gestionar_carrera = ?,
+                 gestion_periodo_academico = ?,
+                 gestion_asig_cursos = ?,
+                 gestion_horario = ?,
+                 titulos_re_materia = ?,
+                 grado = ?,
+                 gestion_grado = ?,
+                 visita = ?
+                 WHERE id = ?";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error al preparar query: " . $db->error);
+        }
+        
+        $stmt->bind_param("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", 
+            $permisos_nuevos['usuario'], $permisos_nuevos['estudiante'], $permisos_nuevos['docente'], 
+            $permisos_nuevos['admin'], $permisos_nuevos['super_user'], $permisos_nuevos['editar_user'], 
+            $permisos_nuevos['editar_nota'], $permisos_nuevos['editar_acceso'], $permisos_nuevos['editar_valores'],
+            $permisos_nuevos['editar_estudiante'], $permisos_nuevos['agregar_estudiante'], $permisos_nuevos['agregar_docente'],
+            $permisos_nuevos['editar_docente'], $permisos_nuevos['agregar_carrera'], $permisos_nuevos['agregar_materia'],
+            $permisos_nuevos['editar_materia'], $permisos_nuevos['pagos'], $permisos_nuevos['auditoria'],
+            $permisos_nuevos['secciones'], $permisos_nuevos['rela_materia_carrera'], $permisos_nuevos['periodos_academicos'],
+            $permisos_nuevos['asig_secciones'], $permisos_nuevos['asig_cursos'], $permisos_nuevos['horarios'],
+            $permisos_nuevos['gestion_director_carrera'], $permisos_nuevos['notas_cargadas'], $permisos_nuevos['consultar_notas'],
+            $permisos_nuevos['consultar_notas_pasadas'], $permisos_nuevos['tipos_pago'], $permisos_nuevos['tipos_horario'],
+            $permisos_nuevos['horario_personal'], $permisos_nuevos['respaldo_bd'], $permisos_nuevos['gestionar_carrera'],
+            $permisos_nuevos['gestion_periodo_academico'], $permisos_nuevos['gestion_asig_cursos'], $permisos_nuevos['gestion_horario'],
+            $permisos_nuevos['titulos_re_materia'], $permisos_nuevos['grado'], $permisos_nuevos['gestion_grado'],
+            $permisos_nuevos['visita'],
+            $user_id
+        );
+        
+        $result = $stmt->execute();
+        $stmt->close();
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - SOLO SI HUBO CAMBIOS REALES
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    // Preparar mensaje descriptivo para la auditoría
+                    $mensaje_auditoria = "Permisos actualizados para usuario: " . $usuario_actual['username'];
+                    
+                    if (!empty($accesos_otorgados)) {
+                        $mensaje_auditoria .= " - Accesos OTORGADOS: " . implode(', ', $accesos_otorgados);
+                    }
+                    
+                    if (!empty($accesos_quitados)) {
+                        if (!empty($accesos_otorgados)) {
+                            $mensaje_auditoria .= " | ";
+                        }
+                        $mensaje_auditoria .= "Accesos QUITADOS: " . implode(', ', $accesos_quitados);
+                    }
+                    
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "users", 
+                        $user_id, 
+                        $usuario_actual, 
+                        [
+                            'usuario_afectado' => $usuario_actual['username'],
+                            'usuario_afectado_id' => $user_id,
+                            'usuario_editor' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_editor_id' => $_SESSION['user']['id'] ?? 0,
+                            'accesos_otorgados' => implode(', ', $accesos_otorgados),
+                            'accesos_quitados' => implode(', ', $accesos_quitados),
+                            'total_otorgados' => count($accesos_otorgados),
+                            'total_quitados' => count($accesos_quitados),
+                            'super_user_anterior' => $usuario_actual['super_user'],
+                            'super_user_nuevo' => $permisos_nuevos['super_user']
+                        ], 
+                        "Gestión de Permisos", 
+                        $mensaje_auditoria
+                    );
+                    
+                } catch (Exception $e) {
+                    error_log("Error en auditoría actualizarPermisosUsuario: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            throw new Exception("Error al ejecutar la actualización");
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarPermisosUsuario: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR PERMISOS
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $user_id, 
+                    null, 
+                    [
+                        'usuario_afectado' => $user_id,
+                        'usuario_editor' => $_SESSION['user']['username'] ?? 'Desconocido',
+                        'error' => $e->getMessage(),
+                        'permisos_solicitados' => json_encode($permisos)
+                    ], 
+                    "Gestión de Permisos", 
+                    "Error al actualizar permisos del usuario ID: " . $user_id
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error actualizarPermisosUsuario: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
+}
+
+// Función para obtener todos los usuarios con permisos - SOLO LECTURA, SIN AUDITORÍA
+function obtenerUsuariosConPermisos() {
+    global $db;
+    
+    $query = "SELECT id, username, 
+             usuario, estudiante, docente, admin, super_user, editar_user, editar_nota, editar_acceso, 
+             editar_valores, editar_estudiante, agregar_estudiante, agregar_docente, editar_docente, 
+             agregar_carrera, agregar_materia, editar_materia,
+             pagos, auditoria, secciones, rela_materia_carrera, periodos_academicos, asig_secciones, 
+             asig_cursos, horarios, gestion_director_carrera, notas_cargadas, consultar_notas, 
+             consultar_notas_pasadas, tipos_pago, tipos_horario, horario_personal, respaldo_bd,
+             gestionar_carrera, gestion_periodo_academico, gestion_asig_cursos, gestion_horario, titulos_re_materia,
+             grado, gestion_grado, visita
+             FROM users ORDER BY username";
+    
+    return $db->query($query);
+}
+
+
+
+
+
+//GRADUACION ***********************************************************************
+
+
+
+/**
+ * Obtener la cantidad de registros por página
+ */
+function obtener_registros_por_pagina() {
+    if (isset($_GET['registros_por_pagina']) && in_array($_GET['registros_por_pagina'], [10, 20, 50, 100])) {
+        return (int)$_GET['registros_por_pagina'];
+    }
+    return 20; // Valor por defecto
+}
+
+/**
+ * Obtener ID del usuario admin logueado
+ */
+function obtener_id_admin() {
+    // Probar diferentes variables de sesión comunes
+    $posibles_variables = ['user_id', 'id', 'usuario_id', 'admin_id', 'userid', 'userId', 'idusuario'];
+    
+    foreach ($posibles_variables as $variable) {
+        if (isset($_SESSION[$variable]) && !empty($_SESSION[$variable])) {
+            return $_SESSION[$variable];
+        }
+    }
+    
+    // Si no se encuentra, usar un valor por defecto
+    return 1;
+}
+
+/**
+ * Obtener estudiantes con paginación para graduación - ACTUALIZADA
+ */
+function obtener_estudiantes_graduacion_paginados($filtros = [], $pagina = 1, $registros_por_pagina = 20) {
+    global $db;
+    
+    try {
+        // Primero obtener todos los estudiantes según los filtros
+        $estudiantes_data = obtener_estudiantes_graduacion($filtros);
+        $todos_estudiantes = [];
+        
+        // Convertir a array para poder manipularlo
+        if (is_array($estudiantes_data)) {
+            $todos_estudiantes = $estudiantes_data;
+        } elseif ($estudiantes_data) {
+            while ($estudiante = mysqli_fetch_assoc($estudiantes_data)) {
+                $todos_estudiantes[] = $estudiante;
+            }
+        }
+        
+        // Si no hay filtro de estado, determinar el estado real de cada estudiante
+        if (!isset($filtros['estado']) || empty($filtros['estado'])) {
+            $estudiantes_con_estado_real = [];
+            foreach ($todos_estudiantes as $estudiante) {
+                // Si el estudiante no tiene estado definido en la tabla graduados, determinar su estado real
+                if (empty($estudiante['estado']) || $estudiante['estado'] === null) {
+                    $cumple_requisitos = cumple_requisitos_graduacion($estudiante['id']);
+                    $estudiante['estado'] = $cumple_requisitos ? 'cumple_requisitos' : 'pendiente';
+                }
+                $estudiantes_con_estado_real[] = $estudiante;
+            }
+            $todos_estudiantes = $estudiantes_con_estado_real;
+        }
+        
+        $total_registros = count($todos_estudiantes);
+        $total_paginas = ceil($total_registros / $registros_por_pagina);
+        
+        // Aplicar paginación
+        $inicio = ($pagina - 1) * $registros_por_pagina;
+        $estudiantes_paginados = array_slice($todos_estudiantes, $inicio, $registros_por_pagina);
+        
+        // REGISTRAR EN AUDITORÍA - CONSULTA DE ESTUDIANTES PARA GRADUACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "SELECT", 
+                    "users", 
+                    null, 
+                    null, 
+                    [
+                        'filtros_aplicados' => $filtros,
+                        'pagina' => $pagina,
+                        'registros_por_pagina' => $registros_por_pagina,
+                        'total_registros' => $total_registros
+                    ], 
+                    "Graduación", 
+                    "Consulta de estudiantes para graduación"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría obtener_estudiantes_graduacion_paginados: " . $e->getMessage());
+            }
+        }
+        
+        return [
+            'resultados' => $estudiantes_paginados,
+            'total_registros' => $total_registros,
+            'total_paginas' => $total_paginas,
+            'pagina_actual' => $pagina
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Error en obtener_estudiantes_graduacion_paginados: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN CONSULTA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    null, 
+                    null, 
+                    [
+                        'filtros' => $filtros,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Graduación", 
+                    "Error al consultar estudiantes para graduación"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error obtener_estudiantes_graduacion_paginados: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'resultados' => [],
+            'total_registros' => 0,
+            'total_paginas' => 0,
+            'pagina_actual' => $pagina
+        ];
+    }
+}
+
+/**
+ * Generar URL para paginación manteniendo los filtros
+ */
+function generar_url_paginacion($pagina) {
+    $params = $_GET;
+    $params['pagina'] = $pagina;
+    
+    // Mantener el parámetro de registros por página si existe
+    if (isset($_GET['registros_por_pagina'])) {
+        $params['registros_por_pagina'] = $_GET['registros_por_pagina'];
+    }
+    
+    return 'grado.php?' . http_build_query($params);
+}
+
+/**
+ * Obtener estudiantes con filtros para graduación - ACTUALIZADA para mostrar nombre carrera
+ */
+function obtener_estudiantes_graduacion($filtros = []) {
+    global $db;
+    
+    try {
+        $where = "WHERE u.estudiante = 1 AND u.status = 1";
+        
+        if (isset($filtros['buscar']) && !empty($filtros['buscar'])) {
+            $buscar = mysqli_real_escape_string($db, $filtros['buscar']);
+            $where .= " AND (u.nombre LIKE '%$buscar%' OR u.idusuario LIKE '%$buscar%')";
+        }
+        
+        if (isset($filtros['carrera']) && !empty($filtros['carrera'])) {
+            $carrera = mysqli_real_escape_string($db, $filtros['carrera']);
+            $where .= " AND c.nombre_carrera = '$carrera'";
+        }
+        
+        // Si se filtra por estado específico de graduación
+        if (isset($filtros['estado']) && !empty($filtros['estado'])) {
+            $estado = mysqli_real_escape_string($db, $filtros['estado']);
+            
+            if ($estado == 'cumple_requisitos') {
+                // Obtener todos los estudiantes no graduados y determinar su estado real
+                $query = "SELECT u.id, u.idusuario, u.nombre, u.carrera,
+                                 c.nombre_carrera,
+                                 g.id as id_graduado, g.estado, g.fecha_graduacion, 
+                                 g.titulo_entregado, g.fecha_entrega_titulo
+                          FROM users u 
+                          LEFT JOIN carreras c ON u.carrera = c.id_carrera
+                          LEFT JOIN graduados g ON u.id = g.id_usuario 
+                          WHERE u.estudiante = 1 AND u.status = 1 
+                          AND (g.id_usuario IS NULL OR g.estado = 'cumple_requisitos')
+                          ORDER BY u.nombre";
+            } else {
+                // Estudiantes con estado específico en graduados
+                $query = "SELECT u.id, u.idusuario, u.nombre, u.carrera,
+                                 c.nombre_carrera,
+                                 g.id as id_graduado, g.estado, g.fecha_graduacion, 
+                                 g.titulo_entregado, g.fecha_entrega_titulo 
+                          FROM users u 
+                          INNER JOIN carreras c ON u.carrera = c.id_carrera
+                          INNER JOIN graduados g ON u.id = g.id_usuario 
+                          WHERE u.estudiante = 1 AND u.status = 1 
+                          AND g.estado = '$estado'
+                          ORDER BY u.nombre";
+            }
+        } else {
+            // Mostrar todos los estudiantes con su estado de graduación
+            $query = "SELECT u.id, u.idusuario, u.nombre, u.carrera,
+                             c.nombre_carrera,
+                             g.id as id_graduado, g.estado, g.fecha_graduacion, 
+                             g.titulo_entregado, g.fecha_entrega_titulo 
+                      FROM users u 
+                      LEFT JOIN carreras c ON u.carrera = c.id_carrera
+                      LEFT JOIN graduados g ON u.id = g.id_usuario 
+                      $where 
+                      ORDER BY u.nombre";
+        }
+        
+        $result = mysqli_query($db, $query);
+        
+        if (!$result) {
+            throw new Exception("Error en consulta: " . mysqli_error($db));
+        }
+        
+        // Si estamos filtrando por "cumple_requisitos", determinar el estado real de cada estudiante
+        if (isset($filtros['estado']) && $filtros['estado'] == 'cumple_requisitos') {
+            $estudiantes_filtrados = [];
+            if ($result && mysqli_num_rows($result) > 0) {
+                while ($estudiante = mysqli_fetch_assoc($result)) {
+                    // Verificar si realmente cumple requisitos
+                    if (cumple_requisitos_graduacion($estudiante['id'])) {
+                        // Si cumple requisitos, actualizar el estado
+                        $estudiante['estado'] = 'cumple_requisitos';
+                        $estudiantes_filtrados[] = $estudiante;
+                    }
+                    // Si no cumple requisitos, NO lo incluimos en los resultados
+                }
+            }
+            return $estudiantes_filtrados;
+        }
+        
+        // Para otros casos, procesar los estados correctamente
+        $estudiantes_procesados = [];
+        if ($result && mysqli_num_rows($result) > 0) {
+            while ($estudiante = mysqli_fetch_assoc($result)) {
+                // Si el estudiante no tiene registro en graduados, determinar su estado real
+                if (empty($estudiante['id_graduado']) || $estudiante['estado'] === null) {
+                    $cumple_requisitos = cumple_requisitos_graduacion($estudiante['id']);
+                    $estudiante['estado'] = $cumple_requisitos ? 'cumple_requisitos' : 'pendiente';
+                }
+                $estudiantes_procesados[] = $estudiante;
+            }
+            return $estudiantes_procesados;
+        }
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtener_estudiantes_graduacion: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Marcar estudiante como graduado
+ */
+function marcar_como_graduado($id_usuario) {
+    global $db;
+    
+    try {
+        $id_usuario = mysqli_real_escape_string($db, $id_usuario);
+        
+        // Obtener información del estudiante antes de la operación
+        $estudiante_info = null;
+        $query_info = "SELECT u.id, u.nombre, u.idusuario, c.nombre_carrera 
+                      FROM users u 
+                      LEFT JOIN carreras c ON u.carrera = c.id_carrera 
+                      WHERE u.id = '$id_usuario'";
+        $result_info = mysqli_query($db, $query_info);
+        if ($result_info && mysqli_num_rows($result_info) > 0) {
+            $estudiante_info = mysqli_fetch_assoc($result_info);
+        }
+        
+        // Obtener el ID del admin desde la sesión
+        $id_admin = obtener_id_admin();
+        
+        $observaciones = isset($_POST['observaciones']) ? mysqli_real_escape_string($db, $_POST['observaciones']) : '';
+        
+        // Verificar si ya existe registro
+        $check = mysqli_query($db, "SELECT id, estado FROM graduados WHERE id_usuario = '$id_usuario'");
+        $registro_existente = null;
+        if ($check && mysqli_num_rows($check) > 0) {
+            $registro_existente = mysqli_fetch_assoc($check);
+        }
+        
+        if ($registro_existente) {
+            // Actualizar registro existente
+            $query = "UPDATE graduados SET 
+                     estado = 'graduado', 
+                     fecha_graduacion = NOW(), 
+                     id_admin_graduacion = '$id_admin', 
+                     observaciones = '$observaciones',
+                     fecha_actualizacion = NOW() 
+                     WHERE id_usuario = '$id_usuario'";
+        } else {
+            // Insertar nuevo registro
+            $query = "INSERT INTO graduados 
+                     (id_usuario, estado, fecha_graduacion, id_admin_graduacion, observaciones) 
+                     VALUES 
+                     ('$id_usuario', 'graduado', NOW(), '$id_admin', '$observaciones')";
+        }
+        
+        if (mysqli_query($db, $query)) {
+            $id_graduado = $registro_existente ? $registro_existente['id'] : mysqli_insert_id($db);
+            
+            // REGISTRAR EN AUDITORÍA - MARCADO COMO GRADUADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        $registro_existente ? "UPDATE" : "INSERT", 
+                        "graduados", 
+                        $id_graduado, 
+                        $registro_existente ? ['estado' => $registro_existente['estado']] : null, 
+                        [
+                            'estado' => 'graduado',
+                            'id_usuario' => $id_usuario,
+                            'estudiante_nombre' => $estudiante_info['nombre'] ?? 'Desconocido',
+                            'estudiante_cedula' => $estudiante_info['idusuario'] ?? '',
+                            'carrera' => $estudiante_info['nombre_carrera'] ?? '',
+                            'id_admin_graduacion' => $id_admin,
+                            'observaciones' => $observaciones
+                        ], 
+                        "Graduación", 
+                        "Estudiante marcado como graduado"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría marcar_como_graduado: " . $e->getMessage());
+                }
+            }
+            
+            $_SESSION['mensaje'] = "Estudiante marcado como graduado exitosamente";
+            $_SESSION['tipo_mensaje'] = "success";
+            return true;
+        } else {
+            throw new Exception("Error en consulta: " . mysqli_error($db));
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en marcar_como_graduado: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL MARCAR COMO GRADUADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "graduados", 
+                    null, 
+                    null, 
+                    [
+                        'id_usuario' => $id_usuario,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Graduación", 
+                    "Error al marcar estudiante como graduado"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error marcar_como_graduado: " . $auditError->getMessage());
+            }
+        }
+        
+        $_SESSION['mensaje'] = "Error al marcar como graduado: " . $e->getMessage();
+        $_SESSION['tipo_mensaje'] = "error";
+        return false;
+    }
+}
+
+/**
+ * Marcar título como entregado
+ */
+function marcar_titulo_entregado($id_graduado) {
+    global $db;
+    
+    try {
+        $id_graduado = mysqli_real_escape_string($db, $id_graduado);
+        
+        // Obtener información del graduado antes de la operación
+        $graduado_info = null;
+        $query_info = "SELECT g.*, u.nombre, u.idusuario, c.nombre_carrera 
+                      FROM graduados g 
+                      INNER JOIN users u ON g.id_usuario = u.id 
+                      LEFT JOIN carreras c ON u.carrera = c.id_carrera 
+                      WHERE g.id = '$id_graduado'";
+        $result_info = mysqli_query($db, $query_info);
+        if ($result_info && mysqli_num_rows($result_info) > 0) {
+            $graduado_info = mysqli_fetch_assoc($result_info);
+        }
+        
+        // Obtener el ID del admin desde la sesión
+        $id_admin = obtener_id_admin();
+        
+        $query = "UPDATE graduados SET 
+                 titulo_entregado = 1, 
+                 fecha_entrega_titulo = NOW(), 
+                 id_admin_entrega_titulo = '$id_admin', 
+                 estado = 'titulo_entregado',
+                 fecha_actualizacion = NOW() 
+                 WHERE id = '$id_graduado'";
+        
+        if (mysqli_query($db, $query)) {
+            // REGISTRAR EN AUDITORÍA - TÍTULO MARCADO COMO ENTREGADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "graduados", 
+                        $id_graduado, 
+                        [
+                            'titulo_entregado' => $graduado_info['titulo_entregado'] ?? 0,
+                            'estado' => $graduado_info['estado'] ?? ''
+                        ], 
+                        [
+                            'titulo_entregado' => 1,
+                            'estado' => 'titulo_entregado',
+                            'id_usuario' => $graduado_info['id_usuario'] ?? '',
+                            'estudiante_nombre' => $graduado_info['nombre'] ?? 'Desconocido',
+                            'estudiante_cedula' => $graduado_info['idusuario'] ?? '',
+                            'carrera' => $graduado_info['nombre_carrera'] ?? '',
+                            'id_admin_entrega_titulo' => $id_admin
+                        ], 
+                        "Graduación", 
+                        "Título marcado como entregado"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría marcar_titulo_entregado: " . $e->getMessage());
+                }
+            }
+            
+            $_SESSION['mensaje'] = "Título marcado como entregado exitosamente";
+            $_SESSION['tipo_mensaje'] = "success";
+            return true;
+        } else {
+            throw new Exception("Error en consulta: " . mysqli_error($db));
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en marcar_titulo_entregado: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL MARCAR TÍTULO COMO ENTREGADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "graduados", 
+                    $id_graduado, 
+                    null, 
+                    [
+                        'id_graduado' => $id_graduado,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Graduación", 
+                    "Error al marcar título como entregado"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error marcar_titulo_entregado: " . $auditError->getMessage());
+            }
+        }
+        
+        $_SESSION['mensaje'] = "Error al marcar título como entregado: " . $e->getMessage();
+        $_SESSION['tipo_mensaje'] = "error";
+        return false;
+    }
+}
+
+/**
+ * Obtener badge de estado para mostrar - ACTUALIZADA
+ */
+function obtener_badge_estado($estado) {
+    if (empty($estado) || $estado == 'pendiente') {
+        return '<span class="badge badge-secondary">Pendiente</span>';
+    }
+    
+    switch ($estado) {
+        case 'cumple_requisitos':
+            return '<span class="badge badge-warning">Cumple Requisitos</span>';
+        case 'graduado':
+            return '<span class="badge badge-success">Graduado</span>';
+        case 'titulo_entregado':
+            return '<span class="badge badge-info">Título Entregado</span>';
+        default:
+            return '<span class="badge badge-secondary">Pendiente</span>';
+    }
+}
+
+/**
+ * Generar botones de acción según el estado
+ */
+function generar_botones_accion($estudiante) {
+    $botones = '';
+    
+    $id_usuario = $estudiante['id'];
+    $estado = $estudiante['estado'];
+    $id_graduado = isset($estudiante['id_graduado']) ? $estudiante['id_graduado'] : null;
+    
+    if (empty($estado) || $estado == 'cumple_requisitos') {
+        // Si cumple requisitos pero no está graduado
+        $botones .= '<button class="btn btn-success btn-sm" onclick="confirmarGraduacion('.$id_usuario.')">
+                        <i class="fas fa-graduation-cap"></i> Marcar Graduado
+                     </button>';
+    } elseif ($estado == 'graduado' && empty($estudiante['titulo_entregado'])) {
+        // Si está graduado pero no se le ha entregado título
+        $botones .= '<form method="POST" style="display:inline;">
+                        <input type="hidden" name="id_graduado" value="'.$id_graduado.'">
+                        <button type="submit" name="marcar_titulo_entregado" class="btn btn-info btn-sm">
+                            <i class="fas fa-file-certificate"></i> Título Entregado
+                        </button>
+                    </form>';
+    } elseif ($estado == 'titulo_entregado') {
+        $botones .= '<span class="text-success"><i class="fas fa-check-circle"></i> Completado</span>';
+    } else {
+        $botones .= '<span class="text-muted">No aplica</span>';
+    }
+    
+    return $botones;
+}
+
+/**
+ * Obtener lista de carreras - ACTUALIZADA para mostrar nombres
+ */
+function obtener_carreras() {
+    global $db;
+    
+    try {
+        $query = "SELECT c.id_carrera, c.nombre_carrera 
+                  FROM carreras c
+                  INNER JOIN users u ON c.id_carrera = u.carrera
+                  WHERE u.estudiante = 1 
+                  AND c.nombre_carrera IS NOT NULL 
+                  AND c.nombre_carrera != '' 
+                  GROUP BY c.id_carrera, c.nombre_carrera
+                  ORDER BY c.nombre_carrera";
+        return mysqli_query($db, $query);
+    } catch (Exception $e) {
+        error_log("Error en obtener_carreras: " . $e->getMessage());
+        return false;
+    }
+}
+
+// =============================================
+// FUNCIONES PARA EVALUACIÓN DE GRADOS (TSU Y GRADO COMPLETO)
+// =============================================
+
+/**
+ * Determinar si un estudiante es apto para el primer título (TSU) o grado completo - ACTUALIZADA
+ */
+function es_apto_para_grado($estudiante_id) {
+    global $db;
+    
+    try {
+        $estudiante_id = mysqli_real_escape_string($db, $estudiante_id);
+        
+        // 1. Obtener información del estudiante y su carrera - ACTUALIZADA para nombre carrera
+        $query_estudiante = "SELECT u.id, u.carrera, c.nombre_carrera 
+                            FROM users u 
+                            LEFT JOIN carreras c ON u.carrera = c.id_carrera 
+                            WHERE u.id = '$estudiante_id'";
+        $result_estudiante = mysqli_query($db, $query_estudiante);
+        
+        if (!$result_estudiante || mysqli_num_rows($result_estudiante) === 0) {
+            return [
+                'apto_tsu' => false,
+                'apto_grado_completo' => false,
+                'materias_aprobadas_tsu' => 0,
+                'total_materias_tsu' => 0,
+                'porcentaje_tsu' => 0,
+                'creditos_aprobados_tsu' => 0,
+                'materias_aprobadas_completo' => 0,
+                'total_materias_carrera' => 0,
+                'porcentaje_completo' => 0,
+                'creditos_aprobados_completo' => 0,
+                'requisitos_adicionales' => false,
+                'carrera' => 'No especificada'
+            ];
+        }
+        
+        $estudiante = mysqli_fetch_assoc($result_estudiante);
+        $carrera_id = $estudiante['carrera'];
+        $nombre_carrera = $estudiante['nombre_carrera'] ?: 'Carrera ' . $carrera_id;
+        
+        // 2. Obtener todas las materias de la carrera (para evaluación completa)
+        $query_materias_completo = "SELECT m.id_materia, m.trayecto, m.creditos
+                                   FROM carrera_materia cm
+                                   INNER JOIN materias m ON cm.id_materia = m.id_materia
+                                   WHERE cm.id_carrera = '$carrera_id' 
+                                   AND m.activa = 1
+                                   ORDER BY m.trayecto";
+        
+        $result_materias_completo = mysqli_query($db, $query_materias_completo);
+        $total_materias_carrera = mysqli_num_rows($result_materias_completo);
+        
+        if ($total_materias_carrera === 0) {
+            return [
+                'apto_tsu' => false,
+                'apto_grado_completo' => false,
+                'materias_aprobadas_tsu' => 0,
+                'total_materias_tsu' => 0,
+                'porcentaje_tsu' => 0,
+                'creditos_aprobados_tsu' => 0,
+                'materias_aprobadas_completo' => 0,
+                'total_materias_carrera' => 0,
+                'porcentaje_completo' => 0,
+                'creditos_aprobados_completo' => 0,
+                'requisitos_adicionales' => false,
+                'carrera' => $nombre_carrera
+            ];
+        }
+        
+        // 3. Obtener solo materias de TSU (trayectos 0, 1, 2)
+        $query_materias_tsu = "SELECT m.id_materia, m.trayecto, m.creditos
+                              FROM carrera_materia cm
+                              INNER JOIN materias m ON cm.id_materia = m.id_materia
+                              WHERE cm.id_carrera = '$carrera_id' 
+                              AND m.trayecto IN (0, 1, 2)
+                              AND m.activa = 1";
+        
+        $result_materias_tsu = mysqli_query($db, $query_materias_tsu);
+        $total_materias_tsu = mysqli_num_rows($result_materias_tsu);
+        
+        // 4. Contar materias aprobadas para TSU
+        $materias_aprobadas_tsu = 0;
+        $creditos_aprobados_tsu = 0;
+        
+        if ($result_materias_tsu) {
+            mysqli_data_seek($result_materias_tsu, 0);
+            while ($materia = mysqli_fetch_assoc($result_materias_tsu)) {
+                $materia_id = $materia['id_materia'];
+                $trayecto = $materia['trayecto'];
+                $creditos = $materia['creditos'] ?: 3;
+                
+                if (tiene_materia_aprobada($estudiante_id, $materia_id, $trayecto)) {
+                    $materias_aprobadas_tsu++;
+                    $creditos_aprobados_tsu += $creditos;
+                }
+            }
+        }
+        
+        // 5. Contar materias aprobadas para carrera completa
+        $materias_aprobadas_completo = 0;
+        $creditos_aprobados_completo = 0;
+        
+        mysqli_data_seek($result_materias_completo, 0);
+        while ($materia = mysqli_fetch_assoc($result_materias_completo)) {
+            $materia_id = $materia['id_materia'];
+            $trayecto = $materia['trayecto'];
+            $creditos = $materia['creditos'] ?: 3;
+            
+            if (tiene_materia_aprobada($estudiante_id, $materia_id, $trayecto)) {
+                $materias_aprobadas_completo++;
+                $creditos_aprobados_completo += $creditos;
+            }
+        }
+        
+        // 6. Verificar requisitos adicionales
+        $requisitos_adicionales_cumplidos = verificar_requisitos_adicionales($estudiante_id);
+        
+        // 7. Determinar estados
+        $porcentaje_tsu = $total_materias_tsu > 0 ? ($materias_aprobadas_tsu / $total_materias_tsu) * 100 : 0;
+        $porcentaje_completo = $total_materias_carrera > 0 ? ($materias_aprobadas_completo / $total_materias_carrera) * 100 : 0;
+        
+        // Para TSU: 90% de materias aprobadas + requisitos adicionales
+        $apto_tsu = ($porcentaje_tsu >= 90) && $requisitos_adicionales_cumplidos;
+        
+        // Para Grado Completo: 100% de materias aprobadas + requisitos adicionales
+        $apto_grado_completo = ($porcentaje_completo >= 100) && $requisitos_adicionales_cumplidos;
+        
+        return [
+            'apto_tsu' => $apto_tsu,
+            'apto_grado_completo' => $apto_grado_completo,
+            
+            // Estadísticas TSU
+            'materias_aprobadas_tsu' => $materias_aprobadas_tsu,
+            'total_materias_tsu' => $total_materias_tsu,
+            'porcentaje_tsu' => round($porcentaje_tsu, 1),
+            'creditos_aprobados_tsu' => $creditos_aprobados_tsu,
+            
+            // Estadísticas carrera completa
+            'materias_aprobadas_completo' => $materias_aprobadas_completo,
+            'total_materias_carrera' => $total_materias_carrera,
+            'porcentaje_completo' => round($porcentaje_completo, 1),
+            'creditos_aprobados_completo' => $creditos_aprobados_completo,
+            
+            // Información general
+            'requisitos_adicionales' => $requisitos_adicionales_cumplidos,
+            'carrera' => $nombre_carrera
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Error en es_apto_para_grado: " . $e->getMessage());
+        return [
+            'apto_tsu' => false,
+            'apto_grado_completo' => false,
+            'materias_aprobadas_tsu' => 0,
+            'total_materias_tsu' => 0,
+            'porcentaje_tsu' => 0,
+            'creditos_aprobados_tsu' => 0,
+            'materias_aprobadas_completo' => 0,
+            'total_materias_carrera' => 0,
+            'porcentaje_completo' => 0,
+            'creditos_aprobados_completo' => 0,
+            'requisitos_adicionales' => false,
+            'carrera' => 'Error en consulta'
+        ];
+    }
+}
+
+/**
+ * Verificar si un estudiante tiene una materia aprobada
+ */
+function tiene_materia_aprobada($estudiante_id, $materia_id, $trayecto) {
+    global $db;
+    
+    try {
+        $estudiante_id = mysqli_real_escape_string($db, $estudiante_id);
+        $materia_id = mysqli_real_escape_string($db, $materia_id);
+        $trayecto = mysqli_real_escape_string($db, $trayecto);
+        
+        // Consulta para verificar nota aprobada
+        $campo_trayecto = 'trayecto_' . $trayecto;
+        $query_nota = "SELECT $campo_trayecto as nota 
+                      FROM notas_definitivas 
+                      WHERE id_usuario = '$estudiante_id' 
+                      AND id_materia = '$materia_id' 
+                      AND $campo_trayecto >= 12  -- Nota mínima para aprobar
+                      AND $campo_trayecto IS NOT NULL
+                      LIMIT 1";
+        
+        $result_nota = mysqli_query($db, $query_nota);
+        
+        if ($result_nota && mysqli_num_rows($result_nota) > 0) {
+            $nota_data = mysqli_fetch_assoc($result_nota);
+            // Verificar que la nota sea realmente un número y esté aprobada
+            return is_numeric($nota_data['nota']) && $nota_data['nota'] >= 10;
+        }
+        
+        return false;
+        
+    } catch (Exception $e) {
+        error_log("Error en tiene_materia_aprobada: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Verificar requisitos adicionales para el grado
+ */
+function verificar_requisitos_adicionales($estudiante_id) {
+    global $db;
+    
+    try {
+        $estudiante_id = mysqli_real_escape_string($db, $estudiante_id);
+        
+        // Por ahora, asumimos que todos los requisitos adicionales están cumplidos
+        // Debes implementar estas verificaciones según las reglas de tu universidad
+        return true;
+        
+    } catch (Exception $e) {
+        error_log("Error en verificar_requisitos_adicionales: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Función para verificar requisitos de graduación
+ */
+function cumple_requisitos_graduacion($id_usuario) {
+    try {
+        $info_aptitud = es_apto_para_grado($id_usuario);
+        
+        // Para la página de graduación, consideramos aptos tanto TSU como grado completo
+        return ($info_aptitud['apto_tsu'] || $info_aptitud['apto_grado_completo']);
+        
+    } catch (Exception $e) {
+        error_log("Error en cumple_requisitos_graduacion: " . $e->getMessage());
+        return false;
+    }
+}
+
+
+
+//IMAGENES SOPORTE *********************************************************************
+
+
+// Función para subir imagen de soporte
+function subirSoporte($archivo) {
+    // Directorio relativo a la raíz del proyecto
+    $directorio = '../soportes/';
+    
+    // Verificar y crear directorio si no existe
+    if (!file_exists($directorio)) {
+        if (!mkdir($directorio, 0755, true)) {
+            return ['success' => false, 'error' => 'No se pudo crear el directorio de soportes'];
+        }
+    }
+    
+    // Validar que se haya subido un archivo
+    if (!isset($archivo['name']) || empty($archivo['name'])) {
+        return ['success' => false, 'error' => 'No se ha seleccionado ningún archivo'];
+    }
+    
+    // Validar errores de subida
+    if ($archivo['error'] !== UPLOAD_ERR_OK) {
+        $errores = [
+            UPLOAD_ERR_INI_SIZE => 'El archivo excede el tamaño máximo permitido',
+            UPLOAD_ERR_FORM_SIZE => 'El archivo excede el tamaño máximo del formulario',
+            UPLOAD_ERR_PARTIAL => 'El archivo fue solo parcialmente subido',
+            UPLOAD_ERR_NO_FILE => 'No se subió ningún archivo',
+            UPLOAD_ERR_NO_TMP_DIR => 'Falta la carpeta temporal',
+            UPLOAD_ERR_CANT_WRITE => 'No se pudo escribir el archivo en el disco',
+            UPLOAD_ERR_EXTENSION => 'Una extensión de PHP detuvo la subida del archivo'
+        ];
+        return ['success' => false, 'error' => $errores[$archivo['error']] ?? 'Error desconocido al subir archivo'];
+    }
+    
+    // Validar tipo de archivo
+    $tiposPermitidos = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
+    $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
+    
+    if (!in_array($extension, $tiposPermitidos)) {
+        return ['success' => false, 'error' => 'Tipo de archivo no permitido. Use: ' . implode(', ', $tiposPermitidos)];
+    }
+    
+    // Validar tamaño (máximo 5MB)
+    $tamañoMaximo = 5 * 1024 * 1024; // 5MB en bytes
+    if ($archivo['size'] > $tamañoMaximo) {
+        return ['success' => false, 'error' => 'El archivo es demasiado grande. Máximo 5MB'];
+    }
+    
+    // Generar nombre único
+    $nombreUnico = uniqid() . '_' . time() . '.' . $extension;
+    $rutaDestino = $directorio . $nombreUnico;
+    
+    // Mover archivo
+    if (move_uploaded_file($archivo['tmp_name'], $rutaDestino)) {
+        return [
+            'success' => true,
+            'ruta' => $nombreUnico,
+            'tipo' => $extension,
+            'tamaño' => $archivo['size']
+        ];
+    } else {
+        return ['success' => false, 'error' => 'Error al mover el archivo subido. Verifique permisos del directorio.'];
+    }
+}
+
+// Función para eliminar soporte anterior si existe
+function eliminarSoporteAnterior($nombreArchivo) {
+    $directorio = '../soportes/';
+    if (!empty($nombreArchivo) && file_exists($directorio . $nombreArchivo)) {
+        return unlink($directorio . $nombreArchivo);
+    }
+    return false;
+}
+
+// Función para obtener soporte actual de un estudiante
+function obtenerSoporteActual($id_estudiante, $id_materia, $id_periodo) {
+    global $db;
+    
+    $query = "SELECT soporte, tipo_archivo FROM notas_pendientes 
+              WHERE id_usuario = ? 
+              AND id_materia = ? 
+              AND id_periodo = ? 
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $id_estudiante, $id_materia, $id_periodo);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    return null;
+}
+
+
+
+// PLANILLA VACIA DE ESTUDIANTES PARA LLENADO MANUAL
+
+
+
+/**
+ * Clase para generar PDF de planilla de notas
+ */
+class PDF_PlanillaNotas {
+    private $pdf;
+    private $info;
+    private $estudiantes;
+    
+    function __construct() {
+        // Incluir FPDF solo cuando se instancie la clase
+        require_once('../fpdf/fpdf.php');
+        $this->pdf = new FPDF();
+    }
+    
+    function generarPlanilla($info, $estudiantes) {
+        $this->info = $info;
+        $this->estudiantes = $estudiantes;
+        
+        $this->pdf->AddPage();
+        $this->Cuerpo();
+        $this->pdf->Output('D', $this->getNombreArchivo());
+        exit;
+    }
+    
+    function Membrete() {
+        // Configurar márgenes
+        $margin = 10;
+        $pageWidth = $this->pdf->GetPageWidth();
+        
+        // Logo (si existe)
+        $logoPath = '../images/uptpc.png';
+        if (file_exists($logoPath)) {
+            $this->pdf->Image($logoPath, $margin, 8, 15, 15);
+        }
+        
+        // Texto del membrete
+        $this->pdf->SetFont('Arial', 'B', 9);
+        $this->pdf->SetY(10);
+        $this->pdf->Cell(0, 4, $this->codificarTexto('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->pdf->SetFont('Arial', 'B', 8);
+        $this->pdf->Cell(0, 4, $this->codificarTexto('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->pdf->Cell(0, 4, $this->codificarTexto('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        
+        // Fecha
+        $this->pdf->SetFont('Arial', '', 7);
+        $this->pdf->SetXY($pageWidth - $margin - 25, 8);
+        $this->pdf->Cell(25, 4, date('d/m/Y'), 0, 0, 'R');
+        
+        // Línea separadora
+        $this->pdf->SetY(28);
+        $this->pdf->Cell(0, 0, '', 'T');
+        $this->pdf->Ln(5);
+    }
+    
+    function Header() {
+        $this->Membrete();
+        
+        // Título principal
+        $this->pdf->SetFont('Arial', 'B', 12);
+        $this->pdf->Cell(0, 6, $this->codificarTexto('PLANILLA DE REGISTRO DE NOTAS'), 0, 1, 'C');
+        $this->pdf->SetFont('Arial', 'B', 9);
+        $this->pdf->Cell(0, 4, $this->codificarTexto('SISTEMA DE CONTROL DE NOTAS'), 0, 1, 'C');
+        $this->pdf->Ln(1);
+        
+        // Información en 2 columnas
+        $this->pdf->SetFont('Arial', '', 8);
+        
+        // Columna izquierda
+        $x = $this->pdf->GetX();
+        $y = $this->pdf->GetY();
+        
+        $this->pdf->Cell(20, 4, $this->codificarTexto('Sección:'), 0, 0);
+        $this->pdf->Cell(40, 4, $this->codificarTexto($this->info['codigo_seccion']), 0, 1);
+        
+        $this->pdf->SetX($x);
+        $this->pdf->Cell(20, 4, $this->codificarTexto('Carrera:'), 0, 0);
+        $this->pdf->Cell(40, 4, $this->codificarTexto($this->info['nombre_carrera']), 0, 1);
+        
+        $this->pdf->SetX($x);
+        $this->pdf->Cell(20, 4, $this->codificarTexto('Trayecto:'), 0, 0);
+        $this->pdf->Cell(40, 4, $this->codificarTexto($this->info['nombre_trayecto']), 0, 1);
+        
+        // Columna derecha
+        $this->pdf->SetXY($x + 80, $y);
+        
+        $this->pdf->Cell(25, 4, $this->codificarTexto('Materia:'), 0, 0);
+        $this->pdf->Cell(50, 4, $this->codificarTexto($this->info['nombre_materia']), 0, 1);
+        
+        $this->pdf->SetX($x + 80);
+        $this->pdf->Cell(25, 4, $this->codificarTexto('Cod materia:'), 0, 0);
+        $this->pdf->Cell(50, 4, $this->codificarTexto($this->info['cod_materia']), 0, 1);
+        
+        $this->pdf->SetX($x + 80);
+        $this->pdf->Cell(25, 4, $this->codificarTexto('Periodo:'), 0, 0);
+        $this->pdf->Cell(50, 4, $this->codificarTexto($this->info['nombre_periodo']), 0, 1);
+        
+        $this->pdf->SetX($x);
+        $this->pdf->Ln(2);
+    }
+    
+    function Firma() {
+        // FIRMA MÁS ARRIBA - justo después de la tabla
+        $this->pdf->SetFont('Arial', '', 9);
+        
+        // Línea para firma
+        $this->pdf->Cell(0, 4, '_________________________________', 0, 1, 'C');
+        
+        // Datos del profesor
+        $this->pdf->Cell(0, 4, $this->codificarTexto('Firma del Docente'), 0, 1, 'C');
+        
+        $this->pdf->SetFont('Arial', '', 8);
+        $this->pdf->Cell(0, 3, $this->codificarTexto('Nombre: _________________________'), 0, 1, 'C');
+        $this->pdf->Cell(0, 3, $this->codificarTexto('Cédula: _________________________'), 0, 1, 'C');
+        $this->pdf->Cell(0, 3, $this->codificarTexto('Materia: ') . $this->codificarTexto($this->info['nombre_materia']), 0, 1, 'C');
+    }
+    
+    function Cuerpo() {
+        // Llamar Header
+        $this->Header();
+        
+        // Calcular el ancho total de la tabla
+        $ancho_total_tabla = 8 + 18 + 45 + (7 * 8) + 8; // Suma de todas las columnas
+        
+        // Calcular la posición X para centrar la tabla
+        $margen_izquierdo = ($this->pdf->GetPageWidth() - $ancho_total_tabla) / 2;
+        
+        // Establecer la posición X para centrar
+        $this->pdf->SetX($margen_izquierdo);
+        
+        // Encabezado de la tabla centrado
+        $this->agregarEncabezadoTabla($margen_izquierdo);
+        
+        // Estudiantes - tabla centrada
+        $contador = 0;
+        foreach ($this->estudiantes as $estudiante) {
+            $contador++;
+            
+            // Establecer posición X centrada para cada fila
+            $this->pdf->SetX($margen_izquierdo);
+            
+            $this->pdf->SetFont('Arial', '', 7);
+            $this->pdf->Cell(8, 5, $contador, 1, 0, 'C');
+            $this->pdf->Cell(18, 5, $estudiante['cedula'], 1, 0, 'C');
+            
+            $nombreCompleto = $this->codificarTexto($estudiante['nombre']);
+            if (strlen($nombreCompleto) > 25) {
+                $nombreCompleto = substr($nombreCompleto, 0, 25) . '...';
+            }
+            $this->pdf->Cell(45, 5, $nombreCompleto, 1, 0);
+            
+            // 8 casillas para notas
+            for ($i = 1; $i <= 8; $i++) {
+                $this->pdf->Cell(7, 5, '', 1, 0, 'C');
+            }
+            
+            // Casilla para nota final
+            $this->pdf->Cell(8, 5, '', 1, 1, 'C');
+        }
+        
+        // AGREGAR FIRMA INMEDIATAMENTE DESPUÉS DE LA TABLA
+        $this->pdf->Ln(20); // Un pequeño espacio
+        $this->Firma();
+    }
+    
+    function agregarEncabezadoTabla($margen_izquierdo = 10) {
+        // Establecer posición X para el encabezado
+        $this->pdf->SetX($margen_izquierdo);
+        
+        // Encabezado de la tabla
+        $this->pdf->SetFont('Arial', 'B', 7);
+        $this->pdf->SetFillColor(200, 200, 200);
+        
+        $this->pdf->Cell(8, 6, 'N°', 1, 0, 'C', true);
+        $this->pdf->Cell(18, 6, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
+        $this->pdf->Cell(45, 6, $this->codificarTexto('Nombre'), 1, 0, 'C', true);
+        
+        // 8 casillas para notas
+        for ($i = 1; $i <= 8; $i++) {
+            $this->pdf->Cell(7, 6, "N$i", 1, 0, 'C', true);
+        }
+        
+        $this->pdf->Cell(8, 6, 'Final', 1, 1, 'C', true);
+        $this->pdf->SetFillColor(255, 255, 255);
+    }
+    
+    /**
+     * Función para codificar texto correctamente
+     */
+    function codificarTexto($texto) {
+        if (mb_detect_encoding($texto, 'UTF-8', true)) {
+            return utf8_decode($texto);
+        }
+        return $texto;
+    }
+    
+    function getNombreArchivo() {
+        $seccion = preg_replace('/[^a-zA-Z0-9]/', '_', $this->info['codigo_seccion']);
+        $materia = preg_replace('/[^a-zA-Z0-9]/', '_', $this->info['cod_materia']);
+        return "Planilla_Notas_{$seccion}_{$materia}.pdf";
+    }
+}
+
+// El resto de las funciones permanecen igual...
+/**
+ * Generar planilla PDF para lista de estudiantes con casillas de notas
+ */
+function generarPlanillaNotasPDF($seccion_id, $materia_id, $docente_id) {
+    global $db;
+    
+    // Verificar que el docente tiene acceso a esta sección y materia
+    if (!verificarAccesoDocente($docente_id, $seccion_id, $materia_id)) {
+        return false;
+    }
+    
+    // Obtener información de la sección y materia
+    $info = obtenerInfoSeccionMateria($seccion_id, $materia_id);
+    if (!$info) {
+        return false;
+    }
+    
+    // Obtener estudiantes de la sección
+    $estudiantes = obtenerEstudiantesSeccion($seccion_id);
+    
+    if (empty($estudiantes)) {
+        return false;
+    }
+    
+    // Crear PDF
+    $pdf = new PDF_PlanillaNotas();
+    $pdf->generarPlanilla($info, $estudiantes);
+    
+    return true;
+}
+
+/**
+ * Verificar acceso del docente a la sección y materia
+ */
+function verificarAccesoDocente($docente_id, $seccion_id, $materia_id) {
+    global $db;
+    
+    $query = "SELECT 1 FROM docente_seccion 
+              WHERE id_usuario = ? AND id_seccion = ? AND id_materia = ?
+              AND (estatus = 'activo' OR estatus = 1)";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $seccion_id, $materia_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->num_rows > 0;
+}
+
+/**
+ * Obtener información de sección y materia
+ */
+function obtenerInfoSeccionMateria($seccion_id, $materia_id) {
+    global $db;
+    
+    $query = "SELECT s.codigo_seccion, c.nombre_carrera, 
+                     t.nombre_trayecto, t.numero_trayecto,
+                     pa.nombre_periodo, m.nombre_materia, m.cod_materia
+              FROM secciones s
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+              INNER JOIN periodos_academicos pa ON s.id_periodo = pa.id_periodo
+              INNER JOIN materias m ON m.id_materia = ?
+              WHERE s.id_seccion = ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("ii", $materia_id, $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Obtener estudiantes de una sección
+ */
+function obtenerEstudiantesSeccion($seccion_id) {
+    global $db;
+    
+    $query = "SELECT u.idusuario as cedula, u.nombre
+              FROM users u
+              INNER JOIN estudiante_seccion es ON u.id = es.id_usuario
+              WHERE es.id_seccion = ? AND es.estatus = 'activo'
+              ORDER BY u.nombre";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $estudiantes = [];
+    while ($row = $result->fetch_assoc()) {
+        $estudiantes[] = $row;
+    }
+    
+    return $estudiantes;
+}
+
+
+
+
+// REPORTE DE NOTAS DEFINITIVAS ***********************************************************************
+
+
+class PDF_NotasDefinitivas {
+    private $pdf;
+    private $datos;
+    private $trayecto;
+    private $columnas_trayectos;
+    
+    function __construct() {
+        require_once('../fpdf/fpdf.php');
+        $this->pdf = new FPDF();
+    }
+    
+    function generarReporte($datos) {
+        $this->datos = $datos;
+        $this->trayecto = $datos['info_general']['numero_trayecto'];
+        $this->definirColumnasTrayecto();
+        
+        $this->pdf->AddPage();
+        $this->Membrete(); // Agregar membrete primero
+        $this->Header();
+        $this->Cuerpo();
+        $this->pdf->Output('D', $this->getNombreArchivo());
+        exit;
+    }
+    
+    function Membrete() {
+        // Configurar márgenes
+        $margin = 10;
+        $pageWidth = $this->pdf->GetPageWidth();
+        
+        // Logo (si existe)
+        $logoPath = '../images/uptpc.png';
+        if (file_exists($logoPath)) {
+            $this->pdf->Image($logoPath, $margin, 10, 20, 20);
+        }
+        
+        // Texto del membrete
+        $this->pdf->SetFont('Arial', 'B', 10);
+        $this->pdf->SetY(15);
+        $this->pdf->Cell(0, 5, $this->codificarTexto('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->pdf->SetFont('Arial', 'B', 9);
+        $this->pdf->Cell(0, 5, $this->codificarTexto('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->pdf->Cell(0, 5, $this->codificarTexto('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        
+        // Fecha
+        $this->pdf->SetFont('Arial', '', 8);
+        $this->pdf->SetXY($pageWidth - $margin - 30, 10);
+        $this->pdf->Cell(30, 5, date('d/m/Y'), 0, 0, 'R');
+        
+        // Línea separadora
+        $this->pdf->SetY(35);
+        $this->pdf->Cell(0, 0, '', 'T');
+        $this->pdf->Ln(10);
+    }
+    
+    function definirColumnasTrayecto() {
+        switch ($this->trayecto) {
+            case 0:
+                $this->columnas_trayectos = [0]; // Solo trayecto 0
+                break;
+            case 1:
+            case 2:
+                $this->columnas_trayectos = [0, 1, 2]; // Trayectos 0, 1, 2
+                break;
+            case 3:
+            case 4:
+                $this->columnas_trayectos = [0, 1, 2, 3, 4]; // Todos los trayectos
+                break;
+            default:
+                $this->columnas_trayectos = [0, 1, 2, 3, 4]; // Por defecto todos
+        }
+    }
+    
+    function Header() {
+        // Título principal (después del membrete)
+        $this->pdf->SetY(45); // Posición después del membrete
+        
+        $this->pdf->SetFont('Arial', 'B', 14);
+        $this->pdf->Cell(0, 8, $this->codificarTexto('REPORTE DE NOTAS DEFINITIVAS'), 0, 1, 'C');
+        $this->pdf->SetFont('Arial', 'B', 10);
+        $this->pdf->Cell(0, 6, $this->codificarTexto('SISTEMA DE CONTROL DE NOTAS'), 0, 1, 'C');
+        $this->pdf->Ln(5);
+        
+        // Información general
+        $this->pdf->SetFont('Arial', '', 9);
+        
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Docente:'), 0, 0);
+        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_docente']), 0, 1);
+        
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Cédula:'), 0, 0);
+        $this->pdf->Cell(80, 5, $this->datos['info_general']['cedula_docente'], 0, 1);
+        
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Materia:'), 0, 0);
+        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_materia']), 0, 1);
+        
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Periodo:'), 0, 0);
+        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_periodo']), 0, 1);
+        
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Sección:'), 0, 0);
+        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['codigo_seccion']), 0, 1);
+        
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Carrera:'), 0, 0);
+        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_carrera']), 0, 1);
+        
+        $this->pdf->Cell(25, 5, $this->codificarTexto('Trayecto:'), 0, 0);
+        $this->pdf->Cell(80, 5, $this->trayecto, 0, 1);
+        
+        $this->pdf->Ln(8);
+    }
+    
+    function Footer() {
+        // Posición a 1.5 cm del final
+        $this->pdf->SetY(-25);
+        
+        // Firma del docente
+        $this->pdf->SetFont('Arial', '', 9);
+        $this->pdf->Cell(0, 5, $this->codificarTexto('Firma del Docente:'), 0, 1);
+        $this->pdf->Ln(3);
+        $this->pdf->Cell(60, 5, '_________________________________', 0, 1);
+        $this->pdf->Cell(60, 5, $this->codificarTexto('Nombre: ') . $this->codificarTexto($this->datos['info_general']['nombre_docente']), 0, 1);
+        $this->pdf->Cell(60, 5, $this->codificarTexto('Cédula: ') . $this->datos['info_general']['cedula_docente'], 0, 1);
+        
+        // Número de página
+        $this->pdf->SetY(-10);
+        $this->pdf->SetFont('Arial', 'I', 8);
+        $this->pdf->Cell(0, 5, $this->codificarTexto('Página ') . $this->pdf->PageNo() . ' de {nb}', 0, 0, 'C');
+    }
+    
+    function Cuerpo() {
+        // Configurar número total de páginas
+        $this->pdf->AliasNbPages();
+        
+        // Calcular ancho de columnas dinámicamente
+        $ancho_nombre = 50; // Ancho base para nombre
+        $ancho_trayecto = 12; // Ancho por cada columna de trayecto
+        $total_columnas_trayecto = count($this->columnas_trayectos);
+        
+        // Ajustar ancho del nombre según cantidad de columnas de trayecto
+        if ($total_columnas_trayecto < 3) {
+            $ancho_nombre = 60;
+        }
+        
+        // Encabezado de la tabla
+        $this->pdf->SetFillColor(200, 200, 200);
+        $this->pdf->SetFont('Arial', 'B', 8);
+        
+        $this->pdf->Cell(8, 8, 'N°', 1, 0, 'C', true);
+        $this->pdf->Cell(22, 8, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
+        $this->pdf->Cell($ancho_nombre, 8, $this->codificarTexto('Nombre del Estudiante'), 1, 0, 'C', true);
+        
+        // Columnas para trayectos (dinámicas)
+        foreach ($this->columnas_trayectos as $trayecto_num) {
+            $this->pdf->Cell($ancho_trayecto, 8, "T$trayecto_num", 1, 0, 'C', true);
+        }
+        
+        $this->pdf->Cell(12, 8, $this->codificarTexto('Final'), 1, 0, 'C', true);
+        $this->pdf->Cell(30, 8, $this->codificarTexto('En Letras'), 1, 0, 'C', true);
+        $this->pdf->Cell(25, 8, $this->codificarTexto('Fecha'), 1, 1, 'C', true);
+        
+        $this->pdf->SetFont('Arial', '', 8);
+        
+        $contador = 0;
+        foreach ($this->datos['notas'] as $nota) {
+            $contador++;
+            
+            // Verificar si necesita nueva página (cada 25 estudiantes)
+            if ($contador > 25 && ($contador - 1) % 25 == 0) {
+                $this->pdf->AddPage();
+                $this->Membrete(); // Agregar membrete en cada página nueva
+                $this->Header();
+                
+                // Volver a dibujar el encabezado de la tabla
+                $this->pdf->SetFillColor(200, 200, 200);
+                $this->pdf->SetFont('Arial', 'B', 8);
+                $this->pdf->Cell(8, 8, 'N°', 1, 0, 'C', true);
+                $this->pdf->Cell(22, 8, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
+                $this->pdf->Cell($ancho_nombre, 8, $this->codificarTexto('Nombre del Estudiante'), 1, 0, 'C', true);
+                
+                foreach ($this->columnas_trayectos as $trayecto_num) {
+                    $this->pdf->Cell($ancho_trayecto, 8, "T$trayecto_num", 1, 0, 'C', true);
+                }
+                
+                $this->pdf->Cell(12, 8, $this->codificarTexto('Final'), 1, 0, 'C', true);
+                $this->pdf->Cell(30, 8, $this->codificarTexto('En Letras'), 1, 0, 'C', true);
+                $this->pdf->Cell(25, 8, $this->codificarTexto('Fecha'), 1, 1, 'C', true);
+                $this->pdf->SetFont('Arial', '', 8);
+            }
+            
+            $this->pdf->Cell(8, 6, $contador, 1, 0, 'C');
+            $this->pdf->Cell(22, 6, $nota['cedula_estudiante'], 1, 0, 'C');
+            
+            $nombreCompleto = $this->codificarTexto($nota['nombre_estudiante']);
+            $max_caracteres = $ancho_nombre == 60 ? 40 : 35;
+            if (strlen($nombreCompleto) > $max_caracteres) {
+                $nombreCompleto = substr($nombreCompleto, 0, $max_caracteres) . '...';
+            }
+            $this->pdf->Cell($ancho_nombre, 6, $nombreCompleto, 1, 0);
+            
+            // Mostrar solo los trayectos correspondientes
+            foreach ($this->columnas_trayectos as $trayecto_num) {
+                $trayecto = $nota["trayecto_$trayecto_num"];
+                $valor = ($trayecto !== null && $trayecto != '') ? intval($trayecto) : '-';
+                $this->pdf->Cell($ancho_trayecto, 6, $valor, 1, 0, 'C');
+            }
+            
+            // Nota final (número entero)
+            $nota_final_entero = intval($nota['nota_final']);
+            $this->pdf->Cell(12, 6, $nota_final_entero, 1, 0, 'C');
+            
+            // Nota en letras
+            $nota_letras = $this->convertirNumeroALetras($nota_final_entero);
+            $this->pdf->Cell(30, 6, $this->codificarTexto($nota_letras), 1, 0, 'C');
+            
+            // Fecha de registro
+            $fecha = date('d/m/Y', strtotime($nota['fecha_registro']));
+            $this->pdf->Cell(25, 6, $fecha, 1, 1, 'C');
+        }
+        
+        // Estadísticas al final
+        $this->pdf->Ln(10);
+        $this->pdf->SetFont('Arial', 'B', 10);
+        $this->pdf->Cell(0, 8, $this->codificarTexto('RESUMEN ESTADÍSTICO'), 0, 1, 'C');
+        
+        $this->pdf->SetFont('Arial', '', 9);
+        $this->pdf->Cell(0, 6, $this->codificarTexto('Total de Estudiantes: ') . $contador, 0, 1);
+        $this->pdf->Cell(0, 6, $this->codificarTexto('Aprobados: ') . $this->datos['estadisticas']['aprobados'], 0, 1);
+        $this->pdf->Cell(0, 6, $this->codificarTexto('Reprobados: ') . $this->datos['estadisticas']['reprobados'], 0, 1);
+        $this->pdf->Cell(0, 6, $this->codificarTexto('Promedio del Grupo: ') . intval($this->datos['estadisticas']['promedio_grupo']), 0, 1);
+    }
+    
+    /**
+     * Función para convertir números a letras
+     */
+    function convertirNumeroALetras($numero) {
+        $unidades = array(
+            '', 'UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE',
+            'DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'
+        );
+        
+        $decenas = array(
+            '', '', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'
+        );
+        
+        if ($numero == 0) {
+            return 'CERO';
+        }
+        
+        if ($numero < 20) {
+            return $unidades[$numero];
+        }
+        
+        if ($numero < 100) {
+            $decena = intval($numero / 10);
+            $unidad = $numero % 10;
+            
+            if ($decena == 2 && $unidad > 0) {
+                return 'VEINTI' . $unidades[$unidad];
+            }
+            
+            if ($unidad == 0) {
+                return $decenas[$decena];
+            } else {
+                return $decenas[$decena] . ' Y ' . $unidades[$unidad];
+            }
+        }
+        
+        if ($numero == 100) {
+            return 'CIEN';
+        }
+        
+        // Para números mayores a 100, devolvemos el número
+        return "($numero)";
+    }
+    
+    /**
+     * Función para codificar texto correctamente
+     */
+    function codificarTexto($texto) {
+        if (mb_detect_encoding($texto, 'UTF-8', true)) {
+            return utf8_decode($texto);
+        }
+        return $texto;
+    }
+    
+    function getNombreArchivo() {
+        $docente = preg_replace('/[^a-zA-Z0-9]/', '_', $this->datos['info_general']['nombre_docente']);
+        $materia = preg_replace('/[^a-zA-Z0-9]/', '_', $this->datos['info_general']['nombre_materia']);
+        $periodo = preg_replace('/[^a-zA-Z0-9]/', '_', $this->datos['info_general']['nombre_periodo']);
+        return "Notas_Definitivas_{$docente}_{$materia}_{$periodo}.pdf";
+    }
+}
+
+/**
+ * Generar PDF de notas definitivas
+ */
+function generarPDFNotasDefinitivas($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    // Obtener información general
+    $info_general = obtenerInfoNotasDefinitivas($docente_id, $materia_id, $periodo_id);
+    if (!$info_general) {
+        return false;
+    }
+    
+    // Obtener notas definitivas
+    $notas = obtenerNotasDefinitivasGrupo($docente_id, $materia_id, $periodo_id);
+    if (empty($notas)) {
+        return false;
+    }
+    
+    // Calcular estadísticas
+    $estadisticas = calcularEstadisticasNotas($notas);
+    
+    // Preparar datos para el PDF
+    $datos = [
+        'info_general' => $info_general,
+        'notas' => $notas,
+        'estadisticas' => $estadisticas
+    ];
+    
+    // Crear PDF
+    $pdf = new PDF_NotasDefinitivas();
+    $pdf->generarReporte($datos);
+    
+    return true;
+}
+
+/**
+ * Obtener información general para el reporte incluyendo el trayecto
+ */
+function obtenerInfoNotasDefinitivas($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT ud.nombre as nombre_docente, ud.idusuario as cedula_docente,
+                     m.nombre_materia, pa.nombre_periodo, 
+                     s.codigo_seccion, c.nombre_carrera, t.numero_trayecto
+              FROM notas_definitivas nd
+              INNER JOIN users ud ON nd.id_docente = ud.id
+              INNER JOIN materias m ON nd.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+              INNER JOIN docente_seccion ds ON nd.id_docente = ds.id_usuario 
+                                           AND nd.id_materia = ds.id_materia
+              INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+              WHERE nd.id_docente = ? AND nd.id_materia = ? AND nd.id_periodo = ?
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Obtener notas definitivas del grupo y calcular nota final
+ */
+function obtenerNotasDefinitivasGrupo($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT nd.id_usuario as id_estudiante,
+                     nd.trayecto_0, nd.trayecto_1, nd.trayecto_2, nd.trayecto_3, nd.trayecto_4,
+                     nd.fecha_registro,
+                     ue.idusuario as cedula_estudiante, ue.nombre as nombre_estudiante
+              FROM notas_definitivas nd
+              INNER JOIN users ue ON nd.id_usuario = ue.id
+              WHERE nd.id_docente = ? AND nd.id_materia = ? AND nd.id_periodo = ?
+              ORDER BY ue.nombre";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $notas = [];
+    while ($row = $result->fetch_assoc()) {
+        // Calcular la nota final basada en los trayectos
+        $nota_final = calcularNotaFinal($row);
+        $row['nota_final'] = $nota_final;
+        $notas[] = $row;
+    }
+    
+    return $notas;
+}
+
+/**
+ * Calcular nota final a partir de los trayectos (números enteros)
+ */
+function calcularNotaFinal($datos_nota) {
+    $trayectos = [];
+    $suma = 0;
+    $contador = 0;
+    
+    // Recolectar trayectos que tengan valor
+    for ($i = 0; $i <= 4; $i++) {
+        $campo_trayecto = "trayecto_$i";
+        if (isset($datos_nota[$campo_trayecto]) && $datos_nota[$campo_trayecto] !== null && $datos_nota[$campo_trayecto] != '') {
+            $trayectos[] = intval($datos_nota[$campo_trayecto]); // Convertir a entero
+            $suma += intval($datos_nota[$campo_trayecto]);
+            $contador++;
+        }
+    }
+    
+    // Calcular promedio si hay trayectos válidos
+    if ($contador > 0) {
+        return round($suma / $contador); // Redondear al entero más cercano
+    }
+    
+    return 0; // Si no hay trayectos con notas
+}
+
+/**
+ * Calcular estadísticas de las notas
+ */
+function calcularEstadisticasNotas($notas) {
+    $total = count($notas);
+    $aprobados = 0;
+    $suma_notas = 0;
+    
+    foreach ($notas as $nota) {
+        $suma_notas += $nota['nota_final'];
+        if ($nota['nota_final'] >= 10.0) {
+            $aprobados++;
+        }
+    }
+    
+    $promedio = $total > 0 ? $suma_notas / $total : 0;
+    $reprobados = $total - $aprobados;
+    
+    return [
+        'total' => $total,
+        'aprobados' => $aprobados,
+        'reprobados' => $reprobados,
+        'promedio_grupo' => $promedio
+    ];
+}
+
+
+
+//ASIGNAR DIRECTORES DE CARRERA************************************************************************
+
+
+/**
+ * Función para asignar carrera a director
+ */
+function asignarCarreraDirector($id_usuario, $id_carrera) {
+    global $db;
+    
+    try {
+        // Obtener información para auditoría
+        $usuario_info = obtenerUsuarioPorId($id_usuario);
+        $carrera_info = obtenerCarreraPorId($id_carrera);
+        
+        if (!$usuario_info) {
+            return [
+                'success' => false,
+                'message' => 'Usuario no encontrado'
+            ];
+        }
+        
+        if (!$carrera_info) {
+            return [
+                'success' => false,
+                'message' => 'Carrera no encontrada'
+            ];
+        }
+
+        // Verificar si el usuario es tipo "usuario = 1" (posiblemente administrador/director)
+        if ($usuario_info['usuario'] != 1) {
+            return [
+                'success' => false,
+                'message' => 'El usuario no tiene permisos para ser director de carrera'
+            ];
+        }
+
+        // Verificar si ya tiene una carrera asignada
+        if (!empty($usuario_info['carrera_di']) && $usuario_info['carrera_di'] != 0) {
+            return [
+                'success' => false,
+                'message' => 'El usuario ya tiene una carrera asignada como director'
+            ];
+        }
+
+        $stmt = $db->prepare("UPDATE users SET carrera_di = ? WHERE id = ? AND usuario = 1");
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("ii", $id_carrera, $id_usuario);
+        
+        if ($stmt->execute()) {
+            $affected_rows = $stmt->affected_rows;
+            $stmt->close();
+            
+            if ($affected_rows > 0) {
+                // REGISTRAR EN AUDITORÍA - ASIGNACIÓN DE CARRERA A DIRECTOR
+                if (function_exists('registrarAuditoria')) {
+                    try {
+                        registrarAuditoria(
+                            "UPDATE", 
+                            "users", 
+                            $id_usuario, 
+                            [
+                                'carrera_di' => $usuario_info['carrera_di'] ?? null,
+                                'estado_anterior' => 'Sin carrera asignada'
+                            ], 
+                            [
+                                'carrera_di' => $id_carrera,
+                                'carrera_nombre' => $carrera_info['nombre_carrera'],
+                                'carrera_codigo' => $carrera_info['cod_carrera'],
+                                'usuario_nombre' => $usuario_info['nombre'],
+                                'usuario_username' => $usuario_info['username'],
+                                'estado_nuevo' => 'Director asignado'
+                            ], 
+                            "Directores de Carrera", 
+                            "Asignación de director de carrera"
+                        );
+                    } catch (Exception $e) {
+                        error_log("Error en auditoría asignarCarreraDirector: " . $e->getMessage());
+                    }
+                }
+                
+                return [
+                    'success' => true,
+                    'message' => 'Director asignado a la carrera exitosamente',
+                    'affected_rows' => $affected_rows
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'message' => 'No se realizaron cambios en la asignación'
+                ];
+            }
+        } else {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en asignarCarreraDirector: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ASIGNAR CARRERA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $id_usuario, 
+                    null, 
+                    [
+                        'id_usuario' => $id_usuario,
+                        'id_carrera' => $id_carrera,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Directores de Carrera", 
+                    "Error al asignar director de carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error asignarCarreraDirector: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al asignar director: ' . $e->getMessage()
+        ];
+    }
+}
+
+/**
+ * Función para eliminar asignación de carrera
+ */
+function eliminarAsignacionCarrera($id_usuario) {
+    global $db;
+    
+    try {
+        // Obtener información para auditoría
+        $usuario_info = obtenerUsuarioPorId($id_usuario);
+        
+        if (!$usuario_info) {
+            return [
+                'success' => false,
+                'message' => 'Usuario no encontrado'
+            ];
+        }
+
+        // Verificar si tiene una carrera asignada
+        if (empty($usuario_info['carrera_di']) || $usuario_info['carrera_di'] == 0) {
+            return [
+                'success' => false,
+                'message' => 'El usuario no tiene una carrera asignada como director'
+            ];
+        }
+
+        // Obtener información de la carrera asignada
+        $carrera_asignada = null;
+        if (!empty($usuario_info['carrera_di'])) {
+            $carrera_asignada = obtenerCarreraPorId($usuario_info['carrera_di']);
+        }
+
+        $stmt = $db->prepare("UPDATE users SET carrera_di = NULL WHERE id = ? AND usuario = 1");
+        
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $id_usuario);
+        
+        if ($stmt->execute()) {
+            $affected_rows = $stmt->affected_rows;
+            $stmt->close();
+            
+            if ($affected_rows > 0) {
+                // REGISTRAR EN AUDITORÍA - ELIMINACIÓN DE ASIGNACIÓN DE CARRERA
+                if (function_exists('registrarAuditoria')) {
+                    try {
+                        registrarAuditoria(
+                            "UPDATE", 
+                            "users", 
+                            $id_usuario, 
+                            [
+                                'carrera_di' => $usuario_info['carrera_di'],
+                                'carrera_nombre' => $carrera_asignada['nombre_carrera'] ?? 'Desconocida',
+                                'carrera_codigo' => $carrera_asignada['cod_carrera'] ?? '',
+                                'estado_anterior' => 'Director asignado'
+                            ], 
+                            [
+                                'carrera_di' => null,
+                                'usuario_nombre' => $usuario_info['nombre'],
+                                'usuario_username' => $usuario_info['username'],
+                                'estado_nuevo' => 'Sin carrera asignada'
+                            ], 
+                            "Directores de Carrera", 
+                            "Eliminación de asignación de director de carrera"
+                        );
+                    } catch (Exception $e) {
+                        error_log("Error en auditoría eliminarAsignacionCarrera: " . $e->getMessage());
+                    }
+                }
+                
+                return [
+                    'success' => true,
+                    'message' => 'Asignación de director eliminada exitosamente',
+                    'affected_rows' => $affected_rows
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'message' => 'No se realizaron cambios en la asignación'
+                ];
+            }
+        } else {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarAsignacionCarrera: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR ASIGNACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $id_usuario, 
+                    null, 
+                    [
+                        'id_usuario' => $id_usuario,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Directores de Carrera", 
+                    "Error al eliminar asignación de director de carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarAsignacionCarrera: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Error al eliminar asignación: ' . $e->getMessage()
+        ];
+    }
+}
+
+/**
+ * Función para obtener directores de carrera (solo usuario = 1)
+ */
+function obtenerDirectoresDeCarrera() {
+    global $db;
+    
+    try {
+        $directores = [];
+        $query = "SELECT u.id, u.nombre, u.username, u.email, u.carrera_di, c.nombre_carrera, c.cod_carrera
+                  FROM users u 
+                  LEFT JOIN carreras c ON u.carrera_di = c.id_carrera 
+                  WHERE u.usuario = 1 
+                  ORDER BY u.nombre ASC";
+        
+        if ($stmt = $db->prepare($query)) {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            while ($row = $result->fetch_assoc()) {
+                $directores[] = $row;
+            }
+            
+            $stmt->close();
+            return $directores;
+        } else {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerDirectoresDeCarrera: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Función para obtener usuarios que pueden ser directores (solo usuario = 1 sin carrera asignada)
+ */
+function obtenerUsuariosParaDirectores() {
+    global $db;
+    
+    try {
+        $usuarios = [];
+        $query = "SELECT id, nombre, username, email 
+                  FROM users 
+                  WHERE usuario = 1 
+                  AND (carrera_di IS NULL OR carrera_di = '' OR carrera_di = 0)
+                  ORDER BY nombre ASC";
+        
+        if ($stmt = $db->prepare($query)) {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            while ($row = $result->fetch_assoc()) {
+                $usuarios[] = $row;
+            }
+            
+            $stmt->close();
+            return $usuarios;
+        } else {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerUsuariosParaDirectores: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Función auxiliar para obtener usuario por ID
+ */
+function obtenerUsuarioPorId($id_usuario) {
+    global $db;
+    
+    try {
+        $query = "SELECT id, nombre, username, email, usuario, carrera_di 
+                  FROM users 
+                  WHERE id = ?";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            return null;
+        }
+        
+        $stmt->bind_param("i", $id_usuario);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $usuario = $result->fetch_assoc();
+        $stmt->close();
+        
+        return $usuario;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerUsuarioPorId: " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Función para obtener carreras sin director asignado
+ */
+function obtenerCarrerasSinDirector() {
+    global $db;
+    
+    try {
+        $carreras = [];
+        $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera
+                  FROM carreras c
+                  WHERE c.activa = 1 
+                  AND c.id_carrera NOT IN (
+                      SELECT DISTINCT carrera_di 
+                      FROM users 
+                      WHERE usuario = 1 
+                      AND carrera_di IS NOT NULL 
+                      AND carrera_di != 0
+                  )
+                  ORDER BY c.nombre_carrera ASC";
+        
+        if ($stmt = $db->prepare($query)) {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            while ($row = $result->fetch_assoc()) {
+                $carreras[] = $row;
+            }
+            
+            $stmt->close();
+            return $carreras;
+        } else {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerCarrerasSinDirector: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Función para verificar si una carrera ya tiene director
+ */
+function carreraTieneDirector($id_carrera) {
+    global $db;
+    
+    try {
+        $query = "SELECT COUNT(*) as total 
+                  FROM users 
+                  WHERE usuario = 1 
+                  AND carrera_di = ?";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            return false;
+        }
+        
+        $stmt->bind_param("i", $id_carrera);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $count = $result->fetch_assoc()['total'];
+        $stmt->close();
+        
+        return $count > 0;
+        
+    } catch (Exception $e) {
+        error_log("Error en carreraTieneDirector: " . $e->getMessage());
+        return false;
+    }
+}
+
+
+
+
+
+
+
+
+
+// CONSULTA DE NOTAS********************************************************
+
+
+
+
+
+// Función para buscar estudiante por cédula (CON AUDITORÍA DE BÚSQUEDA)
+function buscarEstudiantePorCedulaConsulta($cedula) {
+    global $db;
+    
+    try {
+        $query = "SELECT u.id, u.nombre, u.idusuario, u.carrera 
+                  FROM users u 
+                  WHERE u.idusuario = ? AND u.estudiante = 1";
+        $stmt = $db->prepare($query);
+        $stmt->bind_param("s", $cedula);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        $estudiante = $result->num_rows > 0 ? $result->fetch_assoc() : null;
+        
+        // REGISTRAR EN AUDITORÍA - BÚSQUEDA DE ESTUDIANTE
+        if (function_exists('registrarAuditoria')) {
+            try {
+                $resultado_busqueda = $estudiante ? 'ENCONTRADO' : 'NO_ENCONTRADO';
+                $detalles_estudiante = $estudiante ? [
+                    'id_estudiante' => $estudiante['id'],
+                    'nombre_estudiante' => $estudiante['nombre'],
+                    'cedula' => $estudiante['idusuario'],
+                    'id_carrera' => $estudiante['carrera']
+                ] : [
+                    'cedula_buscada' => $cedula,
+                    'resultado' => 'Estudiante no encontrado'
+                ];
+                
+                registrarAuditoria(
+                    "CONSULTA", 
+                    "users", 
+                    $estudiante ? $estudiante['id'] : null, 
+                    null, 
+                    array_merge([
+                        'cedula_buscada' => $cedura,
+                        'resultado_busqueda' => $resultado_busqueda,
+                        'tipo_consulta' => 'busqueda_estudiante'
+                    ], $detalles_estudiante), 
+                    "Consulta de Estudiantes", 
+                    "Búsqueda de estudiante por cédula - " . $resultado_busqueda
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría buscarEstudiantePorCedulaConsulta: " . $e->getMessage());
+            }
+        }
+        
+        return $estudiante;
+        
+    } catch (Exception $e) {
+        error_log("Error en buscarEstudiantePorCedulaConsulta: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN BÚSQUEDA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    null, 
+                    null, 
+                    [
+                        'cedula_buscada' => $cedula,
+                        'error' => $e->getMessage(),
+                        'tipo_consulta' => 'busqueda_estudiante'
+                    ], 
+                    "Consulta de Estudiantes", 
+                    "Error en búsqueda de estudiante por cédula"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error buscarEstudiantePorCedulaConsulta: " . $auditError->getMessage());
+            }
+        }
+        
+        return null;
+    }
+}
+
+// Función para obtener la carrera del estudiante - SOLO LECTURA, SIN AUDITORÍA
+function obtenerCarreraEstudiante($estudiante_id) {
+    global $db;
+    
+    $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera 
+              FROM users u
+              INNER JOIN carreras c ON u.carrera = c.id_carrera
+              WHERE u.id = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $estudiante_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
+}
+
+// Función para obtener todas las materias de la carrera - SOLO LECTURA, SIN AUDITORÍA
+function obtenerMateriasCarrera($carrera_id) {
+    global $db;
+    
+    $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto
+              FROM carrera_materia cm
+              INNER JOIN materias m ON cm.id_materia = m.id_materia
+              WHERE cm.id_carrera = ?
+              ORDER BY m.trayecto, m.nombre_materia";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $carrera_id);
+    $stmt->execute();
+    return $stmt->get_result();
+}
+
+// Función para obtener información del trayecto desde la tabla trayectos - SOLO LECTURA, SIN AUDITORÍA
+function obtenerInfoTrayecto($numero_trayecto) {
+    global $db;
+    
+    $query = "SELECT id_trayecto, numero_trayecto, nombre_trayecto 
+              FROM trayectos 
+              WHERE numero_trayecto = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $numero_trayecto);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    // Si no encuentra el trayecto, crear uno basado en el número
+    $nombres_trayectos = [
+        0 => 'Trayecto Inicial',
+        1 => 'Trayecto 1',
+        2 => 'Trayecto 2', 
+        3 => 'Trayecto 3',
+        4 => 'Trayecto 4'
+    ];
+    
+    return [
+        'id_trayecto' => $numero_trayecto + 1,
+        'numero_trayecto' => $numero_trayecto,
+        'nombre_trayecto' => isset($nombres_trayectos[$numero_trayecto]) ? $nombres_trayectos[$numero_trayecto] : 'Trayecto ' . $numero_trayecto
+    ];
+}
+
+// Función para obtener las notas definitivas del estudiante - SOLO LECTURA, SIN AUDITORÍA
+function obtenerNotasEstudianteConsulta($estudiante_id) {
+    global $db;
+    
+    $query = "SELECT nd.*, 
+                     m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto,
+                     pa.nombre_periodo,
+                     ud.nombre as nombre_docente,
+                     ua.nombre as nombre_admin
+              FROM notas_definitivas nd
+              INNER JOIN materias m ON nd.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+              LEFT JOIN users ud ON nd.id_docente = ud.id
+              LEFT JOIN users ua ON nd.id_admin_aprobador = ua.id
+              WHERE nd.id_usuario = ?
+              ORDER BY pa.nombre_periodo, m.nombre_materia";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $estudiante_id);
+    $stmt->execute();
+    
+    // Convertir to array asociativo con id_materia como clave
+    $result = $stmt->get_result();
+    $notas = [];
+    while ($row = $result->fetch_assoc()) {
+        $notas[$row['id_materia']] = $row;
+    }
+    
+    return $notas;
+}
+
+// Función para determinar si el estudiante es apto para grado (CON AUDITORÍA PARA CASOS ESPECIALES)
+function esAptoParaGradoConsulta($estudiante_id, $carrera_id) {
+    global $db;
+    
+    try {
+        // Obtener información del estudiante para auditoría
+        $estudiante_info = obtenerEstudiantePorId($estudiante_id);
+        $carrera_info = obtenerCarreraPorId($carrera_id);
+        
+        if (!$estudiante_info) {
+            // REGISTRAR EN AUDITORÍA - ESTUDIANTE NO ENCONTRADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "users", 
+                        $estudiante_id, 
+                        null, 
+                        [
+                            'id_estudiante' => $estudiante_id,
+                            'id_carrera' => $carrera_id,
+                            'error' => 'Estudiante no encontrado'
+                        ], 
+                        "Consulta de Grado", 
+                        "Error en consulta de aptitud para grado - Estudiante no existe"
+                    );
+                } catch (Exception $auditError) {
+                    error_log("Error en auditoría esAptoParaGradoConsulta: " . $auditError->getMessage());
+                }
+            }
+            
+            return [
+                'apto_tsu' => false,
+                'apto_grado_completo' => false,
+                'materias_aprobadas_tsu' => 0,
+                'total_materias_tsu' => 0,
+                'porcentaje_tsu' => 0,
+                'materias_aprobadas_completo' => 0,
+                'total_materias_carrera' => 0,
+                'porcentaje_completo' => 0,
+                'error' => 'Estudiante no encontrado'
+            ];
+        }
+
+        // Obtener todas las materias de la carrera
+        $materias_carrera = obtenerMateriasCarrera($carrera_id);
+        $total_materias_carrera = $materias_carrera->num_rows;
+        
+        // Obtener notas del estudiante
+        $notas_estudiante = obtenerNotasEstudianteConsulta($estudiante_id);
+        
+        // Contadores para TSU (trayectos 0, 1, 2)
+        $materias_aprobadas_tsu = 0;
+        $total_materias_tsu = 0;
+        
+        // Contadores para carrera completa
+        $materias_aprobadas_completo = 0;
+        
+        // Recorrer todas las materias de la carrera
+        while ($materia = $materias_carrera->fetch_assoc()) {
+            $trayecto = (int)$materia['trayecto'];
+            $materia_id = $materia['id_materia'];
+            
+            // Verificar si es materia de TSU (trayectos 0, 1, 2)
+            if ($trayecto <= 2) {
+                $total_materias_tsu++;
+            }
+            
+            // Verificar si el estudiante aprobó esta materia
+            if (isset($notas_estudiante[$materia_id])) {
+                $nota = $notas_estudiante[$materia_id];
+                $campo_trayecto = 'trayecto_' . $trayecto;
+                
+                if (isset($nota[$campo_trayecto]) && $nota[$campo_trayecto] !== null) {
+                    $nota_valor = (float)$nota[$campo_trayecto];
+                    if ($nota_valor >= 12) {
+                        $materias_aprobadas_completo++;
+                        
+                        // Si es materia de TSU, contar para TSU también
+                        if ($trayecto <= 2) {
+                            $materias_aprobadas_tsu++;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Calcular porcentajes
+        $porcentaje_tsu = $total_materias_tsu > 0 ? round(($materias_aprobadas_tsu / $total_materias_tsu) * 100, 1) : 0;
+        $porcentaje_completo = $total_materias_carrera > 0 ? round(($materias_aprobadas_completo / $total_materias_carrera) * 100, 1) : 0;
+        
+        // Determinar si es apto
+        $apto_tsu = ($porcentaje_tsu >= 90); // 90% o más para TSU
+        $apto_grado_completo = ($porcentaje_completo >= 100); // 100% para grado completo
+        
+        $resultado = [
+            'apto_tsu' => $apto_tsu,
+            'apto_grado_completo' => $apto_grado_completo,
+            'materias_aprobadas_tsu' => $materias_aprobadas_tsu,
+            'total_materias_tsu' => $total_materias_tsu,
+            'porcentaje_tsu' => $porcentaje_tsu,
+            'materias_aprobadas_completo' => $materias_aprobadas_completo,
+            'total_materias_carrera' => $total_materias_carrera,
+            'porcentaje_completo' => $porcentaje_completo
+        ];
+        
+        // REGISTRAR EN AUDITORÍA - CONSULTA DE APTITUD PARA GRADO (SOLO SI ES APTO)
+        if (function_exists('registrarAuditoria') && ($apto_tsu || $apto_grado_completo)) {
+            try {
+                $tipo_aptitud = $apto_grado_completo ? 'GRADO_COMPLETO' : ($apto_tsu ? 'TSU' : 'NO_APTO');
+                
+                registrarAuditoria(
+                    "CONSULTA", 
+                    "notas_definitivas", 
+                    $estudiante_id, 
+                    null, 
+                    [
+                        'id_estudiante' => $estudiante_id,
+                        'cedula_estudiante' => $estudiante_info['idusuario'] ?? '',
+                        'nombre_estudiante' => $estudiante_info['nombre'] ?? '',
+                        'id_carrera' => $carrera_id,
+                        'carrera_nombre' => $carrera_info['nombre_carrera'] ?? '',
+                        'apto_tsu' => $apto_tsu,
+                        'apto_grado_completo' => $apto_grado_completo,
+                        'porcentaje_tsu' => $porcentaje_tsu,
+                        'porcentaje_completo' => $porcentaje_completo,
+                        'tipo_aptitud' => $tipo_aptitud
+                    ], 
+                    "Consulta de Grado", 
+                    "Consulta de aptitud para grado - " . $tipo_aptitud
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría esAptoParaGradoConsulta: " . $e->getMessage());
+            }
+        }
+        
+        return $resultado;
+        
+    } catch (Exception $e) {
+        error_log("Error en esAptoParaGradoConsulta: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN CONSULTA DE GRADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "notas_definitivas", 
+                    $estudiante_id, 
+                    null, 
+                    [
+                        'id_estudiante' => $estudiante_id,
+                        'id_carrera' => $carrera_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Consulta de Grado", 
+                    "Error en consulta de aptitud para grado"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error esAptoParaGradoConsulta: " . $auditError->getMessage());
+            }
+        }
+        
+        return [
+            'apto_tsu' => false,
+            'apto_grado_completo' => false,
+            'materias_aprobadas_tsu' => 0,
+            'total_materias_tsu' => 0,
+            'porcentaje_tsu' => 0,
+            'materias_aprobadas_completo' => 0,
+            'total_materias_carrera' => 0,
+            'porcentaje_completo' => 0,
+            'error' => 'Error en la consulta: ' . $e->getMessage()
+        ];
+    }
+}
+
+// Función para obtener el badge de estado - SOLO LÓGICA DE PRESENTACIÓN, SIN AUDITORÍA
+function obtenerBadgeEstadoConsulta($info_apto) {
+    if ($info_apto['apto_grado_completo']) {
+        return '<span class="badge badge-success">APTO - GRADO COMPLETO</span>';
+    } elseif ($info_apto['apto_tsu']) {
+        return '<span class="badge badge-warning">APTO - TSU</span>';
+    } else {
+        return '<span class="badge badge-secondary">NO APTO</span>';
+    }
+}
+
+// FUNCIÓN AUXILIAR PARA OBTENER CARRERA POR ID (CON AUDITORÍA EN CASO DE ERROR)
+if (!function_exists('obtenerCarreraPorId')) {
+function obtenerCarreraPorId($carrera_id) {
+    global $db;
+    
+    try {
+        $query = "SELECT id_carrera, nombre_carrera, cod_carrera, activa 
+                  FROM carreras 
+                  WHERE id_carrera = ?";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+        
+        $stmt->bind_param("i", $carrera_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $carrera = $result->fetch_assoc();
+        $stmt->close();
+        
+        return $carrera;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerCarreraPorId: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL OBTENER CARRERA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "carreras", 
+                    $carrera_id, 
+                    null, 
+                    [
+                        'id_carrera' => $carrera_id,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Consulta de Grado", 
+                    "Error al obtener información de carrera"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error obtenerCarreraPorId: " . $auditError->getMessage());
+            }
+        }
+        
+        return null;
+    }
+}
+}
+
+//NOTAS PASADAS***************************************************************
+
+
+
+
+// Obtener lista de profesores para el filtro (docente = 1) - SOLO LECTURA, SIN AUDITORÍA
+function obtenerProfesores() {
+    global $db;
+    $query = "SELECT id, idusuario, nombre 
+              FROM users 
+              WHERE docente = 1 
+              ORDER BY nombre";
+    $result = $db->query($query);
+    return $result;
+}
+
+// Nueva función para buscar profesores por término - CON AUDITORÍA
+function buscarProfesores($termino) {
+    global $db;
+    
+    try {
+        $query = "SELECT id, idusuario, nombre 
+                  FROM users 
+                  WHERE docente = 1 
+                  AND (nombre LIKE ? OR idusuario LIKE ?)
+                  ORDER BY nombre
+                  LIMIT 10";
+        $stmt = $db->prepare($query);
+        $termino_like = "%$termino%";
+        $stmt->bind_param("ss", $termino_like, $termino_like);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        // REGISTRAR EN AUDITORÍA - BÚSQUEDA DE PROFESORES
+        if (function_exists('registrarAuditoria')) {
+            try {
+                $cantidad_resultados = $result->num_rows;
+                $resultado_busqueda = $cantidad_resultados > 0 ? 'ENCONTRADOS' : 'NO_ENCONTRADOS';
+                
+                registrarAuditoria(
+                    "CONSULTA", 
+                    "users", 
+                    null, 
+                    null, 
+                    [
+                        'termino_busqueda' => $termino,
+                        'cantidad_resultados' => $cantidad_resultados,
+                        'resultado_busqueda' => $resultado_busqueda,
+                        'tipo_consulta' => 'busqueda_profesores'
+                    ], 
+                    "Gestión de Docentes", 
+                    "Búsqueda de profesores - " . $resultado_busqueda
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría buscarProfesores: " . $e->getMessage());
+            }
+        }
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        error_log("Error en buscarProfesores: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN BÚSQUEDA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    null, 
+                    null, 
+                    [
+                        'termino_busqueda' => $termino,
+                        'error' => $e->getMessage(),
+                        'tipo_consulta' => 'busqueda_profesores'
+                    ], 
+                    "Gestión de Docentes", 
+                    "Error en búsqueda de profesores"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error buscarProfesores: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
+}
+
+// Obtener información de un profesor específico - CON AUDITORÍA
+function obtenerProfesorPorId($id) {
+    global $db;
+    
+    try {
+        $query = "SELECT id, idusuario, nombre 
+                  FROM users 
+                  WHERE id = ? AND docente = 1";
+        $stmt = $db->prepare($query);
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $profesor = $result->fetch_assoc();
+        
+        // REGISTRAR EN AUDITORÍA - CONSULTA DE PROFESOR ESPECÍFICO
+        if (function_exists('registrarAuditoria') && $profesor) {
+            try {
+                registrarAuditoria(
+                    "CONSULTA", 
+                    "users", 
+                    $id, 
+                    null, 
+                    [
+                        'id_profesor' => $profesor['id'],
+                        'cedula_profesor' => $profesor['idusuario'],
+                        'nombre_profesor' => $profesor['nombre'],
+                        'tipo_consulta' => 'obtener_profesor'
+                    ], 
+                    "Gestión de Docentes", 
+                    "Consulta de información de profesor"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría obtenerProfesorPorId: " . $e->getMessage());
+            }
+        }
+        
+        return $profesor;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerProfesorPorId: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN CONSULTA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "users", 
+                    $id, 
+                    null, 
+                    [
+                        'id_profesor' => $id,
+                        'error' => $e->getMessage(),
+                        'tipo_consulta' => 'obtener_profesor'
+                    ], 
+                    "Gestión de Docentes", 
+                    "Error al obtener información de profesor"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error obtenerProfesorPorId: " . $auditError->getMessage());
+            }
+        }
+        
+        return null;
+    }
+}
+
+// Obtener grupos de notas definitivas agrupados por docente/materia/periodo con filtros - CON AUDITORÍA
+function obtenerGruposNotasDefinitivas($filtro_profesor = '', $filtro_fecha_desde = '', $filtro_fecha_hasta = '') {
+    global $db;
+    
+    try {
+        $query = "SELECT nd.id_docente, nd.id_materia, nd.id_periodo,
+                         ud.nombre as nombre_docente, ud.idusuario as cedula_docente,
+                         m.nombre_materia, 
+                         pa.nombre_periodo, s.codigo_seccion, c.nombre_carrera,
+                         COUNT(nd.id) as total_notas, MAX(nd.fecha_registro) as ultima_fecha
+                  FROM notas_definitivas nd
+                  INNER JOIN users ud ON nd.id_docente = ud.id
+                  INNER JOIN materias m ON nd.id_materia = m.id_materia
+                  INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+                  INNER JOIN docente_seccion ds ON nd.id_docente = ds.id_usuario 
+                                               AND nd.id_materia = ds.id_materia
+                  INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+                  INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+                  WHERE 1=1";
+        
+        $params = array();
+        $types = '';
+        
+        // Aplicar filtro por profesor
+        if (!empty($filtro_profesor)) {
+            $query .= " AND nd.id_docente = ?";
+            $params[] = $filtro_profesor;
+            $types .= "i";
+        }
+        
+        // Aplicar filtro por fecha desde
+        if (!empty($filtro_fecha_desde)) {
+            $query .= " AND DATE(nd.fecha_registro) >= ?";
+            $params[] = $filtro_fecha_desde;
+            $types .= "s";
+        }
+        
+        // Aplicar filtro por fecha hasta
+        if (!empty($filtro_fecha_hasta)) {
+            $query .= " AND DATE(nd.fecha_registro) <= ?";
+            $params[] = $filtro_fecha_hasta;
+            $types .= "s";
+        }
+        
+        $query .= " GROUP BY nd.id_docente, nd.id_materia, nd.id_periodo, s.codigo_seccion, c.nombre_carrera
+                    ORDER BY ultima_fecha DESC";
+        
+        if (!empty($params)) {
+            $stmt = $db->prepare($query);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+        } else {
+            $result = $db->query($query);
+        }
+        
+        // REGISTRAR EN AUDITORÍA - CONSULTA DE GRUPOS DE NOTAS DEFINITIVAS
+        if (function_exists('registrarAuditoria')) {
+            try {
+                $filtros_aplicados = [];
+                if (!empty($filtro_profesor)) $filtros_aplicados[] = 'profesor';
+                if (!empty($filtro_fecha_desde)) $filtros_aplicados[] = 'fecha_desde';
+                if (!empty($filtro_fecha_hasta)) $filtros_aplicados[] = 'fecha_hasta';
+                
+                registrarAuditoria(
+                    "CONSULTA", 
+                    "notas_definitivas", 
+                    null, 
+                    null, 
+                    [
+                        'cantidad_grupos' => $result->num_rows,
+                        'filtros_aplicados' => !empty($filtros_aplicados) ? implode(', ', $filtros_aplicados) : 'ninguno',
+                        'filtro_profesor' => $filtro_profesor ?: 'todos',
+                        'filtro_fecha_desde' => $filtro_fecha_desde ?: 'sin_filtro',
+                        'filtro_fecha_hasta' => $filtro_fecha_hasta ?: 'sin_filtro',
+                        'tipo_consulta' => 'grupos_notas_definitivas'
+                    ], 
+                    "Notas Definitivas", 
+                    "Consulta de grupos de notas definitivas"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría obtenerGruposNotasDefinitivas: " . $e->getMessage());
+            }
+        }
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerGruposNotasDefinitivas: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN CONSULTA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "notas_definitivas", 
+                    null, 
+                    null, 
+                    [
+                        'filtro_profesor' => $filtro_profesor,
+                        'filtro_fecha_desde' => $filtro_fecha_desde,
+                        'filtro_fecha_hasta' => $filtro_fecha_hasta,
+                        'error' => $e->getMessage(),
+                        'tipo_consulta' => 'grupos_notas_definitivas'
+                    ], 
+                    "Notas Definitivas", 
+                    "Error en consulta de grupos de notas definitivas"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error obtenerGruposNotasDefinitivas: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
+}
+
+// Obtener información del grupo para notas definitivas - SOLO LECTURA, SIN AUDITORÍA
+function obtenerInfoGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT ud.nombre as nombre_docente, ud.idusuario as cedula_docente, 
+                     m.nombre_materia, m.cod_materia,
+                     pa.nombre_periodo, s.codigo_seccion, c.nombre_carrera, 
+                     t.nombre_trayecto, t.id_trayecto, t.numero_trayecto,
+                     a.nombre as nombre_admin
+              FROM notas_definitivas nd
+              INNER JOIN users ud ON nd.id_docente = ud.id
+              INNER JOIN materias m ON nd.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+              INNER JOIN docente_seccion ds ON nd.id_docente = ds.id_usuario 
+                                           AND nd.id_materia = ds.id_materia
+              INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+              LEFT JOIN users a ON nd.id_admin_aprobador = a.id
+              WHERE nd.id_docente = ? 
+              AND nd.id_materia = ? 
+              AND nd.id_periodo = ?
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc();
+}
+
+// Obtener estudiantes del grupo para notas definitivas - SOLO LECTURA, SIN AUDITORÍA
+function obtenerEstudiantesGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT nd.*, u.nombre as nombre_estudiante, u.idusuario as cedula,
+                     nd.fecha_registro, nd.soporte, nd.tipo_archivo
+              FROM notas_definitivas nd
+              INNER JOIN users u ON nd.id_usuario = u.id
+              WHERE nd.id_docente = ? 
+              AND nd.id_materia = ? 
+              AND nd.id_periodo = ?
+              ORDER BY u.nombre";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    return $stmt->get_result();
+}
+
+// Obtener información de soporte del grupo para notas definitivas - SOLO LECTURA, SIN AUDITORÍA
+function obtenerSoporteGrupoDefinitivas($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT DISTINCT soporte, tipo_archivo, fecha_registro
+              FROM notas_definitivas 
+              WHERE id_docente = ? 
+              AND id_materia = ? 
+              AND id_periodo = ?
+              AND soporte IS NOT NULL
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    return null;
+}
+
+// Obtener estadísticas del grupo según el id_trayecto para notas definitivas - SOLO LECTURA, SIN AUDITORÍA
+function obtenerEstadisticasGrupoDefinitivas($docente_id, $materia_id, $periodo_id, $id_trayecto) {
+    global $db;
+    
+    $query = "SELECT nd.trayecto_0, nd.trayecto_1, nd.trayecto_2, nd.trayecto_3, nd.trayecto_4
+              FROM notas_definitivas nd
+              WHERE nd.id_docente = ? 
+              AND nd.id_materia = ? 
+              AND nd.id_periodo = ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $total_estudiantes = 0;
+    $suma_total = 0;
+    $aprobados = 0;
+    $reprobados = 0;
+    
+    while ($nota = $result->fetch_assoc()) {
+        $total_estudiantes++;
+        
+        // Calcular promedio según el id_trayecto de la sección
+        $promedio_estudiante = calcularPromedioPorTrayecto($nota, $id_trayecto);
+        $suma_total += $promedio_estudiante;
+        
+        // Aprobados desde 12 puntos
+        if ($promedio_estudiante >= 12) {
+            $aprobados++;
+        } else {
+            $reprobados++;
+        }
+    }
+    
+    $promedio_general = $total_estudiantes > 0 ? round($suma_total / $total_estudiantes, 1) : 0;
+    
+    return [
+        'total_estudiantes' => $total_estudiantes,
+        'promedio_general' => $promedio_general,
+        'aprobados' => $aprobados,
+        'reprobados' => $reprobados,
+        'id_trayecto' => $id_trayecto
+    ];
+}
+
+
+// RESPALDO BD ***********************************************************************
+
+
+
+// Función para realizar respaldo de base de datos - CON AUDITORÍA COMPLETA
+function realizarRespaldo() {
+    global $db;
+    
+    try {
+        // Obtener información del usuario
+        $usuario = $_SESSION['user']['nombre'];
+        $usuario_id = $_SESSION['user']['id'];
+        $fecha = date('Y-m-d_H-i-s');
+        
+        // Nombre del archivo de respaldo con formato: respaldo_(usuario)_(fecha)
+        $backup_file = 'respaldo_' . limpiarNombreArchivo($usuario) . '_' . $fecha . '.sql';
+        
+        // Registrar la descarga en la base de datos
+        $registro_id = registrarDescargaRespaldo($usuario, $backup_file);
+        
+        // REGISTRAR EN AUDITORÍA - INICIO DE RESPALDO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "BACKUP", 
+                    "database", 
+                    $registro_id, 
+                    null, 
+                    [
+                        'archivo' => $backup_file, 
+                        'usuario' => $usuario,
+                        'usuario_id' => $usuario_id,
+                        'fecha_generacion' => date('Y-m-d H:i:s'),
+                        'estado' => 'iniciado'
+                    ], 
+                    "Sistema", 
+                    "Inicio de respaldo de base de datos"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría realizarRespaldo (inicio): " . $e->getMessage());
+            }
+        }
+        
+        // Obtener todas las tablas
+        $tables = array();
+        $result = $db->query('SHOW TABLES');
+        while ($row = $result->fetch_row()) {
+            $tables[] = $row[0];
+        }
+        
+        // Generar el SQL del respaldo
+        $output = "-- Respaldo de Base de Datos\n";
+        $output .= "-- Generado: " . date('Y-m-d H:i:s') . "\n";
+        $output .= "-- Generado por: " . $usuario . "\n";
+        $output .= "-- MySQL Server: " . $db->server_info . "\n\n";
+        
+        // Recorrer todas las tablas
+        foreach ($tables as $table) {
+            // Estructura de la tabla
+            $output .= "--\n-- Estructura de tabla para la tabla `$table`\n--\n";
+            $output .= "DROP TABLE IF EXISTS `$table`;\n";
+            
+            $create_table = $db->query("SHOW CREATE TABLE `$table`");
+            $row = $create_table->fetch_row();
+            $output .= $row[1] . ";\n\n";
+            
+            // Datos de la tabla
+            $output .= "--\n-- Volcado de datos para la tabla `$table`\n--\n";
+            
+            $result = $db->query("SELECT * FROM `$table`");
+            if ($result->num_rows > 0) {
+                $output .= "INSERT IGNORE INTO `$table` VALUES\n";
+                
+                $rows = array();
+                while ($row = $result->fetch_assoc()) {
+                    $values = array();
+                    foreach ($row as $value) {
+                        if ($value === null) {
+                            $values[] = 'NULL';
+                        } else {
+                            $values[] = "'" . $db->real_escape_string($value) . "'";
+                        }
+                    }
+                    $rows[] = "(" . implode(', ', $values) . ")";
+                }
+                
+                $output .= implode(",\n", $rows) . ";\n\n";
+            } else {
+                $output .= "-- La tabla `$table` está vacía\n\n";
+            }
+        }
+        
+        // REGISTRAR EN AUDITORÍA - RESPALDO COMPLETADO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "BACKUP", 
+                    "database", 
+                    $registro_id, 
+                    null, 
+                    [
+                        'archivo' => $backup_file, 
+                        'usuario' => $usuario,
+                        'usuario_id' => $usuario_id,
+                        'fecha_generacion' => date('Y-m-d H:i:s'),
+                        'total_tablas' => count($tables),
+                        'estado' => 'completado',
+                        'tamano_aproximado' => strlen($output) . ' bytes'
+                    ], 
+                    "Sistema", 
+                    "Respaldo de base de datos completado exitosamente"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría realizarRespaldo (completado): " . $e->getMessage());
+            }
+        }
+        
+        // Cabecera para forzar descarga
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . $backup_file . '"');
+        
+        // Escribir el output y finalizar
+        echo $output;
+        exit();
+        
+    } catch (Exception $e) {
+        error_log("Error en realizarRespaldo: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN RESPALDO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "database", 
+                    $registro_id ?? null, 
+                    null, 
+                    [
+                        'archivo' => $backup_file ?? 'desconocido',
+                        'usuario' => $usuario ?? 'desconocido',
+                        'error' => $e->getMessage(),
+                        'estado' => 'fallido'
+                    ], 
+                    "Sistema", 
+                    "Error en respaldo de base de datos"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error realizarRespaldo: " . $auditError->getMessage());
+            }
+        }
+        
+        // Mostrar error al usuario
+        if (!headers_sent()) {
+            header('Content-Type: text/html; charset=utf-8');
+            echo "<script>alert('Error al generar el respaldo: " . addslashes($e->getMessage()) . "'); history.back();</script>";
+        }
+        exit();
+    }
+}
+
+// Función para limpiar nombre de archivo - SIN AUDITORÍA (función auxiliar)
+function limpiarNombreArchivo($nombre) {
+    // Eliminar caracteres no permitidos en nombres de archivo
+    $nombre = preg_replace('/[^a-zA-Z0-9_-]/', '_', $nombre);
+    // Limitar la longitud
+    $nombre = substr($nombre, 0, 50);
+    return $nombre;
+}
+
+// Función para registrar descarga de respaldo - CON AUDITORÍA
+function registrarDescargaRespaldo($usuario, $nombre_archivo) {
+    global $db;
+    
+    try {
+        // Crear tabla de respaldos si no existe
+        $crear_tabla = "
+        CREATE TABLE IF NOT EXISTS respaldos_descargas (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            usuario VARCHAR(100) NOT NULL,
+            nombre_archivo VARCHAR(255) NOT NULL,
+            fecha_descarga DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ip_address VARCHAR(45),
+            user_agent TEXT
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ";
+        
+        $db->query($crear_tabla);
+        
+        // Insertar registro de la descarga
+        $ip = $_SERVER['REMOTE_ADDR'];
+        $user_agent = $_SERVER['HTTP_USER_AGENT'];
+        
+        $stmt = $db->prepare("INSERT INTO respaldos_descargas (usuario, nombre_archivo, ip_address, user_agent) VALUES (?, ?, ?, ?)");
+        $stmt->bind_param("ssss", $usuario, $nombre_archivo, $ip, $user_agent);
+        $stmt->execute();
+        $id_registro = $stmt->insert_id;
+        $stmt->close();
+        
+        // REGISTRAR EN AUDITORÍA - REGISTRO DE DESCARGA
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "INSERT", 
+                    "respaldos_descargas", 
+                    $id_registro, 
+                    null, 
+                    [
+                        'usuario' => $usuario,
+                        'nombre_archivo' => $nombre_archivo,
+                        'ip_address' => $ip,
+                        'fecha_descarga' => date('Y-m-d H:i:s')
+                    ], 
+                    "Sistema", 
+                    "Registro de descarga de respaldo creado"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría registrarDescargaRespaldo: " . $e->getMessage());
+            }
+        }
+        
+        return $id_registro;
+        
+    } catch (Exception $e) {
+        error_log("Error en registrarDescargaRespaldo: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN REGISTRO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "respaldos_descargas", 
+                    null, 
+                    null, 
+                    [
+                        'usuario' => $usuario,
+                        'nombre_archivo' => $nombre_archivo,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Sistema", 
+                    "Error al registrar descarga de respaldo"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error registrarDescargaRespaldo: " . $auditError->getMessage());
+            }
+        }
+        
+        return 0; // Retornar 0 en caso de error
+    }
+}
+
+// Función para obtener historial de respaldos - SOLO LECTURA, SIN AUDITORÍA
+function obtenerHistorialRespaldos() {
+    global $db;
+    
+    // Verificar si la tabla existe
+    $result = $db->query("SHOW TABLES LIKE 'respaldos_descargas'");
+    if ($result->num_rows == 0) {
+        return array();
+    }
+    
+    // Obtener el historial de descargas
+    $historial = array();
+    $result = $db->query("SELECT * FROM respaldos_descargas ORDER BY fecha_descarga DESC LIMIT 10");
+    
+    while ($row = $result->fetch_assoc()) {
+        $historial[] = $row;
+    }
+    
+    return $historial;
+}
+
+// Función para verificar si se puede eliminar un respaldo - SOLO LÓGICA, SIN AUDITORÍA
+function puedeEliminarRespaldo($fecha_descarga) {
+    // Calcular si han pasado 90 días desde la fecha de descarga
+    $fecha_descarga_obj = new DateTime($fecha_descarga);
+    $fecha_actual = new DateTime();
+    $diferencia = $fecha_actual->diff($fecha_descarga_obj);
+    
+    // Verificar si han pasado al menos 90 días
+    return $diferencia->days >= 90;
+}
+
+// Función para calcular días restantes para poder eliminar - SOLO LÓGICA, SIN AUDITORÍA
+function diasParaPoderEliminar($fecha_descarga) {
+    // Calcular cuántos días faltan para poder eliminar el respaldo
+    $fecha_descarga_obj = new DateTime($fecha_descarga);
+    $fecha_actual = new DateTime();
+    $diferencia = $fecha_actual->diff($fecha_descarga_obj);
+    
+    $dias_transcurridos = $diferencia->days;
+    $dias_restantes = 90 - $dias_transcurridos;
+    
+    return max(0, $dias_restantes);
+}
+
+// Función para eliminar respaldo - CON AUDITORÍA COMPLETA
+function eliminarRespaldo($id_respaldo) {
+    global $db;
+    
+    try {
+        // Primero verificar si el respaldo existe y obtener sus datos para auditoría
+        $stmt = $db->prepare("SELECT * FROM respaldos_descargas WHERE id = ?");
+        $stmt->bind_param("i", $id_respaldo);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows === 0) {
+            $_SESSION['error'] = "El respaldo no existe.";
+            
+            // REGISTRAR EN AUDITORÍA - INTENTO DE ELIMINAR RESPALDO INEXISTENTE
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "respaldos_descargas", 
+                        $id_respaldo, 
+                        null, 
+                        [
+                            'id_respaldo' => $id_respaldo,
+                            'error' => 'Respaldo no encontrado'
+                        ], 
+                        "Sistema", 
+                        "Intento de eliminar respaldo inexistente"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarRespaldo (no existe): " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+        $respaldo = $result->fetch_assoc();
+        
+        // Verificar si han pasado 90 días desde la descarga
+        if (!puedeEliminarRespaldo($respaldo['fecha_descarga'])) {
+            $dias_restantes = diasParaPoderEliminar($respaldo['fecha_descarga']);
+            $_SESSION['error'] = "No se puede eliminar el respaldo. Deben pasar 90 días desde su descarga. Faltan " . $dias_restantes . " días.";
+            
+            // REGISTRAR EN AUDITORÍA - INTENTO DE ELIMINACIÓN PREMATURA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "respaldos_descargas", 
+                        $id_respaldo, 
+                        null, 
+                        [
+                            'id_respaldo' => $id_respaldo,
+                            'nombre_archivo' => $respaldo['nombre_archivo'],
+                            'fecha_descarga' => $respaldo['fecha_descarga'],
+                            'dias_restantes' => $dias_restantes,
+                            'error' => 'Eliminación prematura'
+                        ], 
+                        "Sistema", 
+                        "Intento de eliminar respaldo antes de 90 días"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarRespaldo (prematuro): " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+        // REGISTRAR EN AUDITORÍA - ANTES DE ELIMINAR
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "DELETE", 
+                    "respaldos_descargas", 
+                    $id_respaldo, 
+                    $respaldo, 
+                    [
+                        'usuario_eliminacion' => $_SESSION['user']['nombre'] ?? 'Desconocido',
+                        'usuario_id_eliminacion' => $_SESSION['user']['id'] ?? 0,
+                        'fecha_eliminacion' => date('Y-m-d H:i:s'),
+                        'dias_transcurridos' => (new DateTime())->diff(new DateTime($respaldo['fecha_descarga']))->days
+                    ], 
+                    "Sistema", 
+                    "Eliminación de registro de respaldo: " . $respaldo['nombre_archivo']
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría eliminarRespaldo (antes): " . $e->getMessage());
+            }
+        }
+        
+        // Eliminar el registro de la base de datos
+        $stmt = $db->prepare("DELETE FROM respaldos_descargas WHERE id = ?");
+        $stmt->bind_param("i", $id_respaldo);
+        
+        if ($stmt->execute()) {
+            $_SESSION['success'] = "Respaldo eliminado correctamente.";
+            
+            // REGISTRAR EN AUDITORÍA - ELIMINACIÓN EXITOSA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "DELETE_SUCCESS", 
+                        "respaldos_descargas", 
+                        $id_respaldo, 
+                        null, 
+                        [
+                            'id_respaldo' => $id_respaldo,
+                            'nombre_archivo' => $respaldo['nombre_archivo'],
+                            'usuario_original' => $respaldo['usuario'],
+                            'fecha_descarga_original' => $respaldo['fecha_descarga']
+                        ], 
+                        "Sistema", 
+                        "Respaldo eliminado exitosamente"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarRespaldo (éxito): " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            $_SESSION['error'] = "Error al eliminar el respaldo: " . $db->error;
+            
+            // REGISTRAR EN AUDITORÍA - ERROR EN ELIMINACIÓN
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "respaldos_descargas", 
+                        $id_respaldo, 
+                        null, 
+                        [
+                            'id_respaldo' => $id_respaldo,
+                            'nombre_archivo' => $respaldo['nombre_archivo'],
+                            'error' => $db->error
+                        ], 
+                        "Sistema", 
+                        "Error al eliminar respaldo"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarRespaldo (error db): " . $e->getMessage());
+                }
+            }
+            
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarRespaldo: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR GENERAL
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "respaldos_descargas", 
+                    $id_respaldo, 
+                    null, 
+                    [
+                        'id_respaldo' => $id_respaldo,
+                        'error' => $e->getMessage()
+                    ], 
+                    "Sistema", 
+                    "Error general al eliminar respaldo"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarRespaldo: " . $auditError->getMessage());
+            }
+        }
+        
+        $_SESSION['error'] = "Error al eliminar el respaldo: " . $e->getMessage();
+        return false;
+    }
+}
+
+
+
+// RELACIONAR TITULOS CON MATERIAS ***********************************************************************
+
+
+
+// Función para buscar títulos - SOLO LECTURA, SIN AUDITORÍA
+function buscarTitulos($search = '') {
+    global $db;
+    
+    $search = $db->real_escape_string($search);
+    $query = "SELECT * FROM titulos WHERE nombre LIKE '%$search%' OR descripcion LIKE '%$search%' ORDER BY nombre";
+    $result = $db->query($query);
+    
+    return $result;
+}
+
+// Función para buscar relaciones título-materia - SOLO LECTURA, SIN AUDITORÍA
+function buscarRelacionesTituloMateria($search = '') {
+    global $db;
+    
+    $search = $db->real_escape_string($search);
+    $query = "SELECT tm.*, t.nombre AS titulo, m.nombre_materia, m.cod_materia 
+              FROM titulo_materia tm
+              JOIN titulos t ON tm.id_titulo = t.id
+              JOIN materias m ON tm.id_materia = m.id_materia
+              WHERE t.nombre LIKE '%$search%' OR m.nombre_materia LIKE '%$search%' OR m.cod_materia LIKE '%$search%'
+              ORDER BY t.nombre";
+    $result = $db->query($query);
+    
+    return $result;
+}
+
+// Función para agregar título - CON AUDITORÍA
+function agregarTitulo($nombre, $descripcion) {
+    global $db;
+    
+    try {
+        $nombre_original = $nombre;
+        $descripcion_original = $descripcion;
+        
+        $nombre = $db->real_escape_string($nombre);
+        $descripcion = $db->real_escape_string($descripcion);
+        
+        $query = "INSERT INTO titulos (nombre, descripcion) VALUES ('$nombre', '$descripcion')";
+        $result = $db->query($query);
+        
+        if ($result) {
+            $id_titulo = $db->insert_id;
+            
+            // REGISTRAR EN AUDITORÍA - TÍTULO AGREGADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "INSERT", 
+                        "titulos", 
+                        $id_titulo, 
+                        null, 
+                        [
+                            'nombre' => $nombre_original,
+                            'descripcion' => $descripcion_original,
+                            'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_creacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Gestión de Títulos", 
+                        "Título agregado: " . $nombre_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría agregarTitulo: " . $e->getMessage());
+                }
+            }
+            
+            return $id_titulo;
+        } else {
+            throw new Exception("Error en la consulta: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en agregarTitulo: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL AGREGAR TÍTULO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "titulos", 
+                    null, 
+                    null, 
+                    [
+                        'nombre' => $nombre_original ?? '',
+                        'descripcion' => $descripcion_original ?? '',
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido'
+                    ], 
+                    "Gestión de Títulos", 
+                    "Error al agregar título"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error agregarTitulo: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
+}
+
+// Función para editar título - CON AUDITORÍA
+function editarTitulo($id, $nombre, $descripcion) {
+    global $db;
+    
+    try {
+        // Obtener datos actuales para auditoría
+        $query_actual = "SELECT nombre, descripcion FROM titulos WHERE id = '$id'";
+        $result_actual = $db->query($query_actual);
+        
+        if ($result_actual->num_rows === 0) {
+            throw new Exception("Título no encontrado");
+        }
+        
+        $titulo_actual = $result_actual->fetch_assoc();
+        
+        $nombre_original = $nombre;
+        $descripcion_original = $descripcion;
+        
+        $id = $db->real_escape_string($id);
+        $nombre = $db->real_escape_string($nombre);
+        $descripcion = $db->real_escape_string($descripcion);
+        
+        $query = "UPDATE titulos SET nombre = '$nombre', descripcion = '$descripcion' WHERE id = '$id'";
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - TÍTULO EDITADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "titulos", 
+                        $id, 
+                        [
+                            'nombre_anterior' => $titulo_actual['nombre'],
+                            'descripcion_anterior' => $titulo_actual['descripcion']
+                        ], 
+                        [
+                            'nombre_nuevo' => $nombre_original,
+                            'descripcion_nuevo' => $descripcion_original,
+                            'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_actualizacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Gestión de Títulos", 
+                        "Título actualizado: " . $titulo_actual['nombre'] . " → " . $nombre_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría editarTitulo: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            throw new Exception("Error en la consulta: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en editarTitulo: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL EDITAR TÍTULO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "titulos", 
+                    $id, 
+                    null, 
+                    [
+                        'id_titulo' => $id,
+                        'nombre_nuevo' => $nombre_original ?? '',
+                        'descripcion_nuevo' => $descripcion_original ?? '',
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido'
+                    ], 
+                    "Gestión de Títulos", 
+                    "Error al editar título"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error editarTitulo: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
+}
+
+// Función para eliminar título - CON AUDITORÍA
+function eliminarTitulo($id) {
+    global $db;
+    
+    try {
+        // Obtener datos del título para auditoría
+        $query_actual = "SELECT nombre, descripcion FROM titulos WHERE id = '$id'";
+        $result_actual = $db->query($query_actual);
+        
+        if ($result_actual->num_rows === 0) {
+            throw new Exception("Título no encontrado");
+        }
+        
+        $titulo_actual = $result_actual->fetch_assoc();
+        
+        // Verificar si hay relaciones existentes
+        $query_relaciones = "SELECT COUNT(*) as total FROM titulo_materia WHERE id_titulo = '$id'";
+        $result_relaciones = $db->query($query_relaciones);
+        $total_relaciones = $result_relaciones->fetch_assoc()['total'];
+        
+        $id = $db->real_escape_string($id);
+        $query = "DELETE FROM titulos WHERE id = '$id'";
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - TÍTULO ELIMINADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "DELETE", 
+                        "titulos", 
+                        $id, 
+                        [
+                            'nombre' => $titulo_actual['nombre'],
+                            'descripcion' => $titulo_actual['descripcion'],
+                            'relaciones_eliminadas' => $total_relaciones
+                        ], 
+                        [
+                            'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_eliminacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Gestión de Títulos", 
+                        "Título eliminado: " . $titulo_actual['nombre']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarTitulo: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            throw new Exception("Error en la consulta: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarTitulo: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR TÍTULO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "titulos", 
+                    $id, 
+                    null, 
+                    [
+                        'id_titulo' => $id,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido'
+                    ], 
+                    "Gestión de Títulos", 
+                    "Error al eliminar título"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarTitulo: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
+}
+
+// Función para agregar relación título-materia - CON AUDITORÍA
+function agregarRelacionTituloMateria($id_titulo, $id_materia, $prioridad) {
+    global $db;
+    
+    try {
+        // Obtener información del título y materia para auditoría
+        $query_titulo = "SELECT nombre FROM titulos WHERE id = '$id_titulo'";
+        $query_materia = "SELECT nombre_materia, cod_materia FROM materias WHERE id_materia = '$id_materia'";
+        
+        $titulo_info = $db->query($query_titulo)->fetch_assoc();
+        $materia_info = $db->query($query_materia)->fetch_assoc();
+        
+        if (!$titulo_info || !$materia_info) {
+            throw new Exception("Título o materia no encontrados");
+        }
+        
+        $id_titulo = $db->real_escape_string($id_titulo);
+        $id_materia = $db->real_escape_string($id_materia);
+        $prioridad = $db->real_escape_string($prioridad);
+        
+        $query = "INSERT INTO titulo_materia (id_titulo, id_materia, prioridad) VALUES ('$id_titulo', '$id_materia', '$prioridad')";
+        $result = $db->query($query);
+        
+        if ($result) {
+            $id_relacion = $db->insert_id;
+            
+            // REGISTRAR EN AUDITORÍA - RELACIÓN AGREGADA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "INSERT", 
+                        "titulo_materia", 
+                        $id_relacion, 
+                        null, 
+                        [
+                            'id_titulo' => $id_titulo,
+                            'titulo_nombre' => $titulo_info['nombre'],
+                            'id_materia' => $id_materia,
+                            'materia_nombre' => $materia_info['nombre_materia'],
+                            'materia_codigo' => $materia_info['cod_materia'],
+                            'prioridad' => $prioridad,
+                            'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_creacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Gestión de Títulos", 
+                        "Relación título-materia agregada: " . $titulo_info['nombre'] . " - " . $materia_info['nombre_materia']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría agregarRelacionTituloMateria: " . $e->getMessage());
+                }
+            }
+            
+            return $id_relacion;
+        } else {
+            throw new Exception("Error en la consulta: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en agregarRelacionTituloMateria: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL AGREGAR RELACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "titulo_materia", 
+                    null, 
+                    null, 
+                    [
+                        'id_titulo' => $id_titulo,
+                        'id_materia' => $id_materia,
+                        'prioridad' => $prioridad,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido'
+                    ], 
+                    "Gestión de Títulos", 
+                    "Error al agregar relación título-materia"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error agregarRelacionTituloMateria: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
+}
+
+// Función para eliminar relación título-materia - CON AUDITORÍA
+function eliminarRelacionTituloMateria($id_relacion) {
+    global $db;
+    
+    try {
+        // Obtener información de la relación para auditoría
+        $query_relacion = "SELECT tm.*, t.nombre as titulo_nombre, m.nombre_materia, m.cod_materia 
+                          FROM titulo_materia tm
+                          JOIN titulos t ON tm.id_titulo = t.id
+                          JOIN materias m ON tm.id_materia = m.id_materia
+                          WHERE tm.id_relacion = '$id_relacion'";
+        
+        $result_relacion = $db->query($query_relacion);
+        
+        if ($result_relacion->num_rows === 0) {
+            throw new Exception("Relación no encontrada");
+        }
+        
+        $relacion_info = $result_relacion->fetch_assoc();
+        
+        $id_relacion = $db->real_escape_string($id_relacion);
+        $query = "DELETE FROM titulo_materia WHERE id_relacion = '$id_relacion'";
+        $result = $db->query($query);
+        
+        if ($result) {
+            // REGISTRAR EN AUDITORÍA - RELACIÓN ELIMINADA
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "DELETE", 
+                        "titulo_materia", 
+                        $id_relacion, 
+                        [
+                            'id_titulo' => $relacion_info['id_titulo'],
+                            'titulo_nombre' => $relacion_info['titulo_nombre'],
+                            'id_materia' => $relacion_info['id_materia'],
+                            'materia_nombre' => $relacion_info['nombre_materia'],
+                            'materia_codigo' => $relacion_info['cod_materia'],
+                            'prioridad' => $relacion_info['prioridad']
+                        ], 
+                        [
+                            'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_eliminacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Gestión de Títulos", 
+                        "Relación título-materia eliminada: " . $relacion_info['titulo_nombre'] . " - " . $relacion_info['nombre_materia']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarRelacionTituloMateria: " . $e->getMessage());
+                }
+            }
+            
+            return true;
+        } else {
+            throw new Exception("Error en la consulta: " . $db->error);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarRelacionTituloMateria: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR RELACIÓN
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "titulo_materia", 
+                    $id_relacion, 
+                    null, 
+                    [
+                        'id_relacion' => $id_relacion,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['nombre'] ?? 'Desconocido'
+                    ], 
+                    "Gestión de Títulos", 
+                    "Error al eliminar relación título-materia"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de error eliminarRelacionTituloMateria: " . $auditError->getMessage());
+            }
+        }
+        
+        return false;
+    }
+}
+
+// Función para obtener todos los títulos - SOLO LECTURA, SIN AUDITORÍA
+function obtenerTodosTitulos() {
+    global $db;
+    
+    $query = "SELECT * FROM titulos ORDER BY nombre";
+    return $db->query($query);
+}
+
+// Función para obtener todas las materias - SOLO LECTURA, SIN AUDITORÍA
+function obtenerTodasMaterias() {
+    global $db;
+    
+    $query = "SELECT * FROM materias ORDER BY nombre_materia";
+    return $db->query($query);
+}
+
+
+//TIPOS PAGO ***********************************************************************
+
+
+
+// Función para obtener todos los tipos de pago - SOLO LECTURA, SIN AUDITORÍA
+function obtenerTiposPago() {
+    global $db;
+    
+    $query = "SELECT id, tipopago FROM tipo_pago ORDER BY tipopago";
+    $result = $db->query($query);
+    
+    if ($result) {
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+    
+    return [];
+}
+
+// Función para crear un nuevo tipo de pago - CON AUDITORÍA
+function crearTipoPago($tipopago) {
+    global $db;
+    
+    try {
+        $tipopago_original = $tipopago;
+        $stmt = $db->prepare("INSERT INTO tipo_pago (tipopago) VALUES (?)");
+        $stmt->bind_param("s", $tipopago);
+        
+        if ($stmt->execute()) {
+            $id_insertado = $db->insert_id;
+            $stmt->close();
+            
+            // REGISTRAR EN AUDITORÍA - TIPO DE PAGO CREADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "INSERT", 
+                        "tipo_pago", 
+                        $id_insertado, 
+                        null, 
+                        [
+                            'tipo_pago' => $tipopago_original,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_creacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Tipos de Pago", 
+                        "Tipo de pago creado: " . $tipopago_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría crearTipoPago: " . $e->getMessage());
+                }
+            }
+            
+            return ['success' => true, 'message' => 'Tipo de pago creado exitosamente'];
+        } else {
+            $error = $stmt->error;
+            $stmt->close();
+            
+            // REGISTRAR EN AUDITORÍA - ERROR AL CREAR TIPO DE PAGO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipo_pago", 
+                        null, 
+                        null, 
+                        [
+                            'tipo_pago' => $tipopago_original,
+                            'error' => $error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Tipos de Pago", 
+                        "Error al crear tipo de pago: " . $tipopago_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error crearTipoPago: " . $e->getMessage());
+                }
+            }
+            
+            return ['success' => false, 'message' => 'Error al crear: ' . $error];
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en crearTipoPago: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL CREAR TIPO DE PAGO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipo_pago", 
+                    null, 
+                    null, 
+                    [
+                        'tipo_pago' => $tipopago_original ?? '',
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Tipos de Pago", 
+                    "Excepción al crear tipo de pago"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción crearTipoPago: " . $auditError->getMessage());
+            }
+        }
+        
+        return ['success' => false, 'message' => 'Error al crear: ' . $e->getMessage()];
+    }
+}
+
+// Función para actualizar un tipo de pago - CON AUDITORÍA
+function actualizarTipoPago($id, $tipopago) {
+    global $db;
+    
+    try {
+        // Obtener datos actuales para auditoría
+        $stmt_actual = $db->prepare("SELECT tipopago FROM tipo_pago WHERE id = ?");
+        $stmt_actual->bind_param("i", $id);
+        $stmt_actual->execute();
+        $result_actual = $stmt_actual->get_result();
+        
+        if ($result_actual->num_rows === 0) {
+            return ['success' => false, 'message' => 'Tipo de pago no encontrado'];
+        }
+        
+        $tipo_pago_actual = $result_actual->fetch_assoc();
+        $stmt_actual->close();
+        
+        $tipopago_original = $tipopago;
+        $stmt = $db->prepare("UPDATE tipo_pago SET tipopago = ? WHERE id = ?");
+        $stmt->bind_param("si", $tipopago, $id);
+        
+        if ($stmt->execute()) {
+            $stmt->close();
+            
+            // REGISTRAR EN AUDITORÍA - TIPO DE PAGO ACTUALIZADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "UPDATE", 
+                        "tipo_pago", 
+                        $id, 
+                        [
+                            'tipo_pago_anterior' => $tipo_pago_actual['tipopago']
+                        ], 
+                        [
+                            'tipo_pago_nuevo' => $tipopago_original,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_actualizacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Tipos de Pago", 
+                        "Tipo de pago actualizado: " . $tipo_pago_actual['tipopago'] . " → " . $tipopago_original
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría actualizarTipoPago: " . $e->getMessage());
+                }
+            }
+            
+            return ['success' => true, 'message' => 'Tipo de pago actualizado exitosamente'];
+        } else {
+            $error = $stmt->error;
+            $stmt->close();
+            
+            // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR TIPO DE PAGO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipo_pago", 
+                        $id, 
+                        null, 
+                        [
+                            'id_tipo_pago' => $id,
+                            'tipo_pago_nuevo' => $tipopago_original,
+                            'error' => $error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Tipos de Pago", 
+                        "Error al actualizar tipo de pago ID: " . $id
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error actualizarTipoPago: " . $e->getMessage());
+                }
+            }
+            
+            return ['success' => false, 'message' => 'Error al actualizar: ' . $error];
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en actualizarTipoPago: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ACTUALIZAR TIPO DE PAGO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipo_pago", 
+                    $id, 
+                    null, 
+                    [
+                        'id_tipo_pago' => $id,
+                        'tipo_pago_nuevo' => $tipopago_original ?? '',
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Tipos de Pago", 
+                    "Excepción al actualizar tipo de pago"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción actualizarTipoPago: " . $auditError->getMessage());
+            }
+        }
+        
+        return ['success' => false, 'message' => 'Error al actualizar: ' . $e->getMessage()];
+    }
+}
+
+// Función para eliminar un tipo de pago - CON AUDITORÍA
+function eliminarTipoPago($id) {
+    global $db;
+    
+    try {
+        // Obtener datos del tipo de pago para auditoría
+        $stmt_actual = $db->prepare("SELECT tipopago FROM tipo_pago WHERE id = ?");
+        $stmt_actual->bind_param("i", $id);
+        $stmt_actual->execute();
+        $result_actual = $stmt_actual->get_result();
+        
+        if ($result_actual->num_rows === 0) {
+            return ['success' => false, 'message' => 'Tipo de pago no encontrado'];
+        }
+        
+        $tipo_pago_eliminado = $result_actual->fetch_assoc();
+        $stmt_actual->close();
+        
+        $stmt = $db->prepare("DELETE FROM tipo_pago WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        
+        if ($stmt->execute()) {
+            $stmt->close();
+            
+            // REGISTRAR EN AUDITORÍA - TIPO DE PAGO ELIMINADO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "DELETE", 
+                        "tipo_pago", 
+                        $id, 
+                        [
+                            'tipo_pago_eliminado' => $tipo_pago_eliminado['tipopago']
+                        ], 
+                        [
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
+                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
+                            'fecha_eliminacion' => date('Y-m-d H:i:s')
+                        ], 
+                        "Tipos de Pago", 
+                        "Tipo de pago eliminado: " . $tipo_pago_eliminado['tipopago'] . " (ID: " . $id . ")"
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría eliminarTipoPago: " . $e->getMessage());
+                }
+            }
+            
+            return ['success' => true, 'message' => 'Tipo de pago eliminado exitosamente'];
+        } else {
+            $error = $stmt->error;
+            $stmt->close();
+            
+            // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR TIPO DE PAGO
+            if (function_exists('registrarAuditoria')) {
+                try {
+                    registrarAuditoria(
+                        "ERROR", 
+                        "tipo_pago", 
+                        $id, 
+                        null, 
+                        [
+                            'id_tipo_pago' => $id,
+                            'tipo_pago' => $tipo_pago_eliminado['tipopago'],
+                            'error' => $error,
+                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                        ], 
+                        "Tipos de Pago", 
+                        "Error al eliminar tipo de pago: " . $tipo_pago_eliminado['tipopago']
+                    );
+                } catch (Exception $e) {
+                    error_log("Error en auditoría de error eliminarTipoPago: " . $e->getMessage());
+                }
+            }
+            
+            return ['success' => false, 'message' => 'Error al eliminar: ' . $error];
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error en eliminarTipoPago: " . $e->getMessage());
+        
+        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ELIMINAR TIPO DE PAGO
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "ERROR", 
+                    "tipo_pago", 
+                    $id, 
+                    null, 
+                    [
+                        'id_tipo_pago' => $id,
+                        'error' => $e->getMessage(),
+                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
+                    ], 
+                    "Tipos de Pago", 
+                    "Excepción al eliminar tipo de pago"
+                );
+            } catch (Exception $auditError) {
+                error_log("Error en auditoría de excepción eliminarTipoPago: " . $auditError->getMessage());
+            }
+        }
+        
+        return ['success' => false, 'message' => 'Error al eliminar: ' . $e->getMessage()];
+    }
+}
+
+// Función para validar tipo de pago - SOLO VALIDACIÓN, SIN AUDITORÍA
+function validarTipoPago($tipopago) {
+    $tipopago = trim($tipopago);
+    
+    if (empty($tipopago)) {
+        return ['success' => false, 'message' => 'El tipo de pago es requerido'];
+    }
+    
+    if (strlen($tipopago) < 2) {
+        return ['success' => false, 'message' => 'El tipo de pago debe tener al menos 2 caracteres'];
+    }
+    
+    if (strlen($tipopago) > 100) {
+        return ['success' => false, 'message' => 'El tipo de pago no puede exceder los 100 caracteres'];
+    }
+    
+    return ['success' => true, 'message' => ''];
+}
+
+
+
+
+// CARGA DE NOTAS DOCENTE************************************************************
+
+
+
+/**
+ * Obtener ID del usuario desde la sesión
+ */
+function obtenerIdUsuario() {
+    if (isset($_SESSION['user']['id'])) {
+        return (int)$_SESSION['user']['id'];
+    } elseif (isset($_SESSION['id'])) {
+        return (int)$_SESSION['id'];
+    } elseif (isset($_SESSION['user_id'])) {
+        return (int)$_SESSION['user_id'];
+    }
+    return false;
+}
+
+/**
+ * Obtener secciones del docente
+ */
+function obtenerSeccionesDocente($docente_id) {
+    global $db;
+    
+    $query = "SELECT s.id_seccion, s.codigo_seccion, c.nombre_carrera, 
+                     t.nombre_trayecto, pa.nombre_periodo,
+                     m.id_materia, m.nombre_materia, m.cod_materia, t.numero_trayecto
+              FROM secciones s
+              INNER JOIN docente_seccion ds ON s.id_seccion = ds.id_seccion
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+              INNER JOIN periodos_academicos pa ON s.id_periodo = pa.id_periodo
+              INNER JOIN materias m ON ds.id_materia = m.id_materia
+              WHERE ds.id_usuario = ? 
+              AND (ds.estatus = 'activo' OR ds.estatus = 1)
+              ORDER BY pa.fecha_inicio DESC, c.nombre_carrera";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $docente_id);
+    $stmt->execute();
+    
+    return $stmt->get_result();
+}
+
+
+/**
+ * Procesar notas de estudiantes
+ */
+function procesarNotasEstudiantes() {
+    global $db;
+    
+    // Obtener datos del formulario
+    $docente_id = (int)$_POST['docente_id'];
+    $materia_id = (int)$_POST['materia_id'];
+    $periodo_id = (int)$_POST['periodo_id'];
+    $trayecto_actual = (int)$_POST['trayecto_actual'];
+    $campo_trayecto = 'trayecto_' . $trayecto_actual;
+    $notas = $_POST['notas'];
+    
+    // Procesar soporte si se subió
+    $soporte_nombre = null;
+    $tipo_archivo = null;
+    
+    if (isset($_FILES['soporte_grupo']) && $_FILES['soporte_grupo']['error'] === UPLOAD_ERR_OK) {
+        $soporte = $_FILES['soporte_grupo'];
+        $extension = strtolower(pathinfo($soporte['name'], PATHINFO_EXTENSION));
+        $extensiones_permitidas = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
+        
+        if (in_array($extension, $extensiones_permitidas)) {
+            $soporte_nombre = uniqid() . '_' . time() . '.' . $extension;
+            $tipo_archivo = $extension;
+            $ruta_destino = '../soportes/' . $soporte_nombre;
+            
+            if (!move_uploaded_file($soporte['tmp_name'], $ruta_destino)) {
+                echo "<script>alert('Error al subir el archivo de soporte');</script>";
+            }
+        }
+    }
+    
+    // Procesar cada nota
+    $errores = [];
+    $exitos = 0;
+    
+    foreach ($notas as $id_estudiante => $nota_data) {
+        $id_estudiante = (int)$id_estudiante;
+        $valor_nota = (int)$nota_data[$campo_trayecto];
+        
+        // Validar que la nota esté entre 1 y 20
+        if ($valor_nota < 1 || $valor_nota > 20) {
+            $errores[] = "Nota inválida para el estudiante ID $id_estudiante: $valor_nota";
+            continue;
+        }
+        
+        // Verificar si ya existe en notas_pendientes
+        $check_query = "SELECT id FROM notas_pendientes 
+                       WHERE id_usuario = ? 
+                       AND id_materia = ? 
+                       AND id_periodo = ? 
+                       AND id_docente = ?";
+        $stmt = $db->prepare($check_query);
+        $stmt->bind_param("iiii", $id_estudiante, $materia_id, $periodo_id, $docente_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows > 0) {
+            // Actualizar registro existente
+            $update_query = "UPDATE notas_pendientes 
+                            SET $campo_trayecto = ?, 
+                                soporte = ?, 
+                                tipo_archivo = ?, 
+                                fecha_subida = NOW(),
+                                estado = 'en_revision' 
+                            WHERE id_usuario = ? 
+                            AND id_materia = ? 
+                            AND id_periodo = ? 
+                            AND id_docente = ?";
+            
+            $stmt = $db->prepare($update_query);
+            $stmt->bind_param("issiiii", $valor_nota, $soporte_nombre, $tipo_archivo, 
+                             $id_estudiante, $materia_id, $periodo_id, $docente_id);
+        } else {
+            // Insertar nuevo registro - el estado por defecto es 'en revision'
+            $insert_query = "INSERT INTO notas_pendientes 
+                            (id_usuario, id_materia, id_periodo, id_docente, 
+                             $campo_trayecto, soporte, tipo_archivo, estado, fecha_envio, fecha_subida) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 'en_revision', NOW(), NOW())";
+            
+            $stmt = $db->prepare($insert_query);
+            $stmt->bind_param("iiiiiss", $id_estudiante, $materia_id, $periodo_id, $docente_id,
+                             $valor_nota, $soporte_nombre, $tipo_archivo);
+        }
+        
+        if ($stmt->execute()) {
+            $exitos++;
+        } else {
+            $errores[] = "Error al guardar nota para estudiante ID $id_estudiante: " . $stmt->error;
+        }
+    }
+    
+    // Mostrar resultados
+    if (empty($errores)) {
+        $_SESSION['success'] = "✅ Todas las notas se guardaron correctamente ($exitos registros)";
+    } else {
+        $mensaje_error = "Error al guardar algunas notas:\\n";
+        $mensaje_error .= "• " . implode("\\n• ", array_slice($errores, 0, 5));
+        if (count($errores) > 5) {
+            $mensaje_error .= "\\n• ... y " . (count($errores) - 5) . " errores más";
+        }
+        $_SESSION['error'] = $mensaje_error;
+    }
+    
+    // Redirigir de vuelta al formulario
+    header("Location: " . $_SERVER['HTTP_REFERER']);
+    exit();
+}
+
+/**
+ * Verificar estados de notas de estudiantes
+ */
+function verificarEstadosNotas($estudiantes, $materia_id, $periodo_id, $docente_id, $trayecto_a_mostrar) {
+    $notas_aprobadas = false;
+    $notas_rechazadas = false;
+    $notas_en_revision = false;
+    $notas_pendientes = false;
+
+    $estudiantes_con_notas_aprobadas = [];
+    $estudiantes_con_notas_rechazadas = [];
+    $estudiantes_con_notas_en_revision = [];
+    $estudiantes_con_notas_pendientes = [];
+
+    $estudiantes_info = [];
+    
+    while ($estudiante = $estudiantes->fetch_assoc()) {
+        $notas_definitivas = obtenerNotasDefinitivas($estudiante['id'], $materia_id);
+        $notas_pendientes_data = obtenerNotasPendientes($estudiante['id'], $materia_id, $periodo_id, $docente_id);
+        
+        // JERARQUÍA CORRECTA DE ESTADOS:
+        // 1. Aprobada (máxima prioridad) - tabla de notas_definitivas
+        // 2. Rechazada - si está en notas_pendientes con estado 'rechazada'
+        // 3. En Revisión - si está en tabla notas_pendientes con cualquier otro estado
+        // 4. Pendiente - no está en ninguna tabla
+        
+        $estado = 'pendiente'; // Por defecto
+        $valor_nota = 1; // Valor por defecto
+        $campo_trayecto = 'trayecto_' . $trayecto_a_mostrar;
+        
+        // PRIMERO: Verificar si existe en la tabla de notas_definitivas (APROBADA - MÁXIMA PRIORIDAD)
+        if ($notas_definitivas) {
+            $estado = 'aprobada';
+            $notas_aprobadas = true;
+            $estudiantes_con_notas_aprobadas[] = $estudiante['nombre'];
+            // Obtener la nota de la tabla definitiva
+            if (isset($notas_definitivas[$campo_trayecto]) && $notas_definitivas[$campo_trayecto] !== null) {
+                $valor_nota = (int)$notas_definitivas[$campo_trayecto];
+            }
+        } 
+        // SEGUNDO: Si no está aprobada, verificar si está en notas_pendientes y su estado
+        elseif ($notas_pendientes_data) {
+            // Verificar el estado en notas_pendientes
+            $estado_pendiente = isset($notas_pendientes_data['estado_pendiente']) ? $notas_pendientes_data['estado_pendiente'] : 'en_revision';
+            
+            if ($estado_pendiente === 'rechazada') {
+                $estado = 'rechazada';
+                $notas_rechazadas = true;
+                $estudiantes_con_notas_rechazadas[] = $estudiante['nombre'];
+            } else {
+                $estado = 'en_revision';
+                $notas_en_revision = true;
+                $estudiantes_con_notas_en_revision[] = $estudiante['nombre'];
+            }
+            
+            // Obtener la nota de la tabla notas_pendientes
+            if (isset($notas_pendientes_data[$campo_trayecto]) && $notas_pendientes_data[$campo_trayecto] !== null) {
+                $valor_nota = (int)$notas_pendientes_data[$campo_trayecto];
+            }
+        } 
+        // TERCERO: Si no está en ninguna tabla, es pendiente
+        else {
+            $estado = 'pendiente';
+            $notas_pendientes = true;
+            $estudiantes_con_notas_pendientes[] = $estudiante['nombre'];
+            // Mantener el valor por defecto de 1
+        }
+        
+        $estudiantes_info[] = [
+            'datos' => $estudiante,
+            'estado' => $estado,
+            'valor_nota' => $valor_nota
+        ];
+    }
+    
+    return [
+        'estudiantes_info' => $estudiantes_info,
+        'notas_aprobadas' => $notas_aprobadas,
+        'notas_rechazadas' => $notas_rechazadas,
+        'notas_en_revision' => $notas_en_revision,
+        'notas_pendientes' => $notas_pendientes,
+        'estudiantes_con_notas_aprobadas' => $estudiantes_con_notas_aprobadas,
+        'estudiantes_con_notas_rechazadas' => $estudiantes_con_notas_rechazadas,
+        'estudiantes_con_notas_en_revision' => $estudiantes_con_notas_en_revision,
+        'estudiantes_con_notas_pendientes' => $estudiantes_con_notas_pendientes
+    ];
+}
+
+/**
+ * Obtener datos completos de notas_pendientes
+ */
+function obtenerNotasPendientes($id_estudiante, $id_materia, $id_periodo, $id_docente) {
+    global $db;
+    
+    $query = "SELECT *, estado as estado_pendiente FROM notas_pendientes 
+              WHERE id_usuario = ? 
+              AND id_materia = ? 
+              AND id_periodo = ? 
+              AND id_docente = ? 
+              LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iiii", $id_estudiante, $id_materia, $id_periodo, $id_docente);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    
+    return null;
+}
+
+
+
+
+// CORRECCION DE NOTAS**********************************************************************
+
+
+
+
+if (!function_exists('buscarEstudiantePorCedula')) {
+/**
+ * Buscar estudiante por cédula
+ */
+function buscarEstudiantePorCedula($cedula) {
+    global $db;
+    
+    try {
+        $query = "SELECT id, idusuario, nombre, carrera 
+                  FROM users 
+                  WHERE idusuario = ? 
+                  AND estudiante = 1 
+                  AND status = 1";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+
+        $stmt->bind_param("s", $cedula);
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+
+        $result = $stmt->get_result();
+        $estudiantes = [];
+        while ($row = $result->fetch_assoc()) {
+            $estudiantes[] = $row;
+        }
+
+        $stmt->close();
+        
+        // Si hay múltiples resultados, devolver el array completo
+        if (count($estudiantes) > 1) {
+            return $estudiantes;
+        }
+        // Si hay un solo resultado, devolverlo directamente
+        elseif (count($estudiantes) == 1) {
+            return $estudiantes[0];
+        }
+        // Si no hay resultados
+        else {
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error al buscar estudiante: " . $e->getMessage());
+        return false;
+    }
+}
+}
+
+/**
+ * Función auxiliar para buscar carreras por nombre
+ */
+function obtenerCarrerasPorNombre($nombre_carrera) {
+    global $db;
+    
+    try {
+        $query = "SELECT id_carrera, nombre_carrera 
+                  FROM carreras 
+                  WHERE nombre_carrera LIKE ? 
+                  AND activa = 1";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+
+        $nombre_like = "%" . $nombre_carrera . "%";
+        $stmt->bind_param("s", $nombre_like);
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+
+        $result = $stmt->get_result();
+        $carreras = [];
+        while ($row = $result->fetch_assoc()) {
+            $carreras[] = $row;
+        }
+
+        $stmt->close();
+        return $carreras;
+        
+    } catch (Exception $e) {
+        error_log("Error al obtener carreras por nombre: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Obtener estudiante por ID
+ */
+if (!function_exists('obtenerEstudiantePorId')) {
+function obtenerEstudiantePorId($id) {
+    global $db;
+    
+    try {
+        $query = "SELECT id, idusuario, nombre, carrera 
+                  FROM users 
+                  WHERE id = ? 
+                  AND estudiante = 1 
+                  LIMIT 1";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación: " . $db->error);
+        }
+
+        $stmt->bind_param("i", $id);
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución: " . $stmt->error);
+        }
+
+        $result = $stmt->get_result();
+        $estudiante = $result->fetch_assoc();
+        $stmt->close();
+        
+        return $estudiante;
+        
+    } catch (Exception $e) {
+        error_log("Error al obtener estudiante: " . $e->getMessage());
+        return false;
+    }
+}
+}
+
+/**
+ * Obtener carreras del estudiante - VERSIÓN CORREGIDA CON RELACIÓN
+ */
+function obtenerCarrerasEstudiante($id_estudiante) {
+    global $db;
+    
+    try {
+        // Primero obtenemos el ID de la carrera del estudiante
+        $query_user = "SELECT carrera FROM users WHERE id = ? LIMIT 1";
+        $stmt_user = $db->prepare($query_user);
+        if (!$stmt_user) {
+            throw new Exception("Error en preparación user: " . $db->error);
+        }
+
+        $stmt_user->bind_param("i", $id_estudiante);
+        if (!$stmt_user->execute()) {
+            throw new Exception("Error en ejecución user: " . $stmt_user->error);
+        }
+
+        $result_user = $stmt_user->get_result();
+        $user = $result_user->fetch_assoc();
+        $stmt_user->close();
+
+        if (!$user || empty($user['carrera'])) {
+            return [];
+        }
+
+        $carrera_id = $user['carrera'];
+        
+        // Buscamos la carrera por ID
+        $query_carreras = "SELECT id_carrera, nombre_carrera 
+                          FROM carreras 
+                          WHERE id_carrera = ? 
+                          AND activa = 1";
+        
+        $stmt_carreras = $db->prepare($query_carreras);
+        if (!$stmt_carreras) {
+            throw new Exception("Error en preparación carreras: " . $db->error);
+        }
+
+        $stmt_carreras->bind_param("i", $carrera_id);
+        if (!$stmt_carreras->execute()) {
+            throw new Exception("Error en ejecución carreras: " . $stmt_carreras->error);
+        }
+
+        $result_carreras = $stmt_carreras->get_result();
+        $carreras = [];
+        while ($row = $result_carreras->fetch_assoc()) {
+            $carreras[] = $row;
+        }
+
+        $stmt_carreras->close();
+        
+        return $carreras;
+        
+    } catch (Exception $e) {
+        error_log("Error al obtener carreras: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Obtener materias por carrera - VERSIÓN CON TABLA DE RELACIÓN
+ */
+function obtenerMateriasPorCarrera($id_carrera) {
+    global $db;
+    
+    try {
+        // Usamos la tabla carrera_materia para obtener las materias relacionadas
+        $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia, m.trayecto, cm.semestre
+                  FROM materias m
+                  INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+                  WHERE cm.id_carrera = ? 
+                  AND m.activa = 1 
+                  ORDER BY cm.semestre, m.trayecto, m.nombre_materia";
+        
+        $stmt = $db->prepare($query);
+        if (!$stmt) {
+            throw new Exception("Error en preparación materias: " . $db->error);
+        }
+
+        $stmt->bind_param("i", $id_carrera);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error en ejecución materias: " . $stmt->error);
+        }
+
+        $result = $stmt->get_result();
+        $materias = [];
+        while ($row = $result->fetch_assoc()) {
+            $materias[] = $row;
+        }
+
+        $stmt->close();
+        return $materias;
+        
+    } catch (Exception $e) {
+        error_log("Error al obtener materias: " . $e->getMessage());
+        return [];
+    }
+}
+
+// NUEVA FUNCIÓN: Obtener materias con notas del estudiante
+function obtenerMateriasConNotas($id_estudiante, $id_carrera) {
+    global $db;
+    
+    $sql = "SELECT DISTINCT m.*, cm.semestre
+            FROM materias m
+            INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+            INNER JOIN notas_definitivas nd ON m.id_materia = nd.id_materia
+            WHERE cm.id_carrera = ? 
+            AND nd.id_usuario = ?
+            AND (
+                nd.trayecto_0 IS NOT NULL OR 
+                nd.trayecto_1 IS NOT NULL OR 
+                nd.trayecto_2 IS NOT NULL OR 
+                nd.trayecto_3 IS NOT NULL OR 
+                nd.trayecto_4 IS NOT NULL
+            )
+            ORDER BY m.trayecto, cm.semestre, m.nombre_materia";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_carrera, $id_estudiante);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $materias = [];
+    while ($row = $result->fetch_assoc()) {
+        $materias[] = $row;
+    }
+    
+    $stmt->close();
+    return $materias;
+}
+
+// FUNCIÓN: Obtener notas del estudiante para una materia específica
+function obtenerNotasEstudianteMateria($id_estudiante, $id_materia) {
+    global $db;
+    
+    $sql = "SELECT nd.*, pa.nombre_periodo 
+            FROM notas_definitivas nd
+            LEFT JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+            WHERE nd.id_usuario = ? AND nd.id_materia = ?
+            ORDER BY pa.nombre_periodo DESC";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_estudiante, $id_materia);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $notas = [];
+    while ($row = $result->fetch_assoc()) {
+        $notas[] = $row;
+    }
+    
+    $stmt->close();
+    return $notas;
+}
+
+// FUNCIÓN: Obtener historial de cambios de una nota - CORREGIDA
+function obtenerHistorialCambiosNota($id_nota) {
+    global $db;
+    
+    $sql = "SELECT h.*, u.nombre as admin_nombre 
+            FROM historial_cambios_notas h 
+            LEFT JOIN users u ON h.id_admin = u.id 
+            WHERE h.id_nota = ? 
+            ORDER BY h.fecha_cambio DESC";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_nota);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $historial = [];
+    while ($row = $result->fetch_assoc()) {
+        $historial[] = $row;
+    }
+    
+    $stmt->close();
+    return $historial;
+}
+
+// FUNCIÓN: Procesar edición de nota
+function procesarEdicionNota() {
+    global $db;
+    
+    if (!isset($_POST['id_nota']) || !isset($_POST['trayecto']) || !isset($_POST['nueva_nota'])) {
+        return ['success' => false, 'message' => 'Datos incompletos'];
+    }
+    
+    $id_nota = intval($_POST['id_nota']);
+    $trayecto = $_POST['trayecto'];
+    $nueva_nota = $_POST['nueva_nota'];
+    $justificacion = trim($_POST['justificacion'] ?? '');
+    
+    // Obtener el ID del administrador de la sesión - CORREGIDO según la estructura del index
+    if (isset($_SESSION['user']['id'])) {
+        $id_admin = $_SESSION['user']['id'];
+    } elseif (isset($_SESSION['id'])) {
+        $id_admin = $_SESSION['id'];
+    } elseif (isset($_SESSION['user_id'])) {
+        $id_admin = $_SESSION['user_id'];
+    } else {
+        // Debug para ver qué hay en la sesión
+        error_log("Session data: " . print_r($_SESSION, true));
+        return ['success' => false, 'message' => 'No se pudo identificar al administrador. Sesión: ' . print_r($_SESSION, true)];
+    }
+    
+    // Validar que la justificación no esté vacía
+    if (empty($justificacion)) {
+        return ['success' => false, 'message' => 'La justificación es obligatoria'];
+    }
+    
+    // Validar que la nota sea numérica y esté entre 0 y 20
+    if (!is_numeric($nueva_nota) || $nueva_nota < 0 || $nueva_nota > 20) {
+        return ['success' => false, 'message' => 'La nota debe ser un número entre 0 y 20'];
+    }
+    
+    // Obtener la nota actual
+    $sql_actual = "SELECT trayecto_0, trayecto_1, trayecto_2, trayecto_3, trayecto_4 
+                   FROM notas_definitivas WHERE id = ?";
+    $stmt = $db->prepare($sql_actual);
+    $stmt->bind_param("i", $id_nota);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $nota_actual = $result->fetch_assoc();
+    $stmt->close();
+    
+    if (!$nota_actual) {
+        return ['success' => false, 'message' => 'No se encontró la nota a editar'];
+    }
+    
+    // Determinar la nota anterior según el trayecto
+    $nota_anterior = $nota_actual[$trayecto];
+    
+    // Iniciar transacción
+    $db->begin_transaction();
+    
+    try {
+        // 1. Actualizar la nota en notas_definitivas
+        $sql_update = "UPDATE notas_definitivas SET {$trayecto} = ? WHERE id = ?";
+        $stmt = $db->prepare($sql_update);
+        $stmt->bind_param("di", $nueva_nota, $id_nota);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error al actualizar la nota");
+        }
+        $stmt->close();
+        
+        // 2. Registrar el cambio en el historial
+        $sql_historial = "INSERT INTO historial_cambios_notas 
+                         (id_nota, trayecto, nota_anterior, nota_nueva, justificacion, id_admin, fecha_cambio) 
+                         VALUES (?, ?, ?, ?, ?, ?, NOW())";
+        $stmt = $db->prepare($sql_historial);
+        $trayecto_numero = str_replace('trayecto_', '', $trayecto);
+        $stmt->bind_param("isddsi", $id_nota, $trayecto_numero, $nota_anterior, $nueva_nota, $justificacion, $id_admin);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Error al registrar en el historial");
+        }
+        $stmt->close();
+        
+        // 3. REGISTRAR EN AUDITORÍA - EDICIÓN EXITOSA DE NOTA
+        registrarAuditoria(
+            "UPDATE", 
+            "notas_definitivas", 
+            $id_nota, 
+            [
+                $trayecto => $nota_anterior
+            ], 
+            [
+                $trayecto => $nueva_nota,
+                'justificacion' => $justificacion,
+                'id_admin' => $id_admin,
+                'trayecto_afectado' => $trayecto
+            ], 
+            "Notas", 
+            "Edición exitosa de nota"
+        );
+        
+        // Confirmar transacción
+        $db->commit();
+        
+        return ['success' => true, 'message' => 'Nota actualizada correctamente'];
+        
+    } catch (Exception $e) {
+        // Revertir transacción en caso de error
+        $db->rollback();
+        
+        // REGISTRAR EN AUDITORÍA - ERROR EN EDICIÓN
+        registrarAuditoria(
+            "ERROR", 
+            "notas_definitivas", 
+            $id_nota, 
+            null, 
+            [
+                'trayecto' => $trayecto,
+                'nota_anterior' => $nota_anterior,
+                'nueva_nota' => $nueva_nota,
+                'justificacion' => $justificacion,
+                'error' => $e->getMessage()
+            ], 
+            "Notas", 
+            "Error en edición de nota"
+        );
+        
+        return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+    }
+}
+
+
+
+
+//INSCRIPCION DE MATERIAS ***********************************************************************
+
+
+
+/**
+ * Obtiene las materias de un trayecto específico de una carrera
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto Número del trayecto
+ * @return array Materias del trayecto
+ */
+function obtenerMateriasTrayecto($id_carrera, $trayecto) {
+    global $db;
+    
+    $sql = "SELECT m.* 
+            FROM materias m
+            INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+            WHERE cm.id_carrera = ? AND m.trayecto = ? AND m.activa = 1
+            ORDER BY cm.semestre ASC";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_carrera, $trayecto);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $materias = [];
+    while ($row = $result->fetch_assoc()) {
+        $materias[] = $row;
+    }
+    
+    return $materias;
+}
+
+/**
+ * Obtiene las materias aprobadas de un estudiante
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
+ * @param int $trayecto Número del trayecto (opcional)
+ * @return array Materias aprobadas
+ */
+function obtenerMateriasAprobadas($id_usuario, $trayecto = null) {
+    global $db;
+    
+    $sql = "SELECT nd.id_materia, m.nombre_materia, m.trayecto, 
+                   CASE 
+                     WHEN m.es_proyecto_socio = 1
+                     THEN MAX(CASE 
+                              WHEN nd.trayecto_0 >= 16 OR nd.trayecto_1 >= 16 OR nd.trayecto_2 >= 16 OR nd.trayecto_3 >= 16 OR nd.trayecto_4 >= 16 
+                              THEN 1 ELSE 0 END)
+                     ELSE MAX(CASE 
+                              WHEN nd.trayecto_0 >= 12 OR nd.trayecto_1 >= 12 OR nd.trayecto_2 >= 12 OR nd.trayecto_3 >= 12 OR nd.trayecto_4 >= 12 
+                              THEN 1 ELSE 0 END)
+                   END as aprobada
+            FROM notas_definitivas nd
+            INNER JOIN materias m ON nd.id_materia = m.id_materia
+            WHERE nd.id_usuario = ?";
+    
+    if ($trayecto !== null) {
+        $sql .= " AND m.trayecto = ?";
+    }
+    
+    $sql .= " GROUP BY nd.id_materia, m.nombre_materia, m.trayecto
+              HAVING aprobada = 1";
+    
+    $stmt = $db->prepare($sql);
+    
+    if ($trayecto !== null) {
+        $stmt->bind_param("ii", $id_usuario, $trayecto);
+    } else {
+        $stmt->bind_param("i", $id_usuario);
+    }
+    
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $aprobadas = [];
+    while ($row = $result->fetch_assoc()) {
+        $aprobadas[$row['id_materia']] = $row;
+    }
+    
+    return $aprobadas;
+}
+
+/**
+ * Obtiene las materias reprobadas de un estudiante
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
+ * @param int $trayecto Número del trayecto
+ * @param int $id_carrera ID de la carrera
+ * @return array Materias reprobadas
+ */
+function obtenerMateriasReprobadas($id_usuario, $trayecto, $id_carrera) {
+    $materias_trayecto = obtenerMateriasTrayecto($id_carrera, $trayecto);
+    $materias_aprobadas = obtenerMateriasAprobadas($id_usuario, $trayecto);
+    
+    $reprobadas = [];
+    foreach ($materias_trayecto as $materia) {
+        if (!isset($materias_aprobadas[$materia['id_materia']])) {
+            $reprobadas[] = $materia;
+        }
+    }
+    
+    return $reprobadas;
+}
+
+/**
+ * Verifica si el estudiante puede avanzar al siguiente trayecto
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
+ * @param int $trayecto_actual Trayecto actual
+ * @param int $id_carrera ID de la carrera
+ * @return array Resultado con estado y detalles
+ */
+function puedeAvanzarTrayecto($id_usuario, $trayecto_actual, $id_carrera) {
+    // Verificar si ya existe un registro de control
+    $control = obtenerControlAvance($id_usuario, $id_carrera, $trayecto_actual);
+    
+    if ($control && $control['puede_avanzar'] == 1) {
+        // Ya fue aprobado para avanzar
+        $info_aprobador = obtenerInfoUsuarioPorId($control['aprobado_por']);
+        
+        return [
+            'puede_avanzar' => true,
+            'aprobado_manualmente' => true,
+            'cumple_requisitos' => true,
+            'aprobado_por' => $control['aprobado_por'],
+            'nombre_aprobador' => $info_aprobador ? $info_aprobador['nombre'] : 'Administrador',
+            'fecha_aprobacion' => $control['fecha_aprobacion'],
+            'motivo' => $control['motivo'],
+            'detalles' => 'Aprobación manual previa',
+            'control_id' => $control['id']
+        ];
+    }
+    
+    // Obtener todas las materias del trayecto actual
+    $materias_trayecto = obtenerMateriasTrayecto($id_carrera, $trayecto_actual);
+    $materias_aprobadas = obtenerMateriasAprobadas($id_usuario, $trayecto_actual);
+    
+    $total_materias = count($materias_trayecto);
+    $total_aprobadas = count($materias_aprobadas);
+    
+    $resultado = [
+        'puede_avanzar' => false,
+        'aprobado_manualmente' => false,
+        'cumple_requisitos' => false,
+        'detalles' => '',
+        'total_materias' => $total_materias,
+        'total_aprobadas' => $total_aprobadas,
+        'control_id' => null
+    ];
+    
+    // Para trayecto 0: necesita 50% aprobado
+    if ($trayecto_actual == 0) {
+        $cumple_requisitos = ($total_aprobadas >= ceil($total_materias * 0.5));
+        $resultado['puede_avanzar'] = $cumple_requisitos;
+        $resultado['cumple_requisitos'] = $cumple_requisitos;
+        $resultado['detalles'] = "Aprobado {$total_aprobadas} de {$total_materias} materias (" . ceil($total_materias * 0.5) . " mínimas)";
+        $resultado['porcentaje_aprobado'] = $total_materias > 0 ? ($total_aprobadas / $total_materias) * 100 : 0;
+        $resultado['minimo_requerido'] = ceil($total_materias * 0.5);
+    }
+    
+    // Para trayecto 1 a 2 y 3 a 4: necesita aprobar proyecto socio integrador
+    elseif ($trayecto_actual == 1 || $trayecto_actual == 3) {
+        $aprobado_proyecto = haAprobadoProyectoSocio($id_usuario, $trayecto_actual);
+        $resultado['puede_avanzar'] = $aprobado_proyecto;
+        $resultado['cumple_requisitos'] = $aprobado_proyecto;
+        $resultado['detalles'] = $aprobado_proyecto ? 
+            "Proyecto Socio Integrador aprobado (nota ≥ 16)" : 
+            "Proyecto Socio Integrador no aprobado (nota < 16)";
+        $resultado['proyecto_aprobado'] = $aprobado_proyecto;
+    }
+    
+    // Para trayecto 2 a 3: necesita aprobar todas las materias y obtener título
+    elseif ($trayecto_actual == 2) {
+        $todas_aprobadas = ($total_aprobadas == $total_materias);
+        $tiene_titulo = tienePrimerTitulo($id_usuario);
+        $cumple_requisitos = ($todas_aprobadas && $tiene_titulo);
+        
+        $resultado['puede_avanzar'] = $cumple_requisitos;
+        $resultado['cumple_requisitos'] = $cumple_requisitos;
+        $resultado['detalles'] = $todas_aprobadas ? 
+            "Todas las materias aprobadas" . ($tiene_titulo ? " y título obtenido" : " pero falta título") :
+            "Faltan materias por aprobar ({$total_aprobadas}/{$total_materias})";
+        $resultado['todas_aprobadas'] = $todas_aprobadas;
+        $resultado['tiene_titulo'] = $tiene_titulo;
+    }
+    
+    return $resultado;
+}
+
+/**
+ * Obtiene el control de avance de trayecto
+ * @param int $id_usuario ID del usuario
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto Trayecto actual
+ * @return array|false Información del control o false si no existe
+ */
+function obtenerControlAvance($id_usuario, $id_carrera, $trayecto) {
+    global $db;
+    
+    $sql = "SELECT * FROM control_avance_trayecto 
+            WHERE id_usuario = ? 
+            AND id_carrera = ? 
+            AND trayecto_actual = ?
+            ORDER BY created_at DESC LIMIT 1";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iii", $id_usuario, $id_carrera, $trayecto);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
+
+
+
+/**
+ * Rechaza o elimina la aprobación de avance
+ * @param int $id_usuario ID del usuario
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto_actual Trayecto actual
+ * @return bool True si éxito, False si error
+ */
+function rechazarAvanceTrayecto($id_usuario, $id_carrera, $trayecto_actual) {
+    global $db;
+    
+    $sql = "DELETE FROM control_avance_trayecto 
+            WHERE id_usuario = ? 
+            AND id_carrera = ? 
+            AND trayecto_actual = ?";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iii", $id_usuario, $id_carrera, $trayecto_actual);
+    
+    return $stmt->execute();
+}
+
+/**
+ * Obtiene información de usuario por ID
+ * @param int $id_usuario ID del usuario
+ * @return array Información del usuario
+ */
+function obtenerInfoUsuarioPorId($id_usuario) {
+    global $db;
+    
+    if ($id_usuario <= 0) {
+        return null;
+    }
+    
+    $sql = "SELECT id, nombre FROM users WHERE id = ?";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_usuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Verifica si el estudiante aprobó el proyecto socio integrador
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
+ * @param int $trayecto Trayecto del proyecto
+ * @return bool True si aprobó, False si no
+ */
+function haAprobadoProyectoSocio($id_usuario, $trayecto) {
+    global $db;
+    
+    $sql = "SELECT nd.* 
+            FROM notas_definitivas nd
+            INNER JOIN materias m ON nd.id_materia = m.id_materia
+            WHERE nd.id_usuario = ? 
+            AND m.trayecto = ?
+            AND m.es_proyecto_socio = 1
+            AND (
+                (m.trayecto = 1 AND nd.trayecto_1 >= 16) OR
+                (m.trayecto = 3 AND nd.trayecto_3 >= 16)
+            )";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_usuario, $trayecto);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->num_rows > 0;
+}
+
+/**
+ * Verifica si el estudiante tiene el primer título de la carrera
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
+ * @return bool True si tiene título, False si no
+ */
+function tienePrimerTitulo($id_usuario) {
+    global $db;
+    
+    $sql = "SELECT titulos FROM users WHERE id = ?";
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_usuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($row = $result->fetch_assoc()) {
+        return !empty(trim($row['titulos']));
+    }
+    
+    return false;
+}
+
+/**
+ * Obtiene el trayecto actual REAL del estudiante basado en sus notas
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
+ * @param int $id_carrera ID de la carrera
+ * @return int Trayecto actual (0, 1, 2, 3, 4)
+ */
+function obtenerTrayectoActualReal($id_usuario, $id_carrera) {
+    global $db;
+    
+    // Primero, verificar si el estudiante tiene notas registradas
+    $sql = "SELECT MAX(m.trayecto) as max_trayecto_con_notas
+            FROM notas_definitivas nd
+            INNER JOIN materias m ON nd.id_materia = m.id_materia
+            WHERE nd.id_usuario = ? 
+            AND m.id_materia IN (
+                SELECT cm.id_materia 
+                FROM carrera_materia cm 
+                WHERE cm.id_carrera = ?
+            )";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_usuario, $id_carrera);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $row = $result->fetch_assoc();
+    $max_trayecto_con_notas = $row['max_trayecto_con_notas'] ?? -1;
+    
+    // Si no tiene notas, empezar desde trayecto 0
+    if ($max_trayecto_con_notas === -1 || $max_trayecto_con_notas === null) {
+        return 0;
+    }
+    
+    // Ahora determinar en qué trayecto está realmente
+    for ($trayecto = $max_trayecto_con_notas; $trayecto >= 0; $trayecto--) {
+        // Verificar si puede avanzar desde este trayecto
+        $resultado = puedeAvanzarTrayecto($id_usuario, $trayecto, $id_carrera);
+        if ($resultado['puede_avanzar']) {
+            // Si puede avanzar, está en el siguiente trayecto
+            return $trayecto + 1;
+        }
+    }
+    
+    // Si no puede avanzar desde ningún trayecto, está en el último con notas
+    return $max_trayecto_con_notas;
+}
+
+/**
+ * Obtiene las materias en las que el estudiante está actualmente inscrito
+ * VERSIÓN PARA TU ESTRUCTURA DE TABLAS
+ * @param int $id_usuario ID del usuario
+ * @return array Materias inscritas
+ */
+function obtenerMateriasInscritas($id_usuario) {
+    global $db;
+    
+    // Primero, obtener el período activo
+    $periodo_activo = obtenerPeriodoActivo();
+    if (!$periodo_activo) {
+        return [];
+    }
+    
+    // Consulta para obtener materias inscritas en el período activo
+    $sql = "SELECT DISTINCT m.*, s.codigo_seccion, nd.id_periodo,
+                   CASE 
+                     WHEN nd.trayecto_0 IS NOT NULL THEN nd.trayecto_0
+                     WHEN nd.trayecto_1 IS NOT NULL THEN nd.trayecto_1
+                     WHEN nd.trayecto_2 IS NOT NULL THEN nd.trayecto_2
+                     WHEN nd.trayecto_3 IS NOT NULL THEN nd.trayecto_3
+                     WHEN nd.trayecto_4 IS NOT NULL THEN nd.trayecto_4
+                     ELSE NULL
+                   END as nota_actual
+            FROM notas_definitivas nd
+            INNER JOIN materias m ON nd.id_materia = m.id_materia
+            LEFT JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+            LEFT JOIN secciones s ON cm.id_carrera = s.id_carrera AND s.id_periodo = nd.id_periodo
+            LEFT JOIN estudiante_seccion es ON nd.id_usuario = es.id_usuario AND s.id_seccion = es.id_seccion
+            WHERE nd.id_usuario = ?
+            AND nd.id_periodo = ?
+            AND es.estatus = 'Activo'
+            ORDER BY m.trayecto, m.nombre_materia";
+    
+    $stmt = $db->prepare($sql);
+    if (!$stmt) {
+        error_log("Error preparando consulta: " . $db->error);
+        return [];
+    }
+    
+    $stmt->bind_param("ii", $id_usuario, $periodo_activo['id_periodo']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $materias_inscritas = [];
+    while ($row = $result->fetch_assoc()) {
+        $materias_inscritas[] = $row;
+    }
+    
+    return $materias_inscritas;
+}
+
+/**
+ * Obtiene el historial de secciones del estudiante
+ * @param int $id_usuario ID del usuario
+ * @return array Historial de secciones
+ */
+function obtenerHistorialSecciones($id_usuario) {
+    global $db;
+    
+    $sql = "SELECT es.*, s.codigo_seccion, s.id_trayecto, s.id_periodo, p.nombre_periodo
+            FROM estudiante_seccion es
+            INNER JOIN secciones s ON es.id_seccion = s.id_seccion
+            INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
+            WHERE es.id_usuario = ?
+            ORDER BY p.fecha_inicio DESC, es.fecha_inscripcion DESC";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_usuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $historial = [];
+    while ($row = $result->fetch_assoc()) {
+        $historial[] = $row;
+    }
+    
+    return $historial;
+}
+
+/**
+ * Verifica si el estudiante ya está inscrito en el período actual
+ * @param int $id_usuario ID del usuario
+ * @return bool True si ya está inscrito
+ */
+function estaInscritoEnPeriodo($id_usuario) {
+    global $db;
+    
+    $periodo_activo = obtenerPeriodoActivo();
+    if (!$periodo_activo) {
+        return false;
+    }
+    
+    $sql = "SELECT COUNT(*) as total
+            FROM estudiante_seccion es
+            INNER JOIN secciones s ON es.id_seccion = s.id_seccion
+            WHERE es.id_usuario = ? AND s.id_periodo = ?";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_usuario, $periodo_activo['id_periodo']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    
+    return $row['total'] > 0;
+}
+
+/**
+ * Obtiene el último período en el que el estudiante estuvo inscrito
+ * @param int $id_usuario ID del usuario
+ * @return array Información del último período
+ */
+function obtenerUltimoPeriodoInscrito($id_usuario) {
+    global $db;
+    
+    $sql = "SELECT p.*
+            FROM periodos_academicos p
+            INNER JOIN secciones s ON p.id_periodo = s.id_periodo
+            INNER JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion
+            WHERE es.id_usuario = ?
+            ORDER BY p.fecha_inicio DESC
+            LIMIT 1";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_usuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Determina si el estudiante es nuevo (sin historial académico)
+ * @param int $id_usuario ID del usuario
+ * @return bool True si es nuevo
+ */
+function esEstudianteNuevo($id_usuario) {
+    global $db;
+    
+    // Verificar si tiene notas registradas
+    $sql_notas = "SELECT COUNT(*) as total FROM notas_definitivas WHERE id_usuario = ?";
+    $stmt_notas = $db->prepare($sql_notas);
+    $stmt_notas->bind_param("i", $id_usuario);
+    $stmt_notas->execute();
+    $result_notas = $stmt_notas->get_result();
+    $row_notas = $result_notas->fetch_assoc();
+    
+    // Verificar si tiene inscripciones en secciones
+    $sql_inscripciones = "SELECT COUNT(*) as total FROM estudiante_seccion WHERE id_usuario = ?";
+    $stmt_inscripciones = $db->prepare($sql_inscripciones);
+    $stmt_inscripciones->bind_param("i", $id_usuario);
+    $stmt_inscripciones->execute();
+    $result_inscripciones = $stmt_inscripciones->get_result();
+    $row_inscripciones = $result_inscripciones->fetch_assoc();
+    
+    return ($row_notas['total'] == 0 && $row_inscripciones['total'] == 0);
+}
+
+/**
+ * Inscribe al estudiante en materias (sección opcional)
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
+ * @param int $id_seccion ID de la sección (opcional, 0 si no hay)
+ * @param array $materias_ids IDs de las materias a inscribir
+ * @return bool True si éxito, False si error
+ */
+function inscribirMateriasEstudiante($id_usuario, $id_seccion, $materias_ids) {
+    global $db;
+    
+    if (empty($materias_ids)) {
+        error_log("Error: No se proporcionaron materias para inscribir.");
+        return false;
+    }
+    
+    // Obtener el período activo para verificar
+    $periodo_activo = obtenerPeriodoActivo();
+    if (!$periodo_activo) {
+        error_log("Error: No hay período académico activo.");
+        return false;
+    }
+    
+    // Obtener información del estudiante para saber su carrera y trayecto
+    $info_estudiante = obtenerInfoEstudiantePorId($id_usuario);
+    $id_carrera = $info_estudiante['carrera'] ?? $info_estudiante['id_carrera'] ?? 0;
+    $trayecto_actual = obtenerTrayectoActual($id_usuario, $id_carrera);
+    
+    if ($id_carrera <= 0) {
+        error_log("Error: El estudiante no tiene carrera asignada.");
+        return false;
+    }
+    
+    // Iniciar transacción
+    $db->begin_transaction();
+    
+    try {
+        // 1. Si se proporcionó una sección VÁLIDA (mayor a 0), inscribir al estudiante en ella
+        if ($id_seccion > 0) {
+            // Obtener información de la sección
+            $sql_seccion = "SELECT * FROM secciones WHERE id_seccion = ?";
+            $stmt_seccion = $db->prepare($sql_seccion);
+            $stmt_seccion->bind_param("i", $id_seccion);
+            $stmt_seccion->execute();
+            $result_seccion = $stmt_seccion->get_result();
+            $seccion = $result_seccion->fetch_assoc();
+            
+            if (!$seccion) {
+                throw new Exception("Sección no encontrada - ID: $id_seccion");
+            }
+            
+            // Verificar que la sección pertenezca al período activo
+            if ($seccion['id_periodo'] != $periodo_activo['id_periodo']) {
+                throw new Exception("La sección no pertenece al período activo.");
+            }
+            
+            // Verificar capacidad de la sección
+            if ($seccion['capacidad_maxima'] > 0) {
+                $sql_capacidad = "SELECT COUNT(*) as total_inscritos 
+                                 FROM estudiante_seccion 
+                                 WHERE id_seccion = ? AND estatus = 'Activo'";
+                $stmt_capacidad = $db->prepare($sql_capacidad);
+                $stmt_capacidad->bind_param("i", $id_seccion);
+                $stmt_capacidad->execute();
+                $result_capacidad = $stmt_capacidad->get_result();
+                $row_capacidad = $result_capacidad->fetch_assoc();
+                
+                if ($row_capacidad['total_inscritos'] >= $seccion['capacidad_maxima']) {
+                    throw new Exception("La sección ha alcanzado su capacidad máxima.");
+                }
+            }
+            
+            // Verificar si el estudiante ya está inscrito en esta sección
+            $sql_check_seccion = "SELECT * FROM estudiante_seccion WHERE id_usuario = ? AND id_seccion = ?";
+            $stmt_check_seccion = $db->prepare($sql_check_seccion);
+            $stmt_check_seccion->bind_param("ii", $id_usuario, $id_seccion);
+            $stmt_check_seccion->execute();
+            $result_check_seccion = $stmt_check_seccion->get_result();
+            
+            if ($result_check_seccion->num_rows == 0) {
+                // Inscribir al estudiante en la sección
+                $sql_inscripcion_seccion = "INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus) 
+                                           VALUES (?, ?, NOW(), 'Activo')";
+                $stmt_inscripcion_seccion = $db->prepare($sql_inscripcion_seccion);
+                $stmt_inscripcion_seccion->bind_param("ii", $id_usuario, $id_seccion);
+                
+                if (!$stmt_inscripcion_seccion->execute()) {
+                    throw new Exception("Error al inscribir estudiante en sección: " . $stmt_inscripcion_seccion->error);
+                }
+            }
+            
+            $trayecto_seccion = $seccion['id_trayecto'];
+        } else {
+            // No hay sección seleccionada, usar el trayecto actual del estudiante
+            $trayecto_seccion = $trayecto_actual;
+        }
+        
+        // 2. Verificar que las materias pertenezcan al trayecto correcto
+        $materias_validadas = [];
+        foreach ($materias_ids as $id_materia) {
+            $sql_materia = "SELECT m.* 
+                           FROM materias m
+                           INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+                           WHERE m.id_materia = ? 
+                           AND cm.id_carrera = ? 
+                           AND m.trayecto = ?
+                           AND m.activa = 1";
+            
+            $stmt_materia = $db->prepare($sql_materia);
+            $stmt_materia->bind_param("iii", $id_materia, $id_carrera, $trayecto_seccion);
+            $stmt_materia->execute();
+            $result_materia = $stmt_materia->get_result();
+            
+            if ($result_materia->num_rows > 0) {
+                $materia_data = $result_materia->fetch_assoc();
+                $materias_validadas[$id_materia] = $materia_data;
+            } else {
+                // Intentar buscar sin validar trayecto (por si hay inconsistencia)
+                $sql_materia2 = "SELECT m.* 
+                               FROM materias m
+                               INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+                               WHERE m.id_materia = ? 
+                               AND cm.id_carrera = ? 
+                               AND m.activa = 1";
+                
+                $stmt_materia2 = $db->prepare($sql_materia2);
+                $stmt_materia2->bind_param("ii", $id_materia, $id_carrera);
+                $stmt_materia2->execute();
+                $result_materia2 = $stmt_materia2->get_result();
+                
+                if ($result_materia2->num_rows > 0) {
+                    $materia_data = $result_materia2->fetch_assoc();
+                    // Verificar que la materia sea del trayecto correcto
+                    if ($materia_data['trayecto'] == $trayecto_seccion) {
+                        $materias_validadas[$id_materia] = $materia_data;
+                    } else {
+                        error_log("Advertencia: Materia ID $id_materia es del trayecto {$materia_data['trayecto']} pero se esperaba $trayecto_seccion.");
+                    }
+                } else {
+                    error_log("Advertencia: Materia ID $id_materia no pertenece a la carrera $id_carrera o no está activa.");
+                }
+            }
+        }
+        
+        if (empty($materias_validadas)) {
+            throw new Exception("No hay materias válidas para inscribir.");
+        }
+        
+        // 3. Inscribir cada materia en notas_definitivas
+        $inscripciones_exitosas = 0;
+        
+        foreach ($materias_validadas as $id_materia => $materia_data) {
+            // Verificar si ya está inscrito en esta materia en el mismo período
+            $sql_check_materia = "SELECT * FROM notas_definitivas 
+                                 WHERE id_usuario = ? 
+                                 AND id_materia = ? 
+                                 AND id_periodo = ?";
+            $stmt_check_materia = $db->prepare($sql_check_materia);
+            $stmt_check_materia->bind_param("iii", $id_usuario, $id_materia, $periodo_activo['id_periodo']);
+            $stmt_check_materia->execute();
+            $result_check_materia = $stmt_check_materia->get_result();
+            
+            if ($result_check_materia->num_rows == 0) {
+                // Crear registro en notas_definitivas
+                $columna_trayecto = "trayecto_" . $materia_data['trayecto'];
+                
+                $sql_notas = "INSERT INTO notas_definitivas 
+                             (id_usuario, id_materia, id_periodo, fecha_registro, $columna_trayecto) 
+                             VALUES (?, ?, ?, NOW(), NULL)";
+                $stmt_notas = $db->prepare($sql_notas);
+                $stmt_notas->bind_param("iii", $id_usuario, $id_materia, $periodo_activo['id_periodo']);
+                
+                if (!$stmt_notas->execute()) {
+                    throw new Exception("Error al crear registro de notas para materia ID $id_materia: " . $stmt_notas->error);
+                }
+                
+                $inscripciones_exitosas++;
+                
+                error_log("✅ Estudiante ID $id_usuario inscrito en materia ID $id_materia (Trayecto {$materia_data['trayecto']}) para período ID " . $periodo_activo['id_periodo']);
+            } else {
+                error_log("ℹ️ Advertencia: Estudiante ID $id_usuario ya está inscrito en materia ID $id_materia para este período.");
+            }
+        }
+        
+        // 4. Confirmar transacción
+        $db->commit();
+        
+        error_log("✅ Inscripción exitosa: Estudiante ID $id_usuario inscrito con $inscripciones_exitosas materias." . ($id_seccion > 0 ? " Sección: $id_seccion" : " Sin sección asignada"));
+        
+        return true;
+        
+    } catch (Exception $e) {
+        // Revertir transacción en caso de error
+        $db->rollback();
+        error_log("❌ Error en inscripción: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Obtiene información completa del estudiante por ID
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
+ * @return array Información del estudiante
+ */
+function obtenerInfoEstudiantePorId($id_usuario) {
+    global $db;
+    
+    $sql = "SELECT u.*, c.nombre_carrera, c.id_carrera
+            FROM users u
+            LEFT JOIN carreras c ON u.carrera = c.id_carrera
+            WHERE u.id = ? AND u.estudiante = 1";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_usuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Obtiene las secciones disponibles para un trayecto
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto Trayecto
+ * @param int $id_periodo ID del período académico
+ * @return array Secciones disponibles
+ */
+function obtenerSeccionesTrayecto($id_carrera, $trayecto, $id_periodo) {
+    global $db;
+    
+    $sql = "SELECT s.* 
+            FROM secciones s
+            WHERE s.id_carrera = ? 
+            AND s.id_trayecto = ? 
+            AND s.id_periodo = ?
+            AND s.estatus = 'Activa'
+            AND (s.capacidad_maxima IS NULL OR 
+                s.capacidad_maxima > (SELECT COUNT(*) FROM estudiante_seccion es WHERE es.id_seccion = s.id_seccion))";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iii", $id_carrera, $trayecto, $id_periodo);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $secciones = [];
+    while ($row = $result->fetch_assoc()) {
+        $secciones[] = $row;
+    }
+    
+    return $secciones;
+}
+
+/**
+ * Obtiene el período académico activo
+ * @return array Información del período activo
+ */
+function obtenerPeriodoActivo() {
+    global $db;
+    
+    $sql = "SELECT * FROM periodos_academicos WHERE activo = 1 ORDER BY fecha_inicio DESC LIMIT 1";
+    $result = $db->query($sql);
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Obtiene si una materia es proyecto socio integrador
+ * @param int $id_materia ID de la materia
+ * @return bool True si es proyecto socio, False si no
+ */
+function esProyectoSocio($id_materia) {
+    global $db;
+    
+    $sql = "SELECT es_proyecto_socio FROM materias WHERE id_materia = ?";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_materia);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($row = $result->fetch_assoc()) {
+        return $row['es_proyecto_socio'] == 1;
+    }
+    
+    return false;
+}
+
+/**
+ * Obtiene la nota mínima requerida para una materia
+ * @param int $id_materia ID de la materia
+ * @return int Nota mínima requerida
+ */
+function obtenerNotaMinimaMateria($id_materia) {
+    if (esProyectoSocio($id_materia)) {
+        return 16;
+    }
+    return 12;
+}
+
+/**
+ * Script para marcar materias como Proyecto Socio Integrador
+ * Ejecutar una sola vez después de agregar el campo
+ */
+function marcarProyectosSocio() {
+    global $db;
+    
+    $palabras_clave = [
+        'proyecto socio integrador',
+        'proyecto sociointegrador',
+        'proyecto integrador',
+        'socio integrador',
+        'proyecto socio',
+        'sociointegrador',
+        'trabajo especial de grado',
+        'proyecto final',
+        'trabajo de grado'
+    ];
+    
+    $total_actualizadas = 0;
+    
+    foreach ($palabras_clave as $palabra) {
+        $sql = "UPDATE materias 
+                SET es_proyecto_socio = 1 
+                WHERE LOWER(nombre_materia) LIKE ? 
+                AND es_proyecto_socio = 0";
+        
+        $busqueda = "%" . $palabra . "%";
+        $stmt = $db->prepare($sql);
+        $stmt->bind_param("s", $busqueda);
+        $stmt->execute();
+        
+        $total_actualizadas += $stmt->affected_rows;
+    }
+    
+    $codigos_proyecto = ['PSI', 'PROYSOC', 'TEG', 'PROYECTO'];
+    
+    foreach ($codigos_proyecto as $codigo) {
+        $sql = "UPDATE materias 
+                SET es_proyecto_socio = 1 
+                WHERE UPPER(cod_materia) LIKE ? 
+                AND es_proyecto_socio = 0";
+        
+        $busqueda = "%" . $codigo . "%";
+        $stmt = $db->prepare($sql);
+        $stmt->bind_param("s", $busqueda);
+        $stmt->execute();
+        
+        $total_actualizadas += $stmt->affected_rows;
+    }
+    
+    return $total_actualizadas;
+}
+
+
+/**
+ * Obtiene el trayecto actual del estudiante
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
+ * @param int $id_carrera ID de la carrera
+ * @return int Trayecto actual (0, 1, 2, 3, 4)
+ */
+function obtenerTrayectoActual($id_usuario, $id_carrera) {
+    global $db;
+    
+    // Verificar si existe un registro en control_avance_trayecto
+    $sql = "SELECT MAX(trayecto_actual) as max_trayecto_aprobado
+            FROM control_avance_trayecto 
+            WHERE id_usuario = ? 
+            AND id_carrera = ?
+            AND puede_avanzar = 1";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_usuario, $id_carrera);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    
+    // Si tiene un trayecto aprobado, está en el siguiente
+    if ($row && $row['max_trayecto_aprobado'] !== null) {
+        return $row['max_trayecto_aprobado'] + 1;
+    }
+    
+    // Si no tiene aprobaciones, está en trayecto 0
+    return 0;
+}
+
+/**
+ * Verifica si el estudiante cumple requisitos para avanzar de trayecto
+ * @param int $id_usuario ID del usuario (id de users, no idusuario)
+ * @param int $trayecto_actual Trayecto actual
+ * @param int $id_carrera ID de la carrera
+ * @return array Resultado con estado y detalles
+ */
+function verificarRequisitosTrayecto($id_usuario, $trayecto_actual, $id_carrera) {
+    // Obtener todas las materias del trayecto actual
+    $materias_trayecto = obtenerMateriasTrayecto($id_carrera, $trayecto_actual);
+    $materias_aprobadas = obtenerMateriasAprobadas($id_usuario, $trayecto_actual);
+    
+    $total_materias = count($materias_trayecto);
+    $total_aprobadas = count($materias_aprobadas);
+    
+    $resultado = [
+        'cumple_requisitos' => false,
+        'detalles' => '',
+        'total_materias' => $total_materias,
+        'total_aprobadas' => $total_aprobadas,
+        'materias_aprobadas' => $materias_aprobadas,
+        'materias_trayecto' => $materias_trayecto
+    ];
+    
+    // Para trayecto 0: necesita 50% aprobado
+    if ($trayecto_actual == 0) {
+        $minimo_requerido = ceil($total_materias * 0.5);
+        $cumple_requisitos = ($total_aprobadas >= $minimo_requerido);
+        
+        $resultado['cumple_requisitos'] = $cumple_requisitos;
+        $resultado['minimo_requerido'] = $minimo_requerido;
+        $resultado['detalles'] = "Aprobado {$total_aprobadas} de {$total_materias} materias (mínimo requerido: {$minimo_requerido})";
+        $resultado['porcentaje_aprobado'] = $total_materias > 0 ? ($total_aprobadas / $total_materias) * 100 : 0;
+    }
+    
+    // Para trayecto 1 y 3: necesita aprobar proyecto socio integrador
+    elseif ($trayecto_actual == 1 || $trayecto_actual == 3) {
+        $aprobado_proyecto = haAprobadoProyectoSocio($id_usuario, $trayecto_actual);
+        
+        $resultado['cumple_requisitos'] = $aprobado_proyecto;
+        $resultado['detalles'] = $aprobado_proyecto ? 
+            "Proyecto Socio Integrador aprobado (nota ≥ 16)" : 
+            "Proyecto Socio Integrador no aprobado (nota < 16)";
+        $resultado['proyecto_aprobado'] = $aprobado_proyecto;
+    }
+    
+    // Para trayecto 2: necesita aprobar todas las materias y obtener título
+    elseif ($trayecto_actual == 2) {
+        $todas_aprobadas = ($total_aprobadas == $total_materias);
+        $tiene_titulo = tienePrimerTitulo($id_usuario);
+        $cumple_requisitos = ($todas_aprobadas && $tiene_titulo);
+        
+        $resultado['cumple_requisitos'] = $cumple_requisitos;
+        $resultado['detalles'] = $todas_aprobadas ? 
+            "Todas las materias aprobadas" . ($tiene_titulo ? " y título obtenido" : " pero falta título") :
+            "Faltan materias por aprobar ({$total_aprobadas}/{$total_materias})";
+        $resultado['todas_aprobadas'] = $todas_aprobadas;
+        $resultado['tiene_titulo'] = $tiene_titulo;
+    }
+    
+    // Para trayecto 4: es el último, no puede avanzar
+    elseif ($trayecto_actual == 4) {
+        $resultado['cumple_requisitos'] = false;
+        $resultado['detalles'] = "Último trayecto, no puede avanzar más";
+    }
+    
+    return $resultado;
+}
+
+/**
+ * Verifica si ya existe una aprobación para avanzar de trayecto
+ * @param int $id_usuario ID del usuario
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto_actual Trayecto actual
+ * @return array|false Información de la aprobación o false si no existe
+ */
+function verificarAprobacionExistente($id_usuario, $id_carrera, $trayecto_actual) {
+    global $db;
+    
+    $sql = "SELECT * FROM control_avance_trayecto 
+            WHERE id_usuario = ? 
+            AND id_carrera = ? 
+            AND trayecto_actual = ?
+            AND puede_avanzar = 1
+            ORDER BY created_at DESC LIMIT 1";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iii", $id_usuario, $id_carrera, $trayecto_actual);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $aprobacion = $result->fetch_assoc();
+    
+    if ($aprobacion) {
+        // Obtener información del aprobador
+        $info_aprobador = obtenerInfoUsuarioPorId($aprobacion['aprobado_por']);
+        $aprobacion['nombre_aprobador'] = $info_aprobador ? $info_aprobador['nombre'] : 'Administrador';
+        return $aprobacion;
+    }
+    
+    return false;
+}
+
+/**
+ * Obtiene el historial de aprobaciones de trayecto
+ * @param int $id_usuario ID del usuario
+ * @param int $id_carrera ID de la carrera
+ * @return array Historial de aprobaciones
+ */
+function obtenerHistorialAprobaciones($id_usuario, $id_carrera) {
+    global $db;
+    
+    $sql = "SELECT cat.*, u.nombre as nombre_aprobador
+            FROM control_avance_trayecto cat
+            LEFT JOIN users u ON cat.aprobado_por = u.id
+            WHERE cat.id_usuario = ? 
+            AND cat.id_carrera = ?
+            AND cat.puede_avanzar = 1
+            ORDER BY cat.trayecto_actual ASC, cat.fecha_aprobacion ASC";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_usuario, $id_carrera);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $historial = [];
+    while ($row = $result->fetch_assoc()) {
+        $historial[] = $row;
+    }
+    
+    return $historial;
+}
+
+/**
+ * Aprueba el avance de trayecto manualmente
+ * @param int $id_usuario ID del usuario
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto_actual Trayecto actual
+ * @param string $motivo Motivo de la aprobación
+ * @return array Resultado de la operación
+ */
+function aprobarAvanceTrayecto($id_usuario, $id_carrera, $trayecto_actual, $motivo = '') {
+    global $db;
+    
+    // Verificar que el trayecto no sea el último (4)
+    if ($trayecto_actual >= 4) {
+        return [
+            'success' => false,
+            'message' => 'No se puede aprobar avance desde el último trayecto (4)'
+        ];
+    }
+    
+    // Obtener ID del administrador actual desde la sesión
+    // Primero, asegurar que la sesión esté iniciada
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    $aprobado_por = 0;
+    
+    // Buscar el ID del usuario actual de diferentes maneras
+    if (isset($_SESSION['user']['id']) && $_SESSION['user']['id'] > 0) {
+        $aprobado_por = $_SESSION['user']['id'];
+    } elseif (isset($_SESSION['username']) && !empty($_SESSION['username'])) {
+        $username = $_SESSION['username'];
+        
+        $sql_usuario = "SELECT id FROM users WHERE username = ? LIMIT 1";
+        $stmt_usuario = $db->prepare($sql_usuario);
+        $stmt_usuario->bind_param("s", $username);
+        $stmt_usuario->execute();
+        $result_usuario = $stmt_usuario->get_result();
+        
+        if ($row_usuario = $result_usuario->fetch_assoc()) {
+            $aprobado_por = $row_usuario['id'];
+        }
+    } elseif (isset($_SESSION['email']) && !empty($_SESSION['email'])) {
+        $email = $_SESSION['email'];
+        
+        $sql_email = "SELECT id FROM users WHERE email = ? LIMIT 1";
+        $stmt_email = $db->prepare($sql_email);
+        $stmt_email->bind_param("s", $email);
+        $stmt_email->execute();
+        $result_email = $stmt_email->get_result();
+        
+        if ($row_email = $result_email->fetch_assoc()) {
+            $aprobado_por = $row_email['id'];
+        }
+    } elseif (isset($_SESSION['user_id']) && $_SESSION['user_id'] > 0) {
+        $aprobado_por = $_SESSION['user_id'];
+    } elseif (isset($_SESSION['id']) && $_SESSION['id'] > 0) {
+        $aprobado_por = $_SESSION['id'];
+    } elseif (isset($_SESSION['idusuario']) && $_SESSION['idusuario'] > 0) {
+        $aprobado_por = $_SESSION['idusuario'];
+    }
+    
+    // Si no encontramos el ID, usar un valor por defecto
+    if ($aprobado_por <= 0) {
+        // Puedes usar un ID de administrador por defecto o registrar como "sistema"
+        $aprobado_por = 1; // Cambia esto por el ID de un administrador por defecto si es necesario
+    }
+    
+    // CORRECCIÓN: Ajustar la consulta SQL para tener los placeholders correctos
+    $sql = "INSERT INTO control_avance_trayecto 
+            (id_usuario, id_carrera, trayecto_actual, puede_avanzar, aprobado_por, fecha_aprobacion, motivo, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, NOW(), ?, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE 
+            puede_avanzar = VALUES(puede_avanzar),
+            aprobado_por = VALUES(aprobado_por),
+            fecha_aprobacion = VALUES(fecha_aprobacion),
+            motivo = VALUES(motivo),
+            updated_at = NOW()";
+    
+    $stmt = $db->prepare($sql);
+    
+    // CORRECCIÓN: Agregar el valor para 'puede_avanzar' (siempre 1 para aprobar)
+    $puede_avanzar = 1;
+    
+    // Ahora tenemos 6 variables: i, i, i, i, i, s
+    $stmt->bind_param("iiiiis", $id_usuario, $id_carrera, $trayecto_actual, $puede_avanzar, $aprobado_por, $motivo);
+    
+    if ($stmt->execute()) {
+        return [
+            'success' => true,
+            'message' => 'Avance de trayecto aprobado exitosamente'
+        ];
+    } else {
+        return [
+            'success' => false,
+            'message' => 'Error al aprobar avance: ' . $stmt->error
+        ];
+    }
+}
+
+/**
+ * Obtiene el ID del usuario actual de sesión
+ * @return int ID del usuario o 0 si no está definido
+ */
+function obtenerUsuarioActualId() {
+    global $db;
+    
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // Si tenemos un username en sesión, buscar el ID en la base de datos
+    if (isset($_SESSION['username']) && !empty($_SESSION['username'])) {
+        $username = $_SESSION['username'];
+        
+        $sql = "SELECT id FROM users WHERE username = ? LIMIT 1";
+        $stmt = $db->prepare($sql);
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($row = $result->fetch_assoc()) {
+            return $row['id'];
+        }
+    }
+    
+    // Si tenemos email en sesión, buscar el ID
+    if (isset($_SESSION['email']) && !empty($_SESSION['email'])) {
+        $email = $_SESSION['email'];
+        
+        $sql = "SELECT id FROM users WHERE email = ? LIMIT 1";
+        $stmt = $db->prepare($sql);
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($row = $result->fetch_assoc()) {
+            return $row['id'];
+        }
+    }
+    
+    // Intentar obtener directamente de variables de sesión
+    if (isset($_SESSION['user_id']) && $_SESSION['user_id'] > 0) {
+        return $_SESSION['user_id'];
+    } elseif (isset($_SESSION['id']) && $_SESSION['id'] > 0) {
+        return $_SESSION['id'];
+    } elseif (isset($_SESSION['idusuario']) && $_SESSION['idusuario'] > 0) {
+        return $_SESSION['idusuario'];
+    }
+    
+    return 0;
+}
+
+
+
+
+/**
+ * Aprueba el avance de trayecto manualmente con ID de aprobador
+ * @param int $id_usuario ID del usuario
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto_actual Trayecto actual
+ * @param int $aprobado_por ID del usuario que aprueba
+ * @param string $motivo Motivo de la aprobación
+ * @return array Resultado de la operación
+ */
+function aprobarAvanceTrayectoConAprobador($id_usuario, $id_carrera, $trayecto_actual, $aprobado_por, $motivo = '') {
+    global $db;
+    
+    // Verificar que el trayecto no sea el último (4)
+    if ($trayecto_actual >= 4) {
+        return [
+            'success' => false,
+            'message' => 'No se puede aprobar avance desde el último trayecto (4)'
+        ];
+    }
+    
+    // CORRECCIÓN: Ajustar la consulta SQL
+    $sql = "INSERT INTO control_avance_trayecto 
+            (id_usuario, id_carrera, trayecto_actual, puede_avanzar, aprobado_por, fecha_aprobacion, motivo, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, NOW(), ?, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE 
+            puede_avanzar = VALUES(puede_avanzar),
+            aprobado_por = VALUES(aprobado_por),
+            fecha_aprobacion = VALUES(fecha_aprobacion),
+            motivo = VALUES(motivo),
+            updated_at = NOW()";
+    
+    $stmt = $db->prepare($sql);
+    
+    // CORRECCIÓN: Agregar el valor para 'puede_avanzar'
+    $puede_avanzar = 1;
+    
+    // 6 variables: i, i, i, i, i, s
+    $stmt->bind_param("iiiiis", $id_usuario, $id_carrera, $trayecto_actual, $puede_avanzar, $aprobado_por, $motivo);
+    
+    if ($stmt->execute()) {
+        return [
+            'success' => true,
+            'message' => 'Avance de trayecto aprobado exitosamente'
+        ];
+    } else {
+        return [
+            'success' => false,
+            'message' => 'Error al aprobar avance: ' . $stmt->error
+        ];
+    }
+}
+
+
+
+
+/**
+ * Verifica si una materia ya está inscrita para el estudiante en el período actual
+ * @param int $id_usuario ID del usuario
+ * @param int $id_materia ID de la materia
+ * @return bool True si ya está inscrita en el período actual
+ */
+function materiaYaInscrita($id_usuario, $id_materia) {
+    global $db;
+    
+    $periodo_activo = obtenerPeriodoActivo();
+    if (!$periodo_activo) {
+        return false;
+    }
+    
+    $sql = "SELECT COUNT(*) as total 
+            FROM notas_definitivas 
+            WHERE id_usuario = ? 
+            AND id_materia = ? 
+            AND id_periodo = ?";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iii", $id_usuario, $id_materia, $periodo_activo['id_periodo']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    
+    return $row['total'] > 0;
+}
+
+
+
+/**
+ * Obtiene las materias en las que el estudiante está INSCRITO ACTUALMENTE en el período activo
+ * @param int $id_usuario ID del usuario
+ * @return array Materias inscritas en el período actual
+ */
+function obtenerMateriasInscritasActuales($id_usuario) {
+    global $db;
+    
+    // Primero, obtener el período activo
+    $periodo_activo = obtenerPeriodoActivo();
+    if (!$periodo_activo) {
+        return [];
+    }
+    
+    // Buscar materias que tienen registro en notas_definitivas para el período actual
+    // Esto significa que están inscritas en este período
+    $sql = "SELECT DISTINCT m.*, nd.id_periodo
+            FROM notas_definitivas nd
+            INNER JOIN materias m ON nd.id_materia = m.id_materia
+            WHERE nd.id_usuario = ?
+            AND nd.id_periodo = ?
+            ORDER BY m.trayecto, m.nombre_materia";
+    
+    $stmt = $db->prepare($sql);
+    if (!$stmt) {
+        error_log("Error preparando consulta: " . $db->error);
+        return [];
+    }
+    
+    $stmt->bind_param("ii", $id_usuario, $periodo_activo['id_periodo']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $materias_inscritas = [];
+    while ($row = $result->fetch_assoc()) {
+        $materias_inscritas[] = $row;
+    }
+    
+    return $materias_inscritas;
+}
+
+
+
+
+/**
+ * Obtiene las materias disponibles para inscripción (que NO están inscritas actualmente)
+ * @param int $id_usuario ID del usuario
+ * @param int $trayecto Trayecto actual
+ * @param int $id_carrera ID de la carrera
+ * @param bool $es_estudiante_nuevo Si es estudiante nuevo
+ * @return array Materias disponibles para inscripción
+ */
+function obtenerMateriasParaInscripcion($id_usuario, $trayecto, $id_carrera, $es_estudiante_nuevo = false) {
+    // 1. Obtener todas las materias del trayecto
+    $todas_materias = obtenerMateriasTrayecto($id_carrera, $trayecto);
+    
+    // 2. Obtener materias YA INSCRITAS en el período actual
+    $materias_inscritas_actuales = obtenerMateriasInscritasActuales($id_usuario);
+    
+    // Crear array de IDs de materias ya inscritas
+    $ids_materias_inscritas = [];
+    foreach ($materias_inscritas_actuales as $materia_inscrita) {
+        $ids_materias_inscritas[] = $materia_inscrita['id_materia'];
+    }
+    
+    // 3. Filtrar: solo materias NO inscritas actualmente
+    $materias_disponibles = [];
+    foreach ($todas_materias as $materia) {
+        if (!in_array($materia['id_materia'], $ids_materias_inscritas)) {
+            $materias_disponibles[] = $materia;
+        }
+    }
+    
+    return $materias_disponibles;
+}
+
+
+/**
+ * Obtiene la nota actual de una materia para un estudiante
+ * @param int $id_usuario ID del usuario
+ * @param int $id_materia ID de la materia
+ * @return float|null Nota actual o null si no tiene
+ */
+function obtenerNotaMateriaActual($id_usuario, $id_materia) {
+    global $db;
+    
+    $sql = "SELECT nd.*, m.trayecto 
+            FROM notas_definitivas nd
+            INNER JOIN materias m ON nd.id_materia = m.id_materia
+            WHERE nd.id_usuario = ? 
+            AND nd.id_materia = ?
+            ORDER BY nd.id_periodo DESC
+            LIMIT 1";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("ii", $id_usuario, $id_materia);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($row = $result->fetch_assoc()) {
+        switch ($row['trayecto']) {
+            case 0: return $row['trayecto_0'];
+            case 1: return $row['trayecto_1'];
+            case 2: return $row['trayecto_2'];
+            case 3: return $row['trayecto_3'];
+            case 4: return $row['trayecto_4'];
+            default: return null;
+        }
+    }
+    
+    return null;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//UBICACION************************************************************************************************
+
+
+
+/**
+ * Obtener todos los estados
+ */
+function obtenerEstados() {
+    global $db;
+    $estados = [];
+    $sql = "SELECT id_estado, estado FROM estados ORDER BY estado";
+    $result = $db->query($sql);
+    if ($result && $result->num_rows > 0) {
+        while($row = $result->fetch_assoc()) {
+            $estados[] = $row;
+        }
+    }
+    return $estados;
+}
+
+/**
+ * Obtener municipios por estado
+ */
+function obtenerMunicipiosPorEstado($id_estado) {
+    global $db;
+    $municipios = [];
+    if (empty($id_estado) || !is_numeric($id_estado)) {
+        return $municipios;
+    }
+    
+    $sql = "SELECT id_municipio, municipio FROM municipios 
+            WHERE id_estado = ? ORDER BY municipio";
+    $stmt = $db->prepare($sql);
+    if (!$stmt) {
+        return $municipios;
+    }
+    
+    $stmt->bind_param("i", $id_estado);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while($row = $result->fetch_assoc()) {
+        $municipios[] = $row;
+    }
+    $stmt->close();
+    return $municipios;
+}
+
+/**
+ * Obtener parroquias por municipio
+ */
+function obtenerParroquiasPorMunicipio($id_municipio) {
+    global $db;
+    $parroquias = [];
+    if (empty($id_municipio) || !is_numeric($id_municipio)) {
+        return $parroquias;
+    }
+    
+    $sql = "SELECT id_parroquia, parroquia FROM parroquias 
+            WHERE id_municipio = ? ORDER BY parroquia";
+    $stmt = $db->prepare($sql);
+    if (!$stmt) {
+        return $parroquias;
+    }
+    
+    $stmt->bind_param("i", $id_municipio);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while($row = $result->fetch_assoc()) {
+        $parroquias[] = $row;
+    }
+    $stmt->close();
+    return $parroquias;
+}
+
+/**
+ * Obtener nombres de ubicación por IDs
+ */
+function obtenerNombresUbicacion($id_estado, $id_municipio, $id_parroquia) {
+    global $db;
+    $ubicacion = [
+        'estado_nombre' => '',
+        'municipio_nombre' => '',
+        'parroquia_nombre' => ''
+    ];
+    
+    // Obtener nombre del estado
+    if ($id_estado && is_numeric($id_estado)) {
+        $sql = "SELECT estado FROM estados WHERE id_estado = ?";
+        $stmt = $db->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("i", $id_estado);
+            $stmt->execute();
+            $stmt->bind_result($ubicacion['estado_nombre']);
+            $stmt->fetch();
+            $stmt->close();
+        }
+    }
+    
+    // Obtener nombre del municipio
+    if ($id_municipio && is_numeric($id_municipio)) {
+        $sql = "SELECT municipio FROM municipios WHERE id_municipio = ?";
+        $stmt = $db->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("i", $id_municipio);
+            $stmt->execute();
+            $stmt->bind_result($ubicacion['municipio_nombre']);
+            $stmt->fetch();
+            $stmt->close();
+        }
+    }
+    
+    // Obtener nombre de la parroquia
+    if ($id_parroquia && is_numeric($id_parroquia)) {
+        $sql = "SELECT parroquia FROM parroquias WHERE id_parroquia = ?";
+        $stmt = $db->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("i", $id_parroquia);
+            $stmt->execute();
+            $stmt->bind_result($ubicacion['parroquia_nombre']);
+            $stmt->fetch();
+            $stmt->close();
+        }
+    }
+    
+    return $ubicacion;
+}
+
+
+
+// Función directa en detalle_estudiante.php (solo si no tienes la función en functions.php)
+function obtenerNombresUbicacionDirecto($id_estado, $id_municipio, $id_parroquia = null) {
+    global $db;
+    $ubicacion = [
+        'estado_nombre' => 'No especificado',
+        'municipio_nombre' => 'No especificado',
+        'parroquia_nombre' => 'No especificado'
+    ];
+    
+    if ($id_estado && is_numeric($id_estado)) {
+        $sql = "SELECT estado FROM estados WHERE id_estado = ?";
+        $stmt = $db->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("i", $id_estado);
+            $stmt->execute();
+            $stmt->bind_result($nombre);
+            if ($stmt->fetch()) {
+                $ubicacion['estado_nombre'] = $nombre;
+            }
+            $stmt->close();
+        }
+    }
+    
+    if ($id_municipio && is_numeric($id_municipio)) {
+        $sql = "SELECT municipio FROM municipios WHERE id_municipio = ?";
+        $stmt = $db->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("i", $id_municipio);
+            $stmt->execute();
+            $stmt->bind_result($nombre);
+            if ($stmt->fetch()) {
+                $ubicacion['municipio_nombre'] = $nombre;
+            }
+            $stmt->close();
+        }
+    }
+    
+    if ($id_parroquia && is_numeric($id_parroquia)) {
+        $sql = "SELECT parroquia FROM parroquias WHERE id_parroquia = ?";
+        $stmt = $db->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("i", $id_parroquia);
+            $stmt->execute();
+            $stmt->bind_result($nombre);
+            if ($stmt->fetch()) {
+                $ubicacion['parroquia_nombre'] = $nombre;
+            }
+            $stmt->close();
+        }
+    }
+    
+    return $ubicacion;
+}
+
+// Luego en tu código principal, usa:
+$nombresUbicacion = obtenerNombresUbicacionDirecto(
+    $estudiante['estado'] ?? null,
+    $estudiante['municipio'] ?? null,
+    $estudiante['parroquia'] ?? null
+);
+
+
+
 
 
 
@@ -10928,54 +22803,73 @@ function login(){
     }
     
     if (count($errors) == 0) {
-        $password = md5($password);
-
-        $query = "SELECT * FROM users WHERE (username='$username' OR email='$username') AND password='$password' LIMIT 1";
+        // Buscar usuario sin aplicar hash a la contraseña aún
+        $query = "SELECT * FROM users WHERE (username='$username' OR email='$username') LIMIT 1";
         $results = mysqli_query($db, $query);
 
         if (mysqli_num_rows($results) == 1) { // user found
             $logged_in_user = mysqli_fetch_assoc($results);
-            $_SESSION['user'] = $logged_in_user;
-            $_SESSION['success'] = "Bienvenido/a " . $logged_in_user['username'];
             
-            // **CARGAR TODOS LOS PERMISOS ACTUALIZADOS**
-            cargarPermisosUsuario();
-            
-            // REGISTRAR EN AUDITORÍA - LOGIN EXITOSO
-            registrarAuditoria(
-                "LOGIN", 
-                "users", 
-                $logged_in_user['id'], 
-                null, 
-                ['username' => $username], 
-                "Autenticación", 
-                "Inicio de sesión exitoso"
-            );
-            
-            // Determinar los perfiles disponibles
-            $available_profiles = [];
-            
-            // Verificar cada perfil usando tus funciones existentes
-            if (isAdmin()) $available_profiles[] = 'admin';
-            if (isDocente()) $available_profiles[] = 'docente';
-            if (isEstudiante()) $available_profiles[] = 'estudiante';
-            if (isUser()) $available_profiles[] = 'user';
-            
-            // Guardar perfiles disponibles en sesión
-            $_SESSION['user']['available_profiles'] = $available_profiles;
-            
-            // Si solo tiene un perfil, redirigir directamente
-            if (count($available_profiles) == 1) {
-                $_SESSION['current_profile'] = $available_profiles[0];
-                $where = $_SESSION['here'] ?? $available_profiles[0] . '/home.php';
-                header("Location: $where");
+            // Verificar contraseña usando password_verify()
+            if (password_verify($password, $logged_in_user['password'])) {
+                // Contraseña correcta - iniciar sesión
+                $_SESSION['user'] = $logged_in_user;
+                $_SESSION['success'] = "Bienvenido/a " . $logged_in_user['username'];
+                
+                // **CARGAR TODOS LOS PERMISOS ACTUALIZADOS**
+                cargarPermisosUsuario();
+                
+                // REGISTRAR EN AUDITORÍA - LOGIN EXITOSO
+                registrarAuditoria(
+                    "LOGIN", 
+                    "users", 
+                    $logged_in_user['id'], 
+                    null, 
+                    ['username' => $username], 
+                    "Autenticación", 
+                    "Inicio de sesión exitoso"
+                );
+                
+                // Determinar los perfiles disponibles
+                $available_profiles = [];
+                
+                // Verificar cada perfil usando tus funciones existentes
+                if (isAdmin()) $available_profiles[] = 'admin';
+                if (isDocente()) $available_profiles[] = 'docente';
+                if (isEstudiante()) $available_profiles[] = 'estudiante';
+                if (isUser()) $available_profiles[] = 'user';
+                
+                // Guardar perfiles disponibles en sesión
+                $_SESSION['user']['available_profiles'] = $available_profiles;
+                
+                // Si solo tiene un perfil, redirigir directamente
+                if (count($available_profiles) == 1) {
+                    $_SESSION['current_profile'] = $available_profiles[0];
+                    $where = $_SESSION['here'] ?? $available_profiles[0] . '/home.php';
+                    header("Location: $where");
+                } else {
+                    // Mostrar selector de perfiles
+                    header('Location: profile_selector.php');
+                }
+                
+                exit();
             } else {
-                // Mostrar selector de perfiles
-                header('Location: profile_selector.php');
+                // Contraseña incorrecta
+                // REGISTRAR EN AUDITORÍA - LOGIN FALLIDO
+                registrarAuditoria(
+                    "LOGIN", 
+                    "users", 
+                    null, 
+                    null, 
+                    ['username' => $username], 
+                    "Autenticación", 
+                    "Intento de inicio de sesión fallido - Contraseña incorrecta"
+                );
+                
+                array_push($errors, "Usuario/Correo o contraseña incorrectos");
             }
-            
-            exit();
         } else {
+            // Usuario no encontrado
             // REGISTRAR EN AUDITORÍA - LOGIN FALLIDO
             registrarAuditoria(
                 "LOGIN", 
@@ -10984,13 +22878,14 @@ function login(){
                 null, 
                 ['username' => $username], 
                 "Autenticación", 
-                "Intento de inicio de sesión fallido"
+                "Intento de inicio de sesión fallido - Usuario no encontrado"
             );
             
             array_push($errors, "Usuario/Correo o contraseña incorrectos");
         }
     }
 }
+
 function visita() {
   global $pool, $nombrepag, $usua, $stmt_visita;
   try {

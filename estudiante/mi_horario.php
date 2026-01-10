@@ -11,6 +11,10 @@ if (!isLoggedIn() || !isEstudiante()) {
     header('location: ../login.php');
     exit();
 }
+
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Obtener la sección del estudiante - CORREGIDO: usar $_SESSION['user']['id']
 $estudiante_id = (int)$_SESSION['user']['id'];
 $seccion_estudiante = obtenerSeccionEstudiante($db, $estudiante_id);
@@ -383,7 +387,7 @@ include("includes/head.php");
                     <h3 class="text-gray-800">No tienes una sección asignada</h3>
                     <p class="text-muted">Actualmente no estás asignado a ninguna sección.</p>
                     <p class="text-muted">Por favor, contacta con la administración para resolver esta situación.</p>
-                    <a href="../index.php" class="btn btn-primary mt-3">
+                    <a href="index.php" class="btn btn-primary mt-3">
                         <i class="fas fa-home"></i> Volver al Inicio
                     </a>
                 </div>

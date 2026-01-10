@@ -41,16 +41,86 @@ if (!isLoggedIn() || !isDocente()) {
 <title><?php echo $titulopag; ?></title>
 
 <?php echo $bootstrap_head; ?>
+
 <style>
+    /* ESTILOS GENERALES MEJORADOS */
+    body {
+        padding-top: 80px;
+        background-color: #f8f9fc;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
     .nav-item-mensajes {
         position: relative;
     }
+    
     .badge-notificacion {
         position: absolute;
         top: 3px;
         right: 3px;
         font-size: 0.6em;
         padding: 3px 6px;
+    }
+
+    /* NAVBAR FIJO */
+    .navbar {
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    /* DROPDOWNS MEJORADOS */
+    .dropdown-menu {
+        z-index: 1080;
+        border: 1px solid rgba(0,0,0,.15);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .dropdown-item {
+        padding: 0.75rem 1.5rem;
+        font-size: 0.9rem;
+    }
+
+    /* MEJORAS ESPECÍFICAS PARA MÓVILES */
+    @media (max-width: 991.98px) {
+        .navbar-collapse {
+            background-color: #4CAF50;
+            padding: 1rem;
+            margin-top: 1rem;
+            border-radius: 8px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .dropdown-menu {
+            background-color: rgba(255,255,255,0.9);
+            border: none;
+            box-shadow: none;
+            margin-left: 1rem;
+        }
+        
+        .dropdown-item {
+            padding: 0.6rem 1.5rem;
+        }
+        
+        /* Botón hamburguesa más grande para móviles */
+        .navbar-toggler {
+            padding: 0.4rem 0.75rem;
+            font-size: 1.25rem;
+        }
+        
+        /* Mejorar contraste en móviles */
+        .navbar-nav .nav-link {
+            color: white !important;
+            padding: 0.5rem 1rem;
+        }
+        
+        .dropdown-toggle::after {
+            border-top-color: white;
+        }
+    }
+
+    /* CONTENIDO PRINCIPAL */
+    .container {
+        margin-top: 20px;
     }
 </style>
 </head>
@@ -133,9 +203,9 @@ if (!isLoggedIn() || !isDocente()) {
   echo '<p class="text-right">';
   echo $fads;
   echo "<br>";
-  echo $ip;
+ // echo $ip;
   echo "<br>";
-  echo $nombrepag;
+ // echo $nombrepag;
 ?>
 
 </div>
@@ -180,10 +250,6 @@ if (!isLoggedIn() || !isDocente()) {
     </div>
 </div>
 
-
-
-
-
 <!-- Script para actualizar notificaciones cada 30 segundos -->
 <script>
 function actualizarNotificaciones() {
@@ -219,8 +285,6 @@ setInterval(actualizarNotificaciones, 30000);
 // Actualizar también al cargar la página
 document.addEventListener('DOMContentLoaded', actualizarNotificaciones);
 
-
-
 // Script para manejar el modal de logout
 document.addEventListener('DOMContentLoaded', function() {
     // Manejar el clic en el enlace de logout
@@ -242,13 +306,41 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 500);
     });
     
-    // Actualizar también al cargar la página
-    actualizarNotificaciones();
+    // MEJORA PARA DROPDOWNS EN MÓVILES
+    if (window.innerWidth <= 991) {
+        // Cerrar dropdowns al hacer clic en un enlace
+        $('.dropdown-item').on('click', function() {
+            $('.dropdown-menu').removeClass('show');
+        });
+        
+        // Cerrar dropdowns al hacer clic fuera
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('.dropdown').length) {
+                $('.dropdown-menu').removeClass('show');
+            }
+        });
+        
+        // Toggle dropdown al hacer clic en el toggle
+        $('.dropdown-toggle').on('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            var $parent = $(this).closest('.dropdown');
+            var $menu = $parent.find('.dropdown-menu');
+            var isOpen = $menu.hasClass('show');
+            
+            // Cerrar todos los dropdowns
+            $('.dropdown-menu').removeClass('show');
+            
+            // Abrir solo si no estaba abierto
+            if (!isOpen) {
+                $menu.addClass('show');
+            }
+        });
+    }
 });
 
-
 </script>
-
 
 <!-- Incluir jsPDF y html2canvas para generar el PDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -295,12 +387,4 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 </style>
-
-
-
-
-
-
-
-
 </html>

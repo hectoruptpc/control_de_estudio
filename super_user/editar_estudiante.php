@@ -89,21 +89,18 @@ include("includes/head.php");
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label for="carrera" class="form-label required">Carrera</label>
-                                    <select class="form-select" id="carrera" name="carrera" required>
-                                        <option value="" disabled>Seleccione una carrera</option>
-                                        <?php 
-                                        $carreras = obtenerCarreras();
-                                        foreach ($carreras as $carrera): 
-                                            if (!empty($carrera)): ?>
-                                                <option value="<?php echo htmlspecialchars($carrera); ?>" 
-                                                    <?php echo (isset($estudiante['carrera']) && $estudiante['carrera'] == $carrera) ? 'selected' : ''; ?>>
-                                                    <?php echo htmlspecialchars($carrera); ?>
-                                                </option>
-                                            <?php endif;
-                                        endforeach; ?>
-                                    </select>
-                                </div>
+    <label for="carrera" class="form-label required">Programa</label>
+    <select name="carrera" id="carrera" class="form-control" required>
+        <option value="">-- Seleccione una carrera --</option>
+        <?php 
+        $carreras = obtenerTodasLasCarreras();
+        foreach ($carreras as $nombre): ?>
+            <option value="<?php echo htmlspecialchars($nombre); ?>">
+                <?php echo htmlspecialchars($nombre); ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
+</div>
                                 
                                 <div class="mb-3">
                                     <label class="form-label required">Género</label>
