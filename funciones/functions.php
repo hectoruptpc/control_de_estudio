@@ -3973,6 +3973,106 @@ function asignarMateriaACarrera($id_carrera, $id_materia, $semestre) {
 }
 
 /**
+ * Asegura que la tabla `prelaciones` exista.
+ */
+function asegurarTablaPrelaciones() {
+    global $db;
+    $db->query("CREATE TABLE IF NOT EXISTS prelaciones (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        id_carrera INT NOT NULL,
+        id_materia INT NOT NULL,
+        id_prerequisito INT NOT NULL,
+        tipo VARCHAR(50) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX (id_carrera),
+        INDEX (id_materia),
+        INDEX (id_prerequisito),
+        FOREIGN KEY (id_carrera) REFERENCES carreras(id_carrera) ON DELETE CASCADE,
+        FOREIGN KEY (id_materia) REFERENCES materias(id_materia) ON DELETE CASCADE,
+        FOREIGN KEY (id_prerequisito) REFERENCES materias(id_materia) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+/**
+ * Agrega una prelación (prerequisito) para una materia en una carrera
+ */
+function agregarPrelacion($id_carrera, $id_materia, $id_prerequisito, $tipo = null) {
+    global $db;
+    try {
+        asegurarTablaPrelaciones();
+        // Evitar duplicados
+        $check = $db->prepare("SELECT id FROM prelaciones WHERE id_carrera = ? AND id_materia = ? AND id_prerequisito = ? LIMIT 1");
+        if (!$check) throw new Exception('Error al preparar comprobación de prelación: ' . $db->error);
+        $check->bind_param('iii', $id_carrera, $id_materia, $id_prerequisito);
+        $check->execute();
+        $res = $check->get_result();
+        if ($res && $res->num_rows > 0) {
+            $check->close();
+            return ['success' => false, 'message' => 'La prelación ya existe'];
+        }
+        $check->close();
+
+        $stmt = $db->prepare("INSERT INTO prelaciones (id_carrera, id_materia, id_prerequisito, tipo) VALUES (?, ?, ?, ?)");
+        if (!$stmt) throw new Exception('Error al preparar inserción de prelación: ' . $db->error);
+        $stmt->bind_param('iiis', $id_carrera, $id_materia, $id_prerequisito, $tipo);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar inserción de prelación: ' . $stmt->error);
+        $insert_id = $db->insert_id;
+        $stmt->close();
+        return ['success' => true, 'message' => 'Prelación agregada', 'id' => $insert_id];
+    } catch (Exception $e) {
+        error_log('Error en agregarPrelacion: ' . $e->getMessage());
+        return ['success' => false, 'message' => 'Error al agregar prelación: ' . $e->getMessage()];
+    }
+}
+
+/**
+ * Elimina una prelación por id
+ */
+function eliminarPrelacion($id) {
+    global $db;
+    try {
+        asegurarTablaPrelaciones();
+        $stmt = $db->prepare("DELETE FROM prelaciones WHERE id = ?");
+        if (!$stmt) throw new Exception('Error al preparar delete prelación: ' . $db->error);
+        $stmt->bind_param('i', $id);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar delete prelación: ' . $stmt->error);
+        $affected = $stmt->affected_rows;
+        $stmt->close();
+        return ['success' => true, 'affected_rows' => $affected];
+    } catch (Exception $e) {
+        error_log('Error en eliminarPrelacion: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Obtiene prelaciones para una carrera
+ */
+function obtenerPrelacionesPorCarrera($id_carrera) {
+    global $db;
+    $rows = [];
+    asegurarTablaPrelaciones();
+    $query = "SELECT p.id, p.id_carrera, p.id_materia, p.id_prerequisito, p.tipo,
+                     m1.cod_materia AS cod_materia, m1.nombre_materia AS nombre_materia,
+                     m2.cod_materia AS cod_prereq, m2.nombre_materia AS nombre_prereq
+              FROM prelaciones p
+              JOIN materias m1 ON p.id_materia = m1.id_materia
+              JOIN materias m2 ON p.id_prerequisito = m2.id_materia
+              WHERE p.id_carrera = ?
+              ORDER BY m1.trayecto, m1.nombre_materia";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('i', $id_carrera);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) $rows[] = $r;
+            $res->free();
+        }
+        $stmt->close();
+    }
+    return $rows;
+}
+
+/**
  * Elimina una asignación de materia a carrera
  * 
  * @param int $id_relacion ID de la relación materia-carrera a eliminar
