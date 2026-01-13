@@ -226,6 +226,11 @@ if (!isLoggedIn() || !isAdmin()) {
                             <i class="fas fa-calendar fa-fw"></i> Periodos Académicos
                         </a>
                         <?php endif; ?>
+
+                            <a title="Gestionar Prelaciones" class="dropdown-item" href="prelaciones.php">
+            <i class="fas fa-list-ol fa-fw"></i> Prelaciones
+        </a>
+
                     </div>
                 </li>
 
