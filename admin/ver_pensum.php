@@ -143,7 +143,7 @@ include("includes/head.php");
             <small class="text-muted">(<?php echo strtoupper($tipo_periodo); ?>s)</small>
         </h1>
         <div>
-            <a href="lista_carreras.php" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm no-print">
+            <a href="agregar_carrera.php" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm no-print">
                 <i class="fas fa-arrow-left fa-sm text-white-50"></i> Volver a Carreras
             </a>
             <a href="?id_carrera=<?php echo $id_carrera; ?>&pdf=1" class="d-none d-sm-inline-block btn btn-sm btn-success shadow-sm no-print ml-2">
