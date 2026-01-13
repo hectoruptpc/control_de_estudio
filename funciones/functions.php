@@ -3435,6 +3435,33 @@ function obtenerCarrerasActivas() {
 }
 
 /**
+ * Obtiene todas las carreras (activas e inactivas)
+ */
+function obtenerCarrerasCompleta() {
+    global $db;
+    $carreras = [];
+    $query = "SELECT id_carrera, nombre_carrera, cod_carrera, activa, created_at FROM carreras ORDER BY nombre_carrera";
+    if ($stmt = $db->prepare($query)) {
+        try {
+            if (!$stmt->execute()) throw new Exception('Error al ejecutar consulta: ' . $stmt->error);
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $carreras[] = $row;
+            }
+            $result->free();
+        } catch (Exception $e) {
+            error_log('Error en obtenerTodasLasCarreras: ' . $e->getMessage());
+        } finally {
+            $stmt->close();
+        }
+    } else {
+        error_log('Error preparando obtenerTodasLasCarreras: ' . $db->error);
+    }
+
+    return $carreras;
+}
+
+/**
  * Obtiene los años (distinct) en los que existe una carrera con el mismo código
  * útil para mostrar versiones históricas por año
  */
@@ -3442,20 +3469,268 @@ function obtenerAniosPorCodigoCarrera($cod_carrera) {
     global $db;
 
     $anios = [];
-    $query = "SELECT DISTINCT YEAR(created_at) AS anio FROM carreras WHERE cod_carrera = ? ORDER BY anio DESC";
-    if ($stmt = $db->prepare($query)) {
+    // Buscar años en la tabla carreras
+    $query1 = "SELECT DISTINCT YEAR(created_at) AS anio FROM carreras WHERE cod_carrera = ? AND created_at IS NOT NULL";
+    if ($stmt = $db->prepare($query1)) {
         $stmt->bind_param('s', $cod_carrera);
         if ($stmt->execute()) {
             $result = $stmt->get_result();
             while ($row = $result->fetch_assoc()) {
-                if (!empty($row['anio'])) $anios[] = $row['anio'];
+                if (!empty($row['anio']) && !in_array($row['anio'], $anios)) $anios[] = $row['anio'];
             }
             $result->free();
         }
         $stmt->close();
     }
 
+    // Buscar años en la tabla de versiones si existe
+    $check = $db->query("SHOW TABLES LIKE 'carrera_versiones'");
+    if ($check && $check->num_rows > 0) {
+        $query2 = "SELECT DISTINCT YEAR(fecha_vigencia) AS anio FROM carrera_versiones v JOIN carreras c ON v.id_carrera = c.id_carrera WHERE c.cod_carrera = ? AND v.fecha_vigencia IS NOT NULL";
+        if ($stmt = $db->prepare($query2)) {
+            $stmt->bind_param('s', $cod_carrera);
+            if ($stmt->execute()) {
+                $result = $stmt->get_result();
+                while ($row = $result->fetch_assoc()) {
+                    if (!empty($row['anio']) && !in_array($row['anio'], $anios)) $anios[] = $row['anio'];
+                }
+                $result->free();
+            }
+            $stmt->close();
+        }
+    }
+
+    // Ordenar desc
+    rsort($anios);
+
     return $anios;
+}
+
+/**
+ * Obtiene versiones (id + fecha) para un código de carrera
+ */
+function obtenerVersionesPorCodigoCarrera($cod_carrera) {
+    global $db;
+    $versions = [];
+
+    // Verificar si la tabla de versiones existe antes de consultar
+    $check = $db->query("SHOW TABLES LIKE 'carrera_versiones'");
+    if ($check && $check->num_rows > 0) {
+        $query = "SELECT v.id_version, v.id_carrera, v.fecha_vigencia FROM carrera_versiones v JOIN carreras c ON v.id_carrera = c.id_carrera WHERE c.cod_carrera = ? ORDER BY v.fecha_vigencia DESC";
+        if ($stmt = $db->prepare($query)) {
+            $stmt->bind_param('s', $cod_carrera);
+            if ($stmt->execute()) {
+                $res = $stmt->get_result();
+                while ($row = $res->fetch_assoc()) {
+                    $row['anio'] = !empty($row['fecha_vigencia']) ? date('Y', strtotime($row['fecha_vigencia'])) : null;
+                    $versions[] = $row;
+                }
+                $res->free();
+            }
+            $stmt->close();
+        }
+    }
+
+    return $versions;
+}
+
+/**
+ * Obtiene versiones por id_carrera (útil cuando cod_carrera está vacío o cambió)
+ */
+function obtenerVersionesPorIdCarrera($id_carrera) {
+    global $db;
+    $versions = [];
+
+    $check = $db->query("SHOW TABLES LIKE 'carrera_versiones'");
+    if ($check && $check->num_rows > 0) {
+        $query = "SELECT id_version, id_carrera, fecha_vigencia FROM carrera_versiones WHERE id_carrera = ? ORDER BY fecha_vigencia DESC";
+        if ($stmt = $db->prepare($query)) {
+            $stmt->bind_param('i', $id_carrera);
+            if ($stmt->execute()) {
+                $res = $stmt->get_result();
+                while ($row = $res->fetch_assoc()) {
+                    $row['anio'] = !empty($row['fecha_vigencia']) ? date('Y', strtotime($row['fecha_vigencia'])) : null;
+                    $versions[] = $row;
+                }
+                $res->free();
+            }
+            $stmt->close();
+        }
+    }
+
+    return $versions;
+}
+
+/**
+ * Asigna una materia a una versión específica de carrera
+ */
+function asignarMateriaAVersion($id_version, $id_materia, $semestre) {
+    global $db;
+    try {
+        $stmt = $db->prepare("INSERT INTO version_materia (id_version, id_materia, semestre) VALUES (?, ?, ?)");
+        if (!$stmt) throw new Exception('Error al preparar insert version_materia: ' . $db->error);
+        $stmt->bind_param('iii', $id_version, $id_materia, $semestre);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar insert version_materia: ' . $stmt->error);
+        $id = $db->insert_id;
+        $stmt->close();
+        return ['success' => true, 'insert_id' => $id];
+    } catch (Exception $e) {
+        error_log('Error en asignarMateriaAVersion: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Obtiene materias asignadas para una versión de carrera
+ */
+function obtenerMateriasAsignadasVersion($id_version) {
+    global $db;
+    $materias = [];
+    $query = "SELECT vm.id, vm.id_version, vm.id_materia, vm.semestre, m.cod_materia, m.nombre_materia FROM version_materia vm JOIN materias m ON vm.id_materia = m.id_materia WHERE vm.id_version = ? ORDER BY vm.semestre";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('i', $id_version);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($row = $res->fetch_assoc()) {
+                $materias[] = $row;
+            }
+            $res->free();
+        }
+        $stmt->close();
+    }
+    return $materias;
+}
+
+/**
+ * Elimina asignación de materia en versión
+ */
+function eliminarAsignacionVersion($id) {
+    global $db;
+    try {
+        $stmt = $db->prepare("DELETE FROM version_materia WHERE id = ?");
+        if (!$stmt) throw new Exception('Error al preparar delete version_materia: ' . $db->error);
+        $stmt->bind_param('i', $id);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar delete version_materia: ' . $stmt->error);
+        $affected = $stmt->affected_rows;
+        $stmt->close();
+        return ['success' => true, 'affected_rows' => $affected];
+    } catch (Exception $e) {
+        error_log('Error en eliminarAsignacionVersion: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Duplica una carrera como nueva versión con una fecha de vigencia distinta.
+ * Opcionalmente copia las asignaciones de materias (carrera_materia).
+ * Devuelve array con success + message + new_id si aplica.
+ */
+function duplicarCarrera(int $id_carrera_original, string $nueva_fecha, bool $copiar_materias = true): array {
+    global $db;
+
+    try {
+        // Obtener carrera original
+        $stmt = $db->prepare("SELECT nombre_carrera, cod_carrera, activa, duracion_semestres, titulo_otorga, otro_titulo, descripcion, tipo_formacion FROM carreras WHERE id_carrera = ? LIMIT 1");
+        if (!$stmt) throw new Exception('Error al preparar consulta de carrera: ' . $db->error);
+        $stmt->bind_param('i', $id_carrera_original);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        if (!$res || $res->num_rows === 0) {
+            $stmt->close();
+            return ['success' => false, 'message' => 'Carrera original no encontrada'];
+        }
+        $orig = $res->fetch_assoc();
+        $stmt->close();
+
+        // Normalizar fecha
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $nueva_fecha)) {
+            $nueva_fecha = $nueva_fecha . ' 00:00:00';
+        }
+
+        // Crear tablas de versiones si no existen
+        $db->query("CREATE TABLE IF NOT EXISTS carrera_versiones (
+            id_version INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            id_carrera INT NOT NULL,
+            fecha_vigencia DATETIME NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (id_carrera),
+            FOREIGN KEY (id_carrera) REFERENCES carreras(id_carrera) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $db->query("CREATE TABLE IF NOT EXISTS version_materia (
+            id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            id_version INT NOT NULL,
+            id_materia INT NOT NULL,
+            semestre INT NOT NULL,
+            INDEX (id_version),
+            FOREIGN KEY (id_version) REFERENCES carrera_versiones(id_version) ON DELETE CASCADE,
+            FOREIGN KEY (id_materia) REFERENCES materias(id_materia) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $db->begin_transaction();
+
+        // Insertar versión
+        $insert = $db->prepare("INSERT INTO carrera_versiones (id_carrera, fecha_vigencia) VALUES (?, ?)");
+        if (!$insert) throw new Exception('Error al preparar inserción version: ' . $db->error);
+        $insert->bind_param('is', $id_carrera_original, $nueva_fecha);
+        if (!$insert->execute()) {
+            $err = $insert->error;
+            $insert->close();
+            $db->rollback();
+            throw new Exception('Error al insertar versión: ' . $err);
+        }
+
+        $new_version_id = $db->insert_id;
+        $insert->close();
+
+        // Copiar asignaciones de materias a version_materia si se solicita
+        if ($copiar_materias) {
+            $sel = $db->prepare("SELECT id_materia, semestre FROM carrera_materia WHERE id_carrera = ?");
+            if (!$sel) throw new Exception('Error al preparar selección de materias: ' . $db->error);
+            $sel->bind_param('i', $id_carrera_original);
+            $sel->execute();
+            $resm = $sel->get_result();
+
+            $ins = $db->prepare("INSERT INTO version_materia (id_version, id_materia, semestre) VALUES (?, ?, ?)");
+            if (!$ins) {
+                $sel->close();
+                throw new Exception('Error al preparar inserción de materia en version: ' . $db->error);
+            }
+
+            while ($row = $resm->fetch_assoc()) {
+                $id_materia = (int)$row['id_materia'];
+                $semestre = (int)$row['semestre'];
+                $ins->bind_param('iii', $new_version_id, $id_materia, $semestre);
+                if (!$ins->execute()) {
+                    $ins->close();
+                    $sel->close();
+                    $db->rollback();
+                    throw new Exception('Error al insertar relación materia-version: ' . $ins->error);
+                }
+            }
+
+            $ins->close();
+            $sel->close();
+        }
+
+        $db->commit();
+
+        // Auditoría si aplica
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria('INSERT', 'carrera_versiones', $new_version_id, null, ['copiado_de' => $id_carrera_original, 'fecha_vigencia' => $nueva_fecha], 'Carreras', 'Creación de versión de carrera');
+            } catch (Exception $e) {
+                error_log('Error en auditoría duplicarCarrera: ' . $e->getMessage());
+            }
+        }
+
+        return ['success' => true, 'message' => 'Versión creada correctamente', 'new_version_id' => $new_version_id];
+
+    } catch (Exception $e) {
+        if (isset($db) && method_exists($db, 'rollback')) $db->rollback();
+        error_log('Error en duplicarCarrera: ' . $e->getMessage());
+        return ['success' => false, 'message' => 'Error al duplicar carrera: ' . $e->getMessage()];
+    }
 }
 
 /**

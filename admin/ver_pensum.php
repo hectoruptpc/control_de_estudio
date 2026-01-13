@@ -14,32 +14,47 @@ $id_carrera = null;
 $carrera = null;
 
 // Permitir búsqueda por id OR por código + año
-if (isset($_GET['cod']) && isset($_GET['anio'])) {
-    $cod = trim($_GET['cod']);
-    $anio = (int)$_GET['anio'];
-    if ($anio <= 0 || empty($cod)) {
-        header("Location: lista_carreras.php");
-        exit();
+if (isset($_GET['id_version'])) {
+    $version_id = intval($_GET['id_version']);
+    if ($version_id <= 0) { header("Location: lista_carreras.php"); exit(); }
+
+    $stmt = $db->prepare("SELECT v.id_version, v.id_carrera, v.fecha_vigencia, c.nombre_carrera, c.tipo_formacion FROM carrera_versiones v JOIN carreras c ON v.id_carrera = c.id_carrera WHERE v.id_version = ? LIMIT 1");
+    if ($stmt) {
+        $stmt->bind_param('i', $version_id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        if ($res && $res->num_rows > 0) {
+            $row = $res->fetch_assoc();
+            $carrera = ['nombre_carrera' => $row['nombre_carrera'], 'tipo_formacion' => $row['tipo_formacion']];
+            $id_carrera = (int)$row['id_carrera'];
+        }
+        $stmt->close();
     }
 
-    // Buscar la carrera correspondiente por código y año (created_at)
-    $stmt = $db->prepare("SELECT id_carrera, nombre_carrera, tipo_formacion FROM carreras WHERE cod_carrera = ? AND YEAR(created_at) = ? LIMIT 1");
+    if (!$carrera) { header("Location: lista_carreras.php"); exit(); }
+
+} elseif (isset($_GET['cod']) && isset($_GET['anio'])) {
+    $cod = trim($_GET['cod']);
+    $anio = (int)$_GET['anio'];
+    if ($anio <= 0 || empty($cod)) { header("Location: lista_carreras.php"); exit(); }
+
+    // Buscar la versión correspondiente por código y año en carrera_versiones
+    $version_id = null;
+    $stmt = $db->prepare("SELECT v.id_version, c.id_carrera, c.nombre_carrera, c.tipo_formacion FROM carrera_versiones v JOIN carreras c ON v.id_carrera = c.id_carrera WHERE c.cod_carrera = ? AND YEAR(v.fecha_vigencia) = ? LIMIT 1");
     if ($stmt) {
         $stmt->bind_param('si', $cod, $anio);
         $stmt->execute();
         $res = $stmt->get_result();
         if ($res && $res->num_rows > 0) {
-            $carrera = $res->fetch_assoc();
-            $id_carrera = (int)$carrera['id_carrera'];
+            $row = $res->fetch_assoc();
+            $carrera = ['nombre_carrera' => $row['nombre_carrera'], 'tipo_formacion' => $row['tipo_formacion']];
+            $id_carrera = (int)$row['id_carrera'];
+            $version_id = (int)$row['id_version'];
         }
         $stmt->close();
     }
 
-    if (!$carrera) {
-        // No se encontró la versión solicitada
-        header("Location: lista_carreras.php");
-        exit();
-    }
+    if (!$carrera) { header("Location: lista_carreras.php"); exit(); }
 
 } else {
     // Parámetro por id (comportamiento original)
@@ -73,21 +88,18 @@ $es_pnf = ($carrera['tipo_formacion'] == 'PNF');
 // Obtener el tipo de período según la carrera (trimestre o semestre)
 $tipo_periodo = obtenerTipoPeriodoPorCarrera($id_carrera);
 
-// Debug: ver qué está retornando la función
-error_log("Tipo de periodo para carrera ID $id_carrera: " . $tipo_periodo);
+// (removed debug log)
 
 // Corregir la formación del plural
 $texto_duracion = ($tipo_periodo == 'trimestre') ? 'trimestres' : 'semestres';
 
 // Obtener materias agrupadas por trayecto y ordenadas por duración
-$query_materias = "SELECT 
-                    m.*, 
-                    cm.semestre,
-                    m.trayecto
-                  FROM materias m
-                  JOIN carrera_materia cm ON m.id_materia = cm.id_materia
-                  WHERE cm.id_carrera = $id_carrera
-                  ORDER BY m.trayecto, m.duracion_periodo, m.nombre_materia";
+if (!empty($version_id)) {
+    $query_materias = "SELECT m.*, vm.semestre, m.trayecto FROM materias m JOIN version_materia vm ON m.id_materia = vm.id_materia WHERE vm.id_version = " . intval($version_id) . " ORDER BY m.trayecto, m.duracion_periodo, m.nombre_materia";
+} else {
+    $query_materias = "SELECT m.*, cm.semestre, m.trayecto FROM materias m JOIN carrera_materia cm ON m.id_materia = cm.id_materia WHERE cm.id_carrera = " . intval($id_carrera) . " ORDER BY m.trayecto, m.duracion_periodo, m.nombre_materia";
+}
+
 $result_materias = mysqli_query($db, $query_materias);
 
 if (!$result_materias) {

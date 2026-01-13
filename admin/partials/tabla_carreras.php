@@ -68,14 +68,26 @@ try {
                             <i class="fas fa-book"></i> Ver Pensum
                         </a>
 
-                        <?php // Mostrar selector de años si existen versiones por código ?>
-                        <?php $anios = obtenerAniosPorCodigoCarrera($carrera['cod_carrera']); ?>
-                        <?php if (!empty($anios)): ?>
+                        <a href="duplicar_carrera.php?id=<?= intval($carrera['id_carrera']) ?>" 
+                           class="btn btn-sm btn-outline-primary ml-1" title="Crear versión de esta carrera">
+                            <i class="fas fa-copy"></i> Duplicar
+                        </a>
+
+                        <?php // Mostrar selector de versiones (usar id_version para navegación precisa) ?>
+                        <?php $versions = obtenerVersionesPorCodigoCarrera($carrera['cod_carrera']); ?>
+                        <?php if (!empty($versions) || true): // siempre mostrar selector para incluir la versión base ?>
+                            <?php $cbase = obtenerCarreraPorId(intval($carrera['id_carrera'])); $base_year = !empty($cbase['created_at']) ? date('Y', strtotime($cbase['created_at'])) : ''; ?>
                             <select class="form-control form-control-sm d-inline-block ml-2" style="width:auto; display:inline-block;" 
-                                    onchange="if(this.value) window.location.href='ver_pensum.php?cod=<?= urlencode($carrera['cod_carrera']) ?>&anio='+this.value;">
-                                <option value="">Año</option>
-                                <?php foreach ($anios as $anio): ?>
-                                    <option value="<?= intval($anio) ?>"><?= intval($anio) ?></option>
+                                    onchange="if(this.value){ if(this.value.charAt(0)=='c'){ window.location.href='ver_pensum.php?id_carrera='+this.value.substring(1); } else { window.location.href='ver_pensum.php?id_version='+this.value; } }">
+                                <option value="">Versión (Año)</option>
+                                <?php if (!empty($base_year)): ?>
+                                    <option value="c<?= intval($carrera['id_carrera']) ?>"><?= htmlspecialchars($base_year) ?> (Actual)</option>
+                                <?php else: ?>
+                                    <option value="c<?= intval($carrera['id_carrera']) ?>">Actual</option>
+                                <?php endif; ?>
+                                <?php foreach ($versions as $v): ?>
+                                    <?php $vyear = !empty($v['fecha_vigencia']) ? date('Y', strtotime($v['fecha_vigencia'])) : ($v['anio'] ?? ''); ?>
+                                    <option value="<?= intval($v['id_version']) ?>"><?= htmlspecialchars($vyear) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         <?php endif; ?>

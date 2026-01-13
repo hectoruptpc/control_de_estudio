@@ -23,43 +23,79 @@ include("includes/head.php");
 // Procesar formularios
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['agregar_materia'])) {
-        $resultado = asignarMateriaACarrera(
-            intval($_POST['id_carrera']),
-            intval($_POST['id_materia']),
-            intval($_POST['semestre'])
-        );
+            $id_version = isset($_POST['id_version']) && $_POST['id_version'] !== '' ? intval($_POST['id_version']) : 0;
+            if ($id_version > 0) {
+                $resultado = asignarMateriaAVersion($id_version, intval($_POST['id_materia']), intval($_POST['semestre']));
+            } else {
+                $resultado = asignarMateriaACarrera(
+                    intval($_POST['id_carrera']),
+                    intval($_POST['id_materia']),
+                    intval($_POST['semestre'])
+                );
+            }
         
-        if ($resultado['success']) {
-            $mensaje = htmlspecialchars($resultado['message']);
+        if (!is_array($resultado)) $resultado = ['success' => false, 'message' => 'Respuesta inválida'];
+        if (!empty($resultado['success'])) {
+            $mensaje_text = $resultado['message'] ?? 'Asignación realizada correctamente';
+            $mensaje = htmlspecialchars($mensaje_text);
         } else {
-            $error = htmlspecialchars($resultado['message']);
+            $error_text = $resultado['message'] ?? 'Ocurrió un error al asignar la materia';
+            $error = htmlspecialchars($error_text);
         }
     }
     
     if (isset($_POST['eliminar_asignacion'])) {
         $resultado = eliminarAsignacionMateria(intval($_POST['id_relacion']));
         
-        if ($resultado['success']) {
-            $mensaje = htmlspecialchars($resultado['message']);
+        if (!is_array($resultado)) $resultado = ['success' => false, 'message' => 'Respuesta inválida'];
+        if (!empty($resultado['success'])) {
+            $mensaje_text = $resultado['message'] ?? 'Asignación eliminada correctamente';
+            $mensaje = htmlspecialchars($mensaje_text);
         } else {
-            $error = htmlspecialchars($resultado['message']);
+            $error_text = $resultado['message'] ?? 'Ocurrió un error al eliminar la asignación';
+            $error = htmlspecialchars($error_text);
+        }
+    }
+    
+    if (isset($_POST['eliminar_asignacion_version'])) {
+        $resultado = eliminarAsignacionVersion(intval($_POST['id_relacion_version']));
+
+        if (!is_array($resultado)) $resultado = ['success' => false, 'message' => 'Respuesta inválida'];
+        if (!empty($resultado['success'])) {
+            $mensaje_text = $resultado['message'] ?? 'Asignación de versión eliminada';
+            $mensaje = htmlspecialchars($mensaje_text);
+        } else {
+            $error_text = $resultado['message'] ?? 'Ocurrió un error al eliminar la asignación de versión';
+            $error = htmlspecialchars($error_text);
         }
     }
 }
 
-// Obtener datos
-$carreras = obtenerCarrerasActivas();
-$carrera_seleccionada = isset($_POST['id_carrera']) ? intval($_POST['id_carrera']) : ($carreras[0]['id_carrera'] ?? 0);
+// Obtener datos (usar todas las carreras para incluir versiones de carreras inactivas)
+$carreras = function_exists('obtenerCarrerasCompleta') ? obtenerCarrerasCompleta() : obtenerTodasLasCarreras();
+
+// Determinar carrera seleccionada: preferir GET (enlaces), luego POST (formularios), luego primera de la lista
+$carrera_seleccionada = 0;
+if (isset($_GET['id_carrera'])) {
+    $carrera_seleccionada = intval($_GET['id_carrera']);
+} elseif (isset($_POST['id_carrera'])) {
+    $carrera_seleccionada = intval($_POST['id_carrera']);
+} else {
+    $carrera_seleccionada = $carreras[0]['id_carrera'] ?? 0;
+}
 
 // Si se pasa id_materia por GET, preseleccionarla en el formulario
 $preselected_materia = isset($_GET['id_materia']) ? intval($_GET['id_materia']) : 0;
 
 $materias_disponibles = obtenerMateriasDisponibles($carrera_seleccionada);
 $materias_asignadas = obtenerMateriasAsignadas($carrera_seleccionada);
+
+// (Depuraciones removidas para limpiar la interfaz)
 ?>
 
 <div class="container-fluid">
     <h1 class="mt-4"><?= htmlspecialchars($titulopag) ?></h1>
+    
     
     <?php if (isset($mensaje)): ?>
     <div class="alert alert-success">
@@ -83,11 +119,13 @@ $materias_asignadas = obtenerMateriasAsignadas($carrera_seleccionada);
                             <select name="id_carrera" class="form-control" required>
                                 <?php foreach ($carreras as $carrera): ?>
                                     <?php $anio = !empty($carrera['created_at']) ? date('Y', strtotime($carrera['created_at'])) : '';?>
+                                    <?php $versions_for_c = obtenerVersionesPorIdCarrera($carrera['id_carrera']); $vcount = count($versions_for_c); ?>
                                     <option value="<?= intval($carrera['id_carrera']) ?>" 
                                         <?= ($carrera['id_carrera'] == $carrera_seleccionada) ? 'selected' : '' ?>>
                                         <?= htmlspecialchars($carrera['nombre_carrera']) ?>
                                         <?= $carrera['cod_carrera'] ? ' (' . htmlspecialchars($carrera['cod_carrera']) . ')' : '' ?>
                                         <?= $anio ? ' - ' . $anio : '' ?>
+                                        <?= $vcount ? ' — versiones: ' . $vcount : '' ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -104,6 +142,33 @@ $materias_asignadas = obtenerMateriasAsignadas($carrera_seleccionada);
                                 <?php endforeach; ?>
                             </select>
                         </div>
+
+                        <div class="form-group">
+                            <label>Versión / Año (opcional):</label>
+                            <select name="id_version" id="id_version" class="form-control">
+                                <option value="">-- Usar carrera base --</option>
+                                <?php
+                                    // Mostrar versiones disponibles para la carrera seleccionada
+                                    $versions = [];
+                                    if (!empty($carreras)) {
+                                        foreach ($carreras as $c) {
+                                            if ($c['id_carrera'] == $carrera_seleccionada) {
+                                                $versions = obtenerVersionesPorIdCarrera($c['id_carrera']);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                ?>
+                                <?php foreach ($versions as $v): ?>
+                                    <option value="<?= intval($v['id_version']) ?>"><?= htmlspecialchars($v['anio'] ?? '') ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="form-text text-muted">Si selecciona versión, la asignación se guardará para ese año en particular.</small>
+                        </div>
+
+                                <!-- Lista de versiones eliminada para mantener la interfaz limpia -->
+
+                                
                         
                         <div class="form-group">
                             <label>Trimestre/Semestre:</label>
@@ -141,12 +206,15 @@ $materias_asignadas = obtenerMateriasAsignadas($carrera_seleccionada);
                             </thead>
                             <tbody>
                                 <?php foreach ($carreras as $carrera): ?>
-                                    <?php $materias = obtenerMateriasAsignadas($carrera['id_carrera']); ?>
-                                    <?php foreach ($materias as $materia): ?>
+                                    <?php
+                                        // Materias base asignadas
+                                        $materias = obtenerMateriasAsignadas($carrera['id_carrera']);
+                                        foreach ($materias as $materia):
+                                    ?>
                                         <tr>
                                             <td><?= htmlspecialchars($carrera['cod_carrera']) ?></td>
                                             <td><?= htmlspecialchars($materia['cod_materia']) ?> - <?= htmlspecialchars($materia['nombre_materia']) ?></td>
-                                            <td><?= intval($materia['semestre']) ?></td>
+                                            <td><?= intval($materia['semestre']) ?> (base)</td>
                                             <td>
                                                 <form method="POST" style="display:inline;">
                                                     <input type="hidden" name="id_relacion" value="<?= intval($materia['id_relacion']) ?>">
@@ -158,6 +226,31 @@ $materias_asignadas = obtenerMateriasAsignadas($carrera_seleccionada);
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
+
+                                    <?php
+                                        // Mostrar versiones y sus materias
+                                        $versions = obtenerVersionesPorIdCarrera($carrera['id_carrera']);
+                                        foreach ($versions as $v) {
+                                            $vm = obtenerMateriasAsignadasVersion($v['id_version']);
+                                            foreach ($vm as $materia):
+                                    ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($carrera['cod_carrera']) ?></td>
+                                                    <td><?= htmlspecialchars($materia['cod_materia']) ?> - <?= htmlspecialchars($materia['nombre_materia']) ?></td>
+                                                    <td><?= intval($materia['semestre']) ?> (<?= htmlspecialchars($v['anio']) ?>)</td>
+                                                    <td>
+                                                        <form method="POST" style="display:inline;">
+                                                            <input type="hidden" name="id_relacion_version" value="<?= intval($materia['id']) ?>">
+                                                            <button type="submit" name="eliminar_asignacion_version" class="btn btn-sm btn-danger"
+                                                                    onclick="return confirm('¿Eliminar esta asignación de versión?')">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; // end vm loop
+                                        } // end versions loop
+                                    ?>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
@@ -169,3 +262,41 @@ $materias_asignadas = obtenerMateriasAsignadas($carrera_seleccionada);
 </div>
 
 <?php include("includes/footer.php"); ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const carreraSelect = document.querySelector('select[name="id_carrera"]');
+    const versionSelect = document.getElementById('id_version');
+
+    function renderNoVersions() {
+        versionSelect.innerHTML = '<option value="">-- Usar carrera base --</option>';
+    }
+
+    function loadVersions(id) {
+        if (!id || parseInt(id) <= 0) { renderNoVersions(); return; }
+        fetch('ajax_get_versions.php?id_carrera=' + encodeURIComponent(id))
+            .then(res => res.json())
+            .then(data => {
+                versionSelect.innerHTML = '<option value="">-- Usar carrera base --</option>';
+                if (data && data.success && Array.isArray(data.versions) && data.versions.length) {
+                    data.versions.forEach(v => {
+                        const opt = document.createElement('option');
+                        opt.value = v.id_version || v.id || 0;
+                        opt.textContent = v.anio || '';
+                        versionSelect.appendChild(opt);
+                    });
+                } else {
+                    renderNoVersions();
+                }
+            }).catch(err => {
+                versionsBlock.innerHTML = '<div class="alert alert-danger">Error al cargar versiones.</div>';
+            });
+    }
+
+    if (carreraSelect) {
+        carreraSelect.addEventListener('change', function(){ loadVersions(this.value); });
+        // cargar inicial
+        loadVersions(carreraSelect.value);
+    }
+});
+</script>

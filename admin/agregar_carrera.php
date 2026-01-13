@@ -120,7 +120,7 @@ include("includes/head.php");
         </div>
         
         <button type="submit" class="btn btn-primary">Guardar Programa</button>
-        <a href="lista_carreras.php" class="btn btn-secondary">Cancelar</a>
+        <a href="agregar_carrera.php" class="btn btn-secondary">Cancelar</a>
     </form>
 
 <?php endif; ?>
