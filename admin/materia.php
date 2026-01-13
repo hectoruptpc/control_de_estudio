@@ -263,6 +263,11 @@ include("includes/head.php");
                                                     <i class="fas fa-edit"></i> Editar
                                                 </button>
                                                 
+                                                <a href="carrera_materias.php?id_materia=<?= intval($materia['id_materia']) ?>" 
+                                                   class="btn btn-sm btn-info" title="Relacionar con Carrera (versión/año)">
+                                                    <i class="fas fa-link"></i> Relacionar
+                                                </a>
+
                                                 <button type="button" class="btn btn-sm btn-<?= $materia['activa'] ? 'danger' : 'success' ?>" 
                                                         data-toggle="modal" data-target="#modalDeshabilitar" 
                                                         data-id="<?= $materia['id_materia'] ?>" 

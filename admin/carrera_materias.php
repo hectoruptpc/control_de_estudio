@@ -50,6 +50,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 // Obtener datos
 $carreras = obtenerCarrerasActivas();
 $carrera_seleccionada = isset($_POST['id_carrera']) ? intval($_POST['id_carrera']) : ($carreras[0]['id_carrera'] ?? 0);
+
+// Si se pasa id_materia por GET, preseleccionarla en el formulario
+$preselected_materia = isset($_GET['id_materia']) ? intval($_GET['id_materia']) : 0;
+
 $materias_disponibles = obtenerMateriasDisponibles($carrera_seleccionada);
 $materias_asignadas = obtenerMateriasAsignadas($carrera_seleccionada);
 ?>
@@ -75,12 +79,15 @@ $materias_asignadas = obtenerMateriasAsignadas($carrera_seleccionada);
                 <div class="card-body">
                     <form method="POST">
                         <div class="form-group">
-                            <label>Carrera:</label>
+                            <label>Carrera (versión / año):</label>
                             <select name="id_carrera" class="form-control" required>
                                 <?php foreach ($carreras as $carrera): ?>
+                                    <?php $anio = !empty($carrera['created_at']) ? date('Y', strtotime($carrera['created_at'])) : '';?>
                                     <option value="<?= intval($carrera['id_carrera']) ?>" 
                                         <?= ($carrera['id_carrera'] == $carrera_seleccionada) ? 'selected' : '' ?>>
                                         <?= htmlspecialchars($carrera['nombre_carrera']) ?>
+                                        <?= $carrera['cod_carrera'] ? ' (' . htmlspecialchars($carrera['cod_carrera']) . ')' : '' ?>
+                                        <?= $anio ? ' - ' . $anio : '' ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -90,7 +97,8 @@ $materias_asignadas = obtenerMateriasAsignadas($carrera_seleccionada);
                             <label>Materia:</label>
                             <select name="id_materia" class="form-control" required>
                                 <?php foreach ($materias_disponibles as $materia): ?>
-                                    <option value="<?= intval($materia['id_materia']) ?>">
+                                    <option value="<?= intval($materia['id_materia']) ?>" 
+                                        <?= ($preselected_materia && $preselected_materia == $materia['id_materia']) ? 'selected' : '' ?>>
                                         <?= htmlspecialchars($materia['cod_materia']) ?> - <?= htmlspecialchars($materia['nombre_materia']) ?>
                                     </option>
                                 <?php endforeach; ?>

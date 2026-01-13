@@ -67,6 +67,18 @@ try {
                            class="btn btn-sm btn-info">
                             <i class="fas fa-book"></i> Ver Pensum
                         </a>
+
+                        <?php // Mostrar selector de años si existen versiones por código ?>
+                        <?php $anios = obtenerAniosPorCodigoCarrera($carrera['cod_carrera']); ?>
+                        <?php if (!empty($anios)): ?>
+                            <select class="form-control form-control-sm d-inline-block ml-2" style="width:auto; display:inline-block;" 
+                                    onchange="if(this.value) window.location.href='ver_pensum.php?cod=<?= urlencode($carrera['cod_carrera']) ?>&anio='+this.value;">
+                                <option value="">Año</option>
+                                <?php foreach ($anios as $anio): ?>
+                                    <option value="<?= intval($anio) ?>"><?= intval($anio) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>

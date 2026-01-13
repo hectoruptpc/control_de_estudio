@@ -10,24 +10,64 @@ if (!$db) {
     die("Error de conexión: " . mysqli_connect_error());
 }
 
-// Validar parámetro
-if (!isset($_GET['id_carrera']) || !is_numeric($_GET['id_carrera'])) {
-    header("Location: lista_carreras.php");
-    exit();
+$id_carrera = null;
+$carrera = null;
+
+// Permitir búsqueda por id OR por código + año
+if (isset($_GET['cod']) && isset($_GET['anio'])) {
+    $cod = trim($_GET['cod']);
+    $anio = (int)$_GET['anio'];
+    if ($anio <= 0 || empty($cod)) {
+        header("Location: lista_carreras.php");
+        exit();
+    }
+
+    // Buscar la carrera correspondiente por código y año (created_at)
+    $stmt = $db->prepare("SELECT id_carrera, nombre_carrera, tipo_formacion FROM carreras WHERE cod_carrera = ? AND YEAR(created_at) = ? LIMIT 1");
+    if ($stmt) {
+        $stmt->bind_param('si', $cod, $anio);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        if ($res && $res->num_rows > 0) {
+            $carrera = $res->fetch_assoc();
+            $id_carrera = (int)$carrera['id_carrera'];
+        }
+        $stmt->close();
+    }
+
+    if (!$carrera) {
+        // No se encontró la versión solicitada
+        header("Location: lista_carreras.php");
+        exit();
+    }
+
+} else {
+    // Parámetro por id (comportamiento original)
+    if (!isset($_GET['id_carrera']) || !is_numeric($_GET['id_carrera'])) {
+        header("Location: lista_carreras.php");
+        exit();
+    }
+
+    $id_carrera = (int)$_GET['id_carrera'];
+
+    // Obtener información básica de la carrera
+    $stmt = $db->prepare("SELECT nombre_carrera, tipo_formacion FROM carreras WHERE id_carrera = ? LIMIT 1");
+    if ($stmt) {
+        $stmt->bind_param('i', $id_carrera);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        if ($res && $res->num_rows > 0) {
+            $carrera = $res->fetch_assoc();
+        }
+        $stmt->close();
+    }
+
+    if (!$carrera) {
+        header("Location: lista_carreras.php");
+        exit();
+    }
+
 }
-
-$id_carrera = (int)$_GET['id_carrera'];
-
-// Obtener información básica de la carrera
-$query_carrera = "SELECT nombre_carrera, tipo_formacion FROM carreras WHERE id_carrera = $id_carrera";
-$result_carrera = mysqli_query($db, $query_carrera);
-
-if (!$result_carrera || mysqli_num_rows($result_carrera) === 0) {
-    header("Location: lista_carreras.php");
-    exit();
-}
-
-$carrera = mysqli_fetch_assoc($result_carrera);
 $es_pnf = ($carrera['tipo_formacion'] == 'PNF');
 
 // Obtener el tipo de período según la carrera (trimestre o semestre)

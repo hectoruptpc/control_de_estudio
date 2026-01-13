@@ -1832,7 +1832,8 @@ function registrarNuevaCarrera(
     string $tipo_formacion, 
     int $duracion_anios,
     string $titulo_principal,
-    string $titulo_opcional = ''
+    string $titulo_opcional = '',
+    string $vigencia_fecha = null
 ): array {
     global $db;
     
@@ -1882,10 +1883,10 @@ function registrarNuevaCarrera(
         }
         $checkStmt->close();
         
-        // 2. Insertar nueva carrera
+        // 2. Insertar nueva carrera (permitir guardar la fecha de vigencia en created_at)
         $insertStmt = $db->prepare("INSERT INTO carreras 
-            (nombre_carrera, cod_carrera, tipo_formacion, duracion_semestres, titulo_otorga, otro_titulo, descripcion, activa) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1)");
+            (nombre_carrera, cod_carrera, tipo_formacion, duracion_semestres, titulo_otorga, otro_titulo, descripcion, created_at, activa) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)");
         
         if (!$insertStmt) {
             throw new Exception("Error al preparar inserción: " . $db->error);
@@ -1897,15 +1898,26 @@ function registrarNuevaCarrera(
             $descripcion .= "\nTítulo opcional: $titulo_opcional";
         }
         
+        // Si no se proporcionó una fecha de vigencia, usar la fecha actual
+        if (empty($vigencia_fecha)) {
+            $vigencia_fecha = date('Y-m-d H:i:s');
+        } else {
+            // Normalizar formato a YYYY-MM-DD HH:MM:SS si solo se envió YYYY-MM-DD
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $vigencia_fecha)) {
+                $vigencia_fecha = $vigencia_fecha . ' 00:00:00';
+            }
+        }
+
         $insertStmt->bind_param(
-            "sssisss", 
+            "sssissss", 
             $nombre, 
             $codigo, 
             $tipo_formacion,
             $duracion_semestres,
             $titulo_principal,  // Solo el título principal
             $titulo_opcional,   // Título opcional por separado
-            $descripcion
+            $descripcion,
+            $vigencia_fecha
         );
         
         if (!$insertStmt->execute()) {
@@ -1933,6 +1945,7 @@ function registrarNuevaCarrera(
                         'duracion_anios' => $duracion_anios,
                         'titulo_principal' => $titulo_principal,
                         'titulo_opcional' => $titulo_opcional,
+                        'vigencia_fecha' => $vigencia_fecha,
                         'activa' => 1
                     ], 
                     "Carreras", 
@@ -3378,7 +3391,7 @@ function obtenerCarrerasActivas() {
     $carreras = []; // Array para almacenar resultados
     
     // Consulta SQL con parámetro para estado activo
-    $query = "SELECT id_carrera, nombre_carrera, cod_carrera 
+    $query = "SELECT id_carrera, nombre_carrera, cod_carrera, created_at 
               FROM carreras 
               WHERE activa = ? 
               ORDER BY nombre_carrera";
@@ -3419,6 +3432,30 @@ function obtenerCarrerasActivas() {
     }
     
     return $carreras;
+}
+
+/**
+ * Obtiene los años (distinct) en los que existe una carrera con el mismo código
+ * útil para mostrar versiones históricas por año
+ */
+function obtenerAniosPorCodigoCarrera($cod_carrera) {
+    global $db;
+
+    $anios = [];
+    $query = "SELECT DISTINCT YEAR(created_at) AS anio FROM carreras WHERE cod_carrera = ? ORDER BY anio DESC";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('s', $cod_carrera);
+        if ($stmt->execute()) {
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                if (!empty($row['anio'])) $anios[] = $row['anio'];
+            }
+            $result->free();
+        }
+        $stmt->close();
+    }
+
+    return $anios;
 }
 
 /**
