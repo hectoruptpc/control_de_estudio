@@ -12,6 +12,7 @@ if (!$db) {
 
 $id_carrera = null;
 $carrera = null;
+$version_year = null;
 
 // Permitir búsqueda por id OR por código + año
 if (isset($_GET['id_version'])) {
@@ -27,6 +28,7 @@ if (isset($_GET['id_version'])) {
             $row = $res->fetch_assoc();
             $carrera = ['nombre_carrera' => $row['nombre_carrera'], 'tipo_formacion' => $row['tipo_formacion']];
             $id_carrera = (int)$row['id_carrera'];
+            $version_year = !empty($row['fecha_vigencia']) ? date('Y', strtotime($row['fecha_vigencia'])) : null;
         }
         $stmt->close();
     }
@@ -50,6 +52,7 @@ if (isset($_GET['id_version'])) {
             $carrera = ['nombre_carrera' => $row['nombre_carrera'], 'tipo_formacion' => $row['tipo_formacion']];
             $id_carrera = (int)$row['id_carrera'];
             $version_id = (int)$row['id_version'];
+            $version_year = !empty($row['fecha_vigencia']) ? date('Y', strtotime($row['fecha_vigencia'])) : $anio;
         }
         $stmt->close();
     }
@@ -66,13 +69,14 @@ if (isset($_GET['id_version'])) {
     $id_carrera = (int)$_GET['id_carrera'];
 
     // Obtener información básica de la carrera
-    $stmt = $db->prepare("SELECT nombre_carrera, tipo_formacion FROM carreras WHERE id_carrera = ? LIMIT 1");
+    $stmt = $db->prepare("SELECT nombre_carrera, tipo_formacion, created_at FROM carreras WHERE id_carrera = ? LIMIT 1");
     if ($stmt) {
         $stmt->bind_param('i', $id_carrera);
         $stmt->execute();
         $res = $stmt->get_result();
         if ($res && $res->num_rows > 0) {
             $carrera = $res->fetch_assoc();
+            $version_year = !empty($carrera['created_at']) ? date('Y', strtotime($carrera['created_at'])) : null;
         }
         $stmt->close();
     }
@@ -140,7 +144,9 @@ if (isset($_GET['pdf']) && $_GET['pdf'] == '1') {
     }
 
     $pdf->SetFont('Arial', 'B', 14);
-    $pdf->Cell(0, 8, to_iso('Pensum: ' . $carrera['nombre_carrera']), 0, 1, 'C');
+    $title = 'Pensum: ' . $carrera['nombre_carrera'];
+    if (!empty($version_year)) $title .= ' (Año: ' . $version_year . ')';
+    $pdf->Cell(0, 8, to_iso($title), 0, 1, 'C');
     $pdf->SetFont('Arial', '', 10);
     $pdf->Cell(0, 6, to_iso('Fecha: ' . date('d/m/Y')), 0, 1, 'R');
     $pdf->Ln(4);
@@ -181,7 +187,8 @@ if (isset($_GET['pdf']) && $_GET['pdf'] == '1') {
         $pdf->Ln(4);
     }
 
-    $pdf->Output('I', 'pensum_' . $id_carrera . '.pdf');
+    $filename = 'pensum_' . $id_carrera . (!empty($version_year) ? '_' . $version_year : '');
+    $pdf->Output('I', $filename . '.pdf');
     exit();
 }
 
@@ -198,7 +205,8 @@ include("includes/head.php");
             <a href="agregar_carrera.php" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm no-print">
                 <i class="fas fa-arrow-left fa-sm text-white-50"></i> Volver a Carreras
             </a>
-            <a href="?id_carrera=<?php echo $id_carrera; ?>&pdf=1" class="d-none d-sm-inline-block btn btn-sm btn-success shadow-sm no-print ml-2">
+            <?php $pdf_url = !empty($version_id) ? ('?id_version=' . intval($version_id) . '&pdf=1') : ('?id_carrera=' . intval($id_carrera) . '&pdf=1'); ?>
+            <a href="<?= $pdf_url ?>" class="d-none d-sm-inline-block btn btn-sm btn-success shadow-sm no-print ml-2">
                 <i class="fas fa-print fa-sm text-white-50"></i> Generar PDF
             </a>
         </div>
