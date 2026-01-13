@@ -77,15 +77,15 @@ if (isset($_GET['pdf']) && $_GET['pdf'] == '1') {
 
     require_once __DIR__ . '/../fpdf/fpdf.php';
 
-    // Helper para convertir UTF-8 a ISO-8859-1 que espera FPDF
-    function to_iso($s) {
-        if ($s === null) return '';
-        return @iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $s);
-    }
-
     $pdf = new FPDF('P', 'mm', 'A4');
     $pdf->AddPage();
     $pdf->SetAutoPageBreak(true, 15);
+
+    // Agregar membrete usando la función en funciones.php
+    if (function_exists('agregarMembreteFPDF')) {
+        agregarMembreteFPDF($pdf);
+        $pdf->SetY(45); // posición después del membrete
+    }
 
     $pdf->SetFont('Arial', 'B', 14);
     $pdf->Cell(0, 8, to_iso('Pensum: ' . $carrera['nombre_carrera']), 0, 1, 'C');

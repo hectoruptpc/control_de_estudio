@@ -8649,6 +8649,45 @@ function determinarTrayectoAMostrar($id_trayecto_seccion) {
     }
 }
 
+// Helper para convertir UTF-8 a ISO-8859-1 para FPDF
+if (!function_exists('to_iso')) {
+    function to_iso($s) {
+        if ($s === null) return '';
+        return @iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $s);
+    }
+}
+
+// Función global para agregar membrete a un objeto FPDF
+if (!function_exists('agregarMembreteFPDF')) {
+    function agregarMembreteFPDF($pdf, $margin = 10) {
+        $pageWidth = $pdf->GetPageWidth();
+
+        // Logo (si existe)
+        $logoPath = __DIR__ . '/../images/uptpc.png';
+        if (file_exists($logoPath)) {
+            $pdf->Image($logoPath, $margin, 8, 20, 20);
+        }
+
+        // Texto del membrete
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->SetY(15);
+        $pdf->Cell(0, 5, to_iso('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $pdf->SetFont('Arial', 'B', 9);
+        $pdf->Cell(0, 5, to_iso('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $pdf->Cell(0, 5, to_iso('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+
+        // Fecha (a la derecha)
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetXY($pageWidth - $margin - 30, 10);
+        $pdf->Cell(30, 5, date('d/m/Y'), 0, 0, 'R');
+
+        // Línea separadora
+        $pdf->SetY(35);
+        $pdf->Cell(0, 0, '', 'T');
+        $pdf->Ln(5);
+    }
+}
+
 // Obtener información del grupo (SOLO LECTURA - SIN AUDITORÍA)
 function obtenerInfoGrupo($docente_id, $materia_id, $periodo_id) {
     global $db;
