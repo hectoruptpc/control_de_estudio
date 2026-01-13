@@ -69,6 +69,70 @@ while ($materia = mysqli_fetch_assoc($result_materias)) {
     $materias_agrupadas[$texto_trayecto][] = $materia;
 }
 
+// Generar PDF si se solicita
+if (isset($_GET['pdf']) && $_GET['pdf'] == '1') {
+    // Evitar que mensajes deprecados o advertencias envíen salida antes del PDF
+    ini_set('display_errors', '0');
+    error_reporting(error_reporting() & ~E_DEPRECATED & ~E_USER_DEPRECATED);
+
+    require_once __DIR__ . '/../fpdf/fpdf.php';
+
+    // Helper para convertir UTF-8 a ISO-8859-1 que espera FPDF
+    function to_iso($s) {
+        if ($s === null) return '';
+        return @iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $s);
+    }
+
+    $pdf = new FPDF('P', 'mm', 'A4');
+    $pdf->AddPage();
+    $pdf->SetAutoPageBreak(true, 15);
+
+    $pdf->SetFont('Arial', 'B', 14);
+    $pdf->Cell(0, 8, to_iso('Pensum: ' . $carrera['nombre_carrera']), 0, 1, 'C');
+    $pdf->SetFont('Arial', '', 10);
+    $pdf->Cell(0, 6, to_iso('Fecha: ' . date('d/m/Y')), 0, 1, 'R');
+    $pdf->Ln(4);
+
+    foreach ($materias_agrupadas as $texto_trayecto => $materias) {
+        $pdf->SetFont('Arial', 'B', 12);
+        $pdf->Cell(0, 7, to_iso($texto_trayecto), 0, 1);
+
+        // Cabecera de tabla
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->SetFillColor(230, 230, 230);
+        $pdf->Cell(25, 7, to_iso('Codigo'), 1, 0, 'C', true);
+        $pdf->Cell(70, 7, to_iso('Nombre'), 1, 0, 'L', true);
+        $pdf->Cell(15, 7, to_iso('Cred'), 1, 0, 'C', true);
+        $pdf->Cell(20, 7, to_iso('Horas T'), 1, 0, 'C', true);
+        $pdf->Cell(20, 7, to_iso('Horas P'), 1, 0, 'C', true);
+        $pdf->Cell(20, 7, to_iso('Duración'), 1, 0, 'C', true);
+        $pdf->Cell(20, 7, to_iso('Estado'), 1, 1, 'C', true);
+
+        $pdf->SetFont('Arial', '', 10);
+        foreach ($materias as $materia) {
+            $estado = $materia['activa'] ? 'Activa' : 'Inactiva';
+            $pdf->Cell(25, 6, to_iso($materia['cod_materia']), 1, 0, 'L');
+
+            // Nombre: usar MultiCell alternativa para evitar cortar texto
+            $x = $pdf->GetX();
+            $y = $pdf->GetY();
+            $pdf->MultiCell(70, 6, to_iso($materia['nombre_materia']), 1);
+            $pdf->SetXY($x + 70, $y);
+
+            $pdf->Cell(15, 6, to_iso($materia['creditos']), 1, 0, 'C');
+            $pdf->Cell(20, 6, to_iso($materia['horas_teoricas']), 1, 0, 'C');
+            $pdf->Cell(20, 6, to_iso($materia['horas_practicas']), 1, 0, 'C');
+            $pdf->Cell(20, 6, to_iso($materia['duracion_periodo']), 1, 0, 'C');
+            $pdf->Cell(20, 6, to_iso($estado), 1, 1, 'C');
+        }
+
+        $pdf->Ln(4);
+    }
+
+    $pdf->Output('I', 'pensum_' . $id_carrera . '.pdf');
+    exit();
+}
+
 include("includes/head.php");
 ?>
 
@@ -82,9 +146,9 @@ include("includes/head.php");
             <a href="lista_carreras.php" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm no-print">
                 <i class="fas fa-arrow-left fa-sm text-white-50"></i> Volver a Carreras
             </a>
-            <button onclick="generarPDF()" class="d-none d-sm-inline-block btn btn-sm btn-success shadow-sm no-print ml-2">
+            <a href="?id_carrera=<?php echo $id_carrera; ?>&pdf=1" class="d-none d-sm-inline-block btn btn-sm btn-success shadow-sm no-print ml-2">
                 <i class="fas fa-print fa-sm text-white-50"></i> Generar PDF
-            </button>
+            </a>
         </div>
     </div>
 
