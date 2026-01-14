@@ -15,11 +15,12 @@ if (!$carrera) {
 $duracion_anios = $carrera['duracion_semestres'] / 2;
 
 // Obtener títulos
-$titulo_principal = $carrera['titulo_otorga'];
-$titulo_opcional = $carrera['otro_titulo'] ?? '';
+// Asegurar strings para evitar warnings/deprecations en funciones como strpos
+$titulo_principal = isset($carrera['titulo_otorga']) ? (string)$carrera['titulo_otorga'] : '';
+$titulo_opcional = isset($carrera['otro_titulo']) ? (string)$carrera['otro_titulo'] : '';
 
 // Si el título principal contiene "/", separarlo (para compatibilidad con versiones anteriores)
-if (strpos($titulo_principal, ' / ') !== false) {
+if ($titulo_principal !== '' && strpos($titulo_principal, ' / ') !== false) {
     $titulos = explode(' / ', $titulo_principal);
     $titulo_principal = $titulos[0] ?? '';
     $titulo_opcional = $titulos[1] ?? $titulo_opcional;

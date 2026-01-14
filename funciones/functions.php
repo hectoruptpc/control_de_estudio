@@ -4073,6 +4073,187 @@ function obtenerPrelacionesPorCarrera($id_carrera) {
 }
 
 /**
+ * --- Mallas (pensums) ---
+ * Tabla `mallas`: id_malla, id_carrera, codigo_malla, anio, descripcion, created_at
+ * Tabla `malla_materia`: id, id_malla, id_materia, semestre
+ */
+
+function asegurarTablaMallas() {
+    global $db;
+    $db->query("CREATE TABLE IF NOT EXISTS mallas (
+        id_malla INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        id_carrera INT NOT NULL,
+        codigo_malla VARCHAR(100) NOT NULL UNIQUE,
+        anio INT NOT NULL,
+        descripcion TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX (id_carrera),
+        FOREIGN KEY (id_carrera) REFERENCES carreras(id_carrera) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $db->query("CREATE TABLE IF NOT EXISTS malla_materia (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        id_malla INT NOT NULL,
+        id_materia INT NOT NULL,
+        semestre INT NOT NULL,
+        INDEX (id_malla),
+        FOREIGN KEY (id_malla) REFERENCES mallas(id_malla) ON DELETE CASCADE,
+        FOREIGN KEY (id_materia) REFERENCES materias(id_materia) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+/**
+ * Crear una nueva malla para una carrera
+ * codigo_malla se recomienda generar como cod_carrera + anio (numérico)
+ */
+function crearMalla($id_carrera, $anio, $codigo_malla = null, $descripcion = null) {
+    global $db;
+    try {
+        asegurarTablaMallas();
+        if (empty($codigo_malla)) {
+            // intentar obtener codigo de carrera
+            $c = obtenerCarreraPorId($id_carrera);
+            $cod = $c['cod_carrera'] ?? 'C' . $id_carrera;
+            $codigo_malla = $cod . '_' . intval($anio);
+        }
+
+        // Evitar duplicados por codigo
+        $check = $db->prepare("SELECT id_malla FROM mallas WHERE codigo_malla = ? LIMIT 1");
+        $check->bind_param('s', $codigo_malla);
+        $check->execute();
+        $res = $check->get_result();
+        if ($res && $res->num_rows > 0) {
+            $row = $res->fetch_assoc();
+            $check->close();
+            return ['success' => false, 'message' => 'Código de malla ya existe', 'id_malla' => $row['id_malla']];
+        }
+        $check->close();
+
+        $stmt = $db->prepare("INSERT INTO mallas (id_carrera, codigo_malla, anio, descripcion) VALUES (?, ?, ?, ?)");
+        if (!$stmt) throw new Exception('Error al preparar inserción malla: ' . $db->error);
+        $stmt->bind_param('isis', $id_carrera, $codigo_malla, $anio, $descripcion);
+        if (!$stmt->execute()) throw new Exception('Error al insertar malla: ' . $stmt->error);
+        $id = $db->insert_id;
+        $stmt->close();
+        return ['success' => true, 'message' => 'Malla creada', 'id_malla' => $id];
+    } catch (Exception $e) {
+        error_log('Error en crearMalla: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+function obtenerMallasPorCarrera($id_carrera) {
+    global $db;
+    asegurarTablaMallas();
+    $rows = [];
+    $query = "SELECT id_malla, id_carrera, codigo_malla, anio, descripcion, created_at FROM mallas WHERE id_carrera = ? ORDER BY anio DESC";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('i', $id_carrera);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) $rows[] = $r;
+            $res->free();
+        }
+        $stmt->close();
+    }
+    return $rows;
+}
+
+function obtenerMallaPorId($id_malla) {
+    global $db;
+    asegurarTablaMallas();
+    $query = "SELECT id_malla, id_carrera, codigo_malla, anio, descripcion, created_at FROM mallas WHERE id_malla = ? LIMIT 1";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('i', $id_malla);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            $row = $res->fetch_assoc();
+            $res->free();
+            $stmt->close();
+            return $row;
+        }
+        $stmt->close();
+    }
+    return null;
+}
+
+function asignarMateriaAMalla($id_malla, $id_materia, $semestre) {
+    global $db;
+    try {
+        asegurarTablaMallas();
+        // evitar duplicado
+        $check = $db->prepare("SELECT id FROM malla_materia WHERE id_malla = ? AND id_materia = ? LIMIT 1");
+        $check->bind_param('ii', $id_malla, $id_materia);
+        $check->execute();
+        $res = $check->get_result();
+        if ($res && $res->num_rows > 0) { $check->close(); return ['success' => false, 'message' => 'Materia ya asignada a la malla']; }
+        $check->close();
+
+        $stmt = $db->prepare("INSERT INTO malla_materia (id_malla, id_materia, semestre) VALUES (?, ?, ?)");
+        if (!$stmt) throw new Exception('Error al preparar insert malla_materia: ' . $db->error);
+        $stmt->bind_param('iii', $id_malla, $id_materia, $semestre);
+        if (!$stmt->execute()) throw new Exception('Error al insertar malla_materia: ' . $stmt->error);
+        $id = $db->insert_id;
+        $stmt->close();
+        return ['success' => true, 'message' => 'Asignación creada', 'id' => $id];
+    } catch (Exception $e) {
+        error_log('Error en asignarMateriaAMalla: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+function obtenerMateriasDeMalla($id_malla) {
+    global $db;
+    asegurarTablaMallas();
+    $rows = [];
+    $query = "SELECT mm.id, mm.id_malla, mm.id_materia, mm.semestre, m.cod_materia, m.nombre_materia FROM malla_materia mm JOIN materias m ON mm.id_materia = m.id_materia WHERE mm.id_malla = ? ORDER BY mm.semestre, m.nombre_materia";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('i', $id_malla);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) $rows[] = $r;
+            $res->free();
+        }
+        $stmt->close();
+    }
+    return $rows;
+}
+
+function eliminarAsignacionMalla($id) {
+    global $db;
+    try {
+        asegurarTablaMallas();
+        $stmt = $db->prepare("DELETE FROM malla_materia WHERE id = ?");
+        if (!$stmt) throw new Exception('Error al preparar delete malla_materia: ' . $db->error);
+        $stmt->bind_param('i', $id);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar delete malla_materia: ' . $stmt->error);
+        $aff = $stmt->affected_rows;
+        $stmt->close();
+        return ['success' => true, 'affected_rows' => $aff];
+    } catch (Exception $e) {
+        error_log('Error en eliminarAsignacionMalla: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+function eliminarMalla($id_malla) {
+    global $db;
+    try {
+        asegurarTablaMallas();
+        $stmt = $db->prepare("DELETE FROM mallas WHERE id_malla = ?");
+        if (!$stmt) throw new Exception('Error al preparar delete malla: ' . $db->error);
+        $stmt->bind_param('i', $id_malla);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar delete malla: ' . $stmt->error);
+        $aff = $stmt->affected_rows;
+        $stmt->close();
+        return ['success' => true, 'affected_rows' => $aff];
+    } catch (Exception $e) {
+        error_log('Error en eliminarMalla: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
  * Elimina una asignación de materia a carrera
  * 
  * @param int $id_relacion ID de la relación materia-carrera a eliminar
