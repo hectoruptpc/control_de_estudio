@@ -4982,7 +4982,7 @@ function actualizarMateria($db, $id, $data) {
         $trayecto = isset($data['trayecto']) ? (int)$data['trayecto'] : 0;
 
         // Vinculamos parámetros (tipos: s=string, i=integer)
-        $stmt->bind_param("sssiiiiiiii",
+        $stmt->bind_param("sssiiiiiiiii",
             $cod_materia,
             $nombre_materia,
             $pnf_ptf,
