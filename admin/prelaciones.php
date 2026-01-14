@@ -126,7 +126,7 @@ include('includes/head.php');
                                 <tr>
                                     <td><?php echo htmlspecialchars($p['cod_materia']) . ' - ' . htmlspecialchars($p['nombre_materia']); ?></td>
                                     <td><?php echo htmlspecialchars($p['cod_prereq']) . ' - ' . htmlspecialchars($p['nombre_prereq']); ?></td>
-                                    <td><?php echo htmlspecialchars($p['tipo']); ?></td>
+                                    <td><?php echo htmlspecialchars($p['tipo'] ?? ''); ?></td>
                                     <td>
                                         <form method="POST" style="display:inline;">
                                             <input type="hidden" name="id_prelacion" value="<?php echo intval($p['id']); ?>">
