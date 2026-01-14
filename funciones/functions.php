@@ -4825,9 +4825,11 @@ function crearMateria($db, $data) {
                     creditos, 
                     activa, 
                     horas_teoricas, 
-                    horas_practicas, 
+                    horas_practicas,
+                    horas_laboratorio,
+                    horas_semanales,
                     created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
 
         // Preparamos la sentencia
         $stmt = $db->prepare($query);
@@ -4844,9 +4846,11 @@ function crearMateria($db, $data) {
         $creditos = isset($data['creditos']) ? (int)$data['creditos'] : 0;
         $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
         $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
+        $horas_laboratorio = isset($data['horas_laboratorio']) ? (int)$data['horas_laboratorio'] : 0;
+        $horas_semanales = isset($data['horas_semanales']) ? (int)$data['horas_semanales'] : 0;
 
         // Vinculamos parámetros (tipos: s=string, i=integer)
-        $stmt->bind_param("sssiiiiii", 
+        $stmt->bind_param("sssiiiiiiii", 
             $cod_materia,
             $nombre_materia,
             $pnf_ptf,
@@ -4855,7 +4859,9 @@ function crearMateria($db, $data) {
             $creditos,
             $activa,
             $horas_teoricas,
-            $horas_practicas
+            $horas_practicas,
+            $horas_laboratorio,
+            $horas_semanales
         );
         
         // Ejecutamos la sentencia
@@ -4885,7 +4891,9 @@ function crearMateria($db, $data) {
                         'creditos' => $creditos,
                         'activa' => $activa,
                         'horas_teoricas' => $horas_teoricas,
-                        'horas_practicas' => $horas_practicas
+                        'horas_practicas' => $horas_practicas,
+                        'horas_laboratorio' => $horas_laboratorio,
+                        'horas_semanales' => $horas_semanales
                     ], 
                     "Materias", 
                     "Nueva materia creada"
@@ -4940,16 +4948,18 @@ function actualizarMateria($db, $id, $data) {
 
         // Consulta SQL con sentencia preparada
         $query = "UPDATE materias SET 
-                cod_materia = ?, 
-                nombre_materia = ?, 
-                pnf_ptf = ?,
-                duracion_periodo = ?,
-                creditos = ?, 
-                activa = ?, 
-                horas_teoricas = ?, 
-                horas_practicas = ?,
-                trayecto = ?
-                WHERE id_materia = ?";
+            cod_materia = ?, 
+            nombre_materia = ?, 
+            pnf_ptf = ?,
+            duracion_periodo = ?,
+            creditos = ?, 
+            activa = ?, 
+            horas_teoricas = ?, 
+            horas_practicas = ?,
+            horas_laboratorio = ?,
+            horas_semanales = ?,
+            trayecto = ?
+            WHERE id_materia = ?";
         
         // Preparamos la sentencia
         $stmt = $db->prepare($query);
@@ -4967,10 +4977,12 @@ function actualizarMateria($db, $id, $data) {
         $activa = isset($data['activa']) ? (int)(bool)$data['activa'] : 0;
         $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
         $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
+        $horas_laboratorio = isset($data['horas_laboratorio']) ? (int)$data['horas_laboratorio'] : 0;
+        $horas_semanales = isset($data['horas_semanales']) ? (int)$data['horas_semanales'] : 0;
         $trayecto = isset($data['trayecto']) ? (int)$data['trayecto'] : 0;
 
         // Vinculamos parámetros (tipos: s=string, i=integer)
-        $stmt->bind_param("sssiiiiiii",
+        $stmt->bind_param("sssiiiiiiii",
             $cod_materia,
             $nombre_materia,
             $pnf_ptf,
@@ -4979,6 +4991,8 @@ function actualizarMateria($db, $id, $data) {
             $activa,
             $horas_teoricas,
             $horas_practicas,
+            $horas_laboratorio,
+            $horas_semanales,
             $trayecto,
             $id
         );
@@ -5001,7 +5015,7 @@ function actualizarMateria($db, $id, $data) {
                 // Comparar campos modificados
                 $campos_auditar = [
                     'cod_materia', 'nombre_materia', 'pnf_ptf', 'duracion_periodo',
-                    'creditos', 'activa', 'horas_teoricas', 'horas_practicas', 'trayecto'
+                    'creditos', 'activa', 'horas_teoricas', 'horas_practicas', 'horas_laboratorio', 'horas_semanales', 'trayecto'
                 ];
                 
                 foreach ($campos_auditar as $campo) {
@@ -5169,10 +5183,10 @@ if (!function_exists('getAllMaterias')) {
         global $db;
         
         // Consulta SQL para obtener todas las materias
-        $query = "SELECT id, cod_materia, nombre_materia, creditos, 
-                         horas_teoricas, horas_practicas, activa 
-                  FROM materias 
-                  ORDER BY nombre_materia ASC";
+         $query = "SELECT id, cod_materia, nombre_materia, creditos, 
+                    horas_teoricas, horas_practicas, horas_laboratorio, horas_semanales, activa 
+                FROM materias 
+                ORDER BY nombre_materia ASC";
         
         // Preparamos la sentencia
         $stmt = $db->prepare($query);
@@ -5230,10 +5244,10 @@ if (!function_exists('getMateriaById')) {
         }
         
         // Consulta SQL para obtener una materia por ID
-        $query = "SELECT id, cod_materia, nombre_materia, creditos, 
-                         horas_teoricas, horas_practicas, activa 
-                  FROM materias 
-                  WHERE id = ?";
+         $query = "SELECT id, cod_materia, nombre_materia, creditos, 
+                    horas_teoricas, horas_practicas, horas_laboratorio, horas_semanales, activa 
+                FROM materias 
+                WHERE id = ?";
         
         // Preparamos la sentencia
         $stmt = $db->prepare($query);
@@ -5438,20 +5452,25 @@ if (!function_exists('guardarMateria')) {
             if ($esNueva) {
                 // INSERT de nueva materia
                 $query = "INSERT INTO materias 
-                         (cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, activa) 
-                         VALUES (?, ?, ?, ?, ?, ?)";
+                         (cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, horas_laboratorio, horas_semanales, activa) 
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
                 $stmt = $db->prepare($query);
                 
                 if (!$stmt) {
                     throw new Exception("Error preparando INSERT: ".$db->error);
                 }
                 
-                $stmt->bind_param("ssiiii", 
+                $horas_laboratorio = $datos['horas_laboratorio'] ?? 0;
+                $horas_semanales = $datos['horas_semanales'] ?? 0;
+
+                $stmt->bind_param("ssiiiiii", 
                     $datos['cod_materia'],
                     $datos['nombre_materia'],
                     $datos['creditos'],
                     $datos['horas_teoricas'],
                     $datos['horas_practicas'],
+                    $horas_laboratorio,
+                    $horas_semanales,
                     $datos['activa']);
             } else {
                 // UPDATE de materia existente
@@ -5461,6 +5480,8 @@ if (!function_exists('guardarMateria')) {
                          creditos = ?, 
                          horas_teoricas = ?, 
                          horas_practicas = ?, 
+                         horas_laboratorio = ?,
+                         horas_semanales = ?,
                          activa = ? 
                          WHERE id = ?";
                 $stmt = $db->prepare($query);
@@ -5469,12 +5490,17 @@ if (!function_exists('guardarMateria')) {
                     throw new Exception("Error preparando UPDATE: ".$db->error);
                 }
                 
-                $stmt->bind_param("ssiiiii", 
+                $horas_laboratorio = $datos['horas_laboratorio'] ?? 0;
+                $horas_semanales = $datos['horas_semanales'] ?? 0;
+
+                $stmt->bind_param("ssiiiiiii", 
                     $datos['cod_materia'],
                     $datos['nombre_materia'],
                     $datos['creditos'],
                     $datos['horas_teoricas'],
                     $datos['horas_practicas'],
+                    $horas_laboratorio,
+                    $horas_semanales,
                     $datos['activa'],
                     $datos['id']);
             }
@@ -5515,6 +5541,8 @@ if (!function_exists('guardarMateria')) {
                                 'creditos' => $datos['creditos'],
                                 'horas_teoricas' => $datos['horas_teoricas'],
                                 'horas_practicas' => $datos['horas_practicas'],
+                                'horas_laboratorio' => $datos['horas_laboratorio'] ?? 0,
+                                'horas_semanales' => $datos['horas_semanales'] ?? 0,
                                 'activa' => $datos['activa']
                             ], 
                             "Materias", 
@@ -5525,7 +5553,7 @@ if (!function_exists('guardarMateria')) {
                         $valores_antiguos_audit = [];
                         $valores_nuevos_audit = [];
                         
-                        $campos_auditar = ['cod_materia', 'nombre_materia', 'creditos', 'horas_teoricas', 'horas_practicas', 'activa'];
+                        $campos_auditar = ['cod_materia', 'nombre_materia', 'creditos', 'horas_teoricas', 'horas_practicas', 'horas_laboratorio', 'horas_semanales', 'activa'];
                         
                         foreach ($campos_auditar as $campo) {
                             $valor_antiguo = $datos_actuales[$campo] ?? null;
