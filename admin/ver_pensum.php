@@ -13,9 +13,33 @@ if (!$db) {
 $id_carrera = null;
 $carrera = null;
 $version_year = null;
+$codigo_malla = null;
 
 // Permitir búsqueda por id OR por código + año
-if (isset($_GET['id_version'])) {
+if (isset($_GET['id_malla'])) {
+    $malla_id = intval($_GET['id_malla']);
+    if ($malla_id <= 0) { header("Location: lista_carreras.php"); exit(); }
+
+    $stmt = $db->prepare("SELECT m.id_malla, m.id_carrera, m.codigo_malla, m.anio, c.nombre_carrera, c.tipo_formacion FROM mallas m JOIN carreras c ON m.id_carrera = c.id_carrera WHERE m.id_malla = ? LIMIT 1");
+    if ($stmt) {
+        $stmt->bind_param('i', $malla_id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        if ($res && $res->num_rows > 0) {
+            $row = $res->fetch_assoc();
+            $carrera = ['nombre_carrera' => $row['nombre_carrera'], 'tipo_formacion' => $row['tipo_formacion']];
+            $id_carrera = (int)$row['id_carrera'];
+            $version_year = !empty($row['anio']) ? intval($row['anio']) : null;
+            $codigo_malla = $row['codigo_malla'];
+            $version_id = null; // no usar versiones antiguas
+            $id_malla = $malla_id;
+        }
+        $stmt->close();
+    }
+
+    if (!$carrera) { header("Location: lista_carreras.php"); exit(); }
+
+} elseif (isset($_GET['id_version'])) {
     $version_id = intval($_GET['id_version']);
     if ($version_id <= 0) { header("Location: lista_carreras.php"); exit(); }
 
@@ -40,9 +64,9 @@ if (isset($_GET['id_version'])) {
     $anio = (int)$_GET['anio'];
     if ($anio <= 0 || empty($cod)) { header("Location: lista_carreras.php"); exit(); }
 
-    // Buscar la versión correspondiente por código y año en carrera_versiones
-    $version_id = null;
-    $stmt = $db->prepare("SELECT v.id_version, c.id_carrera, c.nombre_carrera, c.tipo_formacion FROM carrera_versiones v JOIN carreras c ON v.id_carrera = c.id_carrera WHERE c.cod_carrera = ? AND YEAR(v.fecha_vigencia) = ? LIMIT 1");
+    // Buscar la malla correspondiente por código y año en mallas
+    $version_id = null; $id_malla = null; $codigo_malla = null;
+    $stmt = $db->prepare("SELECT m.id_malla, m.id_carrera, m.codigo_malla, m.anio, c.nombre_carrera, c.tipo_formacion FROM mallas m JOIN carreras c ON m.id_carrera = c.id_carrera WHERE c.cod_carrera = ? AND m.anio = ? LIMIT 1");
     if ($stmt) {
         $stmt->bind_param('si', $cod, $anio);
         $stmt->execute();
@@ -51,8 +75,9 @@ if (isset($_GET['id_version'])) {
             $row = $res->fetch_assoc();
             $carrera = ['nombre_carrera' => $row['nombre_carrera'], 'tipo_formacion' => $row['tipo_formacion']];
             $id_carrera = (int)$row['id_carrera'];
-            $version_id = (int)$row['id_version'];
-            $version_year = !empty($row['fecha_vigencia']) ? date('Y', strtotime($row['fecha_vigencia'])) : $anio;
+            $id_malla = (int)$row['id_malla'];
+            $codigo_malla = $row['codigo_malla'];
+            $version_year = !empty($row['anio']) ? intval($row['anio']) : $anio;
         }
         $stmt->close();
     }
@@ -89,6 +114,8 @@ if (isset($_GET['id_version'])) {
 }
 $es_pnf = ($carrera['tipo_formacion'] == 'PNF');
 
+$id_malla = $id_malla ?? null;
+
 // Obtener el tipo de período según la carrera (trimestre o semestre)
 $tipo_periodo = obtenerTipoPeriodoPorCarrera($id_carrera);
 
@@ -98,8 +125,8 @@ $tipo_periodo = obtenerTipoPeriodoPorCarrera($id_carrera);
 $texto_duracion = ($tipo_periodo == 'trimestre') ? 'trimestres' : 'semestres';
 
 // Obtener materias agrupadas por trayecto y ordenadas por duración
-if (!empty($version_id)) {
-    $query_materias = "SELECT m.*, vm.semestre, m.trayecto FROM materias m JOIN version_materia vm ON m.id_materia = vm.id_materia WHERE vm.id_version = " . intval($version_id) . " ORDER BY m.trayecto, m.duracion_periodo, m.nombre_materia";
+if (!empty($id_malla)) {
+    $query_materias = "SELECT m.*, mm.semestre, m.trayecto FROM materias m JOIN malla_materia mm ON m.id_materia = mm.id_materia WHERE mm.id_malla = " . intval($id_malla) . " ORDER BY m.trayecto, m.duracion_periodo, m.nombre_materia";
 } else {
     $query_materias = "SELECT m.*, cm.semestre, m.trayecto FROM materias m JOIN carrera_materia cm ON m.id_materia = cm.id_materia WHERE cm.id_carrera = " . intval($id_carrera) . " ORDER BY m.trayecto, m.duracion_periodo, m.nombre_materia";
 }
@@ -145,7 +172,8 @@ if (isset($_GET['pdf']) && $_GET['pdf'] == '1') {
 
     $pdf->SetFont('Arial', 'B', 14);
     $title = 'Pensum: ' . $carrera['nombre_carrera'];
-    if (!empty($version_year)) $title .= ' (Año: ' . $version_year . ')';
+    if (!empty($codigo_malla)) $title .= ' - ' . $codigo_malla;
+    elseif (!empty($version_year)) $title .= ' (Año: ' . $version_year . ')';
     $pdf->Cell(0, 8, to_iso($title), 0, 1, 'C');
     $pdf->SetFont('Arial', '', 10);
     $pdf->Cell(0, 6, to_iso('Fecha: ' . date('d/m/Y')), 0, 1, 'R');
@@ -187,7 +215,7 @@ if (isset($_GET['pdf']) && $_GET['pdf'] == '1') {
         $pdf->Ln(4);
     }
 
-    $filename = 'pensum_' . $id_carrera . (!empty($version_year) ? '_' . $version_year : '');
+    $filename = 'pensum_' . $id_carrera . (!empty($codigo_malla) ? '_' . $codigo_malla : (!empty($version_year) ? '_' . $version_year : ''));
     $pdf->Output('I', $filename . '.pdf');
     exit();
 }
@@ -205,7 +233,7 @@ include("includes/head.php");
             <a href="agregar_carrera.php" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm no-print">
                 <i class="fas fa-arrow-left fa-sm text-white-50"></i> Volver a Carreras
             </a>
-            <?php $pdf_url = !empty($version_id) ? ('?id_version=' . intval($version_id) . '&pdf=1') : ('?id_carrera=' . intval($id_carrera) . '&pdf=1'); ?>
+            <?php $pdf_url = !empty($id_malla) ? ('?id_malla=' . intval($id_malla) . '&pdf=1') : ('?id_carrera=' . intval($id_carrera) . '&pdf=1'); ?>
             <a href="<?= $pdf_url ?>" class="d-none d-sm-inline-block btn btn-sm btn-success shadow-sm no-print ml-2">
                 <i class="fas fa-print fa-sm text-white-50"></i> Generar PDF
             </a>

@@ -4110,11 +4110,11 @@ function crearMalla($id_carrera, $anio, $codigo_malla = null, $descripcion = nul
     global $db;
     try {
         asegurarTablaMallas();
-        if (empty($codigo_malla)) {
-            // intentar obtener codigo de carrera
+        if (empty($codigo_malla) || !preg_match('/^[0-9]+$/', $codigo_malla)) {
+            // generar código numérico (solo dígitos) basado en codigo de carrera + año
             $c = obtenerCarreraPorId($id_carrera);
-            $cod = $c['cod_carrera'] ?? 'C' . $id_carrera;
-            $codigo_malla = $cod . '_' . intval($anio);
+            $cod = $c['cod_carrera'] ?? '';
+            $codigo_malla = generarCodigoMallaNumerico($cod, $anio, $id_carrera);
         }
 
         // Evitar duplicados por codigo
@@ -4140,6 +4140,109 @@ function crearMalla($id_carrera, $anio, $codigo_malla = null, $descripcion = nul
         error_log('Error en crearMalla: ' . $e->getMessage());
         return ['success' => false, 'message' => $e->getMessage()];
     }
+}
+
+/**
+ * Genera un código de malla compuesto solo por dígitos.
+ * - extrae dígitos del `cod_carrera` si existe
+ * - si no hay dígitos usa el id_carrera
+ * - concatena el año (4 dígitos)
+ * - garantiza unicidad añadiendo sufijo numérico si es necesario
+ */
+function generarCodigoMallaNumerico($cod_carrera, $anio, $id_carrera = null) {
+    global $db;
+    // extraer solo dígitos
+    $digits = '';
+    if (!empty($cod_carrera)) {
+        // buscar la primera ocurrencia de 5 dígitos
+        if (preg_match('/(\d{5})/', $cod_carrera, $m)) {
+            $digits = $m[1];
+        } else {
+            // si no hay 5 consecutivos, extraer todos los dígitos y tomar los primeros 5
+            preg_match_all('/\d+/', $cod_carrera, $m2);
+            if (!empty($m2[0])) {
+                $all = implode('', $m2[0]);
+                $digits = substr($all, 0, 5);
+            } else {
+                // convertir letras a números (A=01..Z=26) y tomar primeros 5
+                $s = strtoupper($cod_carrera);
+                $mapped = '';
+                for ($i = 0; $i < strlen($s); $i++) {
+                    $ch = $s[$i];
+                    if (ctype_alpha($ch)) {
+                        $val = ord($ch) - ord('A') + 1;
+                        $mapped .= str_pad($val, 2, '0', STR_PAD_LEFT);
+                        if (strlen($mapped) >= 5) break;
+                    }
+                }
+                $digits = substr($mapped, 0, 5);
+            }
+        }
+    }
+    // asegurarse de tener exactamente 5 dígitos: pad o trim
+    $digits = preg_replace('/\D/', '', $digits);
+    if (strlen($digits) < 5) {
+        // si no alcanzamos 5, usar id_carrera padded
+        if (!empty($id_carrera)) {
+            $digits = str_pad(substr(preg_replace('/\D/', '', strval($id_carrera)), 0, 5), 5, '0', STR_PAD_LEFT);
+        } else {
+            $digits = str_pad($digits, 5, '0', STR_PAD_LEFT);
+        }
+    } elseif (strlen($digits) > 5) {
+        $digits = substr($digits, 0, 5);
+    }
+    $anio_str = str_pad(intval($anio), 4, '0', STR_PAD_LEFT);
+    $base = $digits . $anio_str;
+
+    // asegurar solo dígitos
+    $base = preg_replace('/\D/', '', $base);
+
+    $codigo = $base;
+    $sufijo = 0;
+    while (true) {
+        // comprobar existencia
+        $stmt = $db->prepare("SELECT id_malla FROM mallas WHERE codigo_malla = ? LIMIT 1");
+        if (!$stmt) break; // en caso de error, devolver lo que haya
+        $stmt->bind_param('s', $codigo);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $exists = ($res && $res->num_rows > 0);
+        $stmt->close();
+        if (!$exists) break;
+        $sufijo++;
+        $codigo = $base . str_pad($sufijo, 3, '0', STR_PAD_LEFT);
+        // proteger bucle infinito
+        if ($sufijo > 9999) break;
+    }
+
+    return $codigo;
+}
+
+/**
+ * Normaliza códigos de mallas existentes: asegura que sean solo dígitos
+ * Si una malla tiene codigo no numérico intenta regenerarlo y actualizar.
+ */
+function normalizarCodigosMallas() {
+    global $db;
+    asegurarTablaMallas();
+    $updated = 0;
+    $errors = [];
+    $res = $db->query("SELECT id_malla, id_carrera, codigo_malla, anio FROM mallas");
+    if (!$res) return ['updated' => 0, 'errors' => ['Error listando mallas: ' . $db->error]];
+    while ($row = $res->fetch_assoc()) {
+        if (!preg_match('/^[0-9]+$/', $row['codigo_malla'])) {
+            $nuevo = generarCodigoMallaNumerico('', $row['anio'], $row['id_carrera']);
+            $stmt = $db->prepare("UPDATE mallas SET codigo_malla = ? WHERE id_malla = ?");
+            if ($stmt) {
+                $stmt->bind_param('si', $nuevo, $row['id_malla']);
+                if ($stmt->execute()) { $updated++; } else { $errors[] = 'Error update id ' . $row['id_malla'] . ': ' . $stmt->error; }
+                $stmt->close();
+            } else {
+                $errors[] = 'Error preparar update id ' . $row['id_malla'] . ': ' . $db->error;
+            }
+        }
+    }
+    return ['updated' => $updated, 'errors' => $errors];
 }
 
 function obtenerMallasPorCarrera($id_carrera) {
@@ -4250,6 +4353,97 @@ function eliminarMalla($id_malla) {
     } catch (Exception $e) {
         error_log('Error en eliminarMalla: ' . $e->getMessage());
         return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Migrar datos desde `carrera_versiones`/`version_materia` a `mallas`/`malla_materia`.
+ * Devuelve array con resultados y conteos.
+ */
+function migrarVersionesAMallas() {
+    global $db;
+    $result = ['created_mallas' => 0, 'created_asignaciones' => 0, 'skipped_mallas' => 0, 'errors' => []];
+    try {
+        asegurarTablaMallas();
+
+        // comprobar si tablas de versiones existen
+        $res = $db->query("SHOW TABLES LIKE 'carrera_versiones'");
+        if (!$res || $res->num_rows === 0) {
+            return ['message' => 'No existe tabla carrera_versiones', 'created_mallas' => 0];
+        }
+
+        $rv = $db->query("SELECT id_version, id_carrera, fecha_vigencia, created_at FROM carrera_versiones ORDER BY id_version");
+        if (!$rv) throw new Exception('Error leyendo carrera_versiones: ' . $db->error);
+
+        while ($row = $rv->fetch_assoc()) {
+            $anio = null;
+            if (!empty($row['fecha_vigencia'])) {
+                $anio = intval(date('Y', strtotime($row['fecha_vigencia'])));
+            } elseif (!empty($row['created_at'])) {
+                $anio = intval(date('Y', strtotime($row['created_at'])));
+            } else {
+                $anio = intval(date('Y'));
+            }
+
+            // generar codigo_malla: tomar cod_carrera si disponible
+            $c = obtenerCarreraPorId($row['id_carrera']);
+            $cod = $c['cod_carrera'] ?? ('C' . $row['id_carrera']);
+            $codigo_malla = $cod . '_' . $anio;
+
+            // crear malla (si existe, saltar)
+            $check = $db->prepare("SELECT id_malla FROM mallas WHERE codigo_malla = ? LIMIT 1");
+            $check->bind_param('s', $codigo_malla);
+            $check->execute();
+            $rcheck = $check->get_result();
+            if ($rcheck && $rcheck->num_rows > 0) {
+                $existing = $rcheck->fetch_assoc();
+                $id_malla = $existing['id_malla'];
+                $result['skipped_mallas']++;
+                $check->close();
+            } else {
+                $check->close();
+                $ins = $db->prepare("INSERT INTO mallas (id_carrera, codigo_malla, anio, descripcion) VALUES (?, ?, ?, ?)");
+                $desc = 'Migrada desde carrera_versiones id_version=' . $row['id_version'];
+                $ins->bind_param('isis', $row['id_carrera'], $codigo_malla, $anio, $desc);
+                if (!$ins->execute()) { $result['errors'][] = 'Error insert malla: ' . $ins->error; $ins->close(); continue; }
+                $id_malla = $db->insert_id;
+                $ins->close();
+                $result['created_mallas']++;
+            }
+
+            // copiar asignaciones de version_materia (si existe tabla)
+            $rv2 = $db->query("SHOW TABLES LIKE 'version_materia'");
+            if ($rv2 && $rv2->num_rows > 0) {
+                $q = $db->prepare("SELECT id_materia, semestre FROM version_materia WHERE id_version = ?");
+                $q->bind_param('i', $row['id_version']);
+                if ($q->execute()) {
+                    $res2 = $q->get_result();
+                    while ($as = $res2->fetch_assoc()) {
+                        // insertar en malla_materia si no existe
+                        $chk = $db->prepare("SELECT id FROM malla_materia WHERE id_malla = ? AND id_materia = ? LIMIT 1");
+                        $chk->bind_param('ii', $id_malla, $as['id_materia']);
+                        $chk->execute();
+                        $rchk = $chk->get_result();
+                        if ($rchk && $rchk->num_rows > 0) { $chk->close(); continue; }
+                        $chk->close();
+
+                        $ins2 = $db->prepare("INSERT INTO malla_materia (id_malla, id_materia, semestre) VALUES (?, ?, ?)");
+                        $ins2->bind_param('iii', $id_malla, $as['id_materia'], $as['semestre']);
+                        if ($ins2->execute()) { $result['created_asignaciones']++; }
+                        else { $result['errors'][] = 'Error insert malla_materia: ' . $ins2->error; }
+                        $ins2->close();
+                    }
+                    $res2->free();
+                }
+                $q->close();
+            }
+        }
+
+        $rv->free();
+        return $result;
+    } catch (Exception $e) {
+        $result['errors'][] = $e->getMessage();
+        return $result;
     }
 }
 

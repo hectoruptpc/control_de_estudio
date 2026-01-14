@@ -23,9 +23,9 @@ include("includes/head.php");
 // Procesar formularios
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['agregar_materia'])) {
-            $id_version = isset($_POST['id_version']) && $_POST['id_version'] !== '' ? intval($_POST['id_version']) : 0;
-            if ($id_version > 0) {
-                $resultado = asignarMateriaAVersion($id_version, intval($_POST['id_materia']), intval($_POST['semestre']));
+            $id_malla = isset($_POST['id_malla']) && $_POST['id_malla'] !== '' ? intval($_POST['id_malla']) : 0;
+            if ($id_malla > 0) {
+                $resultado = asignarMateriaAMalla($id_malla, intval($_POST['id_materia']), intval($_POST['semestre']));
             } else {
                 $resultado = asignarMateriaACarrera(
                     intval($_POST['id_carrera']),
@@ -57,15 +57,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
     
-    if (isset($_POST['eliminar_asignacion_version'])) {
-        $resultado = eliminarAsignacionVersion(intval($_POST['id_relacion_version']));
+    if (isset($_POST['eliminar_asignacion_malla'])) {
+        $resultado = eliminarAsignacionMalla(intval($_POST['id_relacion_malla']));
 
         if (!is_array($resultado)) $resultado = ['success' => false, 'message' => 'Respuesta inválida'];
         if (!empty($resultado['success'])) {
-            $mensaje_text = $resultado['message'] ?? 'Asignación de versión eliminada';
+            $mensaje_text = $resultado['message'] ?? 'Asignación de malla eliminada';
             $mensaje = htmlspecialchars($mensaje_text);
         } else {
-            $error_text = $resultado['message'] ?? 'Ocurrió un error al eliminar la asignación de versión';
+            $error_text = $resultado['message'] ?? 'Ocurrió un error al eliminar la asignación de malla';
             $error = htmlspecialchars($error_text);
         }
     }
@@ -119,13 +119,13 @@ $materias_asignadas = obtenerMateriasAsignadas($carrera_seleccionada);
                             <select name="id_carrera" class="form-control" required>
                                 <?php foreach ($carreras as $carrera): ?>
                                     <?php $anio = !empty($carrera['created_at']) ? date('Y', strtotime($carrera['created_at'])) : '';?>
-                                    <?php $versions_for_c = obtenerVersionesPorIdCarrera($carrera['id_carrera']); $vcount = count($versions_for_c); ?>
+                                    <?php $mallas_for_c = obtenerMallasPorCarrera($carrera['id_carrera']); $vcount = count($mallas_for_c); ?>
                                     <option value="<?= intval($carrera['id_carrera']) ?>" 
                                         <?= ($carrera['id_carrera'] == $carrera_seleccionada) ? 'selected' : '' ?>>
                                         <?= htmlspecialchars($carrera['nombre_carrera']) ?>
                                         <?= $carrera['cod_carrera'] ? ' (' . htmlspecialchars($carrera['cod_carrera']) . ')' : '' ?>
                                         <?= $anio ? ' - ' . $anio : '' ?>
-                                        <?= $vcount ? ' — versiones: ' . $vcount : '' ?>
+                                        <?= $vcount ? ' — mallas: ' . $vcount : '' ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -144,26 +144,26 @@ $materias_asignadas = obtenerMateriasAsignadas($carrera_seleccionada);
                         </div>
 
                         <div class="form-group">
-                            <label>Versión / Año (opcional):</label>
-                            <select name="id_version" id="id_version" class="form-control">
+                            <label>Malla (opcional):</label>
+                            <select name="id_malla" id="id_malla" class="form-control">
                                 <option value="">-- Usar carrera base --</option>
                                 <?php
-                                    // Mostrar versiones disponibles para la carrera seleccionada
-                                    $versions = [];
+                                    // Mostrar mallas disponibles para la carrera seleccionada
+                                    $mallas = [];
                                     if (!empty($carreras)) {
                                         foreach ($carreras as $c) {
                                             if ($c['id_carrera'] == $carrera_seleccionada) {
-                                                $versions = obtenerVersionesPorIdCarrera($c['id_carrera']);
+                                                $mallas = obtenerMallasPorCarrera($c['id_carrera']);
                                                 break;
                                             }
                                         }
                                     }
                                 ?>
-                                <?php foreach ($versions as $v): ?>
-                                    <option value="<?= intval($v['id_version']) ?>"><?= htmlspecialchars($v['anio'] ?? '') ?></option>
+                                <?php foreach ($mallas as $m): ?>
+                                    <option value="<?= intval($m['id_malla']) ?>"><?= htmlspecialchars($m['codigo_malla'] . ' (' . $m['anio'] . ')') ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <small class="form-text text-muted">Si selecciona versión, la asignación se guardará para ese año en particular.</small>
+                            <small class="form-text text-muted">Si selecciona una malla, la asignación se guardará en esa malla (pensum) específica.</small>
                         </div>
 
                                 <!-- Lista de versiones eliminada para mantener la interfaz limpia -->
@@ -206,7 +206,7 @@ $materias_asignadas = obtenerMateriasAsignadas($carrera_seleccionada);
                             </thead>
                             <tbody>
                                 <?php foreach ($carreras as $carrera): ?>
-                                    <?php
+                                        <?php
                                         // Materias base asignadas
                                         $materias = obtenerMateriasAsignadas($carrera['id_carrera']);
                                         foreach ($materias as $materia):
@@ -227,29 +227,29 @@ $materias_asignadas = obtenerMateriasAsignadas($carrera_seleccionada);
                                         </tr>
                                     <?php endforeach; ?>
 
-                                    <?php
-                                        // Mostrar versiones y sus materias
-                                        $versions = obtenerVersionesPorIdCarrera($carrera['id_carrera']);
-                                        foreach ($versions as $v) {
-                                            $vm = obtenerMateriasAsignadasVersion($v['id_version']);
-                                            foreach ($vm as $materia):
+                                        <?php
+                                        // Mostrar mallas y sus materias
+                                        $mallas_list = obtenerMallasPorCarrera($carrera['id_carrera']);
+                                        foreach ($mallas_list as $malla) {
+                                            $mm = obtenerMateriasDeMalla($malla['id_malla']);
+                                            foreach ($mm as $materia):
                                     ?>
                                                 <tr>
                                                     <td><?= htmlspecialchars($carrera['cod_carrera']) ?></td>
                                                     <td><?= htmlspecialchars($materia['cod_materia']) ?> - <?= htmlspecialchars($materia['nombre_materia']) ?></td>
-                                                    <td><?= intval($materia['semestre']) ?> (<?= htmlspecialchars($v['anio']) ?>)</td>
+                                                    <td><?= intval($materia['semestre']) ?> (<?= htmlspecialchars($malla['codigo_malla']) ?>)</td>
                                                     <td>
                                                         <form method="POST" style="display:inline;">
-                                                            <input type="hidden" name="id_relacion_version" value="<?= intval($materia['id']) ?>">
-                                                            <button type="submit" name="eliminar_asignacion_version" class="btn btn-sm btn-danger"
-                                                                    onclick="return confirm('¿Eliminar esta asignación de versión?')">
+                                                            <input type="hidden" name="id_relacion_malla" value="<?= intval($materia['id']) ?>">
+                                                            <button type="submit" name="eliminar_asignacion_malla" class="btn btn-sm btn-danger"
+                                                                    onclick="return confirm('¿Eliminar esta asignación de malla?')">
                                                                 <i class="fas fa-trash"></i>
                                                             </button>
                                                         </form>
                                                     </td>
                                                 </tr>
-                                            <?php endforeach; // end vm loop
-                                        } // end versions loop
+                                            <?php endforeach;
+                                        }
                                     ?>
                                 <?php endforeach; ?>
                             </tbody>
@@ -266,37 +266,40 @@ $materias_asignadas = obtenerMateriasAsignadas($carrera_seleccionada);
 <script>
 document.addEventListener('DOMContentLoaded', function(){
     const carreraSelect = document.querySelector('select[name="id_carrera"]');
-    const versionSelect = document.getElementById('id_version');
+    const mallaSelect = document.getElementById('id_malla');
 
-    function renderNoVersions() {
-        versionSelect.innerHTML = '<option value="">-- Usar carrera base --</option>';
+    function renderNoMallas() {
+        mallaSelect.innerHTML = '<option value="">-- Usar carrera base --</option>';
     }
 
-    function loadVersions(id) {
-        if (!id || parseInt(id) <= 0) { renderNoVersions(); return; }
-        fetch('ajax_get_versions.php?id_carrera=' + encodeURIComponent(id))
+    function loadMallas(id) {
+        if (!id || parseInt(id) <= 0) { renderNoMallas(); return; }
+        fetch('ajax_get_mallas.php?id_carrera=' + encodeURIComponent(id))
             .then(res => res.json())
             .then(data => {
-                versionSelect.innerHTML = '<option value="">-- Usar carrera base --</option>';
-                if (data && data.success && Array.isArray(data.versions) && data.versions.length) {
-                    data.versions.forEach(v => {
+                mallaSelect.innerHTML = '<option value="">-- Usar carrera base --</option>';
+                // soportar tanto responses antiguas (versions) como nuevas (mallas)
+                const list = (data && data.success && Array.isArray(data.mallas) && data.mallas.length) ? data.mallas : (data && data.success && Array.isArray(data.versions) ? data.versions : []);
+                if (list.length) {
+                    list.forEach(v => {
                         const opt = document.createElement('option');
-                        opt.value = v.id_version || v.id || 0;
-                        opt.textContent = v.anio || '';
-                        versionSelect.appendChild(opt);
+                        opt.value = v.id_malla || v.id_version || v.id || 0;
+                        opt.textContent = (v.codigo_malla ? v.codigo_malla + ' (' + (v.anio||'') + ')' : (v.anio || ''));
+                        mallaSelect.appendChild(opt);
                     });
                 } else {
-                    renderNoVersions();
+                    renderNoMallas();
                 }
             }).catch(err => {
-                versionsBlock.innerHTML = '<div class="alert alert-danger">Error al cargar versiones.</div>';
+                // silencioso: mantener select vacío
+                renderNoMallas();
             });
     }
 
     if (carreraSelect) {
-        carreraSelect.addEventListener('change', function(){ loadVersions(this.value); });
+        carreraSelect.addEventListener('change', function(){ loadMallas(this.value); });
         // cargar inicial
-        loadVersions(carreraSelect.value);
+        loadMallas(carreraSelect.value);
     }
 });
 </script>
