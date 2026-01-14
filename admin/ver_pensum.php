@@ -214,7 +214,8 @@ if (isset($_GET['pdf']) && $_GET['pdf'] == '1') {
             // Nombre: usar MultiCell alternativa para evitar cortar texto
             $x = $pdf->GetX();
             $y = $pdf->GetY();
-            $pdf->MultiCell(70, 6, to_iso($materia['nombre_materia']), 1);
+            $nombre_tratado = insertarEspaciosEnPalabrasLargas($materia['nombre_materia'], 30);
+            $pdf->MultiCell(70, 6, to_iso($nombre_tratado), 1);
             $pdf->SetXY($x + 70, $y);
 
             $pdf->Cell(15, 6, to_iso($materia['creditos']), 1, 0, 'C');

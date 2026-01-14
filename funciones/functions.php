@@ -9446,6 +9446,81 @@ if (!function_exists('to_iso')) {
     }
 }
 
+/**
+ * Insertar espacios en palabras largas para evitar que FPDF no las parta.
+ * Divide secuencias largas sin espacios cada $limit caracteres.
+ */
+function insertarEspaciosEnPalabrasLargas($s, $limit = 30) {
+    if ($s === null) return '';
+    if (!function_exists('mb_strlen')) return $s;
+    $parts = preg_split('/(\s+)/u', $s, -1, PREG_SPLIT_DELIM_CAPTURE);
+    foreach ($parts as &$p) {
+        // solo procesar partes que no sean espacios
+        if (trim($p) === '') continue;
+        $len = mb_strlen($p, 'UTF-8');
+        if ($len > $limit) {
+            // insertar espacios cada $limit chars
+            $new = '';
+            for ($i = 0; $i < $len; $i += $limit) {
+                $chunk = mb_substr($p, $i, $limit, 'UTF-8');
+                $new .= $chunk;
+                if ($i + $limit < $len) $new .= ' ';
+            }
+            $p = $new;
+        }
+    }
+    return implode('', $parts);
+}
+
+/**
+ * Calcular cuántas líneas ocupará un texto en FPDF para un ancho dado.
+ */
+function calcularLineasFPDF($pdf, $txt, $w) {
+    if (!$pdf) return 1;
+    // manejar saltos de línea explícitos
+    $lines = 0;
+    $parts = explode("\n", (string)$txt);
+    foreach ($parts as $part) {
+        $part = trim($part);
+        if ($part === '') { $lines++; continue; }
+        $words = preg_split('/(\s+)/u', $part, -1, PREG_SPLIT_NO_EMPTY);
+        $cur = '';
+        foreach ($words as $word) {
+            $test = ($cur === '') ? $word : $cur . ' ' . $word;
+            $wtest = $pdf->GetStringWidth($test);
+            if ($wtest <= $w - 2*$pdf->cMargin) {
+                $cur = $test;
+            } else {
+                // word itself may be longer than width -> split
+                if ($pdf->GetStringWidth($word) > $w - 2*$pdf->cMargin) {
+                    // split by characters
+                    $len = mb_strlen($word, 'UTF-8');
+                    $tmp = '';
+                    for ($i=0;$i<$len;$i++) {
+                        $ch = mb_substr($word,$i,1,'UTF-8');
+                        if ($pdf->GetStringWidth($tmp.$ch) <= $w - 2*$pdf->cMargin) {
+                            $tmp .= $ch;
+                        } else {
+                            $lines++; $tmp = $ch;
+                        }
+                    }
+                    if ($tmp !== '') {
+                        $cur = $tmp;
+                    } else {
+                        $cur = '';
+                    }
+                } else {
+                    // move current to next line
+                    $lines++;
+                    $cur = $word;
+                }
+            }
+        }
+        if ($cur !== '') $lines++;
+    }
+    return max(1, $lines);
+}
+
 // Función global para agregar membrete a un objeto FPDF
 if (!function_exists('agregarMembreteFPDF')) {
     function agregarMembreteFPDF($pdf, $margin = 10) {
