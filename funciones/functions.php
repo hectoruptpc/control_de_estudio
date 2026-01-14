@@ -9440,7 +9440,9 @@ function determinarTrayectoAMostrar($id_trayecto_seccion) {
 if (!function_exists('to_iso')) {
     function to_iso($s) {
         if ($s === null) return '';
-        return @iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $s);
+        // Convertir a mayúsculas en UTF-8 y luego convertir a ISO-8859-1 para FPDF
+        $upper = function_exists('mb_strtoupper') ? mb_strtoupper($s, 'UTF-8') : strtoupper($s);
+        return @iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $upper);
     }
 }
 

@@ -114,6 +114,18 @@ if (isset($_GET['id_malla'])) {
 }
 $es_pnf = ($carrera['tipo_formacion'] == 'PNF');
 
+// Si no se indicó explicitamente una malla, intentar obtener la malla más reciente de la tabla `mallas`
+if (empty($id_malla) && !empty($id_carrera)) {
+    $mallas_disponibles = obtenerMallasPorCarrera($id_carrera);
+    if (!empty($mallas_disponibles)) {
+        // obtener la primera (ordenadas por anio DESC en la función)
+        $m0 = $mallas_disponibles[0];
+        $id_malla = intval($m0['id_malla']);
+        $codigo_malla = $m0['codigo_malla'];
+        $version_year = intval($m0['anio']);
+    }
+}
+
 $id_malla = $id_malla ?? null;
 
 // Obtener el tipo de período según la carrera (trimestre o semestre)
@@ -226,8 +238,13 @@ include("includes/head.php");
 <!-- Resto del código HTML/PHP permanece igual -->
 <div class="container-fluid">
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">Pensum: <?php echo htmlspecialchars($carrera['nombre_carrera']); ?> 
-            <small class="text-muted">(<?php echo strtoupper($tipo_periodo); ?>s)</small>
+        <h1 class="h3 mb-0 text-gray-800">PENSUM: <?php echo mb_strtoupper(htmlspecialchars($carrera['nombre_carrera']), 'UTF-8'); ?> 
+            <small class="text-muted">(<?php echo mb_strtoupper($tipo_periodo, 'UTF-8'); ?>S)</small>
+            <?php if (!empty($codigo_malla)): ?>
+                <small class="ml-3"><span class="badge badge-info">CÓDIGO MALLA: <?php echo mb_strtoupper(htmlspecialchars($codigo_malla), 'UTF-8'); ?></span></small>
+            <?php elseif (!empty($version_year)): ?>
+                <small class="ml-3"><span class="badge badge-secondary">AÑO: <?php echo mb_strtoupper(htmlspecialchars($version_year), 'UTF-8'); ?></span></small>
+            <?php endif; ?>
         </h1>
         <div>
             <a href="agregar_carrera.php" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm no-print">
@@ -246,6 +263,9 @@ include("includes/head.php");
             <span class="no-print"><?php echo date('d/m/Y'); ?></span>
         </div>
         <div class="card-body">
+            <?php if (!empty($codigo_malla) || !empty($version_year)): ?>
+                <p class="mb-3"><strong>CÓDIGO DE MALLA:</strong> <?php echo mb_strtoupper(htmlspecialchars($codigo_malla ?: $version_year), 'UTF-8'); ?></p>
+            <?php endif; ?>
             <?php if (empty($materias_agrupadas)): ?>
                 <div class="alert alert-warning">No hay materias asignadas a esta carrera.</div>
             <?php else: ?>
