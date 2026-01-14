@@ -200,7 +200,7 @@ if (isset($_GET['pdf']) && $_GET['pdf'] == '1') {
         $pdf->SetFillColor(230, 230, 230);
         $pdf->Cell(25, 7, to_iso('Codigo'), 1, 0, 'C', true);
         $pdf->Cell(70, 7, to_iso('Nombre'), 1, 0, 'L', true);
-        $pdf->Cell(15, 7, to_iso('Cred'), 1, 0, 'C', true);
+        $pdf->Cell(15, 7, to_iso('UC'), 1, 0, 'C', true);
         $pdf->Cell(20, 7, to_iso('Horas T'), 1, 0, 'C', true);
         $pdf->Cell(20, 7, to_iso('Horas P'), 1, 0, 'C', true);
         $pdf->Cell(20, 7, to_iso('Duración'), 1, 0, 'C', true);
