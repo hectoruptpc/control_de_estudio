@@ -104,14 +104,14 @@ include("includes/head.php");
                                             <i class="fas fa-file-invoice fa-3x text-info mb-3"></i>
                                             <h5>Constancia de Inscripción</h5>
                                             <p class="small text-muted">Disponible para Trayecto Inicial</p>
-                                            <a href="reportes/pdf_inscripcion.php?id=<?php echo $estudiante['id']; ?>" target="_blank" class="btn btn-info btn-block">
+                                            <a href="constancias/pdf_inscripcion.php?id=<?php echo $estudiante['id']; ?>" target="_blank" class="btn btn-info btn-block">
                                                 <i class="fas fa-print mr-2"></i>Generar Reporte
                                             </a>
                                         <?php else: ?>
                                             <i class="fas fa-user-graduate fa-3x text-success mb-3"></i>
                                             <h5>Constancia de Estudios</h5>
                                             <p class="small text-muted">Disponible para Trayectos Regulares</p>
-                                            <a href="reportes/pdf_estudios.php?id=<?php echo $estudiante['id']; ?>" target="_blank" class="btn btn-success btn-block">
+                                            <a href="constancias/pdf_estudios.php?id=<?php echo $estudiante['id']; ?>" target="_blank" class="btn btn-success btn-block">
                                                 <i class="fas fa-print mr-2"></i>Generar Reporte
                                             </a>
                                         <?php endif; ?>
