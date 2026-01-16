@@ -13926,7 +13926,7 @@ function buscarEstudiantePorCedulaConsulta($cedula) {
                     $estudiante ? $estudiante['id'] : null, 
                     null, 
                     array_merge([
-                        'cedula_buscada' => $cedura,
+                        'cedula_buscada' => $cedula,
                         'resultado_busqueda' => $resultado_busqueda,
                         'tipo_consulta' => 'busqueda_estudiante'
                     ], $detalles_estudiante), 

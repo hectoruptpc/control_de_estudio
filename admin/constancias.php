@@ -5,12 +5,45 @@ ini_set('display_errors', '1');
 $titulopag = "Generación de Constancias";
 include('../funciones/functions.php');
 
-// CARGAR PERMISOS
+// CARGAR PERMISOS Y VERIFICAR
 cargarPermisosUsuario();
 verificarPermiso('admin');
-
-// LLAMAR A LA FUNCIÓN DE VISITA
 visita();
+
+$estudiante = null;
+$carrera = null;
+$error = "";
+
+// PROCESAR BÚSQUEDA
+if (isset($_POST['buscar']) && !empty($_POST['cedula'])) {
+    $cedula = strtoupper(trim($_POST['cedula']));
+    
+    // USANDO TU FUNCIÓN ORIGINAL
+    $estudiante = buscarEstudiantePorCedulaConsulta($cedula);
+
+    if ($estudiante) {
+        // USANDO TU FUNCIÓN PARA OBTENER CARRERA
+        $carrera = obtenerCarreraEstudiante($estudiante['id']);
+        
+        // Obtenemos las materias de su carrera para identificar el trayecto
+        // Según tu función, esto devuelve un objeto mysqli_result
+        $res_materias = obtenerMateriasCarrera($estudiante['carrera']);
+        $materias_data = $res_materias->fetch_assoc();
+
+        if (!$materias_data) {
+            $error = "El estudiante no tiene materias asociadas a su carrera.";
+            $estudiante = null;
+        } else {
+            // USANDO TU FUNCIÓN PARA INFO DE TRAYECTO
+            // Tomamos el trayecto de la primera materia encontrada como referencia de su nivel actual
+            $infoTrayecto = obtenerInfoTrayecto($materias_data['trayecto']);
+            $estudiante['trayecto_n'] = $infoTrayecto['numero_trayecto'];
+            $estudiante['trayecto_nombre'] = $infoTrayecto['nombre_trayecto'];
+        }
+    } else {
+        $error = "No se encontró ningún estudiante con la cédula: <strong>$cedula</strong>";
+    }
+}
 
 include("includes/head.php");
 ?>
@@ -18,90 +51,77 @@ include("includes/head.php");
 <div class="container-fluid mt-4">
     <div class="row justify-content-center">
         <div class="col-md-10">
-            <div class="card shadow">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-file-certificate mr-2"></i> Módulo de Constancias Académicas</h5>
-                    <span class="badge badge-light">Administración</span>
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white py-3">
+                    <h5 class="mb-0"><i class="fas fa-file-contract mr-2"></i> Generador de Constancias</h5>
                 </div>
                 <div class="card-body">
                     
-                    <div class="row mb-4">
-                        <div class="col-md-6 offset-md-3 text-center">
-                            <label for="cedula_buscar" class="font-weight-bold">Ingrese la Cédula del Estudiante:</label>
-                            <div class="input-group">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text"><i class="fas fa-id-card"></i></span>
-                                </div>
-                                <input type="number" class="form-control form-control-lg" id="cedula_buscar" placeholder="Ej: 20123456">
-                                <div class="input-group-append">
-                                    <button class="btn btn-primary" type="button">
-                                        <i class="fas fa-search"></i> Buscar
-                                    </button>
+                    <form method="POST" action="" class="mb-4">
+                        <div class="row justify-content-center">
+                            <div class="col-md-6">
+                                <label class="small font-weight-bold">Formato: V-00000000 o E-00000000</label>
+                                <div class="input-group">
+                                    <input type="text" name="cedula" class="form-control form-control-lg" 
+                                           placeholder="Ej: V-12345678" 
+                                           value="<?php echo $_POST['cedula'] ?? ''; ?>" required>
+                                    <div class="input-group-append">
+                                        <button class="btn btn-primary px-4" type="submit" name="buscar">
+                                            <i class="fas fa-search"></i> Consultar
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                            <small class="text-muted">El sistema validará si el estudiante posee un lapso activo.</small>
                         </div>
-                    </div>
+                    </form>
 
-                    <hr>
-
-                    <div id="resultado_estudiante" class="mt-4">
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle mr-2"></i> <strong>Importante:</strong> Las constancias solo se emiten para estudiantes con estado <strong>Activo</strong> en el lapso actual.
+                    <?php if ($error): ?>
+                        <div class="alert alert-warning shadow-sm">
+                            <i class="fas fa-exclamation-triangle mr-2"></i> <?php echo $error; ?>
                         </div>
+                    <?php endif; ?>
 
+                    <?php if ($estudiante): ?>
                         <div class="row mt-4">
                             <div class="col-md-5">
-                                <div class="card border-left-primary h-100 shadow-sm">
+                                <div class="card bg-light shadow-sm">
                                     <div class="card-body">
-                                        <h6 class="text-primary font-weight-bold uppercase">Información Académica</h6>
-                                        <ul class="list-group list-group-flush">
-                                            <li class="list-group-item"><strong>Nombre:</strong> [Nombre del Estudiante]</li>
-                                            <li class="list-group-item"><strong>Cédula:</strong> [Cédula]</li>
-                                            <li class="list-group-item"><strong>Carrera:</strong> [Nombre de la Carrera]</li>
-                                            <li class="list-group-item"><strong>Trayecto/Semestre:</strong> [Trayecto]</li>
-                                            <li class="list-group-item"><strong>Lapso Actual:</strong> <span class="badge badge-success">2024-II</span></li>
-                                        </ul>
+                                        <h5 class="font-weight-bold"><?php echo $estudiante['nombre']; ?></h5>
+                                        <hr>
+                                        <p class="mb-1"><strong>Cédula:</strong> <?php echo $estudiante['idusuario']; ?></p>
+                                        <p class="mb-1"><strong>Carrera:</strong> <?php echo $carrera['nombre_carrera'] ?? 'N/A'; ?></p>
+                                        <p class="mb-1"><strong>Ubicación:</strong> <span class="badge badge-info"><?php echo $estudiante['trayecto_nombre']; ?></span></p>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="col-md-7">
-                                <div class="card h-100 shadow-sm">
-                                    <div class="card-header bg-light font-weight-bold text-dark">
-                                        Reportes Disponibles
-                                    </div>
-                                    <div class="card-body text-center d-flex flex-column justify-content-center">
+                                <div class="card shadow-sm">
+                                    <div class="card-header bg-white font-weight-bold text-primary">OPCIONES DISPONIBLES</div>
+                                    <div class="card-body text-center">
                                         
-                                        <div class="mb-3">
-                                            <button class="btn btn-outline-info btn-block py-3 shadow-sm">
-                                                <i class="fas fa-clipboard-check fa-2x mb-2"></i> <br>
-                                                <strong>Generar Constancia de Inscripción</strong>
-                                                <p class="small mb-0 text-muted">Aplica para todos los trayectos (incluyendo Inicial)</p>
-                                            </button>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <button class="btn btn-outline-success btn-block py-3 shadow-sm">
-                                                <i class="fas fa-user-graduate fa-2x mb-2"></i> <br>
-                                                <strong>Generar Constancia de Estudios</strong>
-                                                <p class="small mb-0 text-muted">Disponible solo para trayectos superiores al Inicial</p>
-                                            </button>
-                                            <div class="alert alert-warning mt-2 small text-left py-1">
-                                                <i class="fas fa-exclamation-triangle mr-1"></i> 
-                                                No disponible para <strong>Trayecto Inicial</strong>.
-                                            </div>
-                                        </div>
+                                        <?php if ($estudiante['trayecto_n'] == 0): ?>
+                                            <i class="fas fa-file-invoice fa-3x text-info mb-3"></i>
+                                            <h5>Constancia de Inscripción</h5>
+                                            <p class="small text-muted">Disponible para Trayecto Inicial</p>
+                                            <a href="reportes/pdf_inscripcion.php?id=<?php echo $estudiante['id']; ?>" target="_blank" class="btn btn-info btn-block">
+                                                <i class="fas fa-print mr-2"></i>Generar Reporte
+                                            </a>
+                                        <?php else: ?>
+                                            <i class="fas fa-user-graduate fa-3x text-success mb-3"></i>
+                                            <h5>Constancia de Estudios</h5>
+                                            <p class="small text-muted">Disponible para Trayectos Regulares</p>
+                                            <a href="reportes/pdf_estudios.php?id=<?php echo $estudiante['id']; ?>" target="_blank" class="btn btn-success btn-block">
+                                                <i class="fas fa-print mr-2"></i>Generar Reporte
+                                            </a>
+                                        <?php endif; ?>
 
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    
-                </div>
-                <div class="card-footer text-muted small">
-                    Sistema de Gestión de Constancias - Universidad v2.0
+                    <?php endif; ?>
+
                 </div>
             </div>
         </div>
