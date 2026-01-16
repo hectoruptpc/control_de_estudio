@@ -5,7 +5,7 @@ ini_set('display_errors', 1);
 $titulopag = "Mi Pensum Académico";
 include('../funciones/functions.php');
 
-// Verificar autenticación y rol
+// 1. Verificar autenticación y rol
 if (!isLoggedIn() || !isEstudiante()) {
     $_SESSION['msg'] = "Debes iniciar sesión como estudiante para acceder";
     header('location: ../login.php');
@@ -39,170 +39,134 @@ if ($id_carrera === 0) {
 }
 
 // 3. Obtener información detallada de la carrera
-$query_carrera = "SELECT 
-                    nombre_carrera, 
-                    cod_carrera, 
-                    tipo_formacion, 
-                    duracion_semestres, 
-                    titulo_otorga,
-                    descripcion
-                  FROM carreras 
-                  WHERE id_carrera = ?";
+$query_carrera = "SELECT nombre_carrera, cod_carrera, tipo_formacion FROM carreras WHERE id_carrera = ?";
 $stmt = mysqli_prepare($db, $query_carrera);
 mysqli_stmt_bind_param($stmt, 'i', $id_carrera);
 mysqli_stmt_execute($stmt);
 $result_carrera = mysqli_stmt_get_result($stmt);
-
-if (!$result_carrera || mysqli_num_rows($result_carrera) === 0) {
-    $_SESSION['error'] = "No se encontró información de tu carrera";
-    header('location: index.php');
-    die();
-}
-
 $carrera = mysqli_fetch_assoc($result_carrera);
+
 $es_pnf = ($carrera['tipo_formacion'] == 'PNF');
-$texto_duracion = $es_pnf ? 'trimestres' : 'semestres';
+$tipo_periodo = obtenerTipoPeriodoPorCarrera($id_carrera);
+$texto_duracion = ($tipo_periodo == 'trimestre') ? 'trimestres' : 'semestres';
 
-// 4. Obtener materias agrupadas por trayecto y ordenadas por duración
-$query_materias = "SELECT 
-                    m.id_materia,
-                    m.cod_materia,
-                    m.nombre_materia,
-                    m.creditos,
-                    m.horas_teoricas,
-                    m.horas_practicas,
-                    m.trayecto,
-                    m.duracion_periodo,
-                    m.activa,
-                    cm.semestre
-                  FROM materias m
-                  JOIN carrera_materia cm ON m.id_materia = cm.id_materia
-                  WHERE cm.id_carrera = ?
-                  ORDER BY m.trayecto, m.duracion_periodo, m.nombre_materia";
-$stmt = mysqli_prepare($db, $query_materias);
-mysqli_stmt_bind_param($stmt, 'i', $id_carrera);
-mysqli_stmt_execute($stmt);
-$result_materias = mysqli_stmt_get_result($stmt);
-
-if (!$result_materias) {
-    die("Error en consulta: " . mysqli_error($db));
+// 4. Intentar obtener el ID de la malla activa para este estudiante (opcional según tu lógica de BD)
+$id_malla = null;
+$codigo_malla = null;
+$mallas_disponibles = obtenerMallasPorCarrera($id_carrera);
+if (!empty($mallas_disponibles)) {
+    $id_malla = intval($mallas_disponibles[0]['id_malla']);
+    $codigo_malla = $mallas_disponibles[0]['codigo_malla'];
 }
 
-// 5. Procesar y agrupar las materias solo por trayecto
-$materias_agrupadas = [];
-$total_creditos = 0;
-$total_materias = 0;
+// 5. Obtener materias (Priorizando tabla malla_materia si existe el ID)
+if (!empty($id_malla)) {
+    $query_materias = "SELECT m.*, mm.semestre, m.trayecto FROM materias m JOIN malla_materia mm ON m.id_materia = mm.id_materia WHERE mm.id_malla = $id_malla ORDER BY m.trayecto, m.duracion_periodo, m.nombre_materia";
+} else {
+    $query_materias = "SELECT m.*, cm.semestre, m.trayecto FROM materias m JOIN carrera_materia cm ON m.id_materia = cm.id_materia WHERE cm.id_carrera = $id_carrera ORDER BY m.trayecto, m.duracion_periodo, m.nombre_materia";
+}
 
+$result_materias = mysqli_query($db, $query_materias);
+
+// Agrupar materias por trayecto
+$materias_agrupadas = [];
 while ($materia = mysqli_fetch_assoc($result_materias)) {
-    $trayecto = (int)$materia['trayecto'];
-    
-    $texto_trayecto = ($trayecto == 0) ? 'Trayecto Inicial' : "Trayecto $trayecto";
-    
+    $trayecto = $materia['trayecto'];
+    $texto_trayecto = ($trayecto == 0) ? 'Trayecto Inicial' : 'Trayecto ' . $trayecto;
     if (!isset($materias_agrupadas[$texto_trayecto])) {
         $materias_agrupadas[$texto_trayecto] = [];
     }
-    
     $materias_agrupadas[$texto_trayecto][] = $materia;
-    $total_creditos += (int)$materia['creditos'];
-    $total_materias++;
+}
+
+// ==========================================
+// GENERACIÓN DE PDF (IGUAL QUE VER_PENSUM.PHP)
+// ==========================================
+if (isset($_GET['pdf']) && $_GET['pdf'] == '1') {
+    ini_set('display_errors', '0');
+    require_once __DIR__ . '/../fpdf/fpdf.php';
+
+    $pdf = new FPDF('P', 'mm', 'A4');
+    $pdf->AddPage();
+    $pdf->SetAutoPageBreak(true, 15);
+
+    if (function_exists('agregarMembreteFPDF')) {
+        agregarMembreteFPDF($pdf);
+        $pdf->SetY(45);
+    }
+
+    $pdf->SetFont('Arial', 'B', 14);
+    $title = 'Pensum Académico: ' . $carrera['nombre_carrera'];
+    if (!empty($codigo_malla)) $title .= ' - ' . $codigo_malla;
+    $pdf->Cell(0, 8, to_iso($title), 0, 1, 'C');
+    
+    $pdf->SetFont('Arial', '', 10);
+    $pdf->Cell(0, 6, to_iso('Estudiante: ' . $_SESSION['user']['nombre'] . ' ' . $_SESSION['user']['apellido']), 0, 1, 'L');
+    $pdf->Cell(0, 6, to_iso('Fecha: ' . date('d/m/Y')), 0, 1, 'R');
+    $pdf->Ln(4);
+
+    foreach ($materias_agrupadas as $texto_trayecto => $materias) {
+        $pdf->SetFont('Arial', 'B', 12);
+        $pdf->Cell(0, 7, to_iso($texto_trayecto), 0, 1);
+
+        $pdf->SetFont('Arial', 'B', 9);
+        $pdf->SetFillColor(230, 230, 230);
+        $pdf->Cell(25, 7, to_iso('Codigo'), 1, 0, 'C', true);
+        $pdf->Cell(75, 7, to_iso('Nombre'), 1, 0, 'L', true);
+        $pdf->Cell(12, 7, to_iso('UC'), 1, 0, 'C', true);
+        $pdf->Cell(18, 7, to_iso('Horas T'), 1, 0, 'C', true);
+        $pdf->Cell(18, 7, to_iso('Horas P'), 1, 0, 'C', true);
+        $pdf->Cell(22, 7, to_iso('Duración'), 1, 0, 'C', true);
+        $pdf->Cell(20, 7, to_iso('Estado'), 1, 1, 'C', true);
+
+        $pdf->SetFont('Arial', '', 9);
+        foreach ($materias as $materia) {
+            $estado = $materia['activa'] ? 'Activa' : 'Inactiva';
+            
+            // Altura dinámica para el nombre
+            $x = $pdf->GetX();
+            $y = $pdf->GetY();
+            $pdf->Cell(25, 6, to_iso($materia['cod_materia']), 1, 0, 'L');
+            
+            $nombre_tratado = insertarEspaciosEnPalabrasLargas($materia['nombre_materia'], 30);
+            $pdf->MultiCell(75, 6, to_iso($nombre_tratado), 1);
+            $newY = $pdf->GetY();
+            $pdf->SetXY($x + 100, $y);
+
+            $pdf->Cell(12, 6, to_iso($materia['creditos']), 1, 0, 'C');
+            $pdf->Cell(18, 6, to_iso($materia['horas_teoricas']), 1, 0, 'C');
+            $pdf->Cell(18, 6, to_iso($materia['horas_practicas']), 1, 0, 'C');
+            $pdf->Cell(22, 6, to_iso($materia['duracion_periodo']), 1, 0, 'C');
+            $pdf->Cell(20, 6, to_iso($estado), 1, 1, 'C');
+            
+            if($pdf->GetY() < $newY) $pdf->SetY($newY);
+        }
+        $pdf->Ln(4);
+    }
+
+    $pdf->Output('I', 'Mi_Pensum_' . $id_carrera . '.pdf');
+    exit();
 }
 
 include("includes/head.php");
 ?>
 
-<script>
-// Función reutilizable para agregar membrete (desde functions.php)
-<?php echo generarMembreteJS(); ?>
-
-// Función ESPECÍFICA para este archivo
-async function generarPDF() {
-    try {
-        // Configuración de jsPDF
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('p', 'mm', 'a4');
-        const margin = 10;
-        const pageWidth = doc.internal.pageSize.getWidth();
-        
-        // Agregar membrete reutilizable
-        const yPos = await agregarMembretePDF(doc, pageWidth, margin);
-        
-        // Continuar con el proceso de generación del PDF
-        const printableElement = document.getElementById('printable-area');
-        
-        const canvas = await html2canvas(printableElement, {
-            scale: 2,
-            useCORS: true,
-            logging: false
-        });
-        
-        const imgData = canvas.toDataURL('image/jpeg', 1.0);
-        const imgWidth = pageWidth - (margin * 2);
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        
-        // Agregar contenido al PDF
-        doc.addImage(imgData, 'JPEG', margin, yPos, imgWidth, imgHeight);
-        
-        // Guardar el PDF
-        doc.save('Pensum_Academico_' + new Date().toISOString().slice(0, 10) + '.pdf');
-        
-    } catch (error) {
-        console.error('Error al generar PDF:', error);
-        alert('Error al generar el PDF. Por favor, intenta nuevamente.');
-    }
-}
-</script>
-
 <div class="container-fluid">
-    <!-- Encabezado principal -->
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">Mi Pensum Académico</h1>
+        <h1 class="h3 mb-0 text-gray-800">Mi Pensum Académico: <?php echo mb_strtoupper(htmlspecialchars($carrera['nombre_carrera']), 'UTF-8'); ?></h1>
         <div>
             <a href="index.php" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm no-print">
                 <i class="fas fa-arrow-left fa-sm text-white-50"></i> Volver al Inicio
             </a>
-            <button onclick="generarPDF()" class="d-none d-sm-inline-block btn btn-sm btn-success shadow-sm no-print ml-2">
-                <i class="fas fa-print fa-sm text-white-50"></i> Imprimir Pensum
-            </button>
+            <a href="?pdf=1" class="d-none d-sm-inline-block btn btn-sm btn-success shadow-sm no-print ml-2">
+                <i class="fas fa-print fa-sm text-white-50"></i> Generar PDF
+            </a>
         </div>
     </div>
 
-    <!-- Tarjeta con información de la carrera -->
     <div class="card shadow mb-4">
-        <div class="card-header py-3 bg-primary text-white">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h4 class="m-0 font-weight-bold"><?= htmlspecialchars($carrera['nombre_carrera']) ?></h4>
-                    <p class="mb-0">Código: <?= htmlspecialchars($carrera['cod_carrera']) ?></p>
-                </div>
-                <span class="badge badge-light">
-                    <?= $es_pnf ? 'PNF' : 'Carrera Tradicional' ?>
-                </span>
-            </div>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <p><strong>Título que otorga:</strong> <?= htmlspecialchars($carrera['titulo_otorga']) ?></p>
-                    <p><strong>Duración:</strong> <?= htmlspecialchars($carrera['duracion_semestres']) ?> semestres</p>
-                </div>
-                <div class="col-md-6">
-                    <p><strong>Total de materias:</strong> <?= $total_materias ?></p>
-                    <p><strong>Total de créditos:</strong> <?= $total_creditos ?></p>
-                </div>
-            </div>
-            <?php if (!empty($carrera['descripcion'])): ?>
-                <div class="mt-3">
-                    <h5>Descripción del Programa</h5>
-                    <p><?= nl2br(htmlspecialchars($carrera['descripcion'])) ?></p>
-                </div>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <!-- Tarjeta con el plan de estudios -->
-    <div class="card shadow mb-4" id="printable-area">
         <div class="card-header py-3 bg-secondary text-white d-flex justify-content-between align-items-center">
-            <h5 class="m-0 font-weight-bold">Plan de Estudios</h5>
+            <h5 class="m-0 font-weight-bold">Plan de Estudios - Duración en <?php echo $texto_duracion; ?></h5>
             <span class="no-print"><?php echo date('d/m/Y'); ?></span>
         </div>
         <div class="card-body">
@@ -234,22 +198,22 @@ async function generarPDF() {
                                                     <th width="8%">Créditos</th>
                                                     <th width="12%">Horas T</th>
                                                     <th width="12%">Horas P</th>
-                                                    <th width="13%">Duración</th>
+                                                    <th width="13%">Duración (<?php echo $texto_duracion; ?>)</th>
                                                     <th width="10%">Estado</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <?php foreach ($materias as $materia): ?>
                                                     <tr>
-                                                        <td><?= htmlspecialchars($materia['cod_materia']) ?></td>
-                                                        <td><?= htmlspecialchars($materia['nombre_materia']) ?></td>
-                                                        <td class="text-center"><?= htmlspecialchars($materia['creditos']) ?></td>
-                                                        <td class="text-center"><?= htmlspecialchars($materia['horas_teoricas']) ?></td>
-                                                        <td class="text-center"><?= htmlspecialchars($materia['horas_practicas']) ?></td>
-                                                        <td class="text-center"><?= htmlspecialchars($materia['duracion_periodo']) ?> <?= $texto_duracion ?></td>
+                                                        <td><?php echo htmlspecialchars($materia['cod_materia']); ?></td>
+                                                        <td><?php echo htmlspecialchars($materia['nombre_materia']); ?></td>
+                                                        <td class="text-center"><?php echo htmlspecialchars($materia['creditos']); ?></td>
+                                                        <td class="text-center"><?php echo htmlspecialchars($materia['horas_teoricas']); ?></td>
+                                                        <td class="text-center"><?php echo htmlspecialchars($materia['horas_practicas']); ?></td>
+                                                        <td class="text-center"><?php echo htmlspecialchars($materia['duracion_periodo']); ?></td>
                                                         <td class="text-center">
-                                                            <span class="badge badge-<?= $materia['activa'] ? 'success' : 'secondary' ?>">
-                                                                <?= $materia['activa'] ? 'Activa' : 'Inactiva' ?>
+                                                            <span class="badge badge-<?php echo $materia['activa'] ? 'success' : 'secondary'; ?>">
+                                                                <?php echo $materia['activa'] ? 'Activa' : 'Inactiva'; ?>
                                                             </span>
                                                         </td>
                                                     </tr>
