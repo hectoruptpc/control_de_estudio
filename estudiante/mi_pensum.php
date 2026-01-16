@@ -198,7 +198,7 @@ include("includes/head.php");
                                                     <th width="8%">Créditos</th>
                                                     <th width="12%">Horas T</th>
                                                     <th width="12%">Horas P</th>
-                                                    <th width="13%">Duración (<?php echo $texto_duracion; ?>)</th>
+                                                    <th width="13%">Trimestre (<?php echo $texto_duracion; ?>)</th>
                                                     <th width="10%">Estado</th>
                                                 </tr>
                                             </thead>

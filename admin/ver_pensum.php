@@ -203,7 +203,7 @@ if (isset($_GET['pdf']) && $_GET['pdf'] == '1') {
         $pdf->Cell(15, 7, to_iso('UC'), 1, 0, 'C', true);
         $pdf->Cell(20, 7, to_iso('Horas T'), 1, 0, 'C', true);
         $pdf->Cell(20, 7, to_iso('Horas P'), 1, 0, 'C', true);
-        $pdf->Cell(20, 7, to_iso('Duración'), 1, 0, 'C', true);
+        $pdf->Cell(20, 7, to_iso('Trimestre'), 1, 0, 'C', true);
         $pdf->Cell(20, 7, to_iso('Estado'), 1, 1, 'C', true);
 
         $pdf->SetFont('Arial', '', 10);
