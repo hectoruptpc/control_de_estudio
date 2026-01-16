@@ -196,6 +196,13 @@ if (!isLoggedIn() || !isAdmin()) {
                                 <i class="fas fa-graduation-cap fa-fw"></i> Grado
                             </a>
                         <?php endif; ?>
+
+                            <?php if (tienePermiso('admin')): ?>
+            <a title="Generar Constancias" class="dropdown-item" href="constancias.php">
+                <i class="fas fa-file-alt fa-fw"></i> Constancias
+            </a>
+        <?php endif; ?>
+
                     </div>
                 </li>
 
