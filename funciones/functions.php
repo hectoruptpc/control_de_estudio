@@ -12917,7 +12917,7 @@ class PDF_PlanillaNotas {
     }
 }
 
-// El resto de las funciones permanecen igual...
+
 /**
  * Generar planilla PDF para lista de estudiantes con casillas de notas
  */
