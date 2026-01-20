@@ -13049,14 +13049,15 @@ function obtenerEstudiantesSeccion($seccion_id) {
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-require_once('../fpdf/fpdf.php');
-include_once('../funciones/functions.php'); 
+require_once('./fpdf/fpdf.php');
+
 
 // 1. OBTENER EL NOMBRE DEL USUARIO ACTUAL (Basado en tu lógica de BD)
-$nombre_usuario_reporte = "ADMINISTRADOR"; // Valor por defecto
+$nombre_usuario_reporte = "ADMINISTRADOR"; 
 
 try {
     $db_user = $pool->getConnection();
+    // Consulta para obtener el nombre real del usuario que está logueado
     $query_user = "SELECT nombre FROM users WHERE username = ? LIMIT 1";
     $stmt_u = $db_user->prepare($query_user);
     $stmt_u->bind_param("s", $usua);
@@ -13069,10 +13070,10 @@ try {
     $stmt_u->close();
     $pool->releaseConnection($db_user);
 } catch (Exception $e) {
-    // Si falla, se queda con el valor por defecto
+    // Si falla, mantiene el valor por defecto
 }
 
-class PDF_ActaFinal extends FPDF {
+class PDF_ActaCarga extends FPDF {
     private $datos;
     private $usuario;
 
@@ -13083,7 +13084,7 @@ class PDF_ActaFinal extends FPDF {
         $this->AliasNbPages();
         $this->AddPage();
         $this->Cuerpo();
-        $this->Output('I', "Acta_Final_" . $this->datos['info_general']['codigo_seccion'] . ".pdf");
+        $this->Output('I', "Reporte_Carga_" . $this->datos['info_general']['codigo_seccion'] . ".pdf");
         exit;
     }
 
@@ -13092,21 +13093,17 @@ class PDF_ActaFinal extends FPDF {
         if (function_exists('agregarMembreteFPDF')) {
             agregarMembreteFPDF($this);
             $this->SetY(40); 
-        } else {
-            $this->SetFont('Arial', 'B', 8);
-            $this->Cell(0, 4, $this->utf8('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'L');
-            $this->Cell(0, 4, $this->utf8('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'L');
-            $this->Cell(0, 4, $this->utf8('UNIVERSIDAD POLITÉCNICA TERRITORIAL PUERTO CABELLO'), 0, 1, 'L');
-            $this->Cell(0, 4, $this->utf8('DEPARTAMENTO DE CONTROL DE ESTUDIOS'), 0, 1, 'L');
-            $this->Ln(5);
         }
 
-        // Título normal (Sin fondo verde)
-        $this->SetFont('Arial', 'B', 10);
-        $this->Cell(0, 7, $this->utf8('ACTA DE CALIFICACIÓN FINAL 2024'), 1, 1, 'C');
+        $info = $this->datos['info_general'];
+        // Usamos el nombre del periodo tal cual viene de la BD (ej. 2025-2)
+        $periodo_texto = $info['nombre_periodo'];
+
+        // Título: LISTADO DE CARGA DE NOTAS con el periodo dinámico
+        $this->SetFont('Arial', 'B', 11);
+        $this->Cell(0, 8, $this->utf8('LISTADO DE CARGA DE NOTAS - PERIODO ' . $periodo_texto), 1, 1, 'C');
         $this->Ln(4);
 
-        $info = $this->datos['info_general'];
         $this->SetFont('Arial', '', 8);
         
         // Fila 1: Asignatura y Sección
@@ -13135,7 +13132,7 @@ class PDF_ActaFinal extends FPDF {
     }
 
     function Cuerpo() {
-        // Cabecera de la tabla de alumnos
+        // Encabezado de la tabla de alumnos
         $this->SetFont('Arial', 'B', 7);
         $this->SetFillColor(245, 245, 245);
         $this->Cell(10, 6, 'NUM.', 1, 0, 'C', true);
@@ -13152,7 +13149,7 @@ class PDF_ActaFinal extends FPDF {
             $this->Cell(10, 5, $i++, 1, 0, 'C');
             $this->Cell(25, 5, $n['cedula_estudiante'], 1, 0, 'C');
             $this->Cell(75, 5, $this->utf8($n['nombre_estudiante']), 1, 0, 'L');
-            $this->Cell(15, 5, '20', 1, 0, 'C'); 
+            $this->Cell(15, 5, '---', 1, 0, 'C'); // Espacio para acumulado si aplica
             $this->Cell(15, 5, str_pad($n['nota_final'], 2, '0', STR_PAD_LEFT), 1, 0, 'C');
             $this->Cell(25, 5, $this->utf8($this->numLetras($n['nota_final'])), 1, 0, 'C');
             $this->Cell(25, 5, ($n['nota_final'] >= 10 ? 'Aprobado' : 'Reprobado'), 1, 1, 'C');
@@ -13161,7 +13158,7 @@ class PDF_ActaFinal extends FPDF {
         }
 
         $this->Ln(2);
-        $this->Cell(0, 5, '============================== FIN DEL ACTA ==============================', 0, 1, 'C');
+        $this->Cell(0, 5, $this->utf8('--- FIN DEL REPORTE DE CARGA ---'), 0, 1, 'C');
         $this->DibujarPie();
     }
 
@@ -13172,38 +13169,38 @@ class PDF_ActaFinal extends FPDF {
         $info = $this->datos['info_general'];
         $st = $this->datos['estadisticas'];
 
-        // Bloque de Firmas (Izquierda)
+        // Bloque de Firmas
         $this->SetXY(10, $y_base);
         $this->SetFont('Arial', 'B', 8);
-        $this->Cell(50, 5, 'Conformes', 1, 1, 'L');
+        $this->Cell(55, 5, $this->utf8('Revisión Docente'), 1, 1, 'L');
         $this->SetFont('Arial', '', 7);
-        $this->Cell(50, 6, $this->utf8('Prof. Materia: ________________'), 'LR', 1);
-        $this->Cell(50, 6, $this->utf8('Control Estudios: ______________'), 'LR', 1);
-        $this->Cell(50, 6, $this->utf8('Director: ____________________'), 'LRB', 1);
+        $this->Cell(55, 6, $this->utf8('Firma Profesor: ________________'), 'LR', 1);
+        $this->Cell(55, 6, $this->utf8('C.I.: __________________________'), 'LR', 1);
+        $this->Cell(55, 6, $this->utf8('Sello Departamento: ____________'), 'LRB', 1);
 
-        // Bloque de Observaciones (Centro)
-        $this->SetXY(60, $y_base);
+        // Bloque de Observaciones
+        $this->SetXY(65, $y_base);
         $this->SetFont('Arial', 'B', 8);
-        $this->Cell(95, 5, 'Observaciones', 1, 1, 'L');
-        $this->SetXY(60, $y_base + 5);
+        $this->Cell(90, 5, 'Detalles del Reporte', 1, 1, 'L');
+        $this->SetXY(65, $y_base + 5);
         $this->SetFont('Arial', '', 7);
-        $this->MultiCell(95, 6, $this->utf8("PNF: " . $info['nombre_carrera'] . "\nPERIODO: " . $info['nombre_periodo'] . "\nSECCION: " . $info['codigo_seccion']), 1, 'L');
+        $this->MultiCell(90, 6, $this->utf8("CARRERA: " . $info['nombre_carrera'] . "\nPERIODO ACADÉMICO: " . $info['nombre_periodo'] . "\nSECCION: " . $info['codigo_seccion']), 1, 'L');
 
-        // Bloque de Estadísticas (Derecha)
+        // Bloque de Estadísticas
         $this->SetXY(155, $y_base);
         $this->SetFont('Arial', '', 7);
-        $this->Cell(25, 5, 'Fecha:', 1, 0); $this->Cell(20, 5, date('d-m-Y'), 1, 1);
+        $this->Cell(25, 5, 'Fecha Impresion:', 1, 0); $this->Cell(20, 5, date('d-m-Y'), 1, 1);
+        $this->SetX(155);
+        $this->Cell(25, 5, 'Inasistentes:', 1, 0); $this->Cell(20, 5, '0', 1, 1);
         $this->SetX(155);
         $this->Cell(25, 5, 'Aprobados:', 1, 0); $this->Cell(20, 5, $st['aprobados'], 1, 1);
         $this->SetX(155);
         $this->Cell(25, 5, 'Reprobados:', 1, 0); $this->Cell(20, 5, $st['reprobados'], 1, 1);
-        $this->SetX(155);
-        $this->Cell(25, 5, 'Inasistentes:', 1, 0); $this->Cell(20, 5, '0', 1, 1);
 
-        // Nombre del Usuario que sacó el reporte (Abajo a la derecha)
+        // Nombre del Usuario Administrativo que genera el reporte
         $this->Ln(6);
         $this->SetFont('Arial', 'B', 8);
-        $this->Cell(0, 5, 'USUARIO: ' . strtoupper($this->utf8($this->usuario)), 0, 1, 'R');
+        $this->Cell(0, 5, 'GENERADO POR: ' . strtoupper($this->utf8($this->usuario)), 0, 1, 'R');
     }
 
     function numLetras($n) {
@@ -13214,14 +13211,10 @@ class PDF_ActaFinal extends FPDF {
     function utf8($t) { return mb_convert_encoding($t, "ISO-8859-1", "UTF-8"); }
 }
 
-// --- LOGICA DE DATOS ---
+// --- PROCESAMIENTO ---
 if (isset($_GET['materia_id'])) {
-    $periodo_id = $_GET['periodo_id'];
-    $materia_id = $_GET['materia_id'];
-    $docente_id = $_GET['docente_id'];
-
-    $info = obtenerInfoNotasDefinitivas($docente_id, $materia_id, $periodo_id);
-    $lista_notas = obtenerNotasDefinitivasGrupo($docente_id, $materia_id, $periodo_id);
+    $info = obtenerInfoNotasDefinitivas($_GET['docente_id'], $_GET['materia_id'], $_GET['periodo_id']);
+    $lista_notas = obtenerNotasDefinitivasGrupo($_GET['docente_id'], $_GET['materia_id'], $_GET['periodo_id']);
     $stats = calcularEstadisticasNotas($lista_notas);
 
     $datos_pdf = [
@@ -13230,7 +13223,7 @@ if (isset($_GET['materia_id'])) {
         'estadisticas' => $stats
     ];
 
-    $pdf = new PDF_ActaFinal();
+    $pdf = new PDF_ActaCarga();
     $pdf->generarReporte($datos_pdf, $nombre_usuario_reporte);
 }
 
