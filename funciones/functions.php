@@ -12724,9 +12724,9 @@ class PDF_PlanillaNotas {
     private $estudiantes;
     
     function __construct() {
-        // Incluir FPDF solo cuando se instancie la clase
+        // Asegúrate de que la ruta a FPDF sea la correcta en tu proyecto
         require_once('../fpdf/fpdf.php');
-        $this->pdf = new FPDF();
+        $this->pdf = new FPDF('P', 'mm', 'A4'); // Orientación Vertical, milímetros, A4
     }
     
     function generarPlanilla($info, $estudiantes) {
@@ -12812,7 +12812,7 @@ class PDF_PlanillaNotas {
         $this->pdf->Cell(50, 4, $this->codificarTexto($this->info['nombre_periodo']), 0, 1);
         
         $this->pdf->SetX($x);
-        $this->pdf->Ln(2);
+        $this->pdf->Ln(5); // Un poco más de espacio antes de la tabla
     }
     
     function Firma() {
@@ -12835,8 +12835,17 @@ class PDF_PlanillaNotas {
         // Llamar Header
         $this->Header();
         
+        // --- CONFIGURACIÓN DE ANCHOS PARA 12 COLUMNAS ---
+        // Ajustamos los anchos para que quepan en una hoja A4 (aprox 190mm ancho útil)
+        $w_num = 8;
+        $w_ced = 20;
+        $w_nom = 60;  // Espacio suficiente para nombre
+        $w_nota = 7;  // Ancho de cada casillero de nota (7mm x 12 = 84mm)
+        $w_fin = 10;  // Nota final
+        $cant_notas = 12;
+
         // Calcular el ancho total de la tabla
-        $ancho_total_tabla = 8 + 18 + 45 + (7 * 8) + 8; // Suma de todas las columnas
+        $ancho_total_tabla = $w_num + $w_ced + $w_nom + ($cant_notas * $w_nota) + $w_fin;
         
         // Calcular la posición X para centrar la tabla
         $margen_izquierdo = ($this->pdf->GetPageWidth() - $ancho_total_tabla) / 2;
@@ -12844,8 +12853,8 @@ class PDF_PlanillaNotas {
         // Establecer la posición X para centrar
         $this->pdf->SetX($margen_izquierdo);
         
-        // Encabezado de la tabla centrado
-        $this->agregarEncabezadoTabla($margen_izquierdo);
+        // Encabezado de la tabla centrado con los parámetros de ancho
+        $this->agregarEncabezadoTabla($margen_izquierdo, $w_num, $w_ced, $w_nom, $w_nota, $w_fin, $cant_notas);
         
         // Estudiantes - tabla centrada
         $contador = 0;
@@ -12856,48 +12865,60 @@ class PDF_PlanillaNotas {
             $this->pdf->SetX($margen_izquierdo);
             
             $this->pdf->SetFont('Arial', '', 7);
-            $this->pdf->Cell(8, 5, $contador, 1, 0, 'C');
-            $this->pdf->Cell(18, 5, $estudiante['cedula'], 1, 0, 'C');
+            
+            // Altura de la fila
+            $h_fila = 5;
+            
+            $this->pdf->Cell($w_num, $h_fila, $contador, 1, 0, 'C');
+            $this->pdf->Cell($w_ced, $h_fila, $estudiante['cedula'], 1, 0, 'C');
             
             $nombreCompleto = $this->codificarTexto($estudiante['nombre']);
-            if (strlen($nombreCompleto) > 25) {
-                $nombreCompleto = substr($nombreCompleto, 0, 25) . '...';
+            if (strlen($nombreCompleto) > 30) {
+                $nombreCompleto = substr($nombreCompleto, 0, 30) . '...';
             }
-            $this->pdf->Cell(45, 5, $nombreCompleto, 1, 0);
+            // Alineación L (Left) para el nombre se ve mejor
+            $this->pdf->Cell($w_nom, $h_fila, ' ' . $nombreCompleto, 1, 0, 'L');
             
-            // 8 casillas para notas
-            for ($i = 1; $i <= 8; $i++) {
-                $this->pdf->Cell(7, 5, '', 1, 0, 'C');
+            // 12 casillas para notas
+            for ($i = 1; $i <= $cant_notas; $i++) {
+                $this->pdf->Cell($w_nota, $h_fila, '', 1, 0, 'C');
             }
             
             // Casilla para nota final
-            $this->pdf->Cell(8, 5, '', 1, 1, 'C');
+            $this->pdf->Cell($w_fin, $h_fila, '', 1, 1, 'C');
         }
         
-        // AGREGAR FIRMA INMEDIATAMENTE DESPUÉS DE LA TABLA
-        $this->pdf->Ln(20); // Un pequeño espacio
+        // AGREGAR FIRMA DESPUÉS DE LA TABLA
+        $this->pdf->Ln(15); // Espacio antes de la firma
         $this->Firma();
     }
     
-    function agregarEncabezadoTabla($margen_izquierdo = 10) {
+    function agregarEncabezadoTabla($margen_izquierdo, $w_num, $w_ced, $w_nom, $w_nota, $w_fin, $cant_notas) {
         // Establecer posición X para el encabezado
         $this->pdf->SetX($margen_izquierdo);
         
-        // Encabezado de la tabla
+        // Configuración de fuente y color para que se parezca a la imagen
         $this->pdf->SetFont('Arial', 'B', 7);
-        $this->pdf->SetFillColor(200, 200, 200);
+        $this->pdf->SetFillColor(230, 230, 230); // Gris claro tipo formulario
+        $this->pdf->SetLineWidth(0.2); // Líneas finas y nítidas
         
-        $this->pdf->Cell(8, 6, 'N°', 1, 0, 'C', true);
-        $this->pdf->Cell(18, 6, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
-        $this->pdf->Cell(45, 6, $this->codificarTexto('Nombre'), 1, 0, 'C', true);
+        $h_header = 8; // Altura del encabezado
         
-        // 8 casillas para notas
-        for ($i = 1; $i <= 8; $i++) {
-            $this->pdf->Cell(7, 6, "N$i", 1, 0, 'C', true);
+        $this->pdf->Cell($w_num, $h_header, 'N', 1, 0, 'C', true);
+        $this->pdf->Cell($w_ced, $h_header, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
+        $this->pdf->Cell($w_nom, $h_header, $this->codificarTexto('Apellidos y Nombres'), 1, 0, 'C', true);
+        
+        // 12 casillas para notas numeradas
+        for ($i = 1; $i <= $cant_notas; $i++) {
+            // Aquí encuadramos bien el número
+            $this->pdf->Cell($w_nota, $h_header, $i, 1, 0, 'C', true);
         }
         
-        $this->pdf->Cell(8, 6, 'Final', 1, 1, 'C', true);
+        $this->pdf->Cell($w_fin, $h_header, 'DEF', 1, 1, 'C', true);
+        
+        // Resetear colores
         $this->pdf->SetFillColor(255, 255, 255);
+        $this->pdf->SetFont('Arial', '', 7);
     }
     
     /**
@@ -12917,6 +12938,9 @@ class PDF_PlanillaNotas {
     }
 }
 
+// --------------------------------------------------------------------------
+// FUNCIONES AUXILIARES (INCLUIDAS TAL CUAL SE SOLICITÓ)
+// --------------------------------------------------------------------------
 
 /**
  * Generar planilla PDF para lista de estudiantes con casillas de notas
@@ -13015,6 +13039,7 @@ function obtenerEstudiantesSeccion($seccion_id) {
     
     return $estudiantes;
 }
+
 
 
 
