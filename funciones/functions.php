@@ -13049,7 +13049,7 @@ function obtenerEstudiantesSeccion($seccion_id) {
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-require_once('./fpdf/fpdf.php');
+require_once __DIR__ . '/../fpdf/fpdf.php';
 
 
 // 1. OBTENER EL NOMBRE DEL USUARIO ACTUAL (Basado en tu lógica de BD)
