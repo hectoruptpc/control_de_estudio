@@ -13046,44 +13046,52 @@ function obtenerEstudiantesSeccion($seccion_id) {
 
 // REPORTE DE NOTAS DEFINITIVAS ***********************************************************************
 
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 require_once('../fpdf/fpdf.php');
+// Se asume que functions.php contiene agregarMembreteFPDF($pdf) y la conexión $db
+include_once('../funciones/functions.php'); 
 
 class PDF_NotasDefinitivas extends FPDF {
     private $datos;
-    private $trayecto;
 
     function generarReporte($datos) {
         $this->datos = $datos;
-        $this->trayecto = $datos['info_general']['numero_trayecto'];
         
         $this->SetMargins(10, 10, 10);
         $this->AliasNbPages();
         $this->AddPage();
         $this->Cuerpo();
         
-        // 'I' para previsualizar, 'D' para descargar. Tú eliges:
+        // 'I' para visualizar en el navegador
         $this->Output('I', $this->getNombreArchivo());
         exit;
     }
 
-    // Encabezado que se repite en cada página (Membrete + Título)
+    /**
+     * ENCABEZADO: Usa tu función global de membrete
+     */
     function Header() {
-        // Membrete Institucional (Izquierda)
-        $this->SetFont('Arial', 'B', 8);
-        $this->Cell(0, 3, $this->codificarTexto('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'L');
-        $this->Cell(0, 3, $this->codificarTexto('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'L');
-        $this->SetFont('Arial', '', 8);
-        $this->Cell(0, 3, $this->codificarTexto('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'L');
-        $this->Cell(0, 3, $this->codificarTexto('DEPARTAMENTO DE CONTROL DE ESTUDIOS'), 0, 1, 'L');
-        $this->Ln(5);
+        if (function_exists('agregarMembreteFPDF')) {
+            // Llama a la función que ya tienes en tu sistema
+            agregarMembreteFPDF($this);
+            // Ajustamos la posición Y para que el título no choque con el membrete
+            $this->SetY(40); 
+        } else {
+            // Fallback en caso de que la función no exista
+            $this->SetFont('Arial', 'B', 10);
+            $this->Cell(0, 5, $this->codificarTexto('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+            $this->Ln(10);
+        }
 
-        // Título del Acta (Fondo Gris)
+        // Título del Acta (Fondo Gris como en la imagen)
         $this->SetFillColor(230, 230, 230);
         $this->SetFont('Arial', 'B', 10);
         $this->Cell(0, 7, $this->codificarTexto('ACTA DE CALIFICACIÓN FINAL'), 1, 1, 'C', true);
         $this->Ln(2);
 
-        // Bloque de Información General
+        // Bloque de Información General con líneas inferiores
         $info = $this->datos['info_general'];
         $this->SetFont('Arial', '', 8);
         
@@ -13111,13 +13119,14 @@ class PDF_NotasDefinitivas extends FPDF {
     function Cuerpo() {
         // Encabezado de la Tabla
         $this->SetFont('Arial', 'B', 7);
-        $this->Cell(8, 8, 'N', 1, 0, 'C');
-        $this->Cell(22, 8, $this->codificarTexto('CÉDULA'), 1, 0, 'C');
-        $this->Cell(70, 8, 'APELLIDOS Y NOMBRES', 1, 0, 'C');
-        $this->Cell(15, 8, 'ACUM.', 1, 0, 'C');
-        $this->Cell(12, 8, 'NOTA', 1, 0, 'C');
-        $this->Cell(35, 8, 'NOTA EN LETRAS', 1, 0, 'C');
-        $this->Cell(28, 8, 'OBSERVACIONES', 1, 1, 'C');
+        $this->SetFillColor(240, 240, 240);
+        $this->Cell(8, 8, 'N', 1, 0, 'C', true);
+        $this->Cell(22, 8, $this->codificarTexto('CÉDULA'), 1, 0, 'C', true);
+        $this->Cell(70, 8, 'APELLIDOS Y NOMBRES', 1, 0, 'C', true);
+        $this->Cell(15, 8, 'ACUM.', 1, 0, 'C', true);
+        $this->Cell(12, 8, 'NOTA', 1, 0, 'C', true);
+        $this->Cell(35, 8, 'NOTA EN LETRAS', 1, 0, 'C', true);
+        $this->Cell(28, 8, 'OBSERVACIONES', 1, 1, 'C', true);
 
         // Listado de Estudiantes
         $this->SetFont('Arial', '', 8);
@@ -13132,11 +13141,11 @@ class PDF_NotasDefinitivas extends FPDF {
             $this->Cell(70, 6, $this->codificarTexto($nota['nombre_estudiante']), 1, 0, 'L');
             $this->Cell(15, 6, '---', 1, 0, 'C'); 
             $this->Cell(12, 6, $nota_str, 1, 0, 'C');
-            $this->Cell(35, 6, $this->convertirNumeroALetras($nota_final), 1, 0, 'C');
+            $this->Cell(35, 6, $this->codificarTexto($this->convertirNumeroALetras($nota_final)), 1, 0, 'C');
             $this->Cell(28, 6, $obs, 1, 1, 'C');
             
-            // Salto de página automático si hay muchos alumnos
-            if($this->GetY() > 250 && $i < count($this->datos['notas'])) {
+            // Salto de página automático
+            if($this->GetY() > 250 && $i <= count($this->datos['notas'])) {
                 $this->AddPage();
             }
         }
@@ -13145,7 +13154,8 @@ class PDF_NotasDefinitivas extends FPDF {
     }
 
     function DibujarPieDeActa() {
-        if ($this->GetY() > 230) $this->AddPage(); // Evitar que el pie quede cortado
+        // Verificar si hay espacio para el pie, si no, agregar página
+        if ($this->GetY() > 220) $this->AddPage();
         
         $this->Ln(10);
         $stats = $this->datos['estadisticas'];
@@ -13188,7 +13198,8 @@ class PDF_NotasDefinitivas extends FPDF {
     }
 
     function codificarTexto($texto) {
-        return utf8_decode($texto);
+        // Usamos mb_convert_encoding para asegurar compatibilidad con FPDF (ISO-8859-1)
+        return mb_convert_encoding($texto, "ISO-8859-1", "UTF-8");
     }
 
     function getNombreArchivo() {
@@ -13197,11 +13208,12 @@ class PDF_NotasDefinitivas extends FPDF {
 }
 
 /**
- * FUNCIONES DE LOGICA Y BASE DE DATOS
+ * LOGICA DE PROCESAMIENTO
  */
 
 function generarPDFNotasDefinitivas($docente_id, $materia_id, $periodo_id) {
     global $db;
+    
     $info_general = obtenerInfoNotasDefinitivas($docente_id, $materia_id, $periodo_id);
     if (!$info_general) return false;
     
@@ -13235,7 +13247,7 @@ function obtenerInfoNotasDefinitivas($docente_id, $materia_id, $periodo_id) {
               INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
               WHERE ds.id_usuario = $docente_id AND ds.id_materia = $materia_id LIMIT 1";
     $result = $db->query($query);
-    return $result->fetch_assoc();
+    return ($result) ? $result->fetch_assoc() : false;
 }
 
 function obtenerNotasDefinitivasGrupo($docente_id, $materia_id, $periodo_id) {
@@ -13247,9 +13259,11 @@ function obtenerNotasDefinitivasGrupo($docente_id, $materia_id, $periodo_id) {
               ORDER BY ue.nombre ASC";
     $result = $db->query($query);
     $notas = [];
-    while ($row = $result->fetch_assoc()) {
-        $row['nota_final'] = calcularNotaFinal($row);
-        $notas[] = $row;
+    if($result){
+        while ($row = $result->fetch_assoc()) {
+            $row['nota_final'] = calcularNotaFinal($row);
+            $notas[] = $row;
+        }
     }
     return $notas;
 }
@@ -13258,7 +13272,7 @@ function calcularNotaFinal($datos_nota) {
     $suma = 0; $cont = 0;
     for ($i = 0; $i <= 4; $i++) {
         $campo = "trayecto_$i";
-        if (!empty($datos_nota[$campo])) {
+        if (isset($datos_nota[$campo]) && $datos_nota[$campo] !== '' && $datos_nota[$campo] !== null) {
             $suma += (int)$datos_nota[$campo];
             $cont++;
         }
@@ -13269,7 +13283,9 @@ function calcularNotaFinal($datos_nota) {
 function calcularEstadisticasNotas($notas) {
     $total = count($notas);
     $aprobados = 0;
-    foreach ($notas as $n) { if ($n['nota_final'] >= 10) $aprobados++; }
+    foreach ($notas as $n) { 
+        if ($n['nota_final'] >= 10) $aprobados++; 
+    }
     return [
         'total' => $total,
         'aprobados' => $aprobados,
