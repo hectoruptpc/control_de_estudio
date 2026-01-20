@@ -13052,16 +13052,25 @@ ini_set('display_errors', 1);
 require_once('../fpdf/fpdf.php');
 include_once('../funciones/functions.php'); 
 
-// 1. SEGURIDAD Y SESIÓN
-cargarPermisosUsuario();
-if (!isLoggedIn() || !isAdmin()) {
-    $_SESSION['msg'] = "Debes iniciar sesión para generar reportes";
-    header('location: ../login.php');
-    exit();
-}
+// 1. OBTENER EL NOMBRE DEL USUARIO ACTUAL (Basado en tu lógica de BD)
+$nombre_usuario_reporte = "ADMINISTRADOR"; // Valor por defecto
 
-// Obtener nombre del usuario actual (el que aparece abajo a la derecha en la imagen)
-$usuario_sistema = isset($_SESSION['nombre']) ? $_SESSION['nombre'] : 'USUARIO NO IDENTIFICADO';
+try {
+    $db_user = $pool->getConnection();
+    $query_user = "SELECT nombre FROM users WHERE username = ? LIMIT 1";
+    $stmt_u = $db_user->prepare($query_user);
+    $stmt_u->bind_param("s", $usua);
+    $stmt_u->execute();
+    $res_u = $stmt_u->get_result();
+    if ($res_u && $res_u->num_rows > 0) {
+        $user_data = $res_u->fetch_assoc();
+        $nombre_usuario_reporte = $user_data['nombre'];
+    }
+    $stmt_u->close();
+    $pool->releaseConnection($db_user);
+} catch (Exception $e) {
+    // Si falla, se queda con el valor por defecto
+}
 
 class PDF_ActaFinal extends FPDF {
     private $datos;
@@ -13079,34 +13088,28 @@ class PDF_ActaFinal extends FPDF {
     }
 
     function Header() {
-        // Membrete según la imagen
+        // Membrete Institucional
         if (function_exists('agregarMembreteFPDF')) {
             agregarMembreteFPDF($this);
+            $this->SetY(40); 
         } else {
-            // Si la función no existe, colocamos el texto manualmente
-            $this->Image('../images/uptpc.png', 10, 10, 20);
-            $this->SetFont('Arial', 'B', 9);
-            $this->SetXY(35, 10);
-            $this->Cell(0, 4, $this->utf8('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1);
-            $this->SetX(35);
-            $this->Cell(0, 4, $this->utf8('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1);
-            $this->Ln(4);
-            $this->SetX(35);
-            $this->Cell(0, 4, $this->utf8('UNIVERSIDAD POLITÉCNICA TERRITORIAL PUERTO CABELLO'), 0, 1);
-            $this->SetX(35);
-            $this->Cell(0, 4, $this->utf8('DEPARTAMENTO DE CONTROL DE ESTUDIOS'), 0, 1);
+            $this->SetFont('Arial', 'B', 8);
+            $this->Cell(0, 4, $this->utf8('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'L');
+            $this->Cell(0, 4, $this->utf8('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'L');
+            $this->Cell(0, 4, $this->utf8('UNIVERSIDAD POLITÉCNICA TERRITORIAL PUERTO CABELLO'), 0, 1, 'L');
+            $this->Cell(0, 4, $this->utf8('DEPARTAMENTO DE CONTROL DE ESTUDIOS'), 0, 1, 'L');
+            $this->Ln(5);
         }
 
-        $this->SetY(35);
-        $this->SetFillColor(200, 255, 200); // Color verde claro de la imagen
+        // Título normal (Sin fondo verde)
         $this->SetFont('Arial', 'B', 10);
-        $this->Cell(0, 7, $this->utf8('ACTA DE CALIFICACION FINAL 2024'), 1, 1, 'C', true);
-        $this->Ln(2);
+        $this->Cell(0, 7, $this->utf8('ACTA DE CALIFICACIÓN FINAL 2024'), 1, 1, 'C');
+        $this->Ln(4);
 
         $info = $this->datos['info_general'];
         $this->SetFont('Arial', '', 8);
         
-        // Fila Asignatura
+        // Fila 1: Asignatura y Sección
         $this->Cell(20, 5, 'ASIGNATURA:', 0, 0);
         $this->SetFont('Arial', 'B', 8);
         $this->Cell(120, 5, $this->utf8($info['nombre_materia']), 'B', 0);
@@ -13115,7 +13118,7 @@ class PDF_ActaFinal extends FPDF {
         $this->SetFont('Arial', 'B', 8);
         $this->Cell(0, 5, $info['codigo_seccion'], 'B', 1);
 
-        // Fila Docente
+        // Fila 2: Docente, Cédula y Carrera (Dpt)
         $this->SetFont('Arial', '', 8);
         $this->Cell(15, 5, 'DOCENTE:', 0, 0);
         $this->SetFont('Arial', 'B', 8);
@@ -13127,79 +13130,80 @@ class PDF_ActaFinal extends FPDF {
         $this->SetFont('Arial', '', 8);
         $this->Cell(12, 5, 'DEPT.:', 0, 0);
         $this->SetFont('Arial', 'B', 8);
-        $this->Cell(30, 5, $this->utf8($info['nombre_carrera']), 'B', 0);
-        $this->SetFont('Arial', '', 8);
-        $this->Cell(8, 5, 'U.C.: 1', 0, 1);
-        $this->Ln(3);
+        $this->Cell(0, 5, $this->utf8($info['nombre_carrera']), 'B', 1);
+        $this->Ln(5);
     }
 
     function Cuerpo() {
-        // Cabecera de tabla como en la imagen
+        // Cabecera de la tabla de alumnos
         $this->SetFont('Arial', 'B', 7);
-        $this->Cell(8, 5, 'NUM.', 1, 0, 'C');
-        $this->Cell(18, 5, 'CODIGO', 1, 0, 'C');
-        $this->Cell(20, 5, 'CEDULA', 1, 0, 'C');
-        $this->Cell(70, 5, 'NOMBRE DEL ALUMNO', 1, 0, 'C');
-        $this->Cell(12, 5, 'ACUM', 1, 0, 'C');
-        $this->Cell(12, 5, 'NOTA', 1, 0, 'C');
-        $this->Cell(25, 5, 'LETRA', 1, 0, 'C');
-        $this->Cell(25, 5, 'Observaciones', 1, 1, 'C');
+        $this->SetFillColor(245, 245, 245);
+        $this->Cell(10, 6, 'NUM.', 1, 0, 'C', true);
+        $this->Cell(25, 6, $this->utf8('CÉDULA'), 1, 0, 'C', true);
+        $this->Cell(75, 6, 'NOMBRE DEL ALUMNO', 1, 0, 'C', true);
+        $this->Cell(15, 6, 'ACUM.', 1, 0, 'C', true);
+        $this->Cell(15, 6, 'NOTA', 1, 0, 'C', true);
+        $this->Cell(25, 6, 'LETRA', 1, 0, 'C', true);
+        $this->Cell(25, 6, 'OBSERVACION', 1, 1, 'C', true);
 
         $this->SetFont('Arial', '', 7);
         $i = 1;
         foreach ($this->datos['notas'] as $n) {
-            $this->Cell(8, 5, $i++, 1, 0, 'C');
-            $this->Cell(18, 5, '347' . rand(100,999), 1, 0, 'C'); // Ejemplo de código
-            $this->Cell(20, 5, $n['cedula_estudiante'], 1, 0, 'C');
-            $this->Cell(70, 5, $this->utf8($n['nombre_estudiante']), 1, 0, 'L');
-            $this->Cell(12, 5, '20', 1, 0, 'C'); // Acumulado
-            $this->Cell(12, 5, str_pad($n['nota_final'], 2, '0', STR_PAD_LEFT), 1, 0, 'C');
+            $this->Cell(10, 5, $i++, 1, 0, 'C');
+            $this->Cell(25, 5, $n['cedula_estudiante'], 1, 0, 'C');
+            $this->Cell(75, 5, $this->utf8($n['nombre_estudiante']), 1, 0, 'L');
+            $this->Cell(15, 5, '20', 1, 0, 'C'); 
+            $this->Cell(15, 5, str_pad($n['nota_final'], 2, '0', STR_PAD_LEFT), 1, 0, 'C');
             $this->Cell(25, 5, $this->utf8($this->numLetras($n['nota_final'])), 1, 0, 'C');
             $this->Cell(25, 5, ($n['nota_final'] >= 10 ? 'Aprobado' : 'Reprobado'), 1, 1, 'C');
 
-            if($this->GetY() > 240) $this->AddPage();
+            if($this->GetY() > 250) $this->AddPage();
         }
 
-        $this->Cell(0, 5, '==================================== FIN DEL ACTA ====================================', 0, 1, 'C');
+        $this->Ln(2);
+        $this->Cell(0, 5, '============================== FIN DEL ACTA ==============================', 0, 1, 'C');
         $this->DibujarPie();
     }
 
     function DibujarPie() {
-        $y = $this->GetY() + 5;
+        if ($this->GetY() > 220) $this->AddPage();
+        
+        $y_base = $this->GetY() + 5;
         $info = $this->datos['info_general'];
         $st = $this->datos['estadisticas'];
 
-        // Tabla Conformes
-        $this->SetXY(10, $y);
+        // Bloque de Firmas (Izquierda)
+        $this->SetXY(10, $y_base);
         $this->SetFont('Arial', 'B', 8);
         $this->Cell(50, 5, 'Conformes', 1, 1, 'L');
         $this->SetFont('Arial', '', 7);
-        $this->Cell(50, 5, 'Prof. Materia', 'LR', 1);
-        $this->Cell(50, 5, 'Control Estudios', 'LR', 1);
-        $this->Cell(50, 5, 'Director', 'LRB', 1);
+        $this->Cell(50, 6, $this->utf8('Prof. Materia: ________________'), 'LR', 1);
+        $this->Cell(50, 6, $this->utf8('Control Estudios: ______________'), 'LR', 1);
+        $this->Cell(50, 6, $this->utf8('Director: ____________________'), 'LRB', 1);
 
-        // Tabla Observaciones (Al lado)
-        $this->SetXY(60, $y);
+        // Bloque de Observaciones (Centro)
+        $this->SetXY(60, $y_base);
         $this->SetFont('Arial', 'B', 8);
-        $this->Cell(100, 5, 'Observaciones', 1, 1, 'L');
-        $this->SetXY(60, $y + 5);
+        $this->Cell(95, 5, 'Observaciones', 1, 1, 'L');
+        $this->SetXY(60, $y_base + 5);
         $this->SetFont('Arial', '', 7);
-        $this->MultiCell(100, 5, $this->utf8($info['nombre_materia'] . " - " . $info['nombre_periodo'] . "\n" . $info['nombre_carrera']), 1, 'L');
+        $this->MultiCell(95, 6, $this->utf8("PNF: " . $info['nombre_carrera'] . "\nPERIODO: " . $info['nombre_periodo'] . "\nSECCION: " . $info['codigo_seccion']), 1, 'L');
 
-        // Tabla Estadísticas (Derecha)
-        $this->SetXY(160, $y);
+        // Bloque de Estadísticas (Derecha)
+        $this->SetXY(155, $y_base);
         $this->SetFont('Arial', '', 7);
-        $this->Cell(20, 5, 'Fecha:', 1, 0); $this->Cell(20, 5, date('d-m-Y'), 1, 1);
-        $this->SetX(160);
-        $this->Cell(20, 5, 'Aprobados:', 1, 0); $this->Cell(20, 5, $st['aprobados'], 1, 1);
-        $this->SetX(160);
-        $this->Cell(20, 5, 'Reprobados:', 1, 0); $this->Cell(20, 5, $st['reprobados'], 1, 1);
-        $this->SetX(160);
-        $this->Cell(20, 5, 'Inasistentes:', 1, 0); $this->Cell(20, 5, '0', 1, 1);
+        $this->Cell(25, 5, 'Fecha:', 1, 0); $this->Cell(20, 5, date('d-m-Y'), 1, 1);
+        $this->SetX(155);
+        $this->Cell(25, 5, 'Aprobados:', 1, 0); $this->Cell(20, 5, $st['aprobados'], 1, 1);
+        $this->SetX(155);
+        $this->Cell(25, 5, 'Reprobados:', 1, 0); $this->Cell(20, 5, $st['reprobados'], 1, 1);
+        $this->SetX(155);
+        $this->Cell(25, 5, 'Inasistentes:', 1, 0); $this->Cell(20, 5, '0', 1, 1);
 
-        $this->Ln(5);
+        // Nombre del Usuario que sacó el reporte (Abajo a la derecha)
+        $this->Ln(6);
         $this->SetFont('Arial', 'B', 8);
-        $this->Cell(0, 5, 'USUARIO: ' . strtoupper($this->usuario), 0, 1, 'R');
+        $this->Cell(0, 5, 'USUARIO: ' . strtoupper($this->utf8($this->usuario)), 0, 1, 'R');
     }
 
     function numLetras($n) {
@@ -13210,16 +13214,24 @@ class PDF_ActaFinal extends FPDF {
     function utf8($t) { return mb_convert_encoding($t, "ISO-8859-1", "UTF-8"); }
 }
 
-// --- PROCESAMIENTO ---
-if (isset($_GET['docente_id'])) {
-    $datos = [
-        'info_general' => obtenerInfoNotasDefinitivas($_GET['docente_id'], $_GET['materia_id'], $_GET['periodo_id']),
-        'notas' => obtenerNotasDefinitivasGrupo($_GET['docente_id'], $_GET['materia_id'], $_GET['periodo_id']),
-        'estadisticas' => calcularEstadisticasNotas(obtenerNotasDefinitivasGrupo($_GET['docente_id'], $_GET['materia_id'], $_GET['periodo_id']))
+// --- LOGICA DE DATOS ---
+if (isset($_GET['materia_id'])) {
+    $periodo_id = $_GET['periodo_id'];
+    $materia_id = $_GET['materia_id'];
+    $docente_id = $_GET['docente_id'];
+
+    $info = obtenerInfoNotasDefinitivas($docente_id, $materia_id, $periodo_id);
+    $lista_notas = obtenerNotasDefinitivasGrupo($docente_id, $materia_id, $periodo_id);
+    $stats = calcularEstadisticasNotas($lista_notas);
+
+    $datos_pdf = [
+        'info_general' => $info,
+        'notas' => $lista_notas,
+        'estadisticas' => $stats
     ];
 
     $pdf = new PDF_ActaFinal();
-    $pdf->generarReporte($datos, $usuario_sistema);
+    $pdf->generarReporte($datos_pdf, $nombre_usuario_reporte);
 }
 
 /**
