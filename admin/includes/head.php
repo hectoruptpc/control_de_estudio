@@ -310,6 +310,11 @@ if (!isLoggedIn() || !isAdmin()) {
                         <a title="Consultar Notas Pasadas" class="dropdown-item" href="correccion_notas.php">
                             <i class="fas fa-pencil-alt fa-fw"></i> Corrección de Notas
                         </a>
+
+                            <a title="Actas de calificación final" class="dropdown-item" href="actas_calificacion.php">
+                            <i class="fas fa-file-signature fa-fw"></i> Actas de calificación final
+                        </a>
+
                     </div>
                 </li>
 
