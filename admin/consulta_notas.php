@@ -80,8 +80,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
     
     <?php if ($estudiante && $carrera): ?>
     <div class="card mb-4">
-        <div class="card-header bg-info text-white">
-            <h5>Información del Estudiante</h5>
+        <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Información del Estudiante</h5>
+            <!-- Botón de Reporte PDF -->
+            <a href="generar_reporte_consulta.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
+               class="btn btn-danger btn-sm" target="_blank">
+                <i class="fas fa-file-pdf"></i> Generar Reporte PDF
+            </a>
         </div>
         <div class="card-body">
             <div class="row">
@@ -491,6 +496,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
 
 .table-sm td, .table-sm th {
     padding: 0.5rem;
+}
+
+/* Estilos para el botón de reporte */
+.btn-danger {
+    color: white;
 }
 </style>
 

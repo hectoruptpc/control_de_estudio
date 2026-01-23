@@ -13821,11 +13821,12 @@ function buscarEstudiantePorCedulaConsulta($cedula) {
     }
 }
 
+
 // Función para obtener la carrera del estudiante - SOLO LECTURA, SIN AUDITORÍA
 function obtenerCarreraEstudiante($estudiante_id) {
     global $db;
     
-    $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera 
+    $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera, c.tipo_formacion 
               FROM users u
               INNER JOIN carreras c ON u.carrera = c.id_carrera
               WHERE u.id = ?";
@@ -13837,11 +13838,12 @@ function obtenerCarreraEstudiante($estudiante_id) {
     return $result->num_rows > 0 ? $result->fetch_assoc() : null;
 }
 
+
 // Función para obtener todas las materias de la carrera - SOLO LECTURA, SIN AUDITORÍA
 function obtenerMateriasCarrera($carrera_id) {
     global $db;
     
-    $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto
+    $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto, m.creditos
               FROM carrera_materia cm
               INNER JOIN materias m ON cm.id_materia = m.id_materia
               WHERE cm.id_carrera = ?
@@ -18159,7 +18161,81 @@ $nombresUbicacion = obtenerNombresUbicacionDirecto(
 
 
 
+//PNF PTF *********************************************************************
 
+
+
+// Función para formatear el nombre de la carrera según su tipo de formación
+function formatearNombreCarrera($nombre_carrera, $tipo_formacion = '') {
+    if (empty($tipo_formacion)) {
+        return $nombre_carrera;
+    }
+    
+    $tipo = strtoupper(trim($tipo_formacion));
+    $nombre = trim($nombre_carrera);
+    
+    // Quitar prefijos si existen
+    $nombre = preg_replace('/^PNF\s+/i', '', $nombre);
+    $nombre = preg_replace('/^PTF\s+/i', '', $nombre);
+    $nombre = preg_replace('/^PROGRAMA\s+NACIONAL\s+DE\s+FORMACIÓN\s+/i', '', $nombre);
+    $nombre = preg_replace('/^PROGRAMA\s+TÉCNICO\s+DE\s+FORMACIÓN\s+/i', '', $nombre);
+    
+    if ($tipo == 'PNF' || $tipo == 'PROGRAMA NACIONAL DE FORMACION' || $tipo == 'PROGRAMA NACIONAL DE FORMACIÓN') {
+        return "PNF " . ucwords(strtolower($nombre));
+    } elseif ($tipo == 'PTF' || $tipo == 'PROGRAMA TECNICO DE FORMACION' || $tipo == 'PROGRAMA TÉCNICO DE FORMACIÓN') {
+        return "PTF " . ucwords(strtolower($nombre));
+    }
+    
+    return $nombre_carrera;
+}
+
+/**
+ * Función auxiliar para obtener el tipo de formación de la base de datos
+ */
+if (!function_exists('obtenerTipoFormacionCarrera')) {
+function obtenerTipoFormacionCarrera($id_carrera) {
+    global $db;
+    
+    try {
+        $query = "SELECT tipo_formacion FROM carreras WHERE id_carrera = ?";
+        $stmt = $db->prepare($query);
+        $stmt->bind_param("i", $id_carrera);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows > 0) {
+            $row = $result->fetch_assoc();
+            return $row['tipo_formacion'] ?? '';
+        }
+        
+        return '';
+        
+    } catch (Exception $e) {
+        error_log("Error al obtener tipo de formación: " . $e->getMessage());
+        return '';
+    }
+}
+}
+
+/**
+ * Función mejorada para obtener carrera del estudiante incluyendo tipo de formación
+ */
+if (!function_exists('obtenerCarreraEstudianteCompleta')) {
+function obtenerCarreraEstudianteCompleta($estudiante_id) {
+    global $db;
+    
+    $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera, c.tipo_formacion 
+              FROM users u
+              INNER JOIN carreras c ON u.carrera = c.id_carrera
+              WHERE u.id = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $estudiante_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
+}
+}
 
 
 
