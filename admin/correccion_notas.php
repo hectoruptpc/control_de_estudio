@@ -120,6 +120,19 @@ include("includes/head.php");
     background-color: #343a40;
     z-index: 10;
 }
+
+/* Estilos para el botón de reporte */
+.btn-reporte {
+    background-color: #17a2b8;
+    border-color: #17a2b8;
+    color: white;
+}
+
+.btn-reporte:hover {
+    background-color: #138496;
+    border-color: #117a8b;
+    color: white;
+}
 </style>
 
 <div class="container-fluid">
@@ -308,10 +321,14 @@ include("includes/head.php");
                                             </span>
                                         </td>
                                         <td>
-                                            <button type="button" class="btn btn-warning btn-sm" data-toggle="modal" data-target="#modalEditarNota<?php echo $nota['id']; ?>">
-                                                <i class="fas fa-edit"></i> Editar
-                                            </button>
-                                            
+                                            <div class="btn-group" role="group">
+                                                <button type="button" class="btn btn-warning btn-sm" data-toggle="modal" data-target="#modalEditarNota<?php echo $nota['id']; ?>">
+                                                    <i class="fas fa-edit"></i> Editar
+                                                </button>
+                                                <button type="button" class="btn btn-reporte btn-sm" data-toggle="modal" data-target="#modalReporteSolicitud<?php echo $nota['id']; ?>">
+                                                    <i class="fas fa-file-alt"></i> Reporte
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
 
@@ -375,6 +392,103 @@ include("includes/head.php");
                                                         <button type="submit" class="btn btn-primary">Guardar Cambios</button>
                                                     </div>
                                                 </form>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Modal para Reporte de Solicitud Administrativa -->
+                                    <div class="modal fade" id="modalReporteSolicitud<?php echo $nota['id']; ?>" tabindex="-1" role="dialog" aria-labelledby="modalReporteSolicitudLabel<?php echo $nota['id']; ?>" aria-hidden="true">
+                                        <div class="modal-dialog modal-lg" role="document">
+                                            <div class="modal-content">
+                                                <div class="modal-header bg-info text-white">
+                                                    <h5 class="modal-title" id="modalReporteSolicitudLabel<?php echo $nota['id']; ?>">
+                                                        <i class="fas fa-file-alt"></i> Reporte de Solicitud Administrativa
+                                                    </h5>
+                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                        <span aria-hidden="true">&times;</span>
+                                                    </button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div class="alert alert-info">
+                                                        <i class="fas fa-info-circle"></i> 
+                                                        Esta funcionalidad generará un reporte formal de solicitud administrativa para cambios de notas.
+                                                    </div>
+                                                    
+                                                    <div class="card mb-3">
+                                                        <div class="card-header">
+                                                            <h6>Información del Estudiante</h6>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <p><strong>Nombre:</strong> <?php echo htmlspecialchars($estudiante['nombre']); ?></p>
+                                                                    <p><strong>Cédula:</strong> <?php echo htmlspecialchars($estudiante['idusuario']); ?></p>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <p><strong>Carrera:</strong> <?php echo htmlspecialchars($estudiante['carrera']); ?></p>
+                                                                    <p><strong>Materia:</strong> <?php echo htmlspecialchars($materia_seleccionada['nombre_materia'] ?? 'N/A'); ?></p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="card mb-3">
+                                                        <div class="card-header">
+                                                            <h6>Datos de la Nota</h6>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <p><strong>Periodo Académico:</strong> <?php echo htmlspecialchars($nota['nombre_periodo'] ?? 'Sin periodo'); ?></p>
+                                                            <p><strong>Notas Actuales:</strong></p>
+                                                            <ul class="list-unstyled">
+                                                                <?php if ($nota['trayecto_0'] !== null): ?>
+                                                                <li>Trayecto 0: <?php echo number_format($nota['trayecto_0'], 2); ?></li>
+                                                                <?php endif; ?>
+                                                                <?php if ($nota['trayecto_1'] !== null): ?>
+                                                                <li>Trayecto 1: <?php echo number_format($nota['trayecto_1'], 2); ?></li>
+                                                                <?php endif; ?>
+                                                                <?php if ($nota['trayecto_2'] !== null): ?>
+                                                                <li>Trayecto 2: <?php echo number_format($nota['trayecto_2'], 2); ?></li>
+                                                                <?php endif; ?>
+                                                                <?php if ($nota['trayecto_3'] !== null): ?>
+                                                                <li>Trayecto 3: <?php echo number_format($nota['trayecto_3'], 2); ?></li>
+                                                                <?php endif; ?>
+                                                                <?php if ($nota['trayecto_4'] !== null): ?>
+                                                                <li>Trayecto 4: <?php echo number_format($nota['trayecto_4'], 2); ?></li>
+                                                                <?php endif; ?>
+                                                            </ul>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="form-group">
+                                                        <label for="tipo_solicitud_<?php echo $nota['id']; ?>">Tipo de Solicitud:</label>
+                                                        <select class="form-control" id="tipo_solicitud_<?php echo $nota['id']; ?>">
+                                                            <option value="">Seleccione el tipo de solicitud</option>
+                                                            <option value="correccion">Corrección de Nota</option>
+                                                            <option value="revision">Revisión de Examen</option>
+                                                            <option value="reconsideracion">Reconsideración de Evaluación</option>
+                                                            <option value="otro">Otro</option>
+                                                        </select>
+                                                    </div>
+                                                    
+                                                    <div class="form-group">
+                                                        <label for="motivo_reporte_<?php echo $nota['id']; ?>">Motivo del Reporte:</label>
+                                                        <textarea class="form-control" id="motivo_reporte_<?php echo $nota['id']; ?>" rows="4" placeholder="Describa el motivo de la solicitud administrativa..."></textarea>
+                                                    </div>
+                                                    
+                                                    <div class="alert alert-warning">
+                                                        <i class="fas fa-exclamation-triangle"></i>
+                                                        <strong>Nota:</strong> Este reporte generará un documento formal que será enviado al departamento administrativo correspondiente.
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                                                    <button type="button" class="btn btn-success" onclick="generarReporte(<?php echo $nota['id']; ?>)">
+                                                        <i class="fas fa-file-pdf"></i> Generar Reporte PDF
+                                                    </button>
+                                                    <button type="button" class="btn btn-primary">
+                                                        <i class="fas fa-paper-plane"></i> Enviar Solicitud
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -510,8 +624,10 @@ include("includes/head.php");
                                                     <?php endif; ?>
                                                 </div>
                                                 <div class="modal-footer">
-                                                    
-                                                   
+                                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+                                                    <button type="button" class="btn btn-primary" onclick="imprimirHistorial(<?php echo $nota['id']; ?>)">
+                                                        <i class="fas fa-print"></i> Imprimir
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -564,6 +680,23 @@ function imprimirHistorial(idNota) {
     `);
     ventanaImpresion.document.close();
     ventanaImpresion.print();
+}
+
+// Función para generar reporte de solicitud
+function generarReporte(idNota) {
+    const tipoSolicitud = document.getElementById('tipo_solicitud_' + idNota).value;
+    const motivo = document.getElementById('motivo_reporte_' + idNota).value;
+    
+    if (!tipoSolicitud || !motivo.trim()) {
+        alert('Por favor complete todos los campos del reporte.');
+        return;
+    }
+    
+    // Aquí puedes implementar la generación del PDF o el envío de la solicitud
+    alert('Función de generación de reporte para la nota ID: ' + idNota + '\n\n' +
+          'Tipo: ' + tipoSolicitud + '\n' +
+          'Motivo: ' + motivo + '\n\n' +
+          'Esta funcionalidad estará disponible próximamente.');
 }
 
 // Función para mejorar la experiencia del modal
