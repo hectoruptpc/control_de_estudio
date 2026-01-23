@@ -45,7 +45,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $id_carrera = $_POST['id_carrera'] ?? '';
                 if (!empty($estudiante_id) && !empty($id_carrera)) {
                     $estudiante = obtenerEstudiantePorId($estudiante_id);
-                    // CAMBIO AQUÍ: Usar la nueva función que filtra por materias con notas
                     $materias = obtenerMateriasConNotas($estudiante_id, $id_carrera);
                     $carreras = obtenerCarrerasEstudiante($estudiante_id);
                     echo "<!-- DEBUG: Materias con notas encontradas: " . print_r($materias, true) . " -->";
@@ -59,7 +58,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!empty($estudiante_id) && !empty($id_materia)) {
                     $estudiante = obtenerEstudiantePorId($estudiante_id);
                     $carreras = obtenerCarrerasEstudiante($estudiante_id);
-                    // CAMBIO AQUÍ: Usar la nueva función que filtra por materias con notas
                     $materias = obtenerMateriasConNotas($estudiante_id, $id_carrera);
                     $notas = obtenerNotasEstudianteMateria($estudiante_id, $id_materia);
                     echo "<!-- DEBUG: Notas encontradas para materia $id_materia: " . print_r($notas, true) . " -->";
@@ -71,14 +69,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($resultado['success']) {
                     $mensaje = $resultado['message'];
                     $tipo_mensaje = 'success';
-                    // Recargar datos
                     $estudiante_id = $_POST['id_usuario'] ?? '';
                     $id_carrera = $_POST['id_carrera'] ?? '';
                     $id_materia = $_POST['id_materia'] ?? '';
                     if (!empty($estudiante_id)) {
                         $estudiante = obtenerEstudiantePorId($estudiante_id);
                         $carreras = obtenerCarrerasEstudiante($estudiante_id);
-                        // CAMBIO AQUÍ: Usar la nueva función que filtra por materias con notas
                         $materias = obtenerMateriasConNotas($estudiante_id, $id_carrera);
                         $notas = obtenerNotasEstudianteMateria($estudiante_id, $id_materia);
                     }
@@ -121,7 +117,7 @@ include("includes/head.php");
     z-index: 10;
 }
 
-/* Estilos para el botón de reporte */
+/* Estilos para los botones */
 .btn-reporte {
     background-color: #17a2b8;
     border-color: #17a2b8;
@@ -132,6 +128,11 @@ include("includes/head.php");
     background-color: #138496;
     border-color: #117a8b;
     color: white;
+}
+
+.btn-group-actions {
+    display: flex;
+    gap: 5px;
 }
 </style>
 
@@ -321,18 +322,20 @@ include("includes/head.php");
                                             </span>
                                         </td>
                                         <td>
-                                            <div class="btn-group" role="group">
+                                            <div class="btn-group-actions">
                                                 <button type="button" class="btn btn-warning btn-sm" data-toggle="modal" data-target="#modalEditarNota<?php echo $nota['id']; ?>">
                                                     <i class="fas fa-edit"></i> Editar
                                                 </button>
-                                                <button type="button" class="btn btn-reporte btn-sm" data-toggle="modal" data-target="#modalReporteSolicitud<?php echo $nota['id']; ?>">
-                                                    <i class="fas fa-file-alt"></i> Reporte
-                                                </button>
+                                                <!-- Botón de Reporte PDF que genera directamente -->
+                                                <a href="generar_reporte_solicitud.php?estudiante_id=<?php echo $estudiante['id']; ?>&estudiante_nombre=<?php echo urlencode($estudiante['nombre']); ?>&estudiante_cedula=<?php echo urlencode($estudiante['idusuario']); ?>&nota_id=<?php echo $nota['id']; ?>&periodo_academico=<?php echo urlencode($nota['nombre_periodo'] ?? 'Sin periodo'); ?>" 
+                                                   class="btn btn-reporte btn-sm" target="_blank">
+                                                    <i class="fas fa-file-pdf"></i> Reporte
+                                                </a>
                                             </div>
                                         </td>
                                     </tr>
 
-                                    <!-- Modal para Editar Nota -->
+                                    <!-- Modal para Editar Nota (se mantiene igual) -->
                                     <div class="modal fade" id="modalEditarNota<?php echo $nota['id']; ?>" tabindex="-1" role="dialog" aria-labelledby="modalEditarNotaLabel<?php echo $nota['id']; ?>" aria-hidden="true">
                                         <div class="modal-dialog" role="document">
                                             <div class="modal-content">
@@ -395,243 +398,6 @@ include("includes/head.php");
                                             </div>
                                         </div>
                                     </div>
-
-                                    <!-- Modal para Reporte de Solicitud Administrativa -->
-                                    <div class="modal fade" id="modalReporteSolicitud<?php echo $nota['id']; ?>" tabindex="-1" role="dialog" aria-labelledby="modalReporteSolicitudLabel<?php echo $nota['id']; ?>" aria-hidden="true">
-                                        <div class="modal-dialog modal-lg" role="document">
-                                            <div class="modal-content">
-                                                <div class="modal-header bg-info text-white">
-                                                    <h5 class="modal-title" id="modalReporteSolicitudLabel<?php echo $nota['id']; ?>">
-                                                        <i class="fas fa-file-alt"></i> Reporte de Solicitud Administrativa
-                                                    </h5>
-                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                                        <span aria-hidden="true">&times;</span>
-                                                    </button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <div class="alert alert-info">
-                                                        <i class="fas fa-info-circle"></i> 
-                                                        Esta funcionalidad generará un reporte formal de solicitud administrativa para cambios de notas.
-                                                    </div>
-                                                    
-                                                    <div class="card mb-3">
-                                                        <div class="card-header">
-                                                            <h6>Información del Estudiante</h6>
-                                                        </div>
-                                                        <div class="card-body">
-                                                            <div class="row">
-                                                                <div class="col-md-6">
-                                                                    <p><strong>Nombre:</strong> <?php echo htmlspecialchars($estudiante['nombre']); ?></p>
-                                                                    <p><strong>Cédula:</strong> <?php echo htmlspecialchars($estudiante['idusuario']); ?></p>
-                                                                </div>
-                                                                <div class="col-md-6">
-                                                                    <p><strong>Carrera:</strong> <?php echo htmlspecialchars($estudiante['carrera']); ?></p>
-                                                                    <p><strong>Materia:</strong> <?php echo htmlspecialchars($materia_seleccionada['nombre_materia'] ?? 'N/A'); ?></p>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <div class="card mb-3">
-                                                        <div class="card-header">
-                                                            <h6>Datos de la Nota</h6>
-                                                        </div>
-                                                        <div class="card-body">
-                                                            <p><strong>Periodo Académico:</strong> <?php echo htmlspecialchars($nota['nombre_periodo'] ?? 'Sin periodo'); ?></p>
-                                                            <p><strong>Notas Actuales:</strong></p>
-                                                            <ul class="list-unstyled">
-                                                                <?php if ($nota['trayecto_0'] !== null): ?>
-                                                                <li>Trayecto 0: <?php echo number_format($nota['trayecto_0'], 2); ?></li>
-                                                                <?php endif; ?>
-                                                                <?php if ($nota['trayecto_1'] !== null): ?>
-                                                                <li>Trayecto 1: <?php echo number_format($nota['trayecto_1'], 2); ?></li>
-                                                                <?php endif; ?>
-                                                                <?php if ($nota['trayecto_2'] !== null): ?>
-                                                                <li>Trayecto 2: <?php echo number_format($nota['trayecto_2'], 2); ?></li>
-                                                                <?php endif; ?>
-                                                                <?php if ($nota['trayecto_3'] !== null): ?>
-                                                                <li>Trayecto 3: <?php echo number_format($nota['trayecto_3'], 2); ?></li>
-                                                                <?php endif; ?>
-                                                                <?php if ($nota['trayecto_4'] !== null): ?>
-                                                                <li>Trayecto 4: <?php echo number_format($nota['trayecto_4'], 2); ?></li>
-                                                                <?php endif; ?>
-                                                            </ul>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <div class="form-group">
-                                                        <label for="tipo_solicitud_<?php echo $nota['id']; ?>">Tipo de Solicitud:</label>
-                                                        <select class="form-control" id="tipo_solicitud_<?php echo $nota['id']; ?>">
-                                                            <option value="">Seleccione el tipo de solicitud</option>
-                                                            <option value="correccion">Corrección de Nota</option>
-                                                            <option value="revision">Revisión de Examen</option>
-                                                            <option value="reconsideracion">Reconsideración de Evaluación</option>
-                                                            <option value="otro">Otro</option>
-                                                        </select>
-                                                    </div>
-                                                    
-                                                    <div class="form-group">
-                                                        <label for="motivo_reporte_<?php echo $nota['id']; ?>">Motivo del Reporte:</label>
-                                                        <textarea class="form-control" id="motivo_reporte_<?php echo $nota['id']; ?>" rows="4" placeholder="Describa el motivo de la solicitud administrativa..."></textarea>
-                                                    </div>
-                                                    
-                                                    <div class="alert alert-warning">
-                                                        <i class="fas fa-exclamation-triangle"></i>
-                                                        <strong>Nota:</strong> Este reporte generará un documento formal que será enviado al departamento administrativo correspondiente.
-                                                    </div>
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                                                    <button type="button" class="btn btn-success" onclick="generarReporte(<?php echo $nota['id']; ?>)">
-                                                        <i class="fas fa-file-pdf"></i> Generar Reporte PDF
-                                                    </button>
-                                                    <button type="button" class="btn btn-primary">
-                                                        <i class="fas fa-paper-plane"></i> Enviar Solicitud
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Modal para Ver Historial - MEJORADO -->
-                                    <div class="modal fade" id="modalHistorial<?php echo $nota['id']; ?>" tabindex="-1" role="dialog" aria-labelledby="modalHistorialLabel<?php echo $nota['id']; ?>" aria-hidden="true">
-                                        <div class="modal-dialog modal-xl" role="document">
-                                            <div class="modal-content">
-                                                <div class="modal-header bg-info text-white">
-                                                    <h5 class="modal-title" id="modalHistorialLabel<?php echo $nota['id']; ?>">
-                                                        <i class="fas fa-history"></i> Historial de Cambios - 
-                                                        <?php echo htmlspecialchars($nota['nombre_periodo'] ?? 'Sin periodo'); ?>
-                                                    </h5>
-                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                                        <span aria-hidden="true">&times;</span>
-                                                    </button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <?php 
-                                                    // Cargar el historial para esta nota específica
-                                                    $historial = obtenerHistorialCambiosNota($nota['id']);
-                                                    
-                                                    if (!empty($historial)): 
-                                                    ?>
-                                                    <div class="alert alert-info">
-                                                        <i class="fas fa-info-circle"></i> 
-                                                        Se encontraron <strong><?php echo count($historial); ?></strong> cambio(s) en esta nota.
-                                                    </div>
-                                                    
-                                                    <div class="table-responsive">
-                                                        <table class="table table-bordered table-hover table-sm historial-table">
-                                                            <thead class="thead-dark">
-                                                                <tr>
-                                                                    <th>Fecha y Hora</th>
-                                                                    <th>Administrador</th>
-                                                                    <th>Trayecto</th>
-                                                                    <th>Nota Anterior</th>
-                                                                    <th>Nota Nueva</th>
-                                                                    <th>Cambio</th>
-                                                                    <th>Justificación</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                <?php foreach ($historial as $cambio): 
-                                                                    $diferencia = $cambio['nota_nueva'] - $cambio['nota_anterior'];
-                                                                    $clase_cambio = $diferencia > 0 ? 'text-success' : ($diferencia < 0 ? 'text-danger' : 'text-warning');
-                                                                    $icono_cambio = $diferencia > 0 ? 'fa-arrow-up' : ($diferencia < 0 ? 'fa-arrow-down' : 'fa-equals');
-                                                                ?>
-                                                                <tr>
-                                                                    <td class="font-weight-bold">
-                                                                        <i class="fas fa-calendar-alt"></i> 
-                                                                        <?php echo date('d/m/Y', strtotime($cambio['fecha_cambio'])); ?>
-                                                                        <br>
-                                                                        <small class="text-muted">
-                                                                            <i class="fas fa-clock"></i> 
-                                                                            <?php echo date('H:i:s', strtotime($cambio['fecha_cambio'])); ?>
-                                                                        </small>
-                                                                    </td>
-                                                                    <td>
-                                                                        <span class="badge badge-primary">
-                                                                            <i class="fas fa-user"></i> 
-                                                                            <?php echo htmlspecialchars($cambio['admin_nombre'] ?? 'Sistema'); ?>
-                                                                        </span>
-                                                                    </td>
-                                                                    <td>
-                                                                        <span class="badge badge-secondary">
-                                                                            Trayecto <?php echo htmlspecialchars($cambio['trayecto']); ?>
-                                                                        </span>
-                                                                    </td>
-                                                                    <td>
-                                                                        <span class="badge badge-<?php echo ($cambio['nota_anterior'] >= 10 ? 'success' : 'danger'); ?> p-2">
-                                                                            <?php echo number_format($cambio['nota_anterior'], 2); ?>
-                                                                        </span>
-                                                                    </td>
-                                                                    <td>
-                                                                        <span class="badge badge-<?php echo ($cambio['nota_nueva'] >= 10 ? 'success' : 'danger'); ?> p-2">
-                                                                            <?php echo number_format($cambio['nota_nueva'], 2); ?>
-                                                                        </span>
-                                                                    </td>
-                                                                    <td class="<?php echo $clase_cambio; ?> font-weight-bold">
-                                                                        <i class="fas <?php echo $icono_cambio; ?>"></i>
-                                                                        <?php echo ($diferencia > 0 ? '+' : '') . number_format($diferencia, 2); ?>
-                                                                    </td>
-                                                                    <td>
-                                                                        <div class="justificacion-texto">
-                                                                            <?php echo nl2br(htmlspecialchars($cambio['justificacion'])); ?>
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                                <?php endforeach; ?>
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                    
-                                                    <!-- Resumen del Historial -->
-                                                    <div class="row mt-3">
-                                                        <div class="col-md-4">
-                                                            <div class="card bg-light">
-                                                                <div class="card-body text-center">
-                                                                    <h6 class="card-title">Total de Cambios</h6>
-                                                                    <h3 class="text-primary"><?php echo count($historial); ?></h3>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="col-md-4">
-                                                            <div class="card bg-light">
-                                                                <div class="card-body text-center">
-                                                                    <h6 class="card-title">Primer Cambio</h6>
-                                                                    <small class="text-muted">
-                                                                        <?php echo date('d/m/Y H:i', strtotime(end($historial)['fecha_cambio'])); ?>
-                                                                    </small>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="col-md-4">
-                                                            <div class="card bg-light">
-                                                                <div class="card-body text-center">
-                                                                    <h6 class="card-title">Último Cambio</h6>
-                                                                    <small class="text-muted">
-                                                                        <?php echo date('d/m/Y H:i', strtotime($historial[0]['fecha_cambio'])); ?>
-                                                                    </small>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <?php else: ?>
-                                                    <div class="alert alert-warning text-center">
-                                                        <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
-                                                        <h5>No hay historial de cambios</h5>
-                                                        <p class="mb-0">Esta nota no ha sido modificada aún.</p>
-                                                    </div>
-                                                    <?php endif; ?>
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
-                                                    <button type="button" class="btn btn-primary" onclick="imprimirHistorial(<?php echo $nota['id']; ?>)">
-                                                        <i class="fas fa-print"></i> Imprimir
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
@@ -647,64 +413,5 @@ include("includes/head.php");
         </div>
     </div>
 </div>
-
-<script>
-// Función para imprimir el historial
-function imprimirHistorial(idNota) {
-    const modalContent = document.querySelector('#modalHistorial' + idNota + ' .modal-content').cloneNode(true);
-    
-    // Remover botones del footer
-    const footer = modalContent.querySelector('.modal-footer');
-    if (footer) footer.remove();
-    
-    // Crear ventana de impresión
-    const ventanaImpresion = window.open('', '_blank');
-    ventanaImpresion.document.write(`
-        <html>
-            <head>
-                <title>Historial de Cambios - Nota ${idNota}</title>
-                <link href="../vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
-                <style>
-                    body { padding: 20px; }
-                    .table { font-size: 12px; }
-                    .badge { font-size: 11px; }
-                    .justificacion-texto { max-height: none; }
-                </style>
-            </head>
-            <body>
-                <h4 class="text-center">Historial de Cambios - Nota ${idNota}</h4>
-                <p class="text-center text-muted">Generado el: ${new Date().toLocaleDateString()}</p>
-                ${modalContent.innerHTML}
-            </body>
-        </html>
-    `);
-    ventanaImpresion.document.close();
-    ventanaImpresion.print();
-}
-
-// Función para generar reporte de solicitud
-function generarReporte(idNota) {
-    const tipoSolicitud = document.getElementById('tipo_solicitud_' + idNota).value;
-    const motivo = document.getElementById('motivo_reporte_' + idNota).value;
-    
-    if (!tipoSolicitud || !motivo.trim()) {
-        alert('Por favor complete todos los campos del reporte.');
-        return;
-    }
-    
-    // Aquí puedes implementar la generación del PDF o el envío de la solicitud
-    alert('Función de generación de reporte para la nota ID: ' + idNota + '\n\n' +
-          'Tipo: ' + tipoSolicitud + '\n' +
-          'Motivo: ' + motivo + '\n\n' +
-          'Esta funcionalidad estará disponible próximamente.');
-}
-
-// Función para mejorar la experiencia del modal
-$(document).ready(function() {
-    $('.modal').on('shown.bs.modal', function() {
-        $(this).find('.table-responsive').css('max-height', '400px');
-    });
-});
-</script>
 
 <?php include("includes/footer.php"); ?>
