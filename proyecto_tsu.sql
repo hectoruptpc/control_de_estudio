@@ -3,8 +3,8 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: localhost:3306
--- Tiempo de generación: 04-12-2025 a las 17:46:59
--- Versión del servidor: 8.0.44-0ubuntu0.24.04.1
+-- Tiempo de generación: 26-01-2026 a las 14:55:06
+-- Versión del servidor: 8.0.44-0ubuntu0.24.04.2
 -- Versión de PHP: 8.3.6
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -29,9 +29,9 @@ SET time_zone = "+00:00";
 
 CREATE TABLE `agenda` (
   `id` int NOT NULL,
-  `id_user` varchar(20) COLLATE latin1_spanish_ci NOT NULL,
-  `first_name` varchar(200) COLLATE latin1_spanish_ci NOT NULL,
-  `numero` varchar(50) COLLATE latin1_spanish_ci NOT NULL,
+  `id_user` varchar(20) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `first_name` varchar(200) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `numero` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
   `fecha` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
 
@@ -57,7 +57,7 @@ CREATE TABLE `aprobaciones_avance` (
   `trayecto_destino` int NOT NULL,
   `aprobado_por` int DEFAULT NULL,
   `fecha_aprobacion` datetime DEFAULT NULL,
-  `motivo` text COLLATE utf8mb3_spanish_ci,
+  `motivo` text CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_spanish_ci;
 
@@ -70,16 +70,16 @@ CREATE TABLE `aprobaciones_avance` (
 CREATE TABLE `auditoria` (
   `id` bigint NOT NULL,
   `usuario_id` int NOT NULL,
-  `accion` varchar(50) COLLATE utf8mb4_spanish_ci NOT NULL,
-  `tabla_afectada` varchar(100) COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `accion` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL,
+  `tabla_afectada` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
   `registro_id` int DEFAULT NULL,
   `fecha_hora` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `valores_antiguos` text COLLATE utf8mb4_spanish_ci,
-  `valores_nuevos` text COLLATE utf8mb4_spanish_ci,
-  `ip_origen` varchar(45) COLLATE utf8mb4_spanish_ci DEFAULT NULL,
-  `user_agent` text COLLATE utf8mb4_spanish_ci,
-  `modulo_sistema` varchar(100) COLLATE utf8mb4_spanish_ci DEFAULT NULL,
-  `descripcion` text COLLATE utf8mb4_spanish_ci
+  `valores_antiguos` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci,
+  `valores_nuevos` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci,
+  `ip_origen` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `user_agent` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci,
+  `modulo_sistema` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `descripcion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -259,7 +259,134 @@ INSERT INTO `auditoria` (`id`, `usuario_id`, `accion`, `tabla_afectada`, `regist
 (279, 4, 'LOGIN', 'users', 4, '2025-12-04 12:18:20', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
 (280, 4, 'LOGOUT', 'users', 4, '2025-12-04 12:19:11', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
 (281, 2, 'LOGIN', 'users', 2, '2025-12-04 12:19:14', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
-(282, 2, 'CONSULTA', 'users', 5, '2025-12-04 12:20:46', NULL, '{\"cedula_buscada\":null,\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO');
+(282, 2, 'CONSULTA', 'users', 5, '2025-12-04 12:20:46', NULL, '{\"cedula_buscada\":null,\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(283, 2, 'LOGIN', 'users', 2, '2026-01-13 10:24:04', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(284, 2, 'CONSULTA', 'users', 5, '2026-01-13 10:25:54', NULL, '{\"cedula_buscada\":null,\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(285, 2, 'INSERT', 'carreras', 12, '2026-01-13 11:28:52', NULL, '{\"nombre_carrera\":\"Mecanica\",\"cod_carrera\":\"1122\",\"tipo_formacion\":\"2\",\"duracion_semestres\":8,\"duracion_anios\":4,\"titulo_principal\":\"TSU Mecanica\",\"titulo_opcional\":\"\",\"vigencia_fecha\":\"2005-01-13 00:00:00\",\"activa\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Nueva carrera registrada'),
+(286, 2, 'LOGIN', 'users', 2, '2026-01-13 11:51:13', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(287, 2, 'INSERT', 'materias', 29, '2026-01-13 12:15:00', NULL, '{\"cod_materia\":\"MAT-154\",\"nombre_materia\":\"Matem\\u00e1tica I\",\"pnf_ptf\":\"PTF\",\"duracion_periodo\":1,\"trayecto\":1,\"creditos\":4,\"activa\":1,\"horas_teoricas\":3,\"horas_practicas\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Materias', 'Nueva materia creada'),
+(288, 2, 'INSERT', 'carrera_materia', 33, '2026-01-13 12:15:43', NULL, '{\"id_carrera\":12,\"carrera_nombre\":\"Mecanica\",\"carrera_codigo\":\"1122\",\"id_materia\":29,\"materia_nombre\":\"Matem\\u00e1tica I\",\"materia_codigo\":\"MAT-154\",\"semestre\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras-Materias', 'Asignación de materia a carrera'),
+(289, 2, 'INSERT', 'carreras', 13, '2026-01-13 12:28:09', NULL, '{\"copiado_de\":12,\"created_at\":\"2000-01-13 00:00:00\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Duplicado/versionado de carrera'),
+(290, 2, 'INSERT', 'carrera_versiones', 1, '2026-01-13 12:38:46', NULL, '{\"copiado_de\":12,\"fecha_vigencia\":\"1977-01-13 00:00:00\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Creación de versión de carrera'),
+(291, 2, 'INSERT', 'materias', 30, '2026-01-13 12:41:36', NULL, '{\"cod_materia\":\"AE-1111\",\"nombre_materia\":\"Fisica\",\"pnf_ptf\":\"PTF\",\"duracion_periodo\":1,\"trayecto\":1,\"creditos\":5,\"activa\":1,\"horas_teoricas\":2,\"horas_practicas\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Materias', 'Nueva materia creada'),
+(292, 2, 'INSERT', 'carreras', 14, '2026-01-13 12:46:03', NULL, '{\"nombre_carrera\":\"Mecanica\",\"cod_carrera\":\"1122\",\"tipo_formacion\":\"2\",\"duracion_semestres\":8,\"duracion_anios\":4,\"titulo_principal\":\"TSU Mecanica\",\"titulo_opcional\":\"Ing. Mecanica\",\"vigencia_fecha\":\"2005-01-13 00:00:00\",\"activa\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Nueva carrera registrada'),
+(293, 2, 'INSERT', 'carrera_materia', 35, '2026-01-13 12:46:42', NULL, '{\"id_carrera\":14,\"carrera_nombre\":\"Mecanica\",\"carrera_codigo\":\"1122\",\"id_materia\":29,\"materia_nombre\":\"Matem\\u00e1tica I\",\"materia_codigo\":\"MAT-154\",\"semestre\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras-Materias', 'Asignación de materia a carrera'),
+(294, 2, 'INSERT', 'carrera_versiones', 2, '2026-01-13 12:48:01', NULL, '{\"copiado_de\":14,\"fecha_vigencia\":\"2000-01-13 00:00:00\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Creación de versión de carrera'),
+(295, 2, 'INSERT', 'carrera_versiones', 3, '2026-01-13 13:36:25', NULL, '{\"copiado_de\":14,\"fecha_vigencia\":\"1977-01-01 00:00:00\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Creación de versión de carrera'),
+(296, 2, 'INSERT', 'materias', 31, '2026-01-13 13:37:32', NULL, '{\"cod_materia\":\"AE-1241\",\"nombre_materia\":\"Deporte I\",\"pnf_ptf\":\"PTF\",\"duracion_periodo\":1,\"trayecto\":1,\"creditos\":2,\"activa\":1,\"horas_teoricas\":2,\"horas_practicas\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Materias', 'Nueva materia creada'),
+(297, 2, 'SEARCH', 'users', 5, '2026-01-13 14:15:45', NULL, '{\"cedula\":\"V-30692052\",\"estudiante\":\"Hector\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Pagos', 'Búsqueda exitosa de estudiante por cédula'),
+(298, 2, 'LOGIN', 'users', 2, '2026-01-14 09:51:18', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(299, 2, 'UPDATE', 'carreras', 1, '2026-01-14 09:58:56', '{\"nombre_carrera\":\"Informatica\",\"cod_carrera\":\"1234\"}', '{\"nombre_carrera\":null,\"cod_carrera\":null}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Actualización de datos de carrera'),
+(300, 2, 'UPDATE', 'carreras', 5, '2026-01-14 09:59:41', '{\"nombre_carrera\":\"Logistica y Distribucion\",\"cod_carrera\":\"3\"}', '{\"nombre_carrera\":null,\"cod_carrera\":null}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Actualización de datos de carrera'),
+(301, 2, 'UPDATE', 'carreras', 14, '2026-01-14 10:00:01', '{\"nombre_carrera\":\"Mecanica\",\"cod_carrera\":\"1122\"}', '{\"nombre_carrera\":null,\"cod_carrera\":null}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Actualización de datos de carrera'),
+(302, 2, 'ERROR', 'carreras', 2, '2026-01-14 10:00:39', NULL, '{\"nombre_carrera\":\"Turismo\",\"cod_carrera\":\"13569\",\"error\":\"Data too long for column \'titulo_otorga\' at row 1\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Error al actualizar carrera'),
+(303, 2, 'UPDATE', 'carreras', 2, '2026-01-14 10:11:15', '{\"nombre_carrera\":\"Turismo\",\"cod_carrera\":\"2\",\"duracion_semestres\":null,\"titulo_otorga\":null}', '{\"nombre_carrera\":null,\"cod_carrera\":null,\"duracion_semestres\":8,\"titulo_otorga\":\"TSU turismo\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Actualización de datos de carrera'),
+(304, 2, 'INSERT', 'materias', 32, '2026-01-14 12:11:55', NULL, '{\"cod_materia\":\"MAT-253\",\"nombre_materia\":\"Matem\\u00e1tica II\",\"pnf_ptf\":\"PTF\",\"duracion_periodo\":1,\"trayecto\":1,\"creditos\":3,\"activa\":1,\"horas_teoricas\":2,\"horas_practicas\":3,\"horas_laboratorio\":0,\"horas_semanales\":4}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Materias', 'Nueva materia creada'),
+(305, 2, 'UPDATE', 'materias', 32, '2026-01-14 12:22:55', '{\"trayecto\":1}', '{\"trayecto\":\"2\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Materias', 'Actualización de datos de materia'),
+(306, 2, 'INSERT', 'carrera_materia', 36, '2026-01-14 12:26:45', NULL, '{\"id_carrera\":14,\"carrera_nombre\":\"Mecanica\",\"carrera_codigo\":\"13351\",\"id_materia\":32,\"materia_nombre\":\"Matem\\u00e1tica II\",\"materia_codigo\":\"MAT-253\",\"semestre\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras-Materias', 'Asignación de materia a carrera'),
+(307, 2, 'LOGIN', 'users', 2, '2026-01-16 09:48:33', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(308, 2, 'LOGIN', 'users', 2, '2026-01-16 09:59:56', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(309, 2, 'LOGOUT', 'users', 2, '2026-01-16 10:00:03', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(310, 2, 'LOGIN', 'users', 2, '2026-01-16 10:00:11', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(311, 2, 'LOGOUT', 'users', 2, '2026-01-16 10:19:23', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(312, 5, 'LOGIN', 'users', 5, '2026-01-16 10:19:27', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(313, 5, 'LOGOUT', 'users', 5, '2026-01-16 10:20:34', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(314, 2, 'LOGIN', 'users', 2, '2026-01-16 10:20:36', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(315, 2, 'LOGOUT', 'users', 2, '2026-01-16 10:40:17', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(316, 5, 'LOGIN', 'users', 5, '2026-01-16 10:40:29', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(317, 5, 'LOGOUT', 'users', 5, '2026-01-16 11:02:34', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(318, 2, 'LOGIN', 'users', 2, '2026-01-16 11:02:37', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(319, 2, 'LOGOUT', 'users', 2, '2026-01-16 11:11:08', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(320, 5, 'LOGIN', 'users', 5, '2026-01-16 11:11:12', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(321, 5, 'LOGOUT', 'users', 5, '2026-01-16 11:27:50', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(322, 2, 'LOGIN', 'users', 2, '2026-01-16 11:27:53', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(323, 2, 'CONSULTA', 'users', NULL, '2026-01-16 12:07:36', NULL, '{\"cedula_buscada\":\"30692052\",\"resultado_busqueda\":\"NO_ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"resultado\":\"Estudiante no encontrado\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - NO_ENCONTRADO'),
+(324, 2, 'CONSULTA', 'users', NULL, '2026-01-16 12:08:18', NULL, '{\"cedula_buscada\":\"30692052\",\"resultado_busqueda\":\"NO_ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"resultado\":\"Estudiante no encontrado\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - NO_ENCONTRADO'),
+(325, 2, 'CONSULTA', 'users', NULL, '2026-01-16 12:10:24', NULL, '{\"cedula_buscada\":\"30692052\",\"resultado_busqueda\":\"NO_ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"resultado\":\"Estudiante no encontrado\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - NO_ENCONTRADO'),
+(326, 2, 'CONSULTA', 'users', 5, '2026-01-16 12:10:36', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(327, 2, 'CONSULTA', 'users', 5, '2026-01-16 12:14:42', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(328, 2, 'CONSULTA', 'users', 2607, '2026-01-16 12:15:10', NULL, '{\"cedula_buscada\":\"V-12345678\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":2607,\"nombre_estudiante\":\"Nombre Ejemplo\",\"cedula\":\"V-12345678\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(329, 2, 'CONSULTA', 'users', 2607, '2026-01-16 12:15:17', NULL, '{\"cedula_buscada\":\"V-12345678\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":2607,\"nombre_estudiante\":\"Nombre Ejemplo\",\"cedula\":\"V-12345678\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(330, 2, 'CONSULTA', 'users', 2607, '2026-01-16 12:15:21', NULL, '{\"cedula_buscada\":\"V-12345678\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":2607,\"nombre_estudiante\":\"Nombre Ejemplo\",\"cedula\":\"V-12345678\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO');
+INSERT INTO `auditoria` (`id`, `usuario_id`, `accion`, `tabla_afectada`, `registro_id`, `fecha_hora`, `valores_antiguos`, `valores_nuevos`, `ip_origen`, `user_agent`, `modulo_sistema`, `descripcion`) VALUES
+(331, 2, 'CONSULTA', 'users', NULL, '2026-01-16 12:15:22', NULL, '{\"cedula_buscada\":\"V-\",\"resultado_busqueda\":\"NO_ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"resultado\":\"Estudiante no encontrado\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - NO_ENCONTRADO'),
+(332, 2, 'CONSULTA', 'users', 5, '2026-01-16 12:15:31', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(333, 2, 'CONSULTA', 'users', 5, '2026-01-16 12:34:44', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(334, 2, 'CONSULTA', 'users', 5, '2026-01-16 12:48:13', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(335, 2, 'CONSULTA', 'users', 5, '2026-01-16 12:59:36', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(336, 2, 'INSERT', 'periodos_academicos', 5, '2026-01-16 13:01:32', NULL, '{\"nombre_periodo\":\"2026-1\",\"fecha_inicio\":\"2026-01-16\",\"fecha_fin\":\"2026-03-16\",\"activo\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Periodos Académicos', 'Nuevo período académico creado'),
+(337, 2, 'CONSULTA', 'users', 5, '2026-01-16 13:13:39', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(338, 2, 'CONSULTA', 'users', 5, '2026-01-16 13:14:52', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(339, 2, 'LOGIN', 'users', 2, '2026-01-16 13:17:07', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(340, 2, 'CONSULTA', 'users', 5, '2026-01-16 13:17:19', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(341, 2, 'CONSULTA', 'users', 5, '2026-01-16 13:17:43', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(342, 2, 'CONSULTA', 'users', 5, '2026-01-16 13:19:02', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(343, 2, 'CONSULTA', 'users', 5, '2026-01-16 13:20:30', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(344, 2, 'CONSULTA', 'users', 5, '2026-01-16 13:23:38', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(345, 2, 'LOGIN', 'users', 2, '2026-01-19 09:19:19', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(346, 2, 'LOGOUT', 'users', 2, '2026-01-19 09:20:24', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(347, 4, 'LOGIN', 'users', 4, '2026-01-19 09:20:48', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(348, 2, 'LOGIN', 'users', 2, '2026-01-20 10:43:41', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(349, 2, 'CONSULTA', 'users', 5, '2026-01-20 10:44:43', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(350, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 10:45:06', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(351, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 11:49:06', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(352, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 12:01:31', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(353, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 12:16:50', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(354, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 12:20:31', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(355, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 12:47:44', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(356, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 12:55:33', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(357, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 12:55:34', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(358, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 12:56:50', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(359, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:01:29', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(360, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:09:27', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(361, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:09:30', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(362, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:12:34', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(363, 2, 'CONSULTA', 'users', 5, '2026-01-20 13:12:42', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(364, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:15:43', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(365, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:18:40', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(366, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:19:05', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(367, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:19:43', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(368, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:22:11', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(369, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:24:34', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(370, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:28:03', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(371, 2, 'CONSULTA', 'users', 5, '2026-01-20 13:28:09', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(372, 2, 'LOGOUT', 'users', 2, '2026-01-20 13:45:43', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(373, 4, 'LOGIN', 'users', 4, '2026-01-20 13:46:25', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(374, 4, 'LOGOUT', 'users', 4, '2026-01-20 13:49:55', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(375, 2, 'LOGIN', 'users', 2, '2026-01-20 13:49:58', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(376, 4, 'LOGIN', 'users', 4, '2026-01-20 13:50:07', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(377, 2, 'LOGIN', 'users', 2, '2026-01-21 09:33:14', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(378, 2, 'LOGOUT', 'users', 2, '2026-01-21 09:53:20', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(379, 4, 'LOGIN', 'users', 4, '2026-01-21 09:53:24', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(380, 4, 'LOGOUT', 'users', 4, '2026-01-21 10:26:06', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(381, 2, 'LOGIN', 'users', 2, '2026-01-21 10:26:08', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(382, 2, 'LOGOUT', 'users', 2, '2026-01-21 11:20:14', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(383, 4, 'LOGIN', 'users', 4, '2026-01-21 11:20:17', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(384, 4, 'LOGOUT', 'users', 4, '2026-01-21 11:20:28', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(385, 2, 'LOGIN', 'users', 2, '2026-01-21 11:20:32', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(386, 2, 'LOGOUT', 'users', 2, '2026-01-21 11:21:46', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(387, 4, 'LOGIN', 'users', 4, '2026-01-21 11:21:50', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(388, 4, 'LOGOUT', 'users', 4, '2026-01-21 11:23:54', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(389, 2, 'LOGIN', 'users', 2, '2026-01-21 11:23:57', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(390, 2, 'LOGIN', 'users', 2, '2026-01-22 09:56:12', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(391, 2, 'LOGOUT', 'users', 2, '2026-01-22 09:57:00', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(392, 4, 'LOGIN', 'users', 4, '2026-01-22 09:57:07', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(393, 4, 'LOGOUT', 'users', 4, '2026-01-22 11:01:18', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(394, 4, 'LOGIN', 'users', 4, '2026-01-22 11:17:20', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(395, 4, 'LOGOUT', 'users', 4, '2026-01-22 11:17:25', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(396, 2, 'LOGIN', 'users', 2, '2026-01-23 09:33:23', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(397, 2, 'LOGOUT', 'users', 2, '2026-01-23 09:35:28', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(398, 4, 'LOGIN', 'users', 4, '2026-01-23 09:35:34', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(399, 4, 'LOGOUT', 'users', 4, '2026-01-23 09:35:52', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(400, 2, 'LOGIN', 'users', 2, '2026-01-23 09:35:57', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(401, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-23 09:36:05', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(402, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-23 09:37:47', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(403, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-23 09:55:05', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(404, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-23 10:20:14', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(405, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-23 11:43:05', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(406, 2, 'CONSULTA', 'users', 5, '2026-01-23 12:14:58', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(407, 2, 'CONSULTA', 'users', 5, '2026-01-23 12:49:03', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(408, 2, 'CONSULTA', 'users', 5, '2026-01-23 12:50:22', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO');
 
 -- --------------------------------------------------------
 
@@ -269,8 +396,8 @@ INSERT INTO `auditoria` (`id`, `usuario_id`, `accion`, `tabla_afectada`, `regist
 
 CREATE TABLE `aulas` (
   `id` int NOT NULL,
-  `nave` varchar(1) COLLATE utf8mb4_spanish_ci NOT NULL,
-  `aula` varchar(5) COLLATE utf8mb4_spanish_ci NOT NULL
+  `nave` varchar(1) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL,
+  `aula` varchar(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -303,7 +430,7 @@ INSERT INTO `aulas` (`id`, `nave`, `aula`) VALUES
 
 CREATE TABLE `bancos` (
   `id` int NOT NULL,
-  `nombre_banco` varchar(100) COLLATE utf8mb3_spanish_ci NOT NULL,
+  `nombre_banco` varchar(100) CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_spanish_ci;
 
@@ -348,9 +475,9 @@ INSERT INTO `bancos` (`id`, `nombre_banco`, `created_at`) VALUES
 CREATE TABLE `bitacora` (
   `id` int NOT NULL,
   `id_pedido` int NOT NULL,
-  `status` varchar(50) COLLATE latin1_spanish_ci NOT NULL,
-  `admin` varchar(50) COLLATE latin1_spanish_ci NOT NULL,
-  `concepto` varchar(50) COLLATE latin1_spanish_ci NOT NULL,
+  `status` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `admin` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `concepto` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
   `fecha` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
 
@@ -362,15 +489,15 @@ CREATE TABLE `bitacora` (
 
 CREATE TABLE `carreras` (
   `id_carrera` int NOT NULL,
-  `nombre_carrera` varchar(100) COLLATE utf32_spanish2_ci NOT NULL,
-  `cod_carrera` varchar(100) COLLATE utf32_spanish2_ci NOT NULL,
+  `nombre_carrera` varchar(100) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
+  `cod_carrera` varchar(100) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
   `activa` tinyint(1) NOT NULL DEFAULT '1',
   `duracion_semestres` int DEFAULT NULL,
-  `titulo_otorga` varchar(80) COLLATE utf32_spanish2_ci DEFAULT NULL,
-  `otro_titulo` varchar(20) COLLATE utf32_spanish2_ci DEFAULT NULL,
-  `descripcion` text COLLATE utf32_spanish2_ci,
+  `titulo_otorga` varchar(80) CHARACTER SET utf32 COLLATE utf32_spanish2_ci DEFAULT NULL,
+  `otro_titulo` varchar(20) CHARACTER SET utf32 COLLATE utf32_spanish2_ci DEFAULT NULL,
+  `descripcion` text CHARACTER SET utf32 COLLATE utf32_spanish2_ci,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `tipo_formacion` enum('PNF','PTF') COLLATE utf32_spanish2_ci NOT NULL DEFAULT 'PNF'
+  `tipo_formacion` enum('PNF','PTF') CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL DEFAULT 'PNF'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -379,9 +506,10 @@ CREATE TABLE `carreras` (
 
 INSERT INTO `carreras` (`id_carrera`, `nombre_carrera`, `cod_carrera`, `activa`, `duracion_semestres`, `titulo_otorga`, `otro_titulo`, `descripcion`, `created_at`, `tipo_formacion`) VALUES
 (0, 'No Especificado', 'NES', 1, 0, 'Ninguno', NULL, 'Carrera genérica para docentes sin asignación específica', '2025-08-01 22:39:06', ''),
-(1, 'Informatica', '1234', 1, 8, 'TSU Informatica', 'Ing. Informatica', '0', '2025-06-02 14:08:44', 'PNF'),
-(2, 'Turismo', '2', 1, NULL, NULL, NULL, NULL, '2025-06-16 18:07:13', 'PNF'),
-(5, 'Logistica y Distribucion', '3', 1, 4, 'Licenciado en Distribucion y Logistica', 'oooo', '0', '2025-08-10 22:26:32', 'PNF');
+(1, 'Informatica', '14232', 1, 8, 'TSU Informatica', 'Ing. Informatica', '0', '2025-06-02 14:08:44', 'PNF'),
+(2, 'Turismo', '13569', 1, 8, 'TSU turismo', '', '0', '2025-06-16 18:07:13', 'PNF'),
+(5, 'Logistica y Distribucion', '14231', 1, 4, 'Licenciado en Distribucion y Logistica', 'oooo', '0', '2025-08-10 22:26:32', 'PNF'),
+(14, 'Mecanica', '13351', 1, 8, 'TSU Mecanica', 'Ing. Mecanica', '0', '2005-01-13 04:00:00', 'PTF');
 
 -- --------------------------------------------------------
 
@@ -423,7 +551,30 @@ INSERT INTO `carrera_materia` (`id_relacion`, `id_carrera`, `id_materia`, `semes
 (29, 2, 15, 1),
 (30, 1, 26, 1),
 (31, 1, 27, 3),
-(32, 1, 28, 3);
+(32, 1, 28, 3),
+(35, 14, 29, 1),
+(36, 14, 32, 1);
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `carrera_versiones`
+--
+
+CREATE TABLE `carrera_versiones` (
+  `id_version` int NOT NULL,
+  `id_carrera` int NOT NULL,
+  `fecha_vigencia` datetime NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Volcado de datos para la tabla `carrera_versiones`
+--
+
+INSERT INTO `carrera_versiones` (`id_version`, `id_carrera`, `fecha_vigencia`, `created_at`) VALUES
+(2, 14, '2000-01-13 00:00:00', '2026-01-13 16:48:01'),
+(3, 14, '1977-01-01 00:00:00', '2026-01-13 17:36:25');
 
 -- --------------------------------------------------------
 
@@ -950,7 +1101,7 @@ INSERT INTO `ciudades` (`id_ciudad`, `id_estado`, `ciudad`, `capital`) VALUES
 
 CREATE TABLE `contenido` (
   `id` int NOT NULL,
-  `seccion` varchar(50) COLLATE latin1_spanish_ci NOT NULL,
+  `seccion` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
   `contenido` longblob NOT NULL,
   `fecha` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
@@ -969,7 +1120,7 @@ CREATE TABLE `control_avance_trayecto` (
   `puede_avanzar` tinyint(1) DEFAULT '0',
   `aprobado_por` int DEFAULT NULL,
   `fecha_aprobacion` datetime DEFAULT NULL,
-  `motivo` text COLLATE utf8mb3_spanish_ci,
+  `motivo` text CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_spanish_ci;
@@ -1079,7 +1230,7 @@ INSERT INTO `estados` (`id_estado`, `estado`, `iso_3166-2`) VALUES
 
 CREATE TABLE `estado_civil` (
   `id` int NOT NULL,
-  `estado_civil` varchar(20) COLLATE utf32_spanish2_ci NOT NULL
+  `estado_civil` varchar(20) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -1103,7 +1254,7 @@ CREATE TABLE `estudiante_seccion` (
   `id_usuario` int NOT NULL,
   `id_seccion` int NOT NULL,
   `fecha_inscripcion` date NOT NULL,
-  `estatus` enum('activo','retirado','aprobado','reprobado') COLLATE utf8mb4_spanish_ci DEFAULT 'activo'
+  `estatus` enum('activo','retirado','aprobado','reprobado') CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT 'activo'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -1169,7 +1320,7 @@ CREATE TABLE `evaluacion` (
 
 CREATE TABLE `genero` (
   `id` int NOT NULL,
-  `genero` varchar(9) COLLATE utf8mb4_spanish_ci NOT NULL
+  `genero` varchar(9) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -1192,9 +1343,9 @@ CREATE TABLE `graduados` (
   `fecha_graduacion` date DEFAULT NULL,
   `titulo_entregado` tinyint(1) DEFAULT '0',
   `fecha_entrega_titulo` date DEFAULT NULL,
-  `acta_entrega` text COLLATE utf8mb3_spanish_ci,
-  `observaciones` text COLLATE utf8mb3_spanish_ci,
-  `estado` enum('cumple_requisitos','graduado','titulo_entregado') COLLATE utf8mb3_spanish_ci DEFAULT 'cumple_requisitos',
+  `acta_entrega` text CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci,
+  `observaciones` text CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci,
+  `estado` enum('cumple_requisitos','graduado','titulo_entregado') CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci DEFAULT 'cumple_requisitos',
   `id_admin_graduacion` int DEFAULT NULL,
   `id_admin_entrega_titulo` int DEFAULT NULL,
   `fecha_registro` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1213,7 +1364,7 @@ CREATE TABLE `historial_cambios_notas` (
   `trayecto` int NOT NULL,
   `nota_anterior` decimal(4,2) DEFAULT NULL,
   `nota_nueva` decimal(4,2) NOT NULL,
-  `justificacion` text COLLATE utf8mb3_spanish_ci NOT NULL,
+  `justificacion` text CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci NOT NULL,
   `id_admin` int NOT NULL,
   `fecha_cambio` datetime DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_spanish_ci;
@@ -1240,7 +1391,7 @@ CREATE TABLE `horarios` (
   `dia` tinyint NOT NULL COMMENT '0=Lunes, 1=Martes, ..., 5=Sábado',
   `hora_inicio` time NOT NULL,
   `hora_fin` time NOT NULL,
-  `aula` varchar(50) COLLATE utf8mb4_spanish_ci DEFAULT NULL
+  `aula` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -1265,7 +1416,7 @@ INSERT INTO `horarios` (`id_horario`, `id_docente_seccion`, `dia`, `hora_inicio`
 
 CREATE TABLE `ingresos` (
   `id` int NOT NULL,
-  `ingreso` varchar(100) COLLATE utf32_spanish2_ci NOT NULL
+  `ingreso` varchar(100) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -1281,14 +1432,86 @@ INSERT INTO `ingresos` (`id`, `ingreso`) VALUES
 -- --------------------------------------------------------
 
 --
+-- Estructura de tabla para la tabla `mallas`
+--
+
+CREATE TABLE `mallas` (
+  `id_malla` int NOT NULL,
+  `id_carrera` int NOT NULL,
+  `codigo_malla` varchar(100) NOT NULL,
+  `anio` int NOT NULL,
+  `descripcion` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Volcado de datos para la tabla `mallas`
+--
+
+INSERT INTO `mallas` (`id_malla`, `id_carrera`, `codigo_malla`, `anio`, `descripcion`, `created_at`) VALUES
+(1, 14, '133512000', 2000, 'Migrada desde carrera_versiones id_version=2', '2026-01-14 14:40:32'),
+(2, 14, '133511977', 1977, 'Migrada desde carrera_versiones id_version=3', '2026-01-14 14:40:32'),
+(3, 1, '142322025', 2025, 'Malla generada automáticamente', '2026-01-14 15:22:34'),
+(4, 5, '142312025', 2025, 'Malla generada automáticamente', '2026-01-14 15:22:39'),
+(5, 2, '135692025', 2025, 'Malla generada automáticamente', '2026-01-14 15:22:40');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `malla_materia`
+--
+
+CREATE TABLE `malla_materia` (
+  `id` int NOT NULL,
+  `id_malla` int NOT NULL,
+  `id_materia` int NOT NULL,
+  `semestre` int NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Volcado de datos para la tabla `malla_materia`
+--
+
+INSERT INTO `malla_materia` (`id`, `id_malla`, `id_materia`, `semestre`) VALUES
+(1, 1, 29, 1),
+(2, 1, 30, 1),
+(3, 2, 31, 1),
+(4, 3, 5, 1),
+(5, 3, 7, 3),
+(6, 3, 6, 1),
+(7, 3, 9, 1),
+(8, 3, 10, 3),
+(9, 3, 11, 3),
+(10, 3, 12, 3),
+(11, 3, 13, 3),
+(12, 3, 14, 3),
+(13, 3, 16, 2),
+(14, 3, 17, 2),
+(15, 3, 18, 3),
+(16, 3, 19, 1),
+(17, 3, 21, 3),
+(18, 3, 22, 3),
+(19, 3, 20, 1),
+(20, 3, 23, 2),
+(21, 3, 24, 1),
+(22, 3, 25, 1),
+(23, 3, 26, 1),
+(24, 3, 27, 3),
+(25, 3, 28, 3),
+(26, 5, 15, 1),
+(28, 1, 32, 3);
+
+-- --------------------------------------------------------
+
+--
 -- Estructura de tabla para la tabla `materias`
 --
 
 CREATE TABLE `materias` (
   `id_materia` int NOT NULL,
-  `cod_materia` varchar(20) COLLATE utf32_spanish2_ci NOT NULL,
-  `pnf_ptf` varchar(3) COLLATE utf32_spanish2_ci NOT NULL,
-  `nombre_materia` varchar(100) COLLATE utf32_spanish2_ci NOT NULL,
+  `cod_materia` varchar(20) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
+  `pnf_ptf` varchar(3) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
+  `nombre_materia` varchar(100) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
   `creditos` int DEFAULT '3',
   `activa` tinyint(1) DEFAULT '1',
   `horas_teoricas` int DEFAULT NULL,
@@ -1296,37 +1519,43 @@ CREATE TABLE `materias` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `duracion_periodo` int NOT NULL,
   `trayecto` tinyint NOT NULL DEFAULT '1',
-  `es_proyecto_socio` tinyint(1) DEFAULT '0'
+  `es_proyecto_socio` tinyint(1) DEFAULT '0',
+  `horas_laboratorio` int DEFAULT NULL,
+  `horas_semanales` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
 -- Volcado de datos para la tabla `materias`
 --
 
-INSERT INTO `materias` (`id_materia`, `cod_materia`, `pnf_ptf`, `nombre_materia`, `creditos`, `activa`, `horas_teoricas`, `horas_practicas`, `created_at`, `duracion_periodo`, `trayecto`, `es_proyecto_socio`) VALUES
-(5, 'MAC015', 'PNF', 'Matematica', 5, 1, 2, 2, '2025-06-04 18:21:13', 1, 0, 0),
-(6, 'PNS013', 'PNF', 'Proyecto Nacional y Nueva Ciudadania', 3, 1, 2, 2, '2025-06-04 18:22:37', 1, 0, 0),
-(7, 'MAC139', 'PNF', 'Matemática I', 9, 1, 2, 2, '2025-06-16 15:21:07', 3, 1, 0),
-(9, 'IPC012', 'PNF', 'Introducción a los Proyectos y al PNF', 2, 1, 2, 2, '2025-08-01 19:51:18', 1, 0, 0),
-(10, 'ACT139', 'PNF', 'Arquitectura del Computador', 9, 1, 2, 2, '2025-08-01 19:58:28', 3, 1, 0),
-(11, 'APT1312', 'PNF', 'Algorítmica y Programación', 12, 1, 2, 2, '2025-08-01 20:03:19', 3, 1, 0),
-(12, 'FCS133', 'PNF', 'Formación Crítica I', 3, 1, 2, 2, '2025-08-01 20:05:28', 3, 1, 0),
-(13, 'PTP139', 'PNF', 'Proyecto Socio tecnológico I', 9, 1, 2, 2, '2025-08-01 20:07:21', 3, 1, 1),
-(14, 'IDC133', 'PNF', 'Inglés', 3, 1, 2, 2, '2025-08-01 20:08:35', 3, 1, 0),
-(15, 'TTIU40', 'PNF', 'Introducción a la Universidad y El Turismo', 1, 1, 2, 2, '2025-08-07 22:35:15', 1, 0, 0),
-(16, 'MAC226', 'PNF', 'Matematica II', 6, 1, 2, 2, '2025-08-24 18:14:27', 2, 2, 0),
-(17, 'RCT226', 'PNF', 'Redes de Computadoras', 6, 1, 2, 2, '2025-08-24 18:18:37', 2, 2, 0),
-(18, 'POT2312', 'PNF', 'Programacion II', 12, 1, 2, 2, '2025-08-24 18:48:27', 3, 2, 0),
-(19, 'ISC213', 'PNF', 'Ingenieria del Software I', 3, 1, 2, 2, '2025-08-24 18:50:56', 1, 2, 0),
-(20, 'BDC213', 'PNF', 'Base de Datos', 3, 1, 2, 2, '2025-08-24 18:53:03', 1, 2, 0),
-(21, 'FCS233', 'PNF', 'Formación Crítica II', 3, 1, 2, 2, '2025-08-24 18:57:07', 3, 2, 0),
-(22, 'PTP239', 'PNF', 'Proyecto Socio tecnológico II', 9, 1, 2, 2, '2025-08-24 19:00:14', 3, 2, 0),
-(23, 'MAC326', 'PNF', 'Matematica Aplicada', 6, 1, 2, 2, '2025-08-24 20:09:26', 2, 3, 0),
-(24, 'IOC313', 'PNF', 'Investigación de Operaciones', 3, 1, 2, 2, '2025-08-24 20:12:20', 1, 3, 0),
-(25, 'SOC313', 'PNF', 'Sistemas Operativos', 3, 1, 2, 2, '2025-08-24 20:14:44', 1, 3, 0),
-(26, 'BDC313', 'PNF', 'Modelado de Bases de Datos', 3, 1, 2, 2, '2025-08-29 19:20:37', 1, 3, 0),
-(27, 'FCS333', 'PNF', 'Formación Crítica III', 3, 1, 2, 2, '2025-08-29 19:33:31', 3, 3, 0),
-(28, 'ISC339', 'PNF', 'Ingeniería del Software II', 9, 1, 2, 2, '2025-08-29 19:44:59', 3, 3, 0);
+INSERT INTO `materias` (`id_materia`, `cod_materia`, `pnf_ptf`, `nombre_materia`, `creditos`, `activa`, `horas_teoricas`, `horas_practicas`, `created_at`, `duracion_periodo`, `trayecto`, `es_proyecto_socio`, `horas_laboratorio`, `horas_semanales`) VALUES
+(5, 'MAC015', 'PNF', 'Matematica', 5, 1, 2, 2, '2025-06-04 18:21:13', 1, 0, 0, NULL, NULL),
+(6, 'PNS013', 'PNF', 'Proyecto Nacional y Nueva Ciudadania', 3, 1, 2, 2, '2025-06-04 18:22:37', 1, 0, 0, NULL, NULL),
+(7, 'MAC139', 'PNF', 'Matemática I', 9, 1, 2, 2, '2025-06-16 15:21:07', 3, 1, 0, NULL, NULL),
+(9, 'IPC012', 'PNF', 'Introducción a los Proyectos y al PNF', 2, 1, 2, 2, '2025-08-01 19:51:18', 1, 0, 0, NULL, NULL),
+(10, 'ACT139', 'PNF', 'Arquitectura del Computador', 9, 1, 2, 2, '2025-08-01 19:58:28', 3, 1, 0, NULL, NULL),
+(11, 'APT1312', 'PNF', 'Algorítmica y Programación', 12, 1, 2, 2, '2025-08-01 20:03:19', 3, 1, 0, NULL, NULL),
+(12, 'FCS133', 'PNF', 'Formación Crítica I', 3, 1, 2, 2, '2025-08-01 20:05:28', 3, 1, 0, NULL, NULL),
+(13, 'PTP139', 'PNF', 'Proyecto Socio tecnológico I', 9, 1, 2, 2, '2025-08-01 20:07:21', 3, 1, 1, NULL, NULL),
+(14, 'IDC133', 'PNF', 'Inglés', 3, 1, 2, 2, '2025-08-01 20:08:35', 3, 1, 0, NULL, NULL),
+(15, 'TTIU40', 'PNF', 'Introducción a la Universidad y El Turismo', 1, 1, 2, 2, '2025-08-07 22:35:15', 1, 0, 0, NULL, NULL),
+(16, 'MAC226', 'PNF', 'Matematica II', 6, 1, 2, 2, '2025-08-24 18:14:27', 2, 2, 0, NULL, NULL),
+(17, 'RCT226', 'PNF', 'Redes de Computadoras', 6, 1, 2, 2, '2025-08-24 18:18:37', 2, 2, 0, NULL, NULL),
+(18, 'POT2312', 'PNF', 'Programacion II', 12, 1, 2, 2, '2025-08-24 18:48:27', 3, 2, 0, NULL, NULL),
+(19, 'ISC213', 'PNF', 'Ingenieria del Software I', 3, 1, 2, 2, '2025-08-24 18:50:56', 1, 2, 0, NULL, NULL),
+(20, 'BDC213', 'PNF', 'Base de Datos', 3, 1, 2, 2, '2025-08-24 18:53:03', 1, 2, 0, NULL, NULL),
+(21, 'FCS233', 'PNF', 'Formación Crítica II', 3, 1, 2, 2, '2025-08-24 18:57:07', 3, 2, 0, NULL, NULL),
+(22, 'PTP239', 'PNF', 'Proyecto Socio tecnológico II', 9, 1, 2, 2, '2025-08-24 19:00:14', 3, 2, 0, NULL, NULL),
+(23, 'MAC326', 'PNF', 'Matematica Aplicada', 6, 1, 2, 2, '2025-08-24 20:09:26', 2, 3, 0, NULL, NULL),
+(24, 'IOC313', 'PNF', 'Investigación de Operaciones', 3, 1, 2, 2, '2025-08-24 20:12:20', 1, 3, 0, NULL, NULL),
+(25, 'SOC313', 'PNF', 'Sistemas Operativos', 3, 1, 2, 2, '2025-08-24 20:14:44', 1, 3, 0, NULL, NULL),
+(26, 'BDC313', 'PNF', 'Modelado de Bases de Datos', 3, 1, 2, 2, '2025-08-29 19:20:37', 1, 3, 0, NULL, NULL),
+(27, 'FCS333', 'PNF', 'Formación Crítica III', 3, 1, 2, 2, '2025-08-29 19:33:31', 3, 3, 0, NULL, NULL),
+(28, 'ISC339', 'PNF', 'Ingeniería del Software II', 9, 1, 2, 2, '2025-08-29 19:44:59', 3, 3, 0, NULL, NULL),
+(29, 'MAT-154', 'PTF', 'Matemática I', 4, 1, 3, 2, '2026-01-13 16:15:00', 1, 1, 0, NULL, NULL),
+(30, 'AE-1111', 'PTF', 'Fisica', 5, 1, 2, 2, '2026-01-13 16:41:36', 1, 1, 0, NULL, NULL),
+(31, 'AE-1241', 'PTF', 'Deporte I', 2, 1, 2, 2, '2026-01-13 17:37:32', 1, 1, 0, NULL, NULL),
+(32, 'MAT-253', 'PTF', 'Matemática II', 3, 1, 2, 3, '2026-01-14 16:11:55', 1, 2, 0, 0, 4);
 
 -- --------------------------------------------------------
 
@@ -1338,8 +1567,8 @@ CREATE TABLE `mensajeria` (
   `id` int NOT NULL,
   `id_usuario_remitente` int NOT NULL,
   `id_usuario_destinatario` int NOT NULL,
-  `titulo` varchar(255) COLLATE utf8mb4_spanish_ci NOT NULL,
-  `mensaje` text COLLATE utf8mb4_spanish_ci NOT NULL,
+  `titulo` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL,
+  `mensaje` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL,
   `fecha_envio` datetime DEFAULT CURRENT_TIMESTAMP,
   `leido` tinyint(1) DEFAULT '0',
   `archivado_remitente` tinyint(1) DEFAULT '0',
@@ -1738,16 +1967,16 @@ INSERT INTO `municipios` (`id_municipio`, `id_estado`, `municipio`) VALUES
 
 CREATE TABLE `nombre_curso` (
   `id` int NOT NULL,
-  `titulo` varchar(200) COLLATE latin1_spanish_ci NOT NULL,
-  `sub_titulo` varchar(500) COLLATE latin1_spanish_ci NOT NULL,
-  `contenido` text COLLATE latin1_spanish_ci NOT NULL,
-  `ponente1` varchar(50) COLLATE latin1_spanish_ci NOT NULL,
-  `cedula1` varchar(10) COLLATE latin1_spanish_ci NOT NULL,
-  `ponente2` varchar(50) COLLATE latin1_spanish_ci NOT NULL,
-  `cedula2` varchar(10) COLLATE latin1_spanish_ci NOT NULL,
-  `lugar` varchar(25) COLLATE latin1_spanish_ci NOT NULL,
+  `titulo` varchar(200) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `sub_titulo` varchar(500) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `contenido` text CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `ponente1` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `cedula1` varchar(10) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `ponente2` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `cedula2` varchar(10) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `lugar` varchar(25) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
   `fecha` date NOT NULL,
-  `horas` varchar(3) COLLATE latin1_spanish_ci NOT NULL
+  `horas` varchar(3) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
 
 -- --------------------------------------------------------
@@ -1767,8 +1996,8 @@ CREATE TABLE `notas_definitivas` (
   `trayecto_2` int DEFAULT NULL,
   `trayecto_3` int DEFAULT NULL,
   `trayecto_4` int DEFAULT NULL,
-  `soporte` varchar(255) COLLATE utf8mb4_spanish_ci DEFAULT NULL,
-  `tipo_archivo` varchar(10) COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `soporte` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `tipo_archivo` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
   `fecha_registro` datetime DEFAULT NULL,
   `id_admin_aprobador` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
@@ -1834,8 +2063,8 @@ CREATE TABLE `notas_pendientes` (
   `trayecto_4` int DEFAULT NULL,
   `fecha_envio` datetime DEFAULT NULL,
   `estado` enum('pendiente','aprobada','rechazada','en revision') CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT 'en revision',
-  `soporte` varchar(255) COLLATE utf8mb4_spanish_ci DEFAULT NULL COMMENT 'Ruta o nombre del archivo de imagen de soporte',
-  `tipo_archivo` varchar(10) COLLATE utf8mb4_spanish_ci DEFAULT NULL COMMENT 'jpg, png, jpeg, etc',
+  `soporte` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL COMMENT 'Ruta o nombre del archivo de imagen de soporte',
+  `tipo_archivo` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL COMMENT 'jpg, png, jpeg, etc',
   `fecha_subida` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
@@ -1890,12 +2119,12 @@ INSERT INTO `notas_pendientes` (`id`, `id_usuario`, `id_materia`, `id_periodo`, 
 CREATE TABLE `pagos` (
   `id` int NOT NULL,
   `estudiante_id` int DEFAULT NULL,
-  `tipo_pago` enum('inscripcion','reincorporacion_estudio_expediente','cambio_programa','cambio_sede','inscripcion_pasantias_practica_profesional','expedicion_constancia_certificada_notas','expedicion_constancia_simple_notas','expedicion_constancia_buena_conducta','expedicion_constancia_culminacion_academica','expedicion_constancia_estudios','expedicion_constancia_inscripcion','expedicion_constancia_servicio_comunitario','carnet_estudiantil','uniforme_franela_estudiantil','certificado_titulo','autenticacion_titulo','pensum_estudios_certificados','programas_analiticos_vigencia_programas','expedicion_constancia_modalidad_estudios','certificacion_acta_grado','grado_titulo_medalla_notas_certificadas_ubicacion_rango_buena_conducta_servicio_comunitario','derecho_grado','certificacion_saberes','examen_suficiencia','examen_extraordinario','cursos','talleres','diplomado','especializacion','maestria','otro') COLLATE utf32_spanish2_ci NOT NULL,
-  `otro_concepto` varchar(100) COLLATE utf32_spanish2_ci DEFAULT NULL,
+  `tipo_pago` enum('inscripcion','reincorporacion_estudio_expediente','cambio_programa','cambio_sede','inscripcion_pasantias_practica_profesional','expedicion_constancia_certificada_notas','expedicion_constancia_simple_notas','expedicion_constancia_buena_conducta','expedicion_constancia_culminacion_academica','expedicion_constancia_estudios','expedicion_constancia_inscripcion','expedicion_constancia_servicio_comunitario','carnet_estudiantil','uniforme_franela_estudiantil','certificado_titulo','autenticacion_titulo','pensum_estudios_certificados','programas_analiticos_vigencia_programas','expedicion_constancia_modalidad_estudios','certificacion_acta_grado','grado_titulo_medalla_notas_certificadas_ubicacion_rango_buena_conducta_servicio_comunitario','derecho_grado','certificacion_saberes','examen_suficiencia','examen_extraordinario','cursos','talleres','diplomado','especializacion','maestria','otro') CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
+  `otro_concepto` varchar(100) CHARACTER SET utf32 COLLATE utf32_spanish2_ci DEFAULT NULL,
   `monto` decimal(10,2) NOT NULL,
   `banco_id` int DEFAULT NULL,
   `fecha_pago` datetime DEFAULT CURRENT_TIMESTAMP,
-  `observaciones` text COLLATE utf32_spanish2_ci,
+  `observaciones` text CHARACTER SET utf32 COLLATE utf32_spanish2_ci,
   `registrado_por` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
@@ -3074,7 +3303,7 @@ INSERT INTO `parroquias` (`id_parroquia`, `id_municipio`, `parroquia`) VALUES
 
 CREATE TABLE `periodos_academicos` (
   `id_periodo` int NOT NULL,
-  `nombre_periodo` varchar(50) COLLATE utf8mb4_spanish_ci NOT NULL,
+  `nombre_periodo` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL,
   `fecha_inicio` date NOT NULL,
   `fecha_fin` date NOT NULL,
   `activo` tinyint(1) DEFAULT '0',
@@ -3087,9 +3316,32 @@ CREATE TABLE `periodos_academicos` (
 
 INSERT INTO `periodos_academicos` (`id_periodo`, `nombre_periodo`, `fecha_inicio`, `fecha_fin`, `activo`, `created_at`) VALUES
 (1, '2024-1', '2024-01-15', '2024-04-15', 0, '2025-07-25 17:28:39'),
-(2, '2025-2', '2025-07-01', '2025-12-10', 1, '2025-07-31 19:13:38'),
+(2, '2025-2', '2025-07-01', '2025-12-10', 0, '2025-07-31 19:13:38'),
 (3, '2027-1', '2027-06-09', '2028-07-05', 0, '2025-08-24 01:06:13'),
-(4, '2026-1', '2025-12-13', '2026-02-10', 0, '2025-12-03 18:33:00');
+(4, '2026-1', '2025-12-13', '2026-02-10', 0, '2025-12-03 18:33:00'),
+(5, '2026-1', '2026-01-16', '2026-03-16', 1, '2026-01-16 17:01:32');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `prelaciones`
+--
+
+CREATE TABLE `prelaciones` (
+  `id` int NOT NULL,
+  `id_carrera` int NOT NULL,
+  `id_materia` int NOT NULL,
+  `id_prerequisito` int NOT NULL,
+  `tipo` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Volcado de datos para la tabla `prelaciones`
+--
+
+INSERT INTO `prelaciones` (`id`, `id_carrera`, `id_materia`, `id_prerequisito`, `tipo`, `created_at`) VALUES
+(2, 14, 32, 29, 'optativo', '2026-01-14 16:31:43');
 
 -- --------------------------------------------------------
 
@@ -3101,7 +3353,7 @@ CREATE TABLE `relacion_cursos` (
   `id` int NOT NULL,
   `id_usuario` int NOT NULL,
   `id_curso` int NOT NULL,
-  `codigo` varchar(10) COLLATE latin1_spanish_ci NOT NULL
+  `codigo` varchar(10) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
 
 -- --------------------------------------------------------
@@ -3112,11 +3364,11 @@ CREATE TABLE `relacion_cursos` (
 
 CREATE TABLE `respaldos_descargas` (
   `id` int NOT NULL,
-  `usuario` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
-  `nombre_archivo` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `usuario` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `nombre_archivo` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `fecha_descarga` datetime DEFAULT CURRENT_TIMESTAMP,
-  `ip_address` varchar(45) COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `user_agent` text COLLATE utf8mb4_general_ci
+  `ip_address` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `user_agent` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -3140,7 +3392,7 @@ CREATE TABLE `revision_mensajes` (
   `id` int NOT NULL,
   `id_usuario` int NOT NULL,
   `fecha` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `ip` varchar(15) COLLATE latin1_spanish_ci NOT NULL
+  `ip` varchar(15) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
 
 -- --------------------------------------------------------
@@ -3151,15 +3403,15 @@ CREATE TABLE `revision_mensajes` (
 
 CREATE TABLE `secciones` (
   `id_seccion` int NOT NULL,
-  `codigo_seccion` varchar(20) COLLATE utf8mb4_spanish_ci NOT NULL,
+  `codigo_seccion` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL,
   `id_carrera` int NOT NULL,
   `id_trayecto` int NOT NULL,
   `id_periodo` int NOT NULL,
   `capacidad_maxima` int NOT NULL,
   `capacidad_minima` int DEFAULT '10',
-  `aula_asignada` varchar(50) COLLATE utf8mb4_spanish_ci DEFAULT NULL,
-  `horario` text COLLATE utf8mb4_spanish_ci,
-  `estatus` enum('activa','inactiva','completa') COLLATE utf8mb4_spanish_ci DEFAULT 'activa',
+  `aula_asignada` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `horario` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci,
+  `estatus` enum('activa','inactiva','completa') CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT 'activa',
   `inicia` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
@@ -3170,7 +3422,7 @@ CREATE TABLE `secciones` (
 
 INSERT INTO `secciones` (`id_seccion`, `codigo_seccion`, `id_carrera`, `id_trayecto`, `id_periodo`, `capacidad_maxima`, `capacidad_minima`, `aula_asignada`, `horario`, `estatus`, `inicia`, `created_at`) VALUES
 (9, '1-70', 1, 1, 1, 30, 10, NULL, NULL, 'inactiva', NULL, '2025-07-25 21:05:43'),
-(10, '1-70', 1, 1, 2, 40, 10, NULL, '{\"lunes\":[\"07:00\",\"11:30\"],\"martes\":null,\"miercoles\":null,\"jueves\":null,\"viernes\":null}', 'activa', '2025-08-14 12:00:00', '2025-07-31 22:15:49'),
+(10, '1-70', 1, 1, 5, 40, 10, NULL, '{\"lunes\":[\"07:00\",\"11:30\"],\"martes\":null,\"miercoles\":null,\"jueves\":null,\"viernes\":null}', 'activa', '2026-08-02 12:00:00', '2025-07-31 22:15:49'),
 (11, '1-80', 2, 1, 2, 30, 10, NULL, NULL, 'activa', '2025-08-14 12:00:00', '2025-08-05 17:14:39');
 
 -- --------------------------------------------------------
@@ -3181,7 +3433,7 @@ INSERT INTO `secciones` (`id_seccion`, `codigo_seccion`, `id_carrera`, `id_traye
 
 CREATE TABLE `status` (
   `id` int NOT NULL,
-  `status` varchar(10) COLLATE utf32_spanish2_ci NOT NULL
+  `status` varchar(10) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -3200,7 +3452,7 @@ INSERT INTO `status` (`id`, `status`) VALUES
 
 CREATE TABLE `tenencia_vivienda` (
   `id` int NOT NULL,
-  `tenencia` varchar(20) COLLATE utf32_spanish2_ci NOT NULL
+  `tenencia` varchar(20) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -3221,7 +3473,7 @@ INSERT INTO `tenencia_vivienda` (`id`, `tenencia`) VALUES
 
 CREATE TABLE `tipos_horario` (
   `id` int NOT NULL,
-  `nombre` varchar(50) COLLATE utf8mb3_spanish_ci NOT NULL,
+  `nombre` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci NOT NULL,
   `horas_academicas` int DEFAULT '0',
   `horas_atendiendo` int DEFAULT '0'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_spanish_ci;
@@ -3244,7 +3496,7 @@ INSERT INTO `tipos_horario` (`id`, `nombre`, `horas_academicas`, `horas_atendien
 
 CREATE TABLE `tipo_cedula` (
   `id` int NOT NULL,
-  `tipo` varchar(2) COLLATE utf32_spanish2_ci NOT NULL
+  `tipo` varchar(2) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -3263,7 +3515,7 @@ INSERT INTO `tipo_cedula` (`id`, `tipo`) VALUES
 
 CREATE TABLE `tipo_formacion` (
   `id` int NOT NULL,
-  `tipo` varchar(50) COLLATE utf8mb4_spanish_ci NOT NULL
+  `tipo` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -3303,7 +3555,7 @@ INSERT INTO `tipo_horario_personal` (`id`, `id_usuario`, `id_tipo_horario`) VALU
 
 CREATE TABLE `tipo_pago` (
   `id` int NOT NULL,
-  `tipopago` varchar(100) COLLATE utf8mb4_spanish_ci NOT NULL
+  `tipopago` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -3353,7 +3605,7 @@ INSERT INTO `tipo_pago` (`id`, `tipopago`) VALUES
 
 CREATE TABLE `tipo_vivienda` (
   `id` int NOT NULL,
-  `vivienda` varchar(20) COLLATE utf32_spanish2_ci NOT NULL
+  `vivienda` varchar(20) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -3374,8 +3626,8 @@ INSERT INTO `tipo_vivienda` (`id`, `vivienda`) VALUES
 
 CREATE TABLE `titulos` (
   `id` int NOT NULL,
-  `nombre` varchar(100) COLLATE utf8mb4_spanish_ci NOT NULL,
-  `descripcion` text COLLATE utf8mb4_spanish_ci
+  `nombre` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL,
+  `descripcion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -3522,9 +3774,9 @@ INSERT INTO `titulos` (`id`, `nombre`, `descripcion`) VALUES
 CREATE TABLE `titulos_obtenidos` (
   `id` int NOT NULL,
   `id_usuario` int NOT NULL,
-  `nombre` varchar(255) COLLATE utf32_spanish2_ci NOT NULL,
-  `titulo_obtenido` varchar(255) COLLATE utf32_spanish2_ci NOT NULL,
-  `instituto` varchar(255) COLLATE utf32_spanish2_ci NOT NULL
+  `nombre` varchar(255) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
+  `titulo_obtenido` varchar(255) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
+  `instituto` varchar(255) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -3622,8 +3874,8 @@ INSERT INTO `titulo_materia` (`id_relacion`, `id_titulo`, `id_materia`, `priorid
 CREATE TABLE `trayectos` (
   `id_trayecto` int NOT NULL,
   `numero_trayecto` int NOT NULL,
-  `nombre_trayecto` varchar(50) COLLATE utf8mb4_spanish_ci DEFAULT NULL,
-  `descripcion` text COLLATE utf8mb4_spanish_ci
+  `nombre_trayecto` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `descripcion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -3645,43 +3897,43 @@ INSERT INTO `trayectos` (`id_trayecto`, `numero_trayecto`, `nombre_trayecto`, `d
 
 CREATE TABLE `users` (
   `id` int NOT NULL,
-  `idusuario` varchar(20) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `nombre` varchar(200) COLLATE latin1_spanish_ci NOT NULL,
-  `username` varchar(100) COLLATE latin1_spanish_ci NOT NULL,
-  `email` varchar(100) COLLATE latin1_spanish_ci NOT NULL,
-  `tlf` varchar(11) COLLATE latin1_spanish_ci NOT NULL,
-  `cel` varchar(11) COLLATE latin1_spanish_ci NOT NULL,
-  `direccion` varchar(300) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `ciudad` varchar(100) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `estado` varchar(100) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `municipio` varchar(100) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `parroquia` varchar(100) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `etnia` varchar(50) COLLATE latin1_spanish_ci DEFAULT 'Ninguna',
-  `casaapto` varchar(50) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `punto_referencia` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `grupo_familiar` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `acargo_usted` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `fuente_ingresos` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `tipo_vivienda` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `tenencia_vivienda` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `enfermedad` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `discapacidad` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `titulos` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `institutos` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `potencialidades` varchar(100) COLLATE latin1_spanish_ci NOT NULL,
+  `idusuario` varchar(20) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `nombre` varchar(200) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `username` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `email` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `tlf` varchar(11) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `cel` varchar(11) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `direccion` varchar(300) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `ciudad` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `estado` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `municipio` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `parroquia` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `etnia` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'Ninguna',
+  `casaapto` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `punto_referencia` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `grupo_familiar` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `acargo_usted` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `fuente_ingresos` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `tipo_vivienda` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `tenencia_vivienda` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `enfermedad` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `discapacidad` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `titulos` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `institutos` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `potencialidades` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
   `fecha_ingreso` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `fecha_act` timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `status` int NOT NULL DEFAULT '1',
-  `user_type` varchar(200) COLLATE latin1_spanish_ci NOT NULL DEFAULT 'user',
+  `user_type` varchar(200) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL DEFAULT 'user',
   `password` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
-  `api_key` varchar(255) COLLATE latin1_spanish_ci DEFAULT NULL,
+  `api_key` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
   `carrera` int DEFAULT NULL,
   `carrera_di` int DEFAULT NULL,
-  `genero` varchar(50) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `edo_civil` varchar(50) COLLATE latin1_spanish_ci DEFAULT NULL,
+  `genero` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `edo_civil` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
   `fecha_nac` date DEFAULT NULL,
-  `num_telf_opc` varchar(50) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `foto_perfil` varchar(255) COLLATE latin1_spanish_ci DEFAULT NULL,
+  `num_telf_opc` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `foto_perfil` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
   `usuario` int NOT NULL,
   `estudiante` int NOT NULL,
   `docente` int NOT NULL,
@@ -3853,8 +4105,8 @@ INSERT INTO `users` (`id`, `idusuario`, `nombre`, `username`, `email`, `tlf`, `c
 
 CREATE TABLE `user_types` (
   `id` int NOT NULL,
-  `user_type` varchar(11) COLLATE latin1_spanish_ci NOT NULL,
-  `descripcion` varchar(50) COLLATE latin1_spanish_ci NOT NULL
+  `user_type` varchar(11) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `descripcion` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
 
 --
@@ -3888,13 +4140,36 @@ CREATE TABLE `user_user_types` (
 
 CREATE TABLE `usuarios_cursos` (
   `id` int NOT NULL,
-  `nro_identificacion` varchar(20) COLLATE latin1_spanish_ci NOT NULL,
-  `nombre` varchar(200) COLLATE latin1_spanish_ci NOT NULL,
-  `pais` varchar(100) COLLATE latin1_spanish_ci NOT NULL,
-  `correo` varchar(100) COLLATE latin1_spanish_ci NOT NULL,
-  `whatsapp` varchar(30) COLLATE latin1_spanish_ci NOT NULL,
-  `telegram` varchar(30) COLLATE latin1_spanish_ci NOT NULL
+  `nro_identificacion` varchar(20) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `nombre` varchar(200) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `pais` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `correo` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `whatsapp` varchar(30) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `telegram` varchar(30) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `version_materia`
+--
+
+CREATE TABLE `version_materia` (
+  `id` int NOT NULL,
+  `id_version` int NOT NULL,
+  `id_materia` int NOT NULL,
+  `semestre` int NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Volcado de datos para la tabla `version_materia`
+--
+
+INSERT INTO `version_materia` (`id`, `id_version`, `id_materia`, `semestre`) VALUES
+(2, 2, 29, 1),
+(3, 2, 30, 1),
+(4, 2, 30, 1),
+(5, 3, 31, 1);
 
 -- --------------------------------------------------------
 
@@ -3905,9 +4180,9 @@ CREATE TABLE `usuarios_cursos` (
 CREATE TABLE `visitas` (
   `id` int NOT NULL,
   `id_usuario` int NOT NULL,
-  `ip` varchar(15) COLLATE latin1_spanish_ci NOT NULL,
+  `ip` varchar(15) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
   `fecha_visita` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `web` varchar(100) COLLATE latin1_spanish_ci NOT NULL
+  `web` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
 
 --
@@ -4502,7 +4777,419 @@ INSERT INTO `visitas` (`id`, `id_usuario`, `ip`, `fecha_visita`, `web`) VALUES
 (585, 2, '::1', '2025-12-04 17:30:17', 'inscripcion_materias.php'),
 (586, 2, '::1', '2025-12-04 17:30:20', 'inscripcion_materias.php'),
 (587, 2, '::1', '2025-12-04 17:30:22', 'inscripcion_materias.php'),
-(588, 2, '::1', '2025-12-04 17:30:32', 'inscripcion_materias.php');
+(588, 2, '::1', '2025-12-04 17:30:32', 'inscripcion_materias.php'),
+(589, 2, '::1', '2026-01-13 14:24:06', 'index.php'),
+(590, 2, '::1', '2026-01-13 14:25:23', 'inscripcion_materias.php'),
+(591, 2, '::1', '2026-01-13 14:25:26', 'inscripcion_materias.php'),
+(592, 2, '::1', '2026-01-13 14:25:52', 'consulta_notas.php'),
+(593, 2, '::1', '2026-01-13 14:25:54', 'consulta_notas.php'),
+(594, 2, '::1', '2026-01-13 14:33:26', 'agregar_carrera.php'),
+(595, 2, '::1', '2026-01-13 14:33:36', 'agregar_carrera.php'),
+(596, 2, '::1', '2026-01-13 14:51:06', 'agregar_carrera.php'),
+(597, 2, '::1', '2026-01-13 15:03:52', 'agregar_carrera.php'),
+(598, 2, '::1', '2026-01-13 15:10:38', 'agregar_carrera.php'),
+(599, 2, '::1', '2026-01-13 15:10:56', 'agregar_carrera.php'),
+(600, 2, '::1', '2026-01-13 15:10:59', 'agregar_carrera.php'),
+(601, 2, '::1', '2026-01-13 15:24:36', 'agregar_carrera.php'),
+(602, 2, '::1', '2026-01-13 15:24:53', 'agregar_carrera.php'),
+(603, 2, '::1', '2026-01-13 15:28:52', 'agregar_carrera.php'),
+(604, 2, '::1', '2026-01-13 15:33:58', 'agregar_carrera.php'),
+(605, 2, '::1', '2026-01-13 15:34:11', 'materia.php'),
+(606, 2, '::1', '2026-01-13 15:44:12', 'materia.php'),
+(607, 2, '::1', '2026-01-13 15:44:15', 'carrera_materias.php'),
+(608, 2, '::1', '2026-01-13 15:44:20', 'materia.php'),
+(609, 2, '::1', '2026-01-13 15:51:14', 'index.php'),
+(610, 2, '::1', '2026-01-13 15:51:47', 'agregar_carrera.php'),
+(611, 2, '::1', '2026-01-13 15:52:24', 'materia.php'),
+(612, 2, '::1', '2026-01-13 16:15:00', 'materia.php'),
+(613, 2, '::1', '2026-01-13 16:15:00', 'materia.php'),
+(614, 2, '::1', '2026-01-13 16:15:11', 'carrera_materias.php'),
+(615, 2, '::1', '2026-01-13 16:15:42', 'carrera_materias.php'),
+(616, 2, '::1', '2026-01-13 16:15:47', 'agregar_carrera.php'),
+(617, 2, '::1', '2026-01-13 16:15:54', 'agregar_carrera.php'),
+(618, 2, '::1', '2026-01-13 16:17:22', 'agregar_carrera.php'),
+(619, 2, '::1', '2026-01-13 16:26:30', 'agregar_carrera.php'),
+(620, 2, '::1', '2026-01-13 16:28:22', 'agregar_carrera.php'),
+(621, 2, '::1', '2026-01-13 16:34:44', 'agregar_carrera.php'),
+(622, 2, '::1', '2026-01-13 16:37:39', 'agregar_carrera.php'),
+(623, 2, '::1', '2026-01-13 16:38:15', 'agregar_carrera.php'),
+(624, 2, '::1', '2026-01-13 16:40:09', 'agregar_carrera.php'),
+(625, 2, '::1', '2026-01-13 16:40:24', 'agregar_carrera.php'),
+(626, 2, '::1', '2026-01-13 16:40:30', 'materia.php'),
+(627, 2, '::1', '2026-01-13 16:40:36', 'carrera_materias.php'),
+(628, 2, '::1', '2026-01-13 16:40:41', 'materia.php'),
+(629, 2, '::1', '2026-01-13 16:41:36', 'materia.php'),
+(630, 2, '::1', '2026-01-13 16:41:36', 'materia.php'),
+(631, 2, '::1', '2026-01-13 16:41:42', 'carrera_materias.php'),
+(632, 2, '::1', '2026-01-13 16:42:57', 'agregar_carrera.php'),
+(633, 2, '::1', '2026-01-13 16:43:16', 'agregar_carrera.php'),
+(634, 2, '::1', '2026-01-13 16:43:20', 'agregar_carrera.php'),
+(635, 2, '::1', '2026-01-13 16:44:22', 'agregar_carrera.php'),
+(636, 2, '::1', '2026-01-13 16:44:31', 'carrera_materias.php'),
+(637, 2, '::1', '2026-01-13 16:45:08', 'agregar_carrera.php'),
+(638, 2, '::1', '2026-01-13 16:46:03', 'agregar_carrera.php'),
+(639, 2, '::1', '2026-01-13 16:46:10', 'agregar_carrera.php'),
+(640, 2, '::1', '2026-01-13 16:46:11', 'materia.php'),
+(641, 2, '::1', '2026-01-13 16:46:25', 'carrera_materias.php'),
+(642, 2, '::1', '2026-01-13 16:46:42', 'carrera_materias.php'),
+(643, 2, '::1', '2026-01-13 16:46:47', 'agregar_carrera.php'),
+(644, 2, '::1', '2026-01-13 16:46:54', 'agregar_carrera.php'),
+(645, 2, '::1', '2026-01-13 16:48:10', 'materia.php'),
+(646, 2, '::1', '2026-01-13 16:48:14', 'carrera_materias.php'),
+(647, 2, '::1', '2026-01-13 16:48:35', 'agregar_estudiante.php'),
+(648, 2, '::1', '2026-01-13 16:48:35', 'agregar_estudiante.php'),
+(649, 2, '::1', '2026-01-13 16:48:38', 'carrera_materias.php'),
+(650, 2, '::1', '2026-01-13 16:51:25', 'carrera_materias.php'),
+(651, 2, '::1', '2026-01-13 16:51:26', 'carrera_materias.php'),
+(652, 2, '::1', '2026-01-13 16:51:26', 'carrera_materias.php'),
+(653, 2, '::1', '2026-01-13 16:53:23', 'carrera_materias.php'),
+(654, 2, '::1', '2026-01-13 16:54:40', 'carrera_materias.php'),
+(655, 2, '::1', '2026-01-13 16:54:42', 'carrera_materias.php'),
+(656, 2, '::1', '2026-01-13 16:54:44', 'carrera_materias.php'),
+(657, 2, '::1', '2026-01-13 16:54:45', 'carrera_materias.php'),
+(658, 2, '::1', '2026-01-13 16:54:46', 'carrera_materias.php'),
+(659, 2, '::1', '2026-01-13 16:55:12', 'carrera_materias.php'),
+(660, 2, '::1', '2026-01-13 16:56:05', 'carrera_materias.php'),
+(661, 2, '::1', '2026-01-13 16:56:06', 'carrera_materias.php'),
+(662, 2, '::1', '2026-01-13 16:56:06', 'carrera_materias.php'),
+(663, 2, '::1', '2026-01-13 16:56:07', 'carrera_materias.php'),
+(664, 2, '::1', '2026-01-13 17:01:45', 'carrera_materias.php'),
+(665, 2, '::1', '2026-01-13 17:03:53', 'carrera_materias.php'),
+(666, 2, '::1', '2026-01-13 17:03:54', 'carrera_materias.php'),
+(667, 2, '::1', '2026-01-13 17:03:55', 'carrera_materias.php'),
+(668, 2, '::1', '2026-01-13 17:03:55', 'carrera_materias.php'),
+(669, 2, '::1', '2026-01-13 17:11:42', 'carrera_materias.php'),
+(670, 2, '::1', '2026-01-13 17:11:43', 'carrera_materias.php'),
+(671, 2, '::1', '2026-01-13 17:11:43', 'carrera_materias.php'),
+(672, 2, '::1', '2026-01-13 17:16:25', 'carrera_materias.php'),
+(673, 2, '::1', '2026-01-13 17:16:26', 'carrera_materias.php'),
+(674, 2, '::1', '2026-01-13 17:16:27', 'carrera_materias.php'),
+(675, 2, '::1', '2026-01-13 17:18:24', 'carrera_materias.php'),
+(676, 2, '::1', '2026-01-13 17:18:40', 'carrera_materias.php'),
+(677, 2, '::1', '2026-01-13 17:19:44', 'carrera_materias.php'),
+(678, 2, '::1', '2026-01-13 17:19:49', 'agregar_carrera.php'),
+(679, 2, '::1', '2026-01-13 17:19:58', 'agregar_carrera.php'),
+(680, 2, '::1', '2026-01-13 17:21:40', 'agregar_carrera.php'),
+(681, 2, '::1', '2026-01-13 17:25:24', 'agregar_carrera.php'),
+(682, 2, '::1', '2026-01-13 17:30:35', 'agregar_carrera.php'),
+(683, 2, '::1', '2026-01-13 17:30:36', 'agregar_carrera.php'),
+(684, 2, '::1', '2026-01-13 17:30:46', 'agregar_carrera.php'),
+(685, 2, '::1', '2026-01-13 17:30:56', 'agregar_carrera.php'),
+(686, 2, '::1', '2026-01-13 17:31:01', 'agregar_carrera.php'),
+(687, 2, '::1', '2026-01-13 17:31:10', 'agregar_carrera.php'),
+(688, 2, '::1', '2026-01-13 17:31:18', 'agregar_carrera.php'),
+(689, 2, '::1', '2026-01-13 17:31:22', 'agregar_carrera.php'),
+(690, 2, '::1', '2026-01-13 17:34:55', 'agregar_carrera.php'),
+(691, 2, '::1', '2026-01-13 17:35:09', 'agregar_carrera.php'),
+(692, 2, '::1', '2026-01-13 17:35:16', 'agregar_carrera.php'),
+(693, 2, '::1', '2026-01-13 17:35:24', 'agregar_carrera.php'),
+(694, 2, '::1', '2026-01-13 17:36:35', 'materia.php'),
+(695, 2, '::1', '2026-01-13 17:37:31', 'materia.php'),
+(696, 2, '::1', '2026-01-13 17:37:32', 'materia.php'),
+(697, 2, '::1', '2026-01-13 17:37:38', 'carrera_materias.php'),
+(698, 2, '::1', '2026-01-13 17:38:09', 'carrera_materias.php'),
+(699, 2, '::1', '2026-01-13 17:38:15', 'agregar_carrera.php'),
+(700, 2, '::1', '2026-01-13 17:38:21', 'agregar_carrera.php'),
+(701, 2, '::1', '2026-01-13 17:38:26', 'agregar_carrera.php'),
+(702, 2, '::1', '2026-01-13 17:38:32', 'agregar_carrera.php'),
+(703, 2, '::1', '2026-01-13 17:42:08', 'agregar_carrera.php'),
+(704, 2, '::1', '2026-01-13 17:42:13', 'carrera_materias.php'),
+(705, 2, '::1', '2026-01-13 17:42:25', 'carrera_materias.php'),
+(706, 2, '::1', '2026-01-13 17:42:26', 'carrera_materias.php'),
+(707, 2, '::1', '2026-01-13 17:44:15', 'carrera_materias.php'),
+(708, 2, '::1', '2026-01-13 17:44:16', 'carrera_materias.php'),
+(709, 2, '::1', '2026-01-13 17:44:32', 'agregar_carrera.php'),
+(710, 2, '::1', '2026-01-13 18:11:29', 'agregar_carrera.php'),
+(711, 2, '::1', '2026-01-13 18:11:42', 'agregar_carrera.php'),
+(712, 2, '::1', '2026-01-13 18:12:33', 'inscripcion_materias.php'),
+(713, 2, '::1', '2026-01-13 18:15:42', 'registro_pagos.php'),
+(714, 2, '::1', '2026-01-13 18:15:44', 'registro_pagos.php'),
+(715, 2, '::1', '2026-01-13 18:15:49', 'mensajeria.php'),
+(716, 2, '::1', '2026-01-13 18:18:29', 'mensajeria.php'),
+(717, 2, '::1', '2026-01-13 18:18:34', 'mensajeria.php'),
+(718, 2, '::1', '2026-01-13 18:24:11', 'mensajeria.php'),
+(719, 2, '::1', '2026-01-13 18:28:38', 'agregar_carrera.php'),
+(720, 2, '::1', '2026-01-13 18:29:10', 'agregar_carrera.php'),
+(721, 2, '::1', '2026-01-13 18:40:56', 'agregar_carrera.php'),
+(722, 2, '::1', '2026-01-14 13:51:21', 'index.php'),
+(723, 2, '::1', '2026-01-14 13:57:09', 'agregar_carrera.php'),
+(724, 2, '::1', '2026-01-14 14:10:27', 'agregar_carrera.php'),
+(725, 2, '::1', '2026-01-14 14:15:29', 'agregar_carrera.php'),
+(726, 2, '::1', '2026-01-14 14:21:33', 'agregar_carrera.php'),
+(727, 2, '::1', '2026-01-14 14:21:33', 'agregar_carrera.php'),
+(728, 2, '::1', '2026-01-14 14:22:07', 'agregar_carrera.php'),
+(729, 2, '::1', '2026-01-14 14:42:42', 'agregar_carrera.php'),
+(730, 2, '::1', '2026-01-14 14:42:43', 'agregar_carrera.php'),
+(731, 2, '::1', '2026-01-14 14:42:57', 'index.php'),
+(732, 2, '::1', '2026-01-14 14:43:00', 'agregar_carrera.php'),
+(733, 2, '::1', '2026-01-14 14:56:38', 'agregar_carrera.php'),
+(734, 2, '::1', '2026-01-14 15:06:04', 'agregar_carrera.php'),
+(735, 2, '::1', '2026-01-14 15:06:10', 'agregar_carrera.php'),
+(736, 2, '::1', '2026-01-14 15:06:26', 'agregar_carrera.php'),
+(737, 2, '::1', '2026-01-14 15:09:01', 'agregar_carrera.php'),
+(738, 2, '::1', '2026-01-14 15:17:45', 'agregar_carrera.php'),
+(739, 2, '::1', '2026-01-14 15:18:03', 'agregar_carrera.php'),
+(740, 2, '::1', '2026-01-14 15:18:12', 'agregar_carrera.php'),
+(741, 2, '::1', '2026-01-14 15:18:30', 'agregar_carrera.php'),
+(742, 2, '::1', '2026-01-14 15:31:03', 'agregar_carrera.php'),
+(743, 2, '::1', '2026-01-14 15:31:12', 'agregar_carrera.php'),
+(744, 2, '::1', '2026-01-14 15:32:00', 'agregar_carrera.php'),
+(745, 2, '::1', '2026-01-14 15:32:05', 'agregar_carrera.php'),
+(746, 2, '::1', '2026-01-14 15:32:19', 'agregar_carrera.php'),
+(747, 2, '::1', '2026-01-14 15:58:59', 'materia.php'),
+(748, 2, '::1', '2026-01-14 16:06:19', 'materia.php'),
+(749, 2, '::1', '2026-01-14 16:07:07', 'materia.php'),
+(750, 2, '::1', '2026-01-14 16:09:36', 'materia.php'),
+(751, 2, '::1', '2026-01-14 16:09:39', 'agregar_carrera.php'),
+(752, 2, '::1', '2026-01-14 16:09:52', 'agregar_carrera.php'),
+(753, 2, '::1', '2026-01-14 16:09:58', 'materia.php'),
+(754, 2, '::1', '2026-01-14 16:11:54', 'materia.php'),
+(755, 2, '::1', '2026-01-14 16:11:55', 'materia.php'),
+(756, 2, '::1', '2026-01-14 16:12:25', 'carrera_materias.php'),
+(757, 2, '::1', '2026-01-14 16:13:15', 'carrera_materias.php'),
+(758, 2, '::1', '2026-01-14 16:13:22', 'agregar_carrera.php'),
+(759, 2, '::1', '2026-01-14 16:15:43', 'carrera_materias.php'),
+(760, 2, '::1', '2026-01-14 16:16:19', 'carrera_materias.php'),
+(761, 2, '::1', '2026-01-14 16:17:04', 'carrera_materias.php'),
+(762, 2, '::1', '2026-01-14 16:17:09', 'agregar_carrera.php'),
+(763, 2, '::1', '2026-01-14 16:18:22', 'materia.php'),
+(764, 2, '::1', '2026-01-14 16:19:02', 'materia.php'),
+(765, 2, '::1', '2026-01-14 16:22:46', 'materia.php'),
+(766, 2, '::1', '2026-01-14 16:22:55', 'materia.php'),
+(767, 2, '::1', '2026-01-14 16:22:55', 'materia.php'),
+(768, 2, '::1', '2026-01-14 16:23:36', 'carrera_materias.php'),
+(769, 2, '::1', '2026-01-14 16:23:42', 'agregar_carrera.php'),
+(770, 2, '::1', '2026-01-14 16:25:38', 'carrera_materias.php'),
+(771, 2, '::1', '2026-01-14 16:25:51', 'carrera_materias.php'),
+(772, 2, '::1', '2026-01-14 16:26:21', 'carrera_materias.php'),
+(773, 2, '::1', '2026-01-14 16:26:45', 'carrera_materias.php'),
+(774, 2, '::1', '2026-01-14 16:26:54', 'agregar_carrera.php'),
+(775, 2, '::1', '2026-01-14 16:30:57', 'index.php'),
+(776, 2, '::1', '2026-01-14 16:32:15', 'agregar_carrera.php'),
+(777, 2, '::1', '2026-01-16 13:48:35', 'index.php'),
+(778, 2, '::1', '2026-01-16 13:48:43', 'inscripcion_materias.php'),
+(779, 2, '::1', '2026-01-16 13:48:47', 'inscripcion_materias.php'),
+(780, 2, '::1', '2026-01-16 13:59:58', 'index.php'),
+(781, 2, '::1', '2026-01-16 14:00:13', 'index.php'),
+(782, 2, '::1', '2026-01-16 14:00:33', 'agregar_carrera.php'),
+(783, 2, '::1', '2026-01-16 14:00:45', 'agregar_carrera.php'),
+(784, 2, '::1', '2026-01-16 14:00:57', 'agregar_carrera.php'),
+(785, 2, '::1', '2026-01-16 14:01:45', 'agregar_carrera.php'),
+(786, 2, '::1', '2026-01-16 14:04:05', 'agregar_carrera.php'),
+(787, 2, '::1', '2026-01-16 14:04:27', 'index.php'),
+(788, 2, '::1', '2026-01-16 14:04:34', 'mi_historial.php'),
+(789, 2, '::1', '2026-01-16 14:04:42', 'mi_horario.php'),
+(790, 2, '::1', '2026-01-16 14:04:44', 'mis_secciones.php'),
+(791, 2, '::1', '2026-01-16 14:04:46', 'mi_pensum.php'),
+(792, 2, '::1', '2026-01-16 14:15:07', 'mis_secciones.php'),
+(793, 2, '::1', '2026-01-16 14:15:11', 'mi_pensum.php'),
+(794, 2, '::1', '2026-01-16 14:15:16', 'mi_pensum.php'),
+(795, 2, '::1', '2026-01-16 14:16:11', 'mi_pensum.php'),
+(796, 2, '::1', '2026-01-16 14:19:02', 'mensajeria_estudiantes.php'),
+(797, 2, '::1', '2026-01-16 14:19:12', 'mi_horario.php'),
+(798, 2, '::1', '2026-01-16 14:19:15', 'mis_secciones.php'),
+(799, 2, '::1', '2026-01-16 14:19:18', 'mi_pensum.php'),
+(800, 5, '::1', '2026-01-16 14:19:28', 'index.php'),
+(801, 5, '::1', '2026-01-16 14:19:34', 'mensajeria_estudiantes.php'),
+(802, 5, '::1', '2026-01-16 14:19:37', 'mi_horario.php'),
+(803, 5, '::1', '2026-01-16 14:20:02', 'mis_secciones.php'),
+(804, 5, '::1', '2026-01-16 14:20:05', 'mi_pensum.php'),
+(805, 5, '::1', '2026-01-16 14:20:11', 'mi_historial.php'),
+(806, 5, '::1', '2026-01-16 14:20:25', 'index.php'),
+(807, 2, '::1', '2026-01-16 14:20:37', 'index.php'),
+(808, 2, '::1', '2026-01-16 14:20:59', 'materia.php'),
+(809, 2, '::1', '2026-01-16 14:21:07', 'agregar_carrera.php'),
+(810, 5, '::1', '2026-01-16 14:40:29', 'index.php'),
+(811, 5, '::1', '2026-01-16 14:40:36', 'mi_pensum.php'),
+(812, 5, '::1', '2026-01-16 14:41:56', 'mi_pensum.php'),
+(813, 5, '::1', '2026-01-16 15:01:48', 'mi_pensum.php'),
+(814, 5, '::1', '2026-01-16 15:02:02', 'mi_pensum.php'),
+(815, 5, '::1', '2026-01-16 15:02:30', 'mi_pensum.php'),
+(816, 2, '::1', '2026-01-16 15:02:38', 'index.php'),
+(817, 2, '::1', '2026-01-16 15:02:41', 'agregar_carrera.php'),
+(818, 5, '::1', '2026-01-16 15:11:12', 'index.php'),
+(819, 5, '::1', '2026-01-16 15:11:16', 'mi_pensum.php'),
+(820, 5, '::1', '2026-01-16 15:11:17', 'mi_pensum.php'),
+(821, 5, '::1', '2026-01-16 15:11:31', 'mi_pensum.php'),
+(822, 5, '::1', '2026-01-16 15:11:37', 'index.php'),
+(823, 5, '::1', '2026-01-16 15:11:53', 'index.php'),
+(824, 5, '::1', '2026-01-16 15:27:18', 'index.php'),
+(825, 5, '::1', '2026-01-16 15:27:21', 'mi_pensum.php'),
+(826, 5, '::1', '2026-01-16 15:27:36', 'mi_pensum.php'),
+(827, 5, '::1', '2026-01-16 15:27:46', 'mi_pensum.php'),
+(828, 2, '::1', '2026-01-16 15:27:54', 'index.php'),
+(829, 2, '::1', '2026-01-16 15:28:00', 'correccion_notas.php'),
+(830, 2, '::1', '2026-01-16 15:28:02', 'correccion_notas.php'),
+(831, 2, '::1', '2026-01-16 15:28:05', 'correccion_notas.php'),
+(832, 2, '::1', '2026-01-16 15:39:17', 'index.php'),
+(833, 2, '::1', '2026-01-16 15:39:20', 'index.php'),
+(834, 2, '::1', '2026-01-16 15:39:46', 'index.php'),
+(835, 2, '::1', '2026-01-16 15:39:50', 'index.php'),
+(836, 2, '::1', '2026-01-16 15:58:58', 'index.php'),
+(837, 2, '::1', '2026-01-16 15:59:00', 'constancias.php'),
+(838, 2, '::1', '2026-01-16 16:07:25', 'constancias.php'),
+(839, 2, '::1', '2026-01-16 16:07:36', 'constancias.php'),
+(840, 2, '::1', '2026-01-16 16:08:18', 'constancias.php'),
+(841, 2, '::1', '2026-01-16 16:10:24', 'constancias.php'),
+(842, 2, '::1', '2026-01-16 16:10:36', 'constancias.php'),
+(843, 2, '::1', '2026-01-16 16:14:42', 'constancias.php'),
+(844, 2, '::1', '2026-01-16 16:15:10', 'constancias.php'),
+(845, 2, '::1', '2026-01-16 16:15:17', 'constancias.php'),
+(846, 2, '::1', '2026-01-16 16:15:21', 'constancias.php'),
+(847, 2, '::1', '2026-01-16 16:15:22', 'constancias.php'),
+(848, 2, '::1', '2026-01-16 16:15:31', 'constancias.php'),
+(849, 2, '::1', '2026-01-16 16:34:39', 'index.php'),
+(850, 2, '::1', '2026-01-16 16:34:41', 'constancias.php'),
+(851, 2, '::1', '2026-01-16 16:34:44', 'constancias.php'),
+(852, 2, '::1', '2026-01-16 16:48:13', 'constancias.php'),
+(853, 2, '::1', '2026-01-16 16:59:36', 'constancias.php'),
+(854, 2, '::1', '2026-01-16 17:00:21', 'gestion_seccion.php'),
+(855, 2, '::1', '2026-01-16 17:00:24', 'gestion_seccion.php');
+INSERT INTO `visitas` (`id`, `id_usuario`, `ip`, `fecha_visita`, `web`) VALUES
+(856, 2, '::1', '2026-01-16 17:00:28', 'gestion_seccion.php'),
+(857, 2, '::1', '2026-01-16 17:00:29', 'gestion_seccion.php'),
+(858, 2, '::1', '2026-01-16 17:00:48', 'periodos_academicos.php'),
+(859, 2, '::1', '2026-01-16 17:01:32', 'periodos_academicos.php'),
+(860, 2, '::1', '2026-01-16 17:01:32', 'periodos_academicos.php'),
+(861, 2, '::1', '2026-01-16 17:01:52', 'gestion_seccion.php'),
+(862, 2, '::1', '2026-01-16 17:02:01', 'gestion_seccion.php'),
+(863, 2, '::1', '2026-01-16 17:04:05', 'gestion_seccion.php'),
+(864, 2, '::1', '2026-01-16 17:04:09', 'gestion_seccion.php'),
+(865, 2, '::1', '2026-01-16 17:04:22', 'gestion_seccion.php'),
+(866, 2, '::1', '2026-01-16 17:05:31', 'gestion_seccion.php'),
+(867, 2, '::1', '2026-01-16 17:05:34', 'gestion_seccion.php'),
+(868, 2, '::1', '2026-01-16 17:05:41', 'tipos_horario.php'),
+(869, 2, '::1', '2026-01-16 17:06:08', 'gestion_horario_personal.php'),
+(870, 2, '::1', '2026-01-16 17:06:21', 'tipos_horario.php'),
+(871, 2, '::1', '2026-01-16 17:07:18', 'gestion_seccion.php'),
+(872, 2, '::1', '2026-01-16 17:07:20', 'gestion_seccion.php'),
+(873, 2, '::1', '2026-01-16 17:13:37', 'constancias.php'),
+(874, 2, '::1', '2026-01-16 17:13:39', 'constancias.php'),
+(875, 2, '::1', '2026-01-16 17:14:52', 'constancias.php'),
+(876, 2, '::1', '2026-01-16 17:17:08', 'index.php'),
+(877, 2, '::1', '2026-01-16 17:17:17', 'constancias.php'),
+(878, 2, '::1', '2026-01-16 17:17:19', 'constancias.php'),
+(879, 2, '::1', '2026-01-16 17:17:43', 'constancias.php'),
+(880, 2, '::1', '2026-01-16 17:19:02', 'constancias.php'),
+(881, 2, '::1', '2026-01-16 17:20:30', 'constancias.php'),
+(882, 2, '::1', '2026-01-16 17:23:38', 'constancias.php'),
+(883, 2, '::1', '2026-01-19 13:19:21', 'index.php'),
+(884, 2, '::1', '2026-01-19 13:20:06', 'admin_notas_pendientes.php'),
+(885, 2, '::1', '2026-01-19 13:20:08', 'consulta_notas.php'),
+(886, 4, '::1', '2026-01-19 13:20:53', 'index.php'),
+(887, 4, '::1', '2026-01-19 13:20:55', 'notas.php'),
+(888, 4, '::1', '2026-01-19 15:36:43', 'notas.php'),
+(889, 2, '::1', '2026-01-20 14:43:44', 'index.php'),
+(890, 2, '::1', '2026-01-20 14:44:40', 'consulta_notas.php'),
+(891, 2, '::1', '2026-01-20 14:44:42', 'consulta_notas.php'),
+(892, 2, '::1', '2026-01-20 14:45:02', 'admin_notas_pendientes.php'),
+(893, 2, '::1', '2026-01-20 14:45:06', 'notas_pasadas.php'),
+(894, 2, '::1', '2026-01-20 15:49:06', 'notas_pasadas.php'),
+(895, 2, '::1', '2026-01-20 16:01:31', 'notas_pasadas.php'),
+(896, 2, '::1', '2026-01-20 16:16:49', 'notas_pasadas.php'),
+(897, 2, '::1', '2026-01-20 16:20:31', 'notas_pasadas.php'),
+(898, 2, '::1', '2026-01-20 16:20:36', 'registro_pagos.php'),
+(899, 2, '::1', '2026-01-20 16:47:44', 'notas_pasadas.php'),
+(900, 2, '::1', '2026-01-20 16:55:33', 'notas_pasadas.php'),
+(901, 2, '::1', '2026-01-20 16:55:34', 'notas_pasadas.php'),
+(902, 2, '::1', '2026-01-20 16:56:49', 'notas_pasadas.php'),
+(903, 2, '::1', '2026-01-20 16:57:03', 'agregar_carrera.php'),
+(904, 2, '::1', '2026-01-20 17:01:27', 'correccion_notas.php'),
+(905, 2, '::1', '2026-01-20 17:01:29', 'notas_pasadas.php'),
+(906, 2, '::1', '2026-01-20 17:09:27', 'notas_pasadas.php'),
+(907, 2, '::1', '2026-01-20 17:09:30', 'notas_pasadas.php'),
+(908, 2, '::1', '2026-01-20 17:12:34', 'notas_pasadas.php'),
+(909, 2, '::1', '2026-01-20 17:12:40', 'consulta_notas.php'),
+(910, 2, '::1', '2026-01-20 17:12:42', 'consulta_notas.php'),
+(911, 2, '::1', '2026-01-20 17:15:43', 'notas_pasadas.php'),
+(912, 2, '::1', '2026-01-20 17:18:40', 'notas_pasadas.php'),
+(913, 2, '::1', '2026-01-20 17:19:05', 'notas_pasadas.php'),
+(914, 2, '::1', '2026-01-20 17:19:43', 'notas_pasadas.php'),
+(915, 2, '::1', '2026-01-20 17:22:11', 'notas_pasadas.php'),
+(916, 2, '::1', '2026-01-20 17:24:34', 'notas_pasadas.php'),
+(917, 2, '::1', '2026-01-20 17:28:03', 'notas_pasadas.php'),
+(918, 2, '::1', '2026-01-20 17:28:06', 'consulta_notas.php'),
+(919, 2, '::1', '2026-01-20 17:28:09', 'consulta_notas.php'),
+(920, 2, '::1', '2026-01-20 17:29:09', 'gestion_seccion.php'),
+(921, 2, '::1', '2026-01-20 17:29:12', 'gestion_seccion.php'),
+(922, 2, '::1', '2026-01-20 17:29:21', 'gestion_seccion.php'),
+(923, 2, '::1', '2026-01-20 17:29:59', 'index.php'),
+(924, 2, '::1', '2026-01-20 17:41:30', 'index.php'),
+(925, 4, '::1', '2026-01-20 17:47:30', 'index.php'),
+(926, 4, '::1', '2026-01-20 17:50:08', 'index.php'),
+(927, 4, '::1', '2026-01-20 17:50:26', 'notas.php'),
+(928, 2, '::1', '2026-01-21 13:33:20', 'index.php'),
+(929, 2, '::1', '2026-01-21 13:47:08', 'visita.php'),
+(930, 2, '::1', '2026-01-21 13:47:12', 'visita.php'),
+(931, 2, '::1', '2026-01-21 13:47:12', 'visita.php'),
+(932, 2, '::1', '2026-01-21 13:47:14', 'visita.php'),
+(933, 2, '::1', '2026-01-21 13:52:49', 'index.php'),
+(934, 4, '::1', '2026-01-21 13:53:25', 'index.php'),
+(935, 4, '::1', '2026-01-21 13:53:27', 'notas.php'),
+(936, 4, '::1', '2026-01-21 14:26:02', 'notas.php'),
+(937, 2, '::1', '2026-01-21 14:26:09', 'index.php'),
+(938, 2, '::1', '2026-01-21 14:26:13', 'actas_calificacion.php'),
+(939, 2, '::1', '2026-01-21 14:27:07', 'actas_calificacion.php'),
+(940, 2, '::1', '2026-01-21 14:28:43', 'carrera_materias.php'),
+(941, 2, '::1', '2026-01-21 14:31:17', 'actas_calificacion.php'),
+(942, 2, '::1', '2026-01-21 14:45:48', 'actas_calificacion.php'),
+(943, 2, '::1', '2026-01-21 14:56:04', 'actas_calificacion.php'),
+(944, 2, '::1', '2026-01-21 14:56:06', 'actas_calificacion.php'),
+(945, 2, '::1', '2026-01-21 14:59:34', 'actas_calificacion.php'),
+(946, 2, '::1', '2026-01-21 14:59:35', 'actas_calificacion.php'),
+(947, 2, '::1', '2026-01-21 15:10:28', 'actas_calificacion.php'),
+(948, 2, '::1', '2026-01-21 15:10:29', 'actas_calificacion.php'),
+(949, 2, '::1', '2026-01-21 15:10:31', 'actas_calificacion.php'),
+(950, 2, '::1', '2026-01-21 15:19:03', 'actas_calificacion.php'),
+(951, 2, '::1', '2026-01-21 15:19:05', 'actas_calificacion.php'),
+(952, 4, '::1', '2026-01-21 15:20:18', 'index.php'),
+(953, 4, '::1', '2026-01-21 15:20:19', 'notas.php'),
+(954, 2, '::1', '2026-01-21 15:20:33', 'index.php'),
+(955, 2, '::1', '2026-01-21 15:20:37', 'actas_calificacion.php'),
+(956, 4, '::1', '2026-01-21 15:21:51', 'index.php'),
+(957, 4, '::1', '2026-01-21 15:21:52', 'notas.php'),
+(958, 2, '::1', '2026-01-21 15:24:08', 'index.php'),
+(959, 2, '::1', '2026-01-21 15:24:11', 'actas_calificacion.php'),
+(960, 2, '::1', '2026-01-21 15:26:44', 'actas_calificacion.php'),
+(961, 2, '::1', '2026-01-22 13:56:14', 'index.php'),
+(962, 4, '::1', '2026-01-22 13:57:08', 'index.php'),
+(963, 4, '::1', '2026-01-22 13:57:09', 'notas.php'),
+(964, 4, '::1', '2026-01-22 15:17:21', 'index.php'),
+(965, 2, '::1', '2026-01-23 13:33:34', 'index.php'),
+(966, 4, '::1', '2026-01-23 13:35:35', 'index.php'),
+(967, 4, '::1', '2026-01-23 13:35:36', 'notas.php'),
+(968, 2, '::1', '2026-01-23 13:35:58', 'index.php'),
+(969, 2, '::1', '2026-01-23 13:36:04', 'notas_pasadas.php'),
+(970, 2, '::1', '2026-01-23 13:37:46', 'notas_pasadas.php'),
+(971, 2, '::1', '2026-01-23 13:55:05', 'notas_pasadas.php'),
+(972, 2, '::1', '2026-01-23 14:20:14', 'notas_pasadas.php'),
+(973, 2, '::1', '2026-01-23 14:20:20', 'correccion_notas.php'),
+(974, 2, '::1', '2026-01-23 14:20:26', 'correccion_notas.php'),
+(975, 2, '::1', '2026-01-23 14:20:29', 'correccion_notas.php'),
+(976, 2, '::1', '2026-01-23 14:21:12', 'correccion_notas.php'),
+(977, 2, '::1', '2026-01-23 14:39:47', 'correccion_notas.php'),
+(978, 2, '::1', '2026-01-23 14:55:55', 'correccion_notas.php'),
+(979, 2, '::1', '2026-01-23 15:03:05', 'correccion_notas.php'),
+(980, 2, '::1', '2026-01-23 15:03:11', 'index.php'),
+(981, 2, '::1', '2026-01-23 15:03:17', 'correccion_notas.php'),
+(982, 2, '::1', '2026-01-23 15:03:20', 'correccion_notas.php'),
+(983, 2, '::1', '2026-01-23 15:03:23', 'correccion_notas.php'),
+(984, 2, '::1', '2026-01-23 15:03:26', 'correccion_notas.php'),
+(985, 2, '::1', '2026-01-23 15:04:26', 'correccion_notas.php'),
+(986, 2, '::1', '2026-01-23 15:04:57', 'correccion_notas.php'),
+(987, 2, '::1', '2026-01-23 15:09:54', 'correccion_notas.php'),
+(988, 2, '::1', '2026-01-23 15:40:41', 'correccion_notas.php'),
+(989, 2, '::1', '2026-01-23 15:40:58', 'correccion_notas.php'),
+(990, 2, '::1', '2026-01-23 15:43:05', 'notas_pasadas.php'),
+(991, 2, '::1', '2026-01-23 15:44:36', 'correccion_notas.php'),
+(992, 2, '::1', '2026-01-23 15:44:38', 'correccion_notas.php'),
+(993, 2, '::1', '2026-01-23 15:44:40', 'correccion_notas.php'),
+(994, 2, '::1', '2026-01-23 15:44:43', 'correccion_notas.php'),
+(995, 2, '::1', '2026-01-23 16:05:03', 'correccion_notas.php'),
+(996, 2, '::1', '2026-01-23 16:14:56', 'consulta_notas.php'),
+(997, 2, '::1', '2026-01-23 16:14:58', 'consulta_notas.php'),
+(998, 2, '::1', '2026-01-23 16:49:03', 'consulta_notas.php'),
+(999, 2, '::1', '2026-01-23 16:50:21', 'consulta_notas.php');
 
 --
 -- Índices para tablas volcadas
@@ -4563,6 +5250,13 @@ ALTER TABLE `carrera_materia`
   ADD PRIMARY KEY (`id_relacion`),
   ADD UNIQUE KEY `idx_relacion_unica` (`id_carrera`,`id_materia`),
   ADD KEY `id_materia` (`id_materia`);
+
+--
+-- Indices de la tabla `carrera_versiones`
+--
+ALTER TABLE `carrera_versiones`
+  ADD PRIMARY KEY (`id_version`),
+  ADD KEY `id_carrera` (`id_carrera`);
 
 --
 -- Indices de la tabla `ciudades`
@@ -4668,6 +5362,22 @@ ALTER TABLE `ingresos`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indices de la tabla `mallas`
+--
+ALTER TABLE `mallas`
+  ADD PRIMARY KEY (`id_malla`),
+  ADD UNIQUE KEY `codigo_malla` (`codigo_malla`),
+  ADD KEY `id_carrera` (`id_carrera`);
+
+--
+-- Indices de la tabla `malla_materia`
+--
+ALTER TABLE `malla_materia`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `id_malla` (`id_malla`),
+  ADD KEY `id_materia` (`id_materia`);
+
+--
 -- Indices de la tabla `materias`
 --
 ALTER TABLE `materias`
@@ -4737,6 +5447,15 @@ ALTER TABLE `parroquias`
 --
 ALTER TABLE `periodos_academicos`
   ADD PRIMARY KEY (`id_periodo`);
+
+--
+-- Indices de la tabla `prelaciones`
+--
+ALTER TABLE `prelaciones`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `id_carrera` (`id_carrera`),
+  ADD KEY `id_materia` (`id_materia`),
+  ADD KEY `id_prerequisito` (`id_prerequisito`);
 
 --
 -- Indices de la tabla `relacion_cursos`
@@ -4878,6 +5597,14 @@ ALTER TABLE `usuarios_cursos`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indices de la tabla `version_materia`
+--
+ALTER TABLE `version_materia`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `id_version` (`id_version`),
+  ADD KEY `id_materia` (`id_materia`);
+
+--
 -- Indices de la tabla `visitas`
 --
 ALTER TABLE `visitas`
@@ -4903,7 +5630,7 @@ ALTER TABLE `aprobaciones_avance`
 -- AUTO_INCREMENT de la tabla `auditoria`
 --
 ALTER TABLE `auditoria`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=283;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=409;
 
 --
 -- AUTO_INCREMENT de la tabla `aulas`
@@ -4927,13 +5654,19 @@ ALTER TABLE `bitacora`
 -- AUTO_INCREMENT de la tabla `carreras`
 --
 ALTER TABLE `carreras`
-  MODIFY `id_carrera` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `id_carrera` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT de la tabla `carrera_materia`
 --
 ALTER TABLE `carrera_materia`
-  MODIFY `id_relacion` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
+  MODIFY `id_relacion` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
+
+--
+-- AUTO_INCREMENT de la tabla `carrera_versiones`
+--
+ALTER TABLE `carrera_versiones`
+  MODIFY `id_version` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT de la tabla `ciudades`
@@ -5014,10 +5747,22 @@ ALTER TABLE `ingresos`
   MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
+-- AUTO_INCREMENT de la tabla `mallas`
+--
+ALTER TABLE `mallas`
+  MODIFY `id_malla` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT de la tabla `malla_materia`
+--
+ALTER TABLE `malla_materia`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
+
+--
 -- AUTO_INCREMENT de la tabla `materias`
 --
 ALTER TABLE `materias`
-  MODIFY `id_materia` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
+  MODIFY `id_materia` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
 
 --
 -- AUTO_INCREMENT de la tabla `mensajeria`
@@ -5065,7 +5810,13 @@ ALTER TABLE `parroquias`
 -- AUTO_INCREMENT de la tabla `periodos_academicos`
 --
 ALTER TABLE `periodos_academicos`
-  MODIFY `id_periodo` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id_periodo` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT de la tabla `prelaciones`
+--
+ALTER TABLE `prelaciones`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT de la tabla `relacion_cursos`
@@ -5188,10 +5939,16 @@ ALTER TABLE `usuarios_cursos`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT de la tabla `version_materia`
+--
+ALTER TABLE `version_materia`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
 -- AUTO_INCREMENT de la tabla `visitas`
 --
 ALTER TABLE `visitas`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=589;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1000;
 
 --
 -- Restricciones para tablas volcadas
@@ -5217,6 +5974,12 @@ ALTER TABLE `auditoria`
 ALTER TABLE `carrera_materia`
   ADD CONSTRAINT `carrera_materia_ibfk_1` FOREIGN KEY (`id_carrera`) REFERENCES `carreras` (`id_carrera`) ON DELETE CASCADE,
   ADD CONSTRAINT `carrera_materia_ibfk_2` FOREIGN KEY (`id_materia`) REFERENCES `materias` (`id_materia`) ON DELETE CASCADE;
+
+--
+-- Filtros para la tabla `carrera_versiones`
+--
+ALTER TABLE `carrera_versiones`
+  ADD CONSTRAINT `carrera_versiones_ibfk_1` FOREIGN KEY (`id_carrera`) REFERENCES `carreras` (`id_carrera`) ON DELETE CASCADE;
 
 --
 -- Filtros para la tabla `ciudades`
@@ -5275,6 +6038,19 @@ ALTER TABLE `horarios`
   ADD CONSTRAINT `horarios_ibfk_1` FOREIGN KEY (`id_docente_seccion`) REFERENCES `docente_seccion` (`id_docente_seccion`) ON DELETE CASCADE;
 
 --
+-- Filtros para la tabla `mallas`
+--
+ALTER TABLE `mallas`
+  ADD CONSTRAINT `mallas_ibfk_1` FOREIGN KEY (`id_carrera`) REFERENCES `carreras` (`id_carrera`) ON DELETE CASCADE;
+
+--
+-- Filtros para la tabla `malla_materia`
+--
+ALTER TABLE `malla_materia`
+  ADD CONSTRAINT `malla_materia_ibfk_1` FOREIGN KEY (`id_malla`) REFERENCES `mallas` (`id_malla`) ON DELETE CASCADE,
+  ADD CONSTRAINT `malla_materia_ibfk_2` FOREIGN KEY (`id_materia`) REFERENCES `materias` (`id_materia`) ON DELETE CASCADE;
+
+--
 -- Filtros para la tabla `mensajeria`
 --
 ALTER TABLE `mensajeria`
@@ -5319,6 +6095,14 @@ ALTER TABLE `parroquias`
   ADD CONSTRAINT `parroquias_ibfk_1` FOREIGN KEY (`id_municipio`) REFERENCES `municipios` (`id_municipio`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
+-- Filtros para la tabla `prelaciones`
+--
+ALTER TABLE `prelaciones`
+  ADD CONSTRAINT `prelaciones_ibfk_1` FOREIGN KEY (`id_carrera`) REFERENCES `carreras` (`id_carrera`) ON DELETE CASCADE,
+  ADD CONSTRAINT `prelaciones_ibfk_2` FOREIGN KEY (`id_materia`) REFERENCES `materias` (`id_materia`) ON DELETE CASCADE,
+  ADD CONSTRAINT `prelaciones_ibfk_3` FOREIGN KEY (`id_prerequisito`) REFERENCES `materias` (`id_materia`) ON DELETE CASCADE;
+
+--
 -- Filtros para la tabla `secciones`
 --
 ALTER TABLE `secciones`
@@ -5359,6 +6143,13 @@ ALTER TABLE `users`
 ALTER TABLE `user_user_types`
   ADD CONSTRAINT `user_user_types_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
   ADD CONSTRAINT `user_user_types_ibfk_2` FOREIGN KEY (`user_type_id`) REFERENCES `user_types` (`id`);
+
+--
+-- Filtros para la tabla `version_materia`
+--
+ALTER TABLE `version_materia`
+  ADD CONSTRAINT `version_materia_ibfk_1` FOREIGN KEY (`id_version`) REFERENCES `carrera_versiones` (`id_version`) ON DELETE CASCADE,
+  ADD CONSTRAINT `version_materia_ibfk_2` FOREIGN KEY (`id_materia`) REFERENCES `materias` (`id_materia`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
