@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
             <!-- Botón de Reporte PDF -->
             <a href="generar_reporte_consulta.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
                class="btn btn-danger btn-sm" target="_blank">
-                <i class="fas fa-file-pdf"></i> Generar Reporte PDF
+                <i class="fas fa-file-pdf"></i> Historial de notas
             </a>
         </div>
         <div class="card-body">
