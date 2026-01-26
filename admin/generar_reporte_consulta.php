@@ -222,8 +222,8 @@ try {
     $pdf->SetFont('Arial', '', 8);
     $pdf->Cell(90, 5, 'Emitido por: YANOSKI CALATRAVA', 0, 1, 'R');
 
-    $pdf->Cell(60, 5, 'Total Créditos: ' . $total_creditos, 0, 0);
-    $pdf->Cell(60, 5, 'Créditos Aprobados: ' . $creditos_aprobados, 0, 1);
+    $pdf->Cell(60, 5, 'Total Creditos: ' . $total_creditos, 0, 0);
+    $pdf->Cell(60, 5, 'Creditos Aprobados: ' . $creditos_aprobados, 0, 1);
 
     $pdf->Cell(60, 5, t('Índice de Rendimiento Académico: 16.779'), 0, 0);
     $pdf->SetX(110);
