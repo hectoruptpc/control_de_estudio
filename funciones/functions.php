@@ -12340,6 +12340,14 @@ function generar_botones_accion($estudiante) {
         $botones .= '<button class="btn btn-success btn-sm" onclick="confirmarGraduacion('.$id_usuario.')">
                         <i class="fas fa-graduation-cap"></i> Marcar Graduado
                      </button>';
+                // Enlace a Notas Certificadas
+                $botones .= ' <a target="_blank" class="btn btn-outline-primary btn-sm ml-1" href="constancias/pdf_notas_certificadas.php?id='.$id_usuario.'">
+                                                <i class="fas fa-file-alt"></i> Notas Certificadas
+                                            </a>';
+                // Enlace a Constancia de Servicio Comunitario (si aplica se validará en el script)
+                $botones .= ' <a target="_blank" class="btn btn-outline-secondary btn-sm ml-1" href="constancias/pdf_servicio_comunitario.php?id='.$id_usuario.'">
+                                                <i class="fas fa-hands-helping"></i> Servicio Comunitario
+                                            </a>';
     } elseif ($estado == 'graduado' && empty($estudiante['titulo_entregado'])) {
         // Si está graduado pero no se le ha entregado título
         $botones .= '<form method="POST" style="display:inline;">
