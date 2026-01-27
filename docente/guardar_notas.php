@@ -9,13 +9,17 @@ if (!isLoggedIn() || !isDocente()) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    die('Acceso no permitido');
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => 'Acceso no permitido']);
+    exit;
 }
 
 $required = ['materia_id', 'seccion_id', 'periodo_id', 'trayecto_actual', 'id_trayecto_seccion', 'notas'];
 foreach ($required as $field) {
     if (!isset($_POST[$field])) {
-        die("Falta el campo: $field");
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => "Falta el campo: $field"]);
+        exit;
     }
 }
 
@@ -29,7 +33,9 @@ $notas = $_POST['notas'];
 if (isset($_SESSION['user']['id'])) {
     $docente_id = (int)$_SESSION['user']['id'];
 } else {
-    die("Error: No se pudo identificar al docente");
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => 'Error: No se pudo identificar al docente']);
+    exit;
 }
 
 // Determinar qué trayecto procesar según el id_trayecto de la sección
@@ -49,16 +55,21 @@ $campo_trayecto = 'trayecto_' . $trayecto_a_procesar;
 $soporte_grupo_nombre = null;
 $tipo_archivo_grupo = null;
 
-if (isset($_FILES['soporte_grupo']) && !empty($_FILES['soporte_grupo']['name'])) {
-    $resultadoSoporte = subirSoporte($_FILES['soporte_grupo']);
-    
-    if ($resultadoSoporte['success']) {
-        $soporte_grupo_nombre = $resultadoSoporte['ruta'];
-        $tipo_archivo_grupo = $resultadoSoporte['tipo'];
-    } else {
-        // Continuar sin soporte pero informar al usuario
-        $error_soporte = $resultadoSoporte['error'];
-    }
+// Requerir archivo de soporte: no se aceptan envíos de notas sin soporte
+if (!isset($_FILES['soporte_grupo']) || empty($_FILES['soporte_grupo']['name'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => 'Debes adjuntar un archivo de soporte (imagen o PDF) para poder subir las notas.']);
+    exit;
+}
+
+$resultadoSoporte = subirSoporte($_FILES['soporte_grupo']);
+if ($resultadoSoporte['success']) {
+    $soporte_grupo_nombre = $resultadoSoporte['ruta'];
+    $tipo_archivo_grupo = $resultadoSoporte['tipo'];
+} else {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => 'Error al subir el archivo de soporte: ' . ($resultadoSoporte['error'] ?? 'Error desconocido')]);
+    exit;
 }
 
 $db->begin_transaction();
@@ -233,14 +244,16 @@ try {
         $mensaje .= "<small class='text-muted'>Las notas aprobadas no pueden ser modificadas.</small>";
     }
     
-    echo $mensaje;
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => true, 'message' => $mensaje, 'soporte' => $soporte_grupo_nombre ? true : false]);
     
 } catch (Exception $e) {
     $db->rollback();
-    // Eliminar el soporte subido si hubo error
     if ($soporte_grupo_nombre) {
         eliminarSoporteAnterior($soporte_grupo_nombre);
     }
-    die("❌ Error al guardar notas: " . $e->getMessage());
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => 'Error al guardar notas: ' . $e->getMessage()]);
+    exit;
 }
 ?>

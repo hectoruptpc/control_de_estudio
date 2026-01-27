@@ -92,6 +92,24 @@ include("includes/head.php");
     </div>
 </div>
 
+<!-- Modal resultado (éxito / error) -->
+<div class="modal fade" id="modalResultado" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header" id="modalResultadoHeader">
+                <h5 class="modal-title" id="modalResultadoTitle">Resultado</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="modalResultadoBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 $(document).ready(function() {
     // Cargar estudiantes
@@ -202,18 +220,39 @@ $(document).ready(function() {
             method: 'POST',
             body: formData
         })
-        .then(response => response.text())
-        .then(result => {
+        .then(response => response.json())
+        .then(data => {
+            // Restaurar el area de resultados (mantener botón volver)
             $('#resultados').html(`
                 <div class="text-right mb-3" id="volver-container">
                     <button class="btn btn-secondary" id="btn-volver">
                         <i class="fas fa-arrow-left"></i> Volver a Secciones
                     </button>
                 </div>
-                <div class="alert alert-success">
-                    ${result}
-                </div>
             `);
+
+            // Preparar modal
+            const header = $('#modalResultadoHeader');
+            const title = $('#modalResultadoTitle');
+            const body = $('#modalResultadoBody');
+
+            if (data.success) {
+                header.removeClass('bg-danger').addClass('bg-success text-white');
+                title.text('Éxito');
+                let soporteInfo = '';
+                if (data.soporte) {
+                    soporteInfo = '<p class="mb-2"><strong>Soporte:</strong> Subido correctamente.</p>';
+                } else {
+                    soporteInfo = '<p class="mb-2 text-warning"><strong>Soporte:</strong> No se subió.</p>';
+                }
+                body.html(soporteInfo + data.message);
+            } else {
+                header.removeClass('bg-success').addClass('bg-danger text-white');
+                title.text('Error');
+                body.html(`<div class="alert alert-danger">${data.message}</div>`);
+            }
+
+            $('#modalResultado').modal('show');
         })
         .catch(error => {
             $('#resultados').html(`

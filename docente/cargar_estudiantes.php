@@ -161,11 +161,12 @@ foreach ($estados_notas['estudiantes_info'] as $info) {
                 <div class="card-body">
                     <div class="form-group">
                         <label for="soporte_grupo"><strong>Imagen/PDF de Soporte:</strong></label>
-                        <input type="file" 
+                           <input type="file" 
                                name="soporte_grupo" 
                                id="soporte_grupo"
                                class="form-control-file soporte-grupo" 
-                               accept=".jpg,.jpeg,.png,.gif,.webp,.pdf">
+                               accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
+                               required>
                         <small class="form-text text-muted">
                             Formatos permitidos: JPG, PNG, GIF, WEBP, PDF. Tamaño máximo: 5MB
                         </small>
