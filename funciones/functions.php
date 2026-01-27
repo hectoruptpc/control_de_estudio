@@ -1832,7 +1832,8 @@ function registrarNuevaCarrera(
     string $tipo_formacion, 
     int $duracion_anios,
     string $titulo_principal,
-    string $titulo_opcional = ''
+    string $titulo_opcional = '',
+    string $vigencia_fecha = null
 ): array {
     global $db;
     
@@ -1882,10 +1883,10 @@ function registrarNuevaCarrera(
         }
         $checkStmt->close();
         
-        // 2. Insertar nueva carrera
+        // 2. Insertar nueva carrera (permitir guardar la fecha de vigencia en created_at)
         $insertStmt = $db->prepare("INSERT INTO carreras 
-            (nombre_carrera, cod_carrera, tipo_formacion, duracion_semestres, titulo_otorga, otro_titulo, descripcion, activa) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1)");
+            (nombre_carrera, cod_carrera, tipo_formacion, duracion_semestres, titulo_otorga, otro_titulo, descripcion, created_at, activa) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)");
         
         if (!$insertStmt) {
             throw new Exception("Error al preparar inserción: " . $db->error);
@@ -1897,15 +1898,26 @@ function registrarNuevaCarrera(
             $descripcion .= "\nTítulo opcional: $titulo_opcional";
         }
         
+        // Si no se proporcionó una fecha de vigencia, usar la fecha actual
+        if (empty($vigencia_fecha)) {
+            $vigencia_fecha = date('Y-m-d H:i:s');
+        } else {
+            // Normalizar formato a YYYY-MM-DD HH:MM:SS si solo se envió YYYY-MM-DD
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $vigencia_fecha)) {
+                $vigencia_fecha = $vigencia_fecha . ' 00:00:00';
+            }
+        }
+
         $insertStmt->bind_param(
-            "sssisss", 
+            "sssissss", 
             $nombre, 
             $codigo, 
             $tipo_formacion,
             $duracion_semestres,
             $titulo_principal,  // Solo el título principal
             $titulo_opcional,   // Título opcional por separado
-            $descripcion
+            $descripcion,
+            $vigencia_fecha
         );
         
         if (!$insertStmt->execute()) {
@@ -1933,6 +1945,7 @@ function registrarNuevaCarrera(
                         'duracion_anios' => $duracion_anios,
                         'titulo_principal' => $titulo_principal,
                         'titulo_opcional' => $titulo_opcional,
+                        'vigencia_fecha' => $vigencia_fecha,
                         'activa' => 1
                     ], 
                     "Carreras", 
@@ -3378,7 +3391,7 @@ function obtenerCarrerasActivas() {
     $carreras = []; // Array para almacenar resultados
     
     // Consulta SQL con parámetro para estado activo
-    $query = "SELECT id_carrera, nombre_carrera, cod_carrera 
+    $query = "SELECT id_carrera, nombre_carrera, cod_carrera, created_at 
               FROM carreras 
               WHERE activa = ? 
               ORDER BY nombre_carrera";
@@ -3419,6 +3432,305 @@ function obtenerCarrerasActivas() {
     }
     
     return $carreras;
+}
+
+/**
+ * Obtiene todas las carreras (activas e inactivas)
+ */
+function obtenerCarrerasCompleta() {
+    global $db;
+    $carreras = [];
+    $query = "SELECT id_carrera, nombre_carrera, cod_carrera, activa, created_at FROM carreras ORDER BY nombre_carrera";
+    if ($stmt = $db->prepare($query)) {
+        try {
+            if (!$stmt->execute()) throw new Exception('Error al ejecutar consulta: ' . $stmt->error);
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $carreras[] = $row;
+            }
+            $result->free();
+        } catch (Exception $e) {
+            error_log('Error en obtenerTodasLasCarreras: ' . $e->getMessage());
+        } finally {
+            $stmt->close();
+        }
+    } else {
+        error_log('Error preparando obtenerTodasLasCarreras: ' . $db->error);
+    }
+
+    return $carreras;
+}
+
+/**
+ * Obtiene los años (distinct) en los que existe una carrera con el mismo código
+ * útil para mostrar versiones históricas por año
+ */
+function obtenerAniosPorCodigoCarrera($cod_carrera) {
+    global $db;
+
+    $anios = [];
+    // Buscar años en la tabla carreras
+    $query1 = "SELECT DISTINCT YEAR(created_at) AS anio FROM carreras WHERE cod_carrera = ? AND created_at IS NOT NULL";
+    if ($stmt = $db->prepare($query1)) {
+        $stmt->bind_param('s', $cod_carrera);
+        if ($stmt->execute()) {
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                if (!empty($row['anio']) && !in_array($row['anio'], $anios)) $anios[] = $row['anio'];
+            }
+            $result->free();
+        }
+        $stmt->close();
+    }
+
+    // Buscar años en la tabla de versiones si existe
+    $check = $db->query("SHOW TABLES LIKE 'carrera_versiones'");
+    if ($check && $check->num_rows > 0) {
+        $query2 = "SELECT DISTINCT YEAR(fecha_vigencia) AS anio FROM carrera_versiones v JOIN carreras c ON v.id_carrera = c.id_carrera WHERE c.cod_carrera = ? AND v.fecha_vigencia IS NOT NULL";
+        if ($stmt = $db->prepare($query2)) {
+            $stmt->bind_param('s', $cod_carrera);
+            if ($stmt->execute()) {
+                $result = $stmt->get_result();
+                while ($row = $result->fetch_assoc()) {
+                    if (!empty($row['anio']) && !in_array($row['anio'], $anios)) $anios[] = $row['anio'];
+                }
+                $result->free();
+            }
+            $stmt->close();
+        }
+    }
+
+    // Ordenar desc
+    rsort($anios);
+
+    return $anios;
+}
+
+/**
+ * Obtiene versiones (id + fecha) para un código de carrera
+ */
+function obtenerVersionesPorCodigoCarrera($cod_carrera) {
+    global $db;
+    $versions = [];
+
+    // Verificar si la tabla de versiones existe antes de consultar
+    $check = $db->query("SHOW TABLES LIKE 'carrera_versiones'");
+    if ($check && $check->num_rows > 0) {
+        $query = "SELECT v.id_version, v.id_carrera, v.fecha_vigencia FROM carrera_versiones v JOIN carreras c ON v.id_carrera = c.id_carrera WHERE c.cod_carrera = ? ORDER BY v.fecha_vigencia DESC";
+        if ($stmt = $db->prepare($query)) {
+            $stmt->bind_param('s', $cod_carrera);
+            if ($stmt->execute()) {
+                $res = $stmt->get_result();
+                while ($row = $res->fetch_assoc()) {
+                    $row['anio'] = !empty($row['fecha_vigencia']) ? date('Y', strtotime($row['fecha_vigencia'])) : null;
+                    $versions[] = $row;
+                }
+                $res->free();
+            }
+            $stmt->close();
+        }
+    }
+
+    return $versions;
+}
+
+/**
+ * Obtiene versiones por id_carrera (útil cuando cod_carrera está vacío o cambió)
+ */
+function obtenerVersionesPorIdCarrera($id_carrera) {
+    global $db;
+    $versions = [];
+
+    $check = $db->query("SHOW TABLES LIKE 'carrera_versiones'");
+    if ($check && $check->num_rows > 0) {
+        $query = "SELECT id_version, id_carrera, fecha_vigencia FROM carrera_versiones WHERE id_carrera = ? ORDER BY fecha_vigencia DESC";
+        if ($stmt = $db->prepare($query)) {
+            $stmt->bind_param('i', $id_carrera);
+            if ($stmt->execute()) {
+                $res = $stmt->get_result();
+                while ($row = $res->fetch_assoc()) {
+                    $row['anio'] = !empty($row['fecha_vigencia']) ? date('Y', strtotime($row['fecha_vigencia'])) : null;
+                    $versions[] = $row;
+                }
+                $res->free();
+            }
+            $stmt->close();
+        }
+    }
+
+    return $versions;
+}
+
+/**
+ * Asigna una materia a una versión específica de carrera
+ */
+function asignarMateriaAVersion($id_version, $id_materia, $semestre) {
+    global $db;
+    try {
+        $stmt = $db->prepare("INSERT INTO version_materia (id_version, id_materia, semestre) VALUES (?, ?, ?)");
+        if (!$stmt) throw new Exception('Error al preparar insert version_materia: ' . $db->error);
+        $stmt->bind_param('iii', $id_version, $id_materia, $semestre);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar insert version_materia: ' . $stmt->error);
+        $id = $db->insert_id;
+        $stmt->close();
+        return ['success' => true, 'insert_id' => $id];
+    } catch (Exception $e) {
+        error_log('Error en asignarMateriaAVersion: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Obtiene materias asignadas para una versión de carrera
+ */
+function obtenerMateriasAsignadasVersion($id_version) {
+    global $db;
+    $materias = [];
+    $query = "SELECT vm.id, vm.id_version, vm.id_materia, vm.semestre, m.cod_materia, m.nombre_materia FROM version_materia vm JOIN materias m ON vm.id_materia = m.id_materia WHERE vm.id_version = ? ORDER BY vm.semestre";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('i', $id_version);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($row = $res->fetch_assoc()) {
+                $materias[] = $row;
+            }
+            $res->free();
+        }
+        $stmt->close();
+    }
+    return $materias;
+}
+
+/**
+ * Elimina asignación de materia en versión
+ */
+function eliminarAsignacionVersion($id) {
+    global $db;
+    try {
+        $stmt = $db->prepare("DELETE FROM version_materia WHERE id = ?");
+        if (!$stmt) throw new Exception('Error al preparar delete version_materia: ' . $db->error);
+        $stmt->bind_param('i', $id);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar delete version_materia: ' . $stmt->error);
+        $affected = $stmt->affected_rows;
+        $stmt->close();
+        return ['success' => true, 'affected_rows' => $affected];
+    } catch (Exception $e) {
+        error_log('Error en eliminarAsignacionVersion: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Duplica una carrera como nueva versión con una fecha de vigencia distinta.
+ * Opcionalmente copia las asignaciones de materias (carrera_materia).
+ * Devuelve array con success + message + new_id si aplica.
+ */
+function duplicarCarrera(int $id_carrera_original, string $nueva_fecha, bool $copiar_materias = true): array {
+    global $db;
+
+    try {
+        // Obtener carrera original
+        $stmt = $db->prepare("SELECT nombre_carrera, cod_carrera, activa, duracion_semestres, titulo_otorga, otro_titulo, descripcion, tipo_formacion FROM carreras WHERE id_carrera = ? LIMIT 1");
+        if (!$stmt) throw new Exception('Error al preparar consulta de carrera: ' . $db->error);
+        $stmt->bind_param('i', $id_carrera_original);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        if (!$res || $res->num_rows === 0) {
+            $stmt->close();
+            return ['success' => false, 'message' => 'Carrera original no encontrada'];
+        }
+        $orig = $res->fetch_assoc();
+        $stmt->close();
+
+        // Normalizar fecha
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $nueva_fecha)) {
+            $nueva_fecha = $nueva_fecha . ' 00:00:00';
+        }
+
+        // Crear tablas de versiones si no existen
+        $db->query("CREATE TABLE IF NOT EXISTS carrera_versiones (
+            id_version INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            id_carrera INT NOT NULL,
+            fecha_vigencia DATETIME NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (id_carrera),
+            FOREIGN KEY (id_carrera) REFERENCES carreras(id_carrera) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $db->query("CREATE TABLE IF NOT EXISTS version_materia (
+            id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            id_version INT NOT NULL,
+            id_materia INT NOT NULL,
+            semestre INT NOT NULL,
+            INDEX (id_version),
+            FOREIGN KEY (id_version) REFERENCES carrera_versiones(id_version) ON DELETE CASCADE,
+            FOREIGN KEY (id_materia) REFERENCES materias(id_materia) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $db->begin_transaction();
+
+        // Insertar versión
+        $insert = $db->prepare("INSERT INTO carrera_versiones (id_carrera, fecha_vigencia) VALUES (?, ?)");
+        if (!$insert) throw new Exception('Error al preparar inserción version: ' . $db->error);
+        $insert->bind_param('is', $id_carrera_original, $nueva_fecha);
+        if (!$insert->execute()) {
+            $err = $insert->error;
+            $insert->close();
+            $db->rollback();
+            throw new Exception('Error al insertar versión: ' . $err);
+        }
+
+        $new_version_id = $db->insert_id;
+        $insert->close();
+
+        // Copiar asignaciones de materias a version_materia si se solicita
+        if ($copiar_materias) {
+            $sel = $db->prepare("SELECT id_materia, semestre FROM carrera_materia WHERE id_carrera = ?");
+            if (!$sel) throw new Exception('Error al preparar selección de materias: ' . $db->error);
+            $sel->bind_param('i', $id_carrera_original);
+            $sel->execute();
+            $resm = $sel->get_result();
+
+            $ins = $db->prepare("INSERT INTO version_materia (id_version, id_materia, semestre) VALUES (?, ?, ?)");
+            if (!$ins) {
+                $sel->close();
+                throw new Exception('Error al preparar inserción de materia en version: ' . $db->error);
+            }
+
+            while ($row = $resm->fetch_assoc()) {
+                $id_materia = (int)$row['id_materia'];
+                $semestre = (int)$row['semestre'];
+                $ins->bind_param('iii', $new_version_id, $id_materia, $semestre);
+                if (!$ins->execute()) {
+                    $ins->close();
+                    $sel->close();
+                    $db->rollback();
+                    throw new Exception('Error al insertar relación materia-version: ' . $ins->error);
+                }
+            }
+
+            $ins->close();
+            $sel->close();
+        }
+
+        $db->commit();
+
+        // Auditoría si aplica
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria('INSERT', 'carrera_versiones', $new_version_id, null, ['copiado_de' => $id_carrera_original, 'fecha_vigencia' => $nueva_fecha], 'Carreras', 'Creación de versión de carrera');
+            } catch (Exception $e) {
+                error_log('Error en auditoría duplicarCarrera: ' . $e->getMessage());
+            }
+        }
+
+        return ['success' => true, 'message' => 'Versión creada correctamente', 'new_version_id' => $new_version_id];
+
+    } catch (Exception $e) {
+        if (isset($db) && method_exists($db, 'rollback')) $db->rollback();
+        error_log('Error en duplicarCarrera: ' . $e->getMessage());
+        return ['success' => false, 'message' => 'Error al duplicar carrera: ' . $e->getMessage()];
+    }
 }
 
 /**
@@ -3657,6 +3969,481 @@ function asignarMateriaACarrera($id_carrera, $id_materia, $semestre) {
             'success' => false,
             'message' => 'Error al asignar materia: ' . $e->getMessage()
         ];
+    }
+}
+
+/**
+ * Asegura que la tabla `prelaciones` exista.
+ */
+function asegurarTablaPrelaciones() {
+    global $db;
+    $db->query("CREATE TABLE IF NOT EXISTS prelaciones (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        id_carrera INT NOT NULL,
+        id_materia INT NOT NULL,
+        id_prerequisito INT NOT NULL,
+        tipo VARCHAR(50) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX (id_carrera),
+        INDEX (id_materia),
+        INDEX (id_prerequisito),
+        FOREIGN KEY (id_carrera) REFERENCES carreras(id_carrera) ON DELETE CASCADE,
+        FOREIGN KEY (id_materia) REFERENCES materias(id_materia) ON DELETE CASCADE,
+        FOREIGN KEY (id_prerequisito) REFERENCES materias(id_materia) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+/**
+ * Agrega una prelación (prerequisito) para una materia en una carrera
+ */
+function agregarPrelacion($id_carrera, $id_materia, $id_prerequisito, $tipo = null) {
+    global $db;
+    try {
+        asegurarTablaPrelaciones();
+        // Evitar duplicados
+        $check = $db->prepare("SELECT id FROM prelaciones WHERE id_carrera = ? AND id_materia = ? AND id_prerequisito = ? LIMIT 1");
+        if (!$check) throw new Exception('Error al preparar comprobación de prelación: ' . $db->error);
+        $check->bind_param('iii', $id_carrera, $id_materia, $id_prerequisito);
+        $check->execute();
+        $res = $check->get_result();
+        if ($res && $res->num_rows > 0) {
+            $check->close();
+            return ['success' => false, 'message' => 'La prelación ya existe'];
+        }
+        $check->close();
+
+        $stmt = $db->prepare("INSERT INTO prelaciones (id_carrera, id_materia, id_prerequisito, tipo) VALUES (?, ?, ?, ?)");
+        if (!$stmt) throw new Exception('Error al preparar inserción de prelación: ' . $db->error);
+        $stmt->bind_param('iiis', $id_carrera, $id_materia, $id_prerequisito, $tipo);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar inserción de prelación: ' . $stmt->error);
+        $insert_id = $db->insert_id;
+        $stmt->close();
+        return ['success' => true, 'message' => 'Prelación agregada', 'id' => $insert_id];
+    } catch (Exception $e) {
+        error_log('Error en agregarPrelacion: ' . $e->getMessage());
+        return ['success' => false, 'message' => 'Error al agregar prelación: ' . $e->getMessage()];
+    }
+}
+
+/**
+ * Elimina una prelación por id
+ */
+function eliminarPrelacion($id) {
+    global $db;
+    try {
+        asegurarTablaPrelaciones();
+        $stmt = $db->prepare("DELETE FROM prelaciones WHERE id = ?");
+        if (!$stmt) throw new Exception('Error al preparar delete prelación: ' . $db->error);
+        $stmt->bind_param('i', $id);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar delete prelación: ' . $stmt->error);
+        $affected = $stmt->affected_rows;
+        $stmt->close();
+        return ['success' => true, 'affected_rows' => $affected];
+    } catch (Exception $e) {
+        error_log('Error en eliminarPrelacion: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Obtiene prelaciones para una carrera
+ */
+function obtenerPrelacionesPorCarrera($id_carrera) {
+    global $db;
+    $rows = [];
+    asegurarTablaPrelaciones();
+    $query = "SELECT p.id, p.id_carrera, p.id_materia, p.id_prerequisito, p.tipo,
+                     m1.cod_materia AS cod_materia, m1.nombre_materia AS nombre_materia,
+                     m2.cod_materia AS cod_prereq, m2.nombre_materia AS nombre_prereq
+              FROM prelaciones p
+              JOIN materias m1 ON p.id_materia = m1.id_materia
+              JOIN materias m2 ON p.id_prerequisito = m2.id_materia
+              WHERE p.id_carrera = ?
+              ORDER BY m1.trayecto, m1.nombre_materia";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('i', $id_carrera);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) $rows[] = $r;
+            $res->free();
+        }
+        $stmt->close();
+    }
+    return $rows;
+}
+
+/**
+ * --- Mallas (pensums) ---
+ * Tabla `mallas`: id_malla, id_carrera, codigo_malla, anio, descripcion, created_at
+ * Tabla `malla_materia`: id, id_malla, id_materia, semestre
+ */
+
+function asegurarTablaMallas() {
+    global $db;
+    $db->query("CREATE TABLE IF NOT EXISTS mallas (
+        id_malla INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        id_carrera INT NOT NULL,
+        codigo_malla VARCHAR(100) NOT NULL UNIQUE,
+        anio INT NOT NULL,
+        descripcion TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX (id_carrera),
+        FOREIGN KEY (id_carrera) REFERENCES carreras(id_carrera) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $db->query("CREATE TABLE IF NOT EXISTS malla_materia (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        id_malla INT NOT NULL,
+        id_materia INT NOT NULL,
+        semestre INT NOT NULL,
+        INDEX (id_malla),
+        FOREIGN KEY (id_malla) REFERENCES mallas(id_malla) ON DELETE CASCADE,
+        FOREIGN KEY (id_materia) REFERENCES materias(id_materia) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+/**
+ * Crear una nueva malla para una carrera
+ * codigo_malla se recomienda generar como cod_carrera + anio (numérico)
+ */
+function crearMalla($id_carrera, $anio, $codigo_malla = null, $descripcion = null) {
+    global $db;
+    try {
+        asegurarTablaMallas();
+        if (empty($codigo_malla) || !preg_match('/^[0-9]+$/', $codigo_malla)) {
+            // generar código numérico (solo dígitos) basado en codigo de carrera + año
+            $c = obtenerCarreraPorId($id_carrera);
+            $cod = $c['cod_carrera'] ?? '';
+            $codigo_malla = generarCodigoMallaNumerico($cod, $anio, $id_carrera);
+        }
+
+        // Evitar duplicados por codigo
+        $check = $db->prepare("SELECT id_malla FROM mallas WHERE codigo_malla = ? LIMIT 1");
+        $check->bind_param('s', $codigo_malla);
+        $check->execute();
+        $res = $check->get_result();
+        if ($res && $res->num_rows > 0) {
+            $row = $res->fetch_assoc();
+            $check->close();
+            return ['success' => false, 'message' => 'Código de malla ya existe', 'id_malla' => $row['id_malla']];
+        }
+        $check->close();
+
+        $stmt = $db->prepare("INSERT INTO mallas (id_carrera, codigo_malla, anio, descripcion) VALUES (?, ?, ?, ?)");
+        if (!$stmt) throw new Exception('Error al preparar inserción malla: ' . $db->error);
+        $stmt->bind_param('isis', $id_carrera, $codigo_malla, $anio, $descripcion);
+        if (!$stmt->execute()) throw new Exception('Error al insertar malla: ' . $stmt->error);
+        $id = $db->insert_id;
+        $stmt->close();
+        return ['success' => true, 'message' => 'Malla creada', 'id_malla' => $id];
+    } catch (Exception $e) {
+        error_log('Error en crearMalla: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Genera un código de malla compuesto solo por dígitos.
+ * - extrae dígitos del `cod_carrera` si existe
+ * - si no hay dígitos usa el id_carrera
+ * - concatena el año (4 dígitos)
+ * - garantiza unicidad añadiendo sufijo numérico si es necesario
+ */
+function generarCodigoMallaNumerico($cod_carrera, $anio, $id_carrera = null) {
+    global $db;
+    // extraer solo dígitos
+    $digits = '';
+    if (!empty($cod_carrera)) {
+        // buscar la primera ocurrencia de 5 dígitos
+        if (preg_match('/(\d{5})/', $cod_carrera, $m)) {
+            $digits = $m[1];
+        } else {
+            // si no hay 5 consecutivos, extraer todos los dígitos y tomar los primeros 5
+            preg_match_all('/\d+/', $cod_carrera, $m2);
+            if (!empty($m2[0])) {
+                $all = implode('', $m2[0]);
+                $digits = substr($all, 0, 5);
+            } else {
+                // convertir letras a números (A=01..Z=26) y tomar primeros 5
+                $s = strtoupper($cod_carrera);
+                $mapped = '';
+                for ($i = 0; $i < strlen($s); $i++) {
+                    $ch = $s[$i];
+                    if (ctype_alpha($ch)) {
+                        $val = ord($ch) - ord('A') + 1;
+                        $mapped .= str_pad($val, 2, '0', STR_PAD_LEFT);
+                        if (strlen($mapped) >= 5) break;
+                    }
+                }
+                $digits = substr($mapped, 0, 5);
+            }
+        }
+    }
+    // asegurarse de tener exactamente 5 dígitos: pad o trim
+    $digits = preg_replace('/\D/', '', $digits);
+    if (strlen($digits) < 5) {
+        // si no alcanzamos 5, usar id_carrera padded
+        if (!empty($id_carrera)) {
+            $digits = str_pad(substr(preg_replace('/\D/', '', strval($id_carrera)), 0, 5), 5, '0', STR_PAD_LEFT);
+        } else {
+            $digits = str_pad($digits, 5, '0', STR_PAD_LEFT);
+        }
+    } elseif (strlen($digits) > 5) {
+        $digits = substr($digits, 0, 5);
+    }
+    $anio_str = str_pad(intval($anio), 4, '0', STR_PAD_LEFT);
+    $base = $digits . $anio_str;
+
+    // asegurar solo dígitos
+    $base = preg_replace('/\D/', '', $base);
+
+    $codigo = $base;
+    $sufijo = 0;
+    while (true) {
+        // comprobar existencia
+        $stmt = $db->prepare("SELECT id_malla FROM mallas WHERE codigo_malla = ? LIMIT 1");
+        if (!$stmt) break; // en caso de error, devolver lo que haya
+        $stmt->bind_param('s', $codigo);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $exists = ($res && $res->num_rows > 0);
+        $stmt->close();
+        if (!$exists) break;
+        $sufijo++;
+        $codigo = $base . str_pad($sufijo, 3, '0', STR_PAD_LEFT);
+        // proteger bucle infinito
+        if ($sufijo > 9999) break;
+    }
+
+    return $codigo;
+}
+
+/**
+ * Normaliza códigos de mallas existentes: asegura que sean solo dígitos
+ * Si una malla tiene codigo no numérico intenta regenerarlo y actualizar.
+ */
+function normalizarCodigosMallas() {
+    global $db;
+    asegurarTablaMallas();
+    $updated = 0;
+    $errors = [];
+    $res = $db->query("SELECT id_malla, id_carrera, codigo_malla, anio FROM mallas");
+    if (!$res) return ['updated' => 0, 'errors' => ['Error listando mallas: ' . $db->error]];
+    while ($row = $res->fetch_assoc()) {
+        if (!preg_match('/^[0-9]+$/', $row['codigo_malla'])) {
+            $nuevo = generarCodigoMallaNumerico('', $row['anio'], $row['id_carrera']);
+            $stmt = $db->prepare("UPDATE mallas SET codigo_malla = ? WHERE id_malla = ?");
+            if ($stmt) {
+                $stmt->bind_param('si', $nuevo, $row['id_malla']);
+                if ($stmt->execute()) { $updated++; } else { $errors[] = 'Error update id ' . $row['id_malla'] . ': ' . $stmt->error; }
+                $stmt->close();
+            } else {
+                $errors[] = 'Error preparar update id ' . $row['id_malla'] . ': ' . $db->error;
+            }
+        }
+    }
+    return ['updated' => $updated, 'errors' => $errors];
+}
+
+function obtenerMallasPorCarrera($id_carrera) {
+    global $db;
+    asegurarTablaMallas();
+    $rows = [];
+    $query = "SELECT id_malla, id_carrera, codigo_malla, anio, descripcion, created_at FROM mallas WHERE id_carrera = ? ORDER BY anio DESC";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('i', $id_carrera);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) $rows[] = $r;
+            $res->free();
+        }
+        $stmt->close();
+    }
+    return $rows;
+}
+
+function obtenerMallaPorId($id_malla) {
+    global $db;
+    asegurarTablaMallas();
+    $query = "SELECT id_malla, id_carrera, codigo_malla, anio, descripcion, created_at FROM mallas WHERE id_malla = ? LIMIT 1";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('i', $id_malla);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            $row = $res->fetch_assoc();
+            $res->free();
+            $stmt->close();
+            return $row;
+        }
+        $stmt->close();
+    }
+    return null;
+}
+
+function asignarMateriaAMalla($id_malla, $id_materia, $semestre) {
+    global $db;
+    try {
+        asegurarTablaMallas();
+        // evitar duplicado
+        $check = $db->prepare("SELECT id FROM malla_materia WHERE id_malla = ? AND id_materia = ? LIMIT 1");
+        $check->bind_param('ii', $id_malla, $id_materia);
+        $check->execute();
+        $res = $check->get_result();
+        if ($res && $res->num_rows > 0) { $check->close(); return ['success' => false, 'message' => 'Materia ya asignada a la malla']; }
+        $check->close();
+
+        $stmt = $db->prepare("INSERT INTO malla_materia (id_malla, id_materia, semestre) VALUES (?, ?, ?)");
+        if (!$stmt) throw new Exception('Error al preparar insert malla_materia: ' . $db->error);
+        $stmt->bind_param('iii', $id_malla, $id_materia, $semestre);
+        if (!$stmt->execute()) throw new Exception('Error al insertar malla_materia: ' . $stmt->error);
+        $id = $db->insert_id;
+        $stmt->close();
+        return ['success' => true, 'message' => 'Asignación creada', 'id' => $id];
+    } catch (Exception $e) {
+        error_log('Error en asignarMateriaAMalla: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+function obtenerMateriasDeMalla($id_malla) {
+    global $db;
+    asegurarTablaMallas();
+    $rows = [];
+    $query = "SELECT mm.id, mm.id_malla, mm.id_materia, mm.semestre, m.cod_materia, m.nombre_materia FROM malla_materia mm JOIN materias m ON mm.id_materia = m.id_materia WHERE mm.id_malla = ? ORDER BY mm.semestre, m.nombre_materia";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('i', $id_malla);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) $rows[] = $r;
+            $res->free();
+        }
+        $stmt->close();
+    }
+    return $rows;
+}
+
+function eliminarAsignacionMalla($id) {
+    global $db;
+    try {
+        asegurarTablaMallas();
+        $stmt = $db->prepare("DELETE FROM malla_materia WHERE id = ?");
+        if (!$stmt) throw new Exception('Error al preparar delete malla_materia: ' . $db->error);
+        $stmt->bind_param('i', $id);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar delete malla_materia: ' . $stmt->error);
+        $aff = $stmt->affected_rows;
+        $stmt->close();
+        return ['success' => true, 'affected_rows' => $aff];
+    } catch (Exception $e) {
+        error_log('Error en eliminarAsignacionMalla: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+function eliminarMalla($id_malla) {
+    global $db;
+    try {
+        asegurarTablaMallas();
+        $stmt = $db->prepare("DELETE FROM mallas WHERE id_malla = ?");
+        if (!$stmt) throw new Exception('Error al preparar delete malla: ' . $db->error);
+        $stmt->bind_param('i', $id_malla);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar delete malla: ' . $stmt->error);
+        $aff = $stmt->affected_rows;
+        $stmt->close();
+        return ['success' => true, 'affected_rows' => $aff];
+    } catch (Exception $e) {
+        error_log('Error en eliminarMalla: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Migrar datos desde `carrera_versiones`/`version_materia` a `mallas`/`malla_materia`.
+ * Devuelve array con resultados y conteos.
+ */
+function migrarVersionesAMallas() {
+    global $db;
+    $result = ['created_mallas' => 0, 'created_asignaciones' => 0, 'skipped_mallas' => 0, 'errors' => []];
+    try {
+        asegurarTablaMallas();
+
+        // comprobar si tablas de versiones existen
+        $res = $db->query("SHOW TABLES LIKE 'carrera_versiones'");
+        if (!$res || $res->num_rows === 0) {
+            return ['message' => 'No existe tabla carrera_versiones', 'created_mallas' => 0];
+        }
+
+        $rv = $db->query("SELECT id_version, id_carrera, fecha_vigencia, created_at FROM carrera_versiones ORDER BY id_version");
+        if (!$rv) throw new Exception('Error leyendo carrera_versiones: ' . $db->error);
+
+        while ($row = $rv->fetch_assoc()) {
+            $anio = null;
+            if (!empty($row['fecha_vigencia'])) {
+                $anio = intval(date('Y', strtotime($row['fecha_vigencia'])));
+            } elseif (!empty($row['created_at'])) {
+                $anio = intval(date('Y', strtotime($row['created_at'])));
+            } else {
+                $anio = intval(date('Y'));
+            }
+
+            // generar codigo_malla: tomar cod_carrera si disponible
+            $c = obtenerCarreraPorId($row['id_carrera']);
+            $cod = $c['cod_carrera'] ?? ('C' . $row['id_carrera']);
+            $codigo_malla = $cod . '_' . $anio;
+
+            // crear malla (si existe, saltar)
+            $check = $db->prepare("SELECT id_malla FROM mallas WHERE codigo_malla = ? LIMIT 1");
+            $check->bind_param('s', $codigo_malla);
+            $check->execute();
+            $rcheck = $check->get_result();
+            if ($rcheck && $rcheck->num_rows > 0) {
+                $existing = $rcheck->fetch_assoc();
+                $id_malla = $existing['id_malla'];
+                $result['skipped_mallas']++;
+                $check->close();
+            } else {
+                $check->close();
+                $ins = $db->prepare("INSERT INTO mallas (id_carrera, codigo_malla, anio, descripcion) VALUES (?, ?, ?, ?)");
+                $desc = 'Migrada desde carrera_versiones id_version=' . $row['id_version'];
+                $ins->bind_param('isis', $row['id_carrera'], $codigo_malla, $anio, $desc);
+                if (!$ins->execute()) { $result['errors'][] = 'Error insert malla: ' . $ins->error; $ins->close(); continue; }
+                $id_malla = $db->insert_id;
+                $ins->close();
+                $result['created_mallas']++;
+            }
+
+            // copiar asignaciones de version_materia (si existe tabla)
+            $rv2 = $db->query("SHOW TABLES LIKE 'version_materia'");
+            if ($rv2 && $rv2->num_rows > 0) {
+                $q = $db->prepare("SELECT id_materia, semestre FROM version_materia WHERE id_version = ?");
+                $q->bind_param('i', $row['id_version']);
+                if ($q->execute()) {
+                    $res2 = $q->get_result();
+                    while ($as = $res2->fetch_assoc()) {
+                        // insertar en malla_materia si no existe
+                        $chk = $db->prepare("SELECT id FROM malla_materia WHERE id_malla = ? AND id_materia = ? LIMIT 1");
+                        $chk->bind_param('ii', $id_malla, $as['id_materia']);
+                        $chk->execute();
+                        $rchk = $chk->get_result();
+                        if ($rchk && $rchk->num_rows > 0) { $chk->close(); continue; }
+                        $chk->close();
+
+                        $ins2 = $db->prepare("INSERT INTO malla_materia (id_malla, id_materia, semestre) VALUES (?, ?, ?)");
+                        $ins2->bind_param('iii', $id_malla, $as['id_materia'], $as['semestre']);
+                        if ($ins2->execute()) { $result['created_asignaciones']++; }
+                        else { $result['errors'][] = 'Error insert malla_materia: ' . $ins2->error; }
+                        $ins2->close();
+                    }
+                    $res2->free();
+                }
+                $q->close();
+            }
+        }
+
+        $rv->free();
+        return $result;
+    } catch (Exception $e) {
+        $result['errors'][] = $e->getMessage();
+        return $result;
     }
 }
 
@@ -4038,9 +4825,11 @@ function crearMateria($db, $data) {
                     creditos, 
                     activa, 
                     horas_teoricas, 
-                    horas_practicas, 
+                    horas_practicas,
+                    horas_laboratorio,
+                    horas_semanales,
                     created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
 
         // Preparamos la sentencia
         $stmt = $db->prepare($query);
@@ -4057,9 +4846,11 @@ function crearMateria($db, $data) {
         $creditos = isset($data['creditos']) ? (int)$data['creditos'] : 0;
         $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
         $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
+        $horas_laboratorio = isset($data['horas_laboratorio']) ? (int)$data['horas_laboratorio'] : 0;
+        $horas_semanales = isset($data['horas_semanales']) ? (int)$data['horas_semanales'] : 0;
 
         // Vinculamos parámetros (tipos: s=string, i=integer)
-        $stmt->bind_param("sssiiiiii", 
+        $stmt->bind_param("sssiiiiiiii", 
             $cod_materia,
             $nombre_materia,
             $pnf_ptf,
@@ -4068,7 +4859,9 @@ function crearMateria($db, $data) {
             $creditos,
             $activa,
             $horas_teoricas,
-            $horas_practicas
+            $horas_practicas,
+            $horas_laboratorio,
+            $horas_semanales
         );
         
         // Ejecutamos la sentencia
@@ -4098,7 +4891,9 @@ function crearMateria($db, $data) {
                         'creditos' => $creditos,
                         'activa' => $activa,
                         'horas_teoricas' => $horas_teoricas,
-                        'horas_practicas' => $horas_practicas
+                        'horas_practicas' => $horas_practicas,
+                        'horas_laboratorio' => $horas_laboratorio,
+                        'horas_semanales' => $horas_semanales
                     ], 
                     "Materias", 
                     "Nueva materia creada"
@@ -4153,16 +4948,18 @@ function actualizarMateria($db, $id, $data) {
 
         // Consulta SQL con sentencia preparada
         $query = "UPDATE materias SET 
-                cod_materia = ?, 
-                nombre_materia = ?, 
-                pnf_ptf = ?,
-                duracion_periodo = ?,
-                creditos = ?, 
-                activa = ?, 
-                horas_teoricas = ?, 
-                horas_practicas = ?,
-                trayecto = ?
-                WHERE id_materia = ?";
+            cod_materia = ?, 
+            nombre_materia = ?, 
+            pnf_ptf = ?,
+            duracion_periodo = ?,
+            creditos = ?, 
+            activa = ?, 
+            horas_teoricas = ?, 
+            horas_practicas = ?,
+            horas_laboratorio = ?,
+            horas_semanales = ?,
+            trayecto = ?
+            WHERE id_materia = ?";
         
         // Preparamos la sentencia
         $stmt = $db->prepare($query);
@@ -4180,10 +4977,12 @@ function actualizarMateria($db, $id, $data) {
         $activa = isset($data['activa']) ? (int)(bool)$data['activa'] : 0;
         $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
         $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
+        $horas_laboratorio = isset($data['horas_laboratorio']) ? (int)$data['horas_laboratorio'] : 0;
+        $horas_semanales = isset($data['horas_semanales']) ? (int)$data['horas_semanales'] : 0;
         $trayecto = isset($data['trayecto']) ? (int)$data['trayecto'] : 0;
 
         // Vinculamos parámetros (tipos: s=string, i=integer)
-        $stmt->bind_param("sssiiiiiii",
+        $stmt->bind_param("sssiiiiiiiii",
             $cod_materia,
             $nombre_materia,
             $pnf_ptf,
@@ -4192,6 +4991,8 @@ function actualizarMateria($db, $id, $data) {
             $activa,
             $horas_teoricas,
             $horas_practicas,
+            $horas_laboratorio,
+            $horas_semanales,
             $trayecto,
             $id
         );
@@ -4214,7 +5015,7 @@ function actualizarMateria($db, $id, $data) {
                 // Comparar campos modificados
                 $campos_auditar = [
                     'cod_materia', 'nombre_materia', 'pnf_ptf', 'duracion_periodo',
-                    'creditos', 'activa', 'horas_teoricas', 'horas_practicas', 'trayecto'
+                    'creditos', 'activa', 'horas_teoricas', 'horas_practicas', 'horas_laboratorio', 'horas_semanales', 'trayecto'
                 ];
                 
                 foreach ($campos_auditar as $campo) {
@@ -4382,10 +5183,10 @@ if (!function_exists('getAllMaterias')) {
         global $db;
         
         // Consulta SQL para obtener todas las materias
-        $query = "SELECT id, cod_materia, nombre_materia, creditos, 
-                         horas_teoricas, horas_practicas, activa 
-                  FROM materias 
-                  ORDER BY nombre_materia ASC";
+         $query = "SELECT id, cod_materia, nombre_materia, creditos, 
+                    horas_teoricas, horas_practicas, horas_laboratorio, horas_semanales, activa 
+                FROM materias 
+                ORDER BY nombre_materia ASC";
         
         // Preparamos la sentencia
         $stmt = $db->prepare($query);
@@ -4443,10 +5244,10 @@ if (!function_exists('getMateriaById')) {
         }
         
         // Consulta SQL para obtener una materia por ID
-        $query = "SELECT id, cod_materia, nombre_materia, creditos, 
-                         horas_teoricas, horas_practicas, activa 
-                  FROM materias 
-                  WHERE id = ?";
+         $query = "SELECT id, cod_materia, nombre_materia, creditos, 
+                    horas_teoricas, horas_practicas, horas_laboratorio, horas_semanales, activa 
+                FROM materias 
+                WHERE id = ?";
         
         // Preparamos la sentencia
         $stmt = $db->prepare($query);
@@ -4651,20 +5452,25 @@ if (!function_exists('guardarMateria')) {
             if ($esNueva) {
                 // INSERT de nueva materia
                 $query = "INSERT INTO materias 
-                         (cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, activa) 
-                         VALUES (?, ?, ?, ?, ?, ?)";
+                         (cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, horas_laboratorio, horas_semanales, activa) 
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
                 $stmt = $db->prepare($query);
                 
                 if (!$stmt) {
                     throw new Exception("Error preparando INSERT: ".$db->error);
                 }
                 
-                $stmt->bind_param("ssiiii", 
+                $horas_laboratorio = $datos['horas_laboratorio'] ?? 0;
+                $horas_semanales = $datos['horas_semanales'] ?? 0;
+
+                $stmt->bind_param("ssiiiiii", 
                     $datos['cod_materia'],
                     $datos['nombre_materia'],
                     $datos['creditos'],
                     $datos['horas_teoricas'],
                     $datos['horas_practicas'],
+                    $horas_laboratorio,
+                    $horas_semanales,
                     $datos['activa']);
             } else {
                 // UPDATE de materia existente
@@ -4674,6 +5480,8 @@ if (!function_exists('guardarMateria')) {
                          creditos = ?, 
                          horas_teoricas = ?, 
                          horas_practicas = ?, 
+                         horas_laboratorio = ?,
+                         horas_semanales = ?,
                          activa = ? 
                          WHERE id = ?";
                 $stmt = $db->prepare($query);
@@ -4682,12 +5490,17 @@ if (!function_exists('guardarMateria')) {
                     throw new Exception("Error preparando UPDATE: ".$db->error);
                 }
                 
-                $stmt->bind_param("ssiiiii", 
+                $horas_laboratorio = $datos['horas_laboratorio'] ?? 0;
+                $horas_semanales = $datos['horas_semanales'] ?? 0;
+
+                $stmt->bind_param("ssiiiiiii", 
                     $datos['cod_materia'],
                     $datos['nombre_materia'],
                     $datos['creditos'],
                     $datos['horas_teoricas'],
                     $datos['horas_practicas'],
+                    $horas_laboratorio,
+                    $horas_semanales,
                     $datos['activa'],
                     $datos['id']);
             }
@@ -4728,6 +5541,8 @@ if (!function_exists('guardarMateria')) {
                                 'creditos' => $datos['creditos'],
                                 'horas_teoricas' => $datos['horas_teoricas'],
                                 'horas_practicas' => $datos['horas_practicas'],
+                                'horas_laboratorio' => $datos['horas_laboratorio'] ?? 0,
+                                'horas_semanales' => $datos['horas_semanales'] ?? 0,
                                 'activa' => $datos['activa']
                             ], 
                             "Materias", 
@@ -4738,7 +5553,7 @@ if (!function_exists('guardarMateria')) {
                         $valores_antiguos_audit = [];
                         $valores_nuevos_audit = [];
                         
-                        $campos_auditar = ['cod_materia', 'nombre_materia', 'creditos', 'horas_teoricas', 'horas_practicas', 'activa'];
+                        $campos_auditar = ['cod_materia', 'nombre_materia', 'creditos', 'horas_teoricas', 'horas_practicas', 'horas_laboratorio', 'horas_semanales', 'activa'];
                         
                         foreach ($campos_auditar as $campo) {
                             $valor_antiguo = $datos_actuales[$campo] ?? null;
@@ -8649,6 +9464,122 @@ function determinarTrayectoAMostrar($id_trayecto_seccion) {
     }
 }
 
+// Helper para convertir UTF-8 a ISO-8859-1 para FPDF
+if (!function_exists('to_iso')) {
+    function to_iso($s) {
+        if ($s === null) return '';
+        // Convertir a mayúsculas en UTF-8 y luego convertir a ISO-8859-1 para FPDF
+        $upper = function_exists('mb_strtoupper') ? mb_strtoupper($s, 'UTF-8') : strtoupper($s);
+        return @iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $upper);
+    }
+}
+
+/**
+ * Insertar espacios en palabras largas para evitar que FPDF no las parta.
+ * Divide secuencias largas sin espacios cada $limit caracteres.
+ */
+function insertarEspaciosEnPalabrasLargas($s, $limit = 30) {
+    if ($s === null) return '';
+    if (!function_exists('mb_strlen')) return $s;
+    $parts = preg_split('/(\s+)/u', $s, -1, PREG_SPLIT_DELIM_CAPTURE);
+    foreach ($parts as &$p) {
+        // solo procesar partes que no sean espacios
+        if (trim($p) === '') continue;
+        $len = mb_strlen($p, 'UTF-8');
+        if ($len > $limit) {
+            // insertar espacios cada $limit chars
+            $new = '';
+            for ($i = 0; $i < $len; $i += $limit) {
+                $chunk = mb_substr($p, $i, $limit, 'UTF-8');
+                $new .= $chunk;
+                if ($i + $limit < $len) $new .= ' ';
+            }
+            $p = $new;
+        }
+    }
+    return implode('', $parts);
+}
+
+/**
+ * Calcular cuántas líneas ocupará un texto en FPDF para un ancho dado.
+ */
+function calcularLineasFPDF($pdf, $txt, $w) {
+    if (!$pdf) return 1;
+    // manejar saltos de línea explícitos
+    $lines = 0;
+    $parts = explode("\n", (string)$txt);
+    foreach ($parts as $part) {
+        $part = trim($part);
+        if ($part === '') { $lines++; continue; }
+        $words = preg_split('/(\s+)/u', $part, -1, PREG_SPLIT_NO_EMPTY);
+        $cur = '';
+        foreach ($words as $word) {
+            $test = ($cur === '') ? $word : $cur . ' ' . $word;
+            $wtest = $pdf->GetStringWidth($test);
+            if ($wtest <= $w - 2*$pdf->cMargin) {
+                $cur = $test;
+            } else {
+                // word itself may be longer than width -> split
+                if ($pdf->GetStringWidth($word) > $w - 2*$pdf->cMargin) {
+                    // split by characters
+                    $len = mb_strlen($word, 'UTF-8');
+                    $tmp = '';
+                    for ($i=0;$i<$len;$i++) {
+                        $ch = mb_substr($word,$i,1,'UTF-8');
+                        if ($pdf->GetStringWidth($tmp.$ch) <= $w - 2*$pdf->cMargin) {
+                            $tmp .= $ch;
+                        } else {
+                            $lines++; $tmp = $ch;
+                        }
+                    }
+                    if ($tmp !== '') {
+                        $cur = $tmp;
+                    } else {
+                        $cur = '';
+                    }
+                } else {
+                    // move current to next line
+                    $lines++;
+                    $cur = $word;
+                }
+            }
+        }
+        if ($cur !== '') $lines++;
+    }
+    return max(1, $lines);
+}
+
+// Función global para agregar membrete a un objeto FPDF
+if (!function_exists('agregarMembreteFPDF')) {
+    function agregarMembreteFPDF($pdf, $margin = 10) {
+        $pageWidth = $pdf->GetPageWidth();
+
+        // Logo (si existe)
+        $logoPath = __DIR__ . '/../images/uptpc.png';
+        if (file_exists($logoPath)) {
+            $pdf->Image($logoPath, $margin, 8, 20, 20);
+        }
+
+        // Texto del membrete
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->SetY(15);
+        $pdf->Cell(0, 5, to_iso('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $pdf->SetFont('Arial', 'B', 9);
+        $pdf->Cell(0, 5, to_iso('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $pdf->Cell(0, 5, to_iso('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+
+        // Fecha (a la derecha)
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetXY($pageWidth - $margin - 30, 10);
+        $pdf->Cell(30, 5, date('d/m/Y'), 0, 0, 'R');
+
+        // Línea separadora
+        $pdf->SetY(35);
+        $pdf->Cell(0, 0, '', 'T');
+        $pdf->Ln(5);
+    }
+}
+
 // Obtener información del grupo (SOLO LECTURA - SIN AUDITORÍA)
 function obtenerInfoGrupo($docente_id, $materia_id, $periodo_id) {
     global $db;
@@ -11793,9 +12724,9 @@ class PDF_PlanillaNotas {
     private $estudiantes;
     
     function __construct() {
-        // Incluir FPDF solo cuando se instancie la clase
+        // Asegúrate de que la ruta a FPDF sea la correcta en tu proyecto
         require_once('../fpdf/fpdf.php');
-        $this->pdf = new FPDF();
+        $this->pdf = new FPDF('P', 'mm', 'A4'); // Orientación Vertical, milímetros, A4
     }
     
     function generarPlanilla($info, $estudiantes) {
@@ -11881,7 +12812,7 @@ class PDF_PlanillaNotas {
         $this->pdf->Cell(50, 4, $this->codificarTexto($this->info['nombre_periodo']), 0, 1);
         
         $this->pdf->SetX($x);
-        $this->pdf->Ln(2);
+        $this->pdf->Ln(5); // Un poco más de espacio antes de la tabla
     }
     
     function Firma() {
@@ -11904,8 +12835,17 @@ class PDF_PlanillaNotas {
         // Llamar Header
         $this->Header();
         
+        // --- CONFIGURACIÓN DE ANCHOS PARA 12 COLUMNAS ---
+        // Ajustamos los anchos para que quepan en una hoja A4 (aprox 190mm ancho útil)
+        $w_num = 8;
+        $w_ced = 20;
+        $w_nom = 60;  // Espacio suficiente para nombre
+        $w_nota = 7;  // Ancho de cada casillero de nota (7mm x 12 = 84mm)
+        $w_fin = 10;  // Nota final
+        $cant_notas = 12;
+
         // Calcular el ancho total de la tabla
-        $ancho_total_tabla = 8 + 18 + 45 + (7 * 8) + 8; // Suma de todas las columnas
+        $ancho_total_tabla = $w_num + $w_ced + $w_nom + ($cant_notas * $w_nota) + $w_fin;
         
         // Calcular la posición X para centrar la tabla
         $margen_izquierdo = ($this->pdf->GetPageWidth() - $ancho_total_tabla) / 2;
@@ -11913,8 +12853,8 @@ class PDF_PlanillaNotas {
         // Establecer la posición X para centrar
         $this->pdf->SetX($margen_izquierdo);
         
-        // Encabezado de la tabla centrado
-        $this->agregarEncabezadoTabla($margen_izquierdo);
+        // Encabezado de la tabla centrado con los parámetros de ancho
+        $this->agregarEncabezadoTabla($margen_izquierdo, $w_num, $w_ced, $w_nom, $w_nota, $w_fin, $cant_notas);
         
         // Estudiantes - tabla centrada
         $contador = 0;
@@ -11925,48 +12865,60 @@ class PDF_PlanillaNotas {
             $this->pdf->SetX($margen_izquierdo);
             
             $this->pdf->SetFont('Arial', '', 7);
-            $this->pdf->Cell(8, 5, $contador, 1, 0, 'C');
-            $this->pdf->Cell(18, 5, $estudiante['cedula'], 1, 0, 'C');
+            
+            // Altura de la fila
+            $h_fila = 5;
+            
+            $this->pdf->Cell($w_num, $h_fila, $contador, 1, 0, 'C');
+            $this->pdf->Cell($w_ced, $h_fila, $estudiante['cedula'], 1, 0, 'C');
             
             $nombreCompleto = $this->codificarTexto($estudiante['nombre']);
-            if (strlen($nombreCompleto) > 25) {
-                $nombreCompleto = substr($nombreCompleto, 0, 25) . '...';
+            if (strlen($nombreCompleto) > 30) {
+                $nombreCompleto = substr($nombreCompleto, 0, 30) . '...';
             }
-            $this->pdf->Cell(45, 5, $nombreCompleto, 1, 0);
+            // Alineación L (Left) para el nombre se ve mejor
+            $this->pdf->Cell($w_nom, $h_fila, ' ' . $nombreCompleto, 1, 0, 'L');
             
-            // 8 casillas para notas
-            for ($i = 1; $i <= 8; $i++) {
-                $this->pdf->Cell(7, 5, '', 1, 0, 'C');
+            // 12 casillas para notas
+            for ($i = 1; $i <= $cant_notas; $i++) {
+                $this->pdf->Cell($w_nota, $h_fila, '', 1, 0, 'C');
             }
             
             // Casilla para nota final
-            $this->pdf->Cell(8, 5, '', 1, 1, 'C');
+            $this->pdf->Cell($w_fin, $h_fila, '', 1, 1, 'C');
         }
         
-        // AGREGAR FIRMA INMEDIATAMENTE DESPUÉS DE LA TABLA
-        $this->pdf->Ln(20); // Un pequeño espacio
+        // AGREGAR FIRMA DESPUÉS DE LA TABLA
+        $this->pdf->Ln(15); // Espacio antes de la firma
         $this->Firma();
     }
     
-    function agregarEncabezadoTabla($margen_izquierdo = 10) {
+    function agregarEncabezadoTabla($margen_izquierdo, $w_num, $w_ced, $w_nom, $w_nota, $w_fin, $cant_notas) {
         // Establecer posición X para el encabezado
         $this->pdf->SetX($margen_izquierdo);
         
-        // Encabezado de la tabla
+        // Configuración de fuente y color para que se parezca a la imagen
         $this->pdf->SetFont('Arial', 'B', 7);
-        $this->pdf->SetFillColor(200, 200, 200);
+        $this->pdf->SetFillColor(230, 230, 230); // Gris claro tipo formulario
+        $this->pdf->SetLineWidth(0.2); // Líneas finas y nítidas
         
-        $this->pdf->Cell(8, 6, 'N°', 1, 0, 'C', true);
-        $this->pdf->Cell(18, 6, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
-        $this->pdf->Cell(45, 6, $this->codificarTexto('Nombre'), 1, 0, 'C', true);
+        $h_header = 8; // Altura del encabezado
         
-        // 8 casillas para notas
-        for ($i = 1; $i <= 8; $i++) {
-            $this->pdf->Cell(7, 6, "N$i", 1, 0, 'C', true);
+        $this->pdf->Cell($w_num, $h_header, 'N', 1, 0, 'C', true);
+        $this->pdf->Cell($w_ced, $h_header, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
+        $this->pdf->Cell($w_nom, $h_header, $this->codificarTexto('Apellidos y Nombres'), 1, 0, 'C', true);
+        
+        // 12 casillas para notas numeradas
+        for ($i = 1; $i <= $cant_notas; $i++) {
+            // Aquí encuadramos bien el número
+            $this->pdf->Cell($w_nota, $h_header, $i, 1, 0, 'C', true);
         }
         
-        $this->pdf->Cell(8, 6, 'Final', 1, 1, 'C', true);
+        $this->pdf->Cell($w_fin, $h_header, 'DEF', 1, 1, 'C', true);
+        
+        // Resetear colores
         $this->pdf->SetFillColor(255, 255, 255);
+        $this->pdf->SetFont('Arial', '', 7);
     }
     
     /**
@@ -11986,7 +12938,10 @@ class PDF_PlanillaNotas {
     }
 }
 
-// El resto de las funciones permanecen igual...
+// --------------------------------------------------------------------------
+// FUNCIONES AUXILIARES (INCLUIDAS TAL CUAL SE SOLICITÓ)
+// --------------------------------------------------------------------------
+
 /**
  * Generar planilla PDF para lista de estudiantes con casillas de notas
  */
@@ -12088,444 +13043,273 @@ function obtenerEstudiantesSeccion($seccion_id) {
 
 
 
+
 // REPORTE DE NOTAS DEFINITIVAS ***********************************************************************
 
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-class PDF_NotasDefinitivas {
-    private $pdf;
-    private $datos;
-    private $trayecto;
-    private $columnas_trayectos;
-    
-    function __construct() {
-        require_once('../fpdf/fpdf.php');
-        $this->pdf = new FPDF();
+require_once __DIR__ . '/../fpdf/fpdf.php';
+
+
+// 1. OBTENER EL NOMBRE DEL USUARIO ACTUAL (Basado en tu lógica de BD)
+$nombre_usuario_reporte = "ADMINISTRADOR"; 
+
+try {
+    $db_user = $pool->getConnection();
+    // Consulta para obtener el nombre real del usuario que está logueado
+    $query_user = "SELECT nombre FROM users WHERE username = ? LIMIT 1";
+    $stmt_u = $db_user->prepare($query_user);
+    $stmt_u->bind_param("s", $usua);
+    $stmt_u->execute();
+    $res_u = $stmt_u->get_result();
+    if ($res_u && $res_u->num_rows > 0) {
+        $user_data = $res_u->fetch_assoc();
+        $nombre_usuario_reporte = $user_data['nombre'];
     }
-    
-    function generarReporte($datos) {
+    $stmt_u->close();
+    $pool->releaseConnection($db_user);
+} catch (Exception $e) {
+    // Si falla, mantiene el valor por defecto
+}
+
+class PDF_ActaCarga extends FPDF {
+    private $datos;
+    private $usuario;
+
+    function generarReporte($datos, $usuario) {
         $this->datos = $datos;
-        $this->trayecto = $datos['info_general']['numero_trayecto'];
-        $this->definirColumnasTrayecto();
-        
-        $this->pdf->AddPage();
-        $this->Membrete(); // Agregar membrete primero
-        $this->Header();
+        $this->usuario = $usuario;
+        $this->SetMargins(10, 10, 10);
+        $this->AliasNbPages();
+        $this->AddPage();
         $this->Cuerpo();
-        $this->pdf->Output('D', $this->getNombreArchivo());
+        $this->Output('I', "Reporte_Carga_" . $this->datos['info_general']['codigo_seccion'] . ".pdf");
         exit;
     }
-    
-    function Membrete() {
-        // Configurar márgenes
-        $margin = 10;
-        $pageWidth = $this->pdf->GetPageWidth();
-        
-        // Logo (si existe)
-        $logoPath = '../images/uptpc.png';
-        if (file_exists($logoPath)) {
-            $this->pdf->Image($logoPath, $margin, 10, 20, 20);
-        }
-        
-        // Texto del membrete
-        $this->pdf->SetFont('Arial', 'B', 10);
-        $this->pdf->SetY(15);
-        $this->pdf->Cell(0, 5, $this->codificarTexto('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
-        $this->pdf->SetFont('Arial', 'B', 9);
-        $this->pdf->Cell(0, 5, $this->codificarTexto('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
-        $this->pdf->Cell(0, 5, $this->codificarTexto('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
-        
-        // Fecha
-        $this->pdf->SetFont('Arial', '', 8);
-        $this->pdf->SetXY($pageWidth - $margin - 30, 10);
-        $this->pdf->Cell(30, 5, date('d/m/Y'), 0, 0, 'R');
-        
-        // Línea separadora
-        $this->pdf->SetY(35);
-        $this->pdf->Cell(0, 0, '', 'T');
-        $this->pdf->Ln(10);
-    }
-    
-    function definirColumnasTrayecto() {
-        switch ($this->trayecto) {
-            case 0:
-                $this->columnas_trayectos = [0]; // Solo trayecto 0
-                break;
-            case 1:
-            case 2:
-                $this->columnas_trayectos = [0, 1, 2]; // Trayectos 0, 1, 2
-                break;
-            case 3:
-            case 4:
-                $this->columnas_trayectos = [0, 1, 2, 3, 4]; // Todos los trayectos
-                break;
-            default:
-                $this->columnas_trayectos = [0, 1, 2, 3, 4]; // Por defecto todos
-        }
-    }
-    
+
     function Header() {
-        // Título principal (después del membrete)
-        $this->pdf->SetY(45); // Posición después del membrete
+        // Membrete Institucional
+        if (function_exists('agregarMembreteFPDF')) {
+            agregarMembreteFPDF($this);
+            $this->SetY(40); 
+        }
+
+        $info = $this->datos['info_general'];
+        // Usamos el nombre del periodo tal cual viene de la BD (ej. 2025-2)
+        $periodo_texto = $info['nombre_periodo'];
+
+        // Título: LISTADO DE CARGA DE NOTAS con el periodo dinámico
+        $this->SetFont('Arial', 'B', 11);
+        $this->Cell(0, 8, $this->utf8('LISTADO DE CARGA DE NOTAS - PERIODO ' . $periodo_texto), 1, 1, 'C');
+        $this->Ln(4);
+
+        $this->SetFont('Arial', '', 8);
         
-        $this->pdf->SetFont('Arial', 'B', 14);
-        $this->pdf->Cell(0, 8, $this->codificarTexto('REPORTE DE NOTAS DEFINITIVAS'), 0, 1, 'C');
-        $this->pdf->SetFont('Arial', 'B', 10);
-        $this->pdf->Cell(0, 6, $this->codificarTexto('SISTEMA DE CONTROL DE NOTAS'), 0, 1, 'C');
-        $this->pdf->Ln(5);
-        
-        // Información general
-        $this->pdf->SetFont('Arial', '', 9);
-        
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Docente:'), 0, 0);
-        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_docente']), 0, 1);
-        
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Cédula:'), 0, 0);
-        $this->pdf->Cell(80, 5, $this->datos['info_general']['cedula_docente'], 0, 1);
-        
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Materia:'), 0, 0);
-        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_materia']), 0, 1);
-        
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Periodo:'), 0, 0);
-        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_periodo']), 0, 1);
-        
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Sección:'), 0, 0);
-        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['codigo_seccion']), 0, 1);
-        
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Carrera:'), 0, 0);
-        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_carrera']), 0, 1);
-        
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Trayecto:'), 0, 0);
-        $this->pdf->Cell(80, 5, $this->trayecto, 0, 1);
-        
-        $this->pdf->Ln(8);
+        // Fila 1: Asignatura y Sección
+        $this->Cell(20, 5, 'ASIGNATURA:', 0, 0);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(120, 5, $this->utf8($info['nombre_materia']), 'B', 0);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(15, 5, $this->utf8('SECCIÓN:'), 0, 0);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(0, 5, $info['codigo_seccion'], 'B', 1);
+
+        // Fila 2: Docente, Cédula y Carrera (Dpt)
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(15, 5, 'DOCENTE:', 0, 0);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(80, 5, $this->utf8($info['nombre_docente']), 'B', 0);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(15, 5, $this->utf8('CÉDULA:'), 0, 0);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(30, 5, $info['cedula_docente'], 'B', 0);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(12, 5, 'DEPT.:', 0, 0);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(0, 5, $this->utf8($info['nombre_carrera']), 'B', 1);
+        $this->Ln(5);
     }
-    
-    function Footer() {
-        // Posición a 1.5 cm del final
-        $this->pdf->SetY(-25);
-        
-        // Firma del docente
-        $this->pdf->SetFont('Arial', '', 9);
-        $this->pdf->Cell(0, 5, $this->codificarTexto('Firma del Docente:'), 0, 1);
-        $this->pdf->Ln(3);
-        $this->pdf->Cell(60, 5, '_________________________________', 0, 1);
-        $this->pdf->Cell(60, 5, $this->codificarTexto('Nombre: ') . $this->codificarTexto($this->datos['info_general']['nombre_docente']), 0, 1);
-        $this->pdf->Cell(60, 5, $this->codificarTexto('Cédula: ') . $this->datos['info_general']['cedula_docente'], 0, 1);
-        
-        // Número de página
-        $this->pdf->SetY(-10);
-        $this->pdf->SetFont('Arial', 'I', 8);
-        $this->pdf->Cell(0, 5, $this->codificarTexto('Página ') . $this->pdf->PageNo() . ' de {nb}', 0, 0, 'C');
-    }
-    
+
     function Cuerpo() {
-        // Configurar número total de páginas
-        $this->pdf->AliasNbPages();
-        
-        // Calcular ancho de columnas dinámicamente
-        $ancho_nombre = 50; // Ancho base para nombre
-        $ancho_trayecto = 12; // Ancho por cada columna de trayecto
-        $total_columnas_trayecto = count($this->columnas_trayectos);
-        
-        // Ajustar ancho del nombre según cantidad de columnas de trayecto
-        if ($total_columnas_trayecto < 3) {
-            $ancho_nombre = 60;
+        // Encabezado de la tabla de alumnos
+        $this->SetFont('Arial', 'B', 7);
+        $this->SetFillColor(245, 245, 245);
+        $this->Cell(10, 6, 'NUM.', 1, 0, 'C', true);
+        $this->Cell(25, 6, $this->utf8('CÉDULA'), 1, 0, 'C', true);
+        $this->Cell(75, 6, 'NOMBRE DEL ALUMNO', 1, 0, 'C', true);
+        $this->Cell(15, 6, 'ACUM.', 1, 0, 'C', true);
+        $this->Cell(15, 6, 'NOTA', 1, 0, 'C', true);
+        $this->Cell(25, 6, 'LETRA', 1, 0, 'C', true);
+        $this->Cell(25, 6, 'OBSERVACION', 1, 1, 'C', true);
+
+        $this->SetFont('Arial', '', 7);
+        $i = 1;
+        foreach ($this->datos['notas'] as $n) {
+            $this->Cell(10, 5, $i++, 1, 0, 'C');
+            $this->Cell(25, 5, $n['cedula_estudiante'], 1, 0, 'C');
+            $this->Cell(75, 5, $this->utf8($n['nombre_estudiante']), 1, 0, 'L');
+            $this->Cell(15, 5, '---', 1, 0, 'C'); // Espacio para acumulado si aplica
+            $this->Cell(15, 5, str_pad($n['nota_final'], 2, '0', STR_PAD_LEFT), 1, 0, 'C');
+            $this->Cell(25, 5, $this->utf8($this->numLetras($n['nota_final'])), 1, 0, 'C');
+            $this->Cell(25, 5, ($n['nota_final'] >= 10 ? 'Aprobado' : 'Reprobado'), 1, 1, 'C');
+
+            if($this->GetY() > 250) $this->AddPage();
         }
-        
-        // Encabezado de la tabla
-        $this->pdf->SetFillColor(200, 200, 200);
-        $this->pdf->SetFont('Arial', 'B', 8);
-        
-        $this->pdf->Cell(8, 8, 'N°', 1, 0, 'C', true);
-        $this->pdf->Cell(22, 8, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
-        $this->pdf->Cell($ancho_nombre, 8, $this->codificarTexto('Nombre del Estudiante'), 1, 0, 'C', true);
-        
-        // Columnas para trayectos (dinámicas)
-        foreach ($this->columnas_trayectos as $trayecto_num) {
-            $this->pdf->Cell($ancho_trayecto, 8, "T$trayecto_num", 1, 0, 'C', true);
-        }
-        
-        $this->pdf->Cell(12, 8, $this->codificarTexto('Final'), 1, 0, 'C', true);
-        $this->pdf->Cell(30, 8, $this->codificarTexto('En Letras'), 1, 0, 'C', true);
-        $this->pdf->Cell(25, 8, $this->codificarTexto('Fecha'), 1, 1, 'C', true);
-        
-        $this->pdf->SetFont('Arial', '', 8);
-        
-        $contador = 0;
-        foreach ($this->datos['notas'] as $nota) {
-            $contador++;
-            
-            // Verificar si necesita nueva página (cada 25 estudiantes)
-            if ($contador > 25 && ($contador - 1) % 25 == 0) {
-                $this->pdf->AddPage();
-                $this->Membrete(); // Agregar membrete en cada página nueva
-                $this->Header();
-                
-                // Volver a dibujar el encabezado de la tabla
-                $this->pdf->SetFillColor(200, 200, 200);
-                $this->pdf->SetFont('Arial', 'B', 8);
-                $this->pdf->Cell(8, 8, 'N°', 1, 0, 'C', true);
-                $this->pdf->Cell(22, 8, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
-                $this->pdf->Cell($ancho_nombre, 8, $this->codificarTexto('Nombre del Estudiante'), 1, 0, 'C', true);
-                
-                foreach ($this->columnas_trayectos as $trayecto_num) {
-                    $this->pdf->Cell($ancho_trayecto, 8, "T$trayecto_num", 1, 0, 'C', true);
-                }
-                
-                $this->pdf->Cell(12, 8, $this->codificarTexto('Final'), 1, 0, 'C', true);
-                $this->pdf->Cell(30, 8, $this->codificarTexto('En Letras'), 1, 0, 'C', true);
-                $this->pdf->Cell(25, 8, $this->codificarTexto('Fecha'), 1, 1, 'C', true);
-                $this->pdf->SetFont('Arial', '', 8);
-            }
-            
-            $this->pdf->Cell(8, 6, $contador, 1, 0, 'C');
-            $this->pdf->Cell(22, 6, $nota['cedula_estudiante'], 1, 0, 'C');
-            
-            $nombreCompleto = $this->codificarTexto($nota['nombre_estudiante']);
-            $max_caracteres = $ancho_nombre == 60 ? 40 : 35;
-            if (strlen($nombreCompleto) > $max_caracteres) {
-                $nombreCompleto = substr($nombreCompleto, 0, $max_caracteres) . '...';
-            }
-            $this->pdf->Cell($ancho_nombre, 6, $nombreCompleto, 1, 0);
-            
-            // Mostrar solo los trayectos correspondientes
-            foreach ($this->columnas_trayectos as $trayecto_num) {
-                $trayecto = $nota["trayecto_$trayecto_num"];
-                $valor = ($trayecto !== null && $trayecto != '') ? intval($trayecto) : '-';
-                $this->pdf->Cell($ancho_trayecto, 6, $valor, 1, 0, 'C');
-            }
-            
-            // Nota final (número entero)
-            $nota_final_entero = intval($nota['nota_final']);
-            $this->pdf->Cell(12, 6, $nota_final_entero, 1, 0, 'C');
-            
-            // Nota en letras
-            $nota_letras = $this->convertirNumeroALetras($nota_final_entero);
-            $this->pdf->Cell(30, 6, $this->codificarTexto($nota_letras), 1, 0, 'C');
-            
-            // Fecha de registro
-            $fecha = date('d/m/Y', strtotime($nota['fecha_registro']));
-            $this->pdf->Cell(25, 6, $fecha, 1, 1, 'C');
-        }
-        
-        // Estadísticas al final
-        $this->pdf->Ln(10);
-        $this->pdf->SetFont('Arial', 'B', 10);
-        $this->pdf->Cell(0, 8, $this->codificarTexto('RESUMEN ESTADÍSTICO'), 0, 1, 'C');
-        
-        $this->pdf->SetFont('Arial', '', 9);
-        $this->pdf->Cell(0, 6, $this->codificarTexto('Total de Estudiantes: ') . $contador, 0, 1);
-        $this->pdf->Cell(0, 6, $this->codificarTexto('Aprobados: ') . $this->datos['estadisticas']['aprobados'], 0, 1);
-        $this->pdf->Cell(0, 6, $this->codificarTexto('Reprobados: ') . $this->datos['estadisticas']['reprobados'], 0, 1);
-        $this->pdf->Cell(0, 6, $this->codificarTexto('Promedio del Grupo: ') . intval($this->datos['estadisticas']['promedio_grupo']), 0, 1);
+
+        $this->Ln(2);
+        $this->Cell(0, 5, $this->utf8('--- FIN DEL REPORTE DE CARGA ---'), 0, 1, 'C');
+        $this->DibujarPie();
     }
-    
-    /**
-     * Función para convertir números a letras
-     */
-    function convertirNumeroALetras($numero) {
-        $unidades = array(
-            '', 'UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE',
-            'DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'
-        );
+
+    function DibujarPie() {
+        if ($this->GetY() > 220) $this->AddPage();
         
-        $decenas = array(
-            '', '', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'
-        );
-        
-        if ($numero == 0) {
-            return 'CERO';
-        }
-        
-        if ($numero < 20) {
-            return $unidades[$numero];
-        }
-        
-        if ($numero < 100) {
-            $decena = intval($numero / 10);
-            $unidad = $numero % 10;
-            
-            if ($decena == 2 && $unidad > 0) {
-                return 'VEINTI' . $unidades[$unidad];
-            }
-            
-            if ($unidad == 0) {
-                return $decenas[$decena];
-            } else {
-                return $decenas[$decena] . ' Y ' . $unidades[$unidad];
-            }
-        }
-        
-        if ($numero == 100) {
-            return 'CIEN';
-        }
-        
-        // Para números mayores a 100, devolvemos el número
-        return "($numero)";
+        $y_base = $this->GetY() + 5;
+        $info = $this->datos['info_general'];
+        $st = $this->datos['estadisticas'];
+
+        // Bloque de Firmas
+        $this->SetXY(10, $y_base);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(55, 5, $this->utf8('Revisión Docente'), 1, 1, 'L');
+        $this->SetFont('Arial', '', 7);
+        $this->Cell(55, 6, $this->utf8('Firma Profesor: ________________'), 'LR', 1);
+        $this->Cell(55, 6, $this->utf8('C.I.: __________________________'), 'LR', 1);
+        $this->Cell(55, 6, $this->utf8('Sello Departamento: ____________'), 'LRB', 1);
+
+        // Bloque de Observaciones
+        $this->SetXY(65, $y_base);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(90, 5, 'Detalles del Reporte', 1, 1, 'L');
+        $this->SetXY(65, $y_base + 5);
+        $this->SetFont('Arial', '', 7);
+        $this->MultiCell(90, 6, $this->utf8("CARRERA: " . $info['nombre_carrera'] . "\nPERIODO ACADÉMICO: " . $info['nombre_periodo'] . "\nSECCION: " . $info['codigo_seccion']), 1, 'L');
+
+        // Bloque de Estadísticas
+        $this->SetXY(155, $y_base);
+        $this->SetFont('Arial', '', 7);
+        $this->Cell(25, 5, 'Fecha Impresion:', 1, 0); $this->Cell(20, 5, date('d-m-Y'), 1, 1);
+        $this->SetX(155);
+        $this->Cell(25, 5, 'Inasistentes:', 1, 0); $this->Cell(20, 5, '0', 1, 1);
+        $this->SetX(155);
+        $this->Cell(25, 5, 'Aprobados:', 1, 0); $this->Cell(20, 5, $st['aprobados'], 1, 1);
+        $this->SetX(155);
+        $this->Cell(25, 5, 'Reprobados:', 1, 0); $this->Cell(20, 5, $st['reprobados'], 1, 1);
+
+        // Nombre del Usuario Administrativo que genera el reporte
+        $this->Ln(6);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(0, 5, 'GENERADO POR: ' . strtoupper($this->utf8($this->usuario)), 0, 1, 'R');
     }
-    
-    /**
-     * Función para codificar texto correctamente
-     */
-    function codificarTexto($texto) {
-        if (mb_detect_encoding($texto, 'UTF-8', true)) {
-            return utf8_decode($texto);
-        }
-        return $texto;
+
+    function numLetras($n) {
+        $l = [0=>'CERO', 1=>'UNO', 2=>'DOS', 3=>'TRES', 4=>'CUATRO', 5=>'CINCO', 6=>'SEIS', 7=>'SIETE', 8=>'OCHO', 9=>'NUEVE', 10=>'DIEZ', 11=>'ONCE', 12=>'DOCE', 13=>'TRECE', 14=>'CATORCE', 15=>'QUINCE', 16=>'DIECISEIS', 17=>'DIECISIETE', 18=>'DIECIOCHO', 19=>'DIECINUEVE', 20=>'VEINTE'];
+        return ($n < 10) ? "CERO " . $l[$n] : $l[$n];
     }
-    
-    function getNombreArchivo() {
-        $docente = preg_replace('/[^a-zA-Z0-9]/', '_', $this->datos['info_general']['nombre_docente']);
-        $materia = preg_replace('/[^a-zA-Z0-9]/', '_', $this->datos['info_general']['nombre_materia']);
-        $periodo = preg_replace('/[^a-zA-Z0-9]/', '_', $this->datos['info_general']['nombre_periodo']);
-        return "Notas_Definitivas_{$docente}_{$materia}_{$periodo}.pdf";
-    }
+
+    function utf8($t) { return mb_convert_encoding($t, "ISO-8859-1", "UTF-8"); }
+}
+
+// --- PROCESAMIENTO ---
+if (isset($_GET['materia_id'])) {
+    $info = obtenerInfoNotasDefinitivas($_GET['docente_id'], $_GET['materia_id'], $_GET['periodo_id']);
+    $lista_notas = obtenerNotasDefinitivasGrupo($_GET['docente_id'], $_GET['materia_id'], $_GET['periodo_id']);
+    $stats = calcularEstadisticasNotas($lista_notas);
+
+    $datos_pdf = [
+        'info_general' => $info,
+        'notas' => $lista_notas,
+        'estadisticas' => $stats
+    ];
+
+    $pdf = new PDF_ActaCarga();
+    $pdf->generarReporte($datos_pdf, $nombre_usuario_reporte);
 }
 
 /**
- * Generar PDF de notas definitivas
+ * LOGICA DE PROCESAMIENTO
  */
+
 function generarPDFNotasDefinitivas($docente_id, $materia_id, $periodo_id) {
     global $db;
     
-    // Obtener información general
     $info_general = obtenerInfoNotasDefinitivas($docente_id, $materia_id, $periodo_id);
-    if (!$info_general) {
-        return false;
-    }
+    if (!$info_general) return false;
     
-    // Obtener notas definitivas
     $notas = obtenerNotasDefinitivasGrupo($docente_id, $materia_id, $periodo_id);
-    if (empty($notas)) {
-        return false;
-    }
+    if (empty($notas)) return false;
     
-    // Calcular estadísticas
     $estadisticas = calcularEstadisticasNotas($notas);
     
-    // Preparar datos para el PDF
     $datos = [
         'info_general' => $info_general,
         'notas' => $notas,
         'estadisticas' => $estadisticas
     ];
     
-    // Crear PDF
     $pdf = new PDF_NotasDefinitivas();
     $pdf->generarReporte($datos);
-    
     return true;
 }
 
-/**
- * Obtener información general para el reporte incluyendo el trayecto
- */
 function obtenerInfoNotasDefinitivas($docente_id, $materia_id, $periodo_id) {
     global $db;
-    
     $query = "SELECT ud.nombre as nombre_docente, ud.idusuario as cedula_docente,
                      m.nombre_materia, pa.nombre_periodo, 
                      s.codigo_seccion, c.nombre_carrera, t.numero_trayecto
-              FROM notas_definitivas nd
-              INNER JOIN users ud ON nd.id_docente = ud.id
-              INNER JOIN materias m ON nd.id_materia = m.id_materia
-              INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
-              INNER JOIN docente_seccion ds ON nd.id_docente = ds.id_usuario 
-                                           AND nd.id_materia = ds.id_materia
+              FROM docente_seccion ds
+              INNER JOIN users ud ON ds.id_usuario = ud.id
+              INNER JOIN materias m ON ds.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON pa.id_periodo = $periodo_id
               INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
               INNER JOIN carreras c ON s.id_carrera = c.id_carrera
               INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
-              WHERE nd.id_docente = ? AND nd.id_materia = ? AND nd.id_periodo = ?
-              LIMIT 1";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    return $result->fetch_assoc();
+              WHERE ds.id_usuario = $docente_id AND ds.id_materia = $materia_id LIMIT 1";
+    $result = $db->query($query);
+    return ($result) ? $result->fetch_assoc() : false;
 }
 
-/**
- * Obtener notas definitivas del grupo y calcular nota final
- */
 function obtenerNotasDefinitivasGrupo($docente_id, $materia_id, $periodo_id) {
     global $db;
-    
-    $query = "SELECT nd.id_usuario as id_estudiante,
-                     nd.trayecto_0, nd.trayecto_1, nd.trayecto_2, nd.trayecto_3, nd.trayecto_4,
-                     nd.fecha_registro,
-                     ue.idusuario as cedula_estudiante, ue.nombre as nombre_estudiante
+    $query = "SELECT nd.*, ue.idusuario as cedula_estudiante, ue.nombre as nombre_estudiante
               FROM notas_definitivas nd
               INNER JOIN users ue ON nd.id_usuario = ue.id
-              WHERE nd.id_docente = ? AND nd.id_materia = ? AND nd.id_periodo = ?
-              ORDER BY ue.nombre";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
+              WHERE nd.id_docente = $docente_id AND nd.id_materia = $materia_id AND nd.id_periodo = $periodo_id
+              ORDER BY ue.nombre ASC";
+    $result = $db->query($query);
     $notas = [];
-    while ($row = $result->fetch_assoc()) {
-        // Calcular la nota final basada en los trayectos
-        $nota_final = calcularNotaFinal($row);
-        $row['nota_final'] = $nota_final;
-        $notas[] = $row;
+    if($result){
+        while ($row = $result->fetch_assoc()) {
+            $row['nota_final'] = calcularNotaFinal($row);
+            $notas[] = $row;
+        }
     }
-    
     return $notas;
 }
 
-/**
- * Calcular nota final a partir de los trayectos (números enteros)
- */
 function calcularNotaFinal($datos_nota) {
-    $trayectos = [];
-    $suma = 0;
-    $contador = 0;
-    
-    // Recolectar trayectos que tengan valor
+    $suma = 0; $cont = 0;
     for ($i = 0; $i <= 4; $i++) {
-        $campo_trayecto = "trayecto_$i";
-        if (isset($datos_nota[$campo_trayecto]) && $datos_nota[$campo_trayecto] !== null && $datos_nota[$campo_trayecto] != '') {
-            $trayectos[] = intval($datos_nota[$campo_trayecto]); // Convertir a entero
-            $suma += intval($datos_nota[$campo_trayecto]);
-            $contador++;
+        $campo = "trayecto_$i";
+        if (isset($datos_nota[$campo]) && $datos_nota[$campo] !== '' && $datos_nota[$campo] !== null) {
+            $suma += (int)$datos_nota[$campo];
+            $cont++;
         }
     }
-    
-    // Calcular promedio si hay trayectos válidos
-    if ($contador > 0) {
-        return round($suma / $contador); // Redondear al entero más cercano
-    }
-    
-    return 0; // Si no hay trayectos con notas
+    return ($cont > 0) ? round($suma / $cont) : 0;
 }
 
-/**
- * Calcular estadísticas de las notas
- */
 function calcularEstadisticasNotas($notas) {
     $total = count($notas);
     $aprobados = 0;
-    $suma_notas = 0;
-    
-    foreach ($notas as $nota) {
-        $suma_notas += $nota['nota_final'];
-        if ($nota['nota_final'] >= 10.0) {
-            $aprobados++;
-        }
+    foreach ($notas as $n) { 
+        if ($n['nota_final'] >= 10) $aprobados++; 
     }
-    
-    $promedio = $total > 0 ? $suma_notas / $total : 0;
-    $reprobados = $total - $aprobados;
-    
     return [
         'total' => $total,
         'aprobados' => $aprobados,
-        'reprobados' => $reprobados,
-        'promedio_grupo' => $promedio
+        'reprobados' => $total - $aprobados
     ];
 }
 
@@ -12995,7 +13779,7 @@ function buscarEstudiantePorCedulaConsulta($cedula) {
                     $estudiante ? $estudiante['id'] : null, 
                     null, 
                     array_merge([
-                        'cedula_buscada' => $cedura,
+                        'cedula_buscada' => $cedula,
                         'resultado_busqueda' => $resultado_busqueda,
                         'tipo_consulta' => 'busqueda_estudiante'
                     ], $detalles_estudiante), 
@@ -13037,11 +13821,12 @@ function buscarEstudiantePorCedulaConsulta($cedula) {
     }
 }
 
+
 // Función para obtener la carrera del estudiante - SOLO LECTURA, SIN AUDITORÍA
 function obtenerCarreraEstudiante($estudiante_id) {
     global $db;
     
-    $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera 
+    $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera, c.tipo_formacion 
               FROM users u
               INNER JOIN carreras c ON u.carrera = c.id_carrera
               WHERE u.id = ?";
@@ -13053,11 +13838,12 @@ function obtenerCarreraEstudiante($estudiante_id) {
     return $result->num_rows > 0 ? $result->fetch_assoc() : null;
 }
 
+
 // Función para obtener todas las materias de la carrera - SOLO LECTURA, SIN AUDITORÍA
 function obtenerMateriasCarrera($carrera_id) {
     global $db;
     
-    $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto
+    $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto, m.creditos
               FROM carrera_materia cm
               INNER JOIN materias m ON cm.id_materia = m.id_materia
               WHERE cm.id_carrera = ?
@@ -17375,7 +18161,81 @@ $nombresUbicacion = obtenerNombresUbicacionDirecto(
 
 
 
+//PNF PTF *********************************************************************
 
+
+
+// Función para formatear el nombre de la carrera según su tipo de formación
+function formatearNombreCarrera($nombre_carrera, $tipo_formacion = '') {
+    if (empty($tipo_formacion)) {
+        return $nombre_carrera;
+    }
+    
+    $tipo = strtoupper(trim($tipo_formacion));
+    $nombre = trim($nombre_carrera);
+    
+    // Quitar prefijos si existen
+    $nombre = preg_replace('/^PNF\s+/i', '', $nombre);
+    $nombre = preg_replace('/^PTF\s+/i', '', $nombre);
+    $nombre = preg_replace('/^PROGRAMA\s+NACIONAL\s+DE\s+FORMACIÓN\s+/i', '', $nombre);
+    $nombre = preg_replace('/^PROGRAMA\s+TÉCNICO\s+DE\s+FORMACIÓN\s+/i', '', $nombre);
+    
+    if ($tipo == 'PNF' || $tipo == 'PROGRAMA NACIONAL DE FORMACION' || $tipo == 'PROGRAMA NACIONAL DE FORMACIÓN') {
+        return "PNF " . ucwords(strtolower($nombre));
+    } elseif ($tipo == 'PTF' || $tipo == 'PROGRAMA TECNICO DE FORMACION' || $tipo == 'PROGRAMA TÉCNICO DE FORMACIÓN') {
+        return "PTF " . ucwords(strtolower($nombre));
+    }
+    
+    return $nombre_carrera;
+}
+
+/**
+ * Función auxiliar para obtener el tipo de formación de la base de datos
+ */
+if (!function_exists('obtenerTipoFormacionCarrera')) {
+function obtenerTipoFormacionCarrera($id_carrera) {
+    global $db;
+    
+    try {
+        $query = "SELECT tipo_formacion FROM carreras WHERE id_carrera = ?";
+        $stmt = $db->prepare($query);
+        $stmt->bind_param("i", $id_carrera);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows > 0) {
+            $row = $result->fetch_assoc();
+            return $row['tipo_formacion'] ?? '';
+        }
+        
+        return '';
+        
+    } catch (Exception $e) {
+        error_log("Error al obtener tipo de formación: " . $e->getMessage());
+        return '';
+    }
+}
+}
+
+/**
+ * Función mejorada para obtener carrera del estudiante incluyendo tipo de formación
+ */
+if (!function_exists('obtenerCarreraEstudianteCompleta')) {
+function obtenerCarreraEstudianteCompleta($estudiante_id) {
+    global $db;
+    
+    $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera, c.tipo_formacion 
+              FROM users u
+              INNER JOIN carreras c ON u.carrera = c.id_carrera
+              WHERE u.id = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $estudiante_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
+}
+}
 
 
 

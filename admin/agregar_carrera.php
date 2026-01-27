@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $duracion_anios = (int)($_POST['duracion_anios'] ?? 0);
     $titulo_principal = trim($_POST['titulo_principal'] ?? '');
     $titulo_opcional = trim($_POST['titulo_opcional'] ?? '');
+    $vigencia_fecha = trim($_POST['vigencia_fecha'] ?? '');
     
     // Validación básica
     $camposObligatorios = [
@@ -26,6 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         'duracion_anios' => $duracion_anios,
         'titulo_principal' => $titulo_principal
     ];
+    // La fecha de vigencia completa es requerida al registrar
+    $camposObligatorios['vigencia_fecha'] = $vigencia_fecha;
     
     $camposVacios = array_filter($camposObligatorios, function($valor) {
         return empty($valor);
@@ -41,7 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $tipo_formacion, 
             $duracion_anios, 
             $titulo_principal, 
-            $titulo_opcional
+            $titulo_opcional,
+            $vigencia_fecha
         );
         
         if ($resultado['success']) {
@@ -107,9 +111,16 @@ include("includes/head.php");
                    value="<?= htmlspecialchars($_POST['titulo_opcional'] ?? '') ?>">
             <small class="form-text text-muted">Título adicional obtenido al completar extensiones del programa (si aplica)</small>
         </div>
+
+        <div class="form-group">
+            <label for="vigencia_fecha">Fecha de Vigencia (día/mes/año):</label>
+            <input type="date" class="form-control" id="vigencia_fecha" name="vigencia_fecha"
+                   value="<?= htmlspecialchars($_POST['vigencia_fecha'] ?? date('Y-m-d')) ?>" required>
+            <small class="form-text text-muted">Guarde la fecha completa; las búsquedas posteriores pueden filtrar por año.</small>
+        </div>
         
         <button type="submit" class="btn btn-primary">Guardar Programa</button>
-        <a href="lista_carreras.php" class="btn btn-secondary">Cancelar</a>
+        <a href="agregar_carrera.php" class="btn btn-secondary">Cancelar</a>
     </form>
 
 <?php endif; ?>

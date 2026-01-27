@@ -196,6 +196,13 @@ if (!isLoggedIn() || !isAdmin()) {
                                 <i class="fas fa-graduation-cap fa-fw"></i> Grado
                             </a>
                         <?php endif; ?>
+
+                            <?php if (tienePermiso('admin')): ?>
+            <a title="Generar Constancias" class="dropdown-item" href="constancias.php">
+                <i class="fas fa-file-alt fa-fw"></i> Constancias
+            </a>
+        <?php endif; ?>
+
                     </div>
                 </li>
 
@@ -226,6 +233,11 @@ if (!isLoggedIn() || !isAdmin()) {
                             <i class="fas fa-calendar fa-fw"></i> Periodos Académicos
                         </a>
                         <?php endif; ?>
+
+                            <a title="Gestionar Prelaciones" class="dropdown-item" href="prelaciones.php">
+            <i class="fas fa-list-ol fa-fw"></i> Prelaciones
+        </a>
+
                     </div>
                 </li>
 
@@ -298,6 +310,11 @@ if (!isLoggedIn() || !isAdmin()) {
                         <a title="Consultar Notas Pasadas" class="dropdown-item" href="correccion_notas.php">
                             <i class="fas fa-pencil-alt fa-fw"></i> Corrección de Notas
                         </a>
+
+                            <a title="Actas de calificación final" class="dropdown-item" href="actas_calificacion.php">
+                            <i class="fas fa-file-signature fa-fw"></i> Actas de calificación final
+                        </a>
+
                     </div>
                 </li>
 
