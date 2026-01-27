@@ -18238,11 +18238,51 @@ function obtenerCarreraEstudianteCompleta($estudiante_id) {
 }
 
 
+//HISTORIAL DESGLOZADO ***********************************************************************
 
 
 
-
-
+/**
+ * Función para obtener historial desglozado de notas
+ */
+function obtenerHistorialNotasDesglozado($estudiante_id) {
+    global $db;
+    
+    $query = "SELECT 
+                nd.id,
+                nd.id_materia,
+                m.nombre_materia,
+                m.cod_materia,
+                m.trayecto,
+                m.creditos,
+                pa.nombre_periodo,
+                nd.fecha_registro,
+                nd.trayecto_0,
+                nd.trayecto_1,
+                nd.trayecto_2,
+                nd.trayecto_3,
+                nd.trayecto_4,
+                ua.nombre as nombre_admin,
+                nd.id_admin_aprobador
+              FROM notas_definitivas nd
+              INNER JOIN materias m ON nd.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+              LEFT JOIN users ua ON nd.id_admin_aprobador = ua.id
+              WHERE nd.id_usuario = ?
+              ORDER BY m.trayecto, m.nombre_materia, nd.fecha_registro DESC";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $estudiante_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $historial = [];
+    while ($row = $result->fetch_assoc()) {
+        $historial[] = $row;
+    }
+    
+    return $historial;
+}
 
 
 
@@ -24497,4 +24537,4 @@ WHERE pre.id_producto IS NULL AND p.id IN (
 }
 }
 
-	?>
+?>

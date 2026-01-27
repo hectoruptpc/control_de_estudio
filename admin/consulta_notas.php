@@ -84,13 +84,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
         <h5 class="mb-0">Información del Estudiante</h5>
         <div class="btn-group" role="group">
             <!-- Botón 1: Historial TSU -->
-            <a href="generar_historial_tsu.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
+            <a href="historial_desglozado_tsu.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
                class="btn btn-warning btn-sm mr-2" target="_blank">
                 <i class="fas fa-file-pdf"></i> Historial TSU
             </a>
             
             <!-- Botón 2: Historial Ingeniería -->
-            <a href="generar_historial_ingenieria.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
+            <a href="historial_desglozado_ingenieria.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
                class="btn btn-info btn-sm mr-2" target="_blank">
                 <i class="fas fa-file-pdf"></i> Historial Ingeniería
             </a>
