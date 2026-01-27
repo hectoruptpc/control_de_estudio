@@ -9245,32 +9245,39 @@ function generarMembreteJS() {
 
 // Función para generar PDF desde HTML
 function generarPDFDesdeHTML($elementoHTML, $nombreArchivo = 'documento.pdf') {
+    // Insertar el código JS del membrete (define agregarMembretePDF)
+    echo generarMembreteJS();
+
+    // Generar el PDF en cliente: primero obtener startY desde agregarMembretePDF (devuelve Promise)
     echo "<script>
-        // Configuración de jsPDF
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('p', 'mm', 'a4');
-        const margin = 10;
-        const pageWidth = doc.internal.pageSize.getWidth();
-        
-        // Agregar membrete
-        const startY = " . generarMembretePDF('doc', 'pageWidth') . ";
-        
-        // Capturar el contenido HTML y agregarlo al PDF
-        html2canvas(document.getElementById('$elementoHTML'), {
-            scale: 2,
-            useCORS: true,
-            logging: false
-        }).then(canvas => {
-            const imgData = canvas.toDataURL('image/jpeg', 1.0);
-            const imgWidth = pageWidth - (margin * 2);
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            
-            // Agregar contenido al PDF
-            doc.addImage(imgData, 'JPEG', margin, startY, imgWidth, imgHeight);
-            
-            // Guardar el PDF
-            doc.save('$nombreArchivo');
-        });
+        (function() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const margin = 10;
+            const pageWidth = doc.internal.pageSize.getWidth();
+
+            // Obtener la posición de inicio del contenido después del membrete
+            agregarMembretePDF(doc, pageWidth, margin).then(function(startY) {
+                // Capturar el contenido HTML y agregarlo al PDF
+                html2canvas(document.getElementById('$elementoHTML'), {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                }).then(function(canvas) {
+                    const imgData = canvas.toDataURL('image/jpeg', 1.0);
+                    const imgWidth = pageWidth - (margin * 2);
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+                    // Agregar contenido al PDF
+                    doc.addImage(imgData, 'JPEG', margin, startY, imgWidth, imgHeight);
+
+                    // Guardar el PDF
+                    doc.save('$nombreArchivo');
+                });
+            }).catch(function(err) {
+                console.error('Error al generar membrete:', err);
+            });
+        })();
     </script>";
 }
 
@@ -12926,7 +12933,7 @@ class PDF_PlanillaNotas {
      */
     function codificarTexto($texto) {
         if (mb_detect_encoding($texto, 'UTF-8', true)) {
-            return utf8_decode($texto);
+            return mb_convert_encoding($texto, 'ISO-8859-1', 'UTF-8');
         }
         return $texto;
     }
@@ -13055,22 +13062,24 @@ require_once __DIR__ . '/../fpdf/fpdf.php';
 // 1. OBTENER EL NOMBRE DEL USUARIO ACTUAL (Basado en tu lógica de BD)
 $nombre_usuario_reporte = "ADMINISTRADOR"; 
 
-try {
-    $db_user = $pool->getConnection();
-    // Consulta para obtener el nombre real del usuario que está logueado
-    $query_user = "SELECT nombre FROM users WHERE username = ? LIMIT 1";
-    $stmt_u = $db_user->prepare($query_user);
-    $stmt_u->bind_param("s", $usua);
-    $stmt_u->execute();
-    $res_u = $stmt_u->get_result();
-    if ($res_u && $res_u->num_rows > 0) {
-        $user_data = $res_u->fetch_assoc();
-        $nombre_usuario_reporte = $user_data['nombre'];
+// Intentar resolver el nombre real sólo si las variables necesarias existen
+if (isset($pool) && isset($usua)) {
+    try {
+        $db_user = $pool->getConnection();
+        $query_user = "SELECT nombre FROM users WHERE username = ? LIMIT 1";
+        $stmt_u = $db_user->prepare($query_user);
+        $stmt_u->bind_param("s", $usua);
+        $stmt_u->execute();
+        $res_u = $stmt_u->get_result();
+        if ($res_u && $res_u->num_rows > 0) {
+            $user_data = $res_u->fetch_assoc();
+            $nombre_usuario_reporte = $user_data['nombre'];
+        }
+        $stmt_u->close();
+        $pool->releaseConnection($db_user);
+    } catch (Exception $e) {
+        // Mantener valor por defecto si falla
     }
-    $stmt_u->close();
-    $pool->releaseConnection($db_user);
-} catch (Exception $e) {
-    // Si falla, mantiene el valor por defecto
 }
 
 class PDF_ActaCarga extends FPDF {
