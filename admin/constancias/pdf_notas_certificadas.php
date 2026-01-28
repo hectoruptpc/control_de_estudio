@@ -33,10 +33,17 @@ class PDF_Certificacion extends FPDF {
         $this->Cell(0, 3, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
         $this->Cell(0, 3, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
         $this->Cell(0, 3, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        
         $this->Ln(6);
         $this->SetFont('Arial', 'B', 10);
         $this->Cell(0, 5, txt('CERTIFICACIÓN'), 0, 1, 'C');
         $this->Ln(4);
+    }
+    
+    function Footer() {
+        $this->SetY(-15);
+        $this->SetFont('Arial', 'I', 7);
+        $this->Cell(0, 10, txt('Página ') . $this->PageNo() . '/{nb}', 0, 0, 'C');
     }
 }
 
@@ -50,7 +57,7 @@ $pdf->SetFont('Arial', '', 9);
 $pdf->MultiCell(0, 4, txt("Quien suscribe, Dra. Blanca A. Crespo C., titular de la cédula de identidad V-10.959.330, Secretario del Consejo de Gestión Universitaria de la Universidad Politécnica Territorial de Puerto Cabello certifica al Ciudadano (a):"), 0, 'L');
 $pdf->Ln(2);
 
-// Datos Alumno
+// Cuadro de Datos del Estudiante
 $pdf->SetFont('Arial', 'B', 8);
 $pdf->Cell(95, 5, txt('APELLIDOS Y NOMBRES'), 1, 0, 'C');
 $pdf->Cell(35, 5, txt('CÉDULA'), 1, 0, 'C');
@@ -61,10 +68,14 @@ $pdf->Cell(95, 6, txt(strtoupper($estudiante['nombre'])), 1, 0, 'C');
 $pdf->Cell(35, 6, txt($estudiante['idusuario']), 1, 0, 'C');
 $pdf->Cell(56, 6, txt($carrera['nombre_carrera']), 1, 1, 'C');
 
-$pdf->Ln(6);
+$pdf->Ln(3);
+$pdf->SetFont('Arial', '', 9);
+$pdf->MultiCell(0, 4, txt("quien cursó y aprobó todas las unidades curriculares del Plan de Estudios del Programa Nacional de Formación para obtener el Título de Técnico Superior Universitario, logrando las siguientes calificaciones:"), 0, 'L');
+$pdf->Ln(3);
 
-// Encabezados Tabla
+// Encabezados de Tabla
 $pdf->SetFont('Arial', 'B', 7);
+$pdf->Cell(0, 4, txt('UNIDADES CURRICULARES CURSADAS'), 0, 1, 'C');
 $pdf->Cell(25, 5, txt('CÓDIGO'), 1, 0, 'C');
 $pdf->Cell(90, 5, txt('UNIDAD CURRICULAR'), 1, 0, 'C');
 $pdf->Cell(12, 5, txt('UC'), 1, 0, 'C');
@@ -76,79 +87,78 @@ $pdf->Cell(0, 5, txt('OBSERVACIÓN'), 1, 1, 'C');
 $suma_ponderada_total = 0;
 $total_uc_general = 0;
 
-// Agrupamos materias por trayecto primero
+// Agrupar materias por trayecto
 $materias_por_trayecto = [];
 while ($m = $materias_carrera->fetch_assoc()) {
-    $t_idx = (int)$m['trayecto'];
-    $materias_por_trayecto[$t_idx][] = $m;
+    $t_num = (int)$m['trayecto'];
+    $materias_por_trayecto[$t_num][] = $m;
 }
 
-// Recorremos cada trayecto
 foreach ($materias_por_trayecto as $t_num => $materias) {
-    $buffer_html = [];
-    $uc_t = 0;
-    $suma_t = 0;
+    $buffer = [];
+    $suma_ponderada_t = 0;
+    $total_uc_t = 0;
 
     foreach ($materias as $m) {
-        // IMPORTANTE: Verificar el ID correcto. Tu código usa 'id_materia'
         $id_m = $m['id_materia'];
         $nota_data = $notas_estudiante[$id_m] ?? null;
         
-        // El campo de la nota se llama trayecto_X
-        $campo_nota = 'trayecto_' . $t_num;
-        $nota_final = (isset($nota_data[$campo_nota])) ? (float)$nota_data[$campo_nota] : null;
+        // Buscar nota en la columna correspondiente al trayecto
+        $campo_t = 'trayecto_' . $t_num;
+        $nota_final = (isset($nota_data[$campo_t])) ? (float)$nota_data[$campo_t] : null;
+        
+        // Obtener UC de la columna 'creditos'
+        $uc = (float)($m['creditos'] ?? 0);
 
-        // Intentar obtener UC de varios nombres posibles (ajusta según tu DB)
-        $uc_valor = (float)($m['uc_materia'] ?? $m['unidades_credito'] ?? $m['uc'] ?? 0);
-
-        // Solo procesar si está aprobada (Nota >= 12)
+        // Solo materias aprobadas (>= 12)
         if ($nota_final !== null && $nota_final >= 12) {
-            $buffer_html[] = [
+            $buffer[] = [
                 'cod' => $m['cod_materia'],
                 'nom' => $m['nombre_materia'],
-                'uc'  => $uc_valor,
+                'uc'  => $uc,
                 'nota'=> $nota_final,
-                'periodo' => $nota_data['nombre_periodo'] ?? ''
+                'lapso'=> $nota_data['nombre_periodo'] ?? ''
             ];
-            $uc_t += $uc_valor;
-            $suma_t += ($nota_final * $uc_valor);
+            $suma_ponderada_t += ($nota_final * $uc);
+            $total_uc_t += $uc;
         }
     }
 
-    // Si el trayecto tiene materias aprobadas, lo imprimimos
-    if (!empty($buffer_html)) {
-        $ira_t = ($uc_t > 0) ? number_format($suma_t / $uc_t, 3) : "0.000";
+    if (!empty($buffer)) {
+        // Cálculo de IRA del Trayecto (Ponderado)
+        $ira_t = ($total_uc_t > 0) ? number_format($suma_ponderada_t / $total_uc_t, 3) : "0.000";
 
-        // Encabezado del Trayecto
+        // Fila de encabezado de Trayecto (Negrita solo etiquetas)
         $pdf->SetFont('Arial', 'B', 7);
         $pdf->Cell(115, 5, txt("Trayecto: $t_num"), 'L', 0, 'L');
         $pdf->SetFont('Arial', 'I', 6);
-        $pdf->Cell(0, 5, txt("IRA $t_num del Trayecto: $ira_t   Total UC: $uc_t"), 'R', 1, 'R');
+        $pdf->Cell(0, 5, txt("IRA $t_num del Trayecto: $ira_t   Total UC: $total_uc_t"), 'R', 1, 'R');
 
-        // Filas de materias
+        // Materias del Trayecto
         $pdf->SetFont('Arial', '', 7);
-        foreach ($buffer_html as $row) {
-            $pdf->Cell(25, 5, txt($row['cod']), 1, 0, 'L');
-            $pdf->Cell(90, 5, txt(substr($row['nom'], 0, 65)), 1, 0, 'L');
-            $pdf->Cell(12, 5, $row['uc'], 1, 0, 'C');
-            $pdf->Cell(12, 5, str_pad($row['nota'], 2, "0", STR_PAD_LEFT), 1, 0, 'C');
-            $pdf->Cell(18, 5, txt($row['periodo']), 1, 0, 'C');
-            $pdf->Cell(0, 5, '', 1, 1, 'C');
-
-            $suma_ponderada_total += ($row['nota'] * $row['uc']);
-            $total_uc_general += $row['uc'];
+        foreach ($buffer as $b) {
+            $pdf->Cell(25, 5, txt($b['cod']), 1, 0, 'L');
+            $pdf->Cell(90, 5, txt(substr($b['nom'], 0, 65)), 1, 0, 'L');
+            $pdf->Cell(12, 5, $b['uc'], 1, 0, 'C');
+            $pdf->Cell(12, 5, str_pad($b['nota'], 2, "0", STR_PAD_LEFT), 1, 0, 'C');
+            $pdf->Cell(18, 5, txt($b['lapso']), 1, 0, 'C');
+            $pdf->Cell(0, 5, '', 1, 1, 'C'); // Observación vacía
+            
+            $suma_ponderada_total += ($b['nota'] * $b['uc']);
+            $total_uc_general += $b['uc'];
         }
     }
 }
 
-// 4. TOTALES FINALES
-$pdf->Ln(5);
+// --- TOTALES FINALES ---
+$pdf->Ln(4);
 $ira_final = ($total_uc_general > 0) ? number_format($suma_ponderada_total / $total_uc_general, 3) : "0.000";
 
 $pdf->SetFont('Arial', 'B', 8);
 $pdf->Cell(0, 6, txt("Unidades de Créditos Cursadas y Aprobadas: $total_uc_general"), 1, 1, 'C');
 $pdf->Cell(0, 6, txt("Índice de Rendimiento Académico: $ira_final"), 1, 1, 'C');
 
+// Limpiar salida y generar
 ob_end_clean();
-$pdf->Output('I', 'Certificacion_Notas.pdf');
+$pdf->Output('I', 'Certificacion_Notas_Final.pdf');
 exit();
