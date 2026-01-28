@@ -13,7 +13,6 @@ if (!isset($_GET['id'])) {
 
 $id_estudiante = intval($_GET['id']);
 
-// Consulta de datos del estudiante
 $query_user = "SELECT * FROM users WHERE id = ? LIMIT 1";
 $stmt = $db->prepare($query_user);
 $stmt->bind_param("i", $id_estudiante);
@@ -25,7 +24,6 @@ if (!$estudiante) {
 }
 
 $cedula_estudiante = $estudiante['idusuario']; 
-// Asumimos que esta función existe en tu functions.php para traer el nombre de la carrera
 $carrera = obtenerCarreraEstudiante($id_estudiante); 
 
 /**
@@ -36,29 +34,37 @@ function txt($texto) {
 }
 
 /**
- * Genera la fecha en el formato específico del Acta
+ * Obtiene los componentes de la fecha por separado para aplicar estilos
  */
-function fechaComunitaria() {
+function obtenerDatosFecha() {
     $meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    
+    $dias_letras = [
+        1 => "Primero", 2 => "dos", 3 => "tres", 4 => "cuatro", 5 => "cinco",
+        6 => "seis", 7 => "siete", 8 => "ocho", 9 => "nueve", 10 => "diez",
+        11 => "once", 12 => "doce", 13 => "trece", 14 => "catorce", 15 => "quince",
+        16 => "dieciséis", 17 => "diecisiete", 18 => "dieciocho", 19 => "diecinueve", 20 => "veinte",
+        21 => "veintiuno", 22 => "veintidós", 23 => "veintitrés", 24 => "veinticuatro", 25 => "veinticinco",
+        26 => "veintiséis", 27 => "veintisiete", 28 => "veintiocho", 29 => "veintinueve", 30 => "treinta",
+        31 => "treinta y uno"
+    ];
+
     $d = (int)date('d');
-    $m = (int)date('m') - 1;
+    $m = $meses[(int)date('m') - 1];
     $y = date('Y');
     
-    // Formato: Primero (01) o el número normal
-    $dia_str = ($d == 1) ? "Primero (01)" : "$d (" . str_pad($d, 2, "0", STR_PAD_LEFT) . ")";
+    $anio_letras = ($y == "2026") ? "dos mil veintiséis" : (($y == "2025") ? "dos mil veinticinco" : "dos mil " . $y);
     
-    // Conversión de año a letras (ajustar según necesidad)
-    if ($y == "2025") $anio_letras = "dos mil veinticinco";
-    elseif ($y == "2026") $anio_letras = "dos mil veintiséis";
-    else $anio_letras = "dos mil " . $y;
-    
-    return "En Puerto Cabello, a los $dia_str días del mes de " . $meses[$m] . " del año $anio_letras ($y).";
+    return [
+        'dia_txt' => $dias_letras[$d] . " (" . str_pad($d, 2, "0", STR_PAD_LEFT) . ")",
+        'mes' => $m,
+        'anio_txt' => $anio_letras . " ($y)"
+    ];
 }
 
-// 2. EXTENSIÓN DE CLASE FPDF PARA CABECERA Y PIE
+// 2. EXTENSIÓN DE CLASE FPDF
 class PDF_Comunitario extends FPDF {
     function Header() {
-        // Logo de la UPT PC
         if(file_exists('../../images/uptpc.png')) {
             $this->Image('../../images/uptpc.png', 25, 12, 18);
         }
@@ -77,7 +83,6 @@ class PDF_Comunitario extends FPDF {
     }
 
     function Footer() {
-        // Pie de página institucional
         $this->SetY(-35);
         $this->SetFont('Arial', '', 7);
         $this->SetTextColor(80, 80, 80);
@@ -85,13 +90,12 @@ class PDF_Comunitario extends FPDF {
     }
 }
 
-// 3. CONFIGURACIÓN Y GENERACIÓN DEL DOCUMENTO
+// 3. GENERACIÓN DEL DOCUMENTO
 $pdf = new PDF_Comunitario('P', 'mm', 'Letter');
-$pdf->SetMargins(25, 25, 25); // Márgenes anchos según la imagen
+$pdf->SetMargins(25, 25, 25);
 $pdf->AddPage();
-$pdf->SetFont('Arial', '', 11);
 
-// --- Párrafo Principal ---
+// Párrafo Principal
 $pdf->SetFont('Arial', '', 11);
 $pdf->Write(6, txt("Quienes suscriben, "));
 $pdf->SetFont('Arial', 'B', 11); $pdf->Write(6, txt("Dra. Crespo C. Blanca A."));
@@ -107,22 +111,41 @@ $pdf->SetFont('Arial', '', 11); $pdf->Write(6, txt(", cumplió con la ejecución
 
 $pdf->Ln(15);
 
-// --- Segundo Párrafo ---
+// Segundo Párrafo
 $pdf->SetFont('Arial', '', 11);
 $pdf->MultiCell(0, 6, txt("Igualmente, se certifica un desempeño satisfactorio conforme a lo establecido en los artículos 8 y 18, de la Ley de Servicio Comunitario del Estudiante de Educación Superior (Gaceta Oficial 38.272 de fecha 14-09-05)"), 0, 'J');
 
+// --- Bloque de Fecha con Negritas ---
+$datosFecha = obtenerDatosFecha();
 $pdf->Ln(20);
-
-// --- Fecha ---
 $pdf->SetFont('Arial', '', 11);
-$pdf->Cell(0, 10, txt(fechaComunitaria()), 0, 1, 'C');
+
+// Cálculo para centrar el bloque de Write
+$texto_total = "En Puerto Cabello, a los " . $datosFecha['dia_txt'] . " días del mes de " . $datosFecha['mes'] . " del año " . $datosFecha['anio_txt'] . ".";
+$width_texto = $pdf->GetStringWidth(txt($texto_total));
+$pdf->SetX(($pdf->GetPageWidth() - $width_texto) / 2);
+
+$pdf->Write(6, txt("En Puerto Cabello, a los "));
+$pdf->SetFont('Arial', 'B', 11); 
+$pdf->Write(6, txt($datosFecha['dia_txt'])); // DIA EN NEGRITA
+
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write(6, txt(" días del mes de "));
+$pdf->SetFont('Arial', 'B', 11); 
+$pdf->Write(6, txt($datosFecha['mes'])); // MES EN NEGRITA
+
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write(6, txt(" del año "));
+$pdf->SetFont('Arial', 'B', 11); 
+$pdf->Write(6, txt($datosFecha['anio_txt'])); // AÑO EN NEGRITA
+
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write(6, txt("."));
 
 $pdf->Ln(25);
 
-// --- Firma Central ---
+// Firma Central
 $pdf->SetFont('Arial', 'B', 10);
-
-// Dibujar línea de firma centrada
 $ancho_linea = 85;
 $x_inicio = ($pdf->GetPageWidth() - $ancho_linea) / 2;
 $y_actual = $pdf->GetY();
@@ -135,7 +158,6 @@ $pdf->Cell(0, 4, txt("Secretario del Consejo de Gestión Universitaria"), 0, 1, 
 $pdf->Cell(0, 4, txt("Resolución N° 34 de fecha 20/07/2022 Gaceta Oficial República"), 0, 1, 'C');
 $pdf->Cell(0, 4, txt("Bolivariana de Venezuela N° 457.753 de fecha 22/07/2022"), 0, 1, 'C');
 
-// Finalización
 ob_end_clean();
-$pdf->Output('I', "Servicio_Comunitario_" . $cedula_estudiante . ".pdf");
+$pdf->Output('I', "Acta_Comunitaria_" . $cedula_estudiante . ".pdf");
 exit();
