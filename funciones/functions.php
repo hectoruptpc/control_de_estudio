@@ -12336,18 +12336,38 @@ function generar_botones_accion($estudiante) {
     $id_graduado = isset($estudiante['id_graduado']) ? $estudiante['id_graduado'] : null;
     
     if (empty($estado) || $estado == 'cumple_requisitos') {
-        // Si cumple requisitos pero no está graduado
+        // Botón principal - Marcar Graduado
+        $botones .= '<div class="mb-2">';
         $botones .= '<button class="btn btn-success btn-sm" onclick="confirmarGraduacion('.$id_usuario.')">
                         <i class="fas fa-graduation-cap"></i> Marcar Graduado
                      </button>';
-                // Enlace a Notas Certificadas
-                $botones .= ' <a target="_blank" class="btn btn-outline-primary btn-sm ml-1" href="constancias/pdf_notas_certificadas.php?id='.$id_usuario.'">
-                                                <i class="fas fa-file-alt"></i> Notas Certificadas
-                                            </a>';
-                // Enlace a Constancia de Servicio Comunitario (si aplica se validará en el script)
-                $botones .= ' <a target="_blank" class="btn btn-outline-secondary btn-sm ml-1" href="constancias/pdf_servicio_comunitario.php?id='.$id_usuario.'">
-                                                <i class="fas fa-hands-helping"></i> Servicio Comunitario
-                                            </a>';
+        $botones .= '</div>';
+        
+        // Botones de documentos en un grupo organizado
+        $botones .= '<div class="btn-group-vertical d-flex flex-column gap-1" style="min-width: 200px;">';
+        
+        // Fila 1: Documentos principales
+        $botones .= '<div class="d-flex gap-1">';
+        $botones .= '<a target="_blank" class="btn btn-outline-primary btn-sm flex-fill" href="constancias/pdf_notas_certificadas.php?id='.$id_usuario.'">
+                        <i class="fas fa-file-alt"></i> Notas Certificadas
+                    </a>';
+        $botones .= '<a target="_blank" class="btn btn-outline-secondary btn-sm flex-fill" href="constancias/pdf_servicio_comunitario.php?id='.$id_usuario.'">
+                        <i class="fas fa-hands-helping"></i> Servicio Com.
+                    </a>';
+        $botones .= '</div>';
+        
+        // Fila 2: Nuevos documentos
+        $botones .= '<div class="d-flex gap-1">';
+        $botones .= '<a target="_blank" class="btn btn-outline-success btn-sm flex-fill" href="constancias/pdf_carta_culminacion.php?id='.$id_usuario.'">
+                        <i class="fas fa-file-contract"></i> Carta Culminación
+                    </a>';
+        $botones .= '<a target="_blank" class="btn btn-outline-info btn-sm flex-fill" href="constancias/pdf_constancia.php?id='.$id_usuario.'">
+                        <i class="fas fa-file-certificate"></i> Constancia
+                    </a>';
+        $botones .= '</div>';
+        
+        $botones .= '</div>'; // Cierre del grupo
+        
     } elseif ($estado == 'graduado' && empty($estudiante['titulo_entregado'])) {
         // Si está graduado pero no se le ha entregado título
         $botones .= '<form method="POST" style="display:inline;">
