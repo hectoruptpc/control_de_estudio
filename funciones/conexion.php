@@ -47,8 +47,8 @@ class ConnectionPool {
 // Crear una instancia del pool de conexiones
 $maxConnections = 50;
 
-$pool = new ConnectionPool($maxConnections, 'localhost', 'root', '', 'proyecto_tsu');
-$db = new mysqli('localhost', 'root', '', 'proyecto_tsu');
+$pool = new ConnectionPool($maxConnections, 'localhost', 'root', '12345678', 'proyecto_tsu');
+$db = new mysqli('localhost', 'root', '12345678', 'proyecto_tsu');
 
 
 
