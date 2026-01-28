@@ -12631,78 +12631,89 @@ function cumple_requisitos_graduacion($id_usuario) {
 //IMAGENES SOPORTE *********************************************************************
 
 
-// Función para subir imagen de soporte
+/**
+ * Función para subir imagen o PDF de soporte
+ * Se ajusta la ruta para que sea absoluta y no rompa el JSON
+ */
 function subirSoporte($archivo) {
-    // Directorio relativo a la raíz del proyecto
-    $directorio = '../soportes/';
+    // Definimos la ruta absoluta basada en la ubicación de este archivo (functions.php)
+    // Asumiendo que functions.php está en /funciones/ y la carpeta soportes en la raíz /soportes/
+    $directorio = dirname(__DIR__) . '/soportes/';
     
-    // Verificar y crear directorio si no existe
+    // Verificar y crear directorio si no existe (silenciamos con @ para evitar salida de texto)
     if (!file_exists($directorio)) {
-        if (!mkdir($directorio, 0755, true)) {
-            return ['success' => false, 'error' => 'No se pudo crear el directorio de soportes'];
+        if (!@mkdir($directorio, 0755, true)) {
+            return ['success' => false, 'error' => 'El servidor no tiene permisos para crear la carpeta de soportes en: ' . $directorio];
         }
     }
     
-    // Validar que se haya subido un archivo
+    // Validar que se haya enviado un archivo
     if (!isset($archivo['name']) || empty($archivo['name'])) {
         return ['success' => false, 'error' => 'No se ha seleccionado ningún archivo'];
     }
     
-    // Validar errores de subida
+    // Validar errores internos de PHP al subir
     if ($archivo['error'] !== UPLOAD_ERR_OK) {
         $errores = [
-            UPLOAD_ERR_INI_SIZE => 'El archivo excede el tamaño máximo permitido',
-            UPLOAD_ERR_FORM_SIZE => 'El archivo excede el tamaño máximo del formulario',
-            UPLOAD_ERR_PARTIAL => 'El archivo fue solo parcialmente subido',
-            UPLOAD_ERR_NO_FILE => 'No se subió ningún archivo',
-            UPLOAD_ERR_NO_TMP_DIR => 'Falta la carpeta temporal',
-            UPLOAD_ERR_CANT_WRITE => 'No se pudo escribir el archivo en el disco',
-            UPLOAD_ERR_EXTENSION => 'Una extensión de PHP detuvo la subida del archivo'
+            UPLOAD_ERR_INI_SIZE   => 'El archivo excede el límite (upload_max_filesize)',
+            UPLOAD_ERR_FORM_SIZE  => 'El archivo excede el límite del formulario',
+            UPLOAD_ERR_PARTIAL    => 'Subida incompleta',
+            UPLOAD_ERR_NO_FILE    => 'No se subió archivo',
+            UPLOAD_ERR_NO_TMP_DIR => 'Falta carpeta temporal en el servidor',
+            UPLOAD_ERR_CANT_WRITE => 'Error al escribir en disco',
+            UPLOAD_ERR_EXTENSION  => 'Una extensión de PHP bloqueó la subida'
         ];
-        return ['success' => false, 'error' => $errores[$archivo['error']] ?? 'Error desconocido al subir archivo'];
+        return ['success' => false, 'error' => $errores[$archivo['error']] ?? 'Error desconocido en el servidor'];
     }
     
-    // Validar tipo de archivo
+    // Validar extensión
     $tiposPermitidos = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
     $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
     
     if (!in_array($extension, $tiposPermitidos)) {
-        return ['success' => false, 'error' => 'Tipo de archivo no permitido. Use: ' . implode(', ', $tiposPermitidos)];
+        return ['success' => false, 'error' => 'Formato no permitido. Use: ' . implode(', ', $tiposPermitidos)];
     }
     
-    // Validar tamaño (máximo 5MB)
-    $tamañoMaximo = 5 * 1024 * 1024; // 5MB en bytes
-    if ($archivo['size'] > $tamañoMaximo) {
-        return ['success' => false, 'error' => 'El archivo es demasiado grande. Máximo 5MB'];
+    // Validar tamaño (5MB)
+    $max_size = 5 * 1024 * 1024;
+    if ($archivo['size'] > $max_size) {
+        return ['success' => false, 'error' => 'Archivo demasiado pesado. Máximo 5MB'];
     }
     
-    // Generar nombre único
-    $nombreUnico = uniqid() . '_' . time() . '.' . $extension;
-    $rutaDestino = $directorio . $nombreUnico;
+    // Generar nombre único para evitar sobreescribir otros soportes
+    $nombreUnico = uniqid('soporte_', true) . '_' . time() . '.' . $extension;
+    $rutaFinal = $directorio . $nombreUnico;
     
-    // Mover archivo
-    if (move_uploaded_file($archivo['tmp_name'], $rutaDestino)) {
+    // Intentar mover el archivo
+    if (@move_uploaded_file($archivo['tmp_name'], $rutaFinal)) {
         return [
             'success' => true,
-            'ruta' => $nombreUnico,
-            'tipo' => $extension,
-            'tamaño' => $archivo['size']
+            'ruta'    => $nombreUnico,
+            'tipo'    => $extension,
+            'tamaño'  => $archivo['size']
         ];
     } else {
-        return ['success' => false, 'error' => 'Error al mover el archivo subido. Verifique permisos del directorio.'];
+        return ['success' => false, 'error' => 'No se pudo guardar el archivo. Verifique permisos de escritura en /soportes/'];
     }
 }
 
-// Función para eliminar soporte anterior si existe
+/**
+ * Función para eliminar un archivo de soporte anterior
+ */
 function eliminarSoporteAnterior($nombreArchivo) {
-    $directorio = '../soportes/';
-    if (!empty($nombreArchivo) && file_exists($directorio . $nombreArchivo)) {
-        return unlink($directorio . $nombreArchivo);
+    if (empty($nombreArchivo)) return false;
+    
+    $rutaCompleta = dirname(__DIR__) . '/soportes/' . $nombreArchivo;
+    
+    if (file_exists($rutaCompleta)) {
+        return @unlink($rutaCompleta);
     }
     return false;
 }
 
-// Función para obtener soporte actual de un estudiante
+/**
+ * Función para obtener los datos de soporte actuales de la BD
+ */
 function obtenerSoporteActual($id_estudiante, $id_materia, $id_periodo) {
     global $db;
     
@@ -12712,13 +12723,15 @@ function obtenerSoporteActual($id_estudiante, $id_materia, $id_periodo) {
               AND id_periodo = ? 
               LIMIT 1";
     
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("iii", $id_estudiante, $id_materia, $id_periodo);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        return $result->fetch_assoc();
+    // Usamos sentencias preparadas para mayor seguridad
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param("iii", $id_estudiante, $id_materia, $id_periodo);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result && $result->num_rows > 0) {
+            return $result->fetch_assoc();
+        }
     }
     
     return null;
