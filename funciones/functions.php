@@ -1,7 +1,9 @@
 
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Asegura que los includes relativos dentro de este archivo
 // se resuelvan contra la carpeta /funciones en sistemas case-sensitive
@@ -13302,8 +13304,11 @@ function generarPDFNotasDefinitivas($docente_id, $materia_id, $periodo_id) {
         'estadisticas' => $estadisticas
     ];
     
-    $pdf = new PDF_NotasDefinitivas();
-    $pdf->generarReporte($datos);
+    // Usar la clase existente `PDF_ActaCarga` para generar el reporte
+    $pdf = new PDF_ActaCarga();
+    // Obtener nombre de usuario para el reporte si está disponible
+    $usuario = isset($nombre_usuario_reporte) ? $nombre_usuario_reporte : '';
+    $pdf->generarReporte($datos, $usuario);
     return true;
 }
 
@@ -18989,49 +18994,7 @@ function contar_en_espera(){
     }
 
 
-	function contar_pedidos(){
-        global $db, $username, $usua, $contar_pedido,
-        $pendiente_pedido, $mes_de_pago_actual, $ganancia_bantecom, $id_usua;
-        if (minisAd())
-        {
-
-
-
-if ($porentregar>0) {
-  $pendiente_pedido = $porentregar;
-} else {
-$pendiente_pedido = 0;
-}
-
-$pendiente_pedido = $pendiente_pedido;
-
-	// } else {
-  //   $contar_pedido .= $entregado .' Ya Entregados <br>';
-  //   $pendiente_pedido = "";
-	// }
-        } else {
-//echo 'USUARIO';
-
-$sql = "SELECT
-SUM(monto) AS total_ventas,
-SUM(IF(MONTH(fecha) = MONTH(CURDATE()) AND YEAR(fecha) = YEAR(CURDATE()), monto, 0)) AS total_ventas_mes,
-COUNT(DISTINCT id) AS cantidad_transacciones,
-SUM(IF(MONTH(fecha) = MONTH(CURDATE()) AND YEAR(fecha) = YEAR(CURDATE()), 1, 0)) AS cantidad_transacciones_mes,
-COUNT(DISTINCT id_cliente) AS cantidad_clientes
-FROM ventas
-WHERE id_usuario = '$id_usua'";
-
-$resultsql = mysqli_query($db, $sql);
-$rowsql = mysqli_fetch_assoc($resultsql);
-
-echo "Total ventas: $" . $rowsql['total_ventas'] . "<br>";
-echo "Total ventas en el mes: $" . $rowsql['total_ventas_mes'] . "<br>";
-echo "Transacciones en el mes: " . $rowsql['cantidad_transacciones_mes'] . "<br>";
-echo "Total transacciones: " . $rowsql['cantidad_transacciones'] . "<br>";
-echo "Total clientes: " . $rowsql['cantidad_clientes'] . "<br>";
-}
-
-}
+	
 
 
 
