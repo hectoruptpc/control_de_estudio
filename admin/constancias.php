@@ -25,21 +25,19 @@ if (isset($_POST['buscar']) && !empty($_POST['cedula'])) {
         // USANDO TU FUNCIÓN PARA OBTENER CARRERA
         $carrera = obtenerCarreraEstudiante($estudiante['id']);
         
-        // Obtenemos las materias de su carrera para identificar el trayecto
-        // Según tu función, esto devuelve un objeto mysqli_result
-        $res_materias = obtenerMateriasCarrera($estudiante['carrera']);
-        $materias_data = $res_materias->fetch_assoc();
-
-        if (!$materias_data) {
-            $error = "El estudiante no tiene materias asociadas a su carrera.";
-            $estudiante = null;
+        // Determinar el trayecto usando la lógica estándar de inscripciones
+        $id_carrera = $carrera['id_carrera'] ?? 0;
+        if ($id_carrera > 0) {
+            $trayecto_actual = obtenerTrayectoActual($estudiante['id'], $id_carrera);
         } else {
-            // USANDO TU FUNCIÓN PARA INFO DE TRAYECTO
-            // Tomamos el trayecto de la primera materia encontrada como referencia de su nivel actual
-            $infoTrayecto = obtenerInfoTrayecto($materias_data['trayecto']);
-            $estudiante['trayecto_n'] = $infoTrayecto['numero_trayecto'];
-            $estudiante['trayecto_nombre'] = $infoTrayecto['nombre_trayecto'];
+            // Si no tiene carrera, intentar estimar por notas (fallback)
+            $trayecto_actual = obtenerTrayectoActualEstudiante($estudiante['id']);
         }
+
+        // Obtener información legible del trayecto
+        $infoTrayecto = obtenerInfoTrayecto($trayecto_actual);
+        $estudiante['trayecto_n'] = $infoTrayecto['numero_trayecto'];
+        $estudiante['trayecto_nombre'] = $infoTrayecto['nombre_trayecto'];
     } else {
         $error = "No se encontró ningún estudiante con la cédula: <strong>$cedula</strong>";
     }

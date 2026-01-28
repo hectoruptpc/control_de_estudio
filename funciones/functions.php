@@ -3,6 +3,10 @@
 
 session_start();
 
+// Asegura que los includes relativos dentro de este archivo
+// se resuelvan contra la carpeta /funciones en sistemas case-sensitive
+chdir(__DIR__);
+
     include('variables.php');
     include('conexion.php');
     include('cabecera_footer.php');
@@ -13935,6 +13939,38 @@ function obtenerInfoTrayecto($numero_trayecto) {
         'numero_trayecto' => $numero_trayecto,
         'nombre_trayecto' => isset($nombres_trayectos[$numero_trayecto]) ? $nombres_trayectos[$numero_trayecto] : 'Trayecto ' . $numero_trayecto
     ];
+}
+
+/**
+ * Obtiene el trayecto actual estimado de un estudiante consultando
+ * las materias en las que tiene notas definitivas o pendientes.
+ * Retorna un entero (0 = Trayecto Inicial si no hay registros).
+ */
+function obtenerTrayectoActualEstudiante($estudiante_id) {
+    global $db;
+
+    // Buscamos el máximo trayecto entre las materias asociadas a las notas
+    $query = "SELECT COALESCE(MAX(m.trayecto), 0) as max_trayecto
+              FROM (
+                SELECT id_materia FROM notas_definitivas WHERE id_usuario = ?
+                UNION
+                SELECT id_materia FROM notas_pendientes WHERE id_usuario = ?
+              ) as t
+              INNER JOIN materias m ON t.id_materia = m.id_materia";
+
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param("ii", $estudiante_id, $estudiante_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($row = $result->fetch_assoc()) {
+            return (int)$row['max_trayecto'];
+        }
+        $stmt->close();
+    } else {
+        error_log("Error al preparar obtenerTrayectoActualEstudiante: " . $db->error);
+    }
+
+    return 0;
 }
 
 // Función para obtener las notas definitivas del estudiante - SOLO LECTURA, SIN AUDITORÍA
