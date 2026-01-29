@@ -41,19 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $cambiado = cambiarEstadoPeriodo($db, $_POST['id_periodo'], $_POST['nuevo_estado']);
         
         if ($cambiado) {
-            $mensaje = 'Estado del periodo cambiado correctamente';
-            
-            if ($_POST['nuevo_estado'] == 0) {
-                // Desactivar período y sus secciones
-                desactivarSeccionesDePeriodo($db, $_POST['id_periodo']);
-                $mensaje .= '. Todas las secciones asociadas han sido desactivadas.';
-            } else {
-                // Activar período y actualizar estado de secciones
-                actualizarEstadoSeccionesDePeriodo($db, $_POST['id_periodo']);
-                $mensaje .= '. Las secciones asociadas se reactivarán si cumplen con los requisitos.';
-            }
-            
-            $_SESSION['mensaje'] = ['tipo' => 'success', 'texto' => $mensaje];
+            // Cambiado: ya no se desactivan/activan automáticamente las secciones.
+            $_SESSION['mensaje'] = ['tipo' => 'success', 'texto' => 'Estado del periodo cambiado correctamente.'];
         } else {
             $_SESSION['mensaje'] = ['tipo' => 'danger', 'texto' => 'Error al cambiar el estado del periodo'];
         }
@@ -263,7 +252,7 @@ $(document).ready(function() {
         var id = $(this).data('id');
         $('#id_periodo_estado').val(id);
         $('#nuevo_estado').val(0);
-        $('#mensaje_estado').html('¿Está seguro que desea DESACTIVAR este periodo académico?<br><br><strong>Todas las secciones asociadas también serán desactivadas.</strong>');
+        $('#mensaje_estado').html('¿Está seguro que desea DESACTIVAR este periodo académico?');
         $('#cambiarEstadoModal').modal('show');
     });
     
@@ -272,7 +261,7 @@ $(document).ready(function() {
         var id = $(this).data('id');
         $('#id_periodo_estado').val(id);
         $('#nuevo_estado').val(1);
-        $('#mensaje_estado').html('¿Está seguro que desea ACTIVAR este periodo académico?<br><br><strong>Las secciones asociadas se reactivarán automáticamente si cumplen con los requisitos (mínimo de estudiantes).</strong>');
+        $('#mensaje_estado').html('¿Está seguro que desea ACTIVAR este periodo académico?');
         $('#cambiarEstadoModal').modal('show');
     });
 });
