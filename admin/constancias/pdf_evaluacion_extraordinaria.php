@@ -1,51 +1,108 @@
 <?php
-ob_start();
 error_reporting(0);
 ini_set('display_errors', 0);
+ob_start();
 
 require_once('../../funciones/functions.php');
 require_once('../fpdf/fpdf.php');
 
-if (!isset($_GET['id'])) { die("ID no proporcionado."); }
-$id = intval($_GET['id']);
+// 1. VALIDACIÓN DE DATOS (Este formulario suele ser para un grupo o vacío para llenar)
+$fecha_hoy = date('d/m/Y');
 
-// Obtener estudiante
-$query = "SELECT * FROM users WHERE id = ? LIMIT 1";
-$stmt = $db->prepare($query);
-$stmt->bind_param("i", $id);
-$stmt->execute();
-$est = $stmt->get_result()->fetch_assoc();
-if (!$est) die('Estudiante no encontrado.');
+/**
+ * Función para convertir texto a codificación ISO para FPDF
+ */
+function txt($texto) {
+    return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+}
 
-function txt($t){ return iconv('UTF-8','ISO-8859-1//TRANSLIT',$t); }
+// 2. CLASE FPDF PERSONALIZADA
+class PDF_Extraordinaria extends FPDF {
+    function Header() {
+        // Logo
+        if(file_exists('../images/uptpc.png')) {
+            $this->Image('../images/uptpc.png', 10, 10, 18);
+        }
+        
+        // Membrete
+        $this->SetY(10);
+        $this->SetFont('Arial', '', 7);
+        $this->Cell(0, 3, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        
+        $this->Ln(5);
+        $this->SetFont('Arial', 'B', 9);
+        $this->Cell(0, 4, txt('DIRECCIÓN DE PNF Y/O PTF'), 0, 1, 'C');
+        $this->Cell(0, 4, txt('SOLICITUD DE EVALUACIÓN EXTRAORDINARIA Y/O EXAMEN DE SUFICIENCIA'), 0, 1, 'C');
+        
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(0, 6, txt('FECHA: ________/________/________'), 0, 1, 'C');
+        $this->Ln(5);
+    }
 
-$pdf = new FPDF('P','mm','A4');
+    function Footer() {
+        // Espacio para Control de Estudios al final
+        $this->SetY(-20);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(0, 10, txt('Control de Estudios Firma y Sello'), 0, 0, 'L');
+    }
+}
+
+// 3. GENERACIÓN DEL DOCUMENTO
+// Usamos orientación 'P' (Vertical) pero el formato de la imagen sugiere que es un cuadro ancho
+$pdf = new PDF_Extraordinaria('P', 'mm', 'Letter');
+$pdf->SetMargins(10, 15, 10);
 $pdf->AddPage();
-$pdf->SetMargins(25, 10, 25);
 
-// Membrete
-if(file_exists('../../images/uptpc.png')) $pdf->Image('../../images/uptpc.png',20,10,18);
-$pdf->SetFont('Arial','B',9);
-$pdf->Cell(0,4,txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'),0,1,'C');
-$pdf->Cell(0,4,txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'),0,1,'C');
+// Estilo de la tabla
+$pdf->SetFillColor(240, 240, 240);
+$pdf->SetFont('Arial', 'B', 7);
+
+// Encabezados de la tabla
+$h = 7; // Altura de celda
+$pdf->Cell(8, $h, txt('N°'), 1, 0, 'C', true);
+$pdf->Cell(25, $h, txt('Cédula'), 1, 0, 'C', true);
+$pdf->Cell(40, $h, txt('Apellidos'), 1, 0, 'C', true);
+$pdf->Cell(40, $h, txt('Nombres'), 1, 0, 'C', true);
+$pdf->Cell(25, $h, txt('PNF/PTF'), 1, 0, 'C', true);
+$pdf->Cell(58, $h, txt('Unidad Curricular'), 1, 1, 'C', true);
+
+// Filas en blanco (puedes hacer un loop con datos de la DB si los tienes)
+$pdf->SetFont('Arial', '', 7);
+for ($i = 1; $i <= 15; $i++) {
+    $pdf->Cell(8, 6, $i, 1, 0, 'C');
+    $pdf->Cell(25, 6, '', 1, 0, 'C');
+    $pdf->Cell(40, 6, '', 1, 0, 'C');
+    $pdf->Cell(40, 6, '', 1, 0, 'C');
+    $pdf->Cell(25, 6, '', 1, 0, 'C');
+    $pdf->Cell(58, 6, '', 1, 1, 'C');
+}
+
 $pdf->Ln(10);
 
-$pdf->SetFont('Arial','B',12);
-$pdf->Cell(0,8,txt('EVALUACIÓN EXTRAORDINARIA'),0,1,'C');
-$pdf->Ln(8);
+// Sección de firmas
+$pdf->SetFont('Arial', 'B', 8);
 
-$pdf->SetFont('Arial','',11);
-$pdf->MultiCell(0,6,txt('Certificamos que el(la) estudiante: ' . strtoupper($est['nombre']) . ' (C.I. ' . $est['idusuario'] . ') ha sido autorizado(a) para presentar evaluación extraordinaria según las normativas vigentes.'),0,'J');
+// Definir coordenadas para las celdas de firmas
+$y_firma = $pdf->GetY();
 
-$pdf->Ln(12);
-$pdf->SetFont('Arial','',11);
-$pdf->MultiCell(0,6,txt('Detalle: .......................................................'),0,'J');
+// Cuadro Firma Estudiante
+$pdf->Rect(10, $y_firma, 60, 20);
+$pdf->SetXY(10, $y_firma);
+$pdf->Cell(60, 5, txt('Firma Estudiante'), 0, 0, 'C');
 
-// Firma
-$pdf->Ln(30);
-$pdf->SetFont('Arial','B',10);
-$pdf->Cell(0,4,txt('Director de Control de Estudios'),0,1,'C');
+// Cuadro Firma Director
+$pdf->Rect(75, $y_firma, 60, 20);
+$pdf->SetXY(75, $y_firma);
+$pdf->Cell(60, 5, txt('Firma Director'), 0, 0, 'C');
+
+// Cuadro Observación
+$pdf->Rect(140, $y_firma, 66, 20);
+$pdf->SetXY(140, $y_firma);
+$pdf->Cell(66, 5, txt('Observación'), 0, 0, 'C');
 
 ob_end_clean();
-$pdf->Output('I','Evaluacion_Extraordinaria_' . $est['idusuario'] . '.pdf');
+$pdf->Output('I', "Solicitud_Evaluacion_Extraordinaria.pdf");
 exit();
