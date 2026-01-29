@@ -645,34 +645,22 @@ include("includes/head.php");
                 </div>
                 
                 <?php
-                // 1. Definir las horas de la tabla (de 7:00 a 16:00)
-                $horas_tabla = [];
-                for ($h = 7; $h <= 16; $h++) {
-                    $horas_tabla[] = sprintf("%02d:00", $h);
-                }
-                
-                // 2. Organizar los horarios por día
+                // Construir tabla similar a la vista de docente: horas x dias con rowspan para bloques
                 $dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                $horas_disponibles = [];
+                for ($h = 7; $h <= 16; $h++) $horas_disponibles[] = sprintf('%02d:00', $h);
+
+                // Agrupar horarios por día
                 $horarios_por_dia = array_fill(0, 6, []);
-                
                 foreach ($horarios as $horario) {
                     $dia = (int)$horario['dia'];
                     $hora_inicio = date('H:i', strtotime($horario['hora_inicio']));
                     $hora_fin = date('H:i', strtotime($horario['hora_fin']));
-                    
-                    $horarios_por_dia[$dia][] = [
-                        'materia' => $horario['nombre_materia'],
-                        'docente' => $horario['nombre_docente'],
-                        'aula' => $horario['aula'],
-                        'hora_inicio' => $hora_inicio,
-                        'hora_fin' => $hora_fin,
-                        'cod_materia' => $horario['cod_materia'] ?? ''
-                    ];
-                    
-                    // Preparar datos para la leyenda
-                    $clave_leyenda = $horario['nombre_materia'].$horario['nombre_docente'].$horario['aula'];
-                    if (!isset($leyenda_materias[$clave_leyenda])) {
-                        $leyenda_materias[$clave_leyenda] = [
+                    $horarios_por_dia[$dia][] = array_merge($horario, ['hora_inicio' => $hora_inicio, 'hora_fin' => $hora_fin]);
+
+                    $clave = $horario['nombre_materia'].$horario['nombre_docente'].$horario['aula'];
+                    if (!isset($leyenda_materias[$clave])) {
+                        $leyenda_materias[$clave] = [
                             'materia' => $horario['nombre_materia'],
                             'docente' => $horario['nombre_docente'],
                             'aula' => $horario['aula'],
@@ -680,8 +668,36 @@ include("includes/head.php");
                         ];
                     }
                 }
+
+                $celdas_ocupadas = array_fill(0, count($dias_semana), array_fill(0, count($horas_disponibles), false));
                 ?>
-                
+
+                <style>
+                    .horario-cell {
+                        min-height: 80px;
+                        border: 1px solid #ddd;
+                        padding: 5px;
+                        cursor: default;
+                        position: relative;
+                        text-align: center;
+                        vertical-align: middle;
+                        box-sizing: border-box;
+                        overflow: hidden;
+                        word-break: break-word;
+                        white-space: normal;
+                        min-height: 60px;
+                    }
+                    .horario-cell:hover { background-color: #f5f5f5; }
+                    .bg-asignada { background-color: #d4edda; font-weight: bold; }
+                    .bg-asignada:hover { background-color: #c3e6cb !important; }
+                    .bg-conflicto { background-color: #f8d7da !important; }
+                    .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(0,0,0,.1); border-radius: 50%; border-top-color: #007bff; animation: spin 1s ease-in-out infinite; margin-right: 10px; }
+                    @keyframes spin { to { transform: rotate(360deg); } }
+                    small { font-size: 0.8em; color: #666; }
+                    table.table { table-layout: fixed; width: 100%; }
+                    td[title] { max-width: 1px; }
+                </style>
+
                 <div class="table-responsive mb-4">
                     <table class="table table-bordered table-hover">
                         <thead class="thead-dark">
@@ -693,42 +709,55 @@ include("includes/head.php");
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($horas_tabla as $index => $hora): ?>
-                                <tr>
-                                    <th><?= $hora ?></th>
-                                    <?php for ($dia = 0; $dia <= 5; $dia++): ?>
-                                        <?php
-                                        $contenido_celda = '';
-                                        $clase_css = 'celda-horario';
-                                        $es_continuacion = false;
-                                        
-                                        // Buscar si hay una clase en esta hora y día
-                                        foreach ($horarios_por_dia[$dia] as $clase) {
-                                            if ($hora >= $clase['hora_inicio'] && $hora < $clase['hora_fin']) {
-                                                $contenido_celda = htmlspecialchars($clase['materia']);
-                                                $clase_css = 'horario-block';
-                                                
-                                                // Verificar si es continuación
-                                                if ($hora != $clase['hora_inicio']) {
-                                                    $clase_css .= ' continuacion';
-                                                    $es_continuacion = true;
+                        <?php foreach ($horas_disponibles as $hora_index => $hora): ?>
+                            <tr>
+                                <td><?= $hora ?></td>
+                                <?php foreach ($dias_semana as $dia_index => $dia_nombre): ?>
+                                    <?php
+                                    if (isset($celdas_ocupadas[$dia_index][$hora_index]) && $celdas_ocupadas[$dia_index][$hora_index]) {
+                                        // celda cubierta por rowspan anterior
+                                        echo '';
+                                        continue;
+                                    }
+
+                                    $celdaContent = '';
+                                    $clasesCelda = 'horario-cell';
+                                    $rowspan = 1;
+
+                                    // Buscar horario que empiece exactamente en esta hora
+                                    foreach ($horarios_por_dia[$dia_index] as $asig) {
+                                        if ($asig['hora_inicio'] == $hora) {
+                                            $celdaContent = '<strong>' . htmlspecialchars($asig['nombre_materia']) . '</strong><br><small>' . htmlspecialchars($asig['nombre_docente']) . ' | ' . htmlspecialchars($asig['aula']) . '</small>';
+
+                                            $hora_fin = $asig['hora_fin'];
+                                            $start_ts = strtotime($hora);
+                                            $end_ts = strtotime($hora_fin);
+                                            if ($end_ts <= $start_ts) {
+                                                $rowspan = 1;
+                                            } else {
+                                                $hours = ($end_ts - $start_ts) / 3600;
+                                                $rowspan = max(1, (int) ceil($hours));
+                                                $max_index = count($horas_disponibles);
+                                                for ($i = $hora_index; $i < min($max_index, $hora_index + $rowspan); $i++) {
+                                                    $celdas_ocupadas[$dia_index][$i] = true;
                                                 }
-                                                break;
                                             }
+
+                                            $clasesCelda .= ' bg-asignada';
+                                            break;
                                         }
-                                        ?>
-                                        <td class="<?= $clase_css ?>">
-                                            <?php if ($es_continuacion): ?>
-                                                <span class="continuacion-simbolo">↳</span>
-                                            <?php endif; ?>
-                                            <?= $contenido_celda ?>
-                                        </td>
-                                    <?php endfor; ?>
-                                </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                                    }
+
+                                    echo '<td class="' . $clasesCelda . '"';
+                                    if ($rowspan > 1) echo ' rowspan="' . $rowspan . '"';
+                                    echo '>' . $celdaContent . '</td>';
+                                    ?>
+                                <?php endforeach; ?>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
                     
                     <!-- Leyenda de materias -->
                     <div class="card border-left-primary shadow py-2 mb-4">
