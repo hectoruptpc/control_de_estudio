@@ -4,7 +4,7 @@ ini_set('display_errors', 0);
 ob_start();
 
 require_once('../../funciones/functions.php');
-require_once('../../fpdf/fpdf.php');
+require_once('../fpdf/fpdf.php');
 
 if (!isset($_GET['id'])) { die("ID no proporcionado."); }
 $id_estudiante = intval($_GET['id']);
@@ -23,6 +23,13 @@ $cedula_estudiante = $estudiante['idusuario'];
 $carrera = obtenerCarreraEstudiante($id_estudiante);
 $materias_carrera = obtenerMateriasCarrera($carrera['id_carrera']);
 $notas_estudiante = obtenerNotasEstudianteConsulta($id_estudiante);
+
+// Determinar etiqueta según tipo de formación: mostrar 'PNF' si la carrera es PNF, si no mostrar 'Carrera'
+$tipo_form = isset($carrera['tipo_formacion']) ? strtoupper(trim($carrera['tipo_formacion'])) : '';
+$etiqueta_tipo = (strpos($tipo_form, 'PNF') !== false) ? 'PNF' : 'Carrera';
+
+// Determinar si se deben usar 'Semestre' en lugar de 'Trayecto' cuando la carrera es PTF
+$periodo_label = (strpos($tipo_form, 'PTF') !== false) ? 'Semestre' : 'Trayecto';
 
 function txt($texto) {
     return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
@@ -91,7 +98,7 @@ $pdf->Ln(7);
 $pdf->SetFont('Arial', 'B', 8);
 $pdf->Cell(95, 5, txt('APELLIDOS Y NOMBRES'), 1, 0, 'C');
 $pdf->Cell(35, 5, txt('CÉDULA'), 1, 0, 'C');
-$pdf->Cell(56, 5, txt('PNF'), 1, 1, 'C');
+$pdf->Cell(56, 5, txt($etiqueta_tipo), 1, 1, 'C');
 $pdf->SetFont('Arial', '', 8);
 $pdf->Cell(95, 6, txt(strtoupper($estudiante['nombre'])), 1, 0, 'C');
 $pdf->Cell(35, 6, txt($cedula_estudiante), 1, 0, 'C');
@@ -131,7 +138,7 @@ foreach ($materias_por_trayecto as $t_num => $materias) {
     }
     if (!empty($rows)) {
         $pdf->SetFont('Arial', 'B', 7);
-        $pdf->Cell(115, 5, txt("Trayecto: $t_num"), 'L', 0, 'L');
+        $pdf->Cell(115, 5, txt($periodo_label . ": " . $t_num), 'L', 0, 'L');
         $pdf->SetFont('Arial', 'I', 6);
         $pdf->Cell(0, 5, txt("IRA $t_num: ".number_format($suma_t/$uc_t, 3)."  Total UC: $uc_t"), 'R', 1, 'R');
         $pdf->SetFont('Arial', '', 7);
