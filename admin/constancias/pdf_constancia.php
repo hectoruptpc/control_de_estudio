@@ -4,7 +4,7 @@ ini_set('display_errors', 0);
 ob_start();
 
 require_once('../../funciones/functions.php');
-require_once('../../fpdf/fpdf.php');
+require_once('../fpdf/fpdf.php');
 
 if (!isset($_GET['id'])) { die("ID no proporcionado."); }
 $id_estudiante = intval($_GET['id']);

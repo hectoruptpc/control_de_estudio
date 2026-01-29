@@ -34,7 +34,7 @@ if ($res_p && mysqli_num_rows($res_p) > 0) {
     $texto_vigencia = $meses[date('n', $f_inicio)-1] . " " . date('Y', $f_inicio) . " - " . $meses[date('n', $f_fin)-1] . " " . date('Y', $f_fin);
 }
 
-require_once('../../fpdf/fpdf.php'); 
+require_once('../fpdf/fpdf.php'); 
 while (ob_get_level()) { ob_end_clean(); }
 
 $pdf = new FPDF('P', 'mm', 'A4');
@@ -43,7 +43,7 @@ $pdf->SetMargins(25, 10, 25);
 $pdf->SetAutoPageBreak(false); 
 
 // --- MEMBRETE ---
-$pdf->Image('../../images/uptpc.png', 20, 10, 18); 
+$pdf->Image('../images/uptpc.png', 20, 10, 18); 
 $pdf->SetFont('Arial', 'B', 7.5);
 $pdf->SetY(10);
 $pdf->Cell(0, 3.5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "REPÚBLICA BOLIVARIANA DE VENEZUELA"), 0, 1, 'C');
