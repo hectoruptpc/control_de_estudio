@@ -199,7 +199,7 @@ if (!isLoggedIn() || !isAdmin()) {
 
                             <?php if (tienePermiso('admin')): ?>
             <a title="Generar Constancias" class="dropdown-item" href="constancias.php">
-                <i class="fas fa-file-alt fa-fw"></i> Constancias
+                <i class="fas fa-file-alt fa-fw"></i> Admicion y Control
             </a>
         <?php endif; ?>
 
