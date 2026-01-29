@@ -616,9 +616,9 @@ include("includes/head.php");
         <a href="gestion_seccion.php?action=view&id=<?= $seccion_id ?>" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Volver a la sección
         </a>
-        <button class="btn btn-success float-right ml-2" onclick="generarPDF()">
+        <a class="btn btn-success float-right ml-2" href="pdf_horario_seccion.php?seccion_id=<?= $seccion_id ?>" target="_blank">
             <i class="fas fa-file-pdf"></i> Descargar PDF
-        </button>
+        </a>
         
     </div>
     
