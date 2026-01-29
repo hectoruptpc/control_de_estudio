@@ -138,10 +138,17 @@ include("includes/head.php");
                                                 </a>
                                             </div>
                                             <div class="col-sm-6 mb-2">
-                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_cambio_turno_seccion.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
-                                                    <i class="fas fa-clock mr-1"></i> Cambio Turno/Sección
+                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_cambio_turno.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                    <i class="fas fa-clock mr-1"></i> Cambio Turno
                                                 </a>
                                             </div>
+                                            <!-- NUEVO BOTÓN AÑADIDO AQUÍ -->
+                                            <div class="col-sm-6 mb-2">
+                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_cambio_seccion.php?id=<?php echo $estudiante['id']; ?>">
+                                                    <i class="fas fa-sync-alt mr-1"></i> Cambiar Sección
+                                                </a>
+                                            </div>
+                                            <!-- FIN DEL NUEVO BOTÓN -->
                                             <div class="col-sm-6 mb-2">
                                                 <a class="btn btn-outline-primary btn-block" href="constancias/pdf_renuncia_cupo.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
                                                     <i class="fas fa-user-times mr-1"></i> Renuncia de Cupo
