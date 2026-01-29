@@ -4,7 +4,7 @@ ini_set('display_errors', 0);
 ob_start();
 
 require_once('../../funciones/functions.php');
-require_once('../../fpdf/fpdf.php');
+require_once('../fpdf/fpdf.php');
 
 // 1. VALIDACIÓN Y OBTENCIÓN DE DATOS
 if (!isset($_GET['id'])) { 
