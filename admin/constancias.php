@@ -113,7 +113,7 @@ include("includes/head.php");
                                             <?php endif; ?>
 
                                             <div class="col-sm-6 mb-2">
-                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_constancia.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_intensivo.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
                                                     <i class="fas fa-file-contract mr-1"></i> Constancia de Intensivo
                                                 </a>
                                             </div>
