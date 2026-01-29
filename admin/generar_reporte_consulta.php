@@ -220,7 +220,8 @@ try {
     $pdf->SetFont('Arial', 'B', 8);
     $pdf->Cell(100, 5, 'RESUMEN:', 0, 0);
     $pdf->SetFont('Arial', '', 8);
-    $pdf->Cell(90, 5, 'Emitido por: YANOSKI CALATRAVA', 0, 1, 'R');
+    $emitido_por = strtoupper($_SESSION['user']['nombre'] ?? $_SESSION['user']['username'] ?? 'DESCONOCIDO');
+    $pdf->Cell(90, 5, 'Emitido por: ' . t($emitido_por), 0, 1, 'R');
 
     $pdf->Cell(60, 5, 'Total Creditos: ' . $total_creditos, 0, 0);
     $pdf->Cell(60, 5, 'Creditos Aprobados: ' . $creditos_aprobados, 0, 1);
