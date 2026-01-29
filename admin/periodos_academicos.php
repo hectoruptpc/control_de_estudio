@@ -38,15 +38,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     
     if (isset($_POST['cambiar_estado'])) {
-        $cambiado = cambiarEstadoPeriodo($db, $_POST['id_periodo'], $_POST['nuevo_estado']);
-        
-        if ($cambiado) {
-            // Cambiado: ya no se desactivan/activan automáticamente las secciones.
-            $_SESSION['mensaje'] = ['tipo' => 'success', 'texto' => 'Estado del periodo cambiado correctamente.'];
+        $resultado = cambiarEstadoPeriodo($db, $_POST['id_periodo'], $_POST['nuevo_estado']);
+
+        // La función devuelve un array con 'success' y 'message'
+        if (is_array($resultado)) {
+            if (!empty($resultado['success'])) {
+                $_SESSION['mensaje'] = ['tipo' => 'success', 'texto' => $resultado['message'] ?? 'Estado del periodo cambiado correctamente.'];
+            } else {
+                $_SESSION['mensaje'] = ['tipo' => 'danger', 'texto' => $resultado['message'] ?? 'Error al cambiar el estado del periodo'];
+            }
         } else {
-            $_SESSION['mensaje'] = ['tipo' => 'danger', 'texto' => 'Error al cambiar el estado del periodo'];
+            // Compatibilidad por si la función retornara booleano
+            if ($resultado) {
+                $_SESSION['mensaje'] = ['tipo' => 'success', 'texto' => 'Estado del periodo cambiado correctamente.'];
+            } else {
+                $_SESSION['mensaje'] = ['tipo' => 'danger', 'texto' => 'Error al cambiar el estado del periodo'];
+            }
         }
-        header("Location: ".$_SERVER['PHP_SELF']);
+
+        header("Location: " . $_SERVER['PHP_SELF']);
         exit();
     }
 }

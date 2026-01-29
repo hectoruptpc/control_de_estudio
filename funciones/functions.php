@@ -102,7 +102,10 @@ function desactivarPeriodosVencidos($db) {
 }
 
 // Ejecutar la función cada vez que alguien entre al sistema
-desactivarPeriodosVencidos($db);
+// Desactivación automática de periodos vencidos DESHABILITADA por decisión administrativa.
+// Ahora los periodos deben ser desactivados/gestionados manualmente desde la UI.
+// Si en el futuro se requiere reactivar la ejecución automática, descomentar la siguiente línea:
+// desactivarPeriodosVencidos($db);
 
 
 
@@ -8214,8 +8217,8 @@ function obtenerMateriasDisponiblesParaDocente($id_docente, $id_seccion) {
  */
 function obtenerPeriodosAcademicos($db) {
     try {
-        // Primero desactivamos cualquier periodo vencido (por si acaso)
-        desactivarPeriodosVencidos($db);
+        // Nota: desactivación automática removida — los periodos se gestionan manualmente.
+        // La llamada a desactivarPeriodosVencidos fue eliminada para evitar cambios automáticos.
         
         $query = "SELECT * FROM periodos_academicos ORDER BY created_at DESC";
         $stmt = $db->prepare($query);
