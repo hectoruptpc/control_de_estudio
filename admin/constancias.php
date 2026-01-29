@@ -96,24 +96,83 @@ include("includes/head.php");
                             <div class="col-md-7">
                                 <div class="card shadow-sm">
                                     <div class="card-header bg-white font-weight-bold text-primary">OPCIONES DISPONIBLES</div>
-                                    <div class="card-body text-center">
-                                        
-                                        <?php if ($estudiante['trayecto_n'] == 0): ?>
-                                            <i class="fas fa-file-invoice fa-3x text-info mb-3"></i>
-                                            <h5>Constancia de Inscripción</h5>
-                                            <p class="small text-muted">Disponible para Trayecto Inicial</p>
-                                            <a href="constancias/pdf_inscripcion.php?id=<?php echo $estudiante['id']; ?>" target="_blank" class="btn btn-info btn-block">
-                                                <i class="fas fa-print mr-2"></i>Generar Reporte
-                                            </a>
-                                        <?php else: ?>
-                                            <i class="fas fa-user-graduate fa-3x text-success mb-3"></i>
-                                            <h5>Constancia de Estudios</h5>
-                                            <p class="small text-muted">Disponible para Trayectos Regulares</p>
-                                            <a href="constancias/pdf_estudios.php?id=<?php echo $estudiante['id']; ?>" target="_blank" class="btn btn-success btn-block">
-                                                <i class="fas fa-print mr-2"></i>Generar Reporte
-                                            </a>
-                                        <?php endif; ?>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <?php if ($estudiante['trayecto_n'] == 0): ?>
+                                                <div class="col-sm-6 mb-2">
+                                                    <a class="btn btn-outline-primary btn-block" href="constancias/pdf_inscripcion.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                        <i class="fas fa-file-invoice mr-1"></i> Constancia de Inscripción
+                                                    </a>
+                                                </div>
+                                            <?php else: ?>
+                                                <div class="col-sm-6 mb-2">
+                                                    <a class="btn btn-outline-primary btn-block" href="constancias/pdf_estudios.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                        <i class="fas fa-user-graduate mr-1"></i> Constancia de Estudios
+                                                    </a>
+                                                </div>
+                                            <?php endif; ?>
 
+                                            <div class="col-sm-6 mb-2">
+                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_constancia.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                    <i class="fas fa-file-contract mr-1"></i> Constancia de Intensivo
+                                                </a>
+                                            </div>
+                                            <div class="col-sm-6 mb-2">
+                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_evaluacion_extraordinaria.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                    <i class="fas fa-redo mr-1"></i> Evaluación Extraordinaria
+                                                </a>
+                                            </div>
+                                            <div class="col-sm-6 mb-2">
+                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_adicion_retiro.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                    <i class="fas fa-exchange-alt mr-1"></i> Adición/Retiro
+                                                </a>
+                                            </div>
+                                            <div class="col-sm-6 mb-2">
+                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_inscripcion_practicas.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                    <i class="fas fa-briefcase mr-1"></i> Pasantías/Proyecto
+                                                </a>
+                                            </div>
+                                            <div class="col-sm-6 mb-2">
+                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_cambio_carrera.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                    <i class="fas fa-random mr-1"></i> Cambio de Carrera
+                                                </a>
+                                            </div>
+                                            <div class="col-sm-6 mb-2">
+                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_cambio_turno_seccion.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                    <i class="fas fa-clock mr-1"></i> Cambio Turno/Sección
+                                                </a>
+                                            </div>
+                                            <div class="col-sm-6 mb-2">
+                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_renuncia_cupo.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                    <i class="fas fa-user-times mr-1"></i> Renuncia de Cupo
+                                                </a>
+                                            </div>
+                                            <div class="col-sm-6 mb-2">
+                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_retiro_semestre.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                    <i class="fas fa-calendar-times mr-1"></i> Retiro de Semestre
+                                                </a>
+                                            </div>
+                                            <div class="col-sm-6 mb-2">
+                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_constancia_retiro.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                    <i class="fas fa-file-export mr-1"></i> Constancia de Retiro
+                                                </a>
+                                            </div>
+                                            <div class="col-sm-6 mb-2">
+                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_constancia_traslado.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                    <i class="fas fa-truck-moving mr-1"></i> Constancia de Traslado
+                                                </a>
+                                            </div>
+                                            <div class="col-sm-6 mb-2">
+                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_constancia_reincorporacion.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                    <i class="fas fa-user-plus mr-1"></i> Constancia de Reincorporación
+                                                </a>
+                                            </div>
+                                            <div class="col-sm-6 mb-2">
+                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_retiro_documento.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
+                                                    <i class="fas fa-file-download mr-1"></i> Retiro de Documento
+                                                </a>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

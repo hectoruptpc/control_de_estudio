@@ -313,77 +313,7 @@ if (!isLoggedIn() || !isAdmin()) {
                     </div>
                 </li>
 
-                <!-- DROPDOWN: Admisión y Control -->
-<li class="nav-item dropdown">
-    <a title="Trámites de Admisión y Control" class="nav-link dropdown-toggle" href="#" 
-       id="navbarDropdownAdmision" role="button" data-toggle="dropdown" 
-       aria-haspopup="true" aria-expanded="false">
-        <i class="fas fa-file-alt fa-fw"></i> Admisión y Control
-    </a>
-    <div class="dropdown-menu" aria-labelledby="navbarDropdownAdmision" style="max-height: 400px; overflow-y: auto;">
-        
-        <!-- Constancias y solicitudes académicas -->
-        <h6 class="dropdown-header text-primary sticky-top bg-white">
-            <i class="fas fa-graduation-cap mr-1"></i> Académico
-        </h6>
-        <a title="Constancia de Intensivo" class="dropdown-item" href="constancia_intensivo.php">
-            <i class="fas fa-file-contract fa-fw"></i> Constancia de Intensivo
-        </a>
-        <a title="Evaluación Extraordinaria" class="dropdown-item" href="evaluacion_extraordinaria.php">
-            <i class="fas fa-redo fa-fw"></i> Evaluación Extraordinaria
-        </a>
-        
-        <!-- Gestión de asignaturas -->
-        <h6 class="dropdown-header text-primary sticky-top bg-white">
-            <i class="fas fa-book mr-1"></i> Gestión de Asignaturas
-        </h6>
-        <a title="Adición/Retiro de Asignatura" class="dropdown-item" href="adicion_retiro.php">
-            <i class="fas fa-exchange-alt fa-fw"></i> Adición/Retiro
-        </a>
-        <a title="Inscripción Pasantías/Proyecto" class="dropdown-item" href="inscripcion_practicas.php">
-            <i class="fas fa-briefcase fa-fw"></i> Pasantías/Proyecto
-        </a>
-        
-        <!-- Cambios y modificaciones -->
-        <h6 class="dropdown-header text-primary sticky-top bg-white">
-            <i class="fas fa-exchange-alt mr-1"></i> Cambios
-        </h6>
-        <a title="Cambio de Carrera" class="dropdown-item" href="cambio_carrera.php">
-            <i class="fas fa-random fa-fw"></i> Cambio de Carrera
-        </a>
-        <a title="Cambio de Turno/Sección" class="dropdown-item" href="cambio_turno_seccion.php">
-            <i class="fas fa-clock fa-fw"></i> Cambio Turno/Sección
-        </a>
-        
-        <!-- Retiros y renuncias -->
-        <h6 class="dropdown-header text-primary sticky-top bg-white">
-            <i class="fas fa-sign-out-alt mr-1"></i> Retiros
-        </h6>
-        <a title="Renuncia de Cupo" class="dropdown-item" href="renuncia_cupo.php">
-            <i class="fas fa-user-times fa-fw"></i> Renuncia de Cupo
-        </a>
-        <a title="Retiro de Semestre" class="dropdown-item" href="retiro_semestre.php">
-            <i class="fas fa-calendar-times fa-fw"></i> Retiro de Semestre
-        </a>
-        <a title="Constancia de Retiro" class="dropdown-item" href="constancia_retiro.php">
-            <i class="fas fa-file-export fa-fw"></i> Constancia de Retiro
-        </a>
-        
-        <!-- Constancias varias -->
-        <h6 class="dropdown-header text-primary sticky-top bg-white">
-            <i class="fas fa-file-certificate mr-1"></i> Constancias
-        </h6>
-        <a title="Constancia de Traslado" class="dropdown-item" href="constancia_traslado.php">
-            <i class="fas fa-truck-moving fa-fw"></i> Constancia de Traslado
-        </a>
-        <a title="Constancia de Reincorporación" class="dropdown-item" href="constancia_reincorporacion.php">
-            <i class="fas fa-user-plus fa-fw"></i> Constancia de Reincorporación
-        </a>
-        <a title="Retiro de Documento" class="dropdown-item" href="retiro_documento.php">
-            <i class="fas fa-file-download fa-fw"></i> Retiro de Documento
-        </a>
-    </div>
-</li>
+                <!-- Admisión y Control: eliminado del menú principal (migrado a constancias.php) -->
 
                 <!-- DROPDOWN: Ajustes -->
                 <li class="nav-item dropdown">
