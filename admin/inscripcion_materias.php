@@ -114,13 +114,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($id_estudiante > 0) {
                 $info_estudiante = obtenerInfoEstudiantePorId($id_estudiante);
-                
+
                 if ($info_estudiante) {
                     $_SESSION['estudiante_seleccionado'] = $info_estudiante['id'];
                 } else {
                     $mensaje = "Estudiante no encontrado";
                     $tipo_mensaje = 'danger';
                 }
+            } else {
+                // Limpiar selección: eliminar variable de sesión y limpiar variables relacionadas
+                unset($_SESSION['estudiante_seleccionado']);
+                $info_estudiante = null;
+                $materias_disponibles = [];
+                $secciones_disponibles = [];
+                $materias_aprobadas = [];
+                $materias_inscritas = [];
+                $historial_secciones = [];
+                $trayecto_actual = 0;
+                $trayecto_inscripcion = 0;
+                $es_estudiante_nuevo = false;
+                $mensaje = "Selección de estudiante limpiada.";
+                $tipo_mensaje = 'info';
             }
         }
     }
