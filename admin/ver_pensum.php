@@ -67,10 +67,24 @@ if (!empty($id_malla)) {
 
 $result_materias = mysqli_query($db, $query_materias);
 $materias_agrupadas = [];
+
+// Determinar el texto a usar basado en el tipo de formación
+$es_ptf = (isset($carrera['tipo_formacion']) && strtoupper($carrera['tipo_formacion']) == 'PTF');
+$texto_trayecto = $es_ptf ? 'Semestre' : 'Trayecto';
+
 while ($materia = mysqli_fetch_assoc($result_materias)) {
     $trayecto = $materia['trayecto'];
-    $texto_trayecto = ($trayecto == 0) ? 'Trayecto Inicial' : 'Trayecto ' . $trayecto;
-    $materias_agrupadas[$texto_trayecto][] = $materia;
+    $nombre_grupo = '';
+    
+    if ($es_ptf) {
+        // Para PTF: "Semestre 1", "Semestre 2", etc.
+        $nombre_grupo = ($trayecto == 0) ? 'Semestre Inicial' : 'Semestre ' . $trayecto;
+    } else {
+        // Para otros tipos: "Trayecto 1", "Trayecto 2", etc.
+        $nombre_grupo = ($trayecto == 0) ? 'Trayecto Inicial' : 'Trayecto ' . $trayecto;
+    }
+    
+    $materias_agrupadas[$nombre_grupo][] = $materia;
 }
 
 // ==========================================
@@ -99,18 +113,18 @@ if (isset($_GET['pdf']) && $_GET['pdf'] == '1') {
     }
     $pdf->Ln(5);
 
-    foreach ($materias_agrupadas as $trayecto_nombre => $materias) {
-        // Verificar espacio restante antes de imprimir el encabezado del trayecto
+    foreach ($materias_agrupadas as $grupo_nombre => $materias) {
+        // Verificar espacio restante antes de imprimir el encabezado del grupo
         if ($pdf->GetY() > 250) $pdf->AddPage();
 
         $pdf->SetFont('Arial', 'B', 10);
         $pdf->SetFillColor(230, 230, 230);
-        $pdf->Cell(0, 7, to_iso($trayecto_nombre), 1, 1, 'L', true);
+        $pdf->Cell(0, 7, to_iso($grupo_nombre), 1, 1, 'L', true);
 
-        // Anchos de columna (Total 190mm)
-        $w = [22, 58, 10, 14, 14, 14, 14, 24, 20];
+        // Anchos de columna redistribuidos (Total 190mm)
+        $w = [22, 70, 14, 16, 16, 16, 16, 20]; // Total: 190mm
         $pdf->SetFont('Arial', 'B', 8);
-        $headers = ['CÓDIGO', 'ASIGNATURA', 'UC', 'H.T.', 'H.P.', 'H.L.', 'H.S.', 'DURACIÓN', 'ESTADO'];
+        $headers = ['CÓDIGO', 'ASIGNATURA', 'UC', 'H.T.', 'H.P.', 'H.L.', 'H.S.', 'ESTADO'];
         foreach($headers as $i => $h_text) $pdf->Cell($w[$i], 7, to_iso($h_text), 1, 0, 'C', true);
         $pdf->Ln();
 
@@ -137,8 +151,7 @@ if (isset($_GET['pdf']) && $_GET['pdf'] == '1') {
             $pdf->Cell($w[4], $h_fila, $m['horas_practicas'], 1, 0, 'C');
             $pdf->Cell($w[5], $h_fila, $m['horas_laboratorio'], 1, 0, 'C');
             $pdf->Cell($w[6], $h_fila, $m['horas_semanales'], 1, 0, 'C');
-            $pdf->Cell($w[7], $h_fila, to_iso($m['duracion_periodo']), 1, 0, 'C');
-            $pdf->Cell($w[8], $h_fila, ($m['activa'] ? 'Activa' : 'Inactiva'), 1, 1, 'C');
+            $pdf->Cell($w[7], $h_fila, ($m['activa'] ? 'Activa' : 'Inactiva'), 1, 1, 'C');
         }
         $pdf->Ln(4);
     }
@@ -151,9 +164,7 @@ include("includes/head.php");
 
 <div class="container-fluid">
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">Pensum: <?php echo htmlspecialchars($carrera['nombre_carrera']); ?> 
-            <small class="text-muted">(<?php echo mb_strtoupper($tipo_periodo, 'UTF-8'); ?>S)</small>
-        </h1>
+        <h1 class="h3 mb-0 text-gray-800">Pensum: <?php echo htmlspecialchars($carrera['nombre_carrera']); ?></h1>
         <div>
             <a href="lista_carreras.php" class="btn btn-sm btn-primary shadow-sm no-print"><i class="fas fa-arrow-left"></i> Volver</a>
             <a href="?<?= $_SERVER['QUERY_STRING'] ?>&pdf=1" class="btn btn-sm btn-success shadow-sm no-print ml-2">
@@ -170,21 +181,20 @@ include("includes/head.php");
             <?php if (empty($materias_agrupadas)): ?>
                 <div class="alert alert-warning">No hay materias registradas.</div>
             <?php else: ?>
-                <?php foreach ($materias_agrupadas as $trayecto => $materias): ?>
-                    <h5 class="font-weight-bold text-primary mt-4 mb-3"><?= $trayecto ?></h5>
+                <?php foreach ($materias_agrupadas as $grupo => $materias): ?>
+                    <h5 class="font-weight-bold text-primary mt-4 mb-3"><?= htmlspecialchars($grupo) ?></h5>
                     <div class="table-responsive">
-                        <table class="table table-bordered table-hover">
+                        <table class="table table-bordered table-hover" style="table-layout: fixed; width: 100%;">
                             <thead class="thead-light text-center">
                                 <tr>
-                                    <th>Código</th>
-                                    <th>Nombre de la Asignatura</th>
-                                    <th>Unidades Crédito</th>
-                                    <th>Horas Teóricas</th>
-                                    <th>Horas Prácticas</th>
-                                    <th>Horas Laboratorio</th>
-                                    <th>Horas Semanales</th>
-                                    <th>Duración Periodo</th>
-                                    <th>Estado</th>
+                                    <th style="width: 12%">Código</th>
+                                    <th style="width: 38%">Nombre de la Asignatura</th>
+                                    <th style="width: 8%">Unidades Crédito</th>
+                                    <th style="width: 8%">Horas Teóricas</th>
+                                    <th style="width: 8%">Horas Prácticas</th>
+                                    <th style="width: 8%">Horas Laboratorio</th>
+                                    <th style="width: 8%">Horas Semanales</th>
+                                    <th style="width: 10%">Estado</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -197,7 +207,6 @@ include("includes/head.php");
                                         <td class="text-center"><?= $m['horas_practicas'] ?></td>
                                         <td class="text-center"><?= $m['horas_laboratorio'] ?></td>
                                         <td class="text-center"><?= $m['horas_semanales'] ?></td>
-                                        <td class="text-center"><?= $m['duracion_periodo'] ?></td>
                                         <td class="text-center">
                                             <span class="badge badge-<?= $m['activa'] ? 'success' : 'secondary' ?>">
                                                 <?= $m['activa'] ? 'Activa' : 'Inactiva' ?>
