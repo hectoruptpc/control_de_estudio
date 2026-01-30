@@ -133,7 +133,7 @@ include("includes/head.php");
                             
                             <div class="form-group col-md-2">
                                 <label for="creditos">Créditos</label>
-                                <input type="number" class="form-control" id="creditos" name="creditos" min="1" value="1" required>
+                                <input type="number" class="form-control" id="creditos" name="creditos" min="0" value="1" required>
                             </div>
                         </div>
                         
