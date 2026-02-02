@@ -1,130 +1,20 @@
 <?php
 require_once('../funciones/functions.php');
 
-
 //CARGAR PERMISOS
 cargarPermisosUsuario();
 verificarPermiso('consultar_notas');
-
-
 
 if (!isLoggedIn()) {
     header('location: ../login.php');
     exit();
 }
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 $titulopag = "Consulta de Notas por Cédula";
 include("includes/head.php");
-
-// Función para buscar estudiante por cédula (nombre cambiado)
-function buscarEstudiantePorCedulaConsulta($cedula) {
-    global $db;
-    
-    $query = "SELECT u.id, u.nombre, u.idusuario, u.carrera 
-              FROM users u 
-              WHERE u.idusuario = ? AND u.estudiante = 1";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("s", $cedula);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
-}
-
-// Función para obtener la carrera del estudiante
-function obtenerCarreraEstudiante($estudiante_id) {
-    global $db;
-    
-    $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera 
-              FROM users u
-              INNER JOIN carreras c ON u.carrera = c.id_carrera
-              WHERE u.id = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $estudiante_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
-}
-
-// Función para obtener todas las materias de la carrera
-function obtenerMateriasCarrera($carrera_id) {
-    global $db;
-    
-    $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto
-              FROM carrera_materia cm
-              INNER JOIN materias m ON cm.id_materia = m.id_materia
-              WHERE cm.id_carrera = ?
-              ORDER BY m.trayecto, m.nombre_materia";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $carrera_id);
-    $stmt->execute();
-    return $stmt->get_result();
-}
-
-// Función para obtener información del trayecto desde la tabla trayectos
-function obtenerInfoTrayecto($numero_trayecto) {
-    global $db;
-    
-    $query = "SELECT id_trayecto, numero_trayecto, nombre_trayecto 
-              FROM trayectos 
-              WHERE numero_trayecto = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $numero_trayecto);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        return $result->fetch_assoc();
-    }
-    
-    // Si no encuentra el trayecto, crear uno basado en el número
-    $nombres_trayectos = [
-        0 => 'Trayecto Inicial',
-        1 => 'Trayecto 1',
-        2 => 'Trayecto 2', 
-        3 => 'Trayecto 3',
-        4 => 'Trayecto 4'
-    ];
-    
-    return [
-        'id_trayecto' => $numero_trayecto + 1,
-        'numero_trayecto' => $numero_trayecto,
-        'nombre_trayecto' => isset($nombres_trayectos[$numero_trayecto]) ? $nombres_trayectos[$numero_trayecto] : 'Trayecto ' . $numero_trayecto
-    ];
-}
-
-// Función para obtener las notas definitivas del estudiante
-function obtenerNotasEstudianteConsulta($estudiante_id) {
-    global $db;
-    
-    $query = "SELECT nd.*, 
-                     m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto,
-                     pa.nombre_periodo,
-                     ud.nombre as nombre_docente,
-                     ua.nombre as nombre_admin
-              FROM notas_definitivas nd
-              INNER JOIN materias m ON nd.id_materia = m.id_materia
-              INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
-              LEFT JOIN users ud ON nd.id_docente = ud.id
-              LEFT JOIN users ua ON nd.id_admin_aprobador = ua.id
-              WHERE nd.id_usuario = ?
-              ORDER BY pa.nombre_periodo, m.nombre_materia";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $estudiante_id);
-    $stmt->execute();
-    
-    // Convertir to array asociativo con id_materia como clave
-    $result = $stmt->get_result();
-    $notas = [];
-    while ($row = $result->fetch_assoc()) {
-        $notas[$row['id_materia']] = $row;
-    }
-    
-    return $notas;
-}
 
 // Procesar búsqueda
 $estudiante = null;
@@ -132,6 +22,7 @@ $carrera = null;
 $materias_carrera = [];
 $notas_estudiante = [];
 $mensaje_error = '';
+$info_apto = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
     $cedula = trim($_POST['cedula']);
@@ -149,6 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                 
                 // Obtener notas del estudiante (si existen)
                 $notas_estudiante = obtenerNotasEstudianteConsulta($estudiante['id']);
+                
+                // Determinar si es apto para grado
+                $info_apto = esAptoParaGradoConsulta($estudiante['id'], $carrera['id_carrera']);
             }
         } else {
             $mensaje_error = "No se encontró ningún estudiante con la cédula: " . htmlspecialchars($cedula);
@@ -185,11 +79,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
     </div>
     
     <?php if ($estudiante && $carrera): ?>
-    <div class="card mb-4">
-        <div class="card-header bg-info text-white">
-            <h5>Información del Estudiante</h5>
+<div class="card mb-4">
+    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Información del Estudiante</h5>
+        <div class="btn-group" role="group">
+            <!-- Botón 1: Historial TSU -->
+            <a href="historial_desglozado_tsu.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
+               class="btn btn-warning btn-sm mr-2" target="_blank">
+                <i class="fas fa-file-pdf"></i> Historial TSU
+            </a>
+            
+            <!-- Botón 2: Historial Ingeniería -->
+            <a href="historial_desglozado_ingenieria.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
+               class="btn btn-info btn-sm mr-2" target="_blank">
+                <i class="fas fa-file-pdf"></i> Historial Ingeniería
+            </a>
+            
+            <!-- Botón 3: Historial Completo -->
+            <a href="generar_reporte_consulta.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
+               class="btn btn-danger btn-sm" target="_blank">
+                <i class="fas fa-file-pdf"></i> Historial Completo
+            </a>
         </div>
-        <div class="card-body">
+    </div>
+    <div class="card-body">
+        
             <div class="row">
                 <div class="col-md-6">
                     <p><strong>Cédula:</strong> <?= htmlspecialchars($estudiante['idusuario']) ?></p>
@@ -198,8 +112,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                 <div class="col-md-6">
                     <p><strong>Carrera:</strong> <?= htmlspecialchars($carrera['nombre_carrera']) ?> (<?= htmlspecialchars($carrera['cod_carrera']) ?>)</p>
                     <p><strong>Total de Materias:</strong> <span class="badge badge-primary"><?= $materias_carrera->num_rows ?></span></p>
+                    <?php if ($info_apto): ?>
+                    <p><strong>Estado para Grado:</strong> 
+                        <?= obtenerBadgeEstadoConsulta($info_apto) ?>
+                    </p>
+                    <?php endif; ?>
                 </div>
             </div>
+            
+            <?php if ($info_apto): ?>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="alert <?= ($info_apto['apto_grado_completo'] || $info_apto['apto_tsu']) ? 'alert-success' : 'alert-warning' ?>">
+                        <h6><i class="fas fa-graduation-cap"></i> Evaluación para Grado:</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>TSU (Trayectos 0-2):</strong><br>
+                                <?= $info_apto['materias_aprobadas_tsu'] ?>/<?= $info_apto['total_materias_tsu'] ?> materias aprobadas<br>
+                                <span class="badge badge-<?= $info_apto['porcentaje_tsu'] >= 90 ? 'success' : 'warning' ?>">
+                                    <?= $info_apto['porcentaje_tsu'] ?>% completado
+                                </span>
+                                <?php if ($info_apto['apto_tsu']): ?>
+                                    <span class="badge badge-success ml-2">APTO TSU</span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Grado Completo:</strong><br>
+                                <?= $info_apto['materias_aprobadas_completo'] ?>/<?= $info_apto['total_materias_carrera'] ?> materias aprobadas<br>
+                                <span class="badge badge-<?= $info_apto['porcentaje_completo'] >= 100 ? 'success' : 'info' ?>">
+                                    <?= $info_apto['porcentaje_completo'] ?>% completado
+                                </span>
+                                <?php if ($info_apto['apto_grado_completo']): ?>
+                                    <span class="badge badge-success ml-2">APTO GRADO COMPLETO</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
     
@@ -210,17 +161,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-bordered table-striped">
-                    <thead class="thead-dark">
+                <table class="table table-bordered table-sm">
+                    <thead class="thead-light">
                         <tr>
-                            <th>Trayecto</th>
+                            <th width="100">Trayecto</th>
                             <th>Materia</th>
-                            <th>Código</th>
-                            <th>Nota</th>
-                            <th>Estado</th>
-                            <th>Periodo</th>
-                            <th>Fecha Registro</th>
-                            <th>Aprobado por</th>
+                            <th width="100">Cod Materia</th>
+                            <th width="80">Nota</th>
+                            <th width="90">Estado</th>
+                            <th width="120">Periodo</th>
+                            <th width="100">Fecha</th>
+                            <th width="120">Aprobado por</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -230,6 +181,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                         $materias_sin_notas = 0;
                         $suma_promedios = 0;
                         $materias_con_notas = 0;
+                        
+                        // Reiniciar el puntero del resultado
+                        $materias_carrera->data_seek(0);
                         
                         while ($materia = $materias_carrera->fetch_assoc()): 
                             $nota = isset($notas_estudiante[$materia['id_materia']]) ? $notas_estudiante[$materia['id_materia']] : null;
@@ -281,9 +235,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                                 
                                 <td class="text-center">
                                     <?php if ($tiene_nota): ?>
-                                        <span class="badge badge-<?= $nota_trayecto >= 12 ? 'success' : 'danger' ?>">
-                                            <?= $nota_trayecto ?>
-                                        </span>
+                                        <div class="nota-display">
+                                            <span class="nota-valor <?= $nota_trayecto >= 12 ? 'nota-aprobada' : 'nota-reprobada' ?>">
+                                                <?= $nota_trayecto ?>
+                                            </span>
+                                        </div>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
@@ -339,26 +295,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                             $porcentaje_completado = $total_materias > 0 ? round(($materias_con_notas / $total_materias) * 100, 1) : 0;
                             ?>
                             
-                            <p><strong>Promedio General:</strong> 
-                                <span class="badge badge-<?= $promedio_general >= 12 ? 'success' : ($promedio_general > 0 ? 'warning' : 'secondary') ?>">
-                                    <?= $promedio_general > 0 ? $promedio_general : 'N/A' ?>
-                                </span>
-                            </p>
-                            <p><strong>Materias Aprobadas:</strong> 
-                                <span class="badge badge-success"><?= $materias_aprobadas ?></span>
-                                <?= $materias_con_notas > 0 ? "($porcentaje_aprobadas%)" : '' ?>
-                            </p>
-                            <p><strong>Materias Reprobadas:</strong> 
-                                <span class="badge badge-danger"><?= $materias_reprobadas ?></span>
-                                <?= $materias_con_notas > 0 ? "(" . (100 - $porcentaje_aprobadas) . "%)" : '' ?>
-                            </p>
-                            <p><strong>Materias Sin Notas:</strong> 
-                                <span class="badge badge-secondary"><?= $materias_sin_notas ?></span>
-                                (<?= $porcentaje_completado ?>% completado)
-                            </p>
-                            <p><strong>Total Materias:</strong> 
-                                <span class="badge badge-primary"><?= $total_materias ?></span>
-                            </p>
+                            <div class="stats-container">
+                                <div class="stat-item">
+                                    <div class="stat-value h4 text-primary"><?= $total_materias ?></div>
+                                    <div class="stat-label">Total Materias</div>
+                                </div>
+                                
+                                <div class="stat-item">
+                                    <div class="stat-value h4 <?= $promedio_general >= 12 ? 'text-success' : ($promedio_general > 0 ? 'text-warning' : 'text-secondary') ?>">
+                                        <?= $promedio_general > 0 ? $promedio_general : 'N/A' ?>
+                                    </div>
+                                    <div class="stat-label">Promedio</div>
+                                </div>
+                                
+                                <div class="stat-item">
+                                    <div class="stat-value h4 text-success"><?= $materias_aprobadas ?></div>
+                                    <div class="stat-label">Aprobadas</div>
+                                </div>
+                                
+                                <div class="stat-item">
+                                    <div class="stat-value h4 text-danger"><?= $materias_reprobadas ?></div>
+                                    <div class="stat-label">Reprobadas</div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <p><strong>Progreso:</strong> 
+                                    <span class="badge badge-<?= $porcentaje_completado >= 100 ? 'success' : ($porcentaje_completado >= 50 ? 'info' : 'warning') ?>">
+                                        <?= $porcentaje_completado ?>% completado
+                                    </span>
+                                </p>
+                                <p><strong>Efectividad:</strong> 
+                                    <span class="badge badge-<?= $porcentaje_aprobadas >= 80 ? 'success' : ($porcentaje_aprobadas >= 50 ? 'warning' : 'danger') ?>">
+                                        <?= $porcentaje_aprobadas ?>% de aprobación
+                                    </span>
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -393,7 +365,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                                 <div class="progress-bar bg-success" 
                                      style="width: <?= $porcentaje_completado ?>%"
                                      title="<?= $porcentaje_completado ?>% completado">
-                                    <?= $porcentaje_completado ?>% Completado
+                                    <span class="progress-text" style="color: #000; font-weight: bold;"><?= $porcentaje_completado ?>%</span>
                                 </div>
                                 
                                 <!-- Línea de meta para TSU -->
@@ -431,15 +403,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                             <div class="progress mb-3" style="height: 20px;">
                                 <div class="progress-bar bg-success" 
                                      style="width: <?= ($materias_aprobadas / $total_materias) * 100 ?>%">
-                                    Aprobadas: <?= $materias_aprobadas ?>
+                                    <span class="progress-text" style="color: #000; font-weight: bold;"><?= $materias_aprobadas ?></span>
                                 </div>
                                 <div class="progress-bar bg-danger" 
                                      style="width: <?= ($materias_reprobadas / $total_materias) * 100 ?>%">
-                                    Reprobadas: <?= $materias_reprobadas ?>
+                                    <span class="progress-text" style="color: #000; font-weight: bold;"><?= $materias_reprobadas ?></span>
                                 </div>
                                 <div class="progress-bar bg-secondary" 
                                      style="width: <?= ($materias_sin_notas / $total_materias) * 100 ?>%">
-                                    Pendientes: <?= $materias_sin_notas ?>
+                                    <span class="progress-text" style="color: #000; font-weight: bold;"><?= $materias_sin_notas ?></span>
                                 </div>
                             </div>
                             
@@ -476,5 +448,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
     
     <?php endif; ?>
 </div>
+
+<style>
+.nota-display {
+    text-align: center;
+    padding: 2px;
+}
+
+.nota-valor {
+    display: inline-block;
+    font-size: 1rem;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 6px;
+    min-width: 40px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    color: #000000 !important; /* Texto negro */
+    font-weight: 900; /* Texto más grueso */
+}
+
+.nota-aprobada {
+    background: #90EE90; /* Verde claro */
+    border: 1px solid #28a745;
+}
+
+.nota-reprobada {
+    background: #FFB6C1; /* Rojo claro */
+    border: 1px solid #dc3545;
+}
+
+.stats-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 8px;
+    border-radius: 6px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+}
+
+.stat-value {
+    font-weight: bold;
+    margin-bottom: 2px;
+    color: #000 !important; /* Texto negro en estadísticas */
+    font-weight: 700;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.progress-text {
+    font-weight: bold;
+    text-shadow: 1px 1px 1px rgba(255,255,255,0.5);
+}
+
+.table-sm td, .table-sm th {
+    padding: 0.5rem;
+}
+
+/* Estilos para el botón de reporte */
+.btn-danger {
+    color: white;
+}
+</style>
 
 <?php include("includes/footer.php"); ?>

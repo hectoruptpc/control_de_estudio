@@ -5,47 +5,41 @@ ini_set('display_errors', '1');
 $titulopag = "Gestión de Tipos de Pago";
 include('../funciones/functions.php');
 
-
-//CARGAR PERMISOS
+// CARGAR PERMISOS
 cargarPermisosUsuario();
 verificarPermiso('tipos_pago');
 
-
-
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
 
 // Variables
 $error = $success = '';
 $id = $tipopago = '';
-$accion = 'crear';
 
 // Procesar formulario de creación/edición
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $id = $_POST['id'] ?? '';
     $tipopago = trim($_POST['tipopago'] ?? '');
     
-    if (empty($tipopago)) {
-        $error = "El tipo de pago es requerido";
+    // Validar datos
+    $validacion = validarTipoPago($tipopago);
+    if (!$validacion['success']) {
+        $error = $validacion['message'];
     } else {
         if (empty($id)) {
             // Crear nuevo registro
-            $stmt = $db->prepare("INSERT INTO tipo_pago (tipopago) VALUES (?)");
-            $stmt->bind_param("s", $tipopago);
-            if ($stmt->execute()) {
-                $success = "Tipo de pago creado exitosamente";
-            } else {
-                $error = "Error al crear: " . $db->error;
-            }
-            $stmt->close();
+            $resultado = crearTipoPago($tipopago);
         } else {
             // Actualizar registro existente
-            $stmt = $db->prepare("UPDATE tipo_pago SET tipopago = ? WHERE id = ?");
-            $stmt->bind_param("si", $tipopago, $id);
-            if ($stmt->execute()) {
-                $success = "Tipo de pago actualizado exitosamente";
-            } else {
-                $error = "Error al actualizar: " . $db->error;
-            }
-            $stmt->close();
+            $resultado = actualizarTipoPago($id, $tipopago);
+        }
+        
+        if ($resultado['success']) {
+            $success = $resultado['message'];
+            // Limpiar formulario después de éxito
+            $id = $tipopago = '';
+        } else {
+            $error = $resultado['message'];
         }
     }
 }
@@ -53,23 +47,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 // Procesar eliminación
 if (isset($_POST['eliminar_id'])) {
     $id_eliminar = intval($_POST['eliminar_id']);
-    $stmt = $db->prepare("DELETE FROM tipo_pago WHERE id = ?");
-    $stmt->bind_param("i", $id_eliminar);
-    if ($stmt->execute()) {
-        $success = "Tipo de pago eliminado exitosamente";
+    $resultado = eliminarTipoPago($id_eliminar);
+    
+    if ($resultado['success']) {
+        $success = $resultado['message'];
     } else {
-        $error = "Error al eliminar: " . $db->error;
+        $error = $resultado['message'];
     }
-    $stmt->close();
 }
 
 // Obtener todos los registros
-$query = "SELECT id, tipopago FROM tipo_pago ORDER BY tipopago";
-$result = $db->query($query);
-$tipos_pago = [];
-if ($result) {
-    $tipos_pago = $result->fetch_all(MYSQLI_ASSOC);
-}
+$tipos_pago = obtenerTiposPago();
 
 include("includes/head.php");
 ?>
@@ -105,17 +93,23 @@ include("includes/head.php");
                 </div>
                 <div class="card-body">
                     <form method="POST" action="">
-                        <input type="hidden" name="id" id="form_id" value="">
+                        <input type="hidden" name="id" id="form_id" value="<?php echo htmlspecialchars($id); ?>">
                         
                         <div class="form-group">
                             <label for="tipopago">Tipo de Pago:</label>
                             <input type="text" class="form-control" id="tipopago" name="tipopago" 
                                    value="<?php echo htmlspecialchars($tipopago); ?>" required 
-                                   placeholder="Ingrese el tipo de pago">
+                                   placeholder="Ingrese el tipo de pago" maxlength="100">
+                            <small class="form-text text-muted">Mínimo 2 caracteres, máximo 100 caracteres</small>
                         </div>
                         
-                        <button type="submit" class="btn btn-primary" id="form_submit_btn">Crear</button>
-                        <button type="button" class="btn btn-secondary" id="cancel_edit_btn" style="display:none;">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="form_submit_btn">
+                            <?php echo empty($id) ? 'Crear' : 'Actualizar'; ?>
+                        </button>
+                        
+                        <?php if (!empty($id)): ?>
+                            <button type="button" class="btn btn-secondary" id="cancel_edit_btn">Cancelar</button>
+                        <?php endif; ?>
                     </form>
                 </div>
             </div>
@@ -148,12 +142,12 @@ include("includes/head.php");
                                                 <button class="btn btn-warning btn-sm edit-btn" 
                                                         data-id="<?php echo $tipo['id']; ?>" 
                                                         data-tipopago="<?php echo htmlspecialchars($tipo['tipopago']); ?>">
-                                                    Editar
+                                                    <i class="fas fa-edit"></i> Editar
                                                 </button>
                                                 <button class="btn btn-danger btn-sm delete-btn" 
                                                         data-id="<?php echo $tipo['id']; ?>" 
                                                         data-tipopago="<?php echo htmlspecialchars($tipo['tipopago']); ?>">
-                                                    Eliminar
+                                                    <i class="fas fa-trash"></i> Eliminar
                                                 </button>
                                             </td>
                                         </tr>
@@ -183,7 +177,8 @@ include("includes/head.php");
                     <input type="hidden" name="id" id="edit_id">
                     <div class="form-group">
                         <label for="edit_tipopago">Tipo de Pago:</label>
-                        <input type="text" class="form-control" id="edit_tipopago" name="tipopago" required>
+                        <input type="text" class="form-control" id="edit_tipopago" name="tipopago" required maxlength="100">
+                        <small class="form-text text-muted">Mínimo 2 caracteres, máximo 100 caracteres</small>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -269,6 +264,16 @@ include("includes/head.php");
         // Cerrar modales al enviar formularios
         $('#editForm').submit(function() {
             $('#editModal').modal('hide');
+        });
+        
+        // Validación en tiempo real del formulario principal
+        $('#tipopago').on('input', function() {
+            var valor = $(this).val().trim();
+            if (valor.length < 2 && valor.length > 0) {
+                $(this).addClass('is-invalid');
+            } else {
+                $(this).removeClass('is-invalid');
+            }
         });
     });
 </script>

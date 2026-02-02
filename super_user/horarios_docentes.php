@@ -9,6 +9,9 @@ include('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('horarios');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 global $db;
 
 // Procesar solicitudes AJAX
@@ -148,15 +151,25 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                             $celdaContent = '<strong>' . $asignacion['materia'] . '</strong><br>' . 
                                             '<small>' . $asignacion['nombre_carrera'] . ' (' . $asignacion['codigo_seccion'] . ')</small>';
                             
-                            $hora_fin = $asignacion['hora_fin'];
-                            $hora_fin_index = array_search($hora_fin, $horas_disponibles);
-                            
-                            if($hora_fin_index !== false) {
-                                $rowspan = $hora_fin_index - $hora_index + 1;
-                                for($i = $hora_index; $i < $hora_fin_index; $i++) {
-                                    $celdas_ocupadas[$dia_index][$i] = true;
-                                }
-                            }
+                                            $hora_fin = $asignacion['hora_fin'];
+
+                                            // Calcular rowspan basado en diferencia de tiempo (en horas).
+                                            // Evita depender de coincidencias exactas en el array de horas.
+                                            $start_ts = strtotime($hora);
+                                            $end_ts = strtotime($hora_fin);
+
+                                            if ($end_ts <= $start_ts) {
+                                                $rowspan = 1;
+                                            } else {
+                                                $hours = ($end_ts - $start_ts) / 3600;
+                                                $rowspan = max(1, (int) ceil($hours));
+
+                                                // Marcar las celdas ocupadas respetando el límite del horario mostrado
+                                                $max_index = count($horas_disponibles);
+                                                for ($i = $hora_index; $i < min($max_index, $hora_index + $rowspan); $i++) {
+                                                    $celdas_ocupadas[$dia_index][$i] = true;
+                                                }
+                                            }
                             
                             $clasesCelda .= ' bg-asignada';
                             $id_horario = $asignacion['id_horario'];
@@ -277,22 +290,9 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                 exit();
             }
             
-            // Validar máximo 2 horas por semana por materia
-            $query = "SELECT SUM(TIME_TO_SEC(TIMEDIFF(hora_fin, hora_inicio)))/3600 as horas_semana
-                      FROM horarios 
-                      WHERE id_docente_seccion = ?";
-            $stmt = $db->prepare($query);
-            $stmt->bind_param("i", $id_docente_seccion);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $horas_existentes = $result->fetch_assoc()['horas_semana'] ?? 0;
-            
-            $nuevas_horas = (strtotime($hora_fin) - strtotime($hora_inicio))/3600;
-            
-            if(($horas_existentes + $nuevas_horas) > 2) {
-                echo json_encode(['success' => false, 'message' => 'No se puede exceder el máximo de 2 horas semanales por materia']);
-                exit();
-            }
+            // Nota: Se eliminó la validación que limitaba a 2 horas por semana por materia.
+            // Ahora no se impone un límite semanal automático; la validación se basa únicamente
+            // en solapamientos de horarios y en la coherencia de hora inicio/fin.
             
             // Verificar conflicto para el docente (mismo horario)
             $query = "SELECT COUNT(*) as conflicto
@@ -418,8 +418,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
 
             $asignaciones = [];
             while($row = $result->fetch_assoc()) {
-                // Limitar a máximo 2 horas por materia
-                $row['horas_totales'] = min($row['horas_totales'], 2);
+                // No se aplica cap automático de horas por materia aquí.
                 $asignaciones[] = $row;
             }
 
@@ -592,8 +591,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                 while($horasAsignadas < $horasNecesarias && $intentos < $maxIntentos) {
                     $intentos++;
                     
-                    // Calcular duración de este bloque (máximo 2 horas por materia)
-                    $duracionBloque = min($duracion_clase, $horasNecesarias - $horasAsignadas, 2);
+                    // Calcular duración de este bloque (sin cap automático de 2 horas)
+                    $duracionBloque = min($duracion_clase, $horasNecesarias - $horasAsignadas);
                     
                     // Buscar horario disponible con verificación de conflictos
                     $horario = encontrarHorarioDisponible($disponibilidad, $dias_disponibles, $horas_disponibles, $duracionBloque, $aulas, $id_docente, $todos_horarios);
@@ -881,7 +880,7 @@ include("includes/head.php");
                 
                 <div class="alert alert-info">
                     <strong>Información:</strong> El sistema intentará distribuir las clases considerando la disponibilidad de aulas y otros docentes.
-                    <br><strong>Máximo 2 horas por materia por semana.</strong>
+                    <br><strong>No se aplica un límite automático de horas por materia; revise la disponibilidad manualmente.</strong>
                 </div>
             </div>
             <div class="modal-footer">
@@ -991,6 +990,22 @@ include("includes/head.php");
     .table-warning {
         background-color: #fff3cd;
     }
+
+    /* Mejoras para evitar desbordes y mantener la tabla alineada */
+    table.table {
+        table-layout: fixed;
+        width: 100%;
+    }
+    .horario-cell {
+        box-sizing: border-box;
+        overflow: hidden;
+        word-break: break-word;
+        white-space: normal;
+        min-height: 60px;
+    }
+    td[title] {
+        max-width: 1px; /* fuerza el quiebre dentro de la celda cuando sea necesario */
+    }
 </style>
 
 <script>
@@ -1067,13 +1082,10 @@ $(document).ready(function() {
                 $('#selectDocenteMateria').change(function() {
                     var horas = $(this).find('option:selected').data('horas');
                     if(horas) {
-                        // Mostrar horas restantes disponibles para esta materia (máximo 2)
-                        var horasRestantes = 2 - horas;
-                        if(horasRestantes > 0) {
-                            $('#horasRestantes').text('Horas disponibles esta semana: ' + horasRestantes + ' de 2');
-                        } else {
-                            $('#horasRestantes').text('¡Atención! Esta materia ya tiene las 2 horas máximas asignadas esta semana');
-                        }
+                        // Mostrar horas asignadas esta semana (sin límite automático)
+                        $('#horasRestantes').text('Horas asignadas esta semana: ' + horas + (horas > 1 ? ' horas' : ' hora'));
+                    } else {
+                        $('#horasRestantes').text('');
                     }
                 });
                 
@@ -1097,11 +1109,8 @@ $(document).ready(function() {
             var fin = new Date('1970-01-01T' + horaFin + ':00');
             var diff = (fin - inicio) / (1000 * 60 * 60); // Diferencia en horas
             
-            if(diff <= 0) {
+                    if(diff <= 0) {
                 $('#duracionClase').html('<span class="text-danger">Hora fin debe ser mayor que hora inicio</span>');
-                $('#btnGuardarAsignacion').prop('disabled', true);
-            } else if(diff > 2) {
-                $('#duracionClase').html('<span class="text-danger">No puede exceder 2 horas continuas</span>');
                 $('#btnGuardarAsignacion').prop('disabled', true);
             } else {
                 $('#duracionClase').text(diff + ' hora(s)');

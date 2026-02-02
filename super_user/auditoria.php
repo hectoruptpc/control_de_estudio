@@ -18,6 +18,9 @@ if (!isAdmin()) {
 cargarPermisosUsuario();
 verificarPermiso('auditoria');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 $titulopag = "Sistema de Auditoría";
 include("includes/head.php");
 

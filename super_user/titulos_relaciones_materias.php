@@ -5,19 +5,21 @@ ini_set('display_errors', '1');
 $titulopag = "Gestión de Títulos y Materias";
 include('../funciones/functions.php');
 
-//CARGAR PERMISOS
+// CARGAR PERMISOS
 cargarPermisosUsuario();
 verificarPermiso('titulos_re_materia');
+
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
 
 // **1. Manejar solicitudes AJAX para búsqueda en tiempo real**
 if (isset($_GET['ajax_type'])) {
     header('Content-Type: application/json');
-    $search = $db->real_escape_string($_GET['search'] ?? '');
+    $search = $_GET['search'] ?? '';
 
     // **Búsqueda de Títulos**
     if ($_GET['ajax_type'] == 'search_titles') {
-        $query = "SELECT * FROM titulos WHERE nombre LIKE '%$search%' OR descripcion LIKE '%$search%' ORDER BY nombre";
-        $result = $db->query($query);
+        $result = buscarTitulos($search);
         
         $output = '';
         if ($result->num_rows > 0) {
@@ -45,13 +47,7 @@ if (isset($_GET['ajax_type'])) {
 
     // **Búsqueda de Relaciones**
     if ($_GET['ajax_type'] == 'search_relations') {
-        $query = "SELECT tm.*, t.nombre AS titulo, m.nombre_materia, m.cod_materia 
-                  FROM titulo_materia tm
-                  JOIN titulos t ON tm.id_titulo = t.id
-                  JOIN materias m ON tm.id_materia = m.id_materia
-                  WHERE t.nombre LIKE '%$search%' OR m.nombre_materia LIKE '%$search%' OR m.cod_materia LIKE '%$search%'
-                  ORDER BY t.nombre";
-        $result = $db->query($query);
+        $result = buscarRelacionesTituloMateria($search);
         
         $output = '';
         if ($result->num_rows > 0) {
@@ -81,47 +77,72 @@ if (isset($_GET['ajax_type'])) {
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // **Agregar título**
     if (isset($_POST['add_title'])) {
-        $nombre = $db->real_escape_string($_POST['nombre']);
-        $descripcion = $db->real_escape_string($_POST['descripcion']);
-        $db->query("INSERT INTO titulos (nombre, descripcion) VALUES ('$nombre', '$descripcion')");
-        $_SESSION['message'] = "Título agregado correctamente";
-        $_SESSION['message_type'] = "success";
+        $nombre = $_POST['nombre'];
+        $descripcion = $_POST['descripcion'];
+        
+        if (agregarTitulo($nombre, $descripcion)) {
+            $_SESSION['message'] = "Título agregado correctamente";
+            $_SESSION['message_type'] = "success";
+        } else {
+            $_SESSION['message'] = "Error al agregar título";
+            $_SESSION['message_type'] = "danger";
+        }
     }
 
     // **Editar título**
     if (isset($_POST['edit_title'])) {
-        $id = $db->real_escape_string($_POST['id_titulo']);
-        $nombre = $db->real_escape_string($_POST['nombre']);
-        $descripcion = $db->real_escape_string($_POST['descripcion']);
-        $db->query("UPDATE titulos SET nombre = '$nombre', descripcion = '$descripcion' WHERE id = '$id'");
-        $_SESSION['message'] = "Título actualizado correctamente";
-        $_SESSION['message_type'] = "success";
+        $id = $_POST['id_titulo'];
+        $nombre = $_POST['nombre'];
+        $descripcion = $_POST['descripcion'];
+        
+        if (editarTitulo($id, $nombre, $descripcion)) {
+            $_SESSION['message'] = "Título actualizado correctamente";
+            $_SESSION['message_type'] = "success";
+        } else {
+            $_SESSION['message'] = "Error al actualizar título";
+            $_SESSION['message_type'] = "danger";
+        }
     }
 
     // **Agregar relación**
     if (isset($_POST['relate_title_subject'])) {
-        $id_titulo = $db->real_escape_string($_POST['id_titulo']);
-        $id_materia = $db->real_escape_string($_POST['id_materia']);
-        $prioridad = $db->real_escape_string($_POST['prioridad']);
-        $db->query("INSERT INTO titulo_materia (id_titulo, id_materia, prioridad) VALUES ('$id_titulo', '$id_materia', '$prioridad')");
-        $_SESSION['message'] = "Relación creada correctamente";
-        $_SESSION['message_type'] = "success";
+        $id_titulo = $_POST['id_titulo'];
+        $id_materia = $_POST['id_materia'];
+        $prioridad = $_POST['prioridad'];
+        
+        if (agregarRelacionTituloMateria($id_titulo, $id_materia, $prioridad)) {
+            $_SESSION['message'] = "Relación creada correctamente";
+            $_SESSION['message_type'] = "success";
+        } else {
+            $_SESSION['message'] = "Error al crear relación";
+            $_SESSION['message_type'] = "danger";
+        }
     }
 
     // **Eliminar título**
     if (isset($_POST['delete_title'])) {
-        $id = $db->real_escape_string($_POST['id_titulo']);
-        $db->query("DELETE FROM titulos WHERE id = '$id'");
-        $_SESSION['message'] = "Título eliminado";
-        $_SESSION['message_type'] = "danger";
+        $id = $_POST['id_titulo'];
+        
+        if (eliminarTitulo($id)) {
+            $_SESSION['message'] = "Título eliminado";
+            $_SESSION['message_type'] = "danger";
+        } else {
+            $_SESSION['message'] = "Error al eliminar título";
+            $_SESSION['message_type'] = "danger";
+        }
     }
 
     // **Eliminar relación**
     if (isset($_POST['delete_relationship'])) {
-        $id = $db->real_escape_string($_POST['id_relacion']);
-        $db->query("DELETE FROM titulo_materia WHERE id_relacion = '$id'");
-        $_SESSION['message'] = "Relación eliminada";
-        $_SESSION['message_type'] = "danger";
+        $id = $_POST['id_relacion'];
+        
+        if (eliminarRelacionTituloMateria($id)) {
+            $_SESSION['message'] = "Relación eliminada";
+            $_SESSION['message_type'] = "danger";
+        } else {
+            $_SESSION['message'] = "Error al eliminar relación";
+            $_SESSION['message_type'] = "danger";
+        }
     }
 
     header("Location: ".$_SERVER['PHP_SELF']); // Evitar reenvío de formulario
@@ -261,7 +282,7 @@ include("includes/head.php");
                                 <select name="id_titulo" class="form-control" required>
                                     <option value="">Seleccionar título</option>
                                     <?php
-                                    $titulos = $db->query("SELECT * FROM titulos ORDER BY nombre");
+                                    $titulos = obtenerTodosTitulos();
                                     while ($t = $titulos->fetch_assoc()) {
                                         echo "<option value='{$t['id']}'>{$t['nombre']}</option>";
                                     }
@@ -272,7 +293,7 @@ include("includes/head.php");
                                 <select name="id_materia" class="form-control" required>
                                     <option value="">Seleccionar materia</option>
                                     <?php
-                                    $materias = $db->query("SELECT * FROM materias ORDER BY nombre_materia");
+                                    $materias = obtenerTodasMaterias();
                                     while ($m = $materias->fetch_assoc()) {
                                         echo "<option value='{$m['id_materia']}'>{$m['cod_materia']} - {$m['nombre_materia']}</option>";
                                     }

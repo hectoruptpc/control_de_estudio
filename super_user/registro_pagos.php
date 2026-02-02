@@ -1,4 +1,7 @@
 <?php
+// MOSTRAR ERRORES (eliminar en producción)
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 require_once('../funciones/functions.php');
 
 //CARGAR PERMISOS
@@ -14,6 +17,9 @@ if (!isLoggedIn() || !isAdmin()) {
     header('location: ../login.php');
     exit();
 }
+
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
 
 $titulopag = "Registro de Pagos";
 include("includes/head.php");
@@ -39,20 +45,6 @@ function buscarEstudiantePorCedulaPagos($cedula) {
     return null;
 }
 
-// Función para obtener los tipos de pago
-function obtenerTiposPago() {
-    global $db;
-    
-    $query = "SELECT id, tipopago FROM tipo_pago ORDER BY tipopago";
-    $result = $db->query($query);
-    
-    $tipos = [];
-    while ($row = $result->fetch_assoc()) {
-        $tipos[] = $row;
-    }
-    
-    return $tipos;
-}
 
 // Función para registrar un pago
 function registrarPago($estudiante_id, $tipo_pago, $otro_concepto, $monto, $observaciones, $registrado_por) {

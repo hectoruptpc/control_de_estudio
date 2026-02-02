@@ -5,6 +5,9 @@ ini_set('display_errors', '1');
 $titulopag = "Agregar Nueva Carrera";
 require_once '../funciones/functions.php';
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Procesar el formulario
 $mensaje = '';
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -24,6 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         'duracion_anios' => $duracion_anios,
         'titulo_principal' => $titulo_principal
     ];
+    // La fecha de vigencia completa es requerida al registrar
     $camposObligatorios['vigencia_fecha'] = $vigencia_fecha;
     
     $camposVacios = array_filter($camposObligatorios, function($valor) {
@@ -107,15 +111,16 @@ include("includes/head.php");
                    value="<?= htmlspecialchars($_POST['titulo_opcional'] ?? '') ?>">
             <small class="form-text text-muted">Título adicional obtenido al completar extensiones del programa (si aplica)</small>
         </div>
-        
+
         <div class="form-group">
             <label for="vigencia_fecha">Fecha de Vigencia (día/mes/año):</label>
             <input type="date" class="form-control" id="vigencia_fecha" name="vigencia_fecha"
                    value="<?= htmlspecialchars($_POST['vigencia_fecha'] ?? date('Y-m-d')) ?>" required>
             <small class="form-text text-muted">Guarde la fecha completa; las búsquedas posteriores pueden filtrar por año.</small>
         </div>
+        
         <button type="submit" class="btn btn-primary">Guardar Programa</button>
-        <a href="lista_carreras.php" class="btn btn-secondary">Cancelar</a>
+        <a href="agregar_carrera.php" class="btn btn-secondary">Cancelar</a>
     </form>
 
 <?php endif; ?>

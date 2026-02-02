@@ -1,4 +1,8 @@
 <?php
+// Debug - mostrar errores
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 require_once('../funciones/functions.php');
 
 // Verificar autenticación y rol
@@ -7,6 +11,9 @@ if (!isLoggedIn() || !isAdmin()) {
     header('location: ../login.php');
     exit();
 }
+
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
 
 $titulopag = "Sistema de Mensajería";
 include("includes/head.php");
