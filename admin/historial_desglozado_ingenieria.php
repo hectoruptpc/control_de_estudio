@@ -23,7 +23,8 @@ if ($estudiante_id == 0) {
 
 // Variables
 $carrera_formateada = "NO ASIGNADA";
-$historial_notas = [];
+$materias_carrera = null;
+$notas_estudiante = [];
 
 // Cargar datos
 try {
@@ -40,13 +41,22 @@ try {
                 $carrera['tipo_formacion'] ?? ''
             );
             
-            // Obtener historial completo
-            $historial_completo = obtenerHistorialNotasDesglozado($estudiante_id);
+            // Obtener todas las materias de la carrera y filtrar por trayectos 3-4
+            $materias_carrera = obtenerMateriasCarrera($carrera['id_carrera']);
+            $notas_estudiante = obtenerNotasEstudianteConsulta($estudiante_id);
             
-            // Filtrar solo trayectos 3-4 para Ingeniería
-            $historial_notas = array_filter($historial_completo, function($nota) {
-                return $nota['trayecto'] >= 3 && $nota['trayecto'] <= 4;
-            });
+            // Filtrar materias solo de Ingeniería (trayectos 3-4)
+            $materias_filtradas = [];
+            if ($materias_carrera && $materias_carrera->num_rows > 0) {
+                $materias_carrera->data_seek(0);
+                while ($m = $materias_carrera->fetch_assoc()) {
+                    if ($m['trayecto'] >= 3 && $m['trayecto'] <= 4) {
+                        $materias_filtradas[] = $m;
+                    }
+                }
+                // Reemplazar con el array filtrado
+                $materias_carrera_array = $materias_filtradas;
+            }
         }
     }
 } catch (Exception $e) {
@@ -90,7 +100,7 @@ try {
 
     // Título ESPECÍFICO
     $pdf->SetFont('Arial', 'BI', 11);
-    $pdf->Cell(0, 7, 'HISTORIAL DESGLOZADO DE NOTAS - INGENIERÍA (TRAYECTOS 3-4)', 0, 1, 'C');
+    $pdf->Cell(0, 7, 'HISTORIAL DESGLOZADO DE NOTAS - INGENIERÍA', 0, 1, 'C');
     $pdf->Ln(2);
 
     // Información del Estudiante
@@ -110,118 +120,116 @@ try {
     $pdf->Cell(0, 5, 'PLAN: C', 0, 1, 'R');
     $pdf->Ln(2);
 
-    // Encabezado de la Tabla DESGLOZADA
+    // Encabezado de la Tabla - ESTILO COMPLETO
     $pdf->SetFillColor(240, 240, 240);
-    $pdf->SetFont('Arial', 'B', 6);
-    
-    // Encabezado principal
-    $pdf->Cell(15, 5, 'CODIGO', 1, 0, 'C', true);
-    $pdf->Cell(55, 5, 'MATERIA', 1, 0, 'C', true);
-    $pdf->Cell(10, 5, 'TR', 1, 0, 'C', true);
+    $pdf->SetFont('Arial', 'B', 7);
+    $pdf->Cell(20, 5, 'CODIGO', 1, 0, 'C', true);
+    $pdf->Cell(85, 5, 'NOMBRE DE LA ASIGNATURA', 1, 0, 'C', true);
+    $pdf->Cell(10, 5, 'TRIM', 1, 0, 'C', true);
     $pdf->Cell(10, 5, 'UC', 1, 0, 'C', true);
-    
-    // Columnas para Ingeniería (T3, T4)
-    $pdf->Cell(15, 5, 'TRAYECTO 3', 1, 0, 'C', true);
-    $pdf->Cell(15, 5, 'TRAYECTO 4', 1, 0, 'C', true);
-    $pdf->Cell(20, 5, '', 1, 0, 'C', true); // Espacio vacío
-    
-    $pdf->Cell(20, 5, 'PERIODO', 1, 0, 'C', true);
-    $pdf->Cell(15, 5, 'FECHA', 1, 0, 'C', true);
-    $pdf->Cell(25, 5, 'APROBADO POR', 1, 1, 'C', true);
+    $pdf->Cell(10, 5, 'VC', 1, 0, 'C', true);
+    $pdf->Cell(15, 5, 'NOTAS', 1, 0, 'C', true);
+    $pdf->Cell(15, 5, 'LAPSO', 1, 0, 'C', true);
+    $pdf->Cell(15, 5, 'TIPO', 1, 0, 'C', true);
+    $pdf->Cell(10, 5, 'CUR.', 1, 1, 'C', true);
 
-    // Agrupar materias por código
-    $materias_agrupadas = [];
-    foreach ($historial_notas as $nota) {
-        $codigo = $nota['cod_materia'];
-        if (!isset($materias_agrupadas[$codigo])) {
-            $materias_agrupadas[$codigo] = [
-                'nombre' => $nota['nombre_materia'],
-                'trayecto' => $nota['trayecto'],
-                'creditos' => $nota['creditos'],
-                'inscripciones' => []
-            ];
+    // Datos de la Tabla agrupados por Trayecto - SOLO TRAYECTOS 3-4
+    if (!empty($materias_carrera_array)) {
+        // Agrupar materias por trayecto
+        $materias_agrupadas = [];
+        foreach ($materias_carrera_array as $m) {
+            $trayecto = $m['trayecto'];
+            if (!isset($materias_agrupadas[$trayecto])) {
+                $materias_agrupadas[$trayecto] = [];
+            }
+            $materias_agrupadas[$trayecto][] = $m;
         }
-        $materias_agrupadas[$codigo]['inscripciones'][] = $nota;
-    }
 
-    // Mostrar historial desglozado
-    $total_materias = count($materias_agrupadas);
-    $total_inscripciones = count($historial_notas);
-    
-    if ($total_inscripciones > 0) {
-        $pdf->SetFont('Arial', '', 6);
+        // Ordenar por trayecto
+        ksort($materias_agrupadas);
         
-        foreach ($materias_agrupadas as $codigo => $materia) {
-            // Mostrar cada inscripción de esta materia
-            foreach ($materia['inscripciones'] as $index => $inscripcion) {
-                // Solo mostrar nombre de materia en la primera fila
-                if ($index == 0) {
-                    $pdf->Cell(15, 5, $codigo, 1, 0, 'C');
-                    $pdf->Cell(55, 5, t(substr($materia['nombre'], 0, 35)), 1, 0, 'L');
-                    $pdf->Cell(10, 5, $materia['trayecto'], 1, 0, 'C');
-                    $pdf->Cell(10, 5, $materia['creditos'] ?? '0', 1, 0, 'C');
-                } else {
-                    // Filas siguientes, dejar en blanco los datos de la materia
-                    $pdf->Cell(15, 5, '', 1, 0, 'C');
-                    $pdf->Cell(55, 5, '', 1, 0, 'L');
-                    $pdf->Cell(10, 5, '', 1, 0, 'C');
-                    $pdf->Cell(10, 5, '', 1, 0, 'C');
+        $total_creditos = 0;
+        $creditos_aprobados = 0;
+        
+        foreach ($materias_agrupadas as $trayecto => $lista) {
+            // Encabezado del trayecto
+            $pdf->SetFont('Arial', 'B', 7);
+            $pdf->Cell(190, 5, t('Trayecto: ' . $trayecto), 1, 1, 'L', true);
+            
+            // Materias del trayecto
+            $pdf->SetFont('Arial', '', 7);
+            foreach ($lista as $materia) {
+                $id_mat = $materia['id_materia'];
+                
+                // Nota y lapso
+                $nota_v = '';
+                $laps_v = '';
+                if (isset($notas_estudiante[$id_mat])) {
+                    $nota_key = 'trayecto_' . $trayecto;
+                    if (isset($notas_estudiante[$id_mat][$nota_key]) && $notas_estudiante[$id_mat][$nota_key] !== null) {
+                        $nota_v = $notas_estudiante[$id_mat][$nota_key];
+                    }
+                    if (isset($notas_estudiante[$id_mat]['nombre_periodo'])) {
+                        $laps_v = $notas_estudiante[$id_mat]['nombre_periodo'];
+                    }
                 }
                 
-                // Mostrar notas de Ingeniería (T3, T4)
-                $pdf->Cell(15, 5, $inscripcion['trayecto_3'] !== null ? $inscripcion['trayecto_3'] : '-', 1, 0, 'C');
-                $pdf->Cell(15, 5, $inscripcion['trayecto_4'] !== null ? $inscripcion['trayecto_4'] : '-', 1, 0, 'C');
-                $pdf->Cell(20, 5, '', 1, 0, 'C'); // Espacio vacío
+                // Unidades de crédito
+                $uc = isset($materia['creditos']) && $materia['creditos'] !== null ? $materia['creditos'] : '0';
+                $creditos = intval($uc);
+                $total_creditos += $creditos;
                 
-                // Información de la inscripción
-                $pdf->Cell(20, 5, substr($inscripcion['nombre_periodo'] ?? '', 0, 10), 1, 0, 'C');
+                // Verificar si está aprobada
+                if ($nota_v !== '' && $nota_v >= 12) {
+                    $creditos_aprobados += $creditos;
+                }
                 
-                // Fecha
-                $fecha = $inscripcion['fecha_registro'] ? date('d/m/y', strtotime($inscripcion['fecha_registro'])) : '-';
-                $pdf->Cell(15, 5, $fecha, 1, 0, 'C');
-                
-                // Aprobado por
-                $pdf->Cell(25, 5, substr($inscripcion['nombre_admin'] ?? '', 0, 12), 1, 1, 'C');
+                $pdf->Cell(20, 5, $materia['cod_materia'] ?? '', 1, 0, 'C');
+                $pdf->Cell(85, 5, t(substr($materia['nombre_materia'] ?? '', 0, 55)), 1, 0, 'L');
+                $pdf->Cell(10, 5, '0', 1, 0, 'C');
+                $pdf->Cell(10, 5, $uc, 1, 0, 'C');
+                $pdf->Cell(10, 5, '1', 1, 0, 'C');
+                $pdf->Cell(15, 5, $nota_v, 1, 0, 'C');
+                $pdf->Cell(15, 5, $laps_v, 1, 0, 'C');
+                $pdf->Cell(15, 5, '', 1, 0, 'C');
+                $pdf->Cell(10, 5, '', 1, 1, 'C');
             }
-            
-            // Línea separadora entre materias
-            $pdf->SetDrawColor(200, 200, 200);
-            $pdf->Cell(190, 0, '', 'T', 1);
-            $pdf->SetDrawColor(0, 0, 0);
         }
     } else {
-        $pdf->Cell(190, 10, t('NO HAY HISTORIAL DE NOTAS INGENIERÍA (TRAYECTOS 3-4)'), 1, 1, 'C');
+        $pdf->Cell(190, 10, t('NO HAY MATERIAS DE INGENIERIA REGISTRADAS (TRAYECTOS 3-4)'), 1, 1, 'C');
+        $total_creditos = 0;
+        $creditos_aprobados = 0;
     }
 
-    // Estadísticas
+    // Bloque de Resumen Final - ESTILO COMPLETO
     $pdf->Ln(5);
     $pdf->SetFont('Arial', 'B', 8);
-    $pdf->Cell(100, 5, 'ESTADÍSTICAS INGENIERÍA DESGLOZADAS:', 0, 0);
+    $pdf->Cell(100, 5, 'RESUMEN INGENIERIA:', 0, 0);
     $pdf->SetFont('Arial', '', 8);
     $emitido_por = strtoupper($_SESSION['user']['nombre'] ?? $_SESSION['user']['username'] ?? 'DESCONOCIDO');
     $pdf->Cell(90, 5, 'Emitido por: ' . t($emitido_por), 0, 1, 'R');
 
-    $pdf->Cell(60, 5, 'Total Materias Ing.: ' . $total_materias, 0, 0);
-    $pdf->Cell(60, 5, 'Total Inscripciones: ' . $total_inscripciones, 0, 1);
+    $pdf->Cell(60, 5, 'Total Creditos Ingenieria: ' . $total_creditos, 0, 0);
+    $pdf->Cell(60, 5, 'Creditos Aprobados Ingenieria: ' . $creditos_aprobados, 0, 1);
 
-    $pdf->Cell(60, 5, 'Promedio Inscripciones: ' . ($total_materias > 0 ? round($total_inscripciones / $total_materias, 1) : '0'), 0, 0);
-    
-    // Calcular estadísticas de aprobación
-    $aprobadas_t3 = 0; $aprobadas_t4 = 0;
-    foreach ($historial_notas as $nota) {
-        if ($nota['trayecto_3'] !== null && $nota['trayecto_3'] >= 12) $aprobadas_t3++;
-        if ($nota['trayecto_4'] !== null && $nota['trayecto_4'] >= 12) $aprobadas_t4++;
-    }
-    
-    $pdf->Cell(60, 5, 'Aprob. T3: ' . $aprobadas_t3 . ' / T4: ' . $aprobadas_t4, 0, 1);
+    $pdf->Cell(60, 5, t('Índice de Rendimiento Académico Ingenieria: N/D'), 0, 0);
+    $pdf->SetX(110);
+    $pdf->Cell(30, 5, 'GENERAL:', 1, 0);
+    $pdf->Cell(25, 5, 'APROBADOS:', 1, 0);
+    $pdf->Cell(25, 5, 'FALTANTES:', 1, 1);
 
-    $pdf->Ln(2);
+    $pdf->SetX(110);
+    $pdf->Cell(30, 5, 'EQUIVALENTES:', 1, 0);
+    $pdf->Cell(50, 5, 'MAX. A CURSAR:', 1, 1);
+
+    $pdf->Ln(4);
     $pdf->SetFont('Arial', '', 6.5);
     $pdf->MultiCell(0, 3, t('Institución autorizada para gestionar el Programa Nacional de Formación según Gaceta oficial de la República Bolivariana de Venezuela N° 39721 de fecha 26 de Julio del 2011'), 0, 'L');
 
-    $nombre_archivo = 'Historial_Desglozado_Ingenieria_' . preg_replace('/[^a-zA-Z0-9]/', '_', $estudiante_cedula) . '_' . date('Ymd_His') . '.pdf';
+    $nombre_archivo = 'Historial_Ingenieria_' . preg_replace('/[^a-zA-Z0-9]/', '_', $estudiante_cedula) . '_' . date('Ymd_His') . '.pdf';
     $pdf->Output('I', $nombre_archivo);
     
 } catch (Exception $e) {
     die("Error al generar PDF: " . $e->getMessage());
 }
+?>
