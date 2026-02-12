@@ -5,7 +5,6 @@ error_reporting(E_ALL);
 
 require_once('../funciones/functions.php');
 
-
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 // Verificar que el usuario es un estudiante
@@ -123,6 +122,37 @@ function obtenerNotasEstudianteConsulta($estudiante_id) {
 }
 }
 
+// Función para verificar si tiene notas en trayectos específicos
+if (!function_exists('tieneNotasEnTrayectos')) {
+function tieneNotasEnTrayectos($materias_carrera, $notas_estudiante, $trayectos) {
+    $tiene_notas = false;
+    $materias_carrera->data_seek(0); // Reiniciar puntero
+    
+    while ($materia = $materias_carrera->fetch_assoc()) {
+        $trayecto = (int)$materia['trayecto'];
+        
+        // Verificar si la materia pertenece a los trayectos solicitados
+        if (in_array($trayecto, $trayectos)) {
+            $nota = isset($notas_estudiante[$materia['id_materia']]) ? $notas_estudiante[$materia['id_materia']] : null;
+            
+            if ($nota) {
+                $campo_trayecto = 'trayecto_' . $trayecto;
+                if (isset($nota[$campo_trayecto]) && $nota[$campo_trayecto] !== null) {
+                    $nota_trayecto = (float)$nota[$campo_trayecto];
+                    if ($nota_trayecto >= 12) { // Solo contar notas aprobadas
+                        $tiene_notas = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    $materias_carrera->data_seek(0); // Reiniciar puntero de nuevo
+    return $tiene_notas;
+}
+}
+
 // Obtener información del estudiante actual
 $estudiante = $_SESSION['user'];
 $carrera = null;
@@ -141,6 +171,22 @@ if ($estudiante) {
         $notas_estudiante = obtenerNotasEstudianteConsulta($estudiante['id']);
     }
 }
+
+// Verificar permisos para cada tipo de reporte
+$puede_ver_tsu = false;
+$puede_ver_ingenieria = false;
+$puede_ver_completo = false;
+
+if ($estudiante && $carrera && $materias_carrera) {
+    // TSU: Debe tener notas aprobadas en trayectos 0,1,2
+    $puede_ver_tsu = tieneNotasEnTrayectos($materias_carrera, $notas_estudiante, [0, 1, 2]);
+    
+    // Ingeniería: Debe tener notas aprobadas en trayectos 3,4
+    $puede_ver_ingenieria = tieneNotasEnTrayectos($materias_carrera, $notas_estudiante, [3, 4]);
+    
+    // Completo: Debe tener al menos una nota aprobada en cualquier trayecto
+    $puede_ver_completo = tieneNotasEnTrayectos($materias_carrera, $notas_estudiante, [0, 1, 2, 3, 4]);
+}
 ?>
 
 <div class="container-fluid">
@@ -148,8 +194,37 @@ if ($estudiante) {
     
     <?php if ($estudiante && $carrera): ?>
     <div class="card mb-4">
-        <div class="card-header bg-info text-white">
-            <h5>Información del Estudiante</h5>
+        <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Información del Estudiante</h5>
+            
+            <!-- Botones de reportes condicionales -->
+            <?php if ($puede_ver_tsu || $puede_ver_ingenieria || $puede_ver_completo): ?>
+            <div class="btn-group" role="group">
+                <?php if ($puede_ver_tsu): ?>
+                <!-- Botón Historial TSU -->
+                <a href="../admin/historial_desglozado_tsu.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
+                   class="btn btn-warning btn-sm mr-2" target="_blank">
+                    <i class="fas fa-file-pdf"></i> Historial TSU
+                </a>
+                <?php endif; ?>
+                
+                <?php if ($puede_ver_ingenieria): ?>
+                <!-- Botón Historial Ingeniería -->
+                <a href="../admin/historial_desglozado_ingenieria.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
+                   class="btn btn-info btn-sm mr-2" target="_blank">
+                    <i class="fas fa-file-pdf"></i> Historial Ingeniería
+                </a>
+                <?php endif; ?>
+                
+                <?php if ($puede_ver_completo): ?>
+                <!-- Botón Historial Completo -->
+                <a href="../admin/generar_reporte_consulta.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
+                   class="btn btn-danger btn-sm" target="_blank">
+                    <i class="fas fa-file-pdf"></i> Historial Completo
+                </a>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
         </div>
         <div class="card-body">
             <div class="row">
@@ -162,6 +237,28 @@ if ($estudiante) {
                     <p><strong>Total de Materias:</strong> <span class="badge badge-primary"><?= $materias_carrera->num_rows ?></span></p>
                 </div>
             </div>
+            
+            <!-- Mensaje informativo sobre disponibilidad de reportes -->
+            <?php if (!$puede_ver_tsu && !$puede_ver_ingenieria && !$puede_ver_completo): ?>
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle"></i> 
+                Aún no tienes notas aprobadas para generar reportes. Los reportes estarán disponibles cuando tengas al menos una materia aprobada.
+            </div>
+            <?php else: ?>
+            <div class="alert alert-light mt-3">
+                <i class="fas fa-file-pdf"></i> 
+                <strong>Reportes disponibles:</strong>
+                <?php if ($puede_ver_tsu): ?> 
+                    <span class="badge badge-warning ml-2">TSU</span>
+                <?php endif; ?>
+                <?php if ($puede_ver_ingenieria): ?> 
+                    <span class="badge badge-info ml-2">Ingeniería</span>
+                <?php endif; ?>
+                <?php if ($puede_ver_completo): ?> 
+                    <span class="badge badge-danger ml-2">Completo</span>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
     
@@ -442,5 +539,22 @@ if ($estudiante) {
         </div>
     <?php endif; ?>
 </div>
+
+<style>
+/* Estilos adicionales para los botones de reportes */
+.btn-group .btn-sm {
+    margin-left: 5px;
+}
+.btn-group .btn-sm:first-child {
+    margin-left: 0;
+}
+.btn-warning, .btn-info, .btn-danger {
+    color: white;
+}
+.btn-warning:hover, .btn-info:hover, .btn-danger:hover {
+    color: white;
+    opacity: 0.9;
+}
+</style>
 
 <?php include("includes/footer.php"); ?>

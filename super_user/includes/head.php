@@ -63,49 +63,79 @@ if (!isLoggedIn() || !isAdmin()) {
         padding: 3px 6px;
     }
 
-    /* NAVBAR FIJO */
+    /* NAVBAR FIJO - ESTILO SUPER ADMIN OSCURO */
     .navbar {
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        border-bottom: 2px solid #343a40;
+    }
+
+    /* Forzar color blanco en enlaces e iconos del Navbar */
+    .navbar-dark .navbar-nav .nav-link {
+        color: rgba(255, 255, 255, 0.9) !important;
+        font-weight: 500;
+    }
+
+    .navbar-dark .navbar-nav .nav-link i {
+        color: #ffffff !important; /* Iconos totalmente blancos */
+        margin-right: 4px;
+    }
+
+    .navbar-dark .navbar-nav .nav-link:hover {
+        color: #ffffff !important;
+        text-shadow: 0 0 8px rgba(255,255,255,0.3);
     }
 
     /* DROPDOWNS MEJORADOS */
     .dropdown-menu {
         z-index: 1080;
-        border: 1px solid rgba(0,0,0,.15);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        background-color: #ffffff;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
     }
 
     .dropdown-item {
         padding: 0.75rem 1.5rem;
         font-size: 0.9rem;
+        color: #333 !important; /* Texto oscuro en el menú desplegable blanco para contraste */
+    }
+
+    .dropdown-item i {
+        color: #555 !important; /* Iconos grises en el menú blanco */
+        width: 20px;
+        text-align: center;
+    }
+
+    .dropdown-item:hover {
+        background-color: #f1f1f1;
+        color: #000 !important;
     }
 
     /* MEJORAS PARA MÓVILES */
     @media (max-width: 991.98px) {
         .navbar-collapse {
-            background-color: #c2d9fe;
-            padding: 1rem;
+            background-color: #2c3136; 
+            padding: 1.5rem;
             margin-top: 1rem;
             border-radius: 8px;
-            max-height: 80vh;
-            overflow-y: auto;
+            border: 1px solid #495057;
         }
         
         .dropdown-menu {
-            background-color: rgba(255,255,255,0.9);
+            background-color: #3d4349; 
             border: none;
-            box-shadow: none;
-            margin-left: 1rem;
+            margin-left: 0.5rem;
         }
         
         .dropdown-item {
-            padding: 0.6rem 1.5rem;
+            color: #ffffff !important; /* Texto blanco en móviles sobre fondo oscuro */
+        }
+
+        .dropdown-item i {
+            color: #ffffff !important;
         }
         
-        /* Botón hamburguesa más grande para móviles */
-        .navbar-toggler {
-            padding: 0.4rem 0.75rem;
-            font-size: 1.25rem;
+        .nav-link {
+            border-bottom: 1px solid #444;
         }
     }
 
@@ -117,7 +147,7 @@ if (!isLoggedIn() || !isAdmin()) {
 </head>
 <body>
 <!-- NAVEGACIÓN PRINCIPAL -->
-<nav class="navbar navbar-expand-lg navbar-light fixed-top" style="background-color: #c2d9fe;">
+<nav class="navbar navbar-expand-lg navbar-dark fixed-top" style="background-color: #212529;">
     <div class="container">
         <!-- Logo -->
         <a title="Cargar Inicio" class="navbar-brand" href="index.php">
