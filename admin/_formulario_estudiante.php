@@ -65,7 +65,7 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
         </div>
     </div>
 
-    <!-- Sección 2: Datos Personales -->
+    <!-- Sección 2: Datos Personales (MODIFICADA - Etnia condicional) -->
     <h5 class="mb-3"><i class="fas fa-user-tag mr-2"></i> Datos Personales</h5>
     <div class="row g-3 mb-4">
         <div class="col-md-6">
@@ -116,9 +116,25 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
                 </select>
             </div>
             
+            <!-- Etnia (Condicional) -->
             <div class="mb-3">
-                <label for="etnia<?php echo $prefijo; ?>" class="form-label">Etnia</label>
-                <input type="text" class="form-control" id="etnia<?php echo $prefijo; ?>" name="etnia">
+                <label class="form-label">¿Pertenece a alguna etnia?</label>
+                <div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="posee_etnia" id="etnia_no<?php echo $prefijo; ?>" value="no" checked>
+                        <label class="form-check-label" for="etnia_no<?php echo $prefijo; ?>">No</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="posee_etnia" id="etnia_si<?php echo $prefijo; ?>" value="si">
+                        <label class="form-check-label" for="etnia_si<?php echo $prefijo; ?>">Sí</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-3" id="etniaContainer<?php echo $prefijo; ?>" style="display: none;">
+                <label for="etnia<?php echo $prefijo; ?>" class="form-label">Especifique la etnia</label>
+                <input type="text" class="form-control" id="etnia<?php echo $prefijo; ?>" name="etnia" placeholder="Ej: Wayúu, Añú, etc.">
+                <small class="text-muted">Indique el nombre de la etnia a la que pertenece</small>
             </div>
         </div>
     </div>
@@ -166,7 +182,7 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
         </div>
     </div>
 
-    <!-- Sección 4: Ubicación y Vivienda (MODIFICADA) -->
+    <!-- Sección 4: Ubicación y Vivienda -->
     <h5 class="mb-3"><i class="fas fa-home mr-2"></i> Vivienda</h5>
     <div class="row g-3 mb-4">
         <div class="col-md-6">
@@ -196,7 +212,7 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
                 </select>
             </div>
             
-            <!-- Campos ocultos para los nombres (opcionales, si quieres guardar los nombres también) -->
+            <!-- Campos ocultos para los nombres -->
             <input type="hidden" id="nombre_estado<?php echo $prefijo; ?>" name="nombre_estado">
             <input type="hidden" id="nombre_municipio<?php echo $prefijo; ?>" name="nombre_municipio">
             <input type="hidden" id="nombre_parroquia<?php echo $prefijo; ?>" name="nombre_parroquia">
@@ -267,20 +283,52 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
         </div>
     </div>
 
-    <!-- Sección 6: Salud -->
+    <!-- Sección 6: Salud (REORGANIZADA COMPLETAMENTE) -->
     <h5 class="mb-3"><i class="fas fa-heartbeat mr-2"></i> Salud</h5>
     <div class="row g-3 mb-4">
+        <!-- Discapacidad (Condicional) -->
         <div class="col-md-6">
             <div class="mb-3">
-                <label for="enfermedad<?php echo $prefijo; ?>" class="form-label">Enfermedades</label>
-                <input type="text" class="form-control" id="enfermedad<?php echo $prefijo; ?>" name="enfermedad" placeholder="Enfermedades conocidas">
+                <label class="form-label">¿Posee alguna discapacidad?</label>
+                <div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="posee_discapacidad" id="discapacidad_no<?php echo $prefijo; ?>" value="no" checked>
+                        <label class="form-check-label" for="discapacidad_no<?php echo $prefijo; ?>">No</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="posee_discapacidad" id="discapacidad_si<?php echo $prefijo; ?>" value="si">
+                        <label class="form-check-label" for="discapacidad_si<?php echo $prefijo; ?>">Sí</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-3" id="discapacidadContainer<?php echo $prefijo; ?>" style="display: none;">
+                <label for="discapacidad<?php echo $prefijo; ?>" class="form-label">Especifique el tipo de discapacidad</label>
+                <input type="text" class="form-control" id="discapacidad<?php echo $prefijo; ?>" name="discapacidad" placeholder="Ej: Visual, Auditiva, Motora, etc.">
+                <small class="text-muted">Indique el tipo de discapacidad que posee</small>
             </div>
         </div>
         
+        <!-- Enfermedad (Condicional) -->
         <div class="col-md-6">
             <div class="mb-3">
-                <label for="discapacida<?php echo $prefijo; ?>" class="form-label">Discapacidad</label>
-                <input type="text" class="form-control" id="discapacida<?php echo $prefijo; ?>" name="discapacida" placeholder="Tipo de discapacidad si aplica">
+                <label class="form-label">¿Posee alguna enfermedad?</label>
+                <div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="posee_enfermedad" id="enfermedad_no<?php echo $prefijo; ?>" value="no" checked>
+                        <label class="form-check-label" for="enfermedad_no<?php echo $prefijo; ?>">No</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="posee_enfermedad" id="enfermedad_si<?php echo $prefijo; ?>" value="si">
+                        <label class="form-check-label" for="enfermedad_si<?php echo $prefijo; ?>">Sí</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-3" id="enfermedadContainer<?php echo $prefijo; ?>" style="display: none;">
+                <label for="enfermedad<?php echo $prefijo; ?>" class="form-label">Especifique la(s) enfermedad(es)</label>
+                <input type="text" class="form-control" id="enfermedad<?php echo $prefijo; ?>" name="enfermedad" placeholder="Ej: Diabetes, Hipertensión, etc.">
+                <small class="text-muted">Puede indicar múltiples enfermedades separadas por coma</small>
             </div>
         </div>
     </div>
@@ -507,7 +555,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const municipioSelect = document.getElementById('municipio' + prefijo);
     const parroquiaSelect = document.getElementById('parroquia' + prefijo);
     
-    // Campos ocultos para nombres (opcionales)
+    // Campos ocultos para nombres
     const nombreEstadoInput = document.getElementById('nombre_estado' + prefijo);
     const nombreMunicipioInput = document.getElementById('nombre_municipio' + prefijo);
     const nombreParroquiaInput = document.getElementById('nombre_parroquia' + prefijo);
@@ -522,7 +570,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const estadoId = this.value;
         const estadoTexto = this.options[this.selectedIndex].text;
         
-        // Guardar nombre en campo oculto si existe
+        // Guardar nombre en campo oculto
         if (nombreEstadoInput) {
             nombreEstadoInput.value = estadoTexto;
         }
@@ -545,7 +593,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const municipioId = this.value;
         const municipioTexto = this.options[this.selectedIndex].text;
         
-        // Guardar nombre en campo oculto si existe
+        // Guardar nombre en campo oculto
         if (nombreMunicipioInput) {
             nombreMunicipioInput.value = municipioTexto;
         }
@@ -566,7 +614,7 @@ document.addEventListener('DOMContentLoaded', function() {
     parroquiaSelect.addEventListener('change', function() {
         const parroquiaTexto = this.options[this.selectedIndex].text;
         
-        // Guardar nombre en campo oculto si existe
+        // Guardar nombre en campo oculto
         if (nombreParroquiaInput) {
             nombreParroquiaInput.value = parroquiaTexto;
         }
@@ -574,11 +622,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // ========== FUNCIÓN: Cargar Municipios ==========
     function cargarMunicipios(estadoId) {
-        // Crear formulario para enviar datos (alternativa a fetch si no funciona)
         const formData = new FormData();
         formData.append('estado_id', estadoId);
         
-        // Usar fetch con async/await
         fetch('api/obtener_municipios.php', {
             method: 'POST',
             body: formData
@@ -607,7 +653,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Método alternativo GET (por si el POST no funciona)
+    // Método alternativo GET
     function cargarMunicipiosAlternativo(estadoId) {
         fetch('api/obtener_municipios.php?estado_id=' + estadoId)
         .then(response => response.json())
@@ -709,44 +755,91 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // ========== FUNCIÓN: Cargar Datos si Estamos Editando ==========
     function cargarDatosUbicacionSiExisten() {
-        // Esta función se puede usar si el formulario es para editar un estudiante existente
-        // Por ejemplo, si tienes datos en variables PHP como $estudiante_edit
         <?php if (isset($estudiante_edit) && $estudiante_edit): ?>
-            // Código PHP para cargar datos existentes
-            // Descomenta y adapta según tus necesidades
-            /*
-            const estadoId = '<?php echo $estudiante_edit["estado"] ?? ""; ?>';
-            const municipioId = '<?php echo $estudiante_edit["municipio"] ?? ""; ?>';
-            const parroquiaId = '<?php echo $estudiante_edit["parroquia"] ?? ""; ?>';
-            
-            if (estadoId) {
-                estadoSelect.value = estadoId;
-                estadoSelect.dispatchEvent(new Event('change'));
-                
-                // Esperar a que carguen los municipios y seleccionar
-                setTimeout(() => {
-                    if (municipioId && municipioSelect) {
-                        municipioSelect.value = municipioId;
-                        municipioSelect.dispatchEvent(new Event('change'));
-                        
-                        // Esperar a que carguen las parroquias y seleccionar
-                        setTimeout(() => {
-                            if (parroquiaId && parroquiaSelect) {
-                                parroquiaSelect.value = parroquiaId;
-                            }
-                        }, 500);
-                    }
-                }, 500);
-            }
-            */
+            // Código para cargar datos existentes (comentado por defecto)
         <?php endif; ?>
     }
     
-    // Ejecutar carga inicial si es necesario
     cargarDatosUbicacionSiExisten();
 });
 
-// Validación del formulario (actualizada para los nuevos selects)
+// =============================================
+// SCRIPT PARA MANEJO CONDICIONAL DE ETNIA, DISCAPACIDAD Y ENFERMEDAD
+// =============================================
+document.addEventListener('DOMContentLoaded', function() {
+    const prefijo = '<?php echo $prefijo; ?>';
+    
+    // ===== Manejo condicional de Etnia =====
+    const radioEtniaSi = document.getElementById('etnia_si' + prefijo);
+    const radioEtniaNo = document.getElementById('etnia_no' + prefijo);
+    const etniaContainer = document.getElementById('etniaContainer' + prefijo);
+    const campoEtnia = document.getElementById('etnia' + prefijo);
+    
+    if (radioEtniaSi && radioEtniaNo && etniaContainer && campoEtnia) {
+        function toggleEtniaField() {
+            if (radioEtniaSi.checked) {
+                etniaContainer.style.display = 'block';
+                campoEtnia.setAttribute('required', 'required');
+            } else {
+                etniaContainer.style.display = 'none';
+                campoEtnia.removeAttribute('required');
+                campoEtnia.value = '';
+            }
+        }
+        
+        toggleEtniaField();
+        radioEtniaSi.addEventListener('change', toggleEtniaField);
+        radioEtniaNo.addEventListener('change', toggleEtniaField);
+    }
+    
+    // ===== Manejo condicional de Discapacidad =====
+    const radioDiscSi = document.getElementById('discapacidad_si' + prefijo);
+    const radioDiscNo = document.getElementById('discapacidad_no' + prefijo);
+    const discContainer = document.getElementById('discapacidadContainer' + prefijo);
+    const campoDisc = document.getElementById('discapacidad' + prefijo);
+    
+    if (radioDiscSi && radioDiscNo && discContainer && campoDisc) {
+        function toggleDiscapacidadField() {
+            if (radioDiscSi.checked) {
+                discContainer.style.display = 'block';
+                campoDisc.setAttribute('required', 'required');
+            } else {
+                discContainer.style.display = 'none';
+                campoDisc.removeAttribute('required');
+                campoDisc.value = '';
+            }
+        }
+        
+        toggleDiscapacidadField();
+        radioDiscSi.addEventListener('change', toggleDiscapacidadField);
+        radioDiscNo.addEventListener('change', toggleDiscapacidadField);
+    }
+    
+    // ===== Manejo condicional de Enfermedad =====
+    const radioEnfSi = document.getElementById('enfermedad_si' + prefijo);
+    const radioEnfNo = document.getElementById('enfermedad_no' + prefijo);
+    const enfContainer = document.getElementById('enfermedadContainer' + prefijo);
+    const campoEnf = document.getElementById('enfermedad' + prefijo);
+    
+    if (radioEnfSi && radioEnfNo && enfContainer && campoEnf) {
+        function toggleEnfermedadField() {
+            if (radioEnfSi.checked) {
+                enfContainer.style.display = 'block';
+                campoEnf.setAttribute('required', 'required');
+            } else {
+                enfContainer.style.display = 'none';
+                campoEnf.removeAttribute('required');
+                campoEnf.value = '';
+            }
+        }
+        
+        toggleEnfermedadField();
+        radioEnfSi.addEventListener('change', toggleEnfermedadField);
+        radioEnfNo.addEventListener('change', toggleEnfermedadField);
+    }
+});
+
+// Validación del formulario
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('<?php echo $formId; ?>');
     
@@ -782,14 +875,14 @@ document.addEventListener('DOMContentLoaded', function() {
             isValid = false;
         }
         
-        // Validar estado (ahora es select)
+        // Validar estado
         const estado = document.getElementById('estado' + prefijo).value;
         if (!estado) {
             mensajesError.push('Debe seleccionar un estado');
             isValid = false;
         }
         
-        // Validar municipio (ahora es select)
+        // Validar municipio
         const municipio = document.getElementById('municipio' + prefijo).value;
         if (!municipio) {
             mensajesError.push('Debe seleccionar un municipio');
@@ -837,6 +930,39 @@ document.addEventListener('DOMContentLoaded', function() {
             const fechaIngresoDate = new Date(fechaIngreso);
             if (fechaIngresoDate < fechaNacDate) {
                 mensajesError.push('La fecha de ingreso no puede ser anterior a la fecha de nacimiento');
+                isValid = false;
+            }
+        }
+        
+        // Validar campo de etnia si se seleccionó "Sí"
+        const radioEtniaSi = document.getElementById('etnia_si' + prefijo);
+        const campoEtnia = document.getElementById('etnia' + prefijo);
+        
+        if (radioEtniaSi && radioEtniaSi.checked && campoEtnia) {
+            if (!campoEtnia.value.trim()) {
+                mensajesError.push('Debe especificar la etnia si seleccionó "Sí"');
+                isValid = false;
+            }
+        }
+        
+        // Validar campo de discapacidad si se seleccionó "Sí"
+        const radioDiscSi = document.getElementById('discapacidad_si' + prefijo);
+        const campoDisc = document.getElementById('discapacidad' + prefijo);
+        
+        if (radioDiscSi && radioDiscSi.checked && campoDisc) {
+            if (!campoDisc.value.trim()) {
+                mensajesError.push('Debe especificar el tipo de discapacidad si seleccionó "Sí"');
+                isValid = false;
+            }
+        }
+        
+        // Validar campo de enfermedad si se seleccionó "Sí"
+        const radioEnfSi = document.getElementById('enfermedad_si' + prefijo);
+        const campoEnf = document.getElementById('enfermedad' + prefijo);
+        
+        if (radioEnfSi && radioEnfSi.checked && campoEnf) {
+            if (!campoEnf.value.trim()) {
+                mensajesError.push('Debe especificar la(s) enfermedad(es) si seleccionó "Sí"');
                 isValid = false;
             }
         }
