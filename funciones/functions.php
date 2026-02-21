@@ -493,18 +493,15 @@ function insertarEstudiante($datos) {
         }
 
         // ============================
-        // 2. PREPARAR DATOS BÁSICOS
+        // 2. PREPARAR DATOS BÁSICOS - AHORA EL USERNAME ES LA CÉDULA
         // ============================
-        $usernameBase = strtolower(preg_replace('/[^a-zA-Z0-9]/', '.', $datos['nombre']));
-        $username = preg_replace('/\.+/', '.', $usernameBase);
-        $username = trim($username, '.');
+        // El username será exactamente el idusuario (cédula con formato V-12345678 o E-12345678)
+        $username = $datos['idusuario']; // Ahora usa directamente la cédula como username
         
-        if (strlen($username) < 3) {
-            $username = strtolower(str_replace(['-', ' '], '', $datos['idusuario']));
-        }
+        // Verificar si el username ya existe
+        $username = generarUsernameUnico($username); // Esta función verificará si la cédula ya existe
         
-        $username = generarUsernameUnico($username);
-        
+        // La contraseña también será la cédula (se encripta)
         $password = password_hash($datos['idusuario'], PASSWORD_DEFAULT);
         $fecha_act = date('Y-m-d H:i:s');
         $api_key = bin2hex(random_bytes(16));
@@ -534,7 +531,7 @@ function insertarEstudiante($datos) {
             'tipo_vivienda' => $datos['tipo_vivienda'] ?? '',
             'tenencia_vivienda' => $datos['tenencia_vivienda'] ?? '',
             'enfermedad' => $datos['enfermedad'] ?? '',
-            'discapacidad' => $datos['discapacida'] ?? '',
+            'discapacidad' => $datos['discapacidad'] ?? '',
             'titulos' => !empty($datos['titulos']) ? implode('|||', $datos['titulos']) : '',
             'institutos' => !empty($datos['institutos']) ? implode('|||', $datos['institutos']) : '',
             'potencialidades' => $datos['potencialidades'] ?? '',
@@ -679,7 +676,7 @@ function insertarEstudiante($datos) {
         $stmt->close();
 
         // ============================
-        // 6. INSERTAR TÍTULOS OBTENIDOS (CORRECTO)
+        // 6. INSERTAR TÍTULOS OBTENIDOS
         // ============================
         if (!empty($datos['titulos']) && is_array($datos['titulos']) && 
             !empty($datos['institutos']) && is_array($datos['institutos'])) {
@@ -690,7 +687,6 @@ function insertarEstudiante($datos) {
             $count = min(count($titulos), count($institutos));
             
             if ($count > 0) {
-                // CORRECTO: Solo estos 4 campos según tu estructura
                 $sqlTitulos = "INSERT INTO titulos_obtenidos (id_usuario, nombre, titulo_obtenido, instituto) 
                                VALUES (?, ?, ?, ?)";
                 
@@ -726,6 +722,7 @@ function insertarEstudiante($datos) {
             $valores_nuevos = [
                 'idusuario' => $datos['idusuario'],
                 'nombre' => $datos['nombre'],
+                'username' => $username,
                 'carrera' => $datos['carrera'] ?? '',
                 'status' => $datos['status'] ?? 'Activo'
             ];
@@ -737,7 +734,7 @@ function insertarEstudiante($datos) {
                 null, 
                 $valores_nuevos, 
                 "Estudiantes", 
-                "Registro de nuevo estudiante"
+                "Registro de nuevo estudiante. Username: " . $username
             );
         }
 
@@ -752,7 +749,8 @@ function insertarEstudiante($datos) {
         return [
             'success' => true,
             'message' => '✅ Estudiante registrado exitosamente' . 
-                        (!empty($nombreFoto) ? ' con foto de perfil.' : '.'),
+                        (!empty($nombreFoto) ? ' con foto de perfil.' : '.') .
+                        ' Usuario y contraseña: ' . $datos['idusuario'],
             'id' => $userId,
             'username' => $username,
             'foto_perfil' => $nombreFoto,
@@ -807,43 +805,33 @@ function insertarEstudiante($datos) {
 }
 
 /**
- * Función auxiliar para generar un username único
+ * Función auxiliar para verificar si el username (cédula) ya existe
+ * Si ya existe, lanza una excepción porque la cédula debe ser única
  */
 function generarUsernameUnico($usernameBase) {
     global $db;
     
-    $username = $usernameBase;
-    $contador = 1;
-    $maxIntentos = 100;
-    
-    while ($contador <= $maxIntentos) {
-        // Verificar si el username ya existe
-        $sql = "SELECT COUNT(*) as count FROM users WHERE username = ?";
-        $stmt = $db->prepare($sql);
-        if (!$stmt) {
-            // Si hay error en la consulta, retornar el username actual
-            return $username;
-        }
-        
-        $stmt->bind_param('s', $username);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        $stmt->close();
-        
-        if ($row['count'] == 0) {
-            // Username disponible
-            return $username;
-        }
-        
-        // Generar nuevo username con sufijo numérico
-        $username = $usernameBase . $contador;
-        $contador++;
+    // Verificar si el username ya existe
+    $sql = "SELECT COUNT(*) as count FROM users WHERE username = ?";
+    $stmt = $db->prepare($sql);
+    if (!$stmt) {
+        // Si hay error en la consulta, retornar el username actual
+        return $usernameBase;
     }
     
-    // Si no se encuentra username único después de muchos intentos,
-    // usar un hash basado en timestamp
-    return $usernameBase . '_' . substr(md5(time()), 0, 6);
+    $stmt->bind_param('s', $usernameBase);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+    
+    if ($row['count'] > 0) {
+        // Si la cédula ya existe, lanzar excepción
+        throw new Exception("La cédula {$usernameBase} ya está registrada en el sistema.", 409);
+    }
+    
+    // Si no existe, retornar la cédula como username
+    return $usernameBase;
 }
 
 /**
