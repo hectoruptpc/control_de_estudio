@@ -68,6 +68,15 @@ include("includes/head.php");
                                                 data-materia="<?= $seccion['id_materia'] ?>">
                                             <i class="fas fa-download"></i> Planilla PDF
                                         </button>
+                                        <button class="btn btn-sm btn-outline-secondary btn-descargar-csv"
+                                                data-seccion="<?= $seccion['id_seccion'] ?>"
+                                                data-materia="<?= $seccion['id_materia'] ?>">
+                                            <i class="fas fa-file-csv"></i> Descargar CSV
+                                        </button>
+                                        <label class="btn btn-sm btn-outline-primary mb-0 ml-1" style="cursor:pointer;">
+                                            <i class="fas fa-file-upload"></i> Importar CSV
+                                            <input type="file" accept=".csv,text/csv,application/vnd.ms-excel" class="d-none input-import-csv" data-seccion="<?= $seccion['id_seccion'] ?>" data-materia="<?= $seccion['id_materia'] ?>">
+                                        </label>
                                     </td>
                                 </tr>
                             <?php endwhile; ?>
@@ -109,6 +118,42 @@ include("includes/head.php");
         </div>
     </div>
 </div>
+
+            <!-- Modal preview import CSV -->
+            <div class="modal fade" id="modalPreviewCSV" tabindex="-1" role="dialog" aria-hidden="true">
+                <div class="modal-dialog modal-lg" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header bg-info text-white">
+                            <h5 class="modal-title">Preview de CSV</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="preview-summary" class="mb-3"></div>
+                            <div class="table-responsive" style="max-height:400px; overflow:auto;">
+                                <table class="table table-sm table-bordered" id="preview-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Línea</th>
+                                            <th>Identificador</th>
+                                            <th>Nombre</th>
+                                            <th>Nota propuesta</th>
+                                            <th>Estado</th>
+                                            <th>Mensaje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+                            <button type="button" class="btn btn-primary" id="btn-apply-csv">Aplicar al formulario</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
 <script>
 $(document).ready(function() {
@@ -196,6 +241,100 @@ $(document).ready(function() {
             btn.html(originalHtml);
             btn.prop('disabled', false);
         }, 3000);
+    });
+
+    // Descargar plantilla CSV
+    $(document).on('click', '.btn-descargar-csv', function() {
+        const seccionId = $(this).data('seccion');
+        const materiaId = $(this).data('materia');
+        window.location.href = `descargar_planilla_csv.php?seccion_id=${seccionId}&materia_id=${materiaId}`;
+    });
+
+    // Importar CSV (input change)
+    $(document).on('change', '.input-import-csv', function(e) {
+        const file = this.files[0];
+        const seccionId = $(this).data('seccion');
+        const materiaId = $(this).data('materia');
+        if (!file) return;
+
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('seccion_id', seccionId);
+        fd.append('materia_id', materiaId);
+        // trayecto_actual: intentar obtener del DOM si existe
+        const tray = $('#trayecto_actual').val() || 0;
+        fd.append('trayecto_actual', tray);
+
+        // Mostrar modal y spinner
+        $('#preview-table tbody').html('<tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-info"></div> Procesando archivo...</td></tr>');
+        $('#preview-summary').text('Procesando...');
+        $('#modalPreviewCSV').modal('show');
+
+        fetch('import_preview_notas.php', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    $('#preview-summary').html(`<div class="alert alert-danger">${data.error}</div>`);
+                    return;
+                }
+
+                const rows = data.previewRows || [];
+                const summary = data.summary || {};
+                $('#preview-summary').html(`<strong>Total:</strong> ${summary.total} — <strong>Válidas:</strong> ${summary.validas} — <strong>Inválidas:</strong> ${summary.invalidas}`);
+
+                const tbody = $('#preview-table tbody');
+                tbody.empty();
+                rows.forEach(r => {
+                    const tr = $('<tr></tr>');
+                    tr.append($('<td></td>').text(r.line));
+                    tr.append($('<td></td>').text(r.identificador));
+                    tr.append($('<td></td>').text(r.nombre || ''));
+                    tr.append($('<td></td>').text(r.nota));
+                    tr.append($('<td></td>').text(r.valido ? 'OK' : 'Error').addClass(r.valido ? 'text-success' : 'text-danger'));
+                    tr.append($('<td></td>').text(r.mensaje));
+                    // Guardar metadata en data-* para aplicar luego
+                    tr.data('row', r);
+                    tbody.append(tr);
+                });
+            })
+            .catch(err => {
+                $('#preview-summary').html(`<div class="alert alert-danger">Error: ${err.message}</div>`);
+            });
+    });
+
+    // Aplicar CSV al formulario: setear inputs existentes
+    $('#btn-apply-csv').click(function() {
+        const rows = [];
+        $('#preview-table tbody tr').each(function() {
+            const r = $(this).data('row');
+            if (r && r.valido) rows.push(r);
+        });
+
+        if (rows.length === 0) {
+            alert('No hay filas válidas para aplicar');
+            return;
+        }
+
+        let applied = 0;
+        let missing = 0;
+        rows.forEach(r => {
+            const estudianteId = r.estudiante_id;
+            const nota = r.nota;
+            const campoTrayecto = 'trayecto_' + ($('#trayecto_actual').val() || 0);
+            const selector = `input[name="notas[${estudianteId}][${campoTrayecto}]"]`;
+            const input = document.querySelector(selector);
+            if (input) {
+                input.value = nota;
+                applied++;
+            } else {
+                missing++;
+            }
+        });
+
+        $('#modalPreviewCSV').modal('hide');
+        let msg = `Se aplicaron ${applied} notas al formulario.`;
+        if (missing) msg += ` ${missing} entradas no se encontraron en el formulario.`;
+        alert(msg);
     });
     
     // Guardar notas

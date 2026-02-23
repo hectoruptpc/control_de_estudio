@@ -13259,9 +13259,14 @@ class PDF_ActaCarga extends FPDF {
 }
 
 // --- PROCESAMIENTO ---
-if (isset($_GET['materia_id'])) {
-    $info = obtenerInfoNotasDefinitivas($_GET['docente_id'], $_GET['materia_id'], $_GET['periodo_id']);
-    $lista_notas = obtenerNotasDefinitivasGrupo($_GET['docente_id'], $_GET['materia_id'], $_GET['periodo_id']);
+// Ejecutar únicamente si se proporcionan todos los parámetros esperados
+if (isset($_GET['materia_id']) && isset($_GET['docente_id']) && isset($_GET['periodo_id'])) {
+    $docente_id_get = $_GET['docente_id'];
+    $materia_id_get = $_GET['materia_id'];
+    $periodo_id_get = $_GET['periodo_id'];
+
+    $info = obtenerInfoNotasDefinitivas($docente_id_get, $materia_id_get, $periodo_id_get);
+    $lista_notas = obtenerNotasDefinitivasGrupo($docente_id_get, $materia_id_get, $periodo_id_get);
     $stats = calcularEstadisticasNotas($lista_notas);
 
     $datos_pdf = [
