@@ -1,11 +1,23 @@
 <?php
 require_once('../funciones/functions.php');
+
+// Buffer para capturar cualquier salida extra (warnings/html) y devolver JSON válido
+ob_start();
 header('Content-Type: application/json; charset=utf-8');
 
-if (!isLoggedIn() || !isDocente()) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Acceso denegado']);
+function respondJson($data, $httpCode = 200) {
+    $extra = trim(ob_get_clean());
+    if ($extra !== '') {
+        // Incluir salida adicional para debugging mínimo
+        $data['server_output'] = substr($extra, 0, 4096);
+    }
+    http_response_code($httpCode);
+    echo json_encode($data);
     exit();
+}
+
+if (!isLoggedIn() || !isDocente()) {
+    respondJson(['error' => 'Acceso denegado'], 403);
 }
 
 $docente_id = obtenerIdUsuario();
@@ -14,35 +26,28 @@ $materia_id = $_POST['materia_id'] ?? null;
 $trayecto_actual = isset($_POST['trayecto_actual']) ? (int)$_POST['trayecto_actual'] : 0;
 
 if (!$seccion_id || !$materia_id) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Parámetros faltantes']);
-    exit();
+    respondJson(['error' => 'Parámetros faltantes'], 400);
 }
 
 if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
-    http_response_code(400);
-    echo json_encode(['error' => 'No se recibió el archivo o hubo un error en la subida']);
-    exit();
+    respondJson(['error' => 'No se recibió el archivo o hubo un error en la subida'], 400);
 }
 
 // Límite razonable
 $maxBytes = 5 * 1024 * 1024; // 5 MB
 if ($_FILES['file']['size'] > $maxBytes) {
-    http_response_code(413);
-    echo json_encode(['error' => 'Archivo demasiado grande (máx 5MB)']);
-    exit();
+    respondJson(['error' => 'Archivo demasiado grande (máx 5MB)'], 413);
 }
 
 $tmp = $_FILES['file']['tmp_name'];
 $handle = fopen($tmp, 'r');
 if (!$handle) {
-    http_response_code(500);
-    echo json_encode(['error' => 'No se pudo procesar el archivo']);
-    exit();
+    respondJson(['error' => 'No se pudo procesar el archivo'], 500);
 }
 
 // Obtener lista de estudiantes de la sección para validación rápida
 $seccionMap = []; // cedula_normalizada => ['id'=>..., 'nombre'=>...]
+$idMap = []; // id => ['id'=>..., 'nombre'=>...]
 if (function_exists('obtenerEstudiantesDeSeccion')) {
     global $db;
     $res = obtenerEstudiantesDeSeccion($db, $seccion_id);
@@ -53,10 +58,13 @@ if (function_exists('obtenerEstudiantesDeSeccion')) {
             elseif (isset($r['identificacion'])) $ced = $r['identificacion'];
             elseif (isset($r['numero_cedula'])) $ced = $r['numero_cedula'];
             $key = preg_replace('/\s+/', '', strtolower($ced));
+            $idVal = $r['id'] ?? $r['id_usuario'] ?? $r['usuario_id'] ?? null;
+            $nombreVal = trim(($r['nombres'] ?? $r['nombre'] ?? $r['nombres_completos'] ?? ''));
             $seccionMap[$key] = [
-                'id' => $r['id'] ?? $r['id_usuario'] ?? $r['usuario_id'] ?? null,
-                'nombre' => trim(($r['nombres'] ?? '') . ' ' . ($r['apellidos'] ?? $r['apellido'] ?? ''))
+                'id' => $idVal,
+                'nombre' => $nombreVal
             ];
+            if ($idVal) $idMap[(string)$idVal] = ['id' => $idVal, 'nombre' => $nombreVal];
         }
     } elseif (is_array($res)) {
         foreach ($res as $r) {
@@ -65,10 +73,13 @@ if (function_exists('obtenerEstudiantesDeSeccion')) {
             elseif (isset($r['identificacion'])) $ced = $r['identificacion'];
             elseif (isset($r['numero_cedula'])) $ced = $r['numero_cedula'];
             $key = preg_replace('/\s+/', '', strtolower($ced));
+            $idVal = $r['id'] ?? $r['id_usuario'] ?? $r['usuario_id'] ?? null;
+            $nombreVal = trim(($r['nombres'] ?? $r['nombre'] ?? $r['nombres_completos'] ?? ''));
             $seccionMap[$key] = [
-                'id' => $r['id'] ?? $r['id_usuario'] ?? $r['usuario_id'] ?? null,
-                'nombre' => trim(($r['nombres'] ?? '') . ' ' . ($r['apellidos'] ?? $r['apellido'] ?? ''))
+                'id' => $idVal,
+                'nombre' => $nombreVal
             ];
+            if ($idVal) $idMap[(string)$idVal] = ['id' => $idVal, 'nombre' => $nombreVal];
         }
     }
 }
@@ -82,17 +93,49 @@ $maxRows = 2000;
 while (($data = fgetcsv($handle, 1000, ',')) !== false) {
     $line++;
     if ($line == 1) {
-        // Si la primera fila parece encabezado con 'identificador' o 'cedula', lo aceptamos y lo saltamos
-        $first = strtolower(trim($data[0] ?? ''));
-        if (strpos($first, 'ident') !== false || strpos($first, 'cedul') !== false) {
+        // Normalizar y eliminar BOM de cada celda antes de detectar header
+        foreach ($data as $k => $v) {
+            $cell = (string)$v;
+            // quitar BOM y trim
+            $cell = preg_replace('/^\xEF\xBB\xBF/', '', $cell);
+            $data[$k] = trim($cell);
+        }
+
+        // Si la primera fila parece encabezado (contiene 'estudiante', 'id', 'ident', 'cedul' o 'nota'), la usamos para localizar la columna de nota
+        $joined = strtolower(implode(',', array_map('trim', $data)));
+        if (strpos($joined, 'estudiante') !== false || strpos($joined, 'estudiante_id') !== false || strpos($joined, 'id') !== false || strpos($joined, 'ident') !== false || strpos($joined, 'cedul') !== false || strpos($joined, 'nota') !== false || strpos($joined, 'nombres') !== false) {
+            // Determinar índice de la columna "nota"
+            $headers = array_map('strtolower', array_map('trim', $data));
+            $notaIndex = array_search('nota', $headers);
+            if ($notaIndex === false) $notaIndex = count($data) - 1; // última columna por defecto
+            $headerDetected = true;
+            // saltar la fila header
             continue;
+        }
+        // si no detectó header, continuar con la fila como datos (se normalizó ya)
+    } else {
+        // Normalizar celdas para filas no-header también
+        foreach ($data as $k => $v) {
+            $cell = (string)$v;
+            $cell = preg_replace('/^\xEF\xBB\xBF/', '', $cell);
+            $data[$k] = trim($cell);
         }
     }
 
     if ($line > $maxRows) break;
 
+    // Si la fila está completamente vacía (ej. saltos de línea), la ignoramos
+    $allEmpty = true;
+    foreach ($data as $cell) {
+        if (trim((string)$cell) !== '') { $allEmpty = false; break; }
+    }
+    if ($allEmpty) continue;
+
+    // Identificador esperado en la primera columna (estudiante_id) y nota en la última columna
     $ident = trim($data[0] ?? '');
-    $notaRaw = isset($data[1]) ? trim($data[1]) : '';
+    // Eliminar BOM si existe
+    $ident = preg_replace('/^\xEF\xBB\xBF/', '', $ident);
+    $notaRaw = isset($data[count($data) - 1]) ? trim($data[count($data) - 1]) : '';
 
     $rowObj = [
         'line' => $line,
@@ -101,7 +144,8 @@ while (($data = fgetcsv($handle, 1000, ',')) !== false) {
         'valido' => false,
         'mensaje' => '',
         'estudiante_id' => null,
-        'nombre' => ''
+        'nombre' => '',
+        'campo' => 'trayecto_' . intval($trayecto_actual)
     ];
 
     if ($ident === '') {
@@ -111,12 +155,26 @@ while (($data = fgetcsv($handle, 1000, ',')) !== false) {
         continue;
     }
 
-    $key = preg_replace('/\s+/', '', strtolower($ident));
-    if (isset($seccionMap[$key]) && $seccionMap[$key]['id']) {
-        $rowObj['estudiante_id'] = $seccionMap[$key]['id'];
-        $rowObj['nombre'] = $seccionMap[$key]['nombre'];
-    } else {
-        $rowObj['mensaje'] = 'Cédula/identificador no encontrado en la sección';
+    // Resolver estudiante: preferir estudiante_id numérico, si no intentar por cédula/identificador
+    $resolved = false;
+    if ($ident !== '' && is_numeric($ident)) {
+        $idKey = (string)(int)$ident;
+        if (isset($idMap[$idKey])) {
+            $rowObj['estudiante_id'] = $idMap[$idKey]['id'];
+            $rowObj['nombre'] = $idMap[$idKey]['nombre'];
+            $resolved = true;
+        }
+    }
+    if (!$resolved) {
+        $key = preg_replace('/\s+/', '', strtolower($ident));
+        if ($key !== '' && isset($seccionMap[$key]) && $seccionMap[$key]['id']) {
+            $rowObj['estudiante_id'] = $seccionMap[$key]['id'];
+            $rowObj['nombre'] = $seccionMap[$key]['nombre'];
+            $resolved = true;
+        }
+    }
+    if (!$resolved) {
+        $rowObj['mensaje'] = 'Estudiante no encontrado en la sección';
         $invalidCount++;
         $rows[] = $rowObj;
         continue;
@@ -152,13 +210,15 @@ while (($data = fgetcsv($handle, 1000, ',')) !== false) {
     $rowObj['valido'] = true;
     $rowObj['mensaje'] = 'OK';
     $rowObj['nota'] = $notaVal;
+    // Indicar qué campo de la tabla `notas_pendientes` se actualizaría
+    $rowObj['campo'] = 'trayecto_' . intval($trayecto_actual);
     $validCount++;
     $rows[] = $rowObj;
 }
 
 fclose($handle);
 
-echo json_encode([
+respondJson([
     'previewRows' => $rows,
     'summary' => [
         'total' => count($rows),
@@ -166,4 +226,3 @@ echo json_encode([
         'invalidas' => $invalidCount
     ]
 ]);
-exit();

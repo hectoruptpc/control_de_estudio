@@ -52,12 +52,12 @@ include("includes/head.php");
                         <tbody>
                             <?php while ($seccion = $result_secciones->fetch_assoc()): ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($seccion['codigo_seccion']) ?></td>
-                                    <td><?= htmlspecialchars($seccion['nombre_carrera']) ?></td>
-                                    <td><?= htmlspecialchars($seccion['nombre_trayecto']) ?></td>
-                                    <td><?= htmlspecialchars($seccion['nombre_periodo']) ?></td>
-                                    <td><?= htmlspecialchars($seccion['nombre_materia']) ?></td>
-                                    <td>
+                                        <td><?= htmlspecialchars($seccion['codigo_seccion']) ?></td>
+                                        <td><?= htmlspecialchars($seccion['nombre_carrera']) ?></td>
+                                        <td><?= htmlspecialchars($seccion['nombre_trayecto']) ?></td>
+                                        <td><?= htmlspecialchars($seccion['nombre_periodo']) ?></td>
+                                        <td><?= htmlspecialchars($seccion['nombre_materia']) ?></td>
+                                        <td>
                                         <button class="btn btn-sm btn-primary btn-cargar" 
                                                 data-seccion="<?= $seccion['id_seccion'] ?>"
                                                 data-materia="<?= $seccion['id_materia'] ?>">
@@ -136,10 +136,10 @@ include("includes/head.php");
                                     <thead>
                                         <tr>
                                             <th>Línea</th>
-                                            <th>Identificador</th>
-                                            <th>Nombre</th>
+                                            <th>Estudiante ID</th>
+                                            <th>Nombres</th>
                                             <th>Nota propuesta</th>
-                                            <th>Estado</th>
+                                            <th>Campo</th>
                                             <th>Mensaje</th>
                                         </tr>
                                     </thead>
@@ -287,10 +287,10 @@ $(document).ready(function() {
                 rows.forEach(r => {
                     const tr = $('<tr></tr>');
                     tr.append($('<td></td>').text(r.line));
-                    tr.append($('<td></td>').text(r.identificador));
+                    tr.append($('<td></td>').text(r.estudiante_id || r.identificador || ''));
                     tr.append($('<td></td>').text(r.nombre || ''));
                     tr.append($('<td></td>').text(r.nota));
-                    tr.append($('<td></td>').text(r.valido ? 'OK' : 'Error').addClass(r.valido ? 'text-success' : 'text-danger'));
+                    tr.append($('<td></td>').text(r.campo || ('trayecto_' + ($('#trayecto_actual').val() || 0))));
                     tr.append($('<td></td>').text(r.mensaje));
                     // Guardar metadata en data-* para aplicar luego
                     tr.data('row', r);
@@ -320,7 +320,7 @@ $(document).ready(function() {
         rows.forEach(r => {
             const estudianteId = r.estudiante_id;
             const nota = r.nota;
-            const campoTrayecto = 'trayecto_' + ($('#trayecto_actual').val() || 0);
+            const campoTrayecto = r.campo || ('trayecto_' + ($('#trayecto_actual').val() || 0));
             const selector = `input[name="notas[${estudianteId}][${campoTrayecto}]"]`;
             const input = document.querySelector(selector);
             if (input) {
