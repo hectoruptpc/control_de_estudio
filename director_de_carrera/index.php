@@ -55,8 +55,14 @@ visita();
         .asignacion-card {
             border-bottom: 4px solid #fd7e14;
         }
+        .voceros-card {
+            border-bottom: 4px solid #28a745;
+        }
         .asignacion-card .card-icon {
             color: #fd7e14;
+        }
+        .voceros-card .card-icon {
+            color: #28a745;
         }
         .btn-access {
             border-radius: 50px;
@@ -72,6 +78,15 @@ visita();
         .btn-asignacion:hover {
             background-color: #e86100;
             border-color: #dc5600;
+        }
+        .btn-voceros {
+            background-color: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+        .btn-voceros:hover {
+            background-color: #218838;
+            border-color: #1e7e34;
         }
         .welcome-message {
             background-color: white;
@@ -89,10 +104,10 @@ visita();
             <p class="lead mb-0">Bienvenido, <?php echo $_SESSION['user']['nombre'] ?? 'Director'; ?></p>
         </div>
 
-        <!-- Tarjeta de acceso -->
+        <!-- Tarjetas de acceso -->
         <div class="row mb-5 justify-content-center">
             <!-- Tarjeta de Asignación de Docentes -->
-            <div class="col-md-6 mb-4">
+            <div class="col-md-5 mb-4">
                 <div class="card feature-card asignacion-card h-100">
                     <div class="card-body text-center p-4">
                         <div class="card-icon">
@@ -104,12 +119,26 @@ visita();
                     </div>
                 </div>
             </div>
+            
+            <!-- Tarjeta de Asignación de Voceros -->
+            <div class="col-md-5 mb-4">
+                <div class="card feature-card voceros-card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="card-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h3 class="card-title h4 font-weight-bold">Asignación de Voceros</h3>
+                        <p class="card-text text-muted">Gestione la asignación de voceros estudiantiles por programa</p>
+                        <a href="asignacion_voceros.php" class="btn btn-access btn-voceros mt-3">Acceder</a>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Mensaje de bienvenida -->
         <div class="welcome-message p-4 text-center">
             <h4 class="font-weight-bold">Bienvenido al Sistema de Gestión</h4>
-            <p class="text-muted mb-0">Utilice la opción disponible para gestionar las asignaciones docentes</p>
+            <p class="text-muted mb-0">Utilice las opciones disponibles para gestionar las asignaciones docentes y de voceros</p>
         </div>
     </div>
 

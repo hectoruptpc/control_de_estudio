@@ -168,6 +168,13 @@ if (!isLoggedIn() || !isUser()) {
               </a>
             </li>
 
+            <!-- NUEVO: Menú de Asignación de Voceros -->
+            <li class="nav-item">
+              <a title="Asignar Voceros Estudiantiles" class="nav-link" href="asignacion_voceros.php">
+                <i class="fas fa-users fa-fw"></i> Asignar Voceros
+              </a>
+            </li>
+
             <!-- Menú de Ajustes - ID ÚNICO CORREGIDO -->
             <li id="dropdown-ajustes-director" class="nav-item dropdown">
                 <a title="Ir a Ajustes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownAjustesDirector" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
