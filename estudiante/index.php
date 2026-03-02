@@ -14,6 +14,24 @@ if (!isLoggedIn() || !isEstudiante()) {
 
 // LLAMAR A LA FUNCIÓN DE VISITA
 visita();
+
+// Determinar si el usuario es vocero (usar sesión si está, sino consultar DB)
+$is_vocero = false;
+if (isset($_SESSION['user']['vocero'])) {
+    $is_vocero = intval($_SESSION['user']['vocero']) === 1;
+} else {
+    if (isset($_SESSION['user']['id'])) {
+        $uid = intval($_SESSION['user']['id']);
+        $qv = $db->prepare("SELECT vocero FROM users WHERE id = ? LIMIT 1");
+        $qv->bind_param('i', $uid);
+        $qv->execute();
+        $rv = $qv->get_result();
+        if ($rv && $rv->num_rows > 0) {
+            $rowv = $rv->fetch_assoc();
+            $is_vocero = intval($rowv['vocero']) === 1;
+        }
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -81,6 +99,12 @@ visita();
         }
         .constancias-card .card-icon {
             color: #e74a3b;
+        }
+        .vocero-card {
+            border-bottom: 4px solid #28a745;
+        }
+        .vocero-card .card-icon {
+            color: #28a745;
         }
         .btn-access {
             border-radius: 50px;
@@ -234,6 +258,21 @@ visita();
                     </div>
                 </div>
             </div>
+                <?php if ($is_vocero): ?>
+                <!-- Tarjeta de Vocero (visible solo para voceros) -->
+                <div class="col-md-5 col-lg-3 col-xl-custom mb-4">
+                    <div class="card feature-card vocero-card h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="card-icon">
+                                <i class="fas fa-user-tie"></i>
+                            </div>
+                            <h3 class="card-title h4 font-weight-bold">Vocero</h3>
+                            <p class="card-text text-muted">Accede a herramientas y opciones para voceros estudiantiles</p>
+                            <a href="vocero.php" class="btn btn-access btn-vocero mt-3">Acceder</a>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
         </div>
 
         <!-- Mensaje de bienvenida -->
