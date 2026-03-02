@@ -131,6 +131,21 @@ while (($data = fgetcsv($handle, 1000, ',')) !== false) {
     }
     if ($allEmpty) continue;
 
+    // Normalizar celdas (trim ya aplicado). Detectar y omitir filas que parezcan una segunda cabecera
+    $headerKeywords = ['estudiante', 'estudiante_id', 'estudianteid', 'id', 'identificador', 'ident', 'cedula', 'cedul', 'nota', 'nombres', 'nombre'];
+    $isHeaderLike = false;
+    foreach ($data as $cell) {
+        $low = strtolower(trim((string)$cell));
+        if ($low === '') continue;
+        foreach ($headerKeywords as $kw) {
+            if ($low === $kw || strpos($low, $kw) !== false) { $isHeaderLike = true; break 2; }
+        }
+    }
+    if ($isHeaderLike) {
+        // Omitir fila que parece ser cabecera (segunda línea o repetida)
+        continue;
+    }
+
     // Identificador esperado en la primera columna (estudiante_id) y nota en la última columna
     $ident = trim($data[0] ?? '');
     // Eliminar BOM si existe
