@@ -53,33 +53,38 @@ if (function_exists('obtenerEstudiantesDeSeccion')) {
     $res = obtenerEstudiantesDeSeccion($db, $seccion_id);
     if (is_object($res)) {
         while ($r = $res->fetch_assoc()) {
+            // Preferir `idusuario` (cédula) como clave de búsqueda
             $ced = '';
-            if (isset($r['cedula'])) $ced = $r['cedula'];
+            if (isset($r['idusuario'])) $ced = $r['idusuario'];
+            elseif (isset($r['cedula'])) $ced = $r['cedula'];
             elseif (isset($r['identificacion'])) $ced = $r['identificacion'];
             elseif (isset($r['numero_cedula'])) $ced = $r['numero_cedula'];
-            $key = preg_replace('/\s+/', '', strtolower($ced));
+            $key = preg_replace('/\s+/', '', strtolower((string)$ced));
             $idVal = $r['id'] ?? $r['id_usuario'] ?? $r['usuario_id'] ?? null;
             $nombreVal = trim(($r['nombres'] ?? $r['nombre'] ?? $r['nombres_completos'] ?? ''));
             $seccionMap[$key] = [
                 'id' => $idVal,
-                'nombre' => $nombreVal
+                'nombre' => $nombreVal,
+                'idusuario' => $ced
             ];
-            if ($idVal) $idMap[(string)$idVal] = ['id' => $idVal, 'nombre' => $nombreVal];
+            if ($idVal) $idMap[(string)$idVal] = ['id' => $idVal, 'nombre' => $nombreVal, 'idusuario' => $ced];
         }
     } elseif (is_array($res)) {
         foreach ($res as $r) {
             $ced = '';
-            if (isset($r['cedula'])) $ced = $r['cedula'];
+            if (isset($r['idusuario'])) $ced = $r['idusuario'];
+            elseif (isset($r['cedula'])) $ced = $r['cedula'];
             elseif (isset($r['identificacion'])) $ced = $r['identificacion'];
             elseif (isset($r['numero_cedula'])) $ced = $r['numero_cedula'];
-            $key = preg_replace('/\s+/', '', strtolower($ced));
+            $key = preg_replace('/\s+/', '', strtolower((string)$ced));
             $idVal = $r['id'] ?? $r['id_usuario'] ?? $r['usuario_id'] ?? null;
             $nombreVal = trim(($r['nombres'] ?? $r['nombre'] ?? $r['nombres_completos'] ?? ''));
             $seccionMap[$key] = [
                 'id' => $idVal,
-                'nombre' => $nombreVal
+                'nombre' => $nombreVal,
+                'idusuario' => $ced
             ];
-            if ($idVal) $idMap[(string)$idVal] = ['id' => $idVal, 'nombre' => $nombreVal];
+            if ($idVal) $idMap[(string)$idVal] = ['id' => $idVal, 'nombre' => $nombreVal, 'idusuario' => $ced];
         }
     }
 }
@@ -155,6 +160,7 @@ while (($data = fgetcsv($handle, 1000, ',')) !== false) {
     $rowObj = [
         'line' => $line,
         'identificador' => $ident,
+        'idusuario' => $ident,
         'nota' => $notaRaw,
         'valido' => false,
         'mensaje' => '',
@@ -170,22 +176,25 @@ while (($data = fgetcsv($handle, 1000, ',')) !== false) {
         continue;
     }
 
-    // Resolver estudiante: preferir estudiante_id numérico, si no intentar por cédula/identificador
+    // Resolver estudiante por idusuario (cédula) preferentemente
     $resolved = false;
-    if ($ident !== '' && is_numeric($ident)) {
-        $idKey = (string)(int)$ident;
-        if (isset($idMap[$idKey])) {
-            $rowObj['estudiante_id'] = $idMap[$idKey]['id'];
-            $rowObj['nombre'] = $idMap[$idKey]['nombre'];
-            $resolved = true;
-        }
-    }
-    if (!$resolved) {
-        $key = preg_replace('/\s+/', '', strtolower($ident));
-        if ($key !== '' && isset($seccionMap[$key]) && $seccionMap[$key]['id']) {
-            $rowObj['estudiante_id'] = $seccionMap[$key]['id'];
-            $rowObj['nombre'] = $seccionMap[$key]['nombre'];
-            $resolved = true;
+    $key = preg_replace('/\s+/', '', strtolower($ident));
+    if ($key !== '' && isset($seccionMap[$key]) && $seccionMap[$key]['id']) {
+        $rowObj['estudiante_id'] = $seccionMap[$key]['id'];
+        $rowObj['nombre'] = $seccionMap[$key]['nombre'];
+        // mantener la cédula normalizada en idusuario
+        $rowObj['idusuario'] = $seccionMap[$key]['idusuario'] ?? $ident;
+        $resolved = true;
+    } else {
+        // fallback: si enviaron número interno del user id, intentar resolver por idMap
+        if (is_numeric($ident)) {
+            $idKey = (string)(int)$ident;
+            if (isset($idMap[$idKey])) {
+                $rowObj['estudiante_id'] = $idMap[$idKey]['id'];
+                $rowObj['nombre'] = $idMap[$idKey]['nombre'];
+                $rowObj['idusuario'] = $idMap[$idKey]['idusuario'] ?? $ident;
+                $resolved = true;
+            }
         }
     }
     if (!$resolved) {

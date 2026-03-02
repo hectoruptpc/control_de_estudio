@@ -55,14 +55,15 @@ header('Content-Type: text/csv; charset=utf-8');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
 $out = fopen('php://output', 'w');
 
-// Encabezado: incluir `estudiante_id` y `nombres`, dejar `nota` vacía
-fputcsv($out, ['estudiante_id','nombres','codigo_seccion','carrera','materia','nota']);
+// Encabezado: incluir `idusuario` (cédula) y `nombres`, dejar `nota` vacía
+fputcsv($out, ['idusuario','nombres','codigo_seccion','carrera','materia','nota']);
 
 foreach ($students as $s) {
-    $id_usuario = $s['id'] ?? $s['id_usuario'] ?? $s['usuario_id'] ?? '';
+    // Preferir campo `idusuario` (cedula) si existe
+    $idusuario = $s['idusuario'] ?? $s['cedula'] ?? $s['identificacion'] ?? $s['numero_cedula'] ?? '';
     $nombres = $s['nombres'] ?? $s['nombre'] ?? $s['nombres_completos'] ?? '';
 
-    fputcsv($out, [$id_usuario, $nombres, $codigo_seccion, $carrera_nombre, $materia_nombre, '']);
+    fputcsv($out, [$idusuario, $nombres, $codigo_seccion, $carrera_nombre, $materia_nombre, '']);
 }
 
 fclose($out);

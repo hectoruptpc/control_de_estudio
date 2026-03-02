@@ -136,7 +136,7 @@ include("includes/head.php");
                                     <thead>
                                         <tr>
                                             <th>Línea</th>
-                                            <th>Estudiante ID</th>
+                                            <th>Cédula</th>
                                             <th>Nombres</th>
                                             <th>Nota propuesta</th>
                                             <th>Campo</th>
@@ -287,7 +287,7 @@ $(document).ready(function() {
                 rows.forEach(r => {
                     const tr = $('<tr></tr>');
                     tr.append($('<td></td>').text(r.line));
-                    tr.append($('<td></td>').text(r.estudiante_id || r.identificador || ''));
+                    tr.append($('<td></td>').text(r.idusuario || r.identificador || ''));
                     tr.append($('<td></td>').text(r.nombre || ''));
                     tr.append($('<td></td>').text(r.nota));
                     tr.append($('<td></td>').text(r.campo || ('trayecto_' + ($('#trayecto_actual').val() || 0))));
