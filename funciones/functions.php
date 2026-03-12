@@ -13086,6 +13086,51 @@ function obtenerEstudiantesSeccion($seccion_id) {
 }
 
 
+/**
+ * Verifica si un usuario tiene marcado el rol de vocero
+ */
+function esVoceroUsuario($user_id) {
+    global $db;
+    $query = "SELECT vocero FROM users WHERE id = ? LIMIT 1";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($res && $res->num_rows > 0) {
+        return intval($res->fetch_assoc()['vocero']) === 1;
+    }
+    return false;
+}
+
+/**
+ * Obtener lista de estudiantes de una sección junto con sus notas definitivas
+ * devuelve un array donde cada elemento tiene keys: id, cedula, nombre, notas (array)
+ */
+function obtenerEstudiantesConNotasSeccion($seccion_id) {
+    global $db;
+    
+    $query = "SELECT u.id, u.idusuario AS cedula, u.nombre
+              FROM users u
+              INNER JOIN estudiante_seccion es ON u.id = es.id_usuario
+              WHERE es.id_seccion = ? AND es.estatus = 'activo'
+              ORDER BY u.nombre";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $estudiantes = [];
+    while ($row = $result->fetch_assoc()) {
+        // agregar notas definitivas para cada estudiante
+        $row['notas'] = obtenerNotasEstudianteConsulta($row['id']);
+        $estudiantes[] = $row;
+    }
+    
+    return $estudiantes;
+}
+
+
 
 
 
