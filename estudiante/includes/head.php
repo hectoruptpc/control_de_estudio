@@ -27,6 +27,18 @@ if (!isLoggedIn() || !isEstudiante()) {
     header('location: ../login.php');
     exit();
 }
+
+// Verificar si el estudiante es vocero para mostrar la opción en el menú
+$es_vocero = false;
+if (isset($_SESSION['user']['id'])) {
+    $query_vocero = "SELECT vocero FROM users WHERE id = ?";
+    $stmt_vocero = $db->prepare($query_vocero);
+    $stmt_vocero->bind_param("i", $_SESSION['user']['id']);
+    $stmt_vocero->execute();
+    $result_vocero = $stmt_vocero->get_result();
+    $usuario_vocero = $result_vocero->fetch_assoc();
+    $es_vocero = ($usuario_vocero && $usuario_vocero['vocero'] == 1);
+}
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html lang="es-Es" xmlns="http://www.w3.org/1999/xhtml">
@@ -152,6 +164,15 @@ if (!isLoggedIn() || !isEstudiante()) {
                 <i class="fas fa-file-alt fa-fw"></i> Solicitudes
               </a>
             </li>
+
+            <!-- OPCIÓN PARA VOCEROS: PANEL DE VOCERO (SOLO VISIBLE SI ES VOCERO) -->
+            <?php if ($es_vocero): ?>
+            <li class="nav-item">
+              <a title="Panel del Vocero" class="nav-link" href="vocero.php">
+                <i class="fas fa-microphone-alt fa-fw"></i> Panel Vocero
+              </a>
+            </li>
+            <?php endif; ?>
 
             <!-- Icono de Mensajería con Notificación para Estudiantes -->
             <li class="nav-item nav-item-mensajes">
