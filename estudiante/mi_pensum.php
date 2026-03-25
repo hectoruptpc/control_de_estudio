@@ -129,62 +129,270 @@ if (isset($_GET['pdf']) && $_GET['pdf'] == '1') {
 include("includes/head.php");
 ?>
 
-<div class="container-fluid">
-    <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <div>
-            <h1 class="h3 mb-0 text-gray-800">Mi Pensum Académico</h1>
+<div class="container-fluid px-2 px-sm-3 px-md-4">
+    <div class="d-flex flex-column flex-sm-row align-items-center justify-content-between mb-4">
+        <div class="mb-2 mb-sm-0 text-center text-sm-left">
+            <h1 class="h3 mb-0 text-gray-800 h2-sm">Mi Pensum Académico</h1>
             <?php if(!empty($codigo_malla)): ?>
-                <span class="badge badge-info"><?= htmlspecialchars($codigo_malla) ?></span>
+                <span class="badge badge-info mt-1"><?= htmlspecialchars($codigo_malla) ?></span>
             <?php endif; ?>
         </div>
-        <div>
-            <a href="index.php" class="btn btn-sm btn-primary shadow-sm no-print"><i class="fas fa-arrow-left"></i> Volver</a>
-            <a href="?pdf=1" class="btn btn-sm btn-success shadow-sm no-print ml-2"><i class="fas fa-print"></i> Imprimir</a>
+        <div class="d-flex">
+            <a href="index.php" class="btn btn-sm btn-primary shadow-sm no-print">
+                <i class="fas fa-arrow-left"></i> <span class="d-none d-sm-inline">Volver</span>
+            </a>
+            <a href="?pdf=1" class="btn btn-sm btn-success shadow-sm no-print ml-2">
+                <i class="fas fa-print"></i> <span class="d-none d-sm-inline">Imprimir</span>
+            </a>
         </div>
     </div>
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 bg-primary text-white">
-            <h5 class="m-0 font-weight-bold"><?= htmlspecialchars($nombre_carrera) ?></h5>
+            <h5 class="m-0 font-weight-bold text-center text-sm-left"><?= htmlspecialchars($nombre_carrera) ?></h5>
         </div>
-        <div class="card-body">
+        <div class="card-body p-2 p-sm-3">
             <?php foreach ($materias_agrupadas as $texto_trayecto => $materias): ?>
-                <h5 class="font-weight-bold text-primary mt-4 mb-3"><?= $texto_trayecto ?></h5>
-                <div class="table-responsive">
+                <h5 class="font-weight-bold text-primary mt-4 mb-3 border-left-primary pl-3"><?= $texto_trayecto ?></h5>
+                
+                <!-- Vista para escritorio: tabla completa -->
+                <div class="table-responsive d-none d-md-block">
                     <table class="table table-bordered table-hover table-sm text-center">
                         <thead class="thead-light">
                             <tr>
                                 <th>Código</th>
                                 <th class="text-left">Nombre de la Asignatura</th>
-                                <th>Unidades Crédito</th>
-                                <th>Horas Teóricas</th>
-                                <th>Horas Prácticas</th>
-                                <th>Horas Laboratorio</th>
-                                <th>Horas Semanales</th>
-                                <th>Duración Periodo</th>
+                                <th>UC</th>
+                                <th>H.T.</th>
+                                <th>H.P.</th>
+                                <th>H.L.</th>
+                                <th>H.S.</th>
+                                <th>Duración</th>
                                 <th>Estado</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($materias as $m): ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($m['cod_materia'] ?? '') ?></td>
-                                    <td class="text-left"><?= htmlspecialchars($m['nombre_materia'] ?? '') ?></td>
-                                    <td><?= (int)($m['creditos'] ?? 0) ?></td>
-                                    <td><?= (int)($m['horas_teoricas'] ?? 0) ?></td>
-                                    <td><?= (int)($m['horas_practicas'] ?? 0) ?></td>
-                                    <td><?= (int)($m['horas_laboratorio'] ?? 0) ?></td>
-                                    <td><?= (int)($m['horas_semanales'] ?? 0) ?></td>
-                                    <td><?= htmlspecialchars($m['duracion_periodo'] ?? '') ?></td>
-                                    <td><span class="badge badge-<?= $m['activa'] ? 'success' : 'secondary' ?>"><?= $m['activa'] ? 'Activa' : 'Inactiva' ?></span></td>
+                                    <td class="align-middle"><?= htmlspecialchars($m['cod_materia'] ?? '') ?></td>
+                                    <td class="text-left align-middle"><?= htmlspecialchars($m['nombre_materia'] ?? '') ?></td>
+                                    <td class="align-middle"><?= (int)($m['creditos'] ?? 0) ?></td>
+                                    <td class="align-middle"><?= (int)($m['horas_teoricas'] ?? 0) ?></td>
+                                    <td class="align-middle"><?= (int)($m['horas_practicas'] ?? 0) ?></td>
+                                    <td class="align-middle"><?= (int)($m['horas_laboratorio'] ?? 0) ?></td>
+                                    <td class="align-middle"><?= (int)($m['horas_semanales'] ?? 0) ?></td>
+                                    <td class="align-middle"><?= htmlspecialchars($m['duracion_periodo'] ?? '') ?></td>
+                                    <td class="align-middle"><span class="badge badge-<?= $m['activa'] ? 'success' : 'secondary' ?>"><?= $m['activa'] ? 'Activa' : 'Inactiva' ?></span></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
+                
+                <!-- Vista para móviles: tarjetas -->
+                <div class="d-block d-md-none">
+                    <?php foreach ($materias as $m): ?>
+                        <div class="card mb-3 shadow-sm">
+                            <div class="card-header bg-light">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <strong class="text-primary"><?= htmlspecialchars($m['cod_materia'] ?? '') ?></strong>
+                                    <span class="badge badge-<?= $m['activa'] ? 'success' : 'secondary' ?>"><?= $m['activa'] ? 'Activa' : 'Inactiva' ?></span>
+                                </div>
+                            </div>
+                            <div class="card-body p-3">
+                                <h6 class="card-title mb-3"><?= htmlspecialchars($m['nombre_materia'] ?? '') ?></h6>
+                                
+                                <div class="row mb-2">
+                                    <div class="col-6 text-muted">
+                                        <i class="fas fa-star"></i> Unidades Crédito:
+                                    </div>
+                                    <div class="col-6">
+                                        <strong><?= (int)($m['creditos'] ?? 0) ?></strong>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-2">
+                                    <div class="col-6 text-muted">
+                                        <i class="fas fa-chalkboard"></i> Horas Teóricas:
+                                    </div>
+                                    <div class="col-6">
+                                        <?= (int)($m['horas_teoricas'] ?? 0) ?>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-2">
+                                    <div class="col-6 text-muted">
+                                        <i class="fas fa-laptop-code"></i> Horas Prácticas:
+                                    </div>
+                                    <div class="col-6">
+                                        <?= (int)($m['horas_practicas'] ?? 0) ?>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-2">
+                                    <div class="col-6 text-muted">
+                                        <i class="fas fa-flask"></i> Horas Laboratorio:
+                                    </div>
+                                    <div class="col-6">
+                                        <?= (int)($m['horas_laboratorio'] ?? 0) ?>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-2">
+                                    <div class="col-6 text-muted">
+                                        <i class="fas fa-clock"></i> Horas Semanales:
+                                    </div>
+                                    <div class="col-6">
+                                        <?= (int)($m['horas_semanales'] ?? 0) ?>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-2">
+                                    <div class="col-6 text-muted">
+                                        <i class="fas fa-calendar-alt"></i> Duración:
+                                    </div>
+                                    <div class="col-6">
+                                        <?= htmlspecialchars($m['duracion_periodo'] ?? '') ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                
             <?php endforeach; ?>
+            
+            <!-- Resumen del Pensum para móviles -->
+            <div class="d-block d-md-none mt-4">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6 class="font-weight-bold mb-3">
+                            <i class="fas fa-chart-line"></i> Resumen del Pensum
+                        </h6>
+                        <?php 
+                        $total_uc = 0;
+                        $total_hs = 0;
+                        $materias_activas = 0;
+                        $materias_totales = 0;
+                        
+                        foreach ($materias_agrupadas as $materias) {
+                            foreach ($materias as $m) {
+                                $materias_totales++;
+                                $total_uc += (int)($m['creditos'] ?? 0);
+                                $total_hs += (int)($m['horas_semanales'] ?? 0);
+                                if ($m['activa']) $materias_activas++;
+                            }
+                        }
+                        ?>
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="h5 text-primary"><?= $materias_totales ?></div>
+                                <small class="text-muted">Materias</small>
+                            </div>
+                            <div class="col-4">
+                                <div class="h5 text-success"><?= $total_uc ?></div>
+                                <small class="text-muted">Total UC</small>
+                            </div>
+                            <div class="col-4">
+                                <div class="h5 text-info"><?= $total_hs ?></div>
+                                <small class="text-muted">Horas/Semana</small>
+                            </div>
+                        </div>
+                        <div class="progress mt-3" style="height: 8px;">
+                            <div class="progress-bar bg-success" style="width: <?= ($materias_activas / $materias_totales) * 100 ?>%"></div>
+                        </div>
+                        <small class="text-muted d-block text-center mt-2">
+                            <?= round(($materias_activas / $materias_totales) * 100) ?>% de materias activas
+                        </small>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<style>
+/* Estilos responsivos */
+@media (max-width: 767.98px) {
+    .h2-sm {
+        font-size: 1.4rem;
+    }
+    
+    .card-header {
+        padding: 0.75rem;
+    }
+    
+    .border-left-primary {
+        border-left: 4px solid #007bff !important;
+        padding-left: 12px;
+    }
+    
+    /* Mejoras para las tarjetas de materias */
+    .d-block.d-md-none .card {
+        transition: transform 0.2s ease;
+        border-radius: 8px;
+    }
+    
+    .d-block.d-md-none .card:active {
+        transform: scale(0.98);
+    }
+    
+    .d-block.d-md-none .card-header {
+        background-color: #f8f9fc;
+        border-bottom: 1px solid #e3e6f0;
+    }
+    
+    .d-block.d-md-none .card-title {
+        font-size: 0.95rem;
+        line-height: 1.4;
+    }
+    
+    .d-block.d-md-none .row {
+        margin-bottom: 0.5rem;
+    }
+    
+    .d-block.d-md-none .col-6 {
+        font-size: 0.85rem;
+    }
+}
+
+/* Ajustes para tablets */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .table th, .table td {
+        padding: 0.5rem;
+        font-size: 0.8rem;
+    }
+    
+    .table th {
+        font-size: 0.75rem;
+    }
+}
+
+/* Mejoras generales */
+.card {
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.card-header {
+    border-bottom: none;
+}
+
+.table th, .table td {
+    vertical-align: middle;
+}
+
+.badge {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.65rem;
+}
+
+/* Tooltips para móviles */
+@media (hover: none) {
+    [data-toggle="tooltip"] {
+        cursor: pointer;
+    }
+}
+</style>
 
 <?php include("includes/footer.php"); ?>
