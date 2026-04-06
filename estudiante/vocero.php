@@ -79,17 +79,17 @@ if (isset($_GET['estudiante_id']) && is_numeric($_GET['estudiante_id'])) {
 include("includes/head.php");
 ?>
 
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 text-gray-800">Panel del Vocero</h1>
-        <div>
+<div class="container-fluid px-2 px-sm-3 px-md-4">
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center mb-4">
+        <h1 class="h3 text-gray-800 mb-2 mb-sm-0">Panel del Vocero</h1>
+        <div class="d-flex">
             <?php if ($estudiante_seleccionado): ?>
                 <a href="vocero.php" class="btn btn-secondary btn-sm mr-2">
-                    <i class="fas fa-arrow-left"></i> Volver a la lista
+                    <i class="fas fa-arrow-left"></i> <span class="d-none d-sm-inline">Volver a la lista</span><span class="d-inline d-sm-none">Volver</span>
                 </a>
             <?php endif; ?>
             <a href="index.php" class="btn btn-secondary btn-sm">
-                <i class="fas fa-home"></i> Inicio
+                <i class="fas fa-home"></i> <span class="d-none d-sm-inline">Inicio</span>
             </a>
         </div>
     </div>
@@ -97,15 +97,15 @@ include("includes/head.php");
     <?php if ($seccion): ?>
         <div class="alert alert-info mb-4">
             <i class="fas fa-users"></i> Sección: <strong><?= htmlspecialchars($seccion['codigo_seccion']) ?></strong>
-            <br>
-            <small>Como vocero, puedes consultar las notas de tus compañeros de sección haciendo clic en cada estudiante.</small>
+            <br class="d-block d-sm-none">
+            <small class="d-block d-sm-inline mt-1 mt-sm-0">Como vocero, puedes consultar las notas de tus compañeros de sección haciendo clic en cada estudiante.</small>
         </div>
 
         <?php if ($estudiante_seleccionado): ?>
             <!-- Detalle del estudiante seleccionado -->
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-primary text-white d-flex flex-column flex-sm-row justify-content-between align-items-center">
+                    <h5 class="mb-2 mb-sm-0">
                         <i class="fas fa-user-graduate"></i> 
                         <?= htmlspecialchars($estudiante_seleccionado['nombre']) ?>
                     </h5>
@@ -113,15 +113,15 @@ include("includes/head.php");
                         <i class="fas fa-times"></i> Cerrar
                     </a>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-2 p-sm-3">
                     <div class="row">
-                        <div class="col-md-6">
-                            <p><strong>Cédula:</strong> <?= htmlspecialchars($estudiante_seleccionado['idusuario']) ?></p>
-                            <p><strong>Nombre:</strong> <?= htmlspecialchars($estudiante_seleccionado['nombre']) ?></p>
+                        <div class="col-12 col-md-6 mb-2 mb-md-0">
+                            <p><strong><i class="fas fa-id-card"></i> Cédula:</strong> <?= htmlspecialchars($estudiante_seleccionado['idusuario']) ?></p>
+                            <p><strong><i class="fas fa-user"></i> Nombre:</strong> <?= htmlspecialchars($estudiante_seleccionado['nombre']) ?></p>
                         </div>
-                        <div class="col-md-6">
-                            <p><strong>Carrera:</strong> <?= htmlspecialchars($carrera['nombre_carrera']) ?> (<?= htmlspecialchars($carrera['cod_carrera']) ?>)</p>
-                            <p><strong>Total de Materias:</strong> <span class="badge badge-primary"><?= $materias_carrera->num_rows ?></span></p>
+                        <div class="col-12 col-md-6">
+                            <p><strong><i class="fas fa-graduation-cap"></i> Carrera:</strong> <?= htmlspecialchars($carrera['nombre_carrera']) ?> (<?= htmlspecialchars($carrera['cod_carrera']) ?>)</p>
+                            <p><strong><i class="fas fa-book"></i> Total Materias:</strong> <span class="badge badge-primary"><?= $materias_carrera->num_rows ?></span></p>
                         </div>
                     </div>
                     
@@ -131,7 +131,7 @@ include("includes/head.php");
                             <div class="alert <?= ($info_apto['apto_grado_completo'] || $info_apto['apto_tsu']) ? 'alert-success' : 'alert-warning' ?>">
                                 <h6><i class="fas fa-graduation-cap"></i> Evaluación para Grado:</h6>
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-12 col-md-6 mb-2 mb-md-0">
                                         <strong>TSU (Trayectos 0-2):</strong><br>
                                         <?= $info_apto['materias_aprobadas_tsu'] ?>/<?= $info_apto['total_materias_tsu'] ?> materias aprobadas<br>
                                         <span class="badge badge-<?= $info_apto['porcentaje_tsu'] >= 90 ? 'success' : 'warning' ?>">
@@ -141,7 +141,7 @@ include("includes/head.php");
                                             <span class="badge badge-success ml-2">APTO TSU</span>
                                         <?php endif; ?>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-12 col-md-6">
                                         <strong>Grado Completo:</strong><br>
                                         <?= $info_apto['materias_aprobadas_completo'] ?>/<?= $info_apto['total_materias_carrera'] ?> materias aprobadas<br>
                                         <span class="badge badge-<?= $info_apto['porcentaje_completo'] >= 100 ? 'success' : 'info' ?>">
@@ -160,18 +160,19 @@ include("includes/head.php");
             </div>
             
             <?php if ($materias_carrera && $materias_carrera->num_rows > 0): ?>
-            <div class="card">
+            <div class="card shadow-sm">
                 <div class="card-header bg-success text-white">
-                    <h5><i class="fas fa-book"></i> Plan de Estudios y Notas</h5>
+                    <h5 class="mb-0"><i class="fas fa-book"></i> Plan de Estudios y Notas</h5>
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive">
+                <div class="card-body p-2 p-sm-3">
+                    <!-- Vista para escritorio: tabla -->
+                    <div class="table-responsive d-none d-md-block">
                         <table class="table table-bordered table-sm">
                             <thead class="thead-light">
                                 <tr>
                                     <th width="100">Trayecto</th>
                                     <th>Materia</th>
-                                    <th width="100">Cod Materia</th>
+                                    <th width="100">Código</th>
                                     <th width="80">Nota</th>
                                     <th width="90">Estado</th>
                                     <th width="120">Periodo</th>
@@ -185,10 +186,12 @@ include("includes/head.php");
                                 $materias_sin_notas = 0;
                                 $suma_promedios = 0;
                                 $materias_con_notas = 0;
+                                $todas_materias = [];
                                 
                                 $materias_carrera->data_seek(0);
                                 
                                 while ($materia = $materias_carrera->fetch_assoc()): 
+                                    $todas_materias[] = $materia;
                                     $nota = isset($notas_estudiante[$materia['id_materia']]) ? $notas_estudiante[$materia['id_materia']] : null;
                                     
                                     $numero_trayecto_materia = (int)$materia['trayecto'];
@@ -265,12 +268,102 @@ include("includes/head.php");
                         </table>
                     </div>
                     
+                    <!-- Vista para móviles: tarjetas -->
+                    <div class="d-block d-md-none">
+                        <?php 
+                        $materias_carrera->data_seek(0);
+                        while ($materia = $materias_carrera->fetch_assoc()): 
+                            $nota = isset($notas_estudiante[$materia['id_materia']]) ? $notas_estudiante[$materia['id_materia']] : null;
+                            $numero_trayecto_materia = (int)$materia['trayecto'];
+                            $info_trayecto = obtenerInfoTrayecto($numero_trayecto_materia);
+                            $nombre_trayecto = $info_trayecto['nombre_trayecto'];
+                            
+                            $nota_trayecto = null;
+                            $tiene_nota = false;
+                            
+                            if ($nota) {
+                                $campo_trayecto = 'trayecto_' . $numero_trayecto_materia;
+                                if (isset($nota[$campo_trayecto]) && $nota[$campo_trayecto] !== null) {
+                                    $nota_trayecto = (float)$nota[$campo_trayecto];
+                                    $tiene_nota = true;
+                                }
+                            }
+                            
+                            $estado = 'Sin notas';
+                            $badge_estado = 'secondary';
+                            
+                            if ($tiene_nota) {
+                                if ($nota_trayecto >= 12) {
+                                    $estado = 'Aprobado';
+                                    $badge_estado = 'success';
+                                } else {
+                                    $estado = 'Reprobado';
+                                    $badge_estado = 'danger';
+                                }
+                            }
+                        ?>
+                            <div class="card mb-3 shadow-sm">
+                                <div class="card-header bg-light">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <strong class="text-primary"><?= htmlspecialchars($materia['cod_materia']) ?></strong>
+                                        <span class="badge badge-<?= $badge_estado ?>"><?= $estado ?></span>
+                                    </div>
+                                </div>
+                                <div class="card-body p-3">
+                                    <h6 class="card-title mb-3"><?= htmlspecialchars($materia['nombre_materia']) ?></h6>
+                                    
+                                    <div class="row mb-2">
+                                        <div class="col-5 text-muted">
+                                            <i class="fas fa-layer-group"></i> Trayecto:
+                                        </div>
+                                        <div class="col-7">
+                                            <?= htmlspecialchars($nombre_trayecto) ?>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row mb-2">
+                                        <div class="col-5 text-muted">
+                                            <i class="fas fa-star"></i> Nota:
+                                        </div>
+                                        <div class="col-7">
+                                            <?php if ($tiene_nota): ?>
+                                                <span class="badge badge-<?= $nota_trayecto >= 12 ? 'success' : 'danger' ?>">
+                                                    <?= $nota_trayecto ?>
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="text-muted">Sin nota</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row mb-2">
+                                        <div class="col-5 text-muted">
+                                            <i class="fas fa-calendar-alt"></i> Periodo:
+                                        </div>
+                                        <div class="col-7">
+                                            <?= $nota ? htmlspecialchars($nota['nombre_periodo']) : '-' ?>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row mb-2">
+                                        <div class="col-5 text-muted">
+                                            <i class="fas fa-calendar-check"></i> Fecha:
+                                        </div>
+                                        <div class="col-7">
+                                            <?= $nota && $nota['fecha_registro'] ? date('d/m/Y', strtotime($nota['fecha_registro'])) : '-' ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endwhile; ?>
+                    </div>
+                    
                     <!-- Resumen estadístico -->
                     <div class="row mt-4">
-                        <div class="col-md-6">
-                            <div class="card">
+                        <div class="col-12 col-md-6 mb-3 mb-md-0">
+                            <div class="card h-100">
                                 <div class="card-header bg-light">
-                                    <h6>Resumen Académico</h6>
+                                    <h6 class="mb-0"><i class="fas fa-chart-line"></i> Resumen Académico</h6>
                                 </div>
                                 <div class="card-body">
                                     <?php
@@ -280,36 +373,37 @@ include("includes/head.php");
                                     $porcentaje_completado = $total_materias > 0 ? round(($materias_con_notas / $total_materias) * 100, 1) : 0;
                                     ?>
                                     
-                                    <div class="stats-container">
-                                        <div class="stat-item">
-                                            <div class="stat-value h4 text-primary"><?= $total_materias ?></div>
-                                            <div class="stat-label">Total Materias</div>
+                                    <div class="row text-center mb-3">
+                                        <div class="col-6 col-md-3 mb-2">
+                                            <div class="h4 text-primary"><?= $total_materias ?></div>
+                                            <small class="text-muted">Total</small>
                                         </div>
-                                        <div class="stat-item">
-                                            <div class="stat-value h4 <?= $promedio_general >= 12 ? 'text-success' : ($promedio_general > 0 ? 'text-warning' : 'text-secondary') ?>">
-                                                <?= $promedio_general > 0 ? $promedio_general : 'N/A' ?>
-                                            </div>
-                                            <div class="stat-label">Promedio</div>
+                                        <div class="col-6 col-md-3 mb-2">
+                                            <div class="h4 text-success"><?= $materias_aprobadas ?></div>
+                                            <small class="text-muted">Aprobadas</small>
                                         </div>
-                                        <div class="stat-item">
-                                            <div class="stat-value h4 text-success"><?= $materias_aprobadas ?></div>
-                                            <div class="stat-label">Aprobadas</div>
+                                        <div class="col-6 col-md-3 mb-2">
+                                            <div class="h4 text-danger"><?= $materias_reprobadas ?></div>
+                                            <small class="text-muted">Reprobadas</small>
                                         </div>
-                                        <div class="stat-item">
-                                            <div class="stat-value h4 text-danger"><?= $materias_reprobadas ?></div>
-                                            <div class="stat-label">Reprobadas</div>
+                                        <div class="col-6 col-md-3 mb-2">
+                                            <div class="h4 text-warning"><?= $materias_sin_notas ?></div>
+                                            <small class="text-muted">Pendientes</small>
                                         </div>
                                     </div>
                                     
-                                    <div class="mt-3">
-                                        <p><strong>Progreso:</strong> 
-                                            <span class="badge badge-<?= $porcentaje_completado >= 100 ? 'success' : ($porcentaje_completado >= 50 ? 'info' : 'warning') ?>">
-                                                <?= $porcentaje_completado ?>% completado
+                                    <div class="mt-2">
+                                        <p><strong>Promedio:</strong> 
+                                            <span class="badge badge-<?= $promedio_general >= 12 ? 'success' : ($promedio_general > 0 ? 'warning' : 'secondary') ?>">
+                                                <?= $promedio_general > 0 ? $promedio_general : 'N/A' ?>
                                             </span>
+                                        </p>
+                                        <p><strong>Progreso:</strong> 
+                                            <span class="badge badge-info"><?= $porcentaje_completado ?>% completado</span>
                                         </p>
                                         <p><strong>Efectividad:</strong> 
                                             <span class="badge badge-<?= $porcentaje_aprobadas >= 80 ? 'success' : ($porcentaje_aprobadas >= 50 ? 'warning' : 'danger') ?>">
-                                                <?= $porcentaje_aprobadas ?>% de aprobación
+                                                <?= $porcentaje_aprobadas ?>%
                                             </span>
                                         </p>
                                     </div>
@@ -317,16 +411,15 @@ include("includes/head.php");
                             </div>
                         </div>
                         
-                        <div class="col-md-6">
-                            <div class="card">
+                        <div class="col-12 col-md-6">
+                            <div class="card h-100">
                                 <div class="card-header bg-light">
-                                    <h6>Progreso de la Carrera</h6>
+                                    <h6 class="mb-0"><i class="fas fa-chart-bar"></i> Progreso de la Carrera</h6>
                                 </div>
                                 <div class="card-body">
                                     <?php if ($total_materias > 0): 
                                     $materias_por_trayecto = [0 => 0, 1 => 0, 2 => 0, 3 => 0, 4 => 0];
-                                    $materias_carrera->data_seek(0);
-                                    while ($materia = $materias_carrera->fetch_assoc()) {
+                                    foreach ($todas_materias as $materia) {
                                         $trayecto = (int)$materia['trayecto'];
                                         if (isset($materias_por_trayecto[$trayecto])) {
                                             $materias_por_trayecto[$trayecto]++;
@@ -334,51 +427,33 @@ include("includes/head.php");
                                     }
                                     
                                     $materias_tsu = $materias_por_trayecto[0] + $materias_por_trayecto[1] + $materias_por_trayecto[2];
-                                    $porcentaje_meta_tsu = ($materias_tsu / $total_materias) * 100;
                                     ?>
                                     
-                                    <div class="progress mb-3" style="height: 25px; position: relative; background-color: #f8f9fa;">
-                                        <div class="progress-bar bg-success" 
-                                             style="width: <?= $porcentaje_completado ?>%">
-                                            <span class="progress-text"><?= $porcentaje_completado ?>%</span>
-                                        </div>
-                                        
-                                        <?php if ($porcentaje_meta_tsu > 0 && $porcentaje_meta_tsu < 100): ?>
-                                        <div style="position: absolute; left: <?= $porcentaje_meta_tsu ?>%; top: -5px; bottom: -5px; width: 3px; background-color: #ff6b00; z-index: 10;"></div>
-                                        <div style="position: absolute; left: <?= $porcentaje_meta_tsu ?>%; top: -20px; transform: translateX(-50%);">
-                                            <i class="fas fa-flag" style="color: #ff6b00;"></i>
-                                        </div>
-                                        <?php endif; ?>
-                                        
-                                        <div style="position: absolute; right: 0; top: -20px;">
-                                            <i class="fas fa-graduation-cap" style="color: #28a745;"></i>
+                                    <div class="progress mb-3" style="height: 25px;">
+                                        <div class="progress-bar bg-success" style="width: <?= $porcentaje_completado ?>%">
+                                            <?= $porcentaje_completado ?>%
                                         </div>
                                     </div>
                                     
                                     <div class="progress mb-3" style="height: 20px;">
-                                        <div class="progress-bar bg-success" 
-                                             style="width: <?= ($materias_aprobadas / $total_materias) * 100 ?>%">
-                                            <span class="progress-text"><?= $materias_aprobadas ?></span>
+                                        <div class="progress-bar bg-success" style="width: <?= ($materias_aprobadas / $total_materias) * 100 ?>%">
+                                            A:<?= $materias_aprobadas ?>
                                         </div>
-                                        <div class="progress-bar bg-danger" 
-                                             style="width: <?= ($materias_reprobadas / $total_materias) * 100 ?>%">
-                                            <span class="progress-text"><?= $materias_reprobadas ?></span>
+                                        <div class="progress-bar bg-danger" style="width: <?= ($materias_reprobadas / $total_materias) * 100 ?>%">
+                                            R:<?= $materias_reprobadas ?>
                                         </div>
-                                        <div class="progress-bar bg-secondary" 
-                                             style="width: <?= ($materias_sin_notas / $total_materias) * 100 ?>%">
-                                            <span class="progress-text"><?= $materias_sin_notas ?></span>
+                                        <div class="progress-bar bg-secondary" style="width: <?= ($materias_sin_notas / $total_materias) * 100 ?>%">
+                                            P:<?= $materias_sin_notas ?>
                                         </div>
                                     </div>
                                     
                                     <div class="mt-3">
-                                        <h6>Distribución por Trayectos:</h6>
-                                        <div class="row">
+                                        <small class="text-muted">Distribución por Trayectos:</small>
+                                        <div class="row mt-1">
                                             <?php for ($i = 0; $i <= 4; $i++): 
                                                 if ($materias_por_trayecto[$i] > 0): ?>
-                                                <div class="col-md-2 col-sm-4 col-4 mb-2">
-                                                    <small>
-                                                        <strong>T<?= $i ?>:</strong> <?= $materias_por_trayecto[$i] ?> mat.
-                                                    </small>
+                                                <div class="col-4 col-sm-3 col-md-2 mb-1">
+                                                    <small><strong>T<?= $i ?>:</strong> <?= $materias_por_trayecto[$i] ?></small>
                                                 </div>
                                                 <?php endif; ?>
                                             <?php endfor; ?>
@@ -396,15 +471,16 @@ include("includes/head.php");
             
         <?php else: ?>
             <!-- Lista de estudiantes de la sección -->
-            <div class="card">
+            <div class="card shadow-sm">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0"><i class="fas fa-users"></i> Estudiantes de tu Sección</h5>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-2 p-sm-3">
                     <?php if (empty($estudiantes)): ?>
                         <div class="alert alert-info">No hay estudiantes inscritos en tu sección.</div>
                     <?php else: ?>
-                        <div class="table-responsive">
+                        <!-- Vista para escritorio: tabla -->
+                        <div class="table-responsive d-none d-md-block">
                             <table class="table table-bordered table-hover">
                                 <thead class="thead-light">
                                     <tr>
@@ -419,7 +495,6 @@ include("includes/head.php");
                                     $contador = 1;
                                     $estudiantes_vistos = [];
                                     foreach ($estudiantes as $est):
-                                        // Evitar duplicados (por si un estudiante tiene varias materias)
                                         if (in_array($est['id'], $estudiantes_vistos)) continue;
                                         $estudiantes_vistos[] = $est['id'];
                                     ?>
@@ -438,6 +513,34 @@ include("includes/head.php");
                             </table>
                         </div>
                         
+                        <!-- Vista para móviles: tarjetas -->
+                        <div class="d-block d-md-none">
+                            <?php 
+                            $contador = 1;
+                            $estudiantes_vistos = [];
+                            foreach ($estudiantes as $est):
+                                if (in_array($est['id'], $estudiantes_vistos)) continue;
+                                $estudiantes_vistos[] = $est['id'];
+                            ?>
+                                <div class="card mb-3 shadow-sm">
+                                    <div class="card-body p-3">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <strong class="text-primary"><?= $contador++ ?>. <?= htmlspecialchars($est['nombre']) ?></strong>
+                                                <br>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-id-card"></i> <?= htmlspecialchars($est['cedula']) ?>
+                                                </small>
+                                            </div>
+                                            <a href="vocero.php?estudiante_id=<?= $est['id'] ?>" class="btn btn-info btn-sm">
+                                                <i class="fas fa-eye"></i> Ver
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                        
                         <div class="alert alert-secondary mt-3">
                             <i class="fas fa-info-circle"></i> 
                             <strong>Instrucción:</strong> Haz clic en "Ver Notas" para consultar el detalle completo de las calificaciones de cada estudiante.
@@ -453,6 +556,69 @@ include("includes/head.php");
 </div>
 
 <style>
+/* Estilos responsivos */
+@media (max-width: 767.98px) {
+    .h3 {
+        font-size: 1.4rem;
+    }
+    
+    .card-header {
+        padding: 0.75rem;
+    }
+    
+    .alert-info small {
+        font-size: 0.8rem;
+    }
+    
+    /* Estilos para tarjetas de materias */
+    .d-block.d-md-none .card {
+        border-radius: 8px;
+    }
+    
+    .d-block.d-md-none .card-header {
+        background-color: #f8f9fc;
+    }
+    
+    .d-block.d-md-none .card-title {
+        font-size: 0.9rem;
+        line-height: 1.3;
+    }
+    
+    .d-block.d-md-none .row {
+        margin-bottom: 0.5rem;
+    }
+    
+    .d-block.d-md-none .col-5, 
+    .d-block.d-md-none .col-7 {
+        font-size: 0.85rem;
+        padding-left: 0.25rem;
+        padding-right: 0.25rem;
+    }
+    
+    /* Estilos para lista de estudiantes móvil */
+    .d-block.d-md-none .card-body {
+        padding: 0.75rem;
+    }
+    
+    /* Ajustes de progreso */
+    .progress-text {
+        font-size: 0.7rem;
+    }
+    
+    .h4 {
+        font-size: 1.2rem;
+    }
+}
+
+/* Ajustes para tablets */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .table th, .table td {
+        padding: 0.5rem;
+        font-size: 0.8rem;
+    }
+}
+
+/* Estilos generales */
 .nota-display {
     text-align: center;
     padding: 2px;
@@ -481,40 +647,26 @@ include("includes/head.php");
     border: 1px solid #dc3545;
 }
 
-.stats-container {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+.card {
+    border-radius: 0.5rem;
+    overflow: hidden;
 }
 
-.stat-item {
-    text-align: center;
-    padding: 8px;
-    border-radius: 6px;
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
+.badge {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.65rem;
 }
 
-.stat-value {
-    font-weight: bold;
-    margin-bottom: 2px;
-    color: #000 !important;
-    font-weight: 700;
-}
-
-.stat-label {
-    font-size: 0.8rem;
-    color: #6c757d;
-}
-
-.progress-text {
-    font-weight: bold;
-    text-shadow: 1px 1px 1px rgba(255,255,255,0.5);
+/* Animación para tarjetas móviles */
+@media (max-width: 767.98px) {
+    .d-block.d-md-none .card:active {
+        transform: scale(0.98);
+        transition: transform 0.1s ease;
+    }
 }
 
 .table-hover tbody tr:hover {
     background-color: #f5f5f5;
-    cursor: pointer;
 }
 </style>
 
