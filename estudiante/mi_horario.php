@@ -45,6 +45,11 @@ include("includes/head.php");
             </div>
         </div>
         
+        <!-- Mensaje para móviles -->
+        <div class="alert alert-info d-block d-md-none mb-4">
+            <i class="fas fa-mobile-alt"></i> Para una mejor experiencia visual, recomendamos descargar el horario en modo escritorio.
+        </div>
+        
         <!-- Información básica de la sección (responsive) -->
         <div class="row mb-4">
             <div class="col-12">
@@ -428,18 +433,46 @@ include("includes/head.php");
             
             // Llamar a la función para agregar el membrete
             agregarMembretePDF(doc, pageWidth, margin).then(startY => {
+                // Hacer scroll al elemento para asegurar que esté visible
+                const element = document.getElementById('horario-clases');
+                element.scrollIntoView({ behavior: 'instant', block: 'start' });
+                
+                // Detectar si es móvil y ajustar escala
+                const isMobile = window.innerWidth <= 768;
+                const scale = isMobile ? 4 : 2; // Mayor escala para móviles
+                
                 // Capturar el contenido HTML y agregarlo al PDF
-                html2canvas(document.getElementById('horario-clases'), {
-                    scale: 2,
+                html2canvas(element, {
+                    scale: scale,
                     useCORS: true,
-                    logging: false
+                    logging: false,
+                    width: element.scrollWidth,
+                    height: element.scrollHeight,
+                    windowWidth: element.scrollWidth,
+                    windowHeight: element.scrollHeight
                 }).then(canvas => {
-                    const imgData = canvas.toDataURL('image/jpeg', 1.0);
+                    const imgData = canvas.toDataURL('image/png', 1.0);
                     const imgWidth = pageWidth - (margin * 2);
                     const imgHeight = (canvas.height * imgWidth) / canvas.width;
                     
-                    // Agregar contenido al PDF
-                    doc.addImage(imgData, 'JPEG', margin, startY, imgWidth, imgHeight);
+                    // Verificar si la imagen es demasiado alta para una página
+                    const pageHeight = doc.internal.pageSize.getHeight();
+                    const maxHeight = pageHeight - startY - margin;
+                    
+                    if (imgHeight > maxHeight) {
+                        // Si es demasiado alta, escalar para que quepa
+                        const scaleFactor = maxHeight / imgHeight;
+                        const finalImgHeight = imgHeight * scaleFactor;
+                        const finalImgWidth = imgWidth * scaleFactor;
+                        
+                        // Centrar horizontalmente
+                        const xOffset = (pageWidth - finalImgWidth) / 2;
+                        doc.addImage(imgData, 'PNG', xOffset, startY, finalImgWidth, finalImgHeight);
+                    } else {
+                        // Agregar contenido al PDF centrado
+                        const xOffset = (pageWidth - imgWidth) / 2;
+                        doc.addImage(imgData, 'PNG', xOffset, startY, imgWidth, imgHeight);
+                    }
                     
                     // Guardar el PDF
                     doc.save('Horario_<?= $seccion_estudiante['codigo_seccion'] ?>.pdf');
