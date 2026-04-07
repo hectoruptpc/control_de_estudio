@@ -64,6 +64,7 @@ if (!isLoggedIn() || !isDocente()) {
 
     /* NAVBAR FIJO */
     .navbar {
+        z-index: 1060;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
 
@@ -105,6 +106,8 @@ if (!isLoggedIn() || !isDocente()) {
         .navbar-toggler {
             padding: 0.4rem 0.75rem;
             font-size: 1.25rem;
+            position: relative;
+            z-index: 1065;
         }
         
         /* Mejorar contraste en móviles */
@@ -115,6 +118,32 @@ if (!isLoggedIn() || !isDocente()) {
         
         .dropdown-toggle::after {
             border-top-color: white;
+        }
+
+        /* Overlay móvil para cerrar el navbar colapsado al tocar fuera */
+        .mobile-navbar-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.35);
+            z-index: 1020;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+
+        .mobile-navbar-backdrop.show {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .navbar-collapse {
+            position: relative;
+            z-index: 1060;
         }
     }
 
@@ -192,6 +221,7 @@ if (!isLoggedIn() || !isDocente()) {
         </div>
       </div>
     </nav>
+    <div id="mobileNavbarBackdrop" class="mobile-navbar-backdrop"></div>
     <div class="container">
     <div class="row">
 <div class="col-sm-6">
@@ -335,6 +365,35 @@ document.addEventListener('DOMContentLoaded', function() {
             // Abrir solo si no estaba abierto
             if (!isOpen) {
                 $menu.addClass('show');
+            }
+        });
+    }
+    
+    // Overlay móvil para cerrar el navbar con un clic fuera
+    var $navbarCollapse = $('#navbarResponsive');
+    var $mobileBackdrop = $('#mobileNavbarBackdrop');
+
+    if ($navbarCollapse.length && $mobileBackdrop.length) {
+        $navbarCollapse.on('show.bs.collapse', function() {
+            $mobileBackdrop.addClass('show');
+        });
+
+        $navbarCollapse.on('hidden.bs.collapse', function() {
+            $mobileBackdrop.removeClass('show');
+        });
+
+        $mobileBackdrop.on('click', function() {
+            $navbarCollapse.collapse('hide');
+        });
+    }
+
+    var $navbarToggler = $('.navbar-toggler');
+    if ($navbarToggler.length && $navbarCollapse.length) {
+        $navbarToggler.on('click', function(e) {
+            if (window.innerWidth <= 991) {
+                e.preventDefault();
+                e.stopPropagation();
+                $navbarCollapse.collapse('toggle');
             }
         });
     }

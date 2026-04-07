@@ -152,7 +152,7 @@ if (!isLoggedIn() || !isAdmin()) {
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.35);
-            z-index: 1050;
+            z-index: 1020;
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
