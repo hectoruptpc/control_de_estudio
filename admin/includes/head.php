@@ -135,6 +135,8 @@ if (!isLoggedIn() || !isAdmin()) {
         .navbar-toggler {
             padding: 0.4rem 0.75rem;
             font-size: 1.25rem;
+            position: relative;
+            z-index: 1065;
         }
         
         /* Forzar alineación en móviles */
@@ -153,12 +155,14 @@ if (!isLoggedIn() || !isAdmin()) {
             z-index: 1050;
             opacity: 0;
             visibility: hidden;
+            pointer-events: none;
             transition: opacity 0.25s ease, visibility 0.25s ease;
         }
 
         .mobile-navbar-backdrop.show {
             opacity: 1;
             visibility: visible;
+            pointer-events: auto;
         }
 
         .navbar-collapse {
@@ -622,6 +626,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
         $mobileBackdrop.on('click', function() {
             $navbarCollapse.collapse('hide');
+        });
+    }
+
+    var $navbarToggler = $('.navbar-toggler');
+    if ($navbarToggler.length && $navbarCollapse.length) {
+        $navbarToggler.on('click', function(e) {
+            if (window.innerWidth <= 991) {
+                e.preventDefault();
+                e.stopPropagation();
+                $navbarCollapse.collapse('toggle');
+            }
         });
     }
     
