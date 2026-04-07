@@ -162,13 +162,159 @@ if (isset($_GET['pdf']) && $_GET['pdf'] == '1') {
 include("includes/head.php");
 ?>
 
+<!-- Estilos CSS Responsivos -->
+<style>
+    /* Estilos base responsivos */
+    @media (max-width: 768px) {
+        .header-buttons {
+            flex-direction: column;
+            align-items: stretch !important;
+            gap: 10px;
+        }
+        
+        .header-buttons a {
+            margin: 0 !important;
+            text-align: center;
+        }
+        
+        h1.h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px !important;
+        }
+        
+        /* Tabla responsiva con scroll horizontal en móviles */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .table {
+            min-width: 700px;
+        }
+        
+        /* Ajuste de títulos de grupos */
+        h5.font-weight-bold {
+            font-size: 1.1rem;
+            padding: 8px;
+            background-color: #f8f9fc;
+            border-left: 4px solid #4e73df;
+        }
+        
+        /* Badges más pequeños en móvil */
+        .badge {
+            font-size: 0.7rem;
+            padding: 4px 8px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .container-fluid {
+            padding: 0 10px;
+        }
+        
+        .card-body {
+            padding: 1rem;
+        }
+        
+        h1.h3 {
+            font-size: 1.2rem;
+        }
+        
+        .btn-sm {
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+        }
+        
+        /* Optimización para pantallas muy pequeñas */
+        .table {
+            font-size: 0.75rem;
+            min-width: 650px;
+        }
+        
+        .table th, 
+        .table td {
+            padding: 0.5rem 0.3rem;
+        }
+        
+        h5.font-weight-bold {
+            font-size: 0.95rem;
+        }
+    }
+    
+    /* Estilos para tablet */
+    @media (min-width: 769px) and (max-width: 1024px) {
+        .table {
+            font-size: 0.85rem;
+        }
+        
+        .table th, 
+        .table td {
+            padding: 0.6rem;
+        }
+        
+        h1.h3 {
+            font-size: 1.6rem;
+        }
+    }
+    
+    /* Estilos para desktop */
+    @media (min-width: 1025px) {
+        .table {
+            font-size: 0.9rem;
+        }
+        
+        .table-responsive {
+            overflow: visible;
+        }
+    }
+    
+    /* Estilos generales mejorados */
+    .card-header {
+        border-bottom: none;
+    }
+    
+    .table thead th {
+        vertical-align: middle;
+        background-color: #f8f9fc;
+        font-weight: 600;
+    }
+    
+    .table tbody tr:hover {
+        background-color: #f5f5f5;
+        transition: background-color 0.3s ease;
+    }
+    
+    /* Tooltips para mejor experiencia en móvil */
+    @media (hover: none) and (pointer: coarse) {
+        .btn:active {
+            opacity: 0.7;
+            transform: scale(0.98);
+        }
+    }
+    
+    /* Mejora de contraste y legibilidad */
+    .text-primary {
+        color: #4e73df !important;
+    }
+    
+    .badge-success {
+        background-color: #1cc88a;
+    }
+    
+    .badge-secondary {
+        background-color: #858796;
+    }
+</style>
+
 <div class="container-fluid">
-    <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">Pensum: <?php echo htmlspecialchars($carrera['nombre_carrera']); ?></h1>
-        <div>
-            <a href="lista_carreras.php" class="btn btn-sm btn-primary shadow-sm no-print"><i class="fas fa-arrow-left"></i> Volver</a>
-            <a href="?<?= $_SERVER['QUERY_STRING'] ?>&pdf=1" class="btn btn-sm btn-success shadow-sm no-print ml-2">
-                <i class="fas fa-print"></i> Generar PDF
+    <div class="d-sm-flex align-items-center justify-content-between mb-4 header-buttons" style="display: flex; flex-wrap: wrap;">
+        <h1 class="h3 mb-0 text-gray-800" style="flex: 1;">Pensum: <?php echo htmlspecialchars($carrera['nombre_carrera']); ?></h1>
+        <div class="d-flex gap-2" style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="lista_carreras.php" class="btn btn-sm btn-primary shadow-sm no-print">
+                <i class="fas fa-arrow-left"></i> <span>Volver</span>
+            </a>
+            <a href="?<?= $_SERVER['QUERY_STRING'] ?>&pdf=1" class="btn btn-sm btn-success shadow-sm no-print">
+                <i class="fas fa-print"></i> <span>Generar PDF</span>
             </a>
         </div>
     </div>
@@ -179,28 +325,33 @@ include("includes/head.php");
         </div>
         <div class="card-body">
             <?php if (empty($materias_agrupadas)): ?>
-                <div class="alert alert-warning">No hay materias registradas.</div>
+                <div class="alert alert-warning text-center">
+                    <i class="fas fa-exclamation-triangle"></i> No hay materias registradas para este pensum.
+                </div>
             <?php else: ?>
                 <?php foreach ($materias_agrupadas as $grupo => $materias): ?>
-                    <h5 class="font-weight-bold text-primary mt-4 mb-3"><?= htmlspecialchars($grupo) ?></h5>
+                    <h5 class="font-weight-bold text-primary mt-4 mb-3">
+                        <i class="fas fa-graduation-cap"></i> <?= htmlspecialchars($grupo) ?>
+                        <span class="badge badge-secondary ml-2"><?= count($materias) ?> materias</span>
+                    </h5>
                     <div class="table-responsive">
-                        <table class="table table-bordered table-hover" style="table-layout: fixed; width: 100%;">
+                        <table class="table table-bordered table-hover">
                             <thead class="thead-light text-center">
                                 <tr>
                                     <th style="width: 12%">Código</th>
                                     <th style="width: 38%">Nombre de la Asignatura</th>
-                                    <th style="width: 8%">Unidades Crédito</th>
-                                    <th style="width: 8%">Horas Teóricas</th>
-                                    <th style="width: 8%">Horas Prácticas</th>
-                                    <th style="width: 8%">Horas Laboratorio</th>
-                                    <th style="width: 8%">Horas Semanales</th>
+                                    <th style="width: 8%">UC</th>
+                                    <th style="width: 8%">H.T.</th>
+                                    <th style="width: 8%">H.P.</th>
+                                    <th style="width: 8%">H.L.</th>
+                                    <th style="width: 8%">H.S.</th>
                                     <th style="width: 10%">Estado</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($materias as $m): ?>
                                     <tr>
-                                        <td class="text-center"><?= htmlspecialchars($m['cod_materia']) ?></td>
+                                        <td class="text-center font-weight-medium"><?= htmlspecialchars($m['cod_materia']) ?></td>
                                         <td><?= htmlspecialchars($m['nombre_materia']) ?></td>
                                         <td class="text-center"><?= $m['creditos'] ?></td>
                                         <td class="text-center"><?= $m['horas_teoricas'] ?></td>
@@ -218,9 +369,57 @@ include("includes/head.php");
                         </table>
                     </div>
                 <?php endforeach; ?>
+                
+                <!-- Leyenda informativa para móviles -->
+                <div class="alert alert-info mt-4 d-block d-md-none">
+                    <small>
+                        <i class="fas fa-info-circle"></i> 
+                        <strong>Leyenda:</strong> UC = Unidades Crédito | H.T. = Horas Teóricas | 
+                        H.P. = Horas Prácticas | H.L. = Horas Laboratorio | H.S. = Horas Semanales
+                    </small>
+                </div>
             <?php endif; ?>
         </div>
     </div>
 </div>
+
+<!-- Script adicional para mejorar la experiencia en móviles -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Detectar si es dispositivo móvil para optimizar la visualización
+    const isMobile = window.innerWidth <= 768;
+    
+    if (isMobile) {
+        // Añadir tooltips a los encabezados de las tablas en móvil
+        const tableHeaders = document.querySelectorAll('.table thead th');
+        const headerTitles = {
+            'UC': 'Unidades Crédito',
+            'H.T.': 'Horas Teóricas',
+            'H.P.': 'Horas Prácticas',
+            'H.L.': 'Horas Laboratorio',
+            'H.S.': 'Horas Semanales'
+        };
+        
+        tableHeaders.forEach(header => {
+            const text = header.innerText.trim();
+            if (headerTitles[text]) {
+                header.setAttribute('title', headerTitles[text]);
+                header.style.cursor = 'help';
+            }
+        });
+    }
+    
+    // Smooth scroll para enlaces internos
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+});
+</script>
 
 <?php include("includes/footer.php"); ?>
