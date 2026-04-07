@@ -99,6 +99,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 include("includes/head.php");
 ?>
 
+<style>
+    .table-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .35rem;
+        align-items: center;
+    }
+    .table-actions form {
+        display: inline-flex;
+        margin: 0;
+    }
+    .table-actions .btn {
+        min-width: 2.5rem;
+    }
+    .table-responsive {
+        overflow-x: auto;
+    }
+    .horario-cell {
+        min-height: 60px;
+        padding: .5rem;
+    }
+    @media (max-width: 991.98px) {
+        .card-header.d-flex {
+            flex-direction: column;
+            align-items: stretch;
+            gap: .5rem;
+        }
+        .card-header.d-flex .badge {
+            width: auto;
+        }
+        .table-actions {
+            width: 100%;
+        }
+        .table-actions form {
+            flex: 1 1 auto;
+        }
+    }
+    @media (max-width: 767.98px) {
+        .form-row {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-row .form-group {
+            width: 100% !important;
+        }
+        .table thead th,
+        .table tbody td {
+            padding: .55rem .65rem;
+            font-size: .9rem;
+        }
+        .btn-block {
+            width: 100%;
+        }
+        #horario-clases .table-responsive {
+            margin-bottom: .75rem;
+        }
+        #horario-clases table {
+            min-width: 720px;
+        }
+        .horario-cell {
+            min-height: 50px;
+        }
+    }
+</style>
+
 <!-- Modal de Confirmación -->
 <div class="modal fade" id="confirmarRetiroModal" tabindex="-1" role="dialog" aria-labelledby="confirmarRetiroModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
@@ -238,8 +303,8 @@ include("includes/head.php");
                                         <?php endif; ?>
                                     </span>
                                 </td>
-                                <td>
-                                    <form method="post" style="display:inline">
+                                <td class="table-actions">
+                                    <form method="post">
                                         <input type="hidden" name="action" value="view">
                                         <input type="hidden" name="id" value="<?= $seccion['id_seccion'] ?>">
                                         <button type="submit" class="btn btn-sm btn-info" title="Ver">
@@ -247,14 +312,14 @@ include("includes/head.php");
                                         </button>
                                     </form>
                                     <?php if ($seccion['periodo_activo'] == 1): ?>
-                                        <form method="post" style="display:inline">
+                                        <form method="post">
                                             <input type="hidden" name="action" value="edit">
                                             <input type="hidden" name="id" value="<?= $seccion['id_seccion'] ?>">
                                             <button type="submit" class="btn btn-sm btn-primary" title="Editar">
                                                 <i class="fas fa-edit"></i>
                                             </button>
                                         </form>
-                                        <form method="post" style="display:inline">
+                                        <form method="post">
                                             <input type="hidden" name="action" value="assign">
                                             <input type="hidden" name="id" value="<?= $seccion['id_seccion'] ?>">
                                             <button type="submit" class="btn btn-sm btn-warning" title="Asignar Estudiantes">
@@ -514,7 +579,9 @@ include("includes/head.php");
             var table = $('#tablaEstudiantes').DataTable({
                 "language": {
                     "url": "//cdn.datatables.net/plug-ins/1.10.20/i18n/Spanish.json"
-                }
+                },
+                "autoWidth": false,
+                "responsive": true
             });
             
             // Función para actualizar el contador y deshabilitar checkboxes si es necesario
