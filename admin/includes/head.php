@@ -68,6 +68,26 @@ if (!isLoggedIn() || !isAdmin()) {
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
 
+    /* FORZAR QUE LOS ÍCONOS ESTÉN AL LADO DEL TEXTO */
+    .nav-link {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px;
+    }
+    
+    .nav-link i {
+        display: inline-block;
+        width: 20px;
+        text-align: center;
+    }
+    
+    /* Asegurar que los dropdown-toggle también mantengan el ícono al lado */
+    .dropdown-toggle {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px;
+    }
+    
     /* DROPDOWNS MEJORADOS */
     .dropdown-menu {
         z-index: 1080;
@@ -78,6 +98,14 @@ if (!isLoggedIn() || !isAdmin()) {
     .dropdown-item {
         padding: 0.75rem 1.5rem;
         font-size: 0.9rem;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px;
+    }
+    
+    .dropdown-item i {
+        width: 20px;
+        text-align: center;
     }
 
     /* MEJORAS PARA MÓVILES */
@@ -106,6 +134,11 @@ if (!isLoggedIn() || !isAdmin()) {
         .navbar-toggler {
             padding: 0.4rem 0.75rem;
             font-size: 1.25rem;
+        }
+        
+        /* Forzar alineación en móviles */
+        .nav-link, .dropdown-toggle {
+            justify-content: flex-start !important;
         }
     }
 
@@ -180,10 +213,10 @@ if (!isLoggedIn() || !isAdmin()) {
                         <?php endif; ?>
 
                          <?php if (tienePermiso('admin')): ?>
-        <a title="Inscribir Materias a Estudiantes" class="dropdown-item" href="inscripcion_materias.php">
-            <i class="fas fa-clipboard-list fa-fw"></i> Inscribir Materias
-        </a>
-        <?php endif; ?>
+                        <a title="Inscribir Materias a Estudiantes" class="dropdown-item" href="inscripcion_materias.php">
+                            <i class="fas fa-clipboard-list fa-fw"></i> Inscribir Materias
+                        </a>
+                        <?php endif; ?>
 
                         <?php if (tienePermiso('secciones')): ?>
                         <a title="Gestionar Secciones" class="dropdown-item" href="gestion_seccion.php">
@@ -198,11 +231,10 @@ if (!isLoggedIn() || !isAdmin()) {
                         <?php endif; ?>
 
                             <?php if (tienePermiso('admin')): ?>
-            <a title="Generar Constancias" class="dropdown-item" href="constancias.php">
-                <i class="fas fa-file-alt fa-fw"></i> Admicion y Control
-            </a>
-        <?php endif; ?>
-
+                        <a title="Generar Constancias" class="dropdown-item" href="constancias.php">
+                            <i class="fas fa-file-alt fa-fw"></i> Admisión y Control
+                        </a>
+                        <?php endif; ?>
                     </div>
                 </li>
 
@@ -215,7 +247,7 @@ if (!isLoggedIn() || !isAdmin()) {
                     </a>
                     <div class="dropdown-menu" aria-labelledby="navbarDropdownPensum">
                         <a title="Agregar Nueva Carrera" class="dropdown-item" href="agregar_carrera.php">
-                            <i class="fas fa-plus-circle fa-fw"></i> Gestion de Programas
+                            <i class="fas fa-plus-circle fa-fw"></i> Gestión de Programas
                         </a>
                         
                         <a title="Asignaturas" class="dropdown-item" href="materia.php">
@@ -234,10 +266,9 @@ if (!isLoggedIn() || !isAdmin()) {
                         </a>
                         <?php endif; ?>
 
-                            <a title="Gestionar Prelaciones" class="dropdown-item" href="prelaciones.php">
-            <i class="fas fa-list-ol fa-fw"></i> Prelaciones
-        </a>
-
+                        <a title="Gestionar Prelaciones" class="dropdown-item" href="prelaciones.php">
+                            <i class="fas fa-list-ol fa-fw"></i> Prelaciones
+                        </a>
                     </div>
                 </li>
 
@@ -307,13 +338,11 @@ if (!isLoggedIn() || !isAdmin()) {
                         </a>
                         <?php endif; ?>
 
-                        <a title="Consultar Notas Pasadas" class="dropdown-item" href="correccion_notas.php">
+                        <a title="Corrección de Notas" class="dropdown-item" href="correccion_notas.php">
                             <i class="fas fa-pencil-alt fa-fw"></i> Corrección de Notas
                         </a>
                     </div>
                 </li>
-
-                <!-- Admisión y Control: eliminado del menú principal (migrado a constancias.php) -->
 
                 <!-- DROPDOWN: Ajustes -->
                 <li class="nav-item dropdown">
@@ -341,7 +370,7 @@ if (!isLoggedIn() || !isAdmin()) {
                           <!-- Visita - Seguimiento de Usuarios -->
                         <?php if (tienePermiso('visita')): ?>
                         <a title="Seguimiento de Movimientos de Usuarios" class="dropdown-item" href="visita.php">
-                        <i class="fas fa-user-secret fa-fw"></i> Visita
+                            <i class="fas fa-user-secret fa-fw"></i> Visita
                         </a>
                         <?php endif; ?>
 
@@ -474,20 +503,22 @@ function actualizarNotificaciones() {
         .then(response => response.json())
         .then(data => {
             const link = document.querySelector('.nav-link[href="mensajeria.php"]');
-            const badge = link.querySelector('.badge-notificacion');
-            
-            if (data.mensajes_no_leidos > 0) {
-                if (badge) {
-                    badge.textContent = data.mensajes_no_leidos;
+            if (link) {
+                const badge = link.querySelector('.badge-notificacion');
+                
+                if (data.mensajes_no_leidos > 0) {
+                    if (badge) {
+                        badge.textContent = data.mensajes_no_leidos;
+                    } else {
+                        const newBadge = document.createElement('span');
+                        newBadge.className = 'badge badge-danger badge-notificacion';
+                        newBadge.textContent = data.mensajes_no_leidos;
+                        link.appendChild(newBadge);
+                    }
                 } else {
-                    const newBadge = document.createElement('span');
-                    newBadge.className = 'badge badge-danger badge-notificacion';
-                    newBadge.textContent = data.mensajes_no_leidos;
-                    link.appendChild(newBadge);
-                }
-            } else {
-                if (badge) {
-                    badge.remove();
+                    if (badge) {
+                        badge.remove();
+                    }
                 }
             }
         })
@@ -497,18 +528,24 @@ function actualizarNotificaciones() {
 // SOLUCIÓN SIMPLE PARA DROPDOWNS EN MÓVILES
 document.addEventListener('DOMContentLoaded', function() {
     // Manejar logout
-    document.getElementById('logoutLink').addEventListener('click', function(e) {
-        e.preventDefault();
-        $('#logoutModal').modal('show');
-    });
+    const logoutLink = document.getElementById('logoutLink');
+    if (logoutLink) {
+        logoutLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            $('#logoutModal').modal('show');
+        });
+    }
     
-    document.getElementById('confirmLogout').addEventListener('click', function(e) {
-        e.preventDefault();
-        $('#logoutModal').modal('hide');
-        setTimeout(function() {
-            window.location.href = '../logout.php';
-        }, 500);
-    });
+    const confirmLogout = document.getElementById('confirmLogout');
+    if (confirmLogout) {
+        confirmLogout.addEventListener('click', function(e) {
+            e.preventDefault();
+            $('#logoutModal').modal('hide');
+            setTimeout(function() {
+                window.location.href = '../logout.php';
+            }, 500);
+        });
+    }
     
     // SOLUCIÓN PARA DROPDOWNS EN MÓVILES
     if (window.innerWidth <= 991) {
@@ -550,3 +587,5 @@ document.addEventListener('DOMContentLoaded', function() {
 // Actualizar notificaciones cada 30 segundos
 setInterval(actualizarNotificaciones, 30000);
 </script>
+</body>
+</html>
