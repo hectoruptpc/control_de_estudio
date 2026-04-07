@@ -65,6 +65,7 @@ if (!isLoggedIn() || !isAdmin()) {
 
     /* NAVBAR FIJO */
     .navbar {
+        z-index: 1060;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
 
@@ -139,6 +140,30 @@ if (!isLoggedIn() || !isAdmin()) {
         /* Forzar alineación en móviles */
         .nav-link, .dropdown-toggle {
             justify-content: flex-start !important;
+        }
+
+        /* Overlay móvil para cerrar el navbar colapsado al tocar fuera */
+        .mobile-navbar-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.35);
+            z-index: 1050;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+
+        .mobile-navbar-backdrop.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .navbar-collapse {
+            position: relative;
+            z-index: 1060;
         }
     }
 
@@ -438,6 +463,8 @@ if (!isLoggedIn() || !isAdmin()) {
     </div>
 </nav>
 
+<div id="mobileNavbarBackdrop" class="mobile-navbar-backdrop"></div>
+
 <!-- CONTENIDO PRINCIPAL -->
 <div class="container">
     <div class="row">
@@ -577,6 +604,24 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!isOpen) {
                 $menu.addClass('show');
             }
+        });
+    }
+
+    // Overlay móvil para cerrar el navbar con un clic fuera
+    var $navbarCollapse = $('#navbarResponsive');
+    var $mobileBackdrop = $('#mobileNavbarBackdrop');
+
+    if ($navbarCollapse.length && $mobileBackdrop.length) {
+        $navbarCollapse.on('show.bs.collapse', function() {
+            $mobileBackdrop.addClass('show');
+        });
+
+        $navbarCollapse.on('hidden.bs.collapse', function() {
+            $mobileBackdrop.removeClass('show');
+        });
+
+        $mobileBackdrop.on('click', function() {
+            $navbarCollapse.collapse('hide');
         });
     }
     
