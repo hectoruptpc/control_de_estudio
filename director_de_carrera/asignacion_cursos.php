@@ -351,11 +351,266 @@ $asignaciones = $db->query($query_asignaciones);
 include("includes/head.php");
 ?>
 
+<!-- Estilos responsivos adicionales -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=yes">
+<style>
+    /* Estilos responsivos generales */
+    @media (max-width: 768px) {
+        .container-fluid {
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+        
+        h1.mt-4 {
+            font-size: 1.5rem;
+            margin-top: 1rem !important;
+        }
+        
+        /* Alertas responsivas */
+        .alert {
+            font-size: 0.85rem;
+            padding: 10px;
+        }
+        
+        /* Tabla responsiva */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .table {
+            min-width: 700px;
+        }
+        
+        .table th, 
+        .table td {
+            padding: 8px 6px;
+            font-size: 0.75rem;
+        }
+        
+        /* Botones de acción en columna */
+        .action-buttons {
+            white-space: nowrap;
+        }
+        
+        .action-buttons .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.7rem;
+            margin: 2px;
+        }
+        
+        /* Formularios responsivos */
+        .form-row {
+            flex-direction: column;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group.col-md-6,
+        .form-group.col-md-12 {
+            padding: 0;
+        }
+        
+        select.form-control,
+        input.form-control {
+            font-size: 16px !important; /* Evita zoom en iOS */
+        }
+        
+        /* Botones */
+        .btn {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        
+        /* Cards */
+        .card-header {
+            padding: 12px;
+        }
+        
+        .card-header i {
+            margin-right: 5px;
+        }
+        
+        /* Recomendaciones */
+        .recommendation-section {
+            padding: 10px;
+        }
+        
+        .professor-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .professor-info {
+            margin-right: 0;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+        
+        .professor-item .btn {
+            width: 100%;
+        }
+        
+        .recommendation-title {
+            font-size: 0.9rem;
+        }
+        
+        .recommendation-title .badge {
+            font-size: 0.7rem;
+        }
+        
+        /* Modal responsivo */
+        .modal-dialog {
+            margin: 10px;
+            max-width: calc(100% - 20px);
+        }
+        
+        .modal-body {
+            padding: 15px;
+        }
+        
+        /* Badges */
+        .badge {
+            font-size: 0.7rem;
+        }
+        
+        /* Alertas de información */
+        .alert-warning i,
+        .alert-info i {
+            margin-right: 5px;
+        }
+    }
+    
+    /* Para tablets */
+    @media (min-width: 769px) and (max-width: 1024px) {
+        .action-buttons .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.75rem;
+        }
+        
+        .professor-item {
+            flex-direction: row;
+            align-items: center;
+        }
+        
+        .professor-info {
+            margin-right: 15px;
+            margin-bottom: 0;
+        }
+        
+        .professor-item .btn {
+            width: auto;
+        }
+        
+        .btn {
+            width: auto;
+        }
+    }
+    
+    /* Desktop */
+    @media (min-width: 1025px) {
+        .professor-item {
+            flex-direction: row;
+            align-items: center;
+        }
+        
+        .professor-info {
+            margin-right: 15px;
+            margin-bottom: 0;
+        }
+        
+        .professor-item .btn {
+            width: auto;
+        }
+        
+        .btn {
+            width: auto;
+        }
+    }
+    
+    /* Estilos existentes mejorados */
+    .recommendation-section {
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-left: 4px solid #007bff;
+    }
+    
+    .recommendation-group {
+        margin-bottom: 15px;
+    }
+    
+    .recommendation-title {
+        color: #0056b3;
+        margin-bottom: 10px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .professor-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .professor-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px;
+        border-bottom: 1px solid #eee;
+        transition: background-color 0.3s;
+    }
+    
+    .professor-item:hover {
+        background-color: #f1f1f1;
+    }
+    
+    .professor-info {
+        flex-grow: 1;
+    }
+    
+    .degree-info, .institute-info {
+        font-size: 0.85em;
+        color: #6c757d;
+    }
+    
+    .action-buttons {
+        white-space: nowrap;
+    }
+    
+    .action-buttons .btn {
+        margin: 0 2px;
+    }
+    
+    .badge-primary {
+        background-color: #007bff;
+    }
+    
+    #resultados-recomendaciones {
+        min-height: 100px;
+    }
+    
+    /* Animación para selección rápida */
+    @keyframes highlightPulse {
+        0% { background-color: #ffc107; }
+        100% { background-color: #28a745; }
+    }
+    
+    .highlight-form {
+        animation: highlightPulse 0.5s ease-in-out;
+    }
+</style>
+
 <div class="container-fluid">
     <div class="row">
-        <div class="col-md-12">
+        <div class="col-12">
             <h1 class="mt-4"><?php echo $titulopag; ?></h1>
             <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
                 <strong>Director de Carrera:</strong> <?php echo htmlspecialchars($_SESSION['user']['nombre']); ?><br>
                 <strong>Carrera:</strong> <?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>
             </div>
@@ -364,33 +619,42 @@ include("includes/head.php");
             
             <!-- Modal de Confirmación para Eliminar -->
             <div class="modal fade" id="confirmDeleteModal" tabindex="-1" role="dialog" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
-                <div class="modal-dialog" role="document">
+                <div class="modal-dialog modal-dialog-centered" role="document">
                     <div class="modal-content">
                         <div class="modal-header bg-danger text-white">
-                            <h5 class="modal-title" id="confirmDeleteModalLabel">Confirmar Eliminación</h5>
+                            <h5 class="modal-title" id="confirmDeleteModalLabel">
+                                <i class="fas fa-exclamation-triangle"></i> Confirmar Eliminación
+                            </h5>
                             <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>
                         <div class="modal-body">
                             <p>¿Estás seguro de eliminar esta asignación?</p>
+                            <p class="text-muted small">Esta acción no se puede deshacer.</p>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                            <a id="confirmDeleteButton" href="#" class="btn btn-danger">Eliminar</a>
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                                <i class="fas fa-times"></i> Cancelar
+                            </button>
+                            <a id="confirmDeleteButton" href="#" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Eliminar
+                            </a>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Sección de Asignaciones Actuales -->
-            <div class="card mb-4">
+            <div class="card mb-4 shadow-sm">
                 <div class="card-header bg-primary text-white">
                     <i class="fas fa-list"></i> Asignaciones Actuales - Todas las Carreras
                 </div>
                 <div class="card-body">
                     <div class="alert alert-warning">
-                        <i class="fas fa-info-circle"></i> Solo puede editar o eliminar asignaciones de su propia carrera: <strong><?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?></strong>
+                        <i class="fas fa-info-circle"></i> 
+                        Solo puede editar o eliminar asignaciones de su propia carrera: 
+                        <strong><?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?></strong>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-bordered table-hover" id="dataTable" width="100%" cellspacing="0">
@@ -400,7 +664,7 @@ include("includes/head.php");
                                     <th>Materia</th>
                                     <th>Código</th>
                                     <th>Carrera</th>
-                                    <th>Fecha Asignación</th>
+                                    <th>Fecha</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
@@ -410,17 +674,20 @@ include("includes/head.php");
                                         $es_mi_carrera = ($asignacion['id_carrera'] == $carrera_director);
                                     ?>
                                     <tr>
-                                        <td><?php echo htmlspecialchars($asignacion['nombre_profesor']); ?> (<?php echo htmlspecialchars($asignacion['idusuario']); ?>)</td>
-                                        <td><?php echo htmlspecialchars($asignacion['nombre_materia']); ?></td>
-                                        <td><?php echo htmlspecialchars($asignacion['cod_materia']); ?></td>
-                                        <td>
+                                        <td data-label="Docente">
+                                            <?php echo htmlspecialchars($asignacion['nombre_profesor']); ?>
+                                            <small class="d-block text-muted"><?php echo htmlspecialchars($asignacion['idusuario']); ?></small>
+                                        </td>
+                                        <td data-label="Materia"><?php echo htmlspecialchars($asignacion['nombre_materia']); ?></td>
+                                        <td data-label="Código"><?php echo htmlspecialchars($asignacion['cod_materia']); ?></td>
+                                        <td data-label="Carrera">
                                             <?php echo htmlspecialchars($asignacion['nombre_carrera']); ?>
                                             <?php if($es_mi_carrera): ?>
                                                 <span class="badge badge-success ml-1">Mi carrera</span>
                                             <?php endif; ?>
                                         </td>
-                                        <td><?php echo date('d/m/Y', strtotime($asignacion['fecha_asignacion'])); ?></td>
-                                        <td class="action-buttons">
+                                        <td data-label="Fecha"><?php echo date('d/m/Y', strtotime($asignacion['fecha_asignacion'])); ?></td>
+                                        <td class="action-buttons" data-label="Acciones">
                                             <?php if($es_mi_carrera): ?>
                                                 <button class="btn btn-sm btn-primary editar-asignacion" 
                                                         data-toggle="modal" 
@@ -457,10 +724,12 @@ include("includes/head.php");
 
             <!-- Modal para editar asignación -->
             <div class="modal fade" id="modalEditar" tabindex="-1" role="dialog" aria-labelledby="modalEditarLabel" aria-hidden="true">
-                <div class="modal-dialog" role="document">
+                <div class="modal-dialog modal-dialog-centered" role="document">
                     <div class="modal-content">
                         <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title" id="modalEditarLabel">Editar Asignación</h5>
+                            <h5 class="modal-title" id="modalEditarLabel">
+                                <i class="fas fa-edit"></i> Editar Asignación
+                            </h5>
                             <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                             </button>
@@ -468,15 +737,15 @@ include("includes/head.php");
                         <form method="post" action="">
                             <div class="modal-body">
                                 <div class="form-group">
-                                    <label>Docente:</label>
+                                    <label><i class="fas fa-chalkboard-teacher"></i> Docente:</label>
                                     <input type="text" class="form-control" id="nombre_profesor_modal" readonly>
                                 </div>
                                 <div class="form-group">
-                                    <label>Materia Actual:</label>
+                                    <label><i class="fas fa-book"></i> Materia Actual:</label>
                                     <input type="text" class="form-control" id="nombre_materia_modal" readonly>
                                 </div>
                                 <div class="form-group">
-                                    <label for="nueva_materia">Nueva Materia:</label>
+                                    <label for="nueva_materia"><i class="fas fa-exchange-alt"></i> Nueva Materia:</label>
                                     <select class="form-control" id="nueva_materia" name="id_materia" required>
                                         <option value="">-- Seleccione una materia --</option>
                                         <?php
@@ -502,8 +771,12 @@ include("includes/head.php");
                                 <input type="hidden" id="id_asignacion" name="id_asignacion">
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                                <button type="submit" name="actualizar_asignacion" class="btn btn-primary">Guardar Cambios</button>
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                                    <i class="fas fa-times"></i> Cancelar
+                                </button>
+                                <button type="submit" name="actualizar_asignacion" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Guardar Cambios
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -511,7 +784,7 @@ include("includes/head.php");
             </div>
 
             <!-- Sección para Asignar Nueva Materia -->
-            <div class="card mb-4">
+            <div class="card mb-4 shadow-sm">
                 <div class="card-header bg-success text-white">
                     <i class="fas fa-chalkboard-teacher"></i> Asignar Nueva Materia - <?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>
                 </div>
@@ -519,7 +792,9 @@ include("includes/head.php");
                     <form method="post" action="">
                         <div class="form-row">
                             <div class="form-group col-md-6">
-                                <label for="id_profesor">Seleccionar Profesor:</label>
+                                <label for="id_profesor">
+                                    <i class="fas fa-user-tie"></i> Seleccionar Profesor:
+                                </label>
                                 <select class="form-control" id="id_profesor" name="id_profesor" required>
                                     <option value="">-- Seleccione --</option>
                                     <?php
@@ -536,7 +811,9 @@ include("includes/head.php");
                             </div>
                             
                             <div class="form-group col-md-6">
-                                <label for="carrera">Carrera:</label>
+                                <label for="carrera">
+                                    <i class="fas fa-graduation-cap"></i> Carrera:
+                                </label>
                                 <input type="text" class="form-control" value="<?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>" readonly>
                                 <input type="hidden" name="carrera" value="<?php echo $carrera_director; ?>">
                             </div>
@@ -544,7 +821,9 @@ include("includes/head.php");
                         
                         <div class="form-row">
                             <div class="form-group col-md-12">
-                                <label for="id_materia">Materia:</label>
+                                <label for="id_materia">
+                                    <i class="fas fa-book-open"></i> Materia:
+                                </label>
                                 <select class="form-control" id="id_materia" name="id_materia" required>
                                     <option value="">-- Seleccione una materia --</option>
                                     <?php
@@ -577,18 +856,22 @@ include("includes/head.php");
             </div>
             
             <!-- Sección de Recomendaciones -->
-            <div class="card mb-4">
+            <div class="card mb-4 shadow-sm">
                 <div class="card-header bg-info text-white">
                     <i class="fas fa-graduation-cap"></i> Recomendaciones por Títulos Académicos - <?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>
                 </div>
                 <div class="card-body">
                     <div class="form-row">
                         <div class="form-group col-md-6">
-                            <label for="carrera_recomendacion">Carrera:</label>
+                            <label for="carrera_recomendacion">
+                                <i class="fas fa-graduation-cap"></i> Carrera:
+                            </label>
                             <input type="text" class="form-control" value="<?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>" readonly>
                         </div>
                         <div class="form-group col-md-6">
-                            <label for="materia_recomendacion">Materia:</label>
+                            <label for="materia_recomendacion">
+                                <i class="fas fa-book"></i> Materia:
+                            </label>
                             <select class="form-control" id="materia_recomendacion" name="materia_recomendacion">
                                 <option value="">-- Seleccione una materia --</option>
                                 <?php
@@ -621,71 +904,6 @@ include("includes/head.php");
         </div>
     </div>
 </div>
-
-<style>
-.recommendation-section {
-    background-color: #f8f9fa;
-    border-radius: 5px;
-    padding: 15px;
-    margin-bottom: 20px;
-    border-left: 4px solid #007bff;
-}
-
-.recommendation-group {
-    margin-bottom: 15px;
-}
-
-.recommendation-title {
-    color: #0056b3;
-    margin-bottom: 10px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #dee2e6;
-}
-
-.professor-list {
-    list-style: none;
-    padding: 0;
-}
-
-.professor-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-    transition: background-color 0.3s;
-}
-
-.professor-item:hover {
-    background-color: #f1f1f1;
-}
-
-.professor-info {
-    flex-grow: 1;
-    margin-right: 15px;
-}
-
-.degree-info, .institute-info {
-    font-size: 0.85em;
-    color: #6c757d;
-}
-
-.action-buttons {
-    white-space: nowrap;
-}
-
-.action-buttons .btn {
-    margin: 0 2px;
-}
-
-.badge-primary {
-    background-color: #007bff;
-}
-
-#resultados-recomendaciones {
-    min-height: 100px;
-}
-</style>
 
 <script>
 // Configurar modal de edición
@@ -736,7 +954,7 @@ $('#materia_recomendacion').change(function() {
                 console.error("Error en AJAX:", status, error);
                 $('#resultados-recomendaciones').html(
                     '<div class="alert alert-danger">'+
-                    'Error al cargar recomendaciones. Por favor intente nuevamente.'+
+                    '<i class="fas fa-exclamation-triangle"></i> Error al cargar recomendaciones. Por favor intente nuevamente.'+
                     '</div>'
                 );
             }
@@ -758,9 +976,9 @@ $(document).on('click', '.asignar-rapido', function(e) {
         $('#id_materia').val(id_materia).trigger('change');
         
         // Resaltar el formulario
-        $('.card-header.bg-success').css('background-color', '#ffc107');
+        $('.card-header.bg-success').addClass('highlight-form');
         setTimeout(function() {
-            $('.card-header.bg-success').css('background-color', '#28a745');
+            $('.card-header.bg-success').removeClass('highlight-form');
         }, 1000);
         
         // Hacer scroll al formulario
@@ -771,7 +989,8 @@ $(document).on('click', '.asignar-rapido', function(e) {
         // Mostrar notificación
         var alertDiv = $(
             '<div class="alert alert-info alert-dismissible fade show" role="alert">'+
-            'Profesor y materia seleccionados. <strong>Por favor confirme la asignación.</strong>'+
+            '<i class="fas fa-check-circle"></i> Profesor y materia seleccionados. '+
+            '<strong>Por favor confirme la asignación.</strong>'+
             '<button type="button" class="close" data-dismiss="alert" aria-label="Close">'+
             '<span aria-hidden="true">&times;</span></button></div>'
         );
@@ -783,6 +1002,13 @@ $(document).on('click', '.asignar-rapido', function(e) {
         }, 5000);
     }
 });
+
+// Mejorar selects en móvil
+if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    $('select').each(function() {
+        $(this).attr('data-native-menu', 'true');
+    });
+}
 </script>
 
 <?php include("includes/footer.php"); ?>
