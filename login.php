@@ -106,19 +106,9 @@ unset($_SESSION['msg']);
 </div>
 
 <hr>
-<?php
-conteo();
-contenido('login');
-?>
 
-<script>
-animacion = function(){
 
-  document.getElementById('afiliarse').classList.toggle('fade');
-}
 
-setInterval(animacion, 200);
-</script>
 
 
 
