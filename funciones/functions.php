@@ -129,6 +129,8 @@ function obtenerEstudiantes() {
                 u.tlf AS num_telf,
                 u.email AS correo,
                 u.fecha_ingreso,
+                u.fecha_nac,
+                u.embarazada,
                 u.status
               FROM users u
               LEFT JOIN carreras c ON u.carrera = c.id_carrera

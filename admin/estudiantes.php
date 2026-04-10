@@ -39,7 +39,7 @@ if (isset($estudiantes) && is_array($estudiantes)) {
 
         // Contar mujeres embarazadas
         $esFemenino = isset($estudiante['genero']) && trim($estudiante['genero']) === 'Femenino';
-        $estaEmbarazada = isset($estudiante['embarazada']) && in_array(trim((string)$estudiante['embarazada']), ['1', 'Si', 'SI', 'si', 'Sí', 'SÍ', 'sí'], true);
+        $estaEmbarazada = isset($estudiante['embarazada']) && trim((string)$estudiante['embarazada']) === '1';
         if ($esFemenino && $estaEmbarazada) {
             $embarazadas++;
         }
