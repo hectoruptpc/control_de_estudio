@@ -26,6 +26,7 @@ $activos = 0;
 $inactivos = 0;
 $embarazadas = 0;
 $menores = 0;
+$estudiantesPorCarrera = [];
 
 if (isset($estudiantes) && is_array($estudiantes)) {
     $totalEstudiantes = count($estudiantes);
@@ -57,6 +58,13 @@ if (isset($estudiantes) && is_array($estudiantes)) {
                 // Ignorar fechas inválidas
             }
         }
+
+        // Contar por carrera
+        $carrera = $estudiante['carrera'] ?? 'Sin Carrera';
+        if (!isset($estudiantesPorCarrera[$carrera])) {
+            $estudiantesPorCarrera[$carrera] = 0;
+        }
+        $estudiantesPorCarrera[$carrera]++;
     }
 }
 
@@ -142,8 +150,99 @@ include("includes/head.php");
                                 </div>
                             </div>
                         </div>
-                        
-                        <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+
+                        <!-- Estadísticas por Carrera -->
+                        <div id="estadisticas-carrera-row" class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="text-center mb-3">
+                                    <i class="fas fa-graduation-cap me-2"></i>Estudiantes por Carrera
+                                </h5>
+                                <div class="row">
+                                    <?php
+                                    $colores = ['bg-primary', 'bg-success', 'bg-info', 'bg-warning', 'bg-danger', 'bg-secondary'];
+                                    $colorIndex = 0;
+                                    foreach ($estudiantesPorCarrera as $carrera => $cantidad):
+                                        $color = $colores[$colorIndex % count($colores)];
+                                        $colorIndex++;
+                                    ?>
+                                    <div class="col-md-4 col-lg-3 mb-3">
+                                        <div class="card <?php echo $color; ?> text-white h-100 shadow-sm">
+                                            <div class="card-body text-center">
+                                                <i class="fas fa-graduation-cap fa-2x mb-2"></i>
+                                                <h5 class="card-title"><?php echo $cantidad; ?></h5>
+                                                <p class="card-text small"><?php echo htmlspecialchars($carrera); ?></p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filtros -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-filter me-2"></i>Filtros de Búsqueda
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <div class="form-group">
+                                                    <label for="filtroEmbarazada" class="form-label">Estado de Embarazo</label>
+                                                    <select class="form-control" id="filtroEmbarazada">
+                                                        <option value="">Todos</option>
+                                                        <option value="embarazada">Solo Embarazadas</option>
+                                                        <option value="no-embarazada">No Embarazadas</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-group">
+                                                    <label for="filtroMenor" class="form-label">Edad</label>
+                                                    <select class="form-control" id="filtroMenor">
+                                                        <option value="">Todos</option>
+                                                        <option value="menor">Menores de 18 años</option>
+                                                        <option value="mayor">Mayores de 18 años</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-group">
+                                                    <label for="filtroCarrera" class="form-label">Carrera</label>
+                                                    <select class="form-control" id="filtroCarrera">
+                                                        <option value="">Todas las Carreras</option>
+                                                        <?php
+                                                        $carrerasUnicas = array_unique(array_column($estudiantes, 'carrera'));
+                                                        sort($carrerasUnicas);
+                                                        foreach ($carrerasUnicas as $carrera):
+                                                            if (!empty($carrera)):
+                                                        ?>
+                                                        <option value="<?php echo htmlspecialchars($carrera); ?>">
+                                                            <?php echo htmlspecialchars($carrera); ?>
+                                                        </option>
+                                                        <?php
+                                                            endif;
+                                                        endforeach;
+                                                        ?>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-12">
+                                                <button type="button" class="btn btn-secondary btn-sm" onclick="limpiarFiltros()">
+                                                    <i class="fas fa-times me-1"></i>Limpiar Filtros
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                             <table id="tablaEstudiantes" class="table table-striped table-hover table-bordered" style="width:100%; min-width: 800px;">
                                 <thead class="table-dark">
                                     <tr>
@@ -161,7 +260,31 @@ include("includes/head.php");
                                 <tbody>
                                     <?php if (isset($estudiantes) && is_array($estudiantes)): ?>
                                         <?php foreach ($estudiantes as $estudiante): ?>
-                                        <tr>
+                                            <?php
+                                            // Calcular edad para el filtro
+                                            $edad = null;
+                                            if (!empty($estudiante['fecha_nac'])) {
+                                                try {
+                                                    $fechaNac = new DateTime($estudiante['fecha_nac']);
+                                                    $hoy = new DateTime();
+                                                    $edad = $fechaNac->diff($hoy)->y;
+                                                } catch (Exception $e) {
+                                                    $edad = null;
+                                                }
+                                            }
+                                            
+                                            // Determinar si es menor de edad
+                                            $esMenor = ($edad !== null && $edad < 18);
+                                            
+                                            // Determinar estado de embarazo
+                                            $esFemenino = isset($estudiante['genero']) && trim($estudiante['genero']) === 'Femenino';
+                                            $estaEmbarazada = isset($estudiante['embarazada']) && trim((string)$estudiante['embarazada']) === '1';
+                                            ?>
+                                        <tr data-genero="<?php echo htmlspecialchars($estudiante['genero'] ?? ''); ?>"
+                                            data-carrera="<?php echo htmlspecialchars($estudiante['carrera'] ?? ''); ?>"
+                                            data-embarazada="<?php echo $estaEmbarazada ? '1' : '0'; ?>"
+                                            data-edad="<?php echo $edad ?? ''; ?>"
+                                            data-es-menor="<?php echo $esMenor ? '1' : '0'; ?>">
                                             <td><?php echo htmlspecialchars($estudiante['cedula'] ?? ''); ?></td>
                                             <td><?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?></td>
                                             <td><?php echo htmlspecialchars($estudiante['carrera'] ?? ''); ?></td>
@@ -410,17 +533,35 @@ include("includes/head.php");
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar DataTable
-    $('#tablaEstudiantes').DataTable({
+    // Inicializar DataTable sin filtros personalizados
+    const tablaEstudiantes = $('#tablaEstudiantes').DataTable({
         responsive: true,
         language: {
             url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json'
+        },
+        searching: false, // Deshabilitar búsqueda integrada de DataTables
+        drawCallback: function() {
+            // Aplicar filtros después de que DataTables haya renderizado
+            setTimeout(aplicarFiltrosVisibilidad, 100);
         }
     });
+
+    // Aplicar filtros también cuando se cambia de página
+    tablaEstudiantes.on('page.dt', function() {
+        setTimeout(aplicarFiltrosVisibilidad, 100); // Pequeño delay para asegurar que el DOM esté actualizado
+    });
+
+    // Variables para almacenar los valores de filtro actuales
+    let filtroActual = {
+        embarazada: '',
+        menor: '',
+        carrera: ''
+    };
     
     // Función para toggle estadísticas
     window.toggleEstadisticas = function() {
         const row = document.getElementById('estadisticas-row');
+        const carreraRow = document.getElementById('estadisticas-carrera-row');
         const button = document.getElementById('toggleEstadisticas');
         const icon = button.querySelector('i');
         const span = button.querySelector('span.d-none.d-sm-inline');
@@ -428,16 +569,157 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (row.style.display === 'none') {
             row.style.display = 'flex';
+            carreraRow.style.display = 'block';
             span.textContent = 'Ocultar Estadísticas';
             spanMobile.textContent = 'Ocultar';
             icon.className = 'fas fa-chart-bar';
         } else {
             row.style.display = 'none';
+            carreraRow.style.display = 'none';
             span.textContent = 'Mostrar Estadísticas';
             spanMobile.textContent = 'Mostrar';
             icon.className = 'fas fa-eye';
         }
     };
+
+    // Función para limpiar filtros
+    window.limpiarFiltros = function() {
+        document.getElementById('filtroEmbarazada').value = '';
+        document.getElementById('filtroMenor').value = '';
+        document.getElementById('filtroCarrera').value = '';
+        // Resetear variables de filtro
+        filtroActual.embarazada = '';
+        filtroActual.menor = '';
+        filtroActual.carrera = '';
+        // Forzar redraw
+        tablaEstudiantes.draw();
+    };
+
+    // Función para aplicar filtros
+    function aplicarFiltros() {
+        const filtroEmbarazada = document.getElementById('filtroEmbarazada');
+        const filtroMenor = document.getElementById('filtroMenor');
+        const filtroCarrera = document.getElementById('filtroCarrera');
+
+        if (!filtroEmbarazada || !filtroMenor || !filtroCarrera) {
+            console.error('Elementos de filtro no encontrados');
+            return;
+        }
+
+        // Actualizar valores de filtro
+        filtroActual.embarazada = filtroEmbarazada.value;
+        filtroActual.menor = filtroMenor.value;
+        filtroActual.carrera = filtroCarrera.value;
+
+        // Forzar redraw para activar drawCallback
+        tablaEstudiantes.draw();
+    }
+
+    // Función para aplicar filtros de visibilidad (llamada desde drawCallback)
+    function aplicarFiltrosVisibilidad() {
+        const valorEmbarazada = filtroActual.embarazada;
+        const valorMenor = filtroActual.menor;
+        const valorCarrera = filtroActual.carrera;
+
+        console.log('Aplicando filtros de visibilidad:', { valorEmbarazada, valorMenor, valorCarrera });
+
+        // Obtener todas las filas de la página actual
+        const rows = tablaEstudiantes.rows({ page: 'current' }).nodes();
+        console.log('Número de filas en página actual:', rows.length);
+
+        let filasVisibles = 0;
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const genero = (row.dataset.genero || '').trim();
+            const carrera = (row.dataset.carrera || '').trim();
+            const embarazada = (row.dataset.embarazada || '0').trim();
+            const esMenor = (row.dataset.esMenor || '0').trim();
+
+            console.log(`Fila ${i}:`, { genero, carrera, embarazada, esMenor });
+
+            let mostrar = true;
+
+            // Filtro por embarazo
+            if (valorEmbarazada) {
+                if (valorEmbarazada === 'embarazada') {
+                    // Solo mostrar mujeres embarazadas
+                    if (genero.toLowerCase() !== 'femenino' || embarazada !== '1') {
+                        mostrar = false;
+                    }
+                } else if (valorEmbarazada === 'no-embarazada') {
+                    // Solo mostrar mujeres no embarazadas o no mujeres
+                    if (genero.toLowerCase() === 'femenino' && embarazada === '1') {
+                        mostrar = false;
+                    }
+                }
+            }
+
+            // Filtro por edad (menor de edad)
+            if (valorMenor) {
+                if (valorMenor === 'menor') {
+                    // Solo mostrar menores de edad
+                    if (esMenor !== '1') {
+                        mostrar = false;
+                    }
+                } else if (valorMenor === 'mayor') {
+                    // Solo mostrar mayores de edad
+                    if (esMenor === '1') {
+                        mostrar = false;
+                    }
+                }
+            }
+
+            // Filtro por carrera
+            if (valorCarrera && carrera.toLowerCase() !== valorCarrera.toLowerCase()) {
+                mostrar = false;
+            }
+
+            console.log(`Fila ${i} - mostrar: ${mostrar}`);
+
+            // Aplicar visibilidad
+            row.style.display = mostrar ? '' : 'none';
+            if (mostrar) filasVisibles++;
+        }
+
+        console.log('Filas visibles después de filtros:', filasVisibles);
+
+        // Actualizar contador de resultados
+        actualizarContadorResultados();
+    }
+
+    // Función para actualizar contador de resultados
+    function actualizarContadorResultados() {
+        const info = tablaEstudiantes.page.info();
+        const totalRegistros = info.recordsTotal;
+
+        // Contar filas visibles en la página actual después de aplicar filtros de visibilidad
+        const rows = tablaEstudiantes.rows({ page: 'current' }).nodes();
+        let filasVisibles = 0;
+        for (let i = 0; i < rows.length; i++) {
+            if (rows[i].style.display !== 'none') {
+                filasVisibles++;
+            }
+        }
+
+        // Buscar si ya existe un contador
+        let contador = document.getElementById('contador-resultados');
+        if (!contador) {
+            // Crear contador si no existe
+            contador = document.createElement('div');
+            contador.id = 'contador-resultados';
+            contador.className = 'alert alert-info mt-2';
+            const table = document.getElementById('tablaEstudiantes');
+            table.parentNode.insertBefore(contador, table);
+        }
+
+        contador.innerHTML = `<i class="fas fa-info-circle"></i> Mostrando ${filasVisibles} de ${totalRegistros} estudiantes`;
+    }
+
+    // Event listeners para filtros
+    document.getElementById('filtroEmbarazada').addEventListener('change', aplicarFiltros);
+    document.getElementById('filtroMenor').addEventListener('change', aplicarFiltros);
+    document.getElementById('filtroCarrera').addEventListener('change', aplicarFiltros);
     
     // Delegación de eventos para botones dinámicos
     document.addEventListener('click', function(e) {
