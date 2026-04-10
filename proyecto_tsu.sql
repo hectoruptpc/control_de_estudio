@@ -4179,6 +4179,7 @@ CREATE TABLE `users` (
   `carrera` int DEFAULT NULL,
   `carrera_di` int DEFAULT NULL,
   `genero` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `embarazada` tinyint(1) DEFAULT 0,
   `edo_civil` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
   `fecha_nac` date DEFAULT NULL,
   `num_telf_opc` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,

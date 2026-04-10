@@ -385,6 +385,18 @@ function validarDatosEstudiante($data) {
             $validados[$campo] = trim($data[$campo]);
         }
     }
+
+    if (!empty($data['genero']) && $data['genero'] === 'Femenino') {
+        if ($data['embarazada'] !== '0' && $data['embarazada'] !== '1') {
+            $errors['embarazada'] = "Debe indicar si la estudiante está embarazada o no";
+        } else {
+            $validados['embarazada'] = (int)$data['embarazada'];
+        }
+    } else {
+        $validados['embarazada'] = isset($data['embarazada']) && ($data['embarazada'] === '0' || $data['embarazada'] === '1')
+            ? (int)$data['embarazada']
+            : 0;
+    }
     
     // Validar campos opcionales que permiten apóstrofes
     $camposConApostrofes = [
@@ -550,6 +562,7 @@ function insertarEstudiante($datos) {
             'carrera' => $datos['carrera'] ?? null,
             'carrera_di' => $datos['carrera'] ?? null,
             'genero' => $datos['genero'] ?? null,
+            'embarazada' => isset($datos['embarazada']) ? (int) $datos['embarazada'] : 0,
             'edo_civil' => $datos['edo_civil'] ?? null,
             'fecha_nac' => $datos['fecha_nac'] ?? null,
             'num_telf_opc' => $datos['num_telf_opc'] ?? '',
@@ -922,6 +935,15 @@ function validarEstudiante($datos) {
     if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
         $errores[] = 'Por favor ingrese un correo electrónico válido';
     }
+
+    // Validar embarazo si el género es femenino
+    if (isset($datos['genero']) && $datos['genero'] === 'Femenino') {
+        if (!isset($datos['embarazada']) || $datos['embarazada'] === '') {
+            $errores[] = 'El campo "embarazada" es obligatorio cuando el género es femenino';
+        } elseif (!in_array($datos['embarazada'], ['0', '1', 'Si', 'No'], true)) {
+            $errores[] = 'El campo "embarazada" debe ser 0, 1, Si o No';
+        }
+    }
     
     // Validar teléfono (al menos 10 dígitos)
     if (strlen($datos['tlf']) < 10) {
@@ -1244,6 +1266,7 @@ function actualizarEstudiante(array $datos): array {
             'institutos' => 's',
             'carrera' => 's',
             'genero' => 's',
+            'embarazada' => 'i',
             'edo_civil' => 's',
             'fecha_nac' => 's',
             'fecha_ingreso' => 's',

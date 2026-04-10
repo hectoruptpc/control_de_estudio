@@ -103,6 +103,20 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
                     </div>
                 </div>
             </div>
+
+            <div class="mb-3" id="embarazoContainer<?php echo $prefijo; ?>" style="display: none;">
+                <label class="form-label">¿Está embarazada?</label>
+                <div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="embarazada" id="embarazada_si<?php echo $prefijo; ?>" value="1">
+                        <label class="form-check-label" for="embarazada_si<?php echo $prefijo; ?>">Sí</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="embarazada" id="embarazada_no<?php echo $prefijo; ?>" value="0" checked>
+                        <label class="form-check-label" for="embarazada_no<?php echo $prefijo; ?>">No</label>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div class="col-md-6">
@@ -837,6 +851,41 @@ document.addEventListener('DOMContentLoaded', function() {
         radioEnfSi.addEventListener('change', toggleEnfermedadField);
         radioEnfNo.addEventListener('change', toggleEnfermedadField);
     }
+
+    // ===== Manejo condicional de Embarazo =====
+    const radioGeneroMasculino = document.getElementById('genero_m' + prefijo);
+    const radioGeneroFemenino = document.getElementById('genero_f' + prefijo);
+    const radioGeneroOtro = document.getElementById('genero_o' + prefijo);
+    const embarazoContainer = document.getElementById('embarazoContainer' + prefijo);
+    const embarazoSi = document.getElementById('embarazada_si' + prefijo);
+    const embarazoNo = document.getElementById('embarazada_no' + prefijo);
+
+    function toggleEmbarazoField() {
+        if (radioGeneroFemenino && radioGeneroFemenino.checked) {
+            if (embarazoContainer) {
+                embarazoContainer.style.display = 'block';
+            }
+            if (embarazoSi) embarazoSi.setAttribute('required', 'required');
+            if (embarazoNo) embarazoNo.setAttribute('required', 'required');
+        } else {
+            if (embarazoContainer) {
+                embarazoContainer.style.display = 'none';
+            }
+            if (embarazoSi) {
+                embarazoSi.removeAttribute('required');
+                embarazoSi.checked = false;
+            }
+            if (embarazoNo) {
+                embarazoNo.removeAttribute('required');
+                embarazoNo.checked = true;
+            }
+        }
+    }
+
+    if (radioGeneroMasculino) radioGeneroMasculino.addEventListener('change', toggleEmbarazoField);
+    if (radioGeneroFemenino) radioGeneroFemenino.addEventListener('change', toggleEmbarazoField);
+    if (radioGeneroOtro) radioGeneroOtro.addEventListener('change', toggleEmbarazoField);
+    toggleEmbarazoField();
 });
 
 // Validación del formulario
@@ -963,6 +1012,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (radioEnfSi && radioEnfSi.checked && campoEnf) {
             if (!campoEnf.value.trim()) {
                 mensajesError.push('Debe especificar la(s) enfermedad(es) si seleccionó "Sí"');
+                isValid = false;
+            }
+        }
+
+        // Validar campo de embarazo si el género es Femenino
+        const radioGeneroFemenino = document.getElementById('genero_f' + prefijo);
+        const embarazoSi = document.getElementById('embarazada_si' + prefijo);
+        const embarazoNo = document.getElementById('embarazada_no' + prefijo);
+
+        if (radioGeneroFemenino && radioGeneroFemenino.checked) {
+            if (embarazoSi && embarazoNo && !embarazoSi.checked && !embarazoNo.checked) {
+                mensajesError.push('Debe indicar si la estudiante está embarazada o no');
                 isValid = false;
             }
         }

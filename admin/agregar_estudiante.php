@@ -162,12 +162,12 @@ function descargarPlantilla() {
         'estado', 'municipio', 'parroquia', 'etnia', 'casaapto', 'punto_referencia',
         'grupo_familiar', 'acargo_usted', 'fuente_ingresos', 'tipo_vivienda', 
         'tenencia_vivienda', 'enfermedad', 'discapacida', 'fecha_ingreso', 'status',
-        'carrera', 'genero', 'edo_civil', 'fecha_nac', 'edad', 'num_telf_opc',
+        'carrera', 'genero', 'embarazada', 'edo_civil', 'fecha_nac', 'edad', 'num_telf_opc',
         'titulos', 'institutos'
     ];
     
     let csvContent = encabezados.join(',') + '\r\n';
-    csvContent += 'V-12345678,Nombre Ejemplo,ejemplo@correo.com,02121234567,04141234567,"Dirección Ejemplo",Caracas,Distrito Capital,Libertador,La Candelaria,"",Casa,"Frente a la plaza",4,2,"Trabajo formal","Casa","Propia","Ninguna","Ninguna",2023-01-15,1,1,Masculino,Soltero,1990-01-01,33,02121234568,"Bachiller,Licenciatura","Liceo XYZ,Universidad ABC"\r\n';
+    csvContent += 'V-12345678,Nombre Ejemplo,ejemplo@correo.com,02121234567,04141234567,"Dirección Ejemplo",Caracas,Distrito Capital,Libertador,La Candelaria,"",Casa,"Frente a la plaza",4,2,"Trabajo formal","Casa","Propia","Ninguna","Ninguna",2023-01-15,1,1,Masculino,0,Soltero,1990-01-01,33,02121234568,"Bachiller,Licenciatura","Liceo XYZ,Universidad ABC"\r\n';
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
