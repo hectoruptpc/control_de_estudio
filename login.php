@@ -18,29 +18,16 @@ include('funciones/functions.php');
 <title>Ingreso al Sistema</title>
 <?php echo $bootstrap_head; ?>
 
-<!-- FAVICON EN LOGIN -->
 
-<link rel="apple-touch-icon" href="images/favicon/apple-touch-icon.png" sizes="180x180">
-<link rel="icon" href="images/favicon/favicon-32x32.png" sizes="32x32" type="image/png">
-<link rel="icon" href="images/favicon/favicon-16x16.png" sizes="16x16" type="image/png">
-<link rel="icon" href="images/favicon/favicon.ico">
 
 </head>
 <body>
 
-<style>
-.carousel-control-prev-icon {
-  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23f00' viewBox='0 0 8 8'%3E%3Cpath d='M5.25 0l-4 4 4 4 1.5-1.5-2.5-2.5 2.5-2.5-1.5-1.5z'/%3E%3C/svg%3E");
-}
 
-.carousel-control-next-icon {
-  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23f00' viewBox='0 0 8 8'%3E%3Cpath d='M2.75 0l-1.5 1.5 2.5 2.5-2.5 2.5 1.5 1.5 4-4-4-4z'/%3E%3C/svg%3E");
-}
-</style>
 
 <div class="container text-center">
 
-        <?php echo $logopertenenciag; ?>
+        <?php echo $logopertenencia; ?>
        
 </div>
 
