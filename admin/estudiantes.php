@@ -20,10 +20,12 @@ if (isset($estudiantes['error'])) {
     unset($estudiantes);
 }
 
-// Contar estudiantes por status
+// Contar estudiantes por status y estadísticas adicionales
 $totalEstudiantes = 0;
 $activos = 0;
 $inactivos = 0;
+$embarazadas = 0;
+$menores = 0;
 
 if (isset($estudiantes) && is_array($estudiantes)) {
     $totalEstudiantes = count($estudiantes);
@@ -33,6 +35,27 @@ if (isset($estudiantes) && is_array($estudiantes)) {
             $activos++;
         } else {
             $inactivos++;
+        }
+
+        // Contar mujeres embarazadas
+        $esFemenino = isset($estudiante['genero']) && trim($estudiante['genero']) === 'Femenino';
+        $estaEmbarazada = isset($estudiante['embarazada']) && in_array(trim((string)$estudiante['embarazada']), ['1', 'Si', 'SI', 'si', 'Sí', 'SÍ', 'sí'], true);
+        if ($esFemenino && $estaEmbarazada) {
+            $embarazadas++;
+        }
+
+        // Contar menores de edad
+        if (!empty($estudiante['fecha_nac'])) {
+            try {
+                $fechaNac = new DateTime($estudiante['fecha_nac']);
+                $hoy = new DateTime();
+                $edad = $fechaNac->diff($hoy)->y;
+                if ($edad < 18) {
+                    $menores++;
+                }
+            } catch (Exception $e) {
+                // Ignorar fechas inválidas
+            }
         }
     }
 }
@@ -74,7 +97,7 @@ include("includes/head.php");
                         <!-- Conteos de estudiantes -->
                         <div id="estadisticas-row" class="row mb-4">
                             <div class="col-md-4 mb-3">
-                                <div class="card bg-primary text-white h-100">
+                                <div class="card bg-primary text-white h-100 shadow-sm">
                                     <div class="card-body text-center">
                                         <i class="fas fa-users fa-2x mb-2"></i>
                                         <h4 class="card-title"><?php echo $totalEstudiantes; ?></h4>
@@ -83,7 +106,7 @@ include("includes/head.php");
                                 </div>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <div class="card bg-success text-white h-100">
+                                <div class="card bg-success text-white h-100 shadow-sm">
                                     <div class="card-body text-center">
                                         <i class="fas fa-user-check fa-2x mb-2"></i>
                                         <h4 class="card-title"><?php echo $activos; ?></h4>
@@ -92,11 +115,29 @@ include("includes/head.php");
                                 </div>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <div class="card bg-secondary text-white h-100">
+                                <div class="card bg-secondary text-white h-100 shadow-sm">
                                     <div class="card-body text-center">
                                         <i class="fas fa-user-times fa-2x mb-2"></i>
                                         <h4 class="card-title"><?php echo $inactivos; ?></h4>
                                         <p class="card-text">Estudiantes Inactivos</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card bg-info text-white h-100 shadow-sm">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-baby-carriage fa-2x mb-2"></i>
+                                        <h4 class="card-title"><?php echo $embarazadas; ?></h4>
+                                        <p class="card-text">Mujeres Embarazadas</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card bg-warning text-dark h-100 shadow-sm">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-child fa-2x mb-2"></i>
+                                        <h4 class="card-title"><?php echo $menores; ?></h4>
+                                        <p class="card-text">Estudiantes Menores de Edad</p>
                                     </div>
                                 </div>
                             </div>
