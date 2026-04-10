@@ -152,6 +152,24 @@ if (empty($fotoPerfil)) {
                             </div>
                         </div>
                         
+                        <div class="col-md-6" id="embarazadaGroup" style="display: <?= ($estudiante['genero'] === 'Femenino') ? 'block' : 'none' ?>;">
+                            <div class="form-group">
+                                <label class="form-label">¿Está embarazada?</label>
+                                <div class="d-flex gap-3 align-items-center">
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="embarazada" id="embarazada_si" value="1"
+                                            <?= isset($estudiante['embarazada']) && trim((string)$estudiante['embarazada']) === '1' ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="embarazada_si">Sí</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="embarazada" id="embarazada_no" value="0"
+                                            <?= !isset($estudiante['embarazada']) || trim((string)$estudiante['embarazada']) !== '1' ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="embarazada_no">No</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="edo_civil" class="form-label">Estado Civil</label>
@@ -501,6 +519,22 @@ $(document).ready(function() {
             }
         }
     });
+
+    // Mostrar campo embarazada solo si el género es femenino
+    function toggleEmbarazadaField() {
+        const genero = $('#genero').val();
+        const wrapper = $('#embarazadaGroup');
+
+        if (genero === 'Femenino') {
+            wrapper.show();
+        } else {
+            wrapper.hide();
+            $('#embarazada_no').prop('checked', true);
+        }
+    }
+
+    $('#genero').on('change', toggleEmbarazadaField);
+    toggleEmbarazadaField();
 
     // VALIDACIÓN DEL FORMULARIO AL ENVIAR
    // En el evento submit del formulario, actualiza el AJAX:

@@ -110,6 +110,7 @@ try {
         'institutos' => isset($_POST['institutos']) ? trim($_POST['institutos']) : '',
         'carrera' => isset($_POST['carrera']) ? trim($_POST['carrera']) : '',
         'genero' => isset($_POST['genero']) ? trim($_POST['genero']) : '',
+        'embarazada' => isset($_POST['embarazada']) ? (int)$_POST['embarazada'] : 0,
         'edo_civil' => isset($_POST['edo_civil']) ? trim($_POST['edo_civil']) : '',
         'fecha_nac' => isset($_POST['fecha_nac']) ? trim($_POST['fecha_nac']) : '',
         'fecha_ingreso' => isset($_POST['fecha_ingreso']) ? trim($_POST['fecha_ingreso']) : '',
