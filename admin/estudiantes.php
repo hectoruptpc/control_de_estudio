@@ -20,6 +20,23 @@ if (isset($estudiantes['error'])) {
     unset($estudiantes);
 }
 
+// Contar estudiantes por status
+$totalEstudiantes = 0;
+$activos = 0;
+$inactivos = 0;
+
+if (isset($estudiantes) && is_array($estudiantes)) {
+    $totalEstudiantes = count($estudiantes);
+    foreach ($estudiantes as $estudiante) {
+        $status = $estudiante['status'] ?? 0;
+        if ($status == 1) {
+            $activos++;
+        } else {
+            $inactivos++;
+        }
+    }
+}
+
 include("includes/head.php");
 ?>
 
@@ -31,6 +48,9 @@ include("includes/head.php");
                     <div class="card-header bg-primary text-white d-flex flex-column flex-sm-row justify-content-between align-items-center">
                         <h5 class="mb-2 mb-sm-0"><i class="fas fa-users me-2"></i>Listado de Estudiantes</h5>
                         <div>
+                            <button id="toggleEstadisticas" class="btn btn-outline-light btn-sm mb-1 mb-sm-0 me-2" onclick="toggleEstadisticas()">
+                                <i class="fas fa-chart-bar"></i> <span class="d-none d-sm-inline">Ocultar Estadísticas</span><span class="d-inline d-sm-none">Ocultar</span>
+                            </button>
                             <?php if (tienePermiso('agregar_estudiante')): ?>
                                 <button class="btn btn-success btn-sm mb-1 mb-sm-0" onclick="abrirModalNuevoEstudiante()">
                                     <i class="fas fa-plus-circle"></i> <span class="d-none d-sm-inline">Nuevo Estudiante</span><span class="d-inline d-sm-none">Nuevo</span>
@@ -50,6 +70,37 @@ include("includes/head.php");
                                 </button>
                             </div>
                         <?php endif; ?>
+                        
+                        <!-- Conteos de estudiantes -->
+                        <div id="estadisticas-row" class="row mb-4">
+                            <div class="col-md-4 mb-3">
+                                <div class="card bg-primary text-white h-100">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-users fa-2x mb-2"></i>
+                                        <h4 class="card-title"><?php echo $totalEstudiantes; ?></h4>
+                                        <p class="card-text">Total de Estudiantes</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card bg-success text-white h-100">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-user-check fa-2x mb-2"></i>
+                                        <h4 class="card-title"><?php echo $activos; ?></h4>
+                                        <p class="card-text">Estudiantes Activos</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card bg-secondary text-white h-100">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-user-times fa-2x mb-2"></i>
+                                        <h4 class="card-title"><?php echo $inactivos; ?></h4>
+                                        <p class="card-text">Estudiantes Inactivos</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         
                         <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
                             <table id="tablaEstudiantes" class="table table-striped table-hover table-bordered" style="width:100%; min-width: 800px;">
@@ -325,6 +376,27 @@ document.addEventListener('DOMContentLoaded', function() {
             url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json'
         }
     });
+    
+    // Función para toggle estadísticas
+    window.toggleEstadisticas = function() {
+        const row = document.getElementById('estadisticas-row');
+        const button = document.getElementById('toggleEstadisticas');
+        const icon = button.querySelector('i');
+        const span = button.querySelector('span.d-none.d-sm-inline');
+        const spanMobile = button.querySelector('span.d-inline.d-sm-none');
+        
+        if (row.style.display === 'none') {
+            row.style.display = 'flex';
+            span.textContent = 'Ocultar Estadísticas';
+            spanMobile.textContent = 'Ocultar';
+            icon.className = 'fas fa-chart-bar';
+        } else {
+            row.style.display = 'none';
+            span.textContent = 'Mostrar Estadísticas';
+            spanMobile.textContent = 'Mostrar';
+            icon.className = 'fas fa-eye';
+        }
+    };
     
     // Delegación de eventos para botones dinámicos
     document.addEventListener('click', function(e) {
