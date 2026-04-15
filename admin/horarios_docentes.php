@@ -89,21 +89,21 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
             $horas_disponibles = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
             
             $html = '<div class="table-responsive">
-                        <table class="table table-bordered">
+                        <table class="table table-bordered table-horario">
                             <thead class="thead-dark">
                                 <tr>
-                                    <th>Hora</th>';
+                                    <th class="hora-col">Hora</th>';
             
             foreach($dias_semana as $dia) {
-                $html .= "<th>$dia</th>";
+                $html .= "<th class=\"dia-col\">$dia</th>";
             }
             
-            $html .= '</tr></thead><tbody>';
+            $html .= '<tr></thead><tbody>';
             
             $celdas_ocupadas = array_fill(0, count($dias_semana), array_fill(0, count($horas_disponibles), false));
             
             foreach($horas_disponibles as $hora_index => $hora) {
-                $html .= "<tr><td>$hora</td>";
+                $html .= "<tr><th class=\"hora-row\">$hora</th>";
                 
                 foreach($dias_semana as $dia_index => $dia_nombre) {
                     if(isset($celdas_ocupadas[$dia_index][$hora_index]) && $celdas_ocupadas[$dia_index][$hora_index]) {
@@ -119,13 +119,12 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                     $tieneConflicto = false;
                     $infoConflicto = [];
                     
-                    // Verificar conflictos con otros docentes (aula o docente mismo horario)
+                    // Verificar conflictos con otros docentes
                     foreach($conflictos as $conflicto) {
                         if($conflicto['dia'] == $dia_index) {
                             $hora_inicio_conflicto = $conflicto['hora_inicio'];
                             $hora_fin_conflicto = $conflicto['hora_fin'];
                             
-                            // Verificar si el horario actual está dentro del horario conflictivo
                             if(($hora >= $hora_inicio_conflicto && $hora < $hora_fin_conflicto)) {
                                 $tieneConflicto = true;
                                 $infoConflicto[] = [
@@ -148,13 +147,11 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                             $title .= "Sección: {$asignacion['codigo_seccion']}\nPeríodo: {$asignacion['id_periodo']}\n";
                             $title .= "Aula: {$asignacion['aula']}\nHoras: {$asignacion['horas_totales']}";
                             
-                            $celdaContent = '<strong>' . $asignacion['materia'] . '</strong><br>' . 
-                                            '<small>' . $asignacion['nombre_carrera'] . ' (' . $asignacion['codigo_seccion'] . ')</small>';
+                            $celdaContent = '<strong>' . htmlspecialchars($asignacion['materia']) . '</strong><br>' . 
+                                            '<small>' . htmlspecialchars($asignacion['nombre_carrera']) . ' (' . htmlspecialchars($asignacion['codigo_seccion']) . ')</small>';
                             
                                             $hora_fin = $asignacion['hora_fin'];
 
-                                            // Calcular rowspan basado en diferencia de tiempo (en horas).
-                                            // Evita depender de coincidencias exactas en el array de horas.
                                             $start_ts = strtotime($hora);
                                             $end_ts = strtotime($hora_fin);
 
@@ -164,7 +161,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                                                 $hours = ($end_ts - $start_ts) / 3600;
                                                 $rowspan = max(1, (int) ceil($hours));
 
-                                                // Marcar las celdas ocupadas respetando el límite del horario mostrado
                                                 $max_index = count($horas_disponibles);
                                                 for ($i = $hora_index; $i < min($max_index, $hora_index + $rowspan); $i++) {
                                                     $celdas_ocupadas[$dia_index][$i] = true;
@@ -179,7 +175,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                     
                     if($tieneConflicto) {
                         $clasesCelda .= ' bg-conflicto';
-                        $titleConflicto = "CONFLICTO DETECTADO:\n";
+                        $titleConflicto = "⚠️ CONFLICTO DETECTADO:\n";
                         foreach($infoConflicto as $conf) {
                             $titleConflicto .= "Docente: {$conf['docente']}\n";
                             $titleConflicto .= "Materia: {$conf['materia']}\n";
@@ -189,7 +185,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                         }
                         
                         if(!$id_horario) {
-                            $celdaContent = '<i class="fas fa-exclamation-triangle"></i> Conflicto';
+                            $celdaContent = '<i class="fas fa-exclamation-triangle"></i><span class="d-none d-md-inline"> Conflicto</span>';
                             $title = $titleConflicto;
                         } else {
                             $title = $title . "\n\n" . $titleConflicto;
@@ -207,30 +203,28 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
             
             $html .= '</tbody></table></div>';
             
-            // Resumen de asignaciones y conflictos
-            $html .= '<div class="card mt-4">
+            // Resumen de asignaciones y conflictos (responsive)
+            $html .= '<div class="card mt-4 shadow-sm">
                         <div class="card-header bg-primary text-white">
                             <i class="fas fa-info-circle mr-1"></i>
-                            Resumen de Asignaciones y Conflictos
+                            Resumen de Asignaciones
                         </div>
-                        <div class="card-body">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Materia</th>
-                                        <th>Carrera</th>
-                                        <th>Sección</th>
-                                        <th>Día</th>
-                                        <th>Horario</th>
-                                        <th>Aula</th>
-                                        <th>Estado</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>';
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-striped mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Materia</th>
+                                            <th>Carrera/Sección</th>
+                                            <th>Horario</th>
+                                            <th>Aula</th>
+                                            <th>Estado</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>';
             
             foreach($asignaciones as $asignacion) {
-                // Verificar si esta asignación tiene conflictos
                 $tieneConflicto = false;
                 $infoConflicto = '';
                 
@@ -240,7 +234,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                        (($asignacion['hora_inicio'] < $conflicto['hora_fin'] && $asignacion['hora_fin'] > $conflicto['hora_inicio']))) {
                         
                         $tieneConflicto = true;
-                        $infoConflicto .= "Conflicto con: {$conflicto['docente']} ({$conflicto['materia']})";
+                        $infoConflicto .= "<small class='d-block text-danger'>⚠️ {$conflicto['docente']} ({$conflicto['materia']})</small>";
                     }
                 }
                 
@@ -249,18 +243,28 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                     '<span class="badge badge-success">OK</span>';
                 
                 $html .= '<tr class="' . ($tieneConflicto ? 'table-warning' : '') . '">
-                            <td>' . $asignacion['materia'] . '</td>
-                            <td>' . $asignacion['nombre_carrera'] . '</td>
-                            <td>' . $asignacion['codigo_seccion'] . '</td>
-                            <td>' . $dias_semana[$asignacion['dia']] . '</td>
-                            <td>' . $asignacion['hora_inicio'] . ' - ' . $asignacion['hora_fin'] . '</td>
-                            <td>' . $asignacion['aula'] . '</td>
-                            <td>' . $estado . '<br><small>' . $infoConflicto . '</small></td>
-                            <td><button class="btn btn-sm btn-danger btn-eliminar" data-id="' . $asignacion['id_horario'] . '">Eliminar</button></td>
+                            <td>
+                                <strong>' . htmlspecialchars($asignacion['materia']) . '</strong>
+                            </td>
+                            <td>
+                                ' . htmlspecialchars($asignacion['nombre_carrera']) . '<br>
+                                <small class="text-muted">Secc: ' . htmlspecialchars($asignacion['codigo_seccion']) . '</small>
+                            </td>
+                            <td>
+                                <i class="fas fa-calendar-day"></i> ' . $dias_semana[$asignacion['dia']] . '<br>
+                                <i class="fas fa-clock"></i> ' . $asignacion['hora_inicio'] . ' - ' . $asignacion['hora_fin'] . '
+                            </td>
+                            <td><i class="fas fa-door-open"></i> ' . htmlspecialchars($asignacion['aula']) . '</td>
+                            <td>' . $estado . $infoConflicto . '</td>
+                            <td>
+                                <button class="btn btn-sm btn-danger btn-eliminar" data-id="' . $asignacion['id_horario'] . '">
+                                    <i class="fas fa-trash"></i> <span class="d-none d-md-inline">Eliminar</span>
+                                </button>
+                            </td>
                           </tr>';
             }
             
-            $html .= '</tbody></table></div></div>';
+            $html .= '</tbody></table></div></div></div>';
             
             echo $html;
             exit();
@@ -290,11 +294,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                 exit();
             }
             
-            // Nota: Se eliminó la validación que limitaba a 2 horas por semana por materia.
-            // Ahora no se impone un límite semanal automático; la validación se basa únicamente
-            // en solapamientos de horarios y en la coherencia de hora inicio/fin.
-            
-            // Verificar conflicto para el docente (mismo horario)
+            // Verificar conflicto para el docente
             $query = "SELECT COUNT(*) as conflicto
                       FROM horarios h
                       JOIN docente_seccion ds ON h.id_docente_seccion = ds.id_docente_seccion
@@ -312,7 +312,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                 exit();
             }
             
-            // Verificar conflicto con otros docentes (misma aula y horario)
+            // Verificar conflicto con otros docentes
             $query = "SELECT COUNT(*) as conflicto, u.nombre as docente, m.nombre_materia as materia
                       FROM horarios h
                       JOIN docente_seccion ds ON h.id_docente_seccion = ds.id_docente_seccion
@@ -373,7 +373,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
             $options = '<option value="">Seleccionar materia...</option>';
             while($row = $result->fetch_assoc()) {
                 $options .= "<option value='{$row['id_docente_seccion']}' data-horas='{$row['horas_totales']}'>
-                                {$row['nombre_materia']} - {$row['nombre_carrera']} ({$row['codigo_seccion']}) - {$row['id_periodo']}
+                                " . htmlspecialchars($row['nombre_materia']) . " - " . htmlspecialchars($row['nombre_carrera']) . " (" . htmlspecialchars($row['codigo_seccion']) . ")
                             </option>";
             }
             
@@ -396,12 +396,11 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
             
         case 'asignacion_automatica':
             $id_docente = $_POST['id_docente'];
-            $dias_opcion = $_POST['dias_opcion']; // 'semana' o 'sabado'
+            $dias_opcion = $_POST['dias_opcion'];
             $horas_min = isset($_POST['horas_min']) ? (int)$_POST['horas_min'] : 7;
             $horas_max = isset($_POST['horas_max']) ? (int)$_POST['horas_max'] : 16;
             $duracion_clase = isset($_POST['duracion_clase']) ? (int)$_POST['duracion_clase'] : 2;
 
-            // Obtener materias del docente ordenadas por horas (mayor a menor)
             $query = "SELECT ds.id_docente_seccion, m.nombre_materia, 
                              m.horas_teoricas + m.horas_practicas as horas_totales,
                              c.nombre_carrera, s.codigo_seccion, s.id_periodo
@@ -418,21 +417,15 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
 
             $asignaciones = [];
             while($row = $result->fetch_assoc()) {
-                // No se aplica cap automático de horas por materia aquí.
                 $asignaciones[] = $row;
             }
 
-            // Eliminar horarios existentes del docente
             $db->query("DELETE FROM horarios WHERE id_docente_seccion IN (SELECT id_docente_seccion FROM docente_seccion WHERE id_usuario = $id_docente)");
 
-            // Configurar días disponibles según la opción seleccionada
-            $dias_disponibles = ($dias_opcion == 'sabado') ? [5] : range(0, 4); // 0-4 = Lunes-Viernes, 5 = Sábado
-
-            // Configurar horas disponibles
+            $dias_disponibles = ($dias_opcion == 'sabado') ? [5] : range(0, 4);
             $horas_base = range($horas_min, $horas_max - 1);
             $horas_disponibles = array_map(function($h) { return sprintf('%02d:00', $h); }, $horas_base);
 
-            // Obtener TODOS los horarios existentes para detectar conflictos
             $query_conflictos = "SELECT h.dia, h.hora_inicio, h.hora_fin, h.aula, 
                                u.id as id_docente, u.nombre as docente,
                                m.nombre_materia as materia
@@ -443,51 +436,42 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
             $result_conflictos = $db->query($query_conflictos);
             $todos_horarios = $result_conflictos->fetch_all(MYSQLI_ASSOC);
 
-            // Obtener aulas disponibles desde la base de datos
             $aulas_result = $db->query("SELECT CONCAT(nave, ' - ', aula) as nombre_aula FROM aulas ORDER BY nave, aula");
             $aulas = [];
             while($row = $aulas_result->fetch_assoc()) {
                 $aulas[] = $row['nombre_aula'];
             }
             
-            // Crear matriz de disponibilidad mejorada
             $disponibilidad = [];
             foreach($dias_disponibles as $dia) {
                 foreach($horas_disponibles as $hora) {
                     $disponibilidad[$dia][$hora] = [
                         'docente_disponible' => true,
-                        'aulas_disponibles' => $aulas // Todas las aulas disponibles inicialmente
+                        'aulas_disponibles' => $aulas
                     ];
                 }
             }
 
-            // Marcar horarios ocupados en la matriz de disponibilidad
             foreach($todos_horarios as $horario) {
                 $dia = $horario['dia'];
                 $hora_inicio = $horario['hora_inicio'];
                 $hora_fin = $horario['hora_fin'];
                 $aula = $horario['aula'];
 
-                // Solo procesar días que estamos considerando
                 if(in_array($dia, $dias_disponibles)) {
                     $hora_actual = $hora_inicio;
                     while($hora_actual < $hora_fin) {
                         if(isset($disponibilidad[$dia][$hora_actual])) {
-                            // Si es el mismo docente, marcar como no disponible
                             if($horario['id_docente'] == $id_docente) {
                                 $disponibilidad[$dia][$hora_actual]['docente_disponible'] = false;
                             }
                             
-                            // Eliminar aula específica de las disponibles
                             $key = array_search($aula, $disponibilidad[$dia][$hora_actual]['aulas_disponibles']);
                             if($key !== false) {
                                 unset($disponibilidad[$dia][$hora_actual]['aulas_disponibles'][$key]);
-                                // Reindexar array
                                 $disponibilidad[$dia][$hora_actual]['aulas_disponibles'] = array_values($disponibilidad[$dia][$hora_actual]['aulas_disponibles']);
                             }
                         }
-                        
-                        // Avanzar hora actual en bloques de 1 hora
                         $hora_actual = date('H:i', strtotime($hora_actual) + 3600);
                     }
                 }
@@ -495,11 +479,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
 
             $asignacionesRealizadas = 0;
             $errores = [];
-            $conflictos_detectados = [];
             
-            // Función mejorada para encontrar horario disponible
             function encontrarHorarioDisponible($disponibilidad, $dias_disponibles, $horas_disponibles, $duracion, $aulas, $id_docente, $todos_horarios) {
-                // Intentar primero en días con más disponibilidad
                 $dias_ordenados = [];
                 foreach($dias_disponibles as $dia) {
                     $disponibles = 0;
@@ -512,7 +493,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                     $dias_ordenados[$dia] = $disponibles;
                 }
                 
-                // Ordenar días de mayor a menor disponibilidad
                 arsort($dias_ordenados);
                 $dias_ordenados = array_keys($dias_ordenados);
                 
@@ -520,12 +500,10 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                     foreach($horas_disponibles as $hora) {
                         $hora_fin = sprintf('%02d:00', intval(substr($hora, 0, 2)) + $duracion);
                         
-                        // Verificar límites de horario
                         if(intval(substr($hora_fin, 0, 2)) > intval(substr(end($horas_disponibles), 0, 2)) + 1) {
                             continue;
                         }
                         
-                        // Verificar disponibilidad para todas las horas del bloque
                         $disponible = true;
                         $aulas_compatibles = $aulas;
                         $hora_actual = $hora;
@@ -537,7 +515,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                                 break;
                             }
                             
-                            // Verificar aulas disponibles en todas las horas del bloque
                             $aulas_compatibles = array_intersect($aulas_compatibles, $disponibilidad[$dia][$hora_actual]['aulas_disponibles']);
                             if(empty($aulas_compatibles)) {
                                 $disponible = false;
@@ -548,7 +525,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                         }
                         
                         if($disponible && !empty($aulas_compatibles)) {
-                            // Verificar conflictos con otros docentes
                             $aula_seleccionada = $aulas_compatibles[array_rand($aulas_compatibles)];
                             $conflicto = false;
                             
@@ -581,44 +557,18 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                 return false;
             }
 
-            // Asignar materias priorizando las que tienen más horas
             foreach($asignaciones as $asignacion) {
                 $horasAsignadas = 0;
                 $horasNecesarias = $asignacion['horas_totales'];
                 $intentos = 0;
-                $maxIntentos = 50; // Aumentado para mejor búsqueda
+                $maxIntentos = 50;
 
                 while($horasAsignadas < $horasNecesarias && $intentos < $maxIntentos) {
                     $intentos++;
-                    
-                    // Calcular duración de este bloque (sin cap automático de 2 horas)
                     $duracionBloque = min($duracion_clase, $horasNecesarias - $horasAsignadas);
-                    
-                    // Buscar horario disponible con verificación de conflictos
                     $horario = encontrarHorarioDisponible($disponibilidad, $dias_disponibles, $horas_disponibles, $duracionBloque, $aulas, $id_docente, $todos_horarios);
                     
                     if($horario) {
-                        // Verificar conflicto nuevamente (por si acaso)
-                        $query = "SELECT COUNT(*) as conflicto
-                                  FROM horarios h
-                                  JOIN docente_seccion ds ON h.id_docente_seccion = ds.id_docente_seccion
-                                  WHERE h.dia = ? AND h.aula = ? AND 
-                                        ((h.hora_inicio < ? AND h.hora_fin > ?) OR 
-                                         (h.hora_inicio >= ? AND h.hora_inicio < ?))";
-                        $stmt = $db->prepare($query);
-                        $stmt->bind_param("isssss", $horario['dia'], $horario['aula'], 
-                                         $horario['hora_fin'], $horario['hora_inicio'], 
-                                         $horario['hora_inicio'], $horario['hora_fin']);
-                        $stmt->execute();
-                        $result = $stmt->get_result();
-                        $conflicto = $result->fetch_assoc();
-                        
-                        if($conflicto['conflicto'] > 0) {
-                            $conflictos_detectados[] = "Conflicto detectado al asignar {$asignacion['nombre_materia']}";
-                            continue;
-                        }
-                        
-                        // Asignar horario
                         $query = "INSERT INTO horarios (id_docente_seccion, dia, hora_inicio, hora_fin, aula)
                                   VALUES (?, ?, ?, ?, ?)";
                         $stmt = $db->prepare($query);
@@ -629,12 +579,9 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                             $horasAsignadas += $duracionBloque;
                             $asignacionesRealizadas++;
                             
-                            // Actualizar matriz de disponibilidad
                             $hora_actual = $horario['hora_inicio'];
                             while($hora_actual < $horario['hora_fin']) {
                                 $disponibilidad[$horario['dia']][$hora_actual]['docente_disponible'] = false;
-                                
-                                // Eliminar aula asignada de las disponibles en este horario
                                 $key = array_search($horario['aula'], $disponibilidad[$horario['dia']][$hora_actual]['aulas_disponibles']);
                                 if($key !== false) {
                                     unset($disponibilidad[$horario['dia']][$hora_actual]['aulas_disponibles'][$key]);
@@ -642,44 +589,34 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
                                         $disponibilidad[$horario['dia']][$hora_actual]['aulas_disponibles']
                                     );
                                 }
-                                
                                 $hora_actual = date('H:i', strtotime($hora_actual) + 3600);
                             }
                             
-                            // Agregar a todos_horarios para futuras verificaciones
                             $todos_horarios[] = [
                                 'dia' => $horario['dia'],
                                 'hora_inicio' => $horario['hora_inicio'],
                                 'hora_fin' => $horario['hora_fin'],
                                 'aula' => $horario['aula'],
                                 'id_docente' => $id_docente,
-                                'docente' => '', // No necesario para esta verificación
+                                'docente' => '',
                                 'materia' => $asignacion['nombre_materia']
                             ];
                         }
                     } else {
-                        $errores[] = "No se encontró horario disponible para {$asignacion['nombre_materia']} (bloque de {$duracionBloque} hora(s))";
+                        $errores[] = "No se encontró horario para " . htmlspecialchars($asignacion['nombre_materia']);
                         break;
                     }
-                }
-                
-                if($horasAsignadas < $horasNecesarias && $intentos >= $maxIntentos) {
-                    $errores[] = "No se pudo asignar todas las horas de {$asignacion['nombre_materia']}";
                 }
             }
 
             $mensaje = "Se asignaron $asignacionesRealizadas bloques horarios.";
-            if(!empty($conflictos_detectados)) {
-                $mensaje .= " Conflictos evitados: " . count($conflictos_detectados);
-            }
             if(!empty($errores)) {
-                $mensaje .= " Errores: " . implode(", ", array_unique($errores));
+                $mensaje .= " " . implode(", ", array_unique($errores));
             }
 
             echo json_encode([
                 'success' => $asignacionesRealizadas > 0,
-                'message' => $mensaje,
-                'conflictos_evitados' => count($conflictos_detectados)
+                'message' => $mensaje
             ]);
             exit();
     }
@@ -688,23 +625,232 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ajax_action'])) {
 include("includes/head.php");
 ?>
 
+<!-- Estilos responsivos -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=yes">
+<style>
+    /* Estilos responsivos generales */
+    @media (max-width: 768px) {
+        .container-fluid {
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+        
+        h1.mt-4 {
+            font-size: 1.4rem;
+        }
+        
+        /* Formularios responsivos */
+        .form-row {
+            flex-direction: column;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group.col-md-6 {
+            padding: 0;
+        }
+        
+        .d-flex.align-items-end {
+            align-items: flex-start !important;
+            margin-top: 10px;
+        }
+        
+        .btn {
+            width: 100%;
+            margin: 5px 0;
+        }
+        
+        /* Tabla de horario responsiva */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .table-horario {
+            min-width: 700px;
+        }
+        
+        .table-horario th,
+        .table-horario td {
+            padding: 8px 4px;
+            font-size: 0.75rem;
+        }
+        
+        .hora-col,
+        .hora-row {
+            width: 60px;
+            font-size: 0.7rem;
+        }
+        
+        .dia-col {
+            font-size: 0.75rem;
+            white-space: nowrap;
+        }
+        
+        .horario-cell {
+            min-height: 50px;
+            font-size: 0.7rem;
+            padding: 4px;
+        }
+        
+        .horario-cell strong {
+            font-size: 0.7rem;
+        }
+        
+        .horario-cell small {
+            font-size: 0.6rem;
+        }
+        
+        /* Tabla de resumen responsiva */
+        .table-striped th,
+        .table-striped td {
+            padding: 8px 6px;
+            font-size: 0.75rem;
+        }
+        
+        /* Modal responsivo */
+        .modal-dialog {
+            margin: 10px;
+            max-width: calc(100% - 20px);
+        }
+        
+        .modal-header {
+            padding: 12px;
+        }
+        
+        .modal-header h5 {
+            font-size: 1.1rem;
+        }
+        
+        .modal-body {
+            padding: 15px;
+        }
+        
+        .modal-footer {
+            padding: 12px;
+        }
+        
+        .modal-footer .btn {
+            width: auto;
+            margin: 0 5px;
+        }
+        
+        /* Alertas */
+        .alert {
+            font-size: 0.8rem;
+            padding: 10px;
+        }
+        
+        /* Badges */
+        .badge {
+            font-size: 0.7rem;
+            padding: 4px 8px;
+        }
+        
+        /* Card headers */
+        .card-header {
+            padding: 10px 12px;
+        }
+        
+        .card-header i {
+            margin-right: 5px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .table-horario th,
+        .table-horario td {
+            font-size: 0.65rem;
+            padding: 6px 3px;
+        }
+        
+        .horario-cell {
+            font-size: 0.6rem;
+        }
+        
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.65rem;
+        }
+        
+        h1.mt-4 {
+            font-size: 1.2rem;
+        }
+    }
+    
+    /* Estilos de la tabla de horario */
+    .table-horario {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .horario-cell {
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        word-break: break-word;
+        white-space: normal;
+    }
+    
+    .horario-cell:hover {
+        background-color: #f5f5f5;
+    }
+    
+    .bg-asignada {
+        background-color: #d4edda;
+    }
+    
+    .bg-asignada:hover {
+        background-color: #c3e6cb !important;
+    }
+    
+    .bg-conflicto {
+        background-color: #f8d7da !important;
+    }
+    
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(0,0,0,.1);
+        border-radius: 50%;
+        border-top-color: #007bff;
+        animation: spin 1s ease-in-out infinite;
+        margin-right: 10px;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* Tooltips en móvil */
+    [data-toggle="tooltip"] {
+        cursor: help;
+    }
+</style>
+
 <div class="container-fluid">
     <div class="row">
-        <div class="col-md-12">
-            <h1 class="mt-4">Gestión de Horarios Docentes</h1>
+        <div class="col-12">
+            <h1 class="mt-4">
+                <i class="fas fa-calendar-alt"></i> Gestión de Horarios Docentes
+            </h1>
             
-            <div class="card mb-4">
-                <div class="card-header">
-                    <i class="fas fa-calendar-alt mr-1"></i>
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-chalkboard-teacher mr-1"></i>
                     Seleccionar Docente
                 </div>
                 <div class="card-body">
                     <form id="filtroHorarioDocente">
                         <div class="form-row">
                             <div class="form-group col-md-6">
-                                <label for="docente">Docente</label>
+                                <label for="docente">
+                                    <i class="fas fa-user-tie"></i> Docente
+                                </label>
                                 <select class="form-control" id="docente" name="docente" required>
-                                    <option value="">Seleccionar...</option>
+                                    <option value="">-- Seleccionar docente --</option>
                                     <?php
                                     $docentes = $db->query("SELECT DISTINCT u.id, u.nombre 
                                                            FROM docente_seccion ds
@@ -712,15 +858,19 @@ include("includes/head.php");
                                                            WHERE ds.estatus = 1
                                                            ORDER BY u.nombre");
                                     while($d = $docentes->fetch_assoc()) {
-                                        echo "<option value='{$d['id']}'>{$d['nombre']}</option>";
+                                        echo "<option value='{$d['id']}'>" . htmlspecialchars($d['nombre']) . "</option>";
                                     }
                                     ?>
                                 </select>
                             </div>
                             <div class="form-group col-md-6 d-flex align-items-end">
                                 <?php if (tienePermiso('gestion_horario')): ?>
-                                <button type="submit" class="btn btn-primary">Cargar Horario</button>
-                                <button type="button" id="btnAutoAsignar" class="btn btn-success ml-2" disabled>Asignación Automática</button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> Cargar Horario
+                                </button>
+                                <button type="button" id="btnAutoAsignar" class="btn btn-success ml-2" disabled>
+                                    <i class="fas fa-magic"></i> Asignación Automática
+                                </button>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -728,14 +878,17 @@ include("includes/head.php");
                 </div>
             </div>
             
-            <div class="card mb-4">
-                <div class="card-header">
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-info text-white">
                     <i class="fas fa-table mr-1"></i>
                     Horario Semanal - Docente
                 </div>
                 <div class="card-body">
                     <div id="horarioDocenteContainer">
-                        <p class="text-muted">Seleccione un docente para visualizar su horario.</p>
+                        <div class="alert alert-info text-center">
+                            <i class="fas fa-info-circle"></i>
+                            Seleccione un docente para visualizar su horario.
+                        </div>
                     </div>
                 </div>
             </div>
@@ -745,11 +898,13 @@ include("includes/head.php");
 
 <!-- Modal para asignar materia -->
 <div class="modal fade" id="asignarMateriaModal" tabindex="-1" role="dialog" aria-labelledby="asignarMateriaModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="asignarMateriaModalLabel">Asignar Materia</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="asignarMateriaModalLabel">
+                    <i class="fas fa-plus-circle"></i> Asignar Materia
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
@@ -760,28 +915,21 @@ include("includes/head.php");
                     <input type="hidden" id="idDocenteActual" name="id_docente">
                     
                     <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label for="selectDocenteMateria">Materia/Sección</label>
+                        <div class="form-group col-md-12">
+                            <label for="selectDocenteMateria">
+                                <i class="fas fa-book"></i> Materia/Sección
+                            </label>
                             <select class="form-control" id="selectDocenteMateria" name="id_docente_seccion" required>
                                 <option value="">Cargando materias...</option>
-                            </select>
-                        </div>
-                        <div class="form-group col-md-6">
-                            <label for="aulaAsignada">Aula</label>
-                            <select class="form-control" id="aulaAsignada" name="aula" required>
-                                <?php
-                                $aulas = $db->query("SELECT CONCAT(nave, ' - ', aula) as nombre_aula FROM aulas ORDER BY nave, aula");
-                                while($aula = $aulas->fetch_assoc()) {
-                                    echo "<option value='{$aula['nombre_aula']}'>{$aula['nombre_aula']}</option>";
-                                }
-                                ?>
                             </select>
                         </div>
                     </div>
                     
                     <div class="form-row">
                         <div class="form-group col-md-6">
-                            <label for="horaInicio">Hora de Inicio</label>
+                            <label for="horaInicio">
+                                <i class="fas fa-clock"></i> Hora de Inicio
+                            </label>
                             <select class="form-control" id="horaInicio" name="hora_inicio" required>
                                 <option value="07:00">07:00</option>
                                 <option value="08:00">08:00</option>
@@ -796,7 +944,9 @@ include("includes/head.php");
                             </select>
                         </div>
                         <div class="form-group col-md-6">
-                            <label for="horaFin">Hora de Fin</label>
+                            <label for="horaFin">
+                                <i class="fas fa-hourglass-end"></i> Hora de Fin
+                            </label>
                             <select class="form-control" id="horaFin" name="hora_fin" required>
                                 <option value="08:00">08:00</option>
                                 <option value="09:00">09:00</option>
@@ -812,8 +962,25 @@ include("includes/head.php");
                         </div>
                     </div>
                     
+                    <div class="form-row">
+                        <div class="form-group col-md-12">
+                            <label for="aulaAsignada">
+                                <i class="fas fa-door-open"></i> Aula
+                            </label>
+                            <select class="form-control" id="aulaAsignada" name="aula" required>
+                                <?php
+                                $aulas = $db->query("SELECT CONCAT(nave, ' - ', aula) as nombre_aula FROM aulas ORDER BY nave, aula");
+                                while($aula = $aulas->fetch_assoc()) {
+                                    echo "<option value='" . htmlspecialchars($aula['nombre_aula']) . "'>" . htmlspecialchars($aula['nombre_aula']) . "</option>";
+                                }
+                                ?>
+                            </select>
+                        </div>
+                    </div>
+                    
                     <div class="form-group">
-                        <div class="alert alert-info mt-3">
+                        <div class="alert alert-info mt-2">
+                            <i class="fas fa-hourglass-half"></i>
                             <strong>Duración:</strong> <span id="duracionClase">1 hora</span>
                             <div class="mt-2 text-danger font-weight-bold" id="horasRestantes"></div>
                         </div>
@@ -821,8 +988,12 @@ include("includes/head.php");
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnGuardarAsignacion">Guardar</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="btnGuardarAsignacion">
+                    <i class="fas fa-save"></i> Guardar
+                </button>
             </div>
         </div>
     </div>
@@ -830,11 +1001,13 @@ include("includes/head.php");
 
 <!-- Modal de confirmación para asignación automática -->
 <div class="modal fade" id="confirmAutoAsignacion" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Configurar Asignación Automática</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-magic"></i> Configurar Asignación Automática
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
@@ -842,7 +1015,9 @@ include("includes/head.php");
                 <p>Configura los parámetros para la asignación automática:</p>
                 
                 <div class="form-group">
-                    <label for="duracionClaseAuto">Duración de cada clase (horas):</label>
+                    <label for="duracionClaseAuto">
+                        <i class="fas fa-hourglass-half"></i> Duración de cada clase (horas):
+                    </label>
                     <select class="form-control" id="duracionClaseAuto">
                         <option value="1">1 hora</option>
                         <option value="2" selected>2 horas</option>
@@ -850,7 +1025,7 @@ include("includes/head.php");
                 </div>
                 
                 <div class="form-group">
-                    <label>Días de asignación:</label>
+                    <label><i class="fas fa-calendar-week"></i> Días de asignación:</label>
                     <div class="form-check">
                         <input class="form-check-input" type="radio" name="diasOpcion" id="diasSemana" value="semana" checked>
                         <label class="form-check-label" for="diasSemana">
@@ -866,7 +1041,9 @@ include("includes/head.php");
                 </div>
                 
                 <div class="form-group">
-                    <label for="preferenciaHoras">Horario preferido:</label>
+                    <label for="preferenciaHoras">
+                        <i class="fas fa-clock"></i> Horario preferido:
+                    </label>
                     <select class="form-control" id="preferenciaHoras">
                         <option value="7-12">Mañana (7:00 - 12:00)</option>
                         <option value="13-16">Tarde (13:00 - 16:00)</option>
@@ -875,17 +1052,17 @@ include("includes/head.php");
                 </div>
                 
                 <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
                     <strong>Nota:</strong> Esta acción eliminará todos los horarios actuales del docente y creará una nueva asignación.
-                </div>
-                
-                <div class="alert alert-info">
-                    <strong>Información:</strong> El sistema intentará distribuir las clases considerando la disponibilidad de aulas y otros docentes.
-                    <br><strong>No se aplica un límite automático de horas por materia; revise la disponibilidad manualmente.</strong>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="confirmarAutoAsignacion">Generar Horario</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-success" id="confirmarAutoAsignacion">
+                    <i class="fas fa-magic"></i> Generar Horario
+                </button>
             </div>
         </div>
     </div>
@@ -893,20 +1070,27 @@ include("includes/head.php");
 
 <!-- Modal de confirmación para eliminar asignación -->
 <div class="modal fade" id="confirmDeleteModal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title">Confirmar Eliminación</h5>
+                <h5 class="modal-title">
+                    <i class="fas fa-trash-alt"></i> Confirmar Eliminación
+                </h5>
                 <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
             <div class="modal-body">
                 <p>¿Está seguro de eliminar esta asignación?</p>
+                <p class="text-muted small">Esta acción no se puede deshacer.</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-danger" id="confirmDeleteButton">Eliminar</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteButton">
+                    <i class="fas fa-trash-alt"></i> Eliminar
+                </button>
             </div>
         </div>
     </div>
@@ -914,9 +1098,9 @@ include("includes/head.php");
 
 <!-- Modal para mensajes de resultado -->
 <div class="modal fade" id="resultModal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header" id="resultModalHeader">
                 <h5 class="modal-title" id="resultModalTitle">Resultado</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
@@ -926,96 +1110,25 @@ include("includes/head.php");
                 <!-- El contenido se llenará dinámicamente -->
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-dismiss="modal">Aceptar</button>
+                <button type="button" class="btn btn-primary" data-dismiss="modal">
+                    <i class="fas fa-check"></i> Aceptar
+                </button>
             </div>
         </div>
     </div>
 </div>
 
-<style>
-    .horario-cell {
-        min-height: 80px;
-        border: 1px solid #ddd;
-        padding: 5px;
-        cursor: pointer;
-        position: relative;
-        text-align: center;
-        vertical-align: middle;
-    }
-    .horario-cell:hover {
-        background-color: #f5f5f5;
-    }
-    .bg-asignada {
-        background-color: #d4edda;
-        font-weight: bold;
-    }
-    .bg-asignada:hover {
-        background-color: #c3e6cb !important;
-    }
-    .bg-conflicto {
-        background-color: #f8d7da !important;
-    }
-    .loading-spinner {
-        display: inline-block;
-        width: 20px;
-        height: 20px;
-        border: 3px solid rgba(0,0,0,.1);
-        border-radius: 50%;
-        border-top-color: #007bff;
-        animation: spin 1s ease-in-out infinite;
-        margin-right: 10px;
-    }
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-    small {
-        font-size: 0.8em;
-        color: #666;
-    }
-    .btn-eliminar {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.875rem;
-    }
-    #duracionClase {
-        font-weight: bold;
-        color: #007bff;
-    }
-    #horasRestantes {
-        font-size: 0.9em;
-    }
-    .badge {
-        font-size: 0.85em;
-        padding: 0.35em 0.65em;
-    }
-    .table-warning {
-        background-color: #fff3cd;
-    }
-
-    /* Mejoras para evitar desbordes y mantener la tabla alineada */
-    table.table {
-        table-layout: fixed;
-        width: 100%;
-    }
-    .horario-cell {
-        box-sizing: border-box;
-        overflow: hidden;
-        word-break: break-word;
-        white-space: normal;
-        min-height: 60px;
-    }
-    td[title] {
-        max-width: 1px; /* fuerza el quiebre dentro de la celda cuando sea necesario */
-    }
-</style>
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
 $(document).ready(function() {
-    // Habilitar botón de asignación automática cuando se selecciona un docente
+    // Habilitar botón de asignación automática
     $('#docente').change(function() {
         $('#btnAutoAsignar').prop('disabled', $(this).val() === '');
     });
     
-    // Cargar horario cuando se selecciona un docente
+    // Cargar horario
     $('#filtroHorarioDocente').submit(function(e) {
         e.preventDefault();
         var idDocente = $('#docente').val();
@@ -1025,7 +1138,7 @@ $(document).ready(function() {
             return;
         }
         
-        $('#horarioDocenteContainer').html('<div class="text-center py-4"><span class="loading-spinner"></span><p>Cargando horario...</p></div>');
+        $('#horarioDocenteContainer').html('<div class="text-center py-5"><div class="loading-spinner"></div><p class="mt-2">Cargando horario...</p></div>');
         
         $.ajax({
             url: '',
@@ -1036,16 +1149,10 @@ $(document).ready(function() {
             },
             success: function(response) {
                 $('#horarioDocenteContainer').html(response);
-                
-                // Configurar eventos para eliminar asignaciones
-                $('.btn-eliminar').click(function() {
-                    var idHorario = $(this).data('id');
-                    $('#confirmDeleteModal').data('idHorario', idHorario).modal('show');
-                });
+                $('[data-toggle="tooltip"]').tooltip();
             },
-            error: function(xhr, status, error) {
-                console.error("Error al cargar horario docente:", status, error);
-                $('#horarioDocenteContainer').html('<div class="alert alert-danger">Error al cargar el horario. Intente nuevamente.</div>');
+            error: function() {
+                $('#horarioDocenteContainer').html('<div class="alert alert-danger">Error al cargar el horario</div>');
             }
         });
     });
@@ -1060,12 +1167,10 @@ $(document).ready(function() {
         $('#horaInicio').val(hora);
         $('#idDocenteActual').val(idDocente);
         
-        // Calcular hora fin por defecto (1 hora después)
         var horaFin = new Date('1970-01-01T' + hora + ':00');
         horaFin.setHours(horaFin.getHours() + 1);
         $('#horaFin').val(('0' + horaFin.getHours()).slice(-2) + ':00');
         
-        // Cargar materias del docente
         $.ajax({
             url: '',
             type: 'POST',
@@ -1075,27 +1180,19 @@ $(document).ready(function() {
             },
             success: function(response) {
                 $('#selectDocenteMateria').html(response);
-                $('#aulaAsignada').val($('#aulaAsignada option:first').val());
                 $('#asignarMateriaModal').modal('show');
                 
-                // Actualizar duración cuando cambia la materia seleccionada
                 $('#selectDocenteMateria').change(function() {
                     var horas = $(this).find('option:selected').data('horas');
                     if(horas) {
-                        // Mostrar horas asignadas esta semana (sin límite automático)
-                        $('#horasRestantes').text('Horas asignadas esta semana: ' + horas + (horas > 1 ? ' horas' : ' hora'));
+                        $('#horasRestantes').text('Horas totales: ' + horas + (horas > 1 ? ' horas' : ' hora'));
                     } else {
                         $('#horasRestantes').text('');
                     }
                 });
                 
-                // Actualizar duración cuando cambian las horas
                 $('#horaInicio, #horaFin').change(actualizarDuracion);
                 actualizarDuracion();
-            },
-            error: function(xhr, status, error) {
-                console.error("Error al cargar materias:", status, error);
-                showResultModal('Error', 'Error al cargar materias disponibles', 'danger');
             }
         });
     });
@@ -1107,10 +1204,10 @@ $(document).ready(function() {
         if(horaInicio && horaFin) {
             var inicio = new Date('1970-01-01T' + horaInicio + ':00');
             var fin = new Date('1970-01-01T' + horaFin + ':00');
-            var diff = (fin - inicio) / (1000 * 60 * 60); // Diferencia en horas
+            var diff = (fin - inicio) / (1000 * 60 * 60);
             
-                    if(diff <= 0) {
-                $('#duracionClase').html('<span class="text-danger">Hora fin debe ser mayor que hora inicio</span>');
+            if(diff <= 0) {
+                $('#duracionClase').html('<span class="text-danger">Hora fin debe ser mayor</span>');
                 $('#btnGuardarAsignacion').prop('disabled', true);
             } else {
                 $('#duracionClase').text(diff + ' hora(s)');
@@ -1126,34 +1223,27 @@ $(document).ready(function() {
         var originalText = $btn.html();
         
         $btn.prop('disabled', true).html('<span class="loading-spinner"></span> Guardando...');
-        
-        // Agregar id_docente al formData
         formData += '&id_docente=' + $('#idDocenteActual').val();
         
         $.ajax({
             url: '',
             type: 'POST',
             data: formData,
+            dataType: 'json',
             success: function(response) {
                 $btn.prop('disabled', false).html(originalText);
                 
                 if(response.success) {
                     $('#asignarMateriaModal').modal('hide');
                     showResultModal('Éxito', 'Asignación guardada correctamente', 'success');
-                    $('#filtroHorarioDocente').submit(); // Recargar horario
+                    $('#filtroHorarioDocente').submit();
                 } else {
-                    var mensaje = 'Error: ' + (response.message || 'No se pudo guardar');
-                    if(response.conflictos) {
-                        mensaje += '\nConflictos con: ' + response.conflictos.join(', ');
-                    }
-                    showResultModal('Error', mensaje, 'danger');
+                    showResultModal('Error', response.message || 'No se pudo guardar', 'danger');
                 }
             },
-            dataType: 'json',
-            error: function(xhr, status, error) {
+            error: function() {
                 $btn.prop('disabled', false).html(originalText);
-                console.error("Error al guardar asignación:", status, error);
-                showResultModal('Error', 'Error de conexión al guardar', 'danger');
+                showResultModal('Error', 'Error de conexión', 'danger');
             }
         });
     });
@@ -1170,7 +1260,6 @@ $(document).ready(function() {
         
         $btn.prop('disabled', true).html('<span class="loading-spinner"></span> Generando...');
         
-        // Obtener preferencias
         var duracion = $('#duracionClaseAuto').val();
         var diasOpcion = $('input[name="diasOpcion"]:checked').val();
         var horasRange = $('#preferenciaHoras').val().split('-');
@@ -1186,28 +1275,31 @@ $(document).ready(function() {
                 horas_min: horasRange[0],
                 horas_max: horasRange[1]
             },
+            dataType: 'json',
             success: function(response) {
                 $btn.prop('disabled', false).html(originalText);
                 $('#confirmAutoAsignacion').modal('hide');
                 
                 if(response.success) {
-                    var mensaje = response.message + (response.conflictos_evitados ? '\nConflictos evitados: ' + response.conflictos_evitados : '');
-                    showResultModal('Asignación Automática', mensaje, 'success');
-                    $('#filtroHorarioDocente').submit(); // Recargar horario
+                    showResultModal('Asignación Automática', response.message, 'success');
+                    $('#filtroHorarioDocente').submit();
                 } else {
-                    showResultModal('Error', 'Error: ' + response.message, 'danger');
+                    showResultModal('Error', response.message, 'danger');
                 }
             },
-            dataType: 'json',
-            error: function(xhr, status, error) {
+            error: function() {
                 $btn.prop('disabled', false).html(originalText);
-                console.error("Error en asignación automática:", status, error);
                 showResultModal('Error', 'Error en asignación automática', 'danger');
             }
         });
     });
     
-    // Confirmar eliminación de asignación
+    // Eliminar asignación
+    $(document).on('click', '.btn-eliminar', function() {
+        var idHorario = $(this).data('id');
+        $('#confirmDeleteModal').data('idHorario', idHorario).modal('show');
+    });
+    
     $('#confirmDeleteButton').click(function() {
         var idHorario = $('#confirmDeleteModal').data('idHorario');
         var $btn = $(this);
@@ -1222,6 +1314,7 @@ $(document).ready(function() {
                 ajax_action: 'eliminar_asignacion',
                 id_horario: idHorario
             },
+            dataType: 'json',
             success: function(response) {
                 $btn.prop('disabled', false).html(originalText);
                 $('#confirmDeleteModal').modal('hide');
@@ -1230,17 +1323,24 @@ $(document).ready(function() {
                     showResultModal('Éxito', 'Asignación eliminada correctamente', 'success');
                     $('#filtroHorarioDocente').submit();
                 } else {
-                    showResultModal('Error', 'Error al eliminar: ' + (response.message || ''), 'danger');
+                    showResultModal('Error', response.message || 'Error al eliminar', 'danger');
                 }
             },
-            dataType: 'json'
+            error: function() {
+                $btn.prop('disabled', false).html(originalText);
+                showResultModal('Error', 'Error de conexión', 'danger');
+            }
         });
     });
     
-    // Función para mostrar modales de resultado
     function showResultModal(title, message, type) {
         $('#resultModalTitle').text(title);
-        $('#resultModalBody').html('<div class="alert alert-' + type + '">' + message.replace(/\n/g, '<br>') + '</div>');
+        var header = $('#resultModalHeader');
+        header.removeClass('bg-success bg-danger bg-info');
+        if(type === 'success') header.addClass('bg-success text-white');
+        else if(type === 'danger') header.addClass('bg-danger text-white');
+        else header.addClass('bg-info text-white');
+        $('#resultModalBody').html('<div class="alert alert-' + type + ' mb-0">' + message.replace(/\n/g, '<br>') + '</div>');
         $('#resultModal').modal('show');
     }
 });
