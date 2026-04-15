@@ -311,14 +311,14 @@ include("includes/head.php");
                                             <i class="fas fa-eye"></i>
                                         </button>
                                     </form>
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="edit">
+                                        <input type="hidden" name="id" value="<?= $seccion['id_seccion'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-primary" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </form>
                                     <?php if ($seccion['periodo_activo'] == 1): ?>
-                                        <form method="post">
-                                            <input type="hidden" name="action" value="edit">
-                                            <input type="hidden" name="id" value="<?= $seccion['id_seccion'] ?>">
-                                            <button type="submit" class="btn btn-sm btn-primary" title="Editar">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                        </form>
                                         <form method="post">
                                             <input type="hidden" name="action" value="assign">
                                             <input type="hidden" name="id" value="<?= $seccion['id_seccion'] ?>">
@@ -1081,6 +1081,13 @@ include("includes/head.php");
                         </p>
                         
                         <div class="mt-4">
+                            <form method="post" style="display:block; margin-bottom:10px;">
+                                <input type="hidden" name="action" value="edit">
+                                <input type="hidden" name="id" value="<?= $seccion_id ?>">
+                                <button type="submit" class="btn btn-primary btn-block">
+                                    <i class="fas fa-edit"></i> Editar Sección
+                                </button>
+                            </form>
                             <?php if (!$periodo_inactivo): ?>
                                 <form method="post" style="display:block; margin-bottom:10px;">
                                     <input type="hidden" name="action" value="assign">
@@ -1089,21 +1096,14 @@ include("includes/head.php");
                                         <i class="fas fa-users"></i> Asignar Estudiantes
                                     </button>
                                 </form>
-                                <form method="post" style="display:block; margin-bottom:10px;">
-                                    <input type="hidden" name="action" value="edit">
-                                    <input type="hidden" name="id" value="<?= $seccion_id ?>">
-                                    <button type="submit" class="btn btn-primary btn-block">
-                                        <i class="fas fa-edit"></i> Editar Sección
-                                    </button>
-                                </form>
-                                <form method="post" style="display:block; margin-bottom:10px;">
-                                    <input type="hidden" name="action" value="view_schedule">
-                                    <input type="hidden" name="id" value="<?= $seccion_id ?>">
-                                    <button type="submit" class="btn btn-info btn-block">
-                                        <i class="fas fa-calendar-alt"></i> Ver Horario Semanal
-                                    </button>
-                                </form>
                             <?php endif; ?>
+                            <form method="post" style="display:block; margin-bottom:10px;">
+                                <input type="hidden" name="action" value="view_schedule">
+                                <input type="hidden" name="id" value="<?= $seccion_id ?>">
+                                <button type="submit" class="btn btn-info btn-block">
+                                    <i class="fas fa-calendar-alt"></i> Ver Horario Semanal
+                                </button>
+                            </form>
                             <a href="gestion_seccion.php" class="btn btn-secondary btn-block">
                                 <i class="fas fa-arrow-left"></i> Volver al listado
                             </a>

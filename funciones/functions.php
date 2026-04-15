@@ -6696,10 +6696,7 @@ function editarSeccion($db, $datos) {
         $periodo = $result->fetch_assoc();
         $stmt->close();
         
-        if ($periodo['activo'] == 0) {
-            throw new Exception("No se puede editar una sección con período inactivo.");
-        }
-        
+        // Permitir editar la sección incluso si el período actual está inactivo.
         $stmt = $db->prepare("UPDATE secciones 
                             SET codigo_seccion = ?, 
                                 id_carrera = ?, 
