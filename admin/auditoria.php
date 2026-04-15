@@ -26,16 +26,13 @@ include("includes/head.php");
 // Procesar filtros
 $fecha_inicio = $_GET['fecha_inicio'] ?? null;
 $fecha_fin = $_GET['fecha_fin'] ?? null;
-$usuario_id = $_GET['usuario_id'] ?? null;
+$usuario_cedula = $_GET['usuario_cedula'] ?? null;
 $accion = $_GET['accion'] ?? null;
 $modulo = $_GET['modulo'] ?? null;
 $limite = $_GET['limite'] ?? 100;
 
 // Obtener registros de auditoría
-$registros = obtenerRegistrosAuditoria($limite, $fecha_inicio, $fecha_fin, $usuario_id, $accion, $modulo);
-
-// Obtener lista de usuarios para el filtro
-$usuarios = obtenerUsuariosParaFiltro();
+$registros = obtenerRegistrosAuditoria($limite, $fecha_inicio, $fecha_fin, $usuario_cedula, $accion, $modulo);
 
 // Obtener lista de acciones únicas para el filtro
 $acciones_unicas = obtenerAccionesUnicas();
@@ -66,16 +63,9 @@ $modulos_unicos = obtenerModulosUnicos();
                                value="<?= htmlspecialchars($fecha_fin ?? '') ?>">
                     </div>
                     <div class="col-12 col-sm-6 col-md-3 mb-2">
-                        <label for="usuario_id">Usuario:</label>
-                        <select class="form-control" id="usuario_id" name="usuario_id">
-                            <option value="">Todos los usuarios</option>
-                            <?php foreach ($usuarios as $usuario): ?>
-                                <option value="<?= $usuario['id'] ?>" 
-                                    <?= ($usuario_id == $usuario['id']) ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($usuario['nombre']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+                        <label for="usuario_cedula">Cédula del Usuario:</label>
+                        <input type="text" class="form-control" id="usuario_cedula" name="usuario_cedula" 
+                               value="<?= htmlspecialchars($usuario_cedula ?? '') ?>" placeholder="Buscar por cédula">
                     </div>
                     <div class="col-12 col-sm-6 col-md-3 mb-2">
                         <label for="accion">Acción:</label>

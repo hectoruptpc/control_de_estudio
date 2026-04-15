@@ -9076,7 +9076,7 @@ function generarDescripcionAuditoria($cambios) {
 /**
  * Obtener registros de auditoría con filtros opcionales (versión mejorada)
  */
-function obtenerRegistrosAuditoria($limite = 100, $fecha_inicio = null, $fecha_fin = null, $usuario_id = null, $accion = null, $modulo = null) {
+function obtenerRegistrosAuditoria($limite = 100, $fecha_inicio = null, $fecha_fin = null, $usuario_cedula = null, $accion = null, $modulo = null) {
     global $db;
     
     $query = "SELECT a.*, u.nombre as usuario_nombre, u.idusuario as usuario_cedula
@@ -9099,10 +9099,10 @@ function obtenerRegistrosAuditoria($limite = 100, $fecha_inicio = null, $fecha_f
         $types .= "s";
     }
     
-    if ($usuario_id) {
-        $query .= " AND a.usuario_id = ?";
-        $params[] = $usuario_id;
-        $types .= "i";
+    if ($usuario_cedula) {
+        $query .= " AND u.idusuario = ?";
+        $params[] = $usuario_cedula;
+        $types .= "s";
     }
     
     if ($accion) {
