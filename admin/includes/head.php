@@ -65,7 +65,7 @@ if (!isLoggedIn() || !isAdmin()) {
 
     /* NAVBAR FIJO */
     .navbar {
-        z-index: 1060;
+        z-index: 1030;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
 
