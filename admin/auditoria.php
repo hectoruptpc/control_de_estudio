@@ -58,12 +58,12 @@ $modulos_unicos = obtenerModulosUnicos();
                     <div class="col-12 col-sm-6 col-md-3 mb-2">
                         <label for="fecha_inicio">Fecha Inicio:</label>
                         <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio" 
-                               value="<?= htmlspecialchars($fecha_inicio) ?>">
+                               value="<?= htmlspecialchars($fecha_inicio ?? '') ?>">
                     </div>
                     <div class="col-12 col-sm-6 col-md-3 mb-2">
                         <label for="fecha_fin">Fecha Fin:</label>
                         <input type="date" class="form-control" id="fecha_fin" name="fecha_fin" 
-                               value="<?= htmlspecialchars($fecha_fin) ?>">
+                               value="<?= htmlspecialchars($fecha_fin ?? '') ?>">
                     </div>
                     <div class="col-12 col-sm-6 col-md-3 mb-2">
                         <label for="usuario_id">Usuario:</label>
@@ -193,8 +193,8 @@ $modulos_unicos = obtenerModulosUnicos();
                                     <small><?= date('H:i:s', strtotime($registro['fecha_hora'])) ?></small>
                                 </td>
                                 <td>
-                                    <?= htmlspecialchars($registro['usuario_nombre']) ?><br>
-                                    <small class="text-muted"><?= htmlspecialchars($registro['usuario_cedula']) ?></small>
+                                    <?= htmlspecialchars($registro['usuario_nombre'] ?? '') ?><br>
+                                    <small class="text-muted"><?= htmlspecialchars($registro['usuario_cedula'] ?? '') ?></small>
                                 </td>
                                 <td>
                                     <span class="badge 
@@ -205,14 +205,14 @@ $modulos_unicos = obtenerModulosUnicos();
                                         <?= $registro['accion'] == 'LOGOUT' ? 'badge-secondary' : '' ?>
                                         <?= $registro['accion'] == 'ERROR' ? 'badge-dark' : '' ?>
                                         <?= $registro['accion'] == 'SEARCH' ? 'badge-primary' : '' ?>">
-                                        <?= htmlspecialchars($registro['accion']) ?>
+                                        <?= htmlspecialchars($registro['accion'] ?? '') ?>
                                     </span>
                                 </td>
-                                <td><?= htmlspecialchars($registro['modulo_sistema']) ?></td>
-                                <td><?= htmlspecialchars($registro['tabla_afectada']) ?></td>
-                                <td><?= htmlspecialchars($registro['registro_id']) ?></td>
-                                <td><?= htmlspecialchars(substr($registro['descripcion'], 0, 60)) ?><?= strlen($registro['descripcion']) > 60 ? '...' : '' ?></td>
-                                <td><?= htmlspecialchars($registro['ip_origen']) ?></td>
+                                <td><?= htmlspecialchars($registro['modulo_sistema'] ?? '') ?></td>
+                                <td><?= htmlspecialchars($registro['tabla_afectada'] ?? '') ?></td>
+                                <td><?= htmlspecialchars($registro['registro_id'] ?? '') ?></td>
+                                <td><?= htmlspecialchars(substr($registro['descripcion'] ?? '', 0, 60)) ?><?= strlen($registro['descripcion'] ?? '') > 60 ? '...' : '' ?></td>
+                                <td><?= htmlspecialchars($registro['ip_origen'] ?? '') ?></td>
                                 <td>
                                     <?php if ($registro['valores_antiguos'] || $registro['valores_nuevos'] || $registro['user_agent']): ?>
                                     <button type="button" class="btn btn-sm btn-info" data-toggle="modal" 
@@ -236,23 +236,23 @@ $modulos_unicos = obtenerModulosUnicos();
                                         <div class="modal-body">
                                             <div class="row mb-3">
                                                 <div class="col-12 col-md-6">
-                                                    <strong>Usuario:</strong> <?= htmlspecialchars($registro['usuario_nombre']) ?> (<?= htmlspecialchars($registro['usuario_cedula']) ?>)
+                                                    <strong>Usuario:</strong> <?= htmlspecialchars($registro['usuario_nombre'] ?? '') ?> (<?= htmlspecialchars($registro['usuario_cedula'] ?? '') ?>)
                                                 </div>
                                                 <div class="col-12 col-md-6">
-                                                    <strong>Acción:</strong> <span class="badge badge-primary"><?= htmlspecialchars($registro['accion']) ?></span>
+                                                    <strong>Acción:</strong> <span class="badge badge-primary"><?= htmlspecialchars($registro['accion'] ?? '') ?></span>
                                                 </div>
                                             </div>
                                             <div class="row mb-3">
                                                 <div class="col-12 col-md-6">
-                                                    <strong>Módulo:</strong> <?= htmlspecialchars($registro['modulo_sistema']) ?>
+                                                    <strong>Módulo:</strong> <?= htmlspecialchars($registro['modulo_sistema'] ?? '') ?>
                                                 </div>
                                                 <div class="col-12 col-md-6">
-                                                    <strong>Tabla:</strong> <?= htmlspecialchars($registro['tabla_afectada']) ?>
+                                                    <strong>Tabla:</strong> <?= htmlspecialchars($registro['tabla_afectada'] ?? '') ?>
                                                 </div>
                                             </div>
                                             <div class="row mb-3">
                                                 <div class="col-12">
-                                                    <strong>Descripción:</strong> <?= htmlspecialchars($registro['descripcion']) ?>
+                                                    <strong>Descripción:</strong> <?= htmlspecialchars($registro['descripcion'] ?? '') ?>
                                                 </div>
                                             </div>
                                             
@@ -282,7 +282,7 @@ $modulos_unicos = obtenerModulosUnicos();
                                                 <div class="col-12">
                                                     <h6>User Agent:</h6>
                                                     <div class="border p-2 bg-light">
-                                                        <small><?= htmlspecialchars($registro['user_agent']) ?></small>
+                                                        <small><?= htmlspecialchars($registro['user_agent'] ?? '') ?></small>
                                                     </div>
                                                 </div>
                                             </div>
