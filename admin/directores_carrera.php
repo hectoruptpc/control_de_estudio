@@ -158,7 +158,7 @@ include("includes/head.php");
                                     </h5>
                                 </div>
                                 <div class="card-body">
-                                    <p>Lista de directores de carrera (usuario = 1) con sus carreras asignadas:</p>
+                                    <p>Lista de directores de carrera con sus carreras asignadas:</p>
                                     
                                     <?php
                                     $directores = obtenerDirectoresDeCarrera();
