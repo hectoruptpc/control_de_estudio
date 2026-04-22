@@ -89,11 +89,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'search') {
     header('Content-Type: application/json');
     $q_ajax = isset($_GET['q']) ? trim($_GET['q']) : '';
+    $filter_voceros = isset($_GET['filter_voceros']) && $_GET['filter_voceros'] === '1' ? true : false;
     $pagina_ajax = isset($_GET['pagina']) ? max(1, intval($_GET['pagina'])) : 1;
     $offset_ajax = ($pagina_ajax - 1) * $registros_por_pagina;
 
     $where_ajax = "WHERE u.estudiante = 1 AND u.carrera = ?";
     $params_ajax = [$carrera_director];
+
+    // Agregar filtro de voceros si está activo
+    if ($filter_voceros) {
+        $where_ajax .= " AND u.vocero = 1";
+    }
 
     if ($q_ajax !== '') {
         $where_ajax .= " AND (u.nombre LIKE ? OR u.idusuario LIKE ? )";
@@ -148,10 +154,16 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'search') {
 
 // Consulta de listado con buscador y paginación
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
+$filter_voceros = isset($_GET['filter_voceros']) && $_GET['filter_voceros'] === '1' ? true : false;
 
 $params = [];
 $where = "WHERE u.estudiante = 1 AND u.carrera = ?";
 $params[] = $carrera_director;
+
+// Agregar filtro de voceros si está activo
+if ($filter_voceros) {
+    $where .= " AND u.vocero = 1";
+}
 
 if ($q !== '') {
     $where .= " AND (u.nombre LIKE ? OR u.idusuario LIKE ? )";
@@ -345,6 +357,11 @@ $result = $stmt->get_result();
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Estilos para el botón de filtro */
+        .btn-filter-active {
+            transition: all 0.3s ease;
+        }
     </style>
 </head>
 <body>
@@ -358,7 +375,7 @@ $result = $stmt->get_result();
             </div>
         </div>
 
-        <!-- Formulario de búsqueda -->
+        <!-- Formulario de búsqueda con filtro de voceros -->
         <form method="get" class="form-inline mb-3" id="searchForm">
             <div class="form-group mr-2 flex-grow-1">
                 <div class="input-group w-100">
@@ -370,7 +387,7 @@ $result = $stmt->get_result();
                     <input type="text" name="q" id="searchInput" value="<?= htmlspecialchars($q) ?>" class="form-control" placeholder="Buscar por nombre o cédula...">
                     <?php if ($q !== ''): ?>
                         <div class="input-group-append">
-                            <a href="asignacion_voceros.php" class="btn btn-outline-secondary">
+                            <a href="asignacion_voceros.php<?= $filter_voceros ? '?filter_voceros=1' : '' ?>" class="btn btn-outline-secondary">
                                 <i class="fas fa-times"></i> Limpiar
                             </a>
                         </div>
@@ -380,12 +397,20 @@ $result = $stmt->get_result();
             <button type="submit" class="btn btn-primary">
                 <i class="fas fa-search"></i> Buscar
             </button>
+            <!-- Botón de filtro rápido para voceros -->
+            <button type="button" id="filterVocerosBtn" class="btn ml-2 <?= $filter_voceros ? 'btn-success' : 'btn-outline-success' ?> btn-filter-active">
+                <i class="fas <?= $filter_voceros ? 'fa-eye' : 'fa-star' ?>"></i>
+                <span id="filterText"><?= $filter_voceros ? 'Mostrar todos' : 'Mostrar solo voceros' ?></span>
+            </button>
         </form>
 
         <!-- Información de paginación -->
         <div class="pagination-info d-flex justify-content-between align-items-center mb-3 flex-wrap">
             <div class="text-muted small">
                 <i class="fas fa-chart-line"></i> Mostrando <strong><?= $result->num_rows ?></strong> de <strong><?= $total_registros ?></strong> estudiantes
+                <?php if ($filter_voceros): ?>
+                    <span class="badge badge-success ml-2"><i class="fas fa-star"></i> Filtro activo: Solo voceros</span>
+                <?php endif; ?>
             </div>
             <div class="text-muted small">
                 <i class="fas fa-calendar-alt"></i> Página <strong><?= $pagina_actual ?></strong> de <strong><?= max(1, $total_paginas) ?></strong>
@@ -547,14 +572,19 @@ $result = $stmt->get_result();
     </div>
 
     <script>
-    // Búsqueda en tiempo real con debounce y paginación
+    // Búsqueda en tiempo real con debounce, paginación y filtro de voceros
     (function(){
         var timer = null;
         var input = document.querySelector('#searchInput');
         var tbody = document.querySelector('#tableBody');
         var tableContainer = document.querySelector('#tableContainer');
-        var currentPage = 1;
+        var currentPage = <?= $pagina_actual ?>;
         var isLoading = false;
+        var filterVocerosActive = <?= $filter_voceros ? 'true' : 'false' ?>;
+        
+        // Botón de filtro
+        var filterBtn = document.querySelector('#filterVocerosBtn');
+        var filterText = document.querySelector('#filterText');
         
         function escapeHtml(str){ 
             return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); 
@@ -562,6 +592,24 @@ $result = $stmt->get_result();
         
         function escapeHtmlAttr(str){ 
             return (str||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); 
+        }
+        
+        // Función para actualizar la URL con el estado del filtro
+        function updateUrlFilter() {
+            var url = new URL(window.location.href);
+            if (filterVocerosActive) {
+                url.searchParams.set('filter_voceros', '1');
+            } else {
+                url.searchParams.delete('filter_voceros');
+            }
+            // Mantener el parámetro de búsqueda si existe
+            var searchQuery = input ? input.value.trim() : '';
+            if (searchQuery) {
+                url.searchParams.set('q', searchQuery);
+            } else {
+                url.searchParams.delete('q');
+            }
+            window.history.pushState({}, '', url);
         }
         
         function renderPagination(paginationData, searchTerm) {
@@ -573,7 +621,6 @@ $result = $stmt->get_result();
             
             var currentPageNum = paginationData.current_page;
             var totalPages = paginationData.total_pages;
-            var baseUrl = 'asignacion_voceros.php?ajax=search&q=' + encodeURIComponent(searchTerm || '');
             
             var html = '<nav aria-label="Navegación de páginas" class="mt-3"><ul class="pagination justify-content-center">';
             
@@ -658,8 +705,9 @@ $result = $stmt->get_result();
             if (data.pagination) {
                 var infoDiv = document.querySelector('.pagination-info');
                 if (infoDiv) {
+                    var filterBadge = filterVocerosActive ? '<span class="badge badge-success ml-2"><i class="fas fa-star"></i> Filtro activo: Solo voceros</span>' : '';
                     infoDiv.innerHTML = `
-                        <div class="text-muted small"><i class="fas fa-chart-line"></i> Mostrando <strong>${data.rows.length}</strong> de <strong>${data.pagination.total_records}</strong> estudiantes</div>
+                        <div class="text-muted small"><i class="fas fa-chart-line"></i> Mostrando <strong>${data.rows.length}</strong> de <strong>${data.pagination.total_records}</strong> estudiantes ${filterBadge}</div>
                         <div class="text-muted small"><i class="fas fa-calendar-alt"></i> Página <strong>${data.pagination.current_page}</strong> de <strong>${data.pagination.total_pages}</strong></div>
                     `;
                 }
@@ -672,7 +720,7 @@ $result = $stmt->get_result();
             isLoading = true;
             
             currentPage = page || 1;
-            var url = 'asignacion_voceros.php?ajax=search&q=' + encodeURIComponent(query) + '&pagina=' + currentPage;
+            var url = 'asignacion_voceros.php?ajax=search&q=' + encodeURIComponent(query) + '&pagina=' + currentPage + '&filter_voceros=' + (filterVocerosActive ? '1' : '0');
             
             // Mostrar indicador de carga
             tableContainer.classList.add('loading-overlay');
@@ -690,6 +738,32 @@ $result = $stmt->get_result();
             });
         }
         
+        // Función para alternar el filtro de voceros
+        function toggleFilterVoceros() {
+            filterVocerosActive = !filterVocerosActive;
+            
+            if (filterVocerosActive) {
+                filterBtn.classList.remove('btn-outline-success');
+                filterBtn.classList.add('btn-success');
+                filterBtn.innerHTML = '<i class="fas fa-eye"></i> <span id="filterText">Mostrar todos</span>';
+                filterText = document.querySelector('#filterText');
+            } else {
+                filterBtn.classList.remove('btn-success');
+                filterBtn.classList.add('btn-outline-success');
+                filterBtn.innerHTML = '<i class="fas fa-star"></i> <span id="filterText">Mostrar solo voceros</span>';
+                filterText = document.querySelector('#filterText');
+            }
+            
+            updateUrlFilter();
+            loadSearchResults(input ? input.value.trim() : '', 1);
+        }
+        
+        // Evento del botón de filtro
+        if (filterBtn) {
+            filterBtn.addEventListener('click', toggleFilterVoceros);
+        }
+        
+        // Búsqueda en tiempo real
         if (input) {
             input.addEventListener('input', function(){
                 clearTimeout(timer);
