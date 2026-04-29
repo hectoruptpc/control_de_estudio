@@ -45,11 +45,7 @@ include('funciones/functions.php');
                     <i class="fa fa-unlock-alt"></i> Recuperar Contraseña provicional
                 </a>
             </span>
-            <span class="d-inline-block" data-toggle="popover" data-content="...">
-                <a id="afiliarse" class="btn btn-outline-success" href="registro.php">
-                    <i class="fas fa-key"></i> Afiliarse al Servicio
-                </a>
-            </span>
+            
         </div>
     </nav>
 
