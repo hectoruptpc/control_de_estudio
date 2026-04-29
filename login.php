@@ -37,6 +37,21 @@ include('funciones/functions.php');
 
 <nav class="nav nav-pills justify-content-end"> 
         <div class="btn-group-horizontal" >
+            <!-- Botón de Preinscripción -->
+            <span class="d-inline-block" data-toggle="popover" data-content="Complete el formulario de preinscripción para iniciar su proceso de admisión.">
+                <a type="link" class="btn btn-outline-success" href="preinscripcion.php">
+                    <i class="fa fa-edit"></i> Preinscripción
+                </a>
+            </span>
+            
+            <!-- Botón de Prosecución -->
+            <span class="d-inline-block" data-toggle="popover" data-content="Continúe con su proceso de prosecución académica.">
+                <a type="link" class="btn btn-outline-info" href="prosecucion.php">
+                    <i class="fa fa-graduation-cap"></i> Prosecución
+                </a>
+            </span>
+            
+            <!-- Botones de Recuperar Contraseña -->
             <span class="d-inline-block" data-toggle="popover" data-content="...">
                 <a type="link" class="btn btn-outline-danger" href="recuperar_password.php">
                     <i class="fa fa-unlock-alt"></i> Recuperar Contraseña
@@ -101,9 +116,3 @@ unset($_SESSION['msg']);
 </div>
 
 <hr>
-
-
-
-
-
-
