@@ -443,7 +443,7 @@ document.addEventListener('DOMContentLoaded', function() {
         function actualizarCedulaCompleta() {
             const numeroLimpio = numeroCedula.value.replace(/[^0-9]/g, '');
             numeroCedula.value = numeroLimpio;
-            idUsuario.value = tipoCedula.value + '-' + numeroLimpio;
+            idUsuario.value = tipoCedula.value + numeroLimpio;
         }
         
         tipoCedula.addEventListener('change', actualizarCedulaCompleta);

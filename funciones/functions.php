@@ -862,6 +862,23 @@ function preinscripcionPendienteExiste($idusuario) {
     return isset($row['count']) && (int)$row['count'] > 0;
 }
 
+function obtenerPreinscripcionRechazada($idusuario) {
+    global $db;
+
+    $query = "SELECT * FROM preinscripcion WHERE idusuario = ? AND status = 'Rechazada' ORDER BY id DESC LIMIT 1";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param('s', $idusuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    return $row ?: null;
+}
+
 /**
  * Inserta una preinscripción en la tabla preinscripcion
  */
@@ -889,6 +906,7 @@ function insertarPreinscripcion($datos) {
         ];
     }
 
+    $preinscripcionRechazada = obtenerPreinscripcionRechazada($datos['idusuario']);
     $fotoPerfil = '';
     $fechaAct = date('Y-m-d H:i:s');
     $datos['status'] = $datos['status'] ?? 'Pendiente';
@@ -962,18 +980,47 @@ function insertarPreinscripcion($datos) {
             $valoresBind[] = $valor;
         }
 
-        $sql = "INSERT INTO preinscripcion (`" . implode('`, `', $columnas) . "`) VALUES (" . implode(', ', $placeholders) . ")";
-        $stmt = $db->prepare($sql);
-        if (!$stmt) {
-            throw new Exception('Error al preparar consulta de preinscripción: ' . $db->error);
-        }
-        $stmt->bind_param($tipos, ...$valoresBind);
-        if (!$stmt->execute()) {
-            throw new Exception('Error al guardar la preinscripción: ' . $stmt->error);
+        if ($preinscripcionRechazada) {
+            $updateColumns = [];
+            $updateValues = [];
+            $updateTypes = '';
+            foreach ($valores as $key => $valor) {
+                if ($key === 'created_at' || $key === 'updated_at') {
+                    continue;
+                }
+                $updateColumns[] = "`$key` = ?";
+                $updateTypes .= is_int($valor) ? 'i' : 's';
+                $updateValues[] = $valor;
+            }
+
+            $updateValues[] = $preinscripcionRechazada['id'];
+            $updateTypes .= 'i';
+
+            $sql = "UPDATE preinscripcion SET " . implode(', ', $updateColumns) . " WHERE id = ?";
+            $stmt = $db->prepare($sql);
+            if (!$stmt) {
+                throw new Exception('Error al preparar actualización de preinscripción: ' . $db->error);
+            }
+            $stmt->bind_param($updateTypes, ...$updateValues);
+            if (!$stmt->execute()) {
+                throw new Exception('Error al actualizar la preinscripción rechazada: ' . $stmt->error);
+            }
+            $preinscripcionId = $preinscripcionRechazada['id'];
+            $stmt->close();
+        } else {
+            $sql = "INSERT INTO preinscripcion (`" . implode('`, `', $columnas) . ") VALUES (" . implode(', ', $placeholders) . ")";
+            $stmt = $db->prepare($sql);
+            if (!$stmt) {
+                throw new Exception('Error al preparar consulta de preinscripción: ' . $db->error);
+            }
+            $stmt->bind_param($tipos, ...$valoresBind);
+            if (!$stmt->execute()) {
+                throw new Exception('Error al guardar la preinscripción: ' . $stmt->error);
+            }
+            $preinscripcionId = $stmt->insert_id;
+            $stmt->close();
         }
 
-        $preinscripcionId = $stmt->insert_id;
-        $stmt->close();
         $db->commit();
 
         return [
@@ -1002,12 +1049,24 @@ function insertarPreinscripcion($datos) {
 /**
  * Obtiene las preinscripciones pendientes
  */
-function obtenerPreinscripcionesPendientes() {
+function obtenerPreinscripcionesPendientes($busqueda = null) {
     global $db;
 
     $preinscripciones = [];
-    $query = "SELECT * FROM preinscripcion WHERE status = 'Pendiente' ORDER BY fecha_ingreso DESC";
+    $busqueda = trim((string)$busqueda);
+    $query = "SELECT * FROM preinscripcion WHERE status = 'Pendiente'";
+
+    if ($busqueda !== '') {
+        $query .= " AND (idusuario LIKE ? OR nombre LIKE ? OR username LIKE ? OR email LIKE ? OR tlf LIKE ? OR cel LIKE ? OR direccion LIKE ? OR punto_referencia LIKE ? OR potencialidades LIKE ? OR estado LIKE ? OR municipio LIKE ? OR parroquia LIKE ? )";
+    }
+
+    $query .= " ORDER BY fecha_ingreso DESC";
+
     if ($stmt = $db->prepare($query)) {
+        if ($busqueda !== '') {
+            $like = '%' . $busqueda . '%';
+            $stmt->bind_param('ssssssssssss', $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like);
+        }
         $stmt->execute();
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {

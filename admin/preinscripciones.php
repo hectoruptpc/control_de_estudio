@@ -31,20 +31,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$preinscripciones = obtenerPreinscripcionesPendientes();
+$busqueda = trim($_GET['busqueda'] ?? '');
+$preinscripciones = obtenerPreinscripcionesPendientes($busqueda);
 $carreras = obtenerTodasLasCarreras();
 $carreraMap = [];
 foreach ($carreras as $carrera) {
     $carreraMap[$carrera['id']] = $carrera['nombre'];
 }
 
+$titulopag = 'Preinscripciones pendientes';
 include('includes/head.php');
 ?>
 
 <div class="container-fluid py-4">
-    <div class="row">
-        <div class="col-12">
+    <div class="row mb-3">
+        <div class="col-12 col-md-8">
             <h2 class="mb-4"><i class="fas fa-file-signature me-2"></i> Preinscripciones Pendientes</h2>
+        </div>
+        <div class="col-12 col-md-4">
+            <form method="get" action="preinscripciones.php" class="mb-3">
+                <div class="input-group">
+                    <input id="searchInput" type="search" name="busqueda" class="form-control" placeholder="Buscar por cédula, nombre, email, teléfono..." value="<?php echo htmlspecialchars($busqueda); ?>">
+                    <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> Buscar</button>
+                    <a href="preinscripciones.php" class="btn btn-secondary"><i class="fas fa-times"></i> Limpiar</a>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -70,7 +81,7 @@ include('includes/head.php');
         <div class="alert alert-info">No hay preinscripciones pendientes por revisar.</div>
     <?php else: ?>
         <div class="table-responsive">
-            <table class="table table-bordered table-hover align-middle">
+            <table id="preinscripcionesTable" class="table table-bordered table-hover align-middle">
                 <thead class="thead-light">
                     <tr>
                         <th>ID</th>
@@ -94,6 +105,9 @@ include('includes/head.php');
                             <td><?php echo htmlspecialchars($pre['tlf']); ?></td>
                             <td><?php echo htmlspecialchars($pre['fecha_ingreso']); ?></td>
                             <td>
+                                <a href="preinscripcion_detalle.php?id=<?php echo (int)$pre['id']; ?>" class="btn btn-sm btn-info mb-1">
+                                    <i class="fas fa-eye"></i> Ver planilla
+                                </a>
                                 <form method="post" class="d-inline-block mb-1">
                                     <input type="hidden" name="aceptar_id" value="<?php echo (int)$pre['id']; ?>">
                                     <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('¿Aceptar esta preinscripción y crear el usuario?');">
@@ -115,6 +129,26 @@ include('includes/head.php');
         </div>
     <?php endif; ?>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('searchInput');
+        const rows = document.querySelectorAll('#preinscripcionesTable tbody tr');
+
+        if (!searchInput || !rows.length) {
+            return;
+        }
+
+        searchInput.addEventListener('input', function() {
+            const term = this.value.toLowerCase().trim();
+
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(term) ? '' : 'none';
+            });
+        });
+    });
+</script>
 
 </body>
 </html>

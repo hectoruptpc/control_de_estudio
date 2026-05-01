@@ -23,7 +23,7 @@ $error_message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $_POST['tipo_cedula'] = $_POST['tipo_cedula'] ?? '';
     $_POST['numero_cedula'] = preg_replace('/[^0-9]/', '', $_POST['numero_cedula'] ?? '');
-    $_POST['idusuario'] = trim($_POST['tipo_cedula'] . '-' . $_POST['numero_cedula']);
+    $_POST['idusuario'] = trim($_POST['tipo_cedula'] . $_POST['numero_cedula']);
     $_POST['status'] = 'Pendiente';
     $_POST['fecha_ingreso'] = $_POST['fecha_ingreso'] ?? date('Y-m-d');
 

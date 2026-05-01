@@ -400,7 +400,7 @@ $fechaSolicitud = date('Y-m-d');
                 </div>
             </div>
         <?php else: ?>
-            <input type="hidden" name="fecha_ingreso" value="<?php echo htmlspecialchars($_POST['fecha_ingreso'] ?? $fechaSolicitud); ?>">
+            <input type="hidden" id="fecha_ingreso<?php echo $prefijo; ?>" name="fecha_ingreso" value="<?php echo htmlspecialchars($_POST['fecha_ingreso'] ?? $fechaSolicitud); ?>">
             <input type="hidden" name="status" value="<?php echo htmlspecialchars($_POST['status'] ?? 'Pendiente'); ?>">
             <div class="col-md-12">
                 <div class="alert alert-info mb-0">
@@ -517,7 +517,7 @@ document.addEventListener('DOMContentLoaded', function() {
         function actualizarCedulaCompleta() {
             const numeroLimpio = numeroCedula.value.replace(/[^0-9]/g, '');
             numeroCedula.value = numeroLimpio;
-            idUsuario.value = tipoCedula.value + '-' + numeroLimpio;
+            idUsuario.value = tipoCedula.value + numeroLimpio;
         }
         
         tipoCedula.addEventListener('change', actualizarCedulaCompleta);
@@ -1025,7 +1025,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Validar fecha de ingreso
-        const fechaIngreso = document.getElementById('fecha_ingreso' + prefijo).value;
+        const fechaIngresoElement = document.getElementById('fecha_ingreso' + prefijo);
+        const fechaIngreso = fechaIngresoElement ? fechaIngresoElement.value : '';
         if (fechaNac && fechaIngreso) {
             const fechaNacDate = new Date(fechaNac);
             const fechaIngresoDate = new Date(fechaIngreso);
