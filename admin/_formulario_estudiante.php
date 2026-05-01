@@ -61,7 +61,7 @@ $fechaSolicitud = date('Y-m-d');
         
         <div class="col-md-6">
             <div class="mb-3">
-                <label for="nombre<?php echo $prefijo; ?>" class="form-label required">Nombre Completo</label>
+                <label for="nombre<?php echo $prefijo; ?>" class="form-label required">Apellidos y nombres</label>
                 <input type="text" class="form-control" id="nombre<?php echo $prefijo; ?>" name="nombre" required value="<?php echo htmlspecialchars($_POST['nombre'] ?? ''); ?>">
             </div>
         </div>
