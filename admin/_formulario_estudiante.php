@@ -27,9 +27,11 @@ if (!isset($estados)) {
 
 // Determinar si estamos en modo modal
 $esModal = isset($esModal) ? $esModal : false;
+$modo_preinscripcion = isset($modo_preinscripcion) ? $modo_preinscripcion : false;
 $formId = $esModal ? 'formEstudianteModal' : 'formEstudiante';
 $prefijo = $esModal ? '_modal' : '';
-$actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["PHP_SELF"]);
+$actionUrl = $modo_preinscripcion ? 'preinscripcion.php' : ($esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["PHP_SELF"]));
+$fechaSolicitud = date('Y-m-d');
 ?>
 
 <form id="<?php echo $formId; ?>" method="post" action="<?php echo $actionUrl; ?>" enctype="multipart/form-data">
@@ -45,13 +47,13 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
                             <?php 
                             $tipoLetra = substr($tipo['tipo'], 0, 1);
                             ?>
-                            <option value="<?php echo htmlspecialchars($tipoLetra); ?>">
+                            <option value="<?php echo htmlspecialchars($tipoLetra); ?>" <?php echo (isset($_POST['tipo_cedula']) && $_POST['tipo_cedula'] === $tipoLetra) ? 'selected' : ''; ?>>
                                 <?php echo htmlspecialchars($tipoLetra); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <input type="text" class="form-control" id="numero_cedula<?php echo $prefijo; ?>" name="numero_cedula" placeholder="Ej: 12345678" required>
-                    <input type="hidden" id="idusuario<?php echo $prefijo; ?>" name="idusuario">
+                    <input type="text" class="form-control" id="numero_cedula<?php echo $prefijo; ?>" name="numero_cedula" placeholder="Ej: 12345678" required value="<?php echo htmlspecialchars($_POST['numero_cedula'] ?? ''); ?>">
+                    <input type="hidden" id="idusuario<?php echo $prefijo; ?>" name="idusuario" value="<?php echo htmlspecialchars($_POST['idusuario'] ?? ''); ?>">
                 </div>
                 <small class="text-muted">Formato: V-12345678 o E-12345678</small>
             </div>
@@ -60,7 +62,7 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
         <div class="col-md-6">
             <div class="mb-3">
                 <label for="nombre<?php echo $prefijo; ?>" class="form-label required">Nombre Completo</label>
-                <input type="text" class="form-control" id="nombre<?php echo $prefijo; ?>" name="nombre" required>
+                <input type="text" class="form-control" id="nombre<?php echo $prefijo; ?>" name="nombre" required value="<?php echo htmlspecialchars($_POST['nombre'] ?? ''); ?>">
             </div>
         </div>
     </div>
@@ -83,22 +85,22 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
 
             <div class="mb-3">
                 <label for="fecha_nac<?php echo $prefijo; ?>" class="form-label required">Fecha de Nacimiento</label>
-                <input type="date" class="form-control" id="fecha_nac<?php echo $prefijo; ?>" name="fecha_nac" required>
+                <input type="date" class="form-control" id="fecha_nac<?php echo $prefijo; ?>" name="fecha_nac" required value="<?php echo htmlspecialchars($_POST['fecha_nac'] ?? ''); ?>">
             </div>
             
             <div class="mb-3">
                 <label class="form-label required">Género</label>
                 <div>
                     <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="genero" id="genero_m<?php echo $prefijo; ?>" value="Masculino" required>
+                        <input class="form-check-input" type="radio" name="genero" id="genero_m<?php echo $prefijo; ?>" value="Masculino" required <?php echo (isset($_POST['genero']) && $_POST['genero'] === 'Masculino') ? 'checked' : ''; ?>>
                         <label class="form-check-label" for="genero_m<?php echo $prefijo; ?>">Masculino</label>
                     </div>
                     <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="genero" id="genero_f<?php echo $prefijo; ?>" value="Femenino">
+                        <input class="form-check-input" type="radio" name="genero" id="genero_f<?php echo $prefijo; ?>" value="Femenino" <?php echo (isset($_POST['genero']) && $_POST['genero'] === 'Femenino') ? 'checked' : ''; ?> >
                         <label class="form-check-label" for="genero_f<?php echo $prefijo; ?>">Femenino</label>
                     </div>
                     <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="genero" id="genero_o<?php echo $prefijo; ?>" value="Otro">
+                        <input class="form-check-input" type="radio" name="genero" id="genero_o<?php echo $prefijo; ?>" value="Otro" <?php echo (isset($_POST['genero']) && $_POST['genero'] === 'Otro') ? 'checked' : ''; ?> >
                         <label class="form-check-label" for="genero_o<?php echo $prefijo; ?>">Otro</label>
                     </div>
                 </div>
@@ -108,11 +110,11 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
                 <label class="form-label">¿Está embarazada?</label>
                 <div>
                     <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="embarazada" id="embarazada_si<?php echo $prefijo; ?>" value="1">
+                        <input class="form-check-input" type="radio" name="embarazada" id="embarazada_si<?php echo $prefijo; ?>" value="1" <?php echo (isset($_POST['embarazada']) && $_POST['embarazada'] == '1') ? 'checked' : ''; ?>>
                         <label class="form-check-label" for="embarazada_si<?php echo $prefijo; ?>">Sí</label>
                     </div>
                     <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="embarazada" id="embarazada_no<?php echo $prefijo; ?>" value="0" checked>
+                        <input class="form-check-input" type="radio" name="embarazada" id="embarazada_no<?php echo $prefijo; ?>" value="0" <?php echo (!isset($_POST['embarazada']) || $_POST['embarazada'] === '0') ? 'checked' : ''; ?>>
                         <label class="form-check-label" for="embarazada_no<?php echo $prefijo; ?>">No</label>
                     </div>
                 </div>
@@ -125,7 +127,7 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
                 <select class="custom-select" id="edo_civil<?php echo $prefijo; ?>" name="edo_civil" required>
                     <option value="" selected disabled>Seleccione una opción</option>
                     <?php foreach ($estadosCiviles as $id => $estadoCivil): ?>
-                        <option value="<?php echo htmlspecialchars($estadoCivil); ?>"><?php echo htmlspecialchars($estadoCivil); ?></option>
+                        <option value="<?php echo htmlspecialchars($estadoCivil); ?>" <?php echo (isset($_POST['edo_civil']) && $_POST['edo_civil'] === $estadoCivil) ? 'selected' : ''; ?>><?php echo htmlspecialchars($estadoCivil); ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -135,11 +137,11 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
                 <label class="form-label">¿Pertenece a alguna etnia?</label>
                 <div>
                     <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="posee_etnia" id="etnia_no<?php echo $prefijo; ?>" value="no" checked>
+                        <input class="form-check-input" type="radio" name="posee_etnia" id="etnia_no<?php echo $prefijo; ?>" value="no" <?php echo (!isset($_POST['posee_etnia']) || $_POST['posee_etnia'] === 'no') ? 'checked' : ''; ?>>
                         <label class="form-check-label" for="etnia_no<?php echo $prefijo; ?>">No</label>
                     </div>
                     <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="posee_etnia" id="etnia_si<?php echo $prefijo; ?>" value="si">
+                        <input class="form-check-input" type="radio" name="posee_etnia" id="etnia_si<?php echo $prefijo; ?>" value="si" <?php echo (isset($_POST['posee_etnia']) && $_POST['posee_etnia'] === 'si') ? 'checked' : ''; ?>>
                         <label class="form-check-label" for="etnia_si<?php echo $prefijo; ?>">Sí</label>
                     </div>
                 </div>
@@ -147,7 +149,7 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
             
             <div class="mb-3" id="etniaContainer<?php echo $prefijo; ?>" style="display: none;">
                 <label for="etnia<?php echo $prefijo; ?>" class="form-label">Especifique la etnia</label>
-                <input type="text" class="form-control" id="etnia<?php echo $prefijo; ?>" name="etnia" placeholder="Ej: Wayúu, Añú, etc.">
+                <input type="text" class="form-control" id="etnia<?php echo $prefijo; ?>" name="etnia" placeholder="Ej: Wayúu, Añú, etc." value="<?php echo htmlspecialchars($_POST['etnia'] ?? ''); ?>">
                 <small class="text-muted">Indique el nombre de la etnia a la que pertenece</small>
             </div>
         </div>
@@ -162,7 +164,7 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
                 <select name="carrera" id="carrera<?php echo $prefijo; ?>" class="form-control" required>
                     <option value="">-- Seleccione una carrera --</option>
                     <?php foreach ($carreras as $carrera): ?>
-                        <option value="<?php echo htmlspecialchars($carrera['id']); ?>">
+                        <option value="<?php echo htmlspecialchars($carrera['id']); ?>" <?php echo (isset($_POST['carrera']) && $_POST['carrera'] == $carrera['id']) ? 'selected' : ''; ?>>
                             <?php echo htmlspecialchars($carrera['nombre']); ?>
                         </option>
                     <?php endforeach; ?>
@@ -205,7 +207,7 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
                 <select class="form-control" id="estado<?php echo $prefijo; ?>" name="estado" required>
                     <option value="">Seleccione un estado</option>
                     <?php foreach ($estados as $estado): ?>
-                        <option value="<?php echo htmlspecialchars($estado['id_estado']); ?>">
+                        <option value="<?php echo htmlspecialchars($estado['id_estado']); ?>" <?php echo (isset($_POST['estado']) && $_POST['estado'] == $estado['id_estado']) ? 'selected' : ''; ?>>
                             <?php echo htmlspecialchars($estado['estado']); ?>
                         </option>
                     <?php endforeach; ?>
@@ -235,7 +237,7 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
         <div class="col-md-6">
             <div class="mb-3">
                 <label for="direccion<?php echo $prefijo; ?>" class="form-label required">Dirección</label>
-                <textarea class="form-control" id="direccion<?php echo $prefijo; ?>" name="direccion" rows="2" required></textarea>
+                <textarea class="form-control" id="direccion<?php echo $prefijo; ?>" name="direccion" rows="2" required><?php echo htmlspecialchars($_POST['direccion'] ?? ''); ?></textarea>
             </div>
             
             <div class="mb-3">
@@ -243,14 +245,14 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
                 <select class="form-control" id="casaapto<?php echo $prefijo; ?>" name="casaapto">
                     <option value="">Seleccione...</option>
                     <?php foreach ($tiposVivienda as $id => $vivienda): ?>
-                        <option value="<?php echo htmlspecialchars($vivienda); ?>"><?php echo htmlspecialchars($vivienda); ?></option>
+                        <option value="<?php echo htmlspecialchars($vivienda); ?>" <?php echo (isset($_POST['casaapto']) && $_POST['casaapto'] === $vivienda) ? 'selected' : ''; ?>><?php echo htmlspecialchars($vivienda); ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
             
             <div class="mb-3">
                 <label for="punto_referencia<?php echo $prefijo; ?>" class="form-label">Punto de Referencia</label>
-                <input type="text" class="form-control" id="punto_referencia<?php echo $prefijo; ?>" name="punto_referencia">
+                <input type="text" class="form-control" id="punto_referencia<?php echo $prefijo; ?>" name="punto_referencia" value="<?php echo htmlspecialchars($_POST['punto_referencia'] ?? ''); ?>">
             </div>
         </div>
     </div>
@@ -306,11 +308,11 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
                 <label class="form-label">¿Posee alguna discapacidad?</label>
                 <div>
                     <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="posee_discapacidad" id="discapacidad_no<?php echo $prefijo; ?>" value="no" checked>
+                        <input class="form-check-input" type="radio" name="posee_discapacidad" id="discapacidad_no<?php echo $prefijo; ?>" value="no" <?php echo (!isset($_POST['posee_discapacidad']) || $_POST['posee_discapacidad'] === 'no') ? 'checked' : ''; ?>>
                         <label class="form-check-label" for="discapacidad_no<?php echo $prefijo; ?>">No</label>
                     </div>
                     <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="posee_discapacidad" id="discapacidad_si<?php echo $prefijo; ?>" value="si">
+                        <input class="form-check-input" type="radio" name="posee_discapacidad" id="discapacidad_si<?php echo $prefijo; ?>" value="si" <?php echo (isset($_POST['posee_discapacidad']) && $_POST['posee_discapacidad'] === 'si') ? 'checked' : ''; ?>>
                         <label class="form-check-label" for="discapacidad_si<?php echo $prefijo; ?>">Sí</label>
                     </div>
                 </div>
@@ -329,11 +331,11 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
                 <label class="form-label">¿Posee alguna enfermedad?</label>
                 <div>
                     <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="posee_enfermedad" id="enfermedad_no<?php echo $prefijo; ?>" value="no" checked>
+                        <input class="form-check-input" type="radio" name="posee_enfermedad" id="enfermedad_no<?php echo $prefijo; ?>" value="no" <?php echo (!isset($_POST['posee_enfermedad']) || $_POST['posee_enfermedad'] === 'no') ? 'checked' : ''; ?>>
                         <label class="form-check-label" for="enfermedad_no<?php echo $prefijo; ?>">No</label>
                     </div>
                     <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="posee_enfermedad" id="enfermedad_si<?php echo $prefijo; ?>" value="si">
+                        <input class="form-check-input" type="radio" name="posee_enfermedad" id="enfermedad_si<?php echo $prefijo; ?>" value="si" <?php echo (isset($_POST['posee_enfermedad']) && $_POST['posee_enfermedad'] === 'si') ? 'checked' : ''; ?>>
                         <label class="form-check-label" for="enfermedad_si<?php echo $prefijo; ?>">Sí</label>
                     </div>
                 </div>
@@ -353,24 +355,24 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
         <div class="col-md-6">
             <div class="mb-3">
                 <label for="tlf<?php echo $prefijo; ?>" class="form-label required">Teléfono Principal</label>
-                <input type="tel" class="form-control" id="tlf<?php echo $prefijo; ?>" name="tlf" required>
+                <input type="tel" class="form-control" id="tlf<?php echo $prefijo; ?>" name="tlf" required value="<?php echo htmlspecialchars($_POST['tlf'] ?? ''); ?>">
             </div>
             
             <div class="mb-3">
                 <label for="cel<?php echo $prefijo; ?>" class="form-label">Teléfono Celular</label>
-                <input type="tel" class="form-control" id="cel<?php echo $prefijo; ?>" name="cel">
+                <input type="tel" class="form-control" id="cel<?php echo $prefijo; ?>" name="cel" value="<?php echo htmlspecialchars($_POST['cel'] ?? ''); ?>">
             </div>
         </div>
         
         <div class="col-md-6">
             <div class="mb-3">
                 <label for="email<?php echo $prefijo; ?>" class="form-label required">Correo Electrónico</label>
-                <input type="email" class="form-control" id="email<?php echo $prefijo; ?>" name="email" required>
+                <input type="email" class="form-control" id="email<?php echo $prefijo; ?>" name="email" required value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>">
             </div>
             
             <div class="mb-3">
                 <label for="num_telf_opc<?php echo $prefijo; ?>" class="form-label">Teléfono Opcional</label>
-                <input type="tel" class="form-control" id="num_telf_opc<?php echo $prefijo; ?>" name="num_telf_opc">
+                <input type="tel" class="form-control" id="num_telf_opc<?php echo $prefijo; ?>" name="num_telf_opc" value="<?php echo htmlspecialchars($_POST['num_telf_opc'] ?? ''); ?>">
             </div>
         </div>
     </div>
@@ -378,24 +380,34 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
     <!-- Sección 8: Datos del Sistema -->
     <h5 class="mb-3"><i class="fas fa-university mr-2"></i> Datos del Sistema</h5>
     <div class="row g-3">
-        <div class="col-md-6">
-            <div class="mb-3">
-                <label for="fecha_ingreso<?php echo $prefijo; ?>" class="form-label required">Fecha de Ingreso</label>
-                <input type="date" class="form-control" id="fecha_ingreso<?php echo $prefijo; ?>" name="fecha_ingreso" required>
+        <?php if (!$modo_preinscripcion): ?>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="fecha_ingreso<?php echo $prefijo; ?>" class="form-label required">Fecha de Ingreso</label>
+                    <input type="date" class="form-control" id="fecha_ingreso<?php echo $prefijo; ?>" name="fecha_ingreso" value="<?php echo htmlspecialchars($_POST['fecha_ingreso'] ?? ''); ?>" required>
+                </div>
             </div>
-        </div>
-        
-        <div class="col-md-6">
-            <div class="mb-3">
-                <label for="status<?php echo $prefijo; ?>" class="form-label required">Status</label>
-                <select class="custom-select" id="status<?php echo $prefijo; ?>" name="status" required>
-                    <option value="" selected disabled>Seleccione un status</option>
-                    <?php foreach ($opcionesStatus as $valor => $texto): ?>
-                        <option value="<?php echo htmlspecialchars($valor); ?>"><?php echo htmlspecialchars($texto); ?></option>
-                    <?php endforeach; ?>
-                </select>
+            
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="status<?php echo $prefijo; ?>" class="form-label required">Status</label>
+                    <select class="custom-select" id="status<?php echo $prefijo; ?>" name="status" required>
+                        <option value="" selected disabled>Seleccione un status</option>
+                        <?php foreach ($opcionesStatus as $valor => $texto): ?>
+                            <option value="<?php echo htmlspecialchars($valor); ?>" <?php echo (isset($_POST['status']) && $_POST['status'] == $valor) ? 'selected' : ''; ?>><?php echo htmlspecialchars($texto); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
             </div>
-        </div>
+        <?php else: ?>
+            <input type="hidden" name="fecha_ingreso" value="<?php echo htmlspecialchars($_POST['fecha_ingreso'] ?? $fechaSolicitud); ?>">
+            <input type="hidden" name="status" value="<?php echo htmlspecialchars($_POST['status'] ?? 'Pendiente'); ?>">
+            <div class="col-md-12">
+                <div class="alert alert-info mb-0">
+                    Su preinscripción se registrará con fecha de solicitud <strong><?php echo htmlspecialchars($_POST['fecha_ingreso'] ?? $fechaSolicitud); ?></strong> y quedará como <strong>Pendiente</strong> hasta revisión administrativa.
+                </div>
+            </div>
+        <?php endif; ?>
     </div>
 
     <div class="d-flex justify-content-between mt-4">
@@ -568,6 +580,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const estadoSelect = document.getElementById('estado' + prefijo);
     const municipioSelect = document.getElementById('municipio' + prefijo);
     const parroquiaSelect = document.getElementById('parroquia' + prefijo);
+    const apiBase = '<?php echo isset($modo_preinscripcion) && $modo_preinscripcion ? 'admin/' : ''; ?>';
     
     // Campos ocultos para nombres
     const nombreEstadoInput = document.getElementById('nombre_estado' + prefijo);
@@ -635,11 +648,11 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // ========== FUNCIÓN: Cargar Municipios ==========
-    function cargarMunicipios(estadoId) {
+    function cargarMunicipios(estadoId, selectedMunicipioId = '', selectedParroquiaId = '') {
         const formData = new FormData();
         formData.append('estado_id', estadoId);
         
-        fetch('api/obtener_municipios.php', {
+        fetch(apiBase + 'api/obtener_municipios.php', {
             method: 'POST',
             body: formData
         })
@@ -653,6 +666,15 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success && data.municipios) {
                 updateSelect(municipioSelect, data.municipios, 'Seleccione un municipio', false);
                 municipioSelect.disabled = false;
+                if (selectedMunicipioId) {
+                    municipioSelect.value = selectedMunicipioId;
+                    if (municipioSelect.value === selectedMunicipioId && nombreMunicipioInput) {
+                        nombreMunicipioInput.value = municipioSelect.options[municipioSelect.selectedIndex]?.text || '';
+                    }
+                    if (selectedMunicipioId) {
+                        cargarParroquias(selectedMunicipioId, selectedParroquiaId);
+                    }
+                }
             } else {
                 resetSelect(municipioSelect, 'No hay municipios disponibles', false);
                 municipioSelect.disabled = false;
@@ -662,19 +684,27 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error al cargar municipios:', error);
             resetSelect(municipioSelect, 'Error al cargar municipios', true);
             
-            // Intentar método alternativo (GET)
-            cargarMunicipiosAlternativo(estadoId);
+            cargarMunicipiosAlternativo(estadoId, selectedMunicipioId, selectedParroquiaId);
         });
     }
     
     // Método alternativo GET
-    function cargarMunicipiosAlternativo(estadoId) {
-        fetch('api/obtener_municipios.php?estado_id=' + estadoId)
+    function cargarMunicipiosAlternativo(estadoId, selectedMunicipioId = '', selectedParroquiaId = '') {
+        fetch(apiBase + 'api/obtener_municipios.php?estado_id=' + estadoId)
         .then(response => response.json())
         .then(data => {
             if (data.success && data.municipios) {
                 updateSelect(municipioSelect, data.municipios, 'Seleccione un municipio', false);
                 municipioSelect.disabled = false;
+                if (selectedMunicipioId) {
+                    municipioSelect.value = selectedMunicipioId;
+                    if (municipioSelect.value === selectedMunicipioId && nombreMunicipioInput) {
+                        nombreMunicipioInput.value = municipioSelect.options[municipioSelect.selectedIndex]?.text || '';
+                    }
+                    if (selectedMunicipioId) {
+                        cargarParroquias(selectedMunicipioId, selectedParroquiaId);
+                    }
+                }
             } else {
                 resetSelect(municipioSelect, 'No hay municipios disponibles', false);
                 municipioSelect.disabled = false;
@@ -687,11 +717,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // ========== FUNCIÓN: Cargar Parroquias ==========
-    function cargarParroquias(municipioId) {
+    function cargarParroquias(municipioId, selectedParroquiaId = '') {
         const formData = new FormData();
         formData.append('municipio_id', municipioId);
         
-        fetch('api/obtener_parroquias.php', {
+        fetch(apiBase + 'api/obtener_parroquias.php', {
             method: 'POST',
             body: formData
         })
@@ -700,6 +730,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success && data.parroquias && data.parroquias.length > 0) {
                 updateSelect(parroquiaSelect, data.parroquias, 'Seleccione una parroquia (opcional)', false);
                 parroquiaSelect.disabled = false;
+                if (selectedParroquiaId) {
+                    parroquiaSelect.value = selectedParroquiaId;
+                    if (parroquiaSelect.value === selectedParroquiaId && nombreParroquiaInput) {
+                        nombreParroquiaInput.value = parroquiaSelect.options[parroquiaSelect.selectedIndex]?.text || '';
+                    }
+                }
             } else {
                 resetSelect(parroquiaSelect, 'No hay parroquias disponibles', false);
                 parroquiaSelect.disabled = false;
@@ -710,13 +746,18 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error al cargar parroquias:', error);
             resetSelect(parroquiaSelect, 'Error de conexión', true);
             
-            // Intentar método alternativo
-            fetch('api/obtener_parroquias.php?municipio_id=' + municipioId)
+            fetch(apiBase + 'api/obtener_parroquias.php?municipio_id=' + municipioId)
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.parroquias) {
                     updateSelect(parroquiaSelect, data.parroquias, 'Seleccione una parroquia (opcional)', false);
                     parroquiaSelect.disabled = false;
+                    if (selectedParroquiaId) {
+                        parroquiaSelect.value = selectedParroquiaId;
+                        if (parroquiaSelect.value === selectedParroquiaId && nombreParroquiaInput) {
+                            nombreParroquiaInput.value = parroquiaSelect.options[parroquiaSelect.selectedIndex]?.text || '';
+                        }
+                    }
                 } else {
                     resetSelect(parroquiaSelect, 'No hay parroquias disponibles', false);
                     parroquiaSelect.disabled = false;
@@ -767,11 +808,22 @@ document.addEventListener('DOMContentLoaded', function() {
         selectElement.disabled = disabled;
     }
     
-    // ========== FUNCIÓN: Cargar Datos si Estamos Editando ==========
+    // ========== FUNCIÓN: Cargar Datos si Estamos Editando O Reenviando ==========
     function cargarDatosUbicacionSiExisten() {
-        <?php if (isset($estudiante_edit) && $estudiante_edit): ?>
-            // Código para cargar datos existentes (comentado por defecto)
-        <?php endif; ?>
+        const selectedEstadoId = <?php echo json_encode($_POST['estado'] ?? ''); ?>;
+        const selectedMunicipioId = <?php echo json_encode($_POST['municipio'] ?? ''); ?>;
+        const selectedParroquiaId = <?php echo json_encode($_POST['parroquia'] ?? ''); ?>;
+
+        if (!selectedEstadoId) {
+            return;
+        }
+
+        estadoSelect.value = selectedEstadoId;
+        if (nombreEstadoInput) {
+            nombreEstadoInput.value = estadoSelect.options[estadoSelect.selectedIndex]?.text || '';
+        }
+
+        cargarMunicipios(selectedEstadoId, selectedMunicipioId, selectedParroquiaId);
     }
     
     cargarDatosUbicacionSiExisten();
