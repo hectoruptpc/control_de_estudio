@@ -8,7 +8,8 @@ ini_set('display_startup_errors', '1');
 $titulo ="Ingreso al Sistema";
 include('funciones/functions.php');
 
-
+$mostrarPreinscripcion = obtenerConfiguracionSecretaria('mostrar_preinscripcion', '1');
+$mostrarProsecucion = obtenerConfiguracionSecretaria('mostrar_prosecucion', '1');
 
 ?>
 
@@ -38,18 +39,22 @@ include('funciones/functions.php');
 <nav class="nav nav-pills justify-content-end"> 
         <div class="btn-group-horizontal" >
             <!-- Botón de Preinscripción -->
+            <?php if ($mostrarPreinscripcion !== '0'): ?>
             <span class="d-inline-block" data-toggle="popover" data-content="Complete el formulario de preinscripción para iniciar su proceso de admisión.">
                 <a type="link" class="btn btn-outline-success" href="preinscripcion.php">
                     <i class="fa fa-edit"></i> Preinscripción
                 </a>
             </span>
+            <?php endif; ?>
             
             <!-- Botón de Prosecución -->
+            <?php if ($mostrarProsecucion !== '0'): ?>
             <span class="d-inline-block" data-toggle="popover" data-content="Continúe con su proceso de prosecución académica.">
                 <a type="link" class="btn btn-outline-info" href="prosecucion.php">
                     <i class="fa fa-graduation-cap"></i> Prosecución
                 </a>
             </span>
+            <?php endif; ?>
             
             <!-- Botones de Recuperar Contraseña -->
             <span class="d-inline-block" data-toggle="popover" data-content="...">

@@ -293,6 +293,20 @@ visita();
                 </div>
             </div>
 
+            <!-- Tarjeta de Secretaría -->
+            <div class="card-wrapper">
+                <div class="card feature-card auditoria-card h-100">
+                    <div class="card-body text-center p-3 p-md-4">
+                        <div class="card-icon">
+                            <i class="fas fa-user-tie"></i>
+                        </div>
+                        <h3 class="card-title h5 font-weight-bold text-break">Secretaría</h3>
+                        <p class="card-text text-muted text-break">Gestiona cupos por carrera y visibilidad de botones públicos</p>
+                        <a href="secretaria.php" class="btn btn-access btn-auditoria mt-2 mt-md-3">Acceder</a>
+                    </div>
+                </div>
+            </div>
+
             <?php if (tienePermiso('auditoria')): ?>
             <!-- Tarjeta de Auditoría -->
             <div class="card-wrapper">

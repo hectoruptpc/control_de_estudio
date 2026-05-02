@@ -151,6 +151,7 @@ include('includes/head.php');
                         <div class="col-md-6"><strong>Estado civil:</strong> <?php echo htmlspecialchars($preinscripcion['edo_civil']); ?></div>
                         <div class="col-md-6"><strong>Embarazada:</strong> <?php echo htmlspecialchars($embarazadaTexto); ?></div>
                         <div class="col-md-6"><strong>Carrera solicitada:</strong> <?php echo htmlspecialchars($carreraMap[$preinscripcion['carrera']] ?? 'No especificada'); ?></div>
+                        <div class="col-md-6"><strong>Turno:</strong> <?php echo htmlspecialchars($preinscripcion['turno'] ?? 'No especificado'); ?></div>
                         <div class="col-md-6"><strong>Fecha de solicitud:</strong> <?php echo htmlspecialchars($preinscripcion['fecha_ingreso']); ?></div>
                     </div>
                 </div>

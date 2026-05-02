@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS `preinscripcion` (
   `institutos` text,
   `pais_titulo` text,
   `legalizado_titulo` text,
+  `turno` varchar(50) DEFAULT NULL,
   `sede` varchar(100) DEFAULT NULL,
   `potencialidades` text,
   `carrera` int DEFAULT NULL,

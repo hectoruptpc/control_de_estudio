@@ -158,7 +158,7 @@ $fechaSolicitud = date('Y-m-d');
     <!-- Sección 3: Formación Académica -->
     <h5 class="mb-3"><i class="fas fa-graduation-cap mr-2"></i> Formación Académica</h5>
     <div class="row g-3 mb-4">
-        <div class="col-md-6">
+        <div class="col-md-4">
             <div class="mb-3">
                 <label for="carrera<?php echo $prefijo; ?>" class="form-label required">Programa</label>
                 <select name="carrera" id="carrera<?php echo $prefijo; ?>" class="form-control" required>
@@ -171,7 +171,19 @@ $fechaSolicitud = date('Y-m-d');
                 </select>
             </div>
         </div>
+        <?php if ($modo_preinscripcion): ?>
         <div class="col-md-6">
+            <div class="mb-3">
+                <label for="turno<?php echo $prefijo; ?>" class="form-label required">Turno</label>
+                <select name="turno" id="turno<?php echo $prefijo; ?>" class="form-control" required>
+                    <option value="">-- Seleccione un turno --</option>
+                    <option value="Diurno" <?php echo (isset($_POST['turno']) && $_POST['turno'] === 'Diurno') ? 'selected' : ''; ?>>Diurno</option>
+                    <option value="Nocturno" <?php echo (isset($_POST['turno']) && $_POST['turno'] === 'Nocturno') ? 'selected' : ''; ?>>Nocturno</option>
+                </select>
+            </div>
+        </div>
+        <?php endif; ?>
+        <div class="col-md-4">
             <div class="mb-3">
                 <label for="sede<?php echo $prefijo; ?>" class="form-label required">Sede</label>
                 <select name="sede" id="sede<?php echo $prefijo; ?>" class="form-control" required>

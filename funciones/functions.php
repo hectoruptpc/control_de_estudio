@@ -906,6 +906,13 @@ function insertarPreinscripcion($datos) {
         ];
     }
 
+    if (!empty($datos['carrera']) && !empty($datos['turno']) && !hayCupoDisponible($datos['carrera'], $datos['turno'])) {
+        return [
+            'success' => false,
+            'message' => 'No hay cupos disponibles para la carrera seleccionada en el turno ' . htmlspecialchars($datos['turno']) . '. Contacte con Secretaría.'
+        ];
+    }
+
     $preinscripcionRechazada = obtenerPreinscripcionRechazada($datos['idusuario']);
     $fotoPerfil = '';
     $fechaAct = date('Y-m-d H:i:s');
@@ -981,6 +988,7 @@ function insertarPreinscripcion($datos) {
             'pais_titulo' => !empty($paisTitulos) ? implode('|||', $paisTitulos) : '',
             'legalizado_titulo' => !empty($legalizadoTitulos) ? implode('|||', $legalizadoTitulos) : '',
             'sede' => $datos['sede'] ?? null,
+            'turno' => $datos['turno'] ?? null,
             'potencialidades' => $datos['potencialidades'] ?? '',
             'carrera' => $datos['carrera'] ?? null,
             'genero' => $datos['genero'] ?? null,
@@ -1126,6 +1134,118 @@ function obtenerPreinscripcionPorId($id) {
     $preinscripcion = $result->fetch_assoc();
     $stmt->close();
     return $preinscripcion ?: null;
+}
+
+/**
+ * Devuelve la configuración de secretaría por clave
+ */
+function obtenerConfiguracionSecretaria($clave, $default = null) {
+    global $db;
+
+    $query = "SELECT valor FROM secretaria_config WHERE clave = ? LIMIT 1";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return $default;
+    }
+    $stmt->bind_param('s', $clave);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    return $row['valor'] ?? $default;
+}
+
+/**
+ * Guarda o actualiza una configuración de secretaría
+ */
+function guardarConfiguracionSecretaria($clave, $valor) {
+    global $db;
+
+    $query = "INSERT INTO secretaria_config (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('ss', $clave, $valor);
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
+}
+
+/**
+ * Obtiene los cupos configurados por carrera y turno
+ */
+function obtenerCuposSecretaria() {
+    global $db;
+
+    $cupos = [];
+    $query = "SELECT carrera_id, turno, cupos_totales FROM secretaria_cupos";
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $cupos[$row['carrera_id']][$row['turno']] = (int)$row['cupos_totales'];
+        }
+        $stmt->close();
+    }
+    return $cupos;
+}
+
+/**
+ * Guarda o actualiza cupos por carrera y turno
+ */
+function guardarCupoSecretaria($carreraId, $turno, $cuposTotales) {
+    global $db;
+
+    $query = "INSERT INTO secretaria_cupos (carrera_id, turno, cupos_totales) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE cupos_totales = VALUES(cupos_totales)";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('isi', $carreraId, $turno, $cuposTotales);
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
+}
+
+/**
+ * Cuenta cuántas preinscripciones están usando cupos para una carrera+turno
+ */
+function contarPreinscripcionesPorCupo($carreraId, $turno) {
+    global $db;
+
+    $query = "SELECT COUNT(*) AS total FROM preinscripcion WHERE carrera = ? AND turno = ? AND status IN ('Pendiente', 'Aprobada')";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return 0;
+    }
+    $stmt->bind_param('is', $carreraId, $turno);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    return (int)($row['total'] ?? 0);
+}
+
+/**
+ * Comprueba si hay cupos disponibles para una carrera y turno
+ */
+function hayCupoDisponible($carreraId, $turno) {
+    $cupos = obtenerCuposSecretaria();
+    if (!isset($cupos[$carreraId][$turno])) {
+        return false;
+    }
+
+    $total = (int)$cupos[$carreraId][$turno];
+    if ($total <= 0) {
+        return false;
+    }
+
+    $ocupados = contarPreinscripcionesPorCupo($carreraId, $turno);
+    return $ocupados < $total;
 }
 
 /**
@@ -1341,6 +1461,10 @@ function validarEstudiante($datos) {
         if (empty($datos[$campo])) {
             $errores[] = "El campo " . str_replace('_', ' ', $campo) . " es requerido";
         }
+    }
+
+    if (isset($datos['user_type']) && $datos['user_type'] === 'preinscrito' && empty($datos['turno'])) {
+        $errores[] = 'El campo turno es requerido para la preinscripción';
     }
     
     // Validación especial para carrera cuando se selecciona "OTRA"

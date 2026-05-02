@@ -88,6 +88,7 @@ include('includes/head.php');
                         <th>Cédula</th>
                         <th>Nombre</th>
                         <th>Carrera</th>
+                        <th>Turno</th>
                         <th>Correo</th>
                         <th>Teléfono</th>
                         <th>Fecha Solicitud</th>
@@ -101,6 +102,7 @@ include('includes/head.php');
                             <td><?php echo htmlspecialchars($pre['idusuario']); ?></td>
                             <td><?php echo htmlspecialchars($pre['nombre']); ?></td>
                             <td><?php echo htmlspecialchars($carreraMap[$pre['carrera']] ?? 'No especificada'); ?></td>
+                            <td><?php echo htmlspecialchars($pre['turno'] ?? 'No especificado'); ?></td>
                             <td><?php echo htmlspecialchars($pre['email']); ?></td>
                             <td><?php echo htmlspecialchars($pre['tlf']); ?></td>
                             <td><?php echo htmlspecialchars($pre['fecha_ingreso']); ?></td>
