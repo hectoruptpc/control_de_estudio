@@ -59,6 +59,10 @@ $estadoNombre = $nombresUbicacion['estado_nombre'] ?: ($preinscripcion['estado']
 $municipioNombre = $nombresUbicacion['municipio_nombre'] ?: ($preinscripcion['municipio'] ?? 'No especificado');
 $parroquiaNombre = $nombresUbicacion['parroquia_nombre'] ?: ($preinscripcion['parroquia'] ?? 'No especificado');
 
+global $db;
+$ingresos = obtenerIngresos($db);
+$fuenteIngresoNombre = $ingresos[$preinscripcion['fuente_ingresos']] ?? 'No especificado';
+
 $titulos = !empty($preinscripcion['titulos']) ? explode('|||', $preinscripcion['titulos']) : [];
 $institutos = !empty($preinscripcion['institutos']) ? explode('|||', $preinscripcion['institutos']) : [];
 $fotoPerfilUrl = !empty($preinscripcion['foto_perfil']) ? '../foto_perfil/' . $preinscripcion['foto_perfil'] : null;
@@ -165,7 +169,7 @@ include('includes/head.php');
                         <div class="col-md-4"><strong>Punto de referencia:</strong> <?php echo htmlspecialchars($preinscripcion['punto_referencia']); ?></div>
                         <div class="col-md-4"><strong>Personas a cargo:</strong> <?php echo htmlspecialchars($preinscripcion['acargo_usted']); ?></div>
                         <div class="col-md-4"><strong>Grupo familiar:</strong> <?php echo htmlspecialchars($preinscripcion['grupo_familiar']); ?></div>
-                        <div class="col-md-4"><strong>Fuente de ingresos:</strong> <?php echo htmlspecialchars($preinscripcion['fuente_ingresos']); ?></div>
+                        <div class="col-md-4"><strong>Fuente de ingresos:</strong> <?php echo htmlspecialchars($fuenteIngresoNombre); ?></div>
                         <div class="col-md-4"><strong>Tipo de vivienda:</strong> <?php echo htmlspecialchars($preinscripcion['tipo_vivienda']); ?></div>
                         <div class="col-md-4"><strong>Tenencia de vivienda:</strong> <?php echo htmlspecialchars($preinscripcion['tenencia_vivienda']); ?></div>
                     </div>
