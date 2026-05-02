@@ -50,6 +50,15 @@ foreach ($carreras as $carrera) {
 
 $titulopag = 'Detalle de preinscripción';
 
+$nombresUbicacion = obtenerNombresUbicacion(
+    $preinscripcion['estado'] ?? null,
+    $preinscripcion['municipio'] ?? null,
+    $preinscripcion['parroquia'] ?? null
+);
+$estadoNombre = $nombresUbicacion['estado_nombre'] ?: ($preinscripcion['estado'] ?? 'No especificado');
+$municipioNombre = $nombresUbicacion['municipio_nombre'] ?: ($preinscripcion['municipio'] ?? 'No especificado');
+$parroquiaNombre = $nombresUbicacion['parroquia_nombre'] ?: ($preinscripcion['parroquia'] ?? 'No especificado');
+
 $titulos = !empty($preinscripcion['titulos']) ? explode('|||', $preinscripcion['titulos']) : [];
 $institutos = !empty($preinscripcion['institutos']) ? explode('|||', $preinscripcion['institutos']) : [];
 $fotoPerfilUrl = !empty($preinscripcion['foto_perfil']) ? '../foto_perfil/' . $preinscripcion['foto_perfil'] : null;
@@ -150,10 +159,9 @@ include('includes/head.php');
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-12"><strong>Dirección:</strong> <?php echo nl2br(htmlspecialchars($preinscripcion['direccion'])); ?></div>
-                        <div class="col-md-4"><strong>Estado:</strong> <?php echo htmlspecialchars($preinscripcion['estado']); ?></div>
-                        <div class="col-md-4"><strong>Municipio:</strong> <?php echo htmlspecialchars($preinscripcion['municipio']); ?></div>
-                        <div class="col-md-4"><strong>Parroquia:</strong> <?php echo htmlspecialchars($preinscripcion['parroquia']); ?></div>
-                        <div class="col-md-4"><strong>Casa/Apto:</strong> <?php echo htmlspecialchars($preinscripcion['casaapto']); ?></div>
+                        <div class="col-md-4"><strong>Estado:</strong> <?php echo htmlspecialchars($estadoNombre); ?></div>
+                        <div class="col-md-4"><strong>Municipio:</strong> <?php echo htmlspecialchars($municipioNombre); ?></div>
+                        <div class="col-md-4"><strong>Parroquia:</strong> <?php echo htmlspecialchars($parroquiaNombre); ?></div>
                         <div class="col-md-4"><strong>Punto de referencia:</strong> <?php echo htmlspecialchars($preinscripcion['punto_referencia']); ?></div>
                         <div class="col-md-4"><strong>Personas a cargo:</strong> <?php echo htmlspecialchars($preinscripcion['acargo_usted']); ?></div>
                         <div class="col-md-4"><strong>Grupo familiar:</strong> <?php echo htmlspecialchars($preinscripcion['grupo_familiar']); ?></div>

@@ -915,6 +915,34 @@ function insertarPreinscripcion($datos) {
     $datos['username'] = $datos['idusuario'];
     $datos['user_type'] = 'preinscrito';
 
+    // Normalizar arrays relacionados con títulos para mantener índices alineados
+    $titulos = [];
+    $institutos = [];
+    $paisTitulos = [];
+    $legalizadoTitulos = [];
+    $maxFilasTitulos = max(
+        count($datos['titulos'] ?? []),
+        count($datos['institutos'] ?? []),
+        count($datos['pais_titulo'] ?? []),
+        count($datos['legalizado_titulo'] ?? [])
+    );
+
+    for ($i = 0; $i < $maxFilasTitulos; $i++) {
+        $titulo = trim($datos['titulos'][$i] ?? '');
+        $instituto = trim($datos['institutos'][$i] ?? '');
+        $paisTitulo = trim($datos['pais_titulo'][$i] ?? '');
+        $legalizadoTitulo = trim($datos['legalizado_titulo'][$i] ?? '');
+
+        if ($titulo === '' && $instituto === '' && $paisTitulo === '' && $legalizadoTitulo === '') {
+            continue;
+        }
+
+        $titulos[] = $titulo;
+        $institutos[] = $instituto;
+        $paisTitulos[] = $paisTitulo;
+        $legalizadoTitulos[] = $legalizadoTitulo;
+    }
+
     try {
         $db->begin_transaction();
 
@@ -939,6 +967,7 @@ function insertarPreinscripcion($datos) {
             'parroquia' => $datos['parroquia'] ?? null,
             'etnia' => $datos['etnia'] ?? '',
             'casaapto' => $datos['casaapto'] ?? 'No especificado',
+            'comuna' => $datos['comuna'] ?? '',
             'punto_referencia' => $datos['punto_referencia'] ?? '',
             'grupo_familiar' => isset($datos['grupo_familiar']) ? (int)$datos['grupo_familiar'] : 0,
             'acargo_usted' => isset($datos['acargo_usted']) ? (int)$datos['acargo_usted'] : 0,
@@ -947,8 +976,11 @@ function insertarPreinscripcion($datos) {
             'tenencia_vivienda' => $datos['tenencia_vivienda'] ?? '',
             'enfermedad' => $datos['enfermedad'] ?? '',
             'discapacidad' => $datos['discapacidad'] ?? '',
-            'titulos' => !empty($datos['titulos']) && is_array($datos['titulos']) ? implode('|||', $datos['titulos']) : '',
-            'institutos' => !empty($datos['institutos']) && is_array($datos['institutos']) ? implode('|||', $datos['institutos']) : '',
+            'titulos' => !empty($titulos) ? implode('|||', $titulos) : '',
+            'institutos' => !empty($institutos) ? implode('|||', $institutos) : '',
+            'pais_titulo' => !empty($paisTitulos) ? implode('|||', $paisTitulos) : '',
+            'legalizado_titulo' => !empty($legalizadoTitulos) ? implode('|||', $legalizadoTitulos) : '',
+            'sede' => $datos['sede'] ?? null,
             'potencialidades' => $datos['potencialidades'] ?? '',
             'carrera' => $datos['carrera'] ?? null,
             'genero' => $datos['genero'] ?? null,
@@ -1008,7 +1040,7 @@ function insertarPreinscripcion($datos) {
             $preinscripcionId = $preinscripcionRechazada['id'];
             $stmt->close();
         } else {
-            $sql = "INSERT INTO preinscripcion (`" . implode('`, `', $columnas) . ") VALUES (" . implode(', ', $placeholders) . ")";
+            $sql = "INSERT INTO preinscripcion (`" . implode('`, `', $columnas) . "`) VALUES (" . implode(', ', $placeholders) . ")";
             $stmt = $db->prepare($sql);
             if (!$stmt) {
                 throw new Exception('Error al preparar consulta de preinscripción: ' . $db->error);
@@ -18598,6 +18630,8 @@ function obtenerNombresUbicacion($id_estado, $id_municipio, $id_parroquia) {
             $stmt->fetch();
             $stmt->close();
         }
+    } elseif (!empty($id_estado)) {
+        $ubicacion['estado_nombre'] = $id_estado;
     }
     
     // Obtener nombre del municipio
@@ -18611,6 +18645,8 @@ function obtenerNombresUbicacion($id_estado, $id_municipio, $id_parroquia) {
             $stmt->fetch();
             $stmt->close();
         }
+    } elseif (!empty($id_municipio)) {
+        $ubicacion['municipio_nombre'] = $id_municipio;
     }
     
     // Obtener nombre de la parroquia
@@ -18624,6 +18660,8 @@ function obtenerNombresUbicacion($id_estado, $id_municipio, $id_parroquia) {
             $stmt->fetch();
             $stmt->close();
         }
+    } elseif (!empty($id_parroquia)) {
+        $ubicacion['parroquia_nombre'] = $id_parroquia;
     }
     
     return $ubicacion;

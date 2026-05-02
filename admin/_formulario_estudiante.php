@@ -171,28 +171,99 @@ $fechaSolicitud = date('Y-m-d');
                 </select>
             </div>
         </div>
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="sede<?php echo $prefijo; ?>" class="form-label required">Sede</label>
+                <select name="sede" id="sede<?php echo $prefijo; ?>" class="form-control" required>
+                    <option value="">-- Seleccione una sede --</option>
+                    <option value="Puerto Cabello" <?php echo (isset($_POST['sede']) && $_POST['sede'] === 'Puerto Cabello') ? 'selected' : ''; ?>>Puerto Cabello</option>
+                    <option value="COEF" <?php echo (isset($_POST['sede']) && $_POST['sede'] === 'COEF') ? 'selected' : ''; ?>>COEF</option>
+                </select>
+            </div>
+        </div>
         
         <!-- Títulos Obtenidos e Instituciones -->
         <div class="col-md-12">
             <div class="mb-3">
                 <label class="form-label">Títulos Obtenidos e Instituciones</label>
                 <div class="row g-3 mb-3">
-                    <div class="col-md-5">
-                        <input type="text" class="form-control" id="titulos<?php echo $prefijo; ?>" 
-                               placeholder="Título obtenido">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" id="titulos<?php echo $prefijo; ?>" name="titulos[]" 
+                               placeholder="Título obtenido" value="<?php echo htmlspecialchars($_POST['titulos'][0] ?? ''); ?>">
                     </div>
-                    <div class="col-md-5">
-                        <input type="text" class="form-control" id="institutos<?php echo $prefijo; ?>" 
-                               placeholder="Institución donde obtuvo el título">
+                    <div class="col-md-3">
+                        <input type="text" class="form-control" id="institutos<?php echo $prefijo; ?>" name="institutos[]" 
+                               placeholder="Institución donde obtuvo el título" value="<?php echo htmlspecialchars($_POST['institutos'][0] ?? ''); ?>">
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
+                        <select class="form-control pais-titulo" id="pais_titulo<?php echo $prefijo; ?>" name="pais_titulo[]">
+                            <option value="">País de emisión</option>
+                            <option value="Venezuela" <?php echo (isset($_POST['pais_titulo'][0]) && $_POST['pais_titulo'][0] === 'Venezuela') ? 'selected' : ''; ?>>Venezuela</option>
+                            <option value="Otro" <?php echo (isset($_POST['pais_titulo'][0]) && $_POST['pais_titulo'][0] === 'Otro') ? 'selected' : ''; ?>>Otro país</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
                         <button type="button" class="btn btn-outline-primary w-100" id="addTituloInstituto<?php echo $prefijo; ?>">
                             <i class="fas fa-plus mr-1"></i> Agregar
                         </button>
                     </div>
                 </div>
+                <div class="row g-3 mb-3 legalizado-row" id="legalizadoRow<?php echo $prefijo; ?>" style="display: none;">
+                    <div class="col-md-12">
+                        <label class="form-label">¿Fue legalizado en Venezuela?</label>
+                        <select class="form-control legalizado-titulo" id="legalizado_titulo<?php echo $prefijo; ?>" name="legalizado_titulo[]">
+                            <option value="">Seleccione...</option>
+                            <option value="Sí" <?php echo (isset($_POST['legalizado_titulo'][0]) && $_POST['legalizado_titulo'][0] === 'Sí') ? 'selected' : ''; ?>>Sí</option>
+                            <option value="No" <?php echo (isset($_POST['legalizado_titulo'][0]) && $_POST['legalizado_titulo'][0] === 'No') ? 'selected' : ''; ?>>No</option>
+                        </select>
+                        <div class="text-danger legalizado-message mt-2" style="display:none;">Debe legalizar el título en Venezuela.</div>
+                    </div>
+                </div>
                 <div id="titulosInstitutosContainer<?php echo $prefijo; ?>">
                     <!-- Aquí se agregarán los pares de títulos e instituciones -->
+                    <?php if (!empty($_POST['titulos']) && is_array($_POST['titulos']) && !empty($_POST['institutos']) && is_array($_POST['institutos'])): ?>
+                        <?php foreach ($_POST['titulos'] as $index => $titulo): ?>
+                            <?php if ($index === 0) continue; ?>
+                            <?php $instituto = $_POST['institutos'][$index] ?? ''; ?>
+                            <?php $paisTitulo = $_POST['pais_titulo'][$index] ?? ''; ?>
+                            <?php $legalizadoTitulo = $_POST['legalizado_titulo'][$index] ?? ''; ?>
+                            <?php if ($titulo !== '' || $instituto !== '' || $paisTitulo !== ''): ?>
+                                <div class="title-pair-group">
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-4">
+                                            <input type="text" class="form-control" name="titulos[]" value="<?php echo htmlspecialchars($titulo); ?>" placeholder="Título obtenido" readonly>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <input type="text" class="form-control" name="institutos[]" value="<?php echo htmlspecialchars($instituto); ?>" placeholder="Institución" readonly>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <select class="form-control pais-titulo" name="pais_titulo[]">
+                                                <option value="">País de emisión</option>
+                                                <option value="Venezuela" <?php echo ($paisTitulo === 'Venezuela') ? 'selected' : ''; ?>>Venezuela</option>
+                                                <option value="Otro" <?php echo ($paisTitulo === 'Otro') ? 'selected' : ''; ?>>Otro país</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2 d-flex align-items-end">
+                                            <button type="button" class="btn btn-outline-danger remove-field w-100">
+                                                <i class="fas fa-minus"></i> Eliminar
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="row g-3 mb-3 legalizado-row" style="display: <?php echo ($paisTitulo !== '' && $paisTitulo !== 'Venezuela') ? 'flex' : 'none'; ?>;">
+                                        <div class="col-md-12">
+                                            <label class="form-label">¿Fue legalizado en Venezuela?</label>
+                                            <select class="form-control legalizado-titulo" name="legalizado_titulo[]">
+                                                <option value="">Seleccione...</option>
+                                                <option value="Sí" <?php echo ($legalizadoTitulo === 'Sí') ? 'selected' : ''; ?>>Sí</option>
+                                                <option value="No" <?php echo ($legalizadoTitulo === 'No') ? 'selected' : ''; ?>>No</option>
+                                            </select>
+                                            <div class="text-danger legalizado-message mt-2" style="display: <?php echo ($legalizadoTitulo === 'No') ? 'block' : 'none'; ?>;">Debe legalizar el título en Venezuela.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -222,10 +293,15 @@ $fechaSolicitud = date('Y-m-d');
             </div>
             
             <div class="mb-3">
-                <label for="parroquia<?php echo $prefijo; ?>" class="form-label">Parroquia</label>
-                <select class="form-control" id="parroquia<?php echo $prefijo; ?>" name="parroquia" disabled>
+                <label for="parroquia<?php echo $prefijo; ?>" class="form-label required">Parroquia</label>
+                <select class="form-control" id="parroquia<?php echo $prefijo; ?>" name="parroquia" required disabled>
                     <option value="">Primero seleccione un municipio</option>
                 </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="comuna<?php echo $prefijo; ?>" class="form-label">Comuna</label>
+                <input type="text" class="form-control" id="comuna<?php echo $prefijo; ?>" name="comuna" value="<?php echo htmlspecialchars($_POST['comuna'] ?? ''); ?>" placeholder="Ingrese la comuna">
             </div>
             
             <!-- Campos ocultos para los nombres -->
@@ -242,10 +318,10 @@ $fechaSolicitud = date('Y-m-d');
             
             <div class="mb-3">
                 <label for="casaapto<?php echo $prefijo; ?>" class="form-label">Tipo de Vivienda</label>
-                <select class="form-control" id="casaapto<?php echo $prefijo; ?>" name="casaapto">
+                <select class="form-control" id="casaapto<?php echo $prefijo; ?>" name="tipo_vivienda">
                     <option value="">Seleccione...</option>
                     <?php foreach ($tiposVivienda as $id => $vivienda): ?>
-                        <option value="<?php echo htmlspecialchars($vivienda); ?>" <?php echo (isset($_POST['casaapto']) && $_POST['casaapto'] === $vivienda) ? 'selected' : ''; ?>><?php echo htmlspecialchars($vivienda); ?></option>
+                        <option value="<?php echo htmlspecialchars($vivienda); ?>" <?php echo (isset($_POST['tipo_vivienda']) && $_POST['tipo_vivienda'] === $vivienda) ? 'selected' : ''; ?>><?php echo htmlspecialchars($vivienda); ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -377,7 +453,19 @@ $fechaSolicitud = date('Y-m-d');
         </div>
     </div>
 
-    <!-- Sección 8: Datos del Sistema -->
+    <!-- Sección 8: Potencialidades -->
+    <h5 class="mb-3"><i class="fas fa-lightbulb mr-2"></i> Potencialidades</h5>
+    <div class="row g-3 mb-4">
+        <div class="col-md-12">
+            <div class="mb-3">
+                <label for="potencialidades<?php echo $prefijo; ?>" class="form-label">Potencialidades</label>
+                <textarea class="form-control" id="potencialidades<?php echo $prefijo; ?>" name="potencialidades" rows="3" placeholder="Describe tus habilidades, fortalezas o talentos relevantes"><?php echo htmlspecialchars($_POST['potencialidades'] ?? ''); ?></textarea>
+                <small class="text-muted">Ejemplo: Deporte, Cultura, comunicación, creatividad, hobby etc.</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección 9: Datos del Sistema -->
     <h5 class="mb-3"><i class="fas fa-university mr-2"></i> Datos del Sistema</h5>
     <div class="row g-3">
         <?php if (!$modo_preinscripcion): ?>
@@ -435,47 +523,153 @@ $fechaSolicitud = date('Y-m-d');
 <script>
 // Script para manejar la adición de campos de título e institución juntos
 document.addEventListener('DOMContentLoaded', function() {
+    function escapeHtml(text) {
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function updateLegalizadoRow(selectElement) {
+        const pairGroup = selectElement.closest('.title-pair-group') || selectElement.closest('.row.g-3.mb-3');
+        if (!pairGroup) {
+            return;
+        }
+
+        const legalizadoRow = pairGroup.querySelector('.legalizado-row');
+        const legalizadoSelect = pairGroup.querySelector('.legalizado-titulo');
+        const legalizadoMessage = pairGroup.querySelector('.legalizado-message');
+
+        if (!legalizadoRow || !legalizadoSelect) {
+            return;
+        }
+
+        if (selectElement.value && selectElement.value !== 'Venezuela') {
+            legalizadoRow.style.display = 'flex';
+            legalizadoSelect.required = true;
+        } else {
+            legalizadoRow.style.display = 'none';
+            legalizadoSelect.required = false;
+            legalizadoSelect.value = '';
+            if (legalizadoMessage) {
+                legalizadoMessage.style.display = 'none';
+            }
+        }
+    }
+
+    function updateLegalizadoMessage(selectElement) {
+        const pairGroup = selectElement.closest('.title-pair-group') || selectElement.closest('.row.g-3.mb-3');
+        const legalizadoMessage = pairGroup ? pairGroup.querySelector('.legalizado-message') : null;
+        if (legalizadoMessage) {
+            legalizadoMessage.style.display = selectElement.value === 'No' ? 'block' : 'none';
+        }
+    }
+
+    function updateMainLegalizadoRow(prefix) {
+        const paisSelect = document.getElementById('pais_titulo' + prefix);
+        const legalizadoRow = document.getElementById('legalizadoRow' + prefix);
+        const legalizadoSelect = document.getElementById('legalizado_titulo' + prefix);
+        const legalizadoMessage = legalizadoRow ? legalizadoRow.querySelector('.legalizado-message') : null;
+
+        if (!paisSelect || !legalizadoRow || !legalizadoSelect) {
+            return;
+        }
+
+        if (paisSelect.value && paisSelect.value !== 'Venezuela') {
+            legalizadoRow.style.display = 'flex';
+            legalizadoSelect.required = true;
+        } else {
+            legalizadoRow.style.display = 'none';
+            legalizadoSelect.required = false;
+            legalizadoSelect.value = '';
+            if (legalizadoMessage) {
+                legalizadoMessage.style.display = 'none';
+            }
+        }
+    }
+
     function addTitleInstitutionPair(prefix) {
-        const titulo = document.getElementById('titulos' + prefix).value.trim();
-        const instituto = document.getElementById('institutos' + prefix).value.trim();
-        
-        if(titulo === '' || instituto === '') {
+        const tituloInput = document.getElementById('titulos' + prefix);
+        const institutoInput = document.getElementById('institutos' + prefix);
+        const paisSelect = document.getElementById('pais_titulo' + prefix);
+        const legalizadoSelect = document.getElementById('legalizado_titulo' + prefix);
+
+        const titulo = tituloInput ? tituloInput.value.trim() : '';
+        const instituto = institutoInput ? institutoInput.value.trim() : '';
+        const paisTitulo = paisSelect ? paisSelect.value : '';
+        const legalizadoTitulo = legalizadoSelect ? legalizadoSelect.value : '';
+
+        if (titulo === '' || instituto === '') {
             alert('Por favor complete ambos campos: título e institución');
             return;
         }
-        
+
         const container = document.getElementById('titulosInstitutosContainer' + prefix);
-        
         const newPair = document.createElement('div');
-        newPair.className = 'row g-3 mb-3';
+        newPair.className = 'title-pair-group';
         newPair.innerHTML = `
-            <div class="col-md-5">
-                <input type="text" class="form-control" name="titulos[]" 
-                       value="${titulo}" placeholder="Título obtenido" readonly>
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" name="titulos[]" value="${escapeHtml(titulo)}" placeholder="Título obtenido" readonly>
+                </div>
+                <div class="col-md-3">
+                    <input type="text" class="form-control" name="institutos[]" value="${escapeHtml(instituto)}" placeholder="Institución" readonly>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-control pais-titulo" name="pais_titulo[]">
+                        <option value="">País de emisión</option>
+                        <option value="Venezuela" ${paisTitulo === 'Venezuela' ? 'selected' : ''}>Venezuela</option>
+                        <option value="Otro" ${paisTitulo === 'Otro' ? 'selected' : ''}>Otro país</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="button" class="btn btn-outline-danger remove-field w-100">
+                        <i class="fas fa-minus"></i> Eliminar
+                    </button>
+                </div>
             </div>
-            <div class="col-md-5">
-                <input type="text" class="form-control" name="institutos[]" 
-                       value="${instituto}" placeholder="Institución" readonly>
-            </div>
-            <div class="col-md-2">
-                <button type="button" class="btn btn-outline-danger remove-field w-100">
-                    <i class="fas fa-minus"></i> Eliminar
-                </button>
+            <div class="row g-3 mb-3 legalizado-row" style="display: ${paisTitulo !== '' && paisTitulo !== 'Venezuela' ? 'flex' : 'none'};">
+                <div class="col-md-12">
+                    <label class="form-label">¿Fue legalizado en Venezuela?</label>
+                    <select class="form-control legalizado-titulo" name="legalizado_titulo[]">
+                        <option value="">Seleccione...</option>
+                        <option value="Sí" ${legalizadoTitulo === 'Sí' ? 'selected' : ''}>Sí</option>
+                        <option value="No" ${legalizadoTitulo === 'No' ? 'selected' : ''}>No</option>
+                    </select>
+                    <div class="text-danger legalizado-message mt-2" style="display: ${legalizadoTitulo === 'No' ? 'block' : 'none'};">Debe legalizar el título en Venezuela.</div>
+                </div>
             </div>
         `;
         container.appendChild(newPair);
-        
-        // Vaciar los campos principales
+
         document.getElementById('titulos' + prefix).value = '';
         document.getElementById('institutos' + prefix).value = '';
+        if (paisSelect) {
+            paisSelect.value = '';
+        }
+        if (legalizadoSelect) {
+            legalizadoSelect.value = '';
+        }
         document.getElementById('titulos' + prefix).focus();
-        
-        // Añadir evento para eliminar el par
+
         newPair.querySelector('.remove-field').addEventListener('click', function() {
             container.removeChild(newPair);
         });
     }
-    
+
+    // Agregar manejadores de eliminación a los pares ya existentes en POST
+    const existingRemoveButtons = document.querySelectorAll('#titulosInstitutosContainer<?php echo $prefijo; ?> .remove-field');
+    existingRemoveButtons.forEach(function(button) {
+        button.addEventListener('click', function() {
+            const pairRow = button.closest('.title-pair-group');
+            if (pairRow) {
+                pairRow.parentNode.removeChild(pairRow);
+            }
+        });
+    });
+
     // Evento para el botón de añadir
     const addButton = document.getElementById('addTituloInstituto' + '<?php echo $prefijo; ?>');
     if (addButton) {
@@ -483,11 +677,39 @@ document.addEventListener('DOMContentLoaded', function() {
             addTitleInstitutionPair('<?php echo $prefijo; ?>');
         });
     }
-    
+
+    // Actualizar legalizado para el row principal y los pares existentes
+    const paisTituloField = document.getElementById('pais_titulo' + '<?php echo $prefijo; ?>');
+    const legalizadoField = document.getElementById('legalizado_titulo' + '<?php echo $prefijo; ?>');
+    if (paisTituloField) {
+        paisTituloField.addEventListener('change', function() {
+            updateMainLegalizadoRow('<?php echo $prefijo; ?>');
+        });
+        updateMainLegalizadoRow('<?php echo $prefijo; ?>');
+    }
+    if (legalizadoField) {
+        legalizadoField.addEventListener('change', function() {
+            updateLegalizadoMessage(this);
+        });
+        updateLegalizadoMessage(legalizadoField);
+    }
+
+    const container = document.getElementById('titulosInstitutosContainer' + '<?php echo $prefijo; ?>');
+    if (container) {
+        container.addEventListener('change', function(e) {
+            if (e.target.matches('.pais-titulo')) {
+                updateLegalizadoRow(e.target);
+            }
+            if (e.target.matches('.legalizado-titulo')) {
+                updateLegalizadoMessage(e.target);
+            }
+        });
+    }
+
     // Manejar el evento Enter en los campos principales
     const titulosField = document.getElementById('titulos' + '<?php echo $prefijo; ?>');
     const institutosField = document.getElementById('institutos' + '<?php echo $prefijo; ?>');
-    
+
     if (titulosField) {
         titulosField.addEventListener('keypress', function(e) {
             if(e.key === 'Enter') {
@@ -496,7 +718,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
+
     if (institutosField) {
         institutosField.addEventListener('keypress', function(e) {
             if(e.key === 'Enter') {
@@ -625,8 +847,11 @@ document.addEventListener('DOMContentLoaded', function() {
             nombreMunicipioInput.value = municipioTexto;
         }
         
-        // Resetear parroquia
+        // Resetear parroquia y limpiar la selección anterior
         resetSelect(parroquiaSelect, 'Cargando parroquias...', true);
+        if (nombreParroquiaInput) {
+            nombreParroquiaInput.value = '';
+        }
         
         if (!municipioId) {
             resetSelect(parroquiaSelect, 'Primero seleccione un municipio', true);
@@ -643,15 +868,43 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Guardar nombre en campo oculto
         if (nombreParroquiaInput) {
-            nombreParroquiaInput.value = parroquiaTexto;
+            nombreParroquiaInput.value = this.value ? parroquiaTexto : '';
         }
     });
     
+    // Método alternativo GET
+    function cargarMunicipiosAlternativo(estadoId, selectedMunicipioId = '', selectedParroquiaId = '') {
+        fetch(apiBase + 'api/obtener_municipios.php?estado_id=' + estadoId)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.municipios) {
+                updateSelect(municipioSelect, data.municipios, 'Seleccione un municipio', false);
+                municipioSelect.disabled = false;
+                if (selectedMunicipioId) {
+                    municipioSelect.value = selectedMunicipioId;
+                    if (municipioSelect.value === selectedMunicipioId && nombreMunicipioInput) {
+                        nombreMunicipioInput.value = municipioSelect.options[municipioSelect.selectedIndex]?.text || '';
+                    }
+                    if (selectedMunicipioId) {
+                        cargarParroquias(selectedMunicipioId, selectedParroquiaId);
+                    }
+                }
+            } else {
+                resetSelect(municipioSelect, 'No hay municipios disponibles', false);
+                municipioSelect.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error alternativo:', error);
+            resetSelect(municipioSelect, 'Error de conexión', true);
+        });
+    }
+
     // ========== FUNCIÓN: Cargar Municipios ==========
     function cargarMunicipios(estadoId, selectedMunicipioId = '', selectedParroquiaId = '') {
         const formData = new FormData();
         formData.append('estado_id', estadoId);
-        
+
         fetch(apiBase + 'api/obtener_municipios.php', {
             method: 'POST',
             body: formData
@@ -683,39 +936,11 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             console.error('Error al cargar municipios:', error);
             resetSelect(municipioSelect, 'Error al cargar municipios', true);
-            
+
             cargarMunicipiosAlternativo(estadoId, selectedMunicipioId, selectedParroquiaId);
         });
     }
-    
-    // Método alternativo GET
-    function cargarMunicipiosAlternativo(estadoId, selectedMunicipioId = '', selectedParroquiaId = '') {
-        fetch(apiBase + 'api/obtener_municipios.php?estado_id=' + estadoId)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.municipios) {
-                updateSelect(municipioSelect, data.municipios, 'Seleccione un municipio', false);
-                municipioSelect.disabled = false;
-                if (selectedMunicipioId) {
-                    municipioSelect.value = selectedMunicipioId;
-                    if (municipioSelect.value === selectedMunicipioId && nombreMunicipioInput) {
-                        nombreMunicipioInput.value = municipioSelect.options[municipioSelect.selectedIndex]?.text || '';
-                    }
-                    if (selectedMunicipioId) {
-                        cargarParroquias(selectedMunicipioId, selectedParroquiaId);
-                    }
-                }
-            } else {
-                resetSelect(municipioSelect, 'No hay municipios disponibles', false);
-                municipioSelect.disabled = false;
-            }
-        })
-        .catch(error => {
-            console.error('Error alternativo:', error);
-            resetSelect(municipioSelect, 'Error de conexión', true);
-        });
-    }
-    
+
     // ========== FUNCIÓN: Cargar Parroquias ==========
     function cargarParroquias(municipioId, selectedParroquiaId = '') {
         const formData = new FormData();
@@ -735,6 +960,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (parroquiaSelect.value === selectedParroquiaId && nombreParroquiaInput) {
                         nombreParroquiaInput.value = parroquiaSelect.options[parroquiaSelect.selectedIndex]?.text || '';
                     }
+                } else if (nombreParroquiaInput) {
+                    nombreParroquiaInput.value = '';
                 }
             } else {
                 resetSelect(parroquiaSelect, 'No hay parroquias disponibles', false);
@@ -757,6 +984,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (parroquiaSelect.value === selectedParroquiaId && nombreParroquiaInput) {
                             nombreParroquiaInput.value = parroquiaSelect.options[parroquiaSelect.selectedIndex]?.text || '';
                         }
+                    } else if (nombreParroquiaInput) {
+                        nombreParroquiaInput.value = '';
                     }
                 } else {
                     resetSelect(parroquiaSelect, 'No hay parroquias disponibles', false);
@@ -987,6 +1216,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const municipio = document.getElementById('municipio' + prefijo).value;
         if (!municipio) {
             mensajesError.push('Debe seleccionar un municipio');
+            isValid = false;
+        }
+
+        // Validar parroquia
+        const parroquia = document.getElementById('parroquia' + prefijo).value;
+        if (!parroquia) {
+            mensajesError.push('Debe seleccionar una parroquia');
             isValid = false;
         }
         
