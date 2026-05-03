@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS `secretaria_cupos` (
   `carrera_id` int NOT NULL,
   `turno` varchar(50) NOT NULL,
   `cupos_totales` int NOT NULL DEFAULT 0,
+  `numero_secciones` int NOT NULL DEFAULT 1,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_carrera_turno` (`carrera_id`, `turno`),

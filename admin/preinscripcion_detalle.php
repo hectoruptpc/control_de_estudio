@@ -167,6 +167,8 @@ include('includes/head.php');
                         <div class="col-md-4"><strong>Estado:</strong> <?php echo htmlspecialchars($estadoNombre); ?></div>
                         <div class="col-md-4"><strong>Municipio:</strong> <?php echo htmlspecialchars($municipioNombre); ?></div>
                         <div class="col-md-4"><strong>Parroquia:</strong> <?php echo htmlspecialchars($parroquiaNombre); ?></div>
+                        <div class="col-md-4"><strong>Sede:</strong> <?php echo htmlspecialchars($preinscripcion['sede'] ?? 'No especificada'); ?></div>
+                        <div class="col-md-4"><strong>Comuna:</strong> <?php echo htmlspecialchars($preinscripcion['comuna'] ?? 'No especificada'); ?></div>
                         <div class="col-md-4"><strong>Punto de referencia:</strong> <?php echo htmlspecialchars($preinscripcion['punto_referencia']); ?></div>
                         <div class="col-md-4"><strong>Personas a cargo:</strong> <?php echo htmlspecialchars($preinscripcion['acargo_usted']); ?></div>
                         <div class="col-md-4"><strong>Grupo familiar:</strong> <?php echo htmlspecialchars($preinscripcion['grupo_familiar']); ?></div>
@@ -208,6 +210,12 @@ include('includes/head.php');
                     <?php else: ?>
                         <div class="text-muted">No se registraron títulos ni universidades.</div>
                     <?php endif; ?>
+                    <div class="mt-3">
+                        <strong>País del título:</strong> <?php echo htmlspecialchars($preinscripcion['pais_titulo'] ?? 'No especificado'); ?><br>
+                        <?php if (strtolower(trim($preinscripcion['pais_titulo'] ?? '')) !== 'venezuela'): ?>
+                            <strong>Legalizado en Venezuela:</strong> <?php echo ($preinscripcion['legalizado_titulo'] ?? 0) ? 'Sí' : 'No'; ?>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
         </div>

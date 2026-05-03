@@ -1180,13 +1180,16 @@ function obtenerCuposSecretaria() {
     global $db;
 
     $cupos = [];
-    $query = "SELECT carrera_id, turno, cupos_totales FROM secretaria_cupos";
+    $query = "SELECT carrera_id, turno, cupos_totales, numero_secciones FROM secretaria_cupos";
     $stmt = $db->prepare($query);
     if ($stmt) {
         $stmt->execute();
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
-            $cupos[$row['carrera_id']][$row['turno']] = (int)$row['cupos_totales'];
+            $cupos[$row['carrera_id']][$row['turno']] = [
+                'cupos_totales' => (int)$row['cupos_totales'],
+                'numero_secciones' => (int)$row['numero_secciones']
+            ];
         }
         $stmt->close();
     }
@@ -1196,17 +1199,52 @@ function obtenerCuposSecretaria() {
 /**
  * Guarda o actualiza cupos por carrera y turno
  */
-function guardarCupoSecretaria($carreraId, $turno, $cuposTotales) {
+function guardarCupoSecretaria($carreraId, $turno, $cuposTotales, $numeroSecciones = 1) {
     global $db;
 
-    $query = "INSERT INTO secretaria_cupos (carrera_id, turno, cupos_totales) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE cupos_totales = VALUES(cupos_totales)";
+    $query = "INSERT INTO secretaria_cupos (carrera_id, turno, cupos_totales, numero_secciones) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE cupos_totales = VALUES(cupos_totales), numero_secciones = VALUES(numero_secciones)";
     $stmt = $db->prepare($query);
     if (!$stmt) {
         return false;
     }
-    $stmt->bind_param('isi', $carreraId, $turno, $cuposTotales);
+    $stmt->bind_param('isii', $carreraId, $turno, $cuposTotales, $numeroSecciones);
     $result = $stmt->execute();
     $stmt->close();
+    return $result;
+}
+
+/**
+ * Obtiene lista de números de sección autorizados por Secretaría para una carrera y turno.
+ */
+function obtenerNumerosSeccionDisponibles($carreraId, $turno) {
+    $cupos = obtenerCuposSecretaria();
+    if (empty($cupos[$carreraId][$turno]) || (int)$cupos[$carreraId][$turno]['numero_secciones'] <= 0) {
+        return [];
+    }
+
+    $max = (int)$cupos[$carreraId][$turno]['numero_secciones'];
+    global $db;
+
+    $query = "SELECT numero_seccion FROM secciones WHERE id_carrera = ? AND turno = ? AND status IN ('Pendiente', 'Aprobada')";
+    $stmt = $db->prepare($query);
+    $usedNumbers = [];
+    if ($stmt) {
+        $stmt->bind_param('is', $carreraId, $turno);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $usedNumbers[] = (int)$row['numero_seccion'];
+        }
+        $stmt->close();
+    }
+
+    $result = [];
+    for ($i = 1; $i <= $max; $i++) {
+        $result[] = [
+            'numero' => $i,
+            'disponible' => !in_array($i, $usedNumbers, true)
+        ];
+    }
     return $result;
 }
 
@@ -1246,6 +1284,142 @@ function hayCupoDisponible($carreraId, $turno) {
 
     $ocupados = contarPreinscripcionesPorCupo($carreraId, $turno);
     return $ocupados < $total;
+}
+
+/**
+ * Obtiene secciones aprobadas por carrera y turno
+ */
+function obtenerSeccionesAprobadas($carreraId, $turno) {
+    global $db;
+
+    $secciones = [];
+    $query = "SELECT id_seccion AS id, numero_seccion, capacidad_maxima AS capacidad FROM secciones WHERE id_carrera = ? AND turno = ? AND status = 'Aprobada' ORDER BY numero_seccion";
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        $stmt->bind_param('is', $carreraId, $turno);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $secciones[] = $row;
+        }
+        $stmt->close();
+    }
+    return $secciones;
+}
+
+/**
+ * Cuenta estudiantes en una sección
+ */
+function contarEstudiantesEnSeccion($seccionId) {
+    global $db;
+
+    $query = "SELECT COUNT(*) AS total FROM users WHERE seccion_id = ?";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return 0;
+    }
+    $stmt->bind_param('i', $seccionId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    return (int)($row['total'] ?? 0);
+}
+
+/**
+ * Asigna sección automáticamente al estudiante
+ */
+function asignarSeccionAutomatica($carreraId, $turno, $userId) {
+    $secciones = obtenerSeccionesAprobadas($carreraId, $turno);
+    if (empty($secciones)) {
+        return false; // No hay secciones
+    }
+
+    foreach ($secciones as $seccion) {
+        $ocupados = contarEstudiantesEnSeccion($seccion['id']);
+        if ($ocupados < $seccion['capacidad']) {
+            // Asignar aquí
+            global $db;
+            $query = "UPDATE users SET seccion_id = ? WHERE id = ?";
+            $stmt = $db->prepare($query);
+            if ($stmt) {
+                $stmt->bind_param('ii', $seccion['id'], $userId);
+                $result = $stmt->execute();
+                $stmt->close();
+                return $result;
+            }
+        }
+    }
+    return false; // Todas llenas
+}
+
+/**
+ * Crea una nueva sección para preinscripciones
+ */
+function crearSeccionPreinscripcion($carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy) {
+    global $db;
+
+    $query = "INSERT INTO secciones (id_carrera, turno, numero_seccion, capacidad_maxima, horario, created_by) VALUES (?, ?, ?, ?, ?, ?)";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('isissi', $carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy);
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
+}
+
+/**
+ * Aprueba una sección
+ */
+function aprobarSeccion($seccionId, $approvedBy) {
+    global $db;
+
+    $query = "UPDATE secciones SET status = 'Aprobada', approved_by = ?, approved_at = NOW() WHERE id_seccion = ?";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('ii', $approvedBy, $seccionId);
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
+}
+
+/**
+ * Rechaza una sección
+ */
+function rechazarSeccion($seccionId, $approvedBy) {
+    global $db;
+
+    $query = "UPDATE secciones SET status = 'Rechazada', approved_by = ?, approved_at = NOW() WHERE id_seccion = ?";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('ii', $approvedBy, $seccionId);
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
+}
+
+/**
+ * Obtiene secciones pendientes de aprobación
+ */
+function obtenerSeccionesPendientes() {
+    global $db;
+
+    $secciones = [];
+    $query = "SELECT s.*, s.id_seccion AS id, s.capacidad_maxima AS capacidad, c.nombre_carrera AS carrera_nombre, u.nombre AS creador_nombre FROM secciones s JOIN carreras c ON s.id_carrera = c.id_carrera LEFT JOIN users u ON s.created_by = u.id WHERE s.status = 'Pendiente' ORDER BY s.created_at DESC";
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $secciones[] = $row;
+        }
+    }
+    return $secciones;
 }
 
 /**
@@ -1307,6 +1481,9 @@ function aceptarPreinscripcion($id, $adminId) {
     if (!$resultado['success']) {
         return $resultado;
     }
+
+    // Asignar sección automáticamente
+    asignarSeccionAutomatica($preinscripcion['carrera'], $preinscripcion['turno'], $resultado['id']);
 
     $query = "UPDATE preinscripcion SET status = 'Aprobada', aprobado_por = ?, fecha_aprobado = NOW() WHERE id = ?";
     $stmt = $db->prepare($query);

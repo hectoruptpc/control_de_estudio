@@ -307,6 +307,20 @@ visita();
                 </div>
             </div>
 
+            <!-- Tarjeta de Aprobar Secciones -->
+            <div class="card-wrapper">
+                <div class="card feature-card auditoria-card h-100">
+                    <div class="card-body text-center p-3 p-md-4">
+                        <div class="card-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <h3 class="card-title h5 font-weight-bold text-break">Aprobar Secciones</h3>
+                        <p class="card-text text-muted text-break">Revisa y aprueba secciones creadas por directores</p>
+                        <a href="aprobar_secciones.php" class="btn btn-access btn-auditoria mt-2 mt-md-3">Acceder</a>
+                    </div>
+                </div>
+            </div>
+
             <?php if (tienePermiso('auditoria')): ?>
             <!-- Tarjeta de Auditoría -->
             <div class="card-wrapper">

@@ -26,7 +26,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($valor < 0) {
                     $valor = 0;
                 }
-                guardarCupoSecretaria($carrera['id'], $turno, $valor);
+                $numeroSecciones = $_POST['secciones'][$carrera['id']][$turno] ?? '';
+                $numeroSecciones = (int) trim($numeroSecciones);
+                if ($numeroSecciones < 1) {
+                    $numeroSecciones = 1;
+                }
+                guardarCupoSecretaria($carrera['id'], $turno, $valor, $numeroSecciones);
             }
         }
 
@@ -73,6 +78,8 @@ include('includes/head.php');
     <form method="post" action="secretaria.php">
         <input type="hidden" name="action" value="guardar">
 
+        <div class="alert alert-info">Los valores de "Secciones autorizadas" definen cuántos números de sección puede elegir el director por turno. Solo se puede crear número 1..N.</div>
+
         <div class="card mb-4">
             <div class="card-header bg-light">
                 <strong>Cupos por carrera y turno</strong>
@@ -87,6 +94,7 @@ include('includes/head.php');
                                 <th>Cupos configurados</th>
                                 <th>Ocupados</th>
                                 <th>Disponibles</th>
+                                <th>Secciones autorizadas</th>
                                 <th>Actualizar cupos</th>
                             </tr>
                         </thead>
@@ -94,7 +102,9 @@ include('includes/head.php');
                             <?php foreach ($carreras as $carrera): ?>
                                 <?php foreach ($turnos as $turno): ?>
                                     <?php
-                                        $total = $cuposActuales[$carrera['id']][$turno] ?? 0;
+                                        $config = $cuposActuales[$carrera['id']][$turno] ?? ['cupos_totales' => 0, 'numero_secciones' => 1];
+                                        $total = $config['cupos_totales'];
+                                        $numeroSecciones = $config['numero_secciones'];
                                         $ocupados = contarPreinscripcionesPorCupo($carrera['id'], $turno);
                                         $libres = max(0, $total - $ocupados);
                                     ?>
@@ -104,6 +114,9 @@ include('includes/head.php');
                                         <td><?php echo number_format($total); ?></td>
                                         <td><?php echo number_format($ocupados); ?></td>
                                         <td><?php echo number_format($libres); ?></td>
+                                        <td>
+                                            <input type="number" min="1" class="form-control" name="secciones[<?php echo (int)$carrera['id']; ?>][<?php echo htmlspecialchars($turno); ?>]" value="<?php echo htmlspecialchars($numeroSecciones); ?>">
+                                        </td>
                                         <td>
                                             <input type="number" min="0" class="form-control" name="cupos[<?php echo (int)$carrera['id']; ?>][<?php echo htmlspecialchars($turno); ?>]" value="<?php echo htmlspecialchars($total); ?>">
                                         </td>
