@@ -23,9 +23,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($action === 'rechazar') {
         if (rechazarSeccion($seccionId, $_SESSION['user']['id'])) {
-            $success_message = 'Sección rechazada correctamente.';
+            $success_message = 'Sección rechazada y eliminada correctamente.';
         } else {
-            $error_message = 'Error al rechazar la sección.';
+            $error_message = 'Error al rechazar y eliminar la sección. Revisa los logs para más detalles.';
         }
     }
 }

@@ -1254,6 +1254,11 @@ function obtenerNumerosSeccionDisponibles($carreraId, $turno) {
 function contarPreinscripcionesPorCupo($carreraId, $turno) {
     global $db;
 
+    $checkTable = $db->query("SHOW TABLES LIKE 'preinscripcion'");
+    if (!$checkTable || $checkTable->num_rows === 0) {
+        return 0;
+    }
+
     $query = "SELECT COUNT(*) AS total FROM preinscripcion WHERE carrera = ? AND turno = ? AND status IN ('Pendiente', 'Aprobada')";
     $stmt = $db->prepare($query);
     if (!$stmt) {
@@ -1389,20 +1394,117 @@ function aprobarSeccion($seccionId, $approvedBy) {
 }
 
 /**
+ * Elimina una sección junto con horarios y asignaciones activas de estudiantes.
+ *
+ * @param int $seccionId ID de la sección
+ * @param int|null $performedBy ID del usuario que ejecuta la eliminación
+ * @return bool True si se eliminó correctamente
+ */
+function eliminarSeccion($seccionId, $performedBy = null) {
+    global $db;
+
+    if (!is_numeric($seccionId) || $seccionId <= 0) {
+        error_log("eliminarSeccion: ID de sección inválido: $seccionId");
+        return false;
+    }
+
+    try {
+        $db->begin_transaction();
+
+        // Deshabilitar restricciones de clave foránea temporalmente
+        $db->query("SET FOREIGN_KEY_CHECKS = 0");
+
+        // Verificar que la sección existe
+        $stmt = $db->prepare("SELECT id_seccion, status FROM secciones WHERE id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error preparando SELECT secciones: " . $db->error);
+        }
+        $stmt->bind_param('i', $seccionId);
+        if (!$stmt->execute()) {
+            throw new Exception("Error ejecutando SELECT secciones: " . $stmt->error);
+        }
+        $result = $stmt->get_result();
+        if ($result->num_rows === 0) {
+            throw new Exception("La sección con ID $seccionId no existe");
+        }
+        $seccion = $result->fetch_assoc();
+        $stmt->close();
+
+        error_log("Intentando eliminar sección $seccionId con status: " . $seccion['status']);
+
+        // Eliminar asignaciones de docente para la sección PRIMERO
+        // Esto automáticamente eliminará los horarios gracias a ON DELETE CASCADE
+        $stmt = $db->prepare("DELETE FROM docente_seccion WHERE id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error preparando DELETE docente_seccion: " . $db->error);
+        }
+        $stmt->bind_param('i', $seccionId);
+        if (!$stmt->execute()) {
+            throw new Exception("Error ejecutando DELETE docente_seccion: " . $stmt->error);
+        }
+        $docentes_eliminados = $stmt->affected_rows;
+        $stmt->close();
+
+        // Eliminar estudiantes de la sección DESPUÉS
+        $stmt = $db->prepare("DELETE FROM estudiante_seccion WHERE id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error preparando DELETE estudiante_seccion: " . $db->error);
+        }
+        $stmt->bind_param('i', $seccionId);
+        if (!$stmt->execute()) {
+            throw new Exception("Error ejecutando DELETE estudiante_seccion: " . $stmt->error);
+        }
+        $estudiantes_eliminados = $stmt->affected_rows;
+        $stmt->close();
+
+        // Finalmente eliminar la sección
+        $stmt = $db->prepare("DELETE FROM secciones WHERE id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error preparando DELETE secciones: " . $db->error);
+        }
+        $stmt->bind_param('i', $seccionId);
+        if (!$stmt->execute()) {
+            throw new Exception("Error ejecutando DELETE secciones: " . $stmt->error);
+        }
+        $stmt->close();
+
+        $db->commit();
+
+        // Log de éxito
+        error_log("Sección $seccionId eliminada exitosamente. Docentes eliminados: $docentes_eliminados, Estudiantes eliminados: $estudiantes_eliminados");
+
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "DELETE",
+                    "secciones",
+                    $seccionId,
+                    null,
+                    [
+                        'performed_by' => $performedBy,
+                        'seccion_id' => $seccionId
+                    ],
+                    "Secciones",
+                    "Eliminación de sección y limpieza de horarios/estudiantes"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría eliminarSeccion: " . $e->getMessage());
+            }
+        }
+
+        return true;
+    } catch (Exception $e) {
+        $db->rollback();
+        error_log("Error en eliminarSeccion: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
  * Rechaza una sección
  */
 function rechazarSeccion($seccionId, $approvedBy) {
-    global $db;
-
-    $query = "UPDATE secciones SET status = 'Rechazada', approved_by = ?, approved_at = NOW() WHERE id_seccion = ?";
-    $stmt = $db->prepare($query);
-    if (!$stmt) {
-        return false;
-    }
-    $stmt->bind_param('ii', $approvedBy, $seccionId);
-    $result = $stmt->execute();
-    $stmt->close();
-    return $result;
+    return eliminarSeccion($seccionId, $approvedBy);
 }
 
 /**
@@ -8000,6 +8102,7 @@ function obtenerListadoSecciones($db) {
                             p.activo as periodo_activo, 
                             s.capacidad_maxima,
                             s.inicia,  
+                            s.status,
                             CASE WHEN p.activo = 0 THEN 'inactiva' ELSE s.estatus END as estatus,
                             COUNT(es.id_usuario) as inscritos
                           FROM secciones s

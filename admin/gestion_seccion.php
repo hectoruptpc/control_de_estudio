@@ -211,7 +211,14 @@ include("includes/head.php");
         
         <div class="card shadow mb-4">
             <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                <h6 class="m-0 font-weight-bold text-primary">Listado de Secciones</h6>
+                <div>
+                    <h6 class="m-0 font-weight-bold text-primary">Listado de Secciones</h6>
+                    <?php if (tienePermiso('admin')): ?>
+                        <a href="aprobar_secciones.php" class="btn btn-info btn-sm mt-2">
+                            <i class="fas fa-check-circle"></i> Secciones Pendientes
+                        </a>
+                    <?php endif; ?>
+                </div>
                 <form method="post" style="display:inline">
                     <input type="hidden" name="action" value="new">
                     <button type="submit" class="btn btn-success btn-sm">
@@ -232,6 +239,7 @@ include("includes/head.php");
                                 <th>Trayecto</th>
                                 <th>Período</th>
                                 <th>Inicio</th>
+                                <th>Aprobación</th>
                                 <th>Estudiantes</th>
                                 <th>Capacidad</th>
                                 <th>Estado</th>
@@ -277,6 +285,22 @@ include("includes/head.php");
                                         }
                                     }
                                 }
+
+                                $status_text = isset($seccion['status']) ? ucfirst($seccion['status']) : 'Desconocido';
+                                switch ($seccion['status'] ?? '') {
+                                    case 'Aprobada':
+                                        $status_class = 'success';
+                                        break;
+                                    case 'Pendiente':
+                                        $status_class = 'warning';
+                                        break;
+                                    case 'Rechazada':
+                                        $status_class = 'danger';
+                                        break;
+                                    default:
+                                        $status_class = 'secondary';
+                                        break;
+                                }
                             ?>
                             <tr>
                                 <td><?= htmlspecialchars($seccion['codigo_seccion']) ?></td>
@@ -284,6 +308,11 @@ include("includes/head.php");
                                 <td>Trayecto <?= $seccion['numero_trayecto'] ?></td>
                                 <td><?= htmlspecialchars($seccion['nombre_periodo']) ?></td>
                                 <td><?= isset($seccion['inicia']) ? date('d/m/Y H:i', strtotime($seccion['inicia'])) : '--' ?></td>
+                                <td>
+                                    <span class="badge badge-<?= $status_class ?>">
+                                        <?= htmlspecialchars($status_text) ?>
+                                    </span>
+                                </td>
                                 <td>
                                     <div class="progress">
                                         <div class="progress-bar <?= $porcentaje >= 80 ? 'bg-success' : 'bg-info' ?>" 
