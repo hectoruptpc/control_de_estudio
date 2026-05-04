@@ -504,6 +504,9 @@ function insertarEstudiante($datos) {
             if (isset($resultadoFoto['success']) && $resultadoFoto['success']) {
                 $nombreFoto = $resultadoFoto['nombre_archivo'];
             }
+        } elseif (!empty($datos['foto_perfil'])) {
+            // Si ya viene una foto desde una preinscripción, conservarla.
+            $nombreFoto = $datos['foto_perfil'];
         }
 
         // ============================
@@ -820,6 +823,817 @@ function insertarEstudiante($datos) {
 }
 
 /**
+ * Verifica si una cédula ya existe en users
+ */
+function estudianteExiste($idusuario) {
+    global $db;
+
+    $query = "SELECT COUNT(*) AS count FROM users WHERE idusuario = ? OR username = ?";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('ss', $idusuario, $idusuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    return isset($row['count']) && (int)$row['count'] > 0;
+}
+
+/**
+ * Verifica si ya existe una preinscripción pendiente para la misma cédula
+ */
+function preinscripcionPendienteExiste($idusuario) {
+    global $db;
+
+    $query = "SELECT COUNT(*) AS count FROM preinscripcion WHERE idusuario = ? AND status = 'Pendiente'";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('s', $idusuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    return isset($row['count']) && (int)$row['count'] > 0;
+}
+
+function obtenerPreinscripcionRechazada($idusuario) {
+    global $db;
+
+    $query = "SELECT * FROM preinscripcion WHERE idusuario = ? AND status = 'Rechazada' ORDER BY id DESC LIMIT 1";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param('s', $idusuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    return $row ?: null;
+}
+
+/**
+ * Inserta una preinscripción en la tabla preinscripcion
+ */
+function insertarPreinscripcion($datos) {
+    global $db;
+
+    if (empty($datos['idusuario'])) {
+        return [
+            'success' => false,
+            'message' => 'La cédula es obligatoria para la preinscripción.'
+        ];
+    }
+
+    if (estudianteExiste($datos['idusuario'])) {
+        return [
+            'success' => false,
+            'message' => 'Ya existe un estudiante con esta cédula. Si ya estás inscrito, inicia sesión con tus datos.'
+        ];
+    }
+
+    if (preinscripcionPendienteExiste($datos['idusuario'])) {
+        return [
+            'success' => false,
+            'message' => 'Ya existe una preinscripción pendiente con esta cédula. Por favor espera la revisión administrativa.'
+        ];
+    }
+
+    if (!empty($datos['carrera']) && !empty($datos['turno']) && !hayCupoDisponible($datos['carrera'], $datos['turno'])) {
+        return [
+            'success' => false,
+            'message' => 'No hay cupos disponibles para la carrera seleccionada en el turno ' . htmlspecialchars($datos['turno']) . '. Contacte con Secretaría.'
+        ];
+    }
+
+    $preinscripcionRechazada = obtenerPreinscripcionRechazada($datos['idusuario']);
+    $fotoPerfil = '';
+    $fechaAct = date('Y-m-d H:i:s');
+    $datos['status'] = $datos['status'] ?? 'Pendiente';
+    $datos['fecha_ingreso'] = $datos['fecha_ingreso'] ?? date('Y-m-d');
+    $datos['fecha_act'] = $fechaAct;
+    $datos['username'] = $datos['idusuario'];
+    $datos['user_type'] = 'preinscrito';
+
+    // Normalizar arrays relacionados con títulos para mantener índices alineados
+    $titulos = [];
+    $institutos = [];
+    $paisTitulos = [];
+    $legalizadoTitulos = [];
+    $maxFilasTitulos = max(
+        count($datos['titulos'] ?? []),
+        count($datos['institutos'] ?? []),
+        count($datos['pais_titulo'] ?? []),
+        count($datos['legalizado_titulo'] ?? [])
+    );
+
+    for ($i = 0; $i < $maxFilasTitulos; $i++) {
+        $titulo = trim($datos['titulos'][$i] ?? '');
+        $instituto = trim($datos['institutos'][$i] ?? '');
+        $paisTitulo = trim($datos['pais_titulo'][$i] ?? '');
+        $legalizadoTitulo = trim($datos['legalizado_titulo'][$i] ?? '');
+
+        if ($titulo === '' && $instituto === '' && $paisTitulo === '' && $legalizadoTitulo === '') {
+            continue;
+        }
+
+        $titulos[] = $titulo;
+        $institutos[] = $instituto;
+        $paisTitulos[] = $paisTitulo;
+        $legalizadoTitulos[] = $legalizadoTitulo;
+    }
+
+    try {
+        $db->begin_transaction();
+
+        if (isset($_FILES['foto_perfil']) && $_FILES['foto_perfil']['error'] === UPLOAD_ERR_OK) {
+            $resultadoFoto = subirFotoPerfil($_FILES['foto_perfil']);
+            if (isset($resultadoFoto['success']) && $resultadoFoto['success']) {
+                $fotoPerfil = $resultadoFoto['nombre_archivo'];
+            }
+        }
+
+        $valores = [
+            'idusuario' => $datos['idusuario'],
+            'nombre' => $datos['nombre'] ?? null,
+            'username' => $datos['username'],
+            'email' => !empty($datos['email']) ? $datos['email'] : null,
+            'tlf' => !empty($datos['tlf']) ? $datos['tlf'] : null,
+            'cel' => $datos['cel'] ?? '',
+            'direccion' => $datos['direccion'] ?? null,
+            'ciudad' => $datos['municipio'] ?? '',
+            'estado' => $datos['estado'] ?? null,
+            'municipio' => $datos['municipio'] ?? null,
+            'parroquia' => $datos['parroquia'] ?? null,
+            'etnia' => $datos['etnia'] ?? '',
+            'casaapto' => $datos['casaapto'] ?? 'No especificado',
+            'comuna' => $datos['comuna'] ?? '',
+            'punto_referencia' => $datos['punto_referencia'] ?? '',
+            'grupo_familiar' => isset($datos['grupo_familiar']) ? (int)$datos['grupo_familiar'] : 0,
+            'acargo_usted' => isset($datos['acargo_usted']) ? (int)$datos['acargo_usted'] : 0,
+            'fuente_ingresos' => $datos['fuente_ingresos'] ?? '',
+            'tipo_vivienda' => $datos['tipo_vivienda'] ?? '',
+            'tenencia_vivienda' => $datos['tenencia_vivienda'] ?? '',
+            'enfermedad' => $datos['enfermedad'] ?? '',
+            'discapacidad' => $datos['discapacidad'] ?? '',
+            'titulos' => !empty($titulos) ? implode('|||', $titulos) : '',
+            'institutos' => !empty($institutos) ? implode('|||', $institutos) : '',
+            'pais_titulo' => !empty($paisTitulos) ? implode('|||', $paisTitulos) : '',
+            'legalizado_titulo' => !empty($legalizadoTitulos) ? implode('|||', $legalizadoTitulos) : '',
+            'sede' => $datos['sede'] ?? null,
+            'turno' => $datos['turno'] ?? null,
+            'potencialidades' => $datos['potencialidades'] ?? '',
+            'carrera' => $datos['carrera'] ?? null,
+            'genero' => $datos['genero'] ?? null,
+            'edo_civil' => $datos['edo_civil'] ?? null,
+            'fecha_nac' => $datos['fecha_nac'] ?? null,
+            'embarazada' => isset($datos['embarazada']) ? (int)$datos['embarazada'] : 0,
+            'num_telf_opc' => $datos['num_telf_opc'] ?? '',
+            'fecha_ingreso' => $datos['fecha_ingreso'],
+            'fecha_act' => $fechaAct,
+            'status' => $datos['status'],
+            'user_type' => $datos['user_type'],
+            'foto_perfil' => $fotoPerfil,
+            'aprobado_por' => null,
+            'fecha_aprobado' => null,
+            'rechazado_por' => null,
+            'fecha_rechazo' => null,
+            'motivo_rechazo' => $datos['motivo_rechazo'] ?? null,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+
+        $columnas = array_keys($valores);
+        $placeholders = array_fill(0, count($columnas), '?');
+        $tipos = '';
+        $valoresBind = [];
+
+        foreach ($valores as $valor) {
+            $tipos .= is_int($valor) ? 'i' : 's';
+            $valoresBind[] = $valor;
+        }
+
+        if ($preinscripcionRechazada) {
+            $updateColumns = [];
+            $updateValues = [];
+            $updateTypes = '';
+            foreach ($valores as $key => $valor) {
+                if ($key === 'created_at' || $key === 'updated_at') {
+                    continue;
+                }
+                $updateColumns[] = "`$key` = ?";
+                $updateTypes .= is_int($valor) ? 'i' : 's';
+                $updateValues[] = $valor;
+            }
+
+            $updateValues[] = $preinscripcionRechazada['id'];
+            $updateTypes .= 'i';
+
+            $sql = "UPDATE preinscripcion SET " . implode(', ', $updateColumns) . " WHERE id = ?";
+            $stmt = $db->prepare($sql);
+            if (!$stmt) {
+                throw new Exception('Error al preparar actualización de preinscripción: ' . $db->error);
+            }
+            $stmt->bind_param($updateTypes, ...$updateValues);
+            if (!$stmt->execute()) {
+                throw new Exception('Error al actualizar la preinscripción rechazada: ' . $stmt->error);
+            }
+            $preinscripcionId = $preinscripcionRechazada['id'];
+            $stmt->close();
+        } else {
+            $sql = "INSERT INTO preinscripcion (`" . implode('`, `', $columnas) . "`) VALUES (" . implode(', ', $placeholders) . ")";
+            $stmt = $db->prepare($sql);
+            if (!$stmt) {
+                throw new Exception('Error al preparar consulta de preinscripción: ' . $db->error);
+            }
+            $stmt->bind_param($tipos, ...$valoresBind);
+            if (!$stmt->execute()) {
+                throw new Exception('Error al guardar la preinscripción: ' . $stmt->error);
+            }
+            $preinscripcionId = $stmt->insert_id;
+            $stmt->close();
+        }
+
+        $db->commit();
+
+        return [
+            'success' => true,
+            'message' => '✅ Preinscripción enviada correctamente. Serás contactado cuando el equipo admin la revise.',
+            'id' => $preinscripcionId
+        ];
+    } catch (Exception $e) {
+        if (isset($db) && method_exists($db, 'rollback')) {
+            $db->rollback();
+        }
+        if (!empty($fotoPerfil)) {
+            $rutaFoto = __DIR__ . '/../foto_perfil/' . $fotoPerfil;
+            if (file_exists($rutaFoto)) {
+                @unlink($rutaFoto);
+            }
+        }
+
+        return [
+            'success' => false,
+            'message' => '❌ ' . $e->getMessage()
+        ];
+    }
+}
+
+/**
+ * Obtiene las preinscripciones pendientes
+ */
+function obtenerPreinscripcionesPendientes($busqueda = null) {
+    global $db;
+
+    $preinscripciones = [];
+    $busqueda = trim((string)$busqueda);
+    $query = "SELECT * FROM preinscripcion WHERE status = 'Pendiente'";
+
+    if ($busqueda !== '') {
+        $query .= " AND (idusuario LIKE ? OR nombre LIKE ? OR username LIKE ? OR email LIKE ? OR tlf LIKE ? OR cel LIKE ? OR direccion LIKE ? OR punto_referencia LIKE ? OR potencialidades LIKE ? OR estado LIKE ? OR municipio LIKE ? OR parroquia LIKE ? )";
+    }
+
+    $query .= " ORDER BY fecha_ingreso DESC";
+
+    if ($stmt = $db->prepare($query)) {
+        if ($busqueda !== '') {
+            $like = '%' . $busqueda . '%';
+            $stmt->bind_param('ssssssssssss', $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like);
+        }
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $preinscripciones[] = $row;
+        }
+        $stmt->close();
+    }
+    return $preinscripciones;
+}
+
+/**
+ * Obtiene una preinscripción por ID
+ */
+function obtenerPreinscripcionPorId($id) {
+    global $db;
+
+    $query = "SELECT * FROM preinscripcion WHERE id = ? LIMIT 1";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param('i', $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $preinscripcion = $result->fetch_assoc();
+    $stmt->close();
+    return $preinscripcion ?: null;
+}
+
+/**
+ * Devuelve la configuración de secretaría por clave
+ */
+function obtenerConfiguracionSecretaria($clave, $default = null) {
+    global $db;
+
+    $query = "SELECT valor FROM secretaria_config WHERE clave = ? LIMIT 1";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return $default;
+    }
+    $stmt->bind_param('s', $clave);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    return $row['valor'] ?? $default;
+}
+
+/**
+ * Guarda o actualiza una configuración de secretaría
+ */
+function guardarConfiguracionSecretaria($clave, $valor) {
+    global $db;
+
+    $query = "INSERT INTO secretaria_config (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('ss', $clave, $valor);
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
+}
+
+/**
+ * Obtiene los cupos configurados por carrera y turno
+ */
+function obtenerCuposSecretaria() {
+    global $db;
+
+    $cupos = [];
+    $query = "SELECT carrera_id, turno, cupos_totales, numero_secciones FROM secretaria_cupos";
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $cupos[$row['carrera_id']][$row['turno']] = [
+                'cupos_totales' => (int)$row['cupos_totales'],
+                'numero_secciones' => (int)$row['numero_secciones']
+            ];
+        }
+        $stmt->close();
+    }
+    return $cupos;
+}
+
+/**
+ * Guarda o actualiza cupos por carrera y turno
+ */
+function guardarCupoSecretaria($carreraId, $turno, $cuposTotales, $numeroSecciones = 1) {
+    global $db;
+
+    $query = "INSERT INTO secretaria_cupos (carrera_id, turno, cupos_totales, numero_secciones) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE cupos_totales = VALUES(cupos_totales), numero_secciones = VALUES(numero_secciones)";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('isii', $carreraId, $turno, $cuposTotales, $numeroSecciones);
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
+}
+
+/**
+ * Obtiene lista de números de sección autorizados por Secretaría para una carrera y turno.
+ */
+function obtenerNumerosSeccionDisponibles($carreraId, $turno) {
+    $cupos = obtenerCuposSecretaria();
+    if (empty($cupos[$carreraId][$turno]) || (int)$cupos[$carreraId][$turno]['numero_secciones'] <= 0) {
+        return [];
+    }
+
+    $max = (int)$cupos[$carreraId][$turno]['numero_secciones'];
+    global $db;
+
+    $query = "SELECT numero_seccion FROM secciones WHERE id_carrera = ? AND turno = ? AND status IN ('Pendiente', 'Aprobada')";
+    $stmt = $db->prepare($query);
+    $usedNumbers = [];
+    if ($stmt) {
+        $stmt->bind_param('is', $carreraId, $turno);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $usedNumbers[] = (int)$row['numero_seccion'];
+        }
+        $stmt->close();
+    }
+
+    $result = [];
+    for ($i = 1; $i <= $max; $i++) {
+        $result[] = [
+            'numero' => $i,
+            'disponible' => !in_array($i, $usedNumbers, true)
+        ];
+    }
+    return $result;
+}
+
+/**
+ * Cuenta cuántas preinscripciones están usando cupos para una carrera+turno
+ */
+function contarPreinscripcionesPorCupo($carreraId, $turno) {
+    global $db;
+
+    $checkTable = $db->query("SHOW TABLES LIKE 'preinscripcion'");
+    if (!$checkTable || $checkTable->num_rows === 0) {
+        return 0;
+    }
+
+    $query = "SELECT COUNT(*) AS total FROM preinscripcion WHERE carrera = ? AND turno = ? AND status IN ('Pendiente', 'Aprobada')";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return 0;
+    }
+    $stmt->bind_param('is', $carreraId, $turno);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    return (int)($row['total'] ?? 0);
+}
+
+/**
+ * Comprueba si hay cupos disponibles para una carrera y turno
+ */
+function hayCupoDisponible($carreraId, $turno) {
+    $cupos = obtenerCuposSecretaria();
+    if (!isset($cupos[$carreraId][$turno])) {
+        return false;
+    }
+
+    $total = (int)$cupos[$carreraId][$turno];
+    if ($total <= 0) {
+        return false;
+    }
+
+    $ocupados = contarPreinscripcionesPorCupo($carreraId, $turno);
+    return $ocupados < $total;
+}
+
+/**
+ * Obtiene secciones aprobadas por carrera y turno
+ */
+function obtenerSeccionesAprobadas($carreraId, $turno) {
+    global $db;
+
+    $secciones = [];
+    $query = "SELECT id_seccion AS id, numero_seccion, capacidad_maxima AS capacidad FROM secciones WHERE id_carrera = ? AND turno = ? AND status = 'Aprobada' ORDER BY numero_seccion";
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        $stmt->bind_param('is', $carreraId, $turno);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $secciones[] = $row;
+        }
+        $stmt->close();
+    }
+    return $secciones;
+}
+
+/**
+ * Cuenta estudiantes en una sección
+ */
+function contarEstudiantesEnSeccion($seccionId) {
+    global $db;
+
+    $query = "SELECT COUNT(*) AS total FROM users WHERE seccion_id = ?";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return 0;
+    }
+    $stmt->bind_param('i', $seccionId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    return (int)($row['total'] ?? 0);
+}
+
+/**
+ * Asigna sección automáticamente al estudiante
+ */
+function asignarSeccionAutomatica($carreraId, $turno, $userId) {
+    $secciones = obtenerSeccionesAprobadas($carreraId, $turno);
+    if (empty($secciones)) {
+        return false; // No hay secciones
+    }
+
+    foreach ($secciones as $seccion) {
+        $ocupados = contarEstudiantesEnSeccion($seccion['id']);
+        if ($ocupados < $seccion['capacidad']) {
+            // Asignar aquí
+            global $db;
+            $query = "UPDATE users SET seccion_id = ? WHERE id = ?";
+            $stmt = $db->prepare($query);
+            if ($stmt) {
+                $stmt->bind_param('ii', $seccion['id'], $userId);
+                $result = $stmt->execute();
+                $stmt->close();
+                return $result;
+            }
+        }
+    }
+    return false; // Todas llenas
+}
+
+/**
+ * Crea una nueva sección para preinscripciones
+ */
+function crearSeccionPreinscripcion($carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy) {
+    global $db;
+
+    $query = "INSERT INTO secciones (id_carrera, turno, numero_seccion, capacidad_maxima, horario, created_by) VALUES (?, ?, ?, ?, ?, ?)";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('isissi', $carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy);
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
+}
+
+/**
+ * Aprueba una sección
+ */
+function aprobarSeccion($seccionId, $approvedBy) {
+    global $db;
+
+    $query = "UPDATE secciones SET status = 'Aprobada', approved_by = ?, approved_at = NOW() WHERE id_seccion = ?";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('ii', $approvedBy, $seccionId);
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
+}
+
+/**
+ * Elimina una sección junto con horarios y asignaciones activas de estudiantes.
+ *
+ * @param int $seccionId ID de la sección
+ * @param int|null $performedBy ID del usuario que ejecuta la eliminación
+ * @return bool True si se eliminó correctamente
+ */
+function eliminarSeccion($seccionId, $performedBy = null) {
+    global $db;
+
+    if (!is_numeric($seccionId) || $seccionId <= 0) {
+        error_log("eliminarSeccion: ID de sección inválido: $seccionId");
+        return false;
+    }
+
+    try {
+        $db->begin_transaction();
+
+        // Deshabilitar restricciones de clave foránea temporalmente
+        $db->query("SET FOREIGN_KEY_CHECKS = 0");
+
+        // Verificar que la sección existe
+        $stmt = $db->prepare("SELECT id_seccion, status FROM secciones WHERE id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error preparando SELECT secciones: " . $db->error);
+        }
+        $stmt->bind_param('i', $seccionId);
+        if (!$stmt->execute()) {
+            throw new Exception("Error ejecutando SELECT secciones: " . $stmt->error);
+        }
+        $result = $stmt->get_result();
+        if ($result->num_rows === 0) {
+            throw new Exception("La sección con ID $seccionId no existe");
+        }
+        $seccion = $result->fetch_assoc();
+        $stmt->close();
+
+        error_log("Intentando eliminar sección $seccionId con status: " . $seccion['status']);
+
+        // Eliminar asignaciones de docente para la sección PRIMERO
+        // Esto automáticamente eliminará los horarios gracias a ON DELETE CASCADE
+        $stmt = $db->prepare("DELETE FROM docente_seccion WHERE id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error preparando DELETE docente_seccion: " . $db->error);
+        }
+        $stmt->bind_param('i', $seccionId);
+        if (!$stmt->execute()) {
+            throw new Exception("Error ejecutando DELETE docente_seccion: " . $stmt->error);
+        }
+        $docentes_eliminados = $stmt->affected_rows;
+        $stmt->close();
+
+        // Eliminar estudiantes de la sección DESPUÉS
+        $stmt = $db->prepare("DELETE FROM estudiante_seccion WHERE id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error preparando DELETE estudiante_seccion: " . $db->error);
+        }
+        $stmt->bind_param('i', $seccionId);
+        if (!$stmt->execute()) {
+            throw new Exception("Error ejecutando DELETE estudiante_seccion: " . $stmt->error);
+        }
+        $estudiantes_eliminados = $stmt->affected_rows;
+        $stmt->close();
+
+        // Finalmente eliminar la sección
+        $stmt = $db->prepare("DELETE FROM secciones WHERE id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error preparando DELETE secciones: " . $db->error);
+        }
+        $stmt->bind_param('i', $seccionId);
+        if (!$stmt->execute()) {
+            throw new Exception("Error ejecutando DELETE secciones: " . $stmt->error);
+        }
+        $stmt->close();
+
+        $db->commit();
+
+        // Log de éxito
+        error_log("Sección $seccionId eliminada exitosamente. Docentes eliminados: $docentes_eliminados, Estudiantes eliminados: $estudiantes_eliminados");
+
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "DELETE",
+                    "secciones",
+                    $seccionId,
+                    null,
+                    [
+                        'performed_by' => $performedBy,
+                        'seccion_id' => $seccionId
+                    ],
+                    "Secciones",
+                    "Eliminación de sección y limpieza de horarios/estudiantes"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría eliminarSeccion: " . $e->getMessage());
+            }
+        }
+
+        return true;
+    } catch (Exception $e) {
+        $db->rollback();
+        error_log("Error en eliminarSeccion: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Rechaza una sección
+ */
+function rechazarSeccion($seccionId, $approvedBy) {
+    return eliminarSeccion($seccionId, $approvedBy);
+}
+
+/**
+ * Obtiene secciones pendientes de aprobación
+ */
+function obtenerSeccionesPendientes() {
+    global $db;
+
+    $secciones = [];
+    $query = "SELECT s.*, s.id_seccion AS id, s.capacidad_maxima AS capacidad, c.nombre_carrera AS carrera_nombre, u.nombre AS creador_nombre FROM secciones s JOIN carreras c ON s.id_carrera = c.id_carrera LEFT JOIN users u ON s.created_by = u.id WHERE s.status = 'Pendiente' ORDER BY s.created_at DESC";
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $secciones[] = $row;
+        }
+    }
+    return $secciones;
+}
+
+/**
+ * Acepta una preinscripción y crea el usuario en la tabla users
+ */
+function aceptarPreinscripcion($id, $adminId) {
+    global $db;
+
+    $preinscripcion = obtenerPreinscripcionPorId($id);
+    if (!$preinscripcion) {
+        return [
+            'success' => false,
+            'message' => 'Preinscripción no encontrada.'
+        ];
+    }
+
+    if (estudianteExiste($preinscripcion['idusuario'])) {
+        return [
+            'success' => false,
+            'message' => 'Ya existe un estudiante registrado con esta cédula.'
+        ];
+    }
+
+    $datos = [
+        'idusuario' => $preinscripcion['idusuario'],
+        'nombre' => $preinscripcion['nombre'],
+        'email' => $preinscripcion['email'],
+        'tlf' => $preinscripcion['tlf'],
+        'cel' => $preinscripcion['cel'],
+        'direccion' => $preinscripcion['direccion'],
+        'municipio' => $preinscripcion['municipio'],
+        'estado' => $preinscripcion['estado'],
+        'parroquia' => $preinscripcion['parroquia'],
+        'etnia' => $preinscripcion['etnia'],
+        'casaapto' => $preinscripcion['casaapto'],
+        'punto_referencia' => $preinscripcion['punto_referencia'],
+        'grupo_familiar' => $preinscripcion['grupo_familiar'],
+        'acargo_usted' => $preinscripcion['acargo_usted'],
+        'fuente_ingresos' => $preinscripcion['fuente_ingresos'],
+        'tipo_vivienda' => $preinscripcion['tipo_vivienda'],
+        'tenencia_vivienda' => $preinscripcion['tenencia_vivienda'],
+        'enfermedad' => $preinscripcion['enfermedad'],
+        'discapacidad' => $preinscripcion['discapacidad'],
+        'titulos' => !empty($preinscripcion['titulos']) ? explode('|||', $preinscripcion['titulos']) : [],
+        'institutos' => !empty($preinscripcion['institutos']) ? explode('|||', $preinscripcion['institutos']) : [],
+        'potencialidades' => $preinscripcion['potencialidades'],
+        'carrera' => $preinscripcion['carrera'],
+        'genero' => $preinscripcion['genero'],
+        'edo_civil' => $preinscripcion['edo_civil'],
+        'fecha_nac' => $preinscripcion['fecha_nac'],
+        'embarazada' => $preinscripcion['embarazada'],
+        'num_telf_opc' => $preinscripcion['num_telf_opc'],
+        'fecha_ingreso' => $preinscripcion['fecha_ingreso'],
+        'status' => 'Activo',
+        'foto_perfil' => $preinscripcion['foto_perfil'] ?? ''
+    ];
+
+    $resultado = insertarEstudiante($datos);
+    if (!$resultado['success']) {
+        return $resultado;
+    }
+
+    // Asignar sección automáticamente
+    asignarSeccionAutomatica($preinscripcion['carrera'], $preinscripcion['turno'], $resultado['id']);
+
+    $query = "UPDATE preinscripcion SET status = 'Aprobada', aprobado_por = ?, fecha_aprobado = NOW() WHERE id = ?";
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        $stmt->bind_param('ii', $adminId, $id);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    return [
+        'success' => true,
+        'message' => '✅ Preinscripción aceptada y estudiante creado en el sistema.',
+        'user_id' => $resultado['id']
+    ];
+}
+
+/**
+ * Rechaza una preinscripción
+ */
+function rechazarPreinscripcion($id, $adminId, $motivo = null) {
+    global $db;
+
+    $query = "UPDATE preinscripcion SET status = 'Rechazada', rechazado_por = ?, fecha_rechazo = NOW(), motivo_rechazo = ? WHERE id = ?";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return [
+            'success' => false,
+            'message' => 'Error al preparar el rechazo de la preinscripción.'
+        ];
+    }
+
+    $stmt->bind_param('isi', $adminId, $motivo, $id);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        return [
+            'success' => false,
+            'message' => 'Error al rechazar la preinscripción: ' . $stmt->error
+        ];
+    }
+
+    $stmt->close();
+    return [
+        'success' => true,
+        'message' => 'Preinscripción rechazada correctamente.'
+    ];
+}
+
+/**
  * Función auxiliar para verificar si el username (cédula) ya existe
  * Si ya existe, lanza una excepción porque la cédula debe ser única
  */
@@ -926,6 +1740,10 @@ function validarEstudiante($datos) {
         if (empty($datos[$campo])) {
             $errores[] = "El campo " . str_replace('_', ' ', $campo) . " es requerido";
         }
+    }
+
+    if (isset($datos['user_type']) && $datos['user_type'] === 'preinscrito' && empty($datos['turno'])) {
+        $errores[] = 'El campo turno es requerido para la preinscripción';
     }
     
     // Validación especial para carrera cuando se selecciona "OTRA"
@@ -7284,6 +8102,7 @@ function obtenerListadoSecciones($db) {
                             p.activo as periodo_activo, 
                             s.capacidad_maxima,
                             s.inicia,  
+                            s.status,
                             CASE WHEN p.activo = 0 THEN 'inactiva' ELSE s.estatus END as estatus,
                             COUNT(es.id_usuario) as inscritos
                           FROM secciones s
@@ -18215,6 +19034,8 @@ function obtenerNombresUbicacion($id_estado, $id_municipio, $id_parroquia) {
             $stmt->fetch();
             $stmt->close();
         }
+    } elseif (!empty($id_estado)) {
+        $ubicacion['estado_nombre'] = $id_estado;
     }
     
     // Obtener nombre del municipio
@@ -18228,6 +19049,8 @@ function obtenerNombresUbicacion($id_estado, $id_municipio, $id_parroquia) {
             $stmt->fetch();
             $stmt->close();
         }
+    } elseif (!empty($id_municipio)) {
+        $ubicacion['municipio_nombre'] = $id_municipio;
     }
     
     // Obtener nombre de la parroquia
@@ -18241,6 +19064,8 @@ function obtenerNombresUbicacion($id_estado, $id_municipio, $id_parroquia) {
             $stmt->fetch();
             $stmt->close();
         }
+    } elseif (!empty($id_parroquia)) {
+        $ubicacion['parroquia_nombre'] = $id_parroquia;
     }
     
     return $ubicacion;

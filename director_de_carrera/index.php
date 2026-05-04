@@ -133,6 +133,20 @@ visita();
                     </div>
                 </div>
             </div>
+
+            <!-- Tarjeta de Crear Sección -->
+            <div class="col-md-5 mb-4">
+                <div class="card feature-card seccion-card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="card-icon">
+                            <i class="fas fa-plus-circle"></i>
+                        </div>
+                        <h3 class="card-title h4 font-weight-bold">Crear Sección</h3>
+                        <p class="card-text text-muted">Cree nuevas secciones con horarios para su programa</p>
+                        <a href="crear_seccion.php" class="btn btn-access btn-seccion mt-3">Acceder</a>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Mensaje de bienvenida -->

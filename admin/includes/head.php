@@ -241,6 +241,12 @@ if (!isLoggedIn() || !isAdmin()) {
                             </a>
                         <?php endif; ?>
 
+                        <?php if (tienePermiso('admin')): ?>
+                            <a title="Preinscripciones" class="dropdown-item" href="preinscripciones.php">
+                                <i class="fas fa-file-signature fa-fw"></i> Preinscripciones
+                            </a>
+                        <?php endif; ?>
+
                          <?php if (tienePermiso('admin')): ?>
                         <a title="Inscribir Materias a Estudiantes" class="dropdown-item" href="inscripcion_materias.php">
                             <i class="fas fa-clipboard-list fa-fw"></i> Inscribir Materias

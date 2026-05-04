@@ -700,6 +700,36 @@ INSERT INTO `carreras` (`id_carrera`, `nombre_carrera`, `cod_carrera`, `activa`,
 -- --------------------------------------------------------
 
 --
+-- Estructura de tabla para la tabla `secretaria_config`
+--
+
+CREATE TABLE `secretaria_config` (
+  `clave` varchar(100) NOT NULL,
+  `valor` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`clave`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `secretaria_cupos`
+--
+
+CREATE TABLE `secretaria_cupos` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `carrera_id` int NOT NULL,
+  `turno` varchar(50) NOT NULL,
+  `cupos_totales` int NOT NULL DEFAULT 0,
+  `numero_secciones` int NOT NULL DEFAULT 1,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_carrera_turno` (`carrera_id`, `turno`),
+  KEY `idx_carrera` (`carrera_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Estructura de tabla para la tabla `carrera_materia`
 --
 
@@ -755,7 +785,7 @@ CREATE TABLE `carrera_versiones` (
   `id_carrera` int NOT NULL,
   `fecha_vigencia` datetime NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
 -- Volcado de datos para la tabla `carrera_versiones`
@@ -1654,7 +1684,7 @@ CREATE TABLE `mallas` (
   `anio` int NOT NULL,
   `descripcion` text,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
 -- Volcado de datos para la tabla `mallas`
@@ -1678,7 +1708,7 @@ CREATE TABLE `malla_materia` (
   `id_malla` int NOT NULL,
   `id_materia` int NOT NULL,
   `semestre` int NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
 -- Volcado de datos para la tabla `malla_materia`
@@ -3589,7 +3619,7 @@ CREATE TABLE `prelaciones` (
   `id_prerequisito` int NOT NULL,
   `tipo` varchar(50) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
 -- Volcado de datos para la tabla `prelaciones`
@@ -3646,9 +3676,11 @@ CREATE TABLE `revision_mensajes` (
 --
 
 CREATE TABLE `secciones` (
-  `id_seccion` int NOT NULL,
+  `id_seccion` int NOT NULL AUTO_INCREMENT,
   `codigo_seccion` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL,
   `id_carrera` int NOT NULL,
+  `turno` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `numero_seccion` int DEFAULT NULL,
   `id_trayecto` int NOT NULL,
   `id_periodo` int NOT NULL,
   `capacidad_maxima` int NOT NULL,
@@ -3656,9 +3688,14 @@ CREATE TABLE `secciones` (
   `aula_asignada` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
   `horario` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci,
   `estatus` enum('activa','inactiva','completa') CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT 'activa',
+  `status` enum('Pendiente','Aprobada','Rechazada') CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT 'Pendiente',
+  `created_by` int DEFAULT NULL,
+  `approved_by` int DEFAULT NULL,
+  `approved_at` timestamp NULL DEFAULT NULL,
   `inicia` datetime DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_seccion`)
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
 -- Volcado de datos para la tabla `secciones`
@@ -4415,7 +4452,7 @@ CREATE TABLE `version_materia` (
   `id_version` int NOT NULL,
   `id_materia` int NOT NULL,
   `semestre` int NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
 -- Volcado de datos para la tabla `version_materia`
@@ -6310,7 +6347,6 @@ ALTER TABLE `revision_mensajes`
 -- Indices de la tabla `secciones`
 --
 ALTER TABLE `secciones`
-  ADD PRIMARY KEY (`id_seccion`),
   ADD KEY `id_carrera` (`id_carrera`),
   ADD KEY `id_trayecto` (`id_trayecto`),
   ADD KEY `id_periodo` (`id_periodo`);
@@ -6666,12 +6702,6 @@ ALTER TABLE `respaldos_descargas`
 --
 ALTER TABLE `revision_mensajes`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `secciones`
---
-ALTER TABLE `secciones`
-  MODIFY `id_seccion` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT de la tabla `status`

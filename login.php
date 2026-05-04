@@ -1,13 +1,15 @@
 <?php
 
 error_reporting(E_ALL);
-ini_set('display_errors', '0');
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
 
 
 $titulo ="Ingreso al Sistema";
 include('funciones/functions.php');
 
-
+$mostrarPreinscripcion = obtenerConfiguracionSecretaria('mostrar_preinscripcion', '1');
+$mostrarProsecucion = obtenerConfiguracionSecretaria('mostrar_prosecucion', '1');
 
 ?>
 
@@ -32,12 +34,29 @@ include('funciones/functions.php');
 </div>
 
 
-</div> <!-- CIERRE DE GRUPO DE BOTONES 2 -->
-</nav>
 <hr>
 
 <nav class="nav nav-pills justify-content-end"> 
         <div class="btn-group-horizontal" >
+            <!-- Botón de Preinscripción -->
+            <?php if ($mostrarPreinscripcion !== '0'): ?>
+            <span class="d-inline-block" data-toggle="popover" data-content="Complete el formulario de preinscripción para iniciar su proceso de admisión.">
+                <a type="link" class="btn btn-outline-success" href="preinscripcion.php">
+                    <i class="fa fa-edit"></i> Preinscripción
+                </a>
+            </span>
+            <?php endif; ?>
+            
+            <!-- Botón de Prosecución -->
+            <?php if ($mostrarProsecucion !== '0'): ?>
+            <span class="d-inline-block" data-toggle="popover" data-content="Continúe con su proceso de prosecución académica.">
+                <a type="link" class="btn btn-outline-info" href="prosecucion.php">
+                    <i class="fa fa-graduation-cap"></i> Prosecución
+                </a>
+            </span>
+            <?php endif; ?>
+            
+            <!-- Botones de Recuperar Contraseña -->
             <span class="d-inline-block" data-toggle="popover" data-content="...">
                 <a type="link" class="btn btn-outline-danger" href="recuperar_password.php">
                     <i class="fa fa-unlock-alt"></i> Recuperar Contraseña
@@ -46,11 +65,7 @@ include('funciones/functions.php');
                     <i class="fa fa-unlock-alt"></i> Recuperar Contraseña provicional
                 </a>
             </span>
-            <span class="d-inline-block" data-toggle="popover" data-content="...">
-                <a id="afiliarse" class="btn btn-outline-success" href="registro.php">
-                    <i class="fas fa-key"></i> Afiliarse al Servicio
-                </a>
-            </span>
+            
         </div>
     </nav>
 
@@ -106,9 +121,3 @@ unset($_SESSION['msg']);
 </div>
 
 <hr>
-
-
-
-
-
-
