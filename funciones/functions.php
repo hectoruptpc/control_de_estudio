@@ -7411,18 +7411,19 @@ define('MINIMO_ESTUDIANTES', 10);
  */
 function crearSeccion($db, $datos) {
     try {
-        $stmt = $db->prepare("INSERT INTO secciones (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, inicia, estatus) 
-                            VALUES (?, ?, ?, ?, ?, ?, 'inactiva')");
+        $stmt = $db->prepare("INSERT INTO secciones (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, turno, inicia, estatus) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 'inactiva')");
         if (!$stmt) {
             throw new Exception("Error en preparación: " . $db->error);
         }
         
-        $stmt->bind_param("siiiis", 
+        $stmt->bind_param("siiiisss", 
             $datos['codigo_seccion'], 
             $datos['id_carrera'], 
             $datos['id_trayecto'], 
             $datos['id_periodo'], 
             $datos['capacidad_maxima'],
+            $datos['turno'],
             $datos['inicia']);
         
         if (!$stmt->execute()) {
@@ -7446,6 +7447,7 @@ function crearSeccion($db, $datos) {
                         'id_trayecto' => $datos['id_trayecto'],
                         'id_periodo' => $datos['id_periodo'],
                         'capacidad_maxima' => $datos['capacidad_maxima'],
+                        'turno' => $datos['turno'],
                         'inicia' => $datos['inicia'],
                         'estatus' => 'inactiva'
                     ], 
@@ -7521,18 +7523,20 @@ function editarSeccion($db, $datos) {
                                 id_trayecto = ?, 
                                 id_periodo = ?, 
                                 capacidad_maxima = ?,
+                                turno = ?,
                                 inicia = ?
                             WHERE id_seccion = ?");
         if (!$stmt) {
             throw new Exception("Error en preparación: " . $db->error);
         }
         
-        $stmt->bind_param("siiiisi", 
+        $stmt->bind_param("siiiissi", 
             $datos['codigo_seccion'], 
             $datos['id_carrera'], 
             $datos['id_trayecto'], 
             $datos['id_periodo'], 
             $datos['capacidad_maxima'],
+            $datos['turno'],
             $datos['inicia'],
             $datos['id_seccion']);
         
@@ -25472,6 +25476,187 @@ WHERE pre.id_producto IS NULL AND p.id IN (
 } else {
     //echo "<h1>No se encontraron productos sin precio</h1>"; 
 }
+}
+
+/**
+ * Obtiene todos los códigos de secciones
+ * @return array Lista de códigos de secciones
+ */
+function obtenerCodigosSecciones() {
+    global $db;
+    
+    $sql = "SELECT cs.*, c.nombre_carrera 
+            FROM codigos_secciones cs 
+            INNER JOIN carreras c ON cs.id_carrera = c.id_carrera 
+            ORDER BY c.nombre_carrera, cs.codigo_inicio";
+    
+    $result = $db->query($sql);
+    $codigos = [];
+    
+    while ($row = $result->fetch_assoc()) {
+        $codigos[] = $row;
+    }
+    
+    return $codigos;
+}
+
+/**
+ * Inserta un nuevo código de sección
+ * @param int $id_carrera ID de la carrera
+ * @param int $codigo_inicio Código inicial del rango
+ * @param int $codigo_fin Código final del rango
+ * @param string $descripcion Descripción opcional
+ * @return array Resultado con success y message
+ */
+function insertarCodigoSeccion($id_carrera, $codigo_inicio, $codigo_fin, $descripcion) {
+    global $db;
+    
+    // Validar que no se solape con rangos existentes para la misma carrera
+    $sql_check = "SELECT COUNT(*) as total FROM codigos_secciones 
+                  WHERE id_carrera = ? AND 
+                  ((? BETWEEN codigo_inicio AND codigo_fin) OR 
+                   (? BETWEEN codigo_inicio AND codigo_fin) OR 
+                   (codigo_inicio BETWEEN ? AND ?) OR 
+                   (codigo_fin BETWEEN ? AND ?))";
+    
+    $stmt_check = $db->prepare($sql_check);
+    $stmt_check->bind_param("iiiiiii", $id_carrera, $codigo_inicio, $codigo_fin, $codigo_inicio, $codigo_fin, $codigo_inicio, $codigo_fin);
+    $stmt_check->execute();
+    $result_check = $stmt_check->get_result();
+    $row_check = $result_check->fetch_assoc();
+    
+    if ($row_check['total'] > 0) {
+        return ['success' => false, 'message' => 'El rango de códigos se solapa con uno existente para esta carrera.'];
+    }
+    
+    $sql = "INSERT INTO codigos_secciones (id_carrera, codigo_inicio, codigo_fin, descripcion) 
+            VALUES (?, ?, ?, ?)";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iiis", $id_carrera, $codigo_inicio, $codigo_fin, $descripcion);
+    
+    if ($stmt->execute()) {
+        return ['success' => true, 'message' => 'Código de sección creado correctamente.'];
+    } else {
+        return ['success' => false, 'message' => 'Error al crear el código de sección: ' . $stmt->error];
+    }
+}
+
+/**
+ * Actualiza un código de sección
+ * @param int $id ID del registro
+ * @param int $id_carrera ID de la carrera
+ * @param int $codigo_inicio Código inicial
+ * @param int $codigo_fin Código final
+ * @param string $descripcion Descripción
+ * @return array Resultado
+ */
+function actualizarCodigoSeccion($id, $id_carrera, $codigo_inicio, $codigo_fin, $descripcion) {
+    global $db;
+    
+    // Validar que no se solape con otros rangos (excluyendo el actual)
+    $sql_check = "SELECT COUNT(*) as total FROM codigos_secciones 
+                  WHERE id != ? AND id_carrera = ? AND 
+                  ((? BETWEEN codigo_inicio AND codigo_fin) OR 
+                   (? BETWEEN codigo_inicio AND codigo_fin) OR 
+                   (codigo_inicio BETWEEN ? AND ?) OR 
+                   (codigo_fin BETWEEN ? AND ?))";
+    
+    $stmt_check = $db->prepare($sql_check);
+    $stmt_check->bind_param("iiiiiiii", $id, $id_carrera, $codigo_inicio, $codigo_fin, $codigo_inicio, $codigo_fin, $codigo_inicio, $codigo_fin);
+    $stmt_check->execute();
+    $result_check = $stmt_check->get_result();
+    $row_check = $result_check->fetch_assoc();
+    
+    if ($row_check['total'] > 0) {
+        return ['success' => false, 'message' => 'El rango de códigos se solapa con uno existente para esta carrera.'];
+    }
+    
+    $sql = "UPDATE codigos_secciones SET id_carrera = ?, codigo_inicio = ?, codigo_fin = ?, descripcion = ? 
+            WHERE id = ?";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iiisi", $id_carrera, $codigo_inicio, $codigo_fin, $descripcion, $id);
+    
+    if ($stmt->execute()) {
+        return ['success' => true, 'message' => 'Código de sección actualizado correctamente.'];
+    } else {
+        return ['success' => false, 'message' => 'Error al actualizar el código de sección: ' . $stmt->error];
+    }
+}
+
+/**
+ * Elimina un código de sección
+ * @param int $id ID del registro
+ * @return array Resultado
+ */
+function eliminarCodigoSeccion($id) {
+    global $db;
+    
+    $sql = "DELETE FROM codigos_secciones WHERE id = ?";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id);
+    
+    if ($stmt->execute()) {
+        return ['success' => true, 'message' => 'Código de sección eliminado correctamente.'];
+    } else {
+        return ['success' => false, 'message' => 'Error al eliminar el código de sección: ' . $stmt->error];
+    }
+}
+
+/**
+ * Genera un código de sección automáticamente basado en los rangos definidos
+ * @param int $id_carrera ID de la carrera
+ * @return string Código generado o null si no hay rango disponible
+ */
+function generarCodigoSeccion($id_carrera) {
+    global $db;
+    
+    // Obtener el rango para la carrera
+    $sql = "SELECT codigo_inicio, codigo_fin FROM codigos_secciones 
+            WHERE id_carrera = ? 
+            ORDER BY codigo_inicio";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_carrera);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows == 0) {
+        return null; // No hay rango definido
+    }
+    
+    $rangos = [];
+    while ($row = $result->fetch_assoc()) {
+        $rangos[] = $row;
+    }
+    
+    // Obtener códigos ya usados en secciones para esta carrera
+    $sql_usados = "SELECT DISTINCT CAST(codigo_seccion AS UNSIGNED) as codigo_num 
+                   FROM secciones 
+                   WHERE id_carrera = ? AND codigo_seccion REGEXP '^[0-9]+$'";
+    
+    $stmt_usados = $db->prepare($sql_usados);
+    $stmt_usados->bind_param("i", $id_carrera);
+    $stmt_usados->execute();
+    $result_usados = $stmt_usados->get_result();
+    
+    $usados = [];
+    while ($row = $result_usados->fetch_assoc()) {
+        $usados[] = (int)$row['codigo_num'];
+    }
+    
+    // Encontrar el primer código disponible en los rangos
+    foreach ($rangos as $rango) {
+        for ($codigo = $rango['codigo_inicio']; $codigo <= $rango['codigo_fin']; $codigo++) {
+            if (!in_array($codigo, $usados)) {
+                return (string)$codigo;
+            }
+        }
+    }
+    
+    return null; // No hay códigos disponibles
 }
 
 ?>

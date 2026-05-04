@@ -21,12 +21,26 @@ $periodo_id = $_POST['periodo'] ?? 0;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['crear_seccion'])) {
         // Procesar creación de sección
+        $id_carrera = (int)$_POST['id_carrera'];
+        $codigo_seccion = trim($_POST['codigo_seccion']);
+        
+        // Generar código automáticamente si no se proporciona
+        if (empty($codigo_seccion)) {
+            $codigo_seccion = generarCodigoSeccion($id_carrera);
+            if (!$codigo_seccion) {
+                $_SESSION['error'] = 'No hay códigos disponibles para esta carrera. Configure los rangos de códigos primero.';
+                header("Location: cod_secciones.php");
+                exit();
+            }
+        }
+        
         $datos = [
-            'codigo_seccion' => trim($_POST['codigo_seccion']),
-            'id_carrera' => (int)$_POST['id_carrera'],
+            'codigo_seccion' => $codigo_seccion,
+            'id_carrera' => $id_carrera,
             'id_trayecto' => (int)$_POST['id_trayecto'],
             'id_periodo' => (int)$_POST['id_periodo'],
             'capacidad_maxima' => (int)$_POST['capacidad_maxima'],
+            'turno' => trim($_POST['turno']),
             'inicia' => $_POST['inicia']
         ];
         
@@ -49,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'id_trayecto' => (int)$_POST['id_trayecto'],
             'id_periodo' => (int)$_POST['id_periodo'],
             'capacidad_maxima' => (int)$_POST['capacidad_maxima'],
+            'turno' => trim($_POST['turno']),
             'inicia' => $_POST['inicia']
         ];
         
@@ -397,13 +412,13 @@ include("includes/head.php");
                     <?php endif; ?>
                     
                     <div class="form-row">
-                        <div class="form-group col-md-3">
+                        <div class="form-group col-md-2">
                             <label for="codigo_seccion">Código de Sección *</label>
                             <input type="text" class="form-control" id="codigo_seccion" name="codigo_seccion" 
-                                   value="<?= $seccion['codigo_seccion'] ?? '' ?>" required>
+                                   value="<?= $seccion['codigo_seccion'] ?? '' ?>" required readonly>
                         </div>
                         
-                        <div class="form-group col-md-4">
+                        <div class="form-group col-md-3">
                             <label for="id_carrera">Carrera *</label>
                             <select class="form-control" id="id_carrera" name="id_carrera" required>
                                 <option value="">Seleccione...</option>
@@ -428,6 +443,29 @@ include("includes/head.php");
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        
+                        <div class="form-group col-md-2">
+                            <label for="turno">Turno *</label>
+                            <select class="form-control" id="turno" name="turno" required>
+                                <option value="">Seleccione...</option>
+                                <option value="Diurno" <?= isset($seccion['turno']) && $seccion['turno'] == 'Diurno' ? 'selected' : '' ?>>Diurno</option>
+                                <option value="Nocturno" <?= isset($seccion['turno']) && $seccion['turno'] == 'Nocturno' ? 'selected' : '' ?>>Nocturno</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group col-md-3">
+                            <label for="id_periodo">Período *</label>
+                            <select class="form-control" id="id_periodo" name="id_periodo" required>
+                                <option value="">Seleccione...</option>
+                                <?php foreach ($periodos as $periodo): ?>
+                                    <option value="<?= $periodo['id_periodo'] ?>" 
+                                        <?= isset($seccion['id_periodo']) && $seccion['id_periodo'] == $periodo['id_periodo'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($periodo['nombre_periodo']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
                         
                         <div class="form-group col-md-3">
                             <label for="id_periodo">Período *</label>
@@ -466,6 +504,41 @@ include("includes/head.php");
                         <i class="fas fa-times"></i> Cancelar
                     </a>
                 </form>
+                
+                <script>
+                $(document).ready(function() {
+                    function generarCodigo() {
+                        var id_carrera = $('#id_carrera').val();
+                        
+                        if (id_carrera) {
+                            $.ajax({
+                                url: 'ajax_generar_codigo.php',
+                                type: 'POST',
+                                data: {
+                                    id_carrera: id_carrera
+                                },
+                                success: function(response) {
+                                    var data = JSON.parse(response);
+                                    if (data.success) {
+                                        $('#codigo_seccion').val(data.codigo);
+                                    } else {
+                                        $('#codigo_seccion').val('');
+                                        alert(data.message);
+                                    }
+                                },
+                                error: function() {
+                                    $('#codigo_seccion').val('');
+                                    alert('Error al generar código');
+                                }
+                            });
+                        } else {
+                            $('#codigo_seccion').val('');
+                        }
+                    }
+                    
+                    $('#id_carrera').change(generarCodigo);
+                });
+                </script>
             </div>
         </div>
 

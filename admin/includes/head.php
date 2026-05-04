@@ -460,6 +460,13 @@ if (!isLoggedIn() || !isAdmin()) {
                             <i class="fas fa-user-clock fa-fw"></i> Horarios por Personal
                         </a>
                         <?php endif; ?>
+
+                        <!-- Códigos de Secciones -->
+                        <?php if (tienePermiso('admin')): ?>
+                        <a title="Definir códigos de secciones" class="dropdown-item" href="cod_secciones.php">
+                            <i class="fas fa-hashtag fa-fw"></i> Códigos de Secciones
+                        </a>
+                        <?php endif; ?>
                         
                         <!-- Cerrar Sesión -->
                         <div class="dropdown-divider"></div>
