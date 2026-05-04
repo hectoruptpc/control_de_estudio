@@ -26,9 +26,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Generar código automáticamente si no se proporciona
         if (empty($codigo_seccion)) {
-            $codigo_seccion = generarCodigoSeccion($id_carrera);
+            $turno_seccion = trim($_POST['turno']);
+            $codigo_seccion = generarCodigoSeccion($id_carrera, $turno_seccion);
             if (!$codigo_seccion) {
-                $_SESSION['error'] = 'No hay códigos disponibles para esta carrera. Configure los rangos de códigos primero.';
+                $_SESSION['error'] = 'No hay códigos disponibles para esta carrera y turno. Configure los rangos de códigos primero.';
                 header("Location: cod_secciones.php");
                 exit();
             }
@@ -511,11 +512,13 @@ include("includes/head.php");
                         var id_carrera = $('#id_carrera').val();
                         
                         if (id_carrera) {
+                            var turno = $('#turno').val();
                             $.ajax({
                                 url: 'ajax_generar_codigo.php',
                                 type: 'POST',
                                 data: {
-                                    id_carrera: id_carrera
+                                    id_carrera: id_carrera,
+                                    turno: turno
                                 },
                                 success: function(response) {
                                     var data = JSON.parse(response);
@@ -536,7 +539,10 @@ include("includes/head.php");
                         }
                     }
                     
-                    $('#id_carrera').change(generarCodigo);
+                    $('#id_carrera, #turno').change(generarCodigo);
+                    if ($('#id_carrera').val() && $('#turno').val()) {
+                        generarCodigo();
+                    }
                 });
                 </script>
             </div>

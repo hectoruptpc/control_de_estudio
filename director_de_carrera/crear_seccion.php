@@ -30,19 +30,20 @@ foreach ($carreras as $c) {
 
 $cupos = obtenerCuposSecretaria();
 $turnos = ['Diurno', 'Nocturno'];
-$availableNumbersByTurno = [
-    'Diurno' => obtenerNumerosSeccionDisponibles($carreraId, 'Diurno'),
-    'Nocturno' => obtenerNumerosSeccionDisponibles($carreraId, 'Nocturno')
+$availableCodesByTurno = [
+    'Diurno' => obtenerCodigosSeccionDisponibles($carreraId, 'Diurno'),
+    'Nocturno' => obtenerCodigosSeccionDisponibles($carreraId, 'Nocturno')
 ];
 $availableNumbers = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['crear_seccion'])) {
     $turno = trim($_POST['turno'] ?? '');
-    $numeroSeccion = (int)($_POST['numero_seccion'] ?? 0);
+    $codigoSeccion = trim($_POST['numero_seccion'] ?? '');
+    $numeroSeccion = (int)$codigoSeccion;
     $capacidad = (int)($_POST['capacidad'] ?? 30);
     $horario = trim($_POST['horario'] ?? '');
 
-    $availableNumbers = $availableNumbersByTurno[$turno] ?? [];
+    $availableCodes = $availableCodesByTurno[$turno] ?? [];
     $config = $cupos[$carreraId][$turno] ?? null;
     $maxSecciones = $config['numero_secciones'] ?? 0;
 
@@ -50,27 +51,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['crear_seccion'])) {
         $error_message = 'Turno inválido.';
     } elseif (!$config || $maxSecciones <= 0) {
         $error_message = 'Secretaría no ha autorizado secciones para este turno.';
-    } elseif ($numeroSeccion < 1) {
-        $error_message = 'Número de sección inválido.';
-    } elseif ($numeroSeccion > $maxSecciones) {
-        $error_message = "Número de sección no puede ser mayor a $maxSecciones.";
+    } elseif (empty($codigoSeccion) || $numeroSeccion <= 0) {
+        $error_message = 'Sección inválida.';
+    } elseif (!in_array($numeroSeccion, $availableCodes, true)) {
+        $error_message = 'La sección seleccionada no está disponible.';
     } elseif ($capacidad < 1) {
         $error_message = 'Capacidad debe ser mayor a 0.';
     } elseif (empty($horario)) {
         $error_message = 'El horario es obligatorio.';
     } else {
-        // Verificar si ya existe sección con ese número
         global $db;
-        $query = "SELECT id_seccion FROM secciones WHERE id_carrera = ? AND turno = ? AND numero_seccion = ?";
+        $query = "SELECT id_seccion FROM secciones WHERE id_carrera = ? AND turno = ? AND codigo_seccion = ?";
         $stmt = $db->prepare($query);
-        $stmt->bind_param('isi', $carreraId, $turno, $numeroSeccion);
+        $stmt->bind_param('iss', $carreraId, $turno, $codigoSeccion);
         $stmt->execute();
         $result = $stmt->get_result();
         if ($result->num_rows > 0) {
-            $error_message = 'Ya existe una sección con ese número para este turno.';
+            $error_message = 'Ya existe una sección con ese código para este turno.';
         } else {
             $stmt->close();
-            if (crearSeccionPreinscripcion($carreraId, $turno, $numeroSeccion, $capacidad, $horario, $_SESSION['user']['id'])) {
+            if (crearSeccionPreinscripcion($carreraId, $turno, $numeroSeccion, $capacidad, $horario, $_SESSION['user']['id'], $codigoSeccion)) {
                 $success_message = 'Sección creada exitosamente y enviada para aprobación.';
             } else {
                 $error_message = 'Error al crear la sección.';
@@ -133,11 +133,11 @@ include('includes/head.php');
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label for="numero_seccion" class="form-label">Número de Sección</label>
+                                <label for="numero_seccion" class="form-label">Código de Sección</label>
                                 <select class="form-control" id="numero_seccion" name="numero_seccion" required>
-                                    <option value="">Seleccionar número</option>
+                                    <option value="">Seleccionar sección</option>
                                 </select>
-                                <div id="section-help" class="form-text text-muted">Solo puedes elegir los números autorizados por Secretaría.</div>
+                                <div id="section-help" class="form-text text-muted">Elige una sección disponible dentro de los rangos habilitados.</div>
                             </div>
                             <div class="col-md-6">
                                 <label for="capacidad" class="form-label">Capacidad</label>
@@ -212,7 +212,7 @@ include('includes/head.php');
 
 <script>
     const cupos = <?php echo json_encode($cupos); ?>;
-    const availableNumbersByTurno = <?php echo json_encode($availableNumbersByTurno); ?>;
+    const availableCodesByTurno = <?php echo json_encode($availableCodesByTurno); ?>;
     const previousSectionNumber = <?php echo json_encode($_POST['numero_seccion'] ?? ''); ?>;
     const carreraId = <?php echo (int)$carreraId; ?>;
     const turnoSelect = document.getElementById('turno');
@@ -226,11 +226,11 @@ include('includes/head.php');
     const addScheduleButton = document.getElementById('addScheduleRow');
 
     function buildSectionOptions(turno) {
-        numeroSeccionSelect.innerHTML = '<option value="">Seleccionar número</option>';
+        numeroSeccionSelect.innerHTML = '<option value="">Seleccionar sección</option>';
         const config = cupos[carreraId] && cupos[carreraId][turno] ? cupos[carreraId][turno] : null;
-        const max = config ? Math.max(0, parseInt(config.numero_secciones, 10)) : 0;
+        const availableCodes = availableCodesByTurno[turno] || [];
 
-        if (!config || max <= 0) {
+        if (!config || (config.numero_secciones ?? 0) <= 0) {
             const noOption = document.createElement('option');
             noOption.value = '';
             noOption.textContent = 'No autorizado por Secretaría';
@@ -245,28 +245,34 @@ include('includes/head.php');
             return;
         }
 
-        numeroSeccionSelect.disabled = false;
-        let anyAvailable = false;
-        const availableNumbers = availableNumbersByTurno[turno] || [];
-        for (let i = 1; i <= max; i++) {
-            const option = document.createElement('option');
-            option.value = i;
-            option.textContent = i;
-            const used = availableNumbers.find(item => item.numero === i && !item.disponible) || null;
-            if (used) {
-                option.textContent = `${i} — ocupado`;
-                option.disabled = true;
-            } else {
-                anyAvailable = true;
+        if (availableCodes.length === 0) {
+            const noOption = document.createElement('option');
+            noOption.value = '';
+            noOption.textContent = 'No hay secciones disponibles';
+            numeroSeccionSelect.appendChild(noOption);
+            numeroSeccionSelect.disabled = true;
+            if (sectionHelp) {
+                sectionHelp.textContent = 'Todas las secciones autorizadas ya están en uso o pendientes.';
             }
-            numeroSeccionSelect.appendChild(option);
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+            return;
         }
 
+        numeroSeccionSelect.disabled = false;
+        availableCodes.forEach(code => {
+            const option = document.createElement('option');
+            option.value = code;
+            option.textContent = code;
+            numeroSeccionSelect.appendChild(option);
+        });
+
         if (sectionHelp) {
-            sectionHelp.textContent = anyAvailable ? 'Puedes seleccionar un número autorizado por Secretaría.' : 'Todos los números autorizados ya están en uso o pendientes.';
+            sectionHelp.textContent = 'Elige una sección disponible dentro de los rangos habilitados.';
         }
         if (submitButton) {
-            submitButton.disabled = !anyAvailable;
+            submitButton.disabled = false;
         }
     }
 

@@ -1249,6 +1249,53 @@ function obtenerNumerosSeccionDisponibles($carreraId, $turno) {
 }
 
 /**
+ * Obtiene lista de códigos de sección disponibles según rangos definidos.
+ */
+function obtenerCodigosSeccionDisponibles($carreraId, $turno) {
+    global $db;
+    $rangos = [];
+    $query = "SELECT codigo_inicio, codigo_fin FROM codigos_secciones WHERE id_carrera = ? ORDER BY codigo_inicio";
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        $stmt->bind_param('i', $carreraId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $rangos[] = $row;
+        }
+        $stmt->close();
+    }
+
+    if (empty($rangos)) {
+        return [];
+    }
+
+    $usedCodes = [];
+    $query_usados = "SELECT DISTINCT CAST(codigo_seccion AS UNSIGNED) as codigo_num FROM secciones WHERE id_carrera = ? AND turno = ? AND codigo_seccion REGEXP '^[0-9]+$' AND status IN ('Pendiente', 'Aprobada')";
+    $stmt_usados = $db->prepare($query_usados);
+    if ($stmt_usados) {
+        $stmt_usados->bind_param('is', $carreraId, $turno);
+        $stmt_usados->execute();
+        $result_usados = $stmt_usados->get_result();
+        while ($row = $result_usados->fetch_assoc()) {
+            $usedCodes[] = (int)$row['codigo_num'];
+        }
+        $stmt_usados->close();
+    }
+
+    $available = [];
+    foreach ($rangos as $rango) {
+        for ($codigo = (int)$rango['codigo_inicio']; $codigo <= (int)$rango['codigo_fin']; $codigo++) {
+            if (!in_array($codigo, $usedCodes, true)) {
+                $available[] = $codigo;
+            }
+        }
+    }
+
+    return $available;
+}
+
+/**
  * Cuenta cuántas preinscripciones están usando cupos para una carrera+turno
  */
 function contarPreinscripcionesPorCupo($carreraId, $turno) {
@@ -1362,15 +1409,22 @@ function asignarSeccionAutomatica($carreraId, $turno, $userId) {
 /**
  * Crea una nueva sección para preinscripciones
  */
-function crearSeccionPreinscripcion($carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy) {
+function crearSeccionPreinscripcion($carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy, $codigoSeccion = null) {
     global $db;
 
-    $query = "INSERT INTO secciones (id_carrera, turno, numero_seccion, capacidad_maxima, horario, created_by) VALUES (?, ?, ?, ?, ?, ?)";
+    if (empty($codigoSeccion)) {
+        $codigoSeccion = generarCodigoSeccion($carreraId, $turno);
+        if (!$codigoSeccion) {
+            return false;
+        }
+    }
+
+    $query = "INSERT INTO secciones (codigo_seccion, id_carrera, turno, numero_seccion, capacidad_maxima, horario, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)";
     $stmt = $db->prepare($query);
     if (!$stmt) {
         return false;
     }
-    $stmt->bind_param('isissi', $carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy);
+    $stmt->bind_param('sissisi', $codigoSeccion, $carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy);
     $result = $stmt->execute();
     $stmt->close();
     return $result;
@@ -25610,7 +25664,7 @@ function eliminarCodigoSeccion($id) {
  * @param int $id_carrera ID de la carrera
  * @return string Código generado o null si no hay rango disponible
  */
-function generarCodigoSeccion($id_carrera) {
+function generarCodigoSeccion($id_carrera, $turno) {
     global $db;
     
     // Obtener el rango para la carrera
@@ -25632,13 +25686,13 @@ function generarCodigoSeccion($id_carrera) {
         $rangos[] = $row;
     }
     
-    // Obtener códigos ya usados en secciones para esta carrera
+    // Obtener códigos ya usados en secciones para esta carrera y turno
     $sql_usados = "SELECT DISTINCT CAST(codigo_seccion AS UNSIGNED) as codigo_num 
                    FROM secciones 
-                   WHERE id_carrera = ? AND codigo_seccion REGEXP '^[0-9]+$'";
+                   WHERE id_carrera = ? AND turno = ? AND codigo_seccion REGEXP '^[0-9]+$'";
     
     $stmt_usados = $db->prepare($sql_usados);
-    $stmt_usados->bind_param("i", $id_carrera);
+    $stmt_usados->bind_param("is", $id_carrera, $turno);
     $stmt_usados->execute();
     $result_usados = $stmt_usados->get_result();
     
