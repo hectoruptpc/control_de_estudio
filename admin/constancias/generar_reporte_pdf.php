@@ -13,11 +13,11 @@ class PDF extends FPDF
     {
         // Título
         $this->SetFont('Arial', 'B', 16);
-        $this->Cell(0, 10, mb_convert_encoding('SISTEMA DE GESTIÓN EDUCATIVA', 'ISO-8859-1', 'UTF-8'), 0, 1, 'C');
+        $this->Cell(0, 10, $this->convertText('SISTEMA DE GESTIÓN EDUCATIVA'), 0, 1, 'C');
         $this->SetFont('Arial', 'B', 14);
-        $this->Cell(0, 10, mb_convert_encoding('REPORTE DE ESTUDIANTES', 'ISO-8859-1', 'UTF-8'), 0, 1, 'C');
+        $this->Cell(0, 10, $this->convertText('REPORTE DE ESTUDIANTES'), 0, 1, 'C');
         $this->SetFont('Arial', '', 10);
-        $this->Cell(0, 6, mb_convert_encoding('Fecha de generación: ' . date('d/m/Y H:i:s'), 'ISO-8859-1', 'UTF-8'), 0, 1, 'C');
+        $this->Cell(0, 6, $this->convertText('Fecha de generación: ' . date('d/m/Y H:i:s')), 0, 1, 'C');
         $this->Ln(10);
     }
 
@@ -26,7 +26,7 @@ class PDF extends FPDF
     {
         $this->SetY(-15);
         $this->SetFont('Arial', 'I', 8);
-        $this->Cell(0, 10, mb_convert_encoding('Página ' . $this->PageNo() . '/{nb}', 'ISO-8859-1', 'UTF-8'), 0, 0, 'C');
+        $this->Cell(0, 10, $this->convertText('Página ' . $this->PageNo() . '/{nb}'), 0, 0, 'C');
     }
     
     // Cabecera de tabla
@@ -36,26 +36,38 @@ class PDF extends FPDF
         $this->SetFillColor(0, 51, 102);
         $this->SetTextColor(255, 255, 255);
         
-        $this->Cell(25, 8, mb_convert_encoding('Cédula', 'ISO-8859-1', 'UTF-8'), 1, 0, 'C', true);
-        $this->Cell(45, 8, mb_convert_encoding('Nombre', 'ISO-8859-1', 'UTF-8'), 1, 0, 'C', true);
-        $this->Cell(40, 8, mb_convert_encoding('Email', 'ISO-8859-1', 'UTF-8'), 1, 0, 'C', true);
-        $this->Cell(25, 8, mb_convert_encoding('Teléfono', 'ISO-8859-1', 'UTF-8'), 1, 0, 'C', true);
-        $this->Cell(35, 8, mb_convert_encoding('Carrera', 'ISO-8859-1', 'UTF-8'), 1, 0, 'C', true);
-        $this->Cell(20, 8, mb_convert_encoding('Género', 'ISO-8859-1', 'UTF-8'), 1, 0, 'C', true);
-        $this->Cell(15, 8, mb_convert_encoding('Edad', 'ISO-8859-1', 'UTF-8'), 1, 0, 'C', true);
-        $this->Cell(25, 8, mb_convert_encoding('Estado Civil', 'ISO-8859-1', 'UTF-8'), 1, 0, 'C', true);
-        $this->Cell(20, 8, mb_convert_encoding('Status', 'ISO-8859-1', 'UTF-8'), 1, 0, 'C', true);
-        $this->Cell(25, 8, mb_convert_encoding('Fecha Ingreso', 'ISO-8859-1', 'UTF-8'), 1, 1, 'C', true);
+        $this->Cell(25, 8, $this->convertText('Cédula'), 1, 0, 'C', true);
+        $this->Cell(45, 8, $this->convertText('Nombre'), 1, 0, 'C', true);
+        $this->Cell(40, 8, $this->convertText('Email'), 1, 0, 'C', true);
+        $this->Cell(25, 8, $this->convertText('Teléfono'), 1, 0, 'C', true);
+        $this->Cell(35, 8, $this->convertText('Carrera'), 1, 0, 'C', true);
+        $this->Cell(20, 8, $this->convertText('Género'), 1, 0, 'C', true);
+        $this->Cell(15, 8, $this->convertText('Edad'), 1, 0, 'C', true);
+        $this->Cell(25, 8, $this->convertText('Estado Civil'), 1, 0, 'C', true);
+        $this->Cell(20, 8, $this->convertText('Status'), 1, 0, 'C', true);
+        $this->Cell(25, 8, $this->convertText('Fecha Ingreso'), 1, 1, 'C', true);
         
         $this->SetTextColor(0, 0, 0);
         $this->SetFont('Arial', '', 7);
     }
     
-    // Función para convertir texto a ISO-8859-1
+    // Función para convertir texto a ISO-8859-1 manejando NULL
     function convertText($text)
     {
-        if (empty($text)) return '';
+        if ($text === null || $text === '') {
+            return '';
+        }
         return mb_convert_encoding($text, 'ISO-8859-1', 'UTF-8');
+    }
+    
+    // Función segura para substr manejando NULL
+    function safeSubstr($text, $start, $length)
+    {
+        if ($text === null || $text === '') {
+            return '';
+        }
+        $textStr = (string)$text;
+        return substr($textStr, $start, $length);
     }
 }
 
@@ -107,7 +119,7 @@ if ($result && $result->num_rows > 0) {
             }
         }
         $row['edad'] = $edad;
-        $row['telefono'] = !empty($row['tlf']) ? $row['tlf'] : $row['cel'];
+        $row['telefono'] = !empty($row['tlf']) ? $row['tlf'] : ($row['cel'] ?? '');
         $estudiantes[] = $row;
     }
 }
@@ -166,14 +178,15 @@ foreach ($estudiantes as $e) {
     $status_text = ($e['status'] == 1) ? 'Activo' : 'Inactivo';
     $fecha_ingreso = !empty($e['fecha_ingreso']) ? date('d/m/Y', strtotime($e['fecha_ingreso'])) : '';
     
-    $pdf->Cell(25, 7, $pdf->convertText(substr($e['idusuario'], 0, 20)), 1, 0, 'L');
-    $pdf->Cell(45, 7, $pdf->convertText(substr($e['nombre'], 0, 25)), 1, 0, 'L');
-    $pdf->Cell(40, 7, $pdf->convertText(substr($e['email'], 0, 25)), 1, 0, 'L');
-    $pdf->Cell(25, 7, $pdf->convertText(substr($e['telefono'], 0, 15)), 1, 0, 'L');
-    $pdf->Cell(35, 7, $pdf->convertText(substr($e['carrera'], 0, 20)), 1, 0, 'L');
-    $pdf->Cell(20, 7, $pdf->convertText(substr($e['genero'], 0, 10)), 1, 0, 'L');
+    // Usar safeSubstr para evitar errores con NULL
+    $pdf->Cell(25, 7, $pdf->convertText($pdf->safeSubstr($e['idusuario'], 0, 20)), 1, 0, 'L');
+    $pdf->Cell(45, 7, $pdf->convertText($pdf->safeSubstr($e['nombre'], 0, 25)), 1, 0, 'L');
+    $pdf->Cell(40, 7, $pdf->convertText($pdf->safeSubstr($e['email'], 0, 25)), 1, 0, 'L');
+    $pdf->Cell(25, 7, $pdf->convertText($pdf->safeSubstr($e['telefono'], 0, 15)), 1, 0, 'L');
+    $pdf->Cell(35, 7, $pdf->convertText($pdf->safeSubstr($e['carrera'], 0, 20)), 1, 0, 'L');
+    $pdf->Cell(20, 7, $pdf->convertText($pdf->safeSubstr($e['genero'], 0, 10)), 1, 0, 'L');
     $pdf->Cell(15, 7, $e['edad'], 1, 0, 'C');
-    $pdf->Cell(25, 7, $pdf->convertText(substr($e['edo_civil'], 0, 15)), 1, 0, 'L');
+    $pdf->Cell(25, 7, $pdf->convertText($pdf->safeSubstr($e['edo_civil'], 0, 15)), 1, 0, 'L');
     $pdf->Cell(20, 7, $status_text, 1, 0, 'C');
     $pdf->Cell(25, 7, $fecha_ingreso, 1, 1, 'C');
 }

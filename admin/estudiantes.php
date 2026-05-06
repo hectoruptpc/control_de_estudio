@@ -138,6 +138,9 @@ include("includes/head.php");
                             <button id="toggleEstadisticas" class="btn btn-outline-light btn-sm mb-1 mb-sm-0 me-2" onclick="toggleEstadisticas()">
                                 <i class="fas fa-chart-bar"></i> Estadísticas
                             </button>
+                            <button id="toggleFiltros" class="btn btn-outline-light btn-sm mb-1 mb-sm-0 me-2">
+                                <i class="fas fa-filter"></i> <span id="toggleFiltrosText">Ocultar Filtros</span>
+                            </button>
                             <button id="btnGenerarReporte" class="btn btn-danger btn-sm mb-1 mb-sm-0 me-2">
                                 <i class="fas fa-file-pdf"></i> Generar Reporte PDF
                             </button>
@@ -228,16 +231,19 @@ include("includes/head.php");
                             </div>
                         </div>
 
-                        <!-- Filtros Avanzados -->
-                        <div class="row mb-4">
+                        <!-- Filtros Avanzados (con toggle para ocultar/mostrar) -->
+                        <div id="filtrosContainer" class="row mb-4">
                             <div class="col-12">
                                 <div class="card border-primary">
-                                    <div class="card-header bg-primary text-white">
+                                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                                         <h6 class="mb-0">
                                             <i class="fas fa-filter me-2"></i>Filtros Avanzados
                                         </h6>
+                                        <button type="button" id="btnOcultarFiltros" class="btn btn-sm btn-outline-light">
+                                            <i class="fas fa-chevron-up"></i> Ocultar
+                                        </button>
                                     </div>
-                                    <div class="card-body">
+                                    <div class="card-body" id="filtrosBody">
                                         <!-- Buscador por Cédula -->
                                         <div class="row mb-3">
                                             <div class="col-md-12">
@@ -541,7 +547,7 @@ include("includes/head.php");
     </div>
 </div>
 
-<!-- Modal para Reporte -->
+<!-- Modales (igual que antes) -->
 <div class="modal fade" id="reporteModal" tabindex="-1" aria-labelledby="reporteModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -575,7 +581,7 @@ include("includes/head.php");
     </div>
 </div>
 
-<!-- Modales (detalle, editar, agregar, resultado) -->
+<!-- Modal para detalles del estudiante -->
 <div class="modal fade" id="detalleModal" tabindex="-1" aria-labelledby="detalleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
@@ -707,6 +713,19 @@ include("includes/head.php");
     background-color: #6f42c1 !important;
 }
 
+/* Animación para ocultar/mostrar filtros */
+.filtrosHidden .card-body {
+    display: none !important;
+}
+
+.filtrosHidden .card-header {
+    border-radius: 0.375rem !important;
+}
+
+.transition-fade {
+    transition: all 0.3s ease;
+}
+
 @media (max-width: 767.98px) {
     .card-header h5 {
         font-size: 1rem;
@@ -739,6 +758,33 @@ include("includes/head.php");
 </style>
 
 <script>
+// Variables para el estado de los filtros
+let filtrosOcultos = false;
+
+// Función para ocultar/mostrar filtros
+function toggleFiltros() {
+    const filtrosContainer = document.getElementById('filtrosContainer');
+    const toggleBtn = document.getElementById('toggleFiltros');
+    const toggleText = document.getElementById('toggleFiltrosText');
+    const btnOcultarFiltros = document.getElementById('btnOcultarFiltros');
+    
+    if (filtrosOcultos) {
+        // Mostrar filtros
+        filtrosContainer.style.display = 'block';
+        filtrosOcultos = false;
+        if (toggleText) toggleText.innerHTML = 'Ocultar Filtros';
+        if (btnOcultarFiltros) btnOcultarFiltros.innerHTML = '<i class="fas fa-chevron-up"></i> Ocultar';
+        localStorage.setItem('filtrosOcultos', 'false');
+    } else {
+        // Ocultar filtros
+        filtrosContainer.style.display = 'none';
+        filtrosOcultos = true;
+        if (toggleText) toggleText.innerHTML = 'Mostrar Filtros';
+        if (btnOcultarFiltros) btnOcultarFiltros.innerHTML = '<i class="fas fa-chevron-down"></i> Mostrar';
+        localStorage.setItem('filtrosOcultos', 'true');
+    }
+}
+
 // Función para obtener los IDs de los estudiantes filtrados actualmente
 function getEstudiantesFiltrados() {
     let filas = document.querySelectorAll('#tablaBody tr');
@@ -1016,6 +1062,10 @@ document.getElementById('btnGenerarReporte').addEventListener('click', function(
 
 document.getElementById('btnGenerarPDF').addEventListener('click', generarReportePDF);
 
+// Botón para toggle de filtros
+document.getElementById('toggleFiltros').addEventListener('click', toggleFiltros);
+document.getElementById('btnOcultarFiltros').addEventListener('click', toggleFiltros);
+
 // Función para toggle estadísticas
 window.toggleEstadisticas = function() {
     const row = document.getElementById('estadisticas-row');
@@ -1024,11 +1074,33 @@ window.toggleEstadisticas = function() {
     if (row.style.display === 'none') {
         row.style.display = 'flex';
         button.innerHTML = '<i class="fas fa-chart-bar"></i> Ocultar Estadísticas';
+        localStorage.setItem('estadisticasOcultas', 'false');
     } else {
         row.style.display = 'none';
         button.innerHTML = '<i class="fas fa-chart-bar"></i> Mostrar Estadísticas';
+        localStorage.setItem('estadisticasOcultas', 'true');
     }
 };
+
+// Cargar estado guardado
+function cargarEstadoGuardado() {
+    // Cargar estado de estadísticas
+    const estadisticasOcultas = localStorage.getItem('estadisticasOcultas');
+    if (estadisticasOcultas === 'true') {
+        document.getElementById('estadisticas-row').style.display = 'none';
+        document.getElementById('toggleEstadisticas').innerHTML = '<i class="fas fa-chart-bar"></i> Mostrar Estadísticas';
+    }
+    
+    // Cargar estado de filtros
+    const filtrosGuardados = localStorage.getItem('filtrosOcultos');
+    if (filtrosGuardados === 'true') {
+        document.getElementById('filtrosContainer').style.display = 'none';
+        filtrosOcultos = true;
+        document.getElementById('toggleFiltrosText').innerHTML = 'Mostrar Filtros';
+        const btnOcultar = document.getElementById('btnOcultarFiltros');
+        if (btnOcultar) btnOcultar.innerHTML = '<i class="fas fa-chevron-down"></i> Mostrar';
+    }
+}
 
 // Modal handlers
 document.addEventListener('click', function(e) {
@@ -1173,8 +1245,9 @@ function abrirModalNuevoEstudiante() {
     $('#agregarEstudianteModal').modal('show');
 }
 
-// Aplicar filtros al cargar
+// Aplicar filtros al cargar y cargar estado guardado
 document.addEventListener('DOMContentLoaded', function() {
+    cargarEstadoGuardado();
     aplicarFiltros();
 });
 </script>
