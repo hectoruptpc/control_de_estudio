@@ -8717,6 +8717,205 @@ function obtenerSeccionesPorCarrera($db, $carrera_id) {
 
 
 
+/**
+ * Obtiene secciones disponibles por carrera y turno
+ */
+function obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno) {
+    global $db;
+    
+    $query = "SELECT 
+        s.id_seccion,
+        s.codigo_seccion,
+        s.capacidad_maxima,
+        s.turno,
+        (SELECT COUNT(*) FROM inscripciones_seccion WHERE id_seccion = s.id_seccion) as inscritos
+    FROM secciones s
+    WHERE s.id_carrera = ? 
+        AND s.turno = ?
+        AND s.periodo_activo = 1
+        AND s.status = 'activa'
+    ORDER BY s.codigo_seccion ASC";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param('is', $carrera_id, $turno);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $secciones = [];
+    while ($row = $result->fetch_assoc()) {
+        $cupos_disponibles = $row['capacidad_maxima'] - $row['inscritos'];
+        if ($cupos_disponibles > 0) {
+            $row['cupos_disponibles'] = $cupos_disponibles;
+            $secciones[] = $row;
+        }
+    }
+    
+    return $secciones;
+}
+
+/**
+ * Asigna un estudiante a una sección disponible automáticamente
+ */
+function asignarEstudianteASeccionDisponible($usuario_id, $carrera_id, $turno) {
+    global $db;
+    
+    // Buscar sección con cupo disponible
+    $query = "SELECT 
+        s.id_seccion,
+        s.codigo_seccion,
+        s.capacidad_maxima,
+        (SELECT COUNT(*) FROM inscripciones_seccion WHERE id_seccion = s.id_seccion) as inscritos
+    FROM secciones s
+    WHERE s.id_carrera = ? 
+        AND s.turno = ?
+        AND s.periodo_activo = 1
+        AND s.status = 'activa'
+    HAVING inscritos < capacidad_maxima
+    ORDER BY inscritos ASC
+    LIMIT 1";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param('is', $carrera_id, $turno);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $seccion = $result->fetch_assoc();
+    
+    if (!$seccion) {
+        return ['success' => false, 'message' => 'No hay secciones disponibles para esta carrera y turno'];
+    }
+    
+    // Verificar si ya está inscrito
+    $check = $db->prepare("SELECT id FROM inscripciones_seccion WHERE id_usuario = ? AND id_seccion = ?");
+    $check->bind_param('ii', $usuario_id, $seccion['id_seccion']);
+    $check->execute();
+    if ($check->get_result()->num_rows > 0) {
+        return ['success' => false, 'message' => 'El estudiante ya está inscrito en esta sección'];
+    }
+    
+    // Inscribir estudiante
+    $fecha = date('Y-m-d H:i:s');
+    $insert = $db->prepare("INSERT INTO inscripciones_seccion (id_usuario, id_seccion, fecha_inscripcion) VALUES (?, ?, ?)");
+    $insert->bind_param('iis', $usuario_id, $seccion['id_seccion'], $fecha);
+    
+    if ($insert->execute()) {
+        return [
+            'success' => true, 
+            'message' => 'Estudiante asignado a la sección ' . $seccion['codigo_seccion'],
+            'seccion' => $seccion['codigo_seccion']
+        ];
+    }
+    
+    return ['success' => false, 'message' => 'Error al asignar estudiante a la sección'];
+}
+
+/**
+ * Acepta preinscripción y asigna automáticamente a sección disponible
+ */
+function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
+    global $db;
+    
+    $db->begin_transaction();
+    
+    try {
+        // Obtener datos de la preinscripción
+        $query = "SELECT * FROM preinscripciones WHERE id = ?";
+        $stmt = $db->prepare($query);
+        $stmt->bind_param('i', $preinscripcion_id);
+        $stmt->execute();
+        $preinscripcion = $stmt->get_result()->fetch_assoc();
+        
+        if (!$preinscripcion) {
+            throw new Exception('Preinscripción no encontrada');
+        }
+        
+        if ($preinscripcion['status'] !== 'Pendiente') {
+            throw new Exception('Esta preinscripción ya fue procesada');
+        }
+        
+        // Verificar si el usuario ya existe
+        $check_user = $db->prepare("SELECT id FROM users WHERE idusuario = ?");
+        $check_user->bind_param('s', $preinscripcion['idusuario']);
+        $check_user->execute();
+        $existing_user = $check_user->get_result()->fetch_assoc();
+        
+        if ($existing_user) {
+            $usuario_id = $existing_user['id'];
+        } else {
+            // Crear nuevo usuario
+            $password_hash = password_hash($preinscripcion['idusuario'], PASSWORD_DEFAULT);
+            
+            $insert_user = $db->prepare("INSERT INTO users (
+                idusuario, nombre, username, email, tlf, cel, direccion, ciudad, estado, 
+                municipio, parroquia, fecha_ingreso, fecha_nac, carrera, genero, embarazada, 
+                edo_civil, estudiante, status, password, fecha_act
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, 1, 1, ?, NOW())");
+            
+            $insert_user->bind_param(
+                'sssssssssssssssss',
+                $preinscripcion['idusuario'],
+                $preinscripcion['nombre'],
+                $preinscripcion['username'],
+                $preinscripcion['email'],
+                $preinscripcion['tlf'],
+                $preinscripcion['cel'],
+                $preinscripcion['direccion'],
+                $preinscripcion['ciudad'],
+                $preinscripcion['estado'],
+                $preinscripcion['municipio'],
+                $preinscripcion['parroquia'],
+                $preinscripcion['fecha_nac'],
+                $preinscripcion['carrera'],
+                $preinscripcion['genero'],
+                $preinscripcion['embarazada'],
+                $preinscripcion['edo_civil'],
+                $password_hash
+            );
+            
+            if (!$insert_user->execute()) {
+                throw new Exception('Error al crear el usuario: ' . $insert_user->error);
+            }
+            
+            $usuario_id = $db->insert_id;
+        }
+        
+        // Asignar a sección disponible
+        $turno = $preinscripcion['turno'] ?? 'Diurno';
+        $asignacion = asignarEstudianteASeccionDisponible($usuario_id, $preinscripcion['carrera'], $turno);
+        
+        if (!$asignacion['success']) {
+            throw new Exception($asignacion['message']);
+        }
+        
+        // Actualizar preinscripción
+        $fecha_actual = date('Y-m-d H:i:s');
+        $update = $db->prepare("UPDATE preinscripciones SET 
+            status = 'Aprobada', 
+            aprobado_por = ?, 
+            fecha_aprobado = ?,
+            updated_at = ?
+            WHERE id = ?");
+        $update->bind_param('issi', $admin_id, $fecha_actual, $fecha_actual, $preinscripcion_id);
+        $update->execute();
+        
+        $db->commit();
+        
+        return [
+            'success' => true,
+            'message' => 'Preinscripción aprobada exitosamente. ' . $asignacion['message'],
+            'seccion_asignada' => 'Sección: ' . $asignacion['seccion']
+        ];
+        
+    } catch (Exception $e) {
+        $db->rollback();
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+
+
+
+
+
 //ASIGNAR SECCIONES A DOCENTES ***********************************************************************************************
 
 

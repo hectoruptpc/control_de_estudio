@@ -15,9 +15,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = isset($_POST['aceptar_id']) ? (int)$_POST['aceptar_id'] : (int)($_POST['rechazar_id'] ?? 0);
 
     if (!empty($_POST['aceptar_id'])) {
-        $resultado = aceptarPreinscripcion($id, $_SESSION['user']['id']);
+        $resultado = aceptarPreinscripcionConSeccion($id, $_SESSION['user']['id']);
         if ($resultado['success']) {
             $success_message = $resultado['message'];
+            if (isset($resultado['seccion_asignada'])) {
+                $success_message .= ' ' . $resultado['seccion_asignada'];
+            }
         } else {
             $error_message = $resultado['message'];
         }
@@ -40,6 +43,15 @@ $preinscripcion = obtenerPreinscripcionPorId($id);
 if (!$preinscripcion) {
     header('Location: preinscripciones.php');
     exit;
+}
+
+// Obtener secciones disponibles para mostrar
+$seccionesDisponibles = [];
+if ($preinscripcion['status'] === 'Pendiente') {
+    $seccionesDisponibles = obtenerSeccionesDisponiblesPorCarreraYTurno(
+        $preinscripcion['carrera'], 
+        $preinscripcion['turno'] ?? 'Diurno'
+    );
 }
 
 $carreras = obtenerTodasLasCarreras();
@@ -107,11 +119,33 @@ include('includes/head.php');
     <div class="row mb-3">
         <div class="col-12">
             <?php if ($preinscripcion['status'] === 'Pendiente'): ?>
+                <!-- Mostrar secciones disponibles -->
+                <?php if (!empty($seccionesDisponibles)): ?>
+                    <div class="alert alert-info mb-3">
+                        <i class="fas fa-info-circle"></i> 
+                        <strong>Secciones disponibles para <?= htmlspecialchars($carreraMap[$preinscripcion['carrera']] ?? 'la carrera') ?> (Turno: <?= htmlspecialchars($preinscripcion['turno'] ?? 'Diurno') ?>):</strong>
+                        <ul class="mb-0 mt-2">
+                            <?php foreach ($seccionesDisponibles as $sec): ?>
+                                <li>Código: <strong><?= htmlspecialchars($sec['codigo_seccion']) ?></strong> - Cupos disponibles: <?= $sec['cupos_disponibles'] ?>/<?= $sec['capacidad_maxima'] ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                <?php else: ?>
+                    <div class="alert alert-warning mb-3">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>¡Atención!</strong> No hay secciones disponibles para esta carrera y turno. 
+                        Debes crear una sección antes de aprobar esta preinscripción.
+                    </div>
+                <?php endif; ?>
+
                 <div class="d-flex flex-wrap gap-2 mb-3">
-                    <form method="post" class="d-inline-block">
+                    <form method="post" class="d-inline-block" id="formAceptar">
                         <input type="hidden" name="aceptar_id" value="<?php echo (int)$preinscripcion['id']; ?>">
-                        <button type="submit" class="btn btn-success" onclick="return confirm('¿Aceptar esta preinscripción y crear el usuario?');">
-                            <i class="fas fa-check"></i> Aprobar preinscripción
+                        <button type="submit" class="btn btn-success" 
+                                id="btnAceptar"
+                                <?php echo empty($seccionesDisponibles) ? 'disabled' : ''; ?>
+                                onclick="return confirm('¿Aceptar esta preinscripción? Se creará el usuario y se asignará automáticamente a una sección disponible.');">
+                            <i class="fas fa-check"></i> Aprobar y Asignar a Sección
                         </button>
                     </form>
                     <form method="post" id="rechazarForm" class="d-inline-block">
@@ -130,6 +164,7 @@ include('includes/head.php');
         </div>
     </div>
 
+    <!-- Resto del contenido igual... -->
     <div class="row">
         <div class="col-12 col-xl-8">
             <div class="card mb-4">
@@ -269,18 +304,16 @@ include('includes/head.php');
         const rechazarBtn = document.getElementById('rechazarBtn');
         const motivoInput = document.getElementById('motivoRechazoInput');
 
-        if (!rechazarBtn || !motivoInput) {
-            return;
+        if (rechazarBtn && motivoInput) {
+            rechazarBtn.addEventListener('click', function(event) {
+                const motivo = prompt('Ingrese el motivo del rechazo:', 'Preinscripción rechazada por el administrador.');
+                if (motivo === null) {
+                    event.preventDefault();
+                    return;
+                }
+                motivoInput.value = motivo.trim() || 'Preinscripción rechazada por el administrador.';
+            });
         }
-
-        rechazarBtn.addEventListener('click', function(event) {
-            const motivo = prompt('Ingrese el motivo del rechazo:', 'Preinscripción rechazada por el administrador.');
-            if (motivo === null) {
-                event.preventDefault();
-                return;
-            }
-            motivoInput.value = motivo.trim() || 'Preinscripción rechazada por el administrador.';
-        });
     });
 </script>
 
