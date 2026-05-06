@@ -11,61 +11,85 @@ $puedeEditar = isset($_SESSION['user']['editar_estudiante']) && $_SESSION['user'
 // LLAMAR A LA FUNCIÓN DE VISITA
 visita();
 
-// Obtener lista de estudiantes
-$estudiantes = obtenerEstudiantes();
+// Obtener estudiantes (SOLO los que tienen estudiante = 1)
+$query = "SELECT 
+    id,
+    idusuario,
+    nombre,
+    username,
+    email,
+    tlf,
+    cel,
+    direccion,
+    ciudad,
+    estado,
+    municipio,
+    parroquia,
+    fecha_ingreso,
+    fecha_nac,
+    status,
+    carrera,
+    genero,
+    embarazada,
+    edo_civil,
+    num_telf_opc,
+    foto_perfil
+FROM users 
+WHERE estudiante = 1
+ORDER BY nombre ASC";
 
-// Verificar si hubo error
-if (isset($estudiantes['error'])) {
-    $error_message = $estudiantes['error'];
-    unset($estudiantes);
+$result = $db->query($query);
+$estudiantes = [];
+
+if ($result && $result->num_rows > 0) {
+    while ($row = $result->fetch_assoc()) {
+        $estudiantes[] = $row;
+    }
 }
 
 // Contar estudiantes por status y estadísticas adicionales
-$totalEstudiantes = 0;
+$totalEstudiantes = count($estudiantes);
 $activos = 0;
 $inactivos = 0;
 $embarazadas = 0;
 $menores = 0;
 $estudiantesPorCarrera = [];
 
-if (isset($estudiantes) && is_array($estudiantes)) {
-    $totalEstudiantes = count($estudiantes);
-    foreach ($estudiantes as $estudiante) {
-        $status = $estudiante['status'] ?? 0;
-        if ($status == 1) {
-            $activos++;
-        } else {
-            $inactivos++;
-        }
-
-        // Contar mujeres embarazadas
-        $esFemenino = isset($estudiante['genero']) && trim($estudiante['genero']) === 'Femenino';
-        $estaEmbarazada = isset($estudiante['embarazada']) && trim((string)$estudiante['embarazada']) === '1';
-        if ($esFemenino && $estaEmbarazada) {
-            $embarazadas++;
-        }
-
-        // Contar menores de edad
-        if (!empty($estudiante['fecha_nac'])) {
-            try {
-                $fechaNac = new DateTime($estudiante['fecha_nac']);
-                $hoy = new DateTime();
-                $edad = $fechaNac->diff($hoy)->y;
-                if ($edad < 18) {
-                    $menores++;
-                }
-            } catch (Exception $e) {
-                // Ignorar fechas inválidas
-            }
-        }
-
-        // Contar por carrera
-        $carrera = $estudiante['carrera'] ?? 'Sin Carrera';
-        if (!isset($estudiantesPorCarrera[$carrera])) {
-            $estudiantesPorCarrera[$carrera] = 0;
-        }
-        $estudiantesPorCarrera[$carrera]++;
+foreach ($estudiantes as $estudiante) {
+    $status = $estudiante['status'] ?? 0;
+    if ($status == 1) {
+        $activos++;
+    } else {
+        $inactivos++;
     }
+
+    // Contar mujeres embarazadas
+    $esFemenino = isset($estudiante['genero']) && trim($estudiante['genero']) === 'Femenino';
+    $estaEmbarazada = isset($estudiante['embarazada']) && trim((string)$estudiante['embarazada']) === '1';
+    if ($esFemenino && $estaEmbarazada) {
+        $embarazadas++;
+    }
+
+    // Contar menores de edad
+    if (!empty($estudiante['fecha_nac'])) {
+        try {
+            $fechaNac = new DateTime($estudiante['fecha_nac']);
+            $hoy = new DateTime();
+            $edad = $fechaNac->diff($hoy)->y;
+            if ($edad < 18) {
+                $menores++;
+            }
+        } catch (Exception $e) {
+            // Ignorar fechas inválidas
+        }
+    }
+
+    // Contar por carrera
+    $carrera = $estudiante['carrera'] ?? 'Sin Carrera';
+    if (!isset($estudiantesPorCarrera[$carrera])) {
+        $estudiantesPorCarrera[$carrera] = 0;
+    }
+    $estudiantesPorCarrera[$carrera]++;
 }
 
 include("includes/head.php");
@@ -93,15 +117,6 @@ include("includes/head.php");
                         </div>
                     </div>
                     <div class="card-body p-2 p-sm-3">
-                        <?php if (isset($error_message)): ?>
-                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                                <?php echo $error_message; ?>
-                                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                    <span aria-hidden="true">&times;</span>
-                                </button>
-                            </div>
-                        <?php endif; ?>
-                        
                         <!-- Conteos de estudiantes -->
                         <div id="estadisticas-row" class="row mb-4">
                             <div class="col-md-4 mb-3">
@@ -145,7 +160,7 @@ include("includes/head.php");
                                     <div class="card-body text-center">
                                         <i class="fas fa-child fa-2x mb-2"></i>
                                         <h4 class="card-title"><?php echo $menores; ?></h4>
-                                        <p class="card-text">Estudiantes Menores de Edad</p>
+                                        <p class="card-text">Menores de Edad</p>
                                     </div>
                                 </div>
                             </div>
@@ -179,147 +194,124 @@ include("includes/head.php");
                             </div>
                         </div>
 
-                        <!-- Filtros -->
+                        <!-- Buscador por Cédula -->
                         <div class="row mb-4">
                             <div class="col-12">
-                                <div class="card">
-                                    <div class="card-header bg-light">
+                                <div class="card border-primary">
+                                    <div class="card-header bg-primary text-white">
                                         <h6 class="mb-0">
-                                            <i class="fas fa-filter me-2"></i>Filtros de Búsqueda
+                                            <i class="fas fa-search me-2"></i>Buscador por Cédula
                                         </h6>
                                     </div>
                                     <div class="card-body">
                                         <div class="row">
-                                            <div class="col-md-4">
-                                                <div class="form-group">
-                                                    <label for="filtroEmbarazada" class="form-label">Estado de Embarazo</label>
-                                                    <select class="form-control" id="filtroEmbarazada">
-                                                        <option value="">Todos</option>
-                                                        <option value="embarazada">Solo Embarazadas</option>
-                                                        <option value="no-embarazada">No Embarazadas</option>
-                                                    </select>
+                                            <div class="col-md-6 mx-auto">
+                                                <div class="input-group">
+                                                    <span class="input-group-text bg-primary text-white">
+                                                        <i class="fas fa-id-card"></i>
+                                                    </span>
+                                                    <input type="text" 
+                                                           id="buscadorCedula" 
+                                                           class="form-control form-control-lg" 
+                                                           placeholder="Escriba la cédula: V12345678 o E12345678"
+                                                           autocomplete="off">
+                                                    <button type="button" id="limpiarBusqueda" class="btn btn-secondary">
+                                                        <i class="fas fa-times"></i> Limpiar
+                                                    </button>
                                                 </div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <div class="form-group">
-                                                    <label for="filtroMenor" class="form-label">Edad</label>
-                                                    <select class="form-control" id="filtroMenor">
-                                                        <option value="">Todos</option>
-                                                        <option value="menor">Menores de 18 años</option>
-                                                        <option value="mayor">Mayores de 18 años</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <div class="form-group">
-                                                    <label for="filtroCarrera" class="form-label">Carrera</label>
-                                                    <select class="form-control" id="filtroCarrera">
-                                                        <option value="">Todas las Carreras</option>
-                                                        <?php
-                                                        $carrerasUnicas = array_unique(array_column($estudiantes, 'carrera'));
-                                                        sort($carrerasUnicas);
-                                                        foreach ($carrerasUnicas as $carrera):
-                                                            if (!empty($carrera)):
-                                                        ?>
-                                                        <option value="<?php echo htmlspecialchars($carrera); ?>">
-                                                            <?php echo htmlspecialchars($carrera); ?>
-                                                        </option>
-                                                        <?php
-                                                            endif;
-                                                        endforeach;
-                                                        ?>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="row">
-                                            <div class="col-12">
-                                                <button type="button" class="btn btn-secondary btn-sm" onclick="limpiarFiltros()">
-                                                    <i class="fas fa-times me-1"></i>Limpiar Filtros
-                                                </button>
+                                                <small class="text-muted mt-2 d-block text-center">
+                                                    <i class="fas fa-info-circle"></i> La búsqueda se actualiza automáticamente mientras escribe
+                                                </small>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                            <table id="tablaEstudiantes" class="table table-striped table-hover table-bordered" style="width:100%; min-width: 800px;">
+
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover table-bordered" id="tablaEstudiantes">
                                 <thead class="table-dark">
                                     <tr>
                                         <th>Cédula</th>
                                         <th>Nombre</th>
-                                        <th>Programa</th>
-                                        <th>Género</th>
+                                        <th>Usuario</th>
+                                        <th>Email</th>
                                         <th>Teléfono</th>
-                                        <th>Correo</th>
-                                        <th>Ingreso</th>
+                                        <th>Carrera</th>
+                                        <th>Género</th>
+                                        <th>Edad</th>
                                         <th>Status</th>
+                                        <th>Fecha Ingreso</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <?php if (isset($estudiantes) && is_array($estudiantes)): ?>
+                                <tbody id="tablaBody">
+                                    <?php if (count($estudiantes) > 0): ?>
                                         <?php foreach ($estudiantes as $estudiante): ?>
                                             <?php
-                                            // Calcular edad para el filtro
-                                            $edad = null;
+                                            // Calcular edad
+                                            $edad = '';
                                             if (!empty($estudiante['fecha_nac'])) {
                                                 try {
                                                     $fechaNac = new DateTime($estudiante['fecha_nac']);
                                                     $hoy = new DateTime();
                                                     $edad = $fechaNac->diff($hoy)->y;
                                                 } catch (Exception $e) {
-                                                    $edad = null;
+                                                    $edad = '';
                                                 }
                                             }
                                             
-                                            // Determinar si es menor de edad
-                                            $esMenor = ($edad !== null && $edad < 18);
-                                            
-                                            // Determinar estado de embarazo
-                                            $esFemenino = isset($estudiante['genero']) && trim($estudiante['genero']) === 'Femenino';
                                             $estaEmbarazada = isset($estudiante['embarazada']) && trim((string)$estudiante['embarazada']) === '1';
+                                            $esFemenino = isset($estudiante['genero']) && trim($estudiante['genero']) === 'Femenino';
+                                            $cedula = $estudiante['idusuario'] ?? '';
                                             ?>
-                                        <tr data-genero="<?php echo htmlspecialchars($estudiante['genero'] ?? ''); ?>"
-                                            data-carrera="<?php echo htmlspecialchars($estudiante['carrera'] ?? ''); ?>"
-                                            data-embarazada="<?php echo $estaEmbarazada ? '1' : '0'; ?>"
-                                            data-edad="<?php echo $edad ?? ''; ?>"
-                                            data-es-menor="<?php echo $esMenor ? '1' : '0'; ?>">
-                                            <td><?php echo htmlspecialchars($estudiante['cedula'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($estudiante['carrera'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($estudiante['genero'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($estudiante['num_telf'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($estudiante['correo'] ?? ''); ?></td>
-                                            <td><?php echo !empty($estudiante['fecha_ingreso']) ? date('d/m/Y', strtotime($estudiante['fecha_ingreso'])) : ''; ?></td>
-                                            <td>
-                                                <?php
-                                                    $status = $estudiante['status'] ?? 0;
-                                                    echo ($status == 1) ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-secondary">Inactivo</span>';
-                                                ?>
-                                            </td>
-                                            <td>
-                                                <div class="d-flex flex-wrap gap-1">
-                                                    <button class="btn btn-info btn-details btn-sm" 
-                                                        data-toggle="modal" 
-                                                        data-target="#detalleModal"
-                                                        data-id="<?php echo $estudiante['id']; ?>"
-                                                        title="Ver detalles">
-                                                        <i class="fas fa-eye"></i> <span class="d-none d-md-inline">Ver</span>
-                                                    </button>
-                                                    <?php if (tienePermiso('editar_estudiante')): ?>
-                                                        <button class="btn btn-warning btn-sm btn-edit" 
-                                                            data-toggle="modal" 
-                                                            data-target="#editarEstudianteModal"
-                                                            data-id="<?php echo $estudiante['id']; ?>"
-                                                            title="Editar">
-                                                            <i class="fas fa-edit"></i> <span class="d-none d-md-inline">Editar</span>
-                                                        </button>
+                                            <tr data-cedula="<?php echo htmlspecialchars(strtoupper($cedula)); ?>">
+                                                <td><?php echo htmlspecialchars($cedula); ?></td>
+                                                <td><?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?></td>
+                                                <td><?php echo htmlspecialchars($estudiante['username'] ?? ''); ?></td>
+                                                <td><?php echo htmlspecialchars($estudiante['email'] ?? ''); ?></td>
+                                                <td><?php echo htmlspecialchars($estudiante['tlf'] ?? $estudiante['cel'] ?? ''); ?></td>
+                                                <td><?php echo htmlspecialchars($estudiante['carrera'] ?? ''); ?></td>
+                                                <td>
+                                                    <?php echo htmlspecialchars($estudiante['genero'] ?? ''); ?>
+                                                    <?php if ($esFemenino && $estaEmbarazada): ?>
+                                                        <span class="badge bg-info ms-1" title="Embarazada">🤰</span>
                                                     <?php endif; ?>
-                                                </div>
-                                            </td>
-                                        </tr>
+                                                </td>
+                                                <td><?php echo $edad; ?></td>
+                                                <td>
+                                                    <?php
+                                                        $status = $estudiante['status'] ?? 0;
+                                                        echo ($status == 1) ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-secondary">Inactivo</span>';
+                                                    ?>
+                                                 </td>
+                                                <td><?php echo !empty($estudiante['fecha_ingreso']) ? date('d/m/Y', strtotime($estudiante['fecha_ingreso'])) : ''; ?></td>
+                                                <td>
+                                                    <div class="d-flex flex-wrap gap-1">
+                                                        <button class="btn btn-info btn-details btn-sm" 
+                                                            data-toggle="modal" 
+                                                            data-target="#detalleModal"
+                                                            data-id="<?php echo $estudiante['id']; ?>"
+                                                            title="Ver detalles">
+                                                            <i class="fas fa-eye"></i>
+                                                        </button>
+                                                        <?php if ($puedeEditar): ?>
+                                                            <button class="btn btn-warning btn-sm btn-edit" 
+                                                                data-toggle="modal" 
+                                                                data-target="#editarEstudianteModal"
+                                                                data-id="<?php echo $estudiante['id']; ?>"
+                                                                title="Editar">
+                                                                <i class="fas fa-edit"></i>
+                                                            </button>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                  </tr>
                                         <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td colspan="11" class="text-center">No hay estudiantes registrados</td>
+                                        </tr>
                                     <?php endif; ?>
                                 </tbody>
                             </table>
@@ -329,105 +321,105 @@ include("includes/head.php");
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Modal para detalles del estudiante -->
-    <div class="modal fade" id="detalleModal" tabindex="-1" aria-labelledby="detalleModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title" id="detalleModalLabel">Detalles del Estudiante</h5>
-                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+<!-- Modal para detalles del estudiante -->
+<div class="modal fade" id="detalleModal" tabindex="-1" aria-labelledby="detalleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="detalleModalLabel">Detalles del Estudiante</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="detalleEstudianteContent">
+                <div class="text-center my-5 py-5">
+                    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-3">Cargando información del estudiante...</p>
                 </div>
-                <div class="modal-body" id="detalleEstudianteContent">
-                    <div class="text-center my-5 py-5">
-                        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-                            <span class="visually-hidden">Cargando...</span>
-                        </div>
-                        <p class="mt-3">Cargando información del estudiante...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Editar Estudiante -->
+<div class="modal fade" id="editarEstudianteModal" tabindex="-1" aria-labelledby="editarEstudianteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-white">
+                <h5 class="modal-title" id="editarEstudianteModalLabel"><i class="fas fa-user-edit me-2"></i> Editar Estudiante</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="editarEstudianteContent">
+                <div class="text-center my-5 py-5">
+                    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-3">Cargando formulario de edición...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Agregar Estudiante -->
+<div class="modal fade" id="agregarEstudianteModal" tabindex="-1" aria-labelledby="agregarEstudianteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="agregarEstudianteModalLabel">
+                    <i class="fas fa-user-plus me-2"></i> Agregar Nuevo Estudiante
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <?php 
+                $tiposCedula = obtenerTiposCedula($db);
+                $estadosCiviles = obtenerEstadosCiviless($db);
+                $tiposVivienda = obtenerTiposVivienda($db);
+                $tenenciasVivienda = obtenerTenenciaViviendas($db);
+                $opcionesStatus = obtenerOpcionesStatus($db);
+                $carreras = obtenerTodasLasCarreras();
+                $ingresos = obtenerIngresos($db);
+                $esModal = true;
+                ?>
+                
+                <div class="tab-content" id="myTabContent">
+                    <div class="tab-pane fade show active" id="individual" role="tabpanel" aria-labelledby="individual-tab">
+                        <form id="formEstudianteModal" method="post" enctype="multipart/form-data">
+                            <?php 
+                            $esModal = true;
+                            include('_formulario_estudiante.php'); 
+                            ?>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Modal para Editar Estudiante -->
-    <div class="modal fade" id="editarEstudianteModal" tabindex="-1" aria-labelledby="editarEstudianteModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-xl">
-            <div class="modal-content">
-                <div class="modal-header bg-warning text-white">
-                    <h5 class="modal-title" id="editarEstudianteModalLabel"><i class="fas fa-user-edit me-2"></i> Editar Estudiante</h5>
-                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body" id="editarEstudianteContent">
-                    <div class="text-center my-5 py-5">
-                        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-                            <span class="visually-hidden">Cargando...</span>
-                        </div>
-                        <p class="mt-3">Cargando información del estudiante...</p>
-                    </div>
-                </div>
+<!-- Modal para Mensajes de Resultado -->
+<div class="modal fade" id="resultadoModal" tabindex="-1" aria-labelledby="resultadoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" id="resultadoModalHeader">
+                <h5 class="modal-title" id="resultadoModalLabel">Resultado</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
-        </div>
-    </div>
-
-    <!-- Modal para Agregar Estudiante -->
-    <div class="modal fade" id="agregarEstudianteModal" tabindex="-1" aria-labelledby="agregarEstudianteModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-xl">
-            <div class="modal-content">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title" id="agregarEstudianteModalLabel">
-                        <i class="fas fa-user-plus me-2"></i> Agregar Nuevo Estudiante
-                    </h5>
-                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <?php 
-                    $tiposCedula = obtenerTiposCedula($db);
-                    $estadosCiviles = obtenerEstadosCiviless($db);
-                    $tiposVivienda = obtenerTiposVivienda($db);
-                    $tenenciasVivienda = obtenerTenenciaViviendas($db);
-                    $opcionesStatus = obtenerOpcionesStatus($db);
-                    $carreras = obtenerTodasLasCarreras();
-                    $ingresos = obtenerIngresos($db);
-                    $esModal = true;
-                    ?>
-                    
-                    <div class="tab-content" id="myTabContent">
-                        <div class="tab-pane fade show active" id="individual" role="tabpanel" aria-labelledby="individual-tab">
-                            <form id="formEstudianteModal" method="post" enctype="multipart/form-data">
-                                <?php 
-                                $esModal = true;
-                                include('_formulario_estudiante.php'); 
-                                ?>
-                            </form>
-                        </div>
-                    </div>
-                </div>
+            <div class="modal-body" id="resultadoModalBody">
             </div>
-        </div>
-    </div>
-
-    <!-- Modal para Mensajes de Resultado -->
-    <div class="modal fade" id="resultadoModal" tabindex="-1" aria-labelledby="resultadoModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header" id="resultadoModalHeader">
-                    <h5 class="modal-title" id="resultadoModalLabel">Resultado</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body" id="resultadoModalBody">
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" data-dismiss="modal">Aceptar</button>
-                </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-dismiss="modal">Aceptar</button>
             </div>
         </div>
     </div>
@@ -462,7 +454,6 @@ include("includes/head.php");
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
 }
 
-/* Estilos responsivos */
 @media (max-width: 767.98px) {
     .card-header h5 {
         font-size: 1rem;
@@ -487,424 +478,223 @@ include("includes/head.php");
     .modal-body {
         padding: 0.75rem;
     }
-}
-
-@media (min-width: 768px) and (max-width: 991.98px) {
-    .table td, .table th {
-        font-size: 0.8rem;
-        padding: 0.5rem;
-    }
     
-    .btn-sm {
-        padding: 0.3rem 0.6rem;
-        font-size: 0.75rem;
-    }
-}
-
-/* Scroll suave para la tabla */
-.table-responsive {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-}
-
-/* Mejoras para botones en móviles */
-@media (max-width: 767.98px) {
     .d-flex.flex-wrap {
         gap: 0.25rem !important;
-    }
-    
-    .btn i {
-        font-size: 0.7rem;
-    }
-}
-
-/* Estilos para modales en móviles */
-@media (max-width: 767.98px) {
-    .modal-dialog {
-        margin: 0.5rem;
-    }
-    
-    .modal-xl {
-        max-width: calc(100% - 1rem);
-        margin: 0.5rem;
     }
 }
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar DataTable sin filtros personalizados
-    const tablaEstudiantes = $('#tablaEstudiantes').DataTable({
-        responsive: true,
-        language: {
-            url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json'
-        },
-        searching: false, // Deshabilitar búsqueda integrada de DataTables
-        drawCallback: function() {
-            // Aplicar filtros después de que DataTables haya renderizado
-            setTimeout(aplicarFiltrosVisibilidad, 100);
-        }
-    });
-
-    // Aplicar filtros también cuando se cambia de página
-    tablaEstudiantes.on('page.dt', function() {
-        setTimeout(aplicarFiltrosVisibilidad, 100); // Pequeño delay para asegurar que el DOM esté actualizado
-    });
-
-    // Variables para almacenar los valores de filtro actuales
-    let filtroActual = {
-        embarazada: '',
-        menor: '',
-        carrera: ''
-    };
+// Función para el buscador en tiempo real
+document.getElementById('buscadorCedula').addEventListener('keyup', function() {
+    let filtro = this.value.toUpperCase();
+    let filas = document.querySelectorAll('#tablaBody tr');
+    let encontrados = 0;
     
-    // Función para toggle estadísticas
-    window.toggleEstadisticas = function() {
-        const row = document.getElementById('estadisticas-row');
-        const carreraRow = document.getElementById('estadisticas-carrera-row');
-        const button = document.getElementById('toggleEstadisticas');
-        const icon = button.querySelector('i');
-        const span = button.querySelector('span.d-none.d-sm-inline');
-        const spanMobile = button.querySelector('span.d-inline.d-sm-none');
-        
-        if (row.style.display === 'none') {
-            row.style.display = 'flex';
-            carreraRow.style.display = 'block';
-            span.textContent = 'Ocultar Estadísticas';
-            spanMobile.textContent = 'Ocultar';
-            icon.className = 'fas fa-chart-bar';
+    filas.forEach(fila => {
+        let cedula = fila.getAttribute('data-cedula') || '';
+        if(cedula.includes(filtro)) {
+            fila.style.display = '';
+            encontrados++;
         } else {
-            row.style.display = 'none';
-            carreraRow.style.display = 'none';
-            span.textContent = 'Mostrar Estadísticas';
-            spanMobile.textContent = 'Mostrar';
-            icon.className = 'fas fa-eye';
-        }
-    };
-
-    // Función para limpiar filtros
-    window.limpiarFiltros = function() {
-        document.getElementById('filtroEmbarazada').value = '';
-        document.getElementById('filtroMenor').value = '';
-        document.getElementById('filtroCarrera').value = '';
-        // Resetear variables de filtro
-        filtroActual.embarazada = '';
-        filtroActual.menor = '';
-        filtroActual.carrera = '';
-        // Forzar redraw
-        tablaEstudiantes.draw();
-    };
-
-    // Función para aplicar filtros
-    function aplicarFiltros() {
-        const filtroEmbarazada = document.getElementById('filtroEmbarazada');
-        const filtroMenor = document.getElementById('filtroMenor');
-        const filtroCarrera = document.getElementById('filtroCarrera');
-
-        if (!filtroEmbarazada || !filtroMenor || !filtroCarrera) {
-            console.error('Elementos de filtro no encontrados');
-            return;
-        }
-
-        // Actualizar valores de filtro
-        filtroActual.embarazada = filtroEmbarazada.value;
-        filtroActual.menor = filtroMenor.value;
-        filtroActual.carrera = filtroCarrera.value;
-
-        // Forzar redraw para activar drawCallback
-        tablaEstudiantes.draw();
-    }
-
-    // Función para aplicar filtros de visibilidad (llamada desde drawCallback)
-    function aplicarFiltrosVisibilidad() {
-        const valorEmbarazada = filtroActual.embarazada;
-        const valorMenor = filtroActual.menor;
-        const valorCarrera = filtroActual.carrera;
-
-        console.log('Aplicando filtros de visibilidad:', { valorEmbarazada, valorMenor, valorCarrera });
-
-        // Obtener todas las filas de la página actual
-        const rows = tablaEstudiantes.rows({ page: 'current' }).nodes();
-        console.log('Número de filas en página actual:', rows.length);
-
-        let filasVisibles = 0;
-
-        for (let i = 0; i < rows.length; i++) {
-            const row = rows[i];
-            const genero = (row.dataset.genero || '').trim();
-            const carrera = (row.dataset.carrera || '').trim();
-            const embarazada = (row.dataset.embarazada || '0').trim();
-            const esMenor = (row.dataset.esMenor || '0').trim();
-
-            console.log(`Fila ${i}:`, { genero, carrera, embarazada, esMenor });
-
-            let mostrar = true;
-
-            // Filtro por embarazo
-            if (valorEmbarazada) {
-                if (valorEmbarazada === 'embarazada') {
-                    // Solo mostrar mujeres embarazadas
-                    if (genero.toLowerCase() !== 'femenino' || embarazada !== '1') {
-                        mostrar = false;
-                    }
-                } else if (valorEmbarazada === 'no-embarazada') {
-                    // Solo mostrar mujeres no embarazadas o no mujeres
-                    if (genero.toLowerCase() === 'femenino' && embarazada === '1') {
-                        mostrar = false;
-                    }
-                }
-            }
-
-            // Filtro por edad (menor de edad)
-            if (valorMenor) {
-                if (valorMenor === 'menor') {
-                    // Solo mostrar menores de edad
-                    if (esMenor !== '1') {
-                        mostrar = false;
-                    }
-                } else if (valorMenor === 'mayor') {
-                    // Solo mostrar mayores de edad
-                    if (esMenor === '1') {
-                        mostrar = false;
-                    }
-                }
-            }
-
-            // Filtro por carrera
-            if (valorCarrera && carrera.toLowerCase() !== valorCarrera.toLowerCase()) {
-                mostrar = false;
-            }
-
-            console.log(`Fila ${i} - mostrar: ${mostrar}`);
-
-            // Aplicar visibilidad
-            row.style.display = mostrar ? '' : 'none';
-            if (mostrar) filasVisibles++;
-        }
-
-        console.log('Filas visibles después de filtros:', filasVisibles);
-
-        // Actualizar contador de resultados
-        actualizarContadorResultados();
-    }
-
-    // Función para actualizar contador de resultados
-    function actualizarContadorResultados() {
-        const info = tablaEstudiantes.page.info();
-        const totalRegistros = info.recordsTotal;
-
-        // Contar filas visibles en la página actual después de aplicar filtros de visibilidad
-        const rows = tablaEstudiantes.rows({ page: 'current' }).nodes();
-        let filasVisibles = 0;
-        for (let i = 0; i < rows.length; i++) {
-            if (rows[i].style.display !== 'none') {
-                filasVisibles++;
-            }
-        }
-
-        // Buscar si ya existe un contador
-        let contador = document.getElementById('contador-resultados');
-        if (!contador) {
-            // Crear contador si no existe
-            contador = document.createElement('div');
-            contador.id = 'contador-resultados';
-            contador.className = 'alert alert-info mt-2';
-            const table = document.getElementById('tablaEstudiantes');
-            table.parentNode.insertBefore(contador, table);
-        }
-
-        contador.innerHTML = `<i class="fas fa-info-circle"></i> Mostrando ${filasVisibles} de ${totalRegistros} estudiantes`;
-    }
-
-    // Event listeners para filtros
-    document.getElementById('filtroEmbarazada').addEventListener('change', aplicarFiltros);
-    document.getElementById('filtroMenor').addEventListener('change', aplicarFiltros);
-    document.getElementById('filtroCarrera').addEventListener('change', aplicarFiltros);
-    
-    // Delegación de eventos para botones dinámicos
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.btn-details')) {
-            const button = e.target.closest('.btn-details');
-            const studentId = button.getAttribute('data-id');
-            loadStudentDetails(studentId);
-        }
-        
-        if (e.target.closest('.btn-edit')) {
-            const button = e.target.closest('.btn-edit');
-            const studentId = button.getAttribute('data-id');
-            loadEditStudentForm(studentId);
+            fila.style.display = 'none';
         }
     });
     
-    function mostrarMensaje(titulo, mensaje, esExito = true) {
-        const header = document.getElementById('resultadoModalHeader');
-        const body = document.getElementById('resultadoModalBody');
-        const label = document.getElementById('resultadoModalLabel');
-        
-        if (esExito) {
-            header.className = 'modal-header bg-success text-white';
-            body.innerHTML = `
-                <div class="text-center">
-                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
-                    <h4>${titulo}</h4>
-                    <p>${mensaje}</p>
-                </div>
-            `;
+    // Mostrar mensaje si no hay resultados
+    let mensajeDiv = document.getElementById('mensajeBusqueda');
+    if(!mensajeDiv) {
+        mensajeDiv = document.createElement('div');
+        mensajeDiv.id = 'mensajeBusqueda';
+        mensajeDiv.className = 'alert alert-info mt-3';
+        document.querySelector('.table-responsive').appendChild(mensajeDiv);
+    }
+    
+    if(filtro === '') {
+        mensajeDiv.innerHTML = `<i class="fas fa-users"></i> Mostrando ${filas.length} estudiantes en total`;
+        mensajeDiv.className = 'alert alert-info mt-3';
+    } else if(encontrados === 0) {
+        mensajeDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> No se encontraron estudiantes con cédula que contenga "<strong>${filtro}</strong>"`;
+        mensajeDiv.className = 'alert alert-warning mt-3';
+    } else {
+        mensajeDiv.innerHTML = `<i class="fas fa-check-circle"></i> Se encontraron ${encontrados} estudiante(s) con cédula que contiene "<strong>${filtro}</strong>"`;
+        mensajeDiv.className = 'alert alert-success mt-3';
+    }
+});
+
+// Botón limpiar búsqueda
+document.getElementById('limpiarBusqueda').addEventListener('click', function() {
+    document.getElementById('buscadorCedula').value = '';
+    let filas = document.querySelectorAll('#tablaBody tr');
+    filas.forEach(fila => fila.style.display = '');
+    
+    let mensajeDiv = document.getElementById('mensajeBusqueda');
+    if(mensajeDiv) {
+        mensajeDiv.innerHTML = `<i class="fas fa-users"></i> Mostrando ${filas.length} estudiantes en total`;
+        mensajeDiv.className = 'alert alert-info mt-3';
+    }
+    document.getElementById('buscadorCedula').focus();
+});
+
+// Función para toggle estadísticas
+window.toggleEstadisticas = function() {
+    const row = document.getElementById('estadisticas-row');
+    const carreraRow = document.getElementById('estadisticas-carrera-row');
+    const button = document.getElementById('toggleEstadisticas');
+    const icon = button.querySelector('i');
+    const span = button.querySelector('span.d-none.d-sm-inline');
+    const spanMobile = button.querySelector('span.d-inline.d-sm-none');
+    
+    if (row.style.display === 'none') {
+        row.style.display = 'flex';
+        carreraRow.style.display = 'block';
+        span.textContent = 'Ocultar Estadísticas';
+        spanMobile.textContent = 'Ocultar';
+        icon.className = 'fas fa-chart-bar';
+    } else {
+        row.style.display = 'none';
+        carreraRow.style.display = 'none';
+        span.textContent = 'Mostrar Estadísticas';
+        spanMobile.textContent = 'Mostrar';
+        icon.className = 'fas fa-eye';
+    }
+};
+
+// Modal handlers
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.btn-details')) {
+        const button = e.target.closest('.btn-details');
+        const studentId = button.getAttribute('data-id');
+        loadStudentDetails(studentId);
+    }
+    
+    if (e.target.closest('.btn-edit')) {
+        const button = e.target.closest('.btn-edit');
+        const studentId = button.getAttribute('data-id');
+        loadEditStudentForm(studentId);
+    }
+});
+
+function loadStudentDetails(studentId) {
+    const modalContent = document.getElementById('detalleEstudianteContent');
+    modalContent.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p>Cargando...</p></div>`;
+    $('#detalleModal').modal('show');
+    
+    fetch(`detalle_estudiante.php?id=${studentId}`)
+        .then(response => response.text())
+        .then(data => modalContent.innerHTML = data)
+        .catch(error => modalContent.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`);
+}
+
+function loadEditStudentForm(studentId) {
+    const modalContent = document.getElementById('editarEstudianteContent');
+    modalContent.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p>Cargando...</p></div>`;
+    $('#editarEstudianteModal').modal('show');
+    
+    fetch(`editar_estudiante_modal.php?id=${studentId}`)
+        .then(response => response.text())
+        .then(data => {
+            modalContent.innerHTML = data;
+            const editForm = document.getElementById('formEditarEstudiante');
+            if (editForm) {
+                editForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    submitEditForm(this);
+                });
+            }
+        })
+        .catch(error => modalContent.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`);
+}
+
+function submitEditForm(form) {
+    const formData = new FormData(form);
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalText = submitButton.innerHTML;
+    
+    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+    submitButton.disabled = true;
+    
+    fetch('actualizar_estudiante.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            $('#editarEstudianteModal').modal('hide');
+            mostrarMensaje('Éxito', data.message || 'Estudiante actualizado', true, true);
         } else {
-            header.className = 'modal-header bg-danger text-white';
-            body.innerHTML = `
-                <div class="text-center">
-                    <i class="fas fa-exclamation-circle fa-3x text-danger mb-3"></i>
-                    <h4>${titulo}</h4>
-                    <p>${mensaje}</p>
-                </div>
-            `;
+            mostrarMensaje('Error', data.message || 'Error al actualizar', false);
+            submitButton.innerHTML = originalText;
+            submitButton.disabled = false;
         }
-        
-        label.textContent = titulo;
-        $('#resultadoModal').modal('show');
-        
-        if (esExito) {
-            $('#resultadoModal').on('hidden.bs.modal', function() {
-                location.reload();
-            });
-        }
-    }
+    })
+    .catch(error => {
+        mostrarMensaje('Error', 'Error de conexión', false);
+        submitButton.innerHTML = originalText;
+        submitButton.disabled = false;
+    });
+}
+
+function mostrarMensaje(titulo, mensaje, esExito = true, recargar = false) {
+    const header = document.getElementById('resultadoModalHeader');
+    const body = document.getElementById('resultadoModalBody');
+    const label = document.getElementById('resultadoModalLabel');
     
-    function loadStudentDetails(studentId) {
-        const modalContent = document.getElementById('detalleEstudianteContent');
-        
-        modalContent.innerHTML = `
-            <div class="text-center py-5 my-5">
-                <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-                    <span class="visually-hidden">Cargando...</span>
-                </div>
-                <p class="mt-3">Cargando información...</p>
-            </div>
-        `;
-        
-        $('#detalleModal').modal('show');
-        
-        fetch(`detalle_estudiante.php?id=${studentId}`)
-            .then(response => response.text())
-            .then(data => {
-                modalContent.innerHTML = data;
-            })
-            .catch(error => {
-                modalContent.innerHTML = `<div class="alert alert-danger">Error al cargar los detalles: ${error.message}</div>`;
-            });
-    }
+    header.className = `modal-header bg-${esExito ? 'success' : 'danger'} text-white`;
+    body.innerHTML = `<div class="text-center"><i class="fas fa-${esExito ? 'check-circle' : 'exclamation-circle'} fa-3x mb-3"></i><h4>${titulo}</h4><p>${mensaje}</p></div>`;
+    label.textContent = titulo;
+    $('#resultadoModal').modal('show');
     
-    function loadEditStudentForm(studentId) {
-        const modalContent = document.getElementById('editarEstudianteContent');
-        
-        modalContent.innerHTML = `
-            <div class="text-center py-5 my-5">
-                <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-                    <span class="visually-hidden">Cargando...</span>
-                </div>
-                <p class="mt-3">Cargando formulario de edición...</p>
-            </div>
-        `;
-        
-        $('#editarEstudianteModal').modal('show');
-        
-        fetch(`editar_estudiante_modal.php?id=${studentId}`)
-            .then(response => response.text())
-            .then(data => {
-                modalContent.innerHTML = data;
-                
-                const editForm = document.getElementById('formEditarEstudiante');
-                if (editForm) {
-                    editForm.addEventListener('submit', function(e) {
-                        e.preventDefault();
-                        submitEditForm(this);
-                    });
-                }
-            })
-            .catch(error => {
-                modalContent.innerHTML = `<div class="alert alert-danger">Error al cargar el formulario: ${error.message}</div>`;
-            });
+    if (recargar) {
+        $('#resultadoModal').on('hidden.bs.modal', () => location.reload());
     }
-    
-    function submitEditForm(form) {
-        const formData = new FormData(form);
-        const submitButton = form.querySelector('button[type="submit"]');
-        const originalButtonText = submitButton.innerHTML;
+}
+
+// Limpiar modales al cerrar
+$('#detalleModal, #editarEstudianteModal, #agregarEstudianteModal').on('hidden.bs.modal', function() {
+    const contentId = this.id === 'detalleModal' ? 'detalleEstudianteContent' : 
+                     (this.id === 'editarEstudianteModal' ? 'editarEstudianteContent' : null);
+    if (contentId && document.getElementById(contentId)) {
+        if (this.id !== 'agregarEstudianteModal') document.getElementById(contentId).innerHTML = '';
+    }
+});
+
+// Formulario nuevo estudiante
+const formEstudiante = document.getElementById('formEstudianteModal');
+if (formEstudiante) {
+    formEstudiante.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const submitButton = this.querySelector('button[type="submit"]');
+        const originalText = submitButton.innerHTML;
         
         submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
         submitButton.disabled = true;
         
-        fetch('actualizar_estudiante.php', {
+        fetch('procesar_estudiante.php', {
             method: 'POST',
             body: formData
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                $('#editarEstudianteModal').modal('hide');
-                mostrarMensaje('¡Éxito!', data.message || 'Estudiante actualizado exitosamente', true);
+                $('#agregarEstudianteModal').modal('hide');
+                mostrarMensaje('Éxito', data.message || 'Estudiante registrado', true, true);
             } else {
-                mostrarMensaje('Error', data.message || 'Error al actualizar el estudiante', false);
-                submitButton.innerHTML = originalButtonText;
+                mostrarMensaje('Error', data.message || 'Error al guardar', false);
+                submitButton.innerHTML = originalText;
                 submitButton.disabled = false;
             }
         })
         .catch(error => {
-            mostrarMensaje('Error', 'Error de conexión: ' + error.message, false);
-            submitButton.innerHTML = originalButtonText;
+            mostrarMensaje('Error', 'Error de conexión', false);
+            submitButton.innerHTML = originalText;
             submitButton.disabled = false;
         });
-    }
-    
-    $('#detalleModal').on('hidden.bs.modal', function() {
-        document.getElementById('detalleEstudianteContent').innerHTML = '';
     });
-    
-    $('#editarEstudianteModal').on('hidden.bs.modal', function() {
-        document.getElementById('editarEstudianteContent').innerHTML = '';
-    });
-    
-    $('#agregarEstudianteModal').on('hidden.bs.modal', function() {
-        const form = document.getElementById('formEstudianteModal');
-        if (form) form.reset();
-    });
-    
-    const formEstudiante = document.getElementById('formEstudianteModal');
-    if (formEstudiante) {
-        formEstudiante.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(this);
-            const submitButton = this.querySelector('button[type="submit"]');
-            const originalButtonText = submitButton.innerHTML;
-            
-            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
-            submitButton.disabled = true;
-            
-            fetch('procesar_estudiante.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    $('#agregarEstudianteModal').modal('hide');
-                    mostrarMensaje('¡Éxito!', data.message || 'Estudiante registrado exitosamente', true);
-                } else {
-                    mostrarMensaje('Error', data.message || 'Error al guardar el estudiante', false);
-                    submitButton.innerHTML = originalButtonText;
-                    submitButton.disabled = false;
-                }
-            })
-            .catch(error => {
-                mostrarMensaje('Error', 'Error de conexión: ' + error.message, false);
-                submitButton.innerHTML = originalButtonText;
-                submitButton.disabled = false;
-            });
-        });
-    }
-});
+}
 
 function abrirModalNuevoEstudiante() {
     $('#agregarEstudianteModal').modal('show');
