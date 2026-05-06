@@ -1739,7 +1739,7 @@ function aceptarPreinscripcion($id, $adminId) {
         'embarazada' => $preinscripcion['embarazada'],
         'num_telf_opc' => $preinscripcion['num_telf_opc'],
         'fecha_ingreso' => $preinscripcion['fecha_ingreso'],
-        'status' => 'Activo',
+        'status' => 1, // 🔥 CAMBIADO: 1 = Activo (entero, no string)
         'foto_perfil' => $preinscripcion['foto_perfil'] ?? ''
     ];
 
