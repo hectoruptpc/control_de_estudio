@@ -1341,18 +1341,18 @@ function hayCupoDisponible($carreraId, $turno) {
 /**
  * Obtiene secciones aprobadas por carrera y turno
  */
-function obtenerSeccionesAprobadas($carreraId, $turno = null) {
+function obtenerSeccionesTrayecto0($carreraId, $turno = null) {
     global $db;
 
     $secciones = [];
     if ($turno === null) {
-        $query = "SELECT id_seccion AS id, numero_seccion, capacidad_maxima AS capacidad FROM secciones WHERE id_carrera = ? AND status = 'Aprobada' ORDER BY numero_seccion";
+        $query = "SELECT s.id_seccion AS id, s.numero_seccion, s.capacidad_maxima AS capacidad FROM secciones s JOIN trayectos t ON s.id_trayecto = t.id_trayecto WHERE s.id_carrera = ? AND t.numero_trayecto = 0 AND s.estatus = 'activa' ORDER BY s.numero_seccion";
         $stmt = $db->prepare($query);
         if ($stmt) {
             $stmt->bind_param('i', $carreraId);
         }
     } else {
-        $query = "SELECT id_seccion AS id, numero_seccion, capacidad_maxima AS capacidad FROM secciones WHERE id_carrera = ? AND turno = ? AND status = 'Aprobada' ORDER BY numero_seccion";
+        $query = "SELECT s.id_seccion AS id, s.numero_seccion, s.capacidad_maxima AS capacidad FROM secciones s JOIN trayectos t ON s.id_trayecto = t.id_trayecto WHERE s.id_carrera = ? AND s.turno = ? AND t.numero_trayecto = 0 AND s.estatus = 'activa' ORDER BY s.numero_seccion";
         $stmt = $db->prepare($query);
         if ($stmt) {
             $stmt->bind_param('is', $carreraId, $turno);
@@ -1399,7 +1399,7 @@ function asignarSeccionAutomatica($carreraId, $turno, $userId) {
 
     if ($userId !== null) {
         // Asignar un estudiante específico
-        $secciones = obtenerSeccionesAprobadas($carreraId, $turno);
+        $secciones = obtenerSeccionesTrayecto0($carreraId, $turno);
         if (empty($secciones)) {
             return false; // No hay secciones
         }
@@ -1422,7 +1422,7 @@ function asignarSeccionAutomatica($carreraId, $turno, $userId) {
     }
 
     // Asignar estudiantes sin sección de la carrera y turno a secciones disponibles
-    $secciones = obtenerSeccionesAprobadas($carreraId, $turno);
+    $secciones = obtenerSeccionesTrayecto0($carreraId, $turno);
     if (empty($secciones)) {
         return false;
     }
@@ -1480,29 +1480,39 @@ function asignarSeccionAutomatica($carreraId, $turno, $userId) {
 }
 
 /**
- * Crea una nueva sección para preinscripciones
+ * Crea una nueva sección (para directores)
  */
-function crearSeccionPreinscripcion($carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy, $codigoSeccion = null, $idTrayecto = null, $idPeriodo = null) {
+function crearSeccionDirector($carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy, $codigoSeccion, $idTrayecto, $idPeriodo, $inicia) {
     global $db;
-
-    if (empty($codigoSeccion)) {
-        $codigoSeccion = generarCodigoSeccion($carreraId, $turno);
-        if (!$codigoSeccion) {
-            return false;
-        }
-    }
-
-    if ($idTrayecto === null || $idPeriodo === null || $idTrayecto <= 0 || $idPeriodo <= 0) {
-        return false;
-    }
-
-    $query = "INSERT INTO secciones (codigo_seccion, id_carrera, turno, numero_seccion, capacidad_maxima, horario, created_by, status, estatus, id_trayecto, id_periodo) VALUES (?, ?, ?, ?, ?, ?, ?, 'Pendiente', 'inactiva', ?, ?)";
+    
+    $query = "INSERT INTO secciones (codigo_seccion, id_carrera, turno, numero_seccion, capacidad_maxima, horario, created_by, estatus, id_trayecto, id_periodo, inicia, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'inactiva', ?, ?, ?, NOW())";
+    
     $stmt = $db->prepare($query);
     if (!$stmt) {
+        error_log("Error prepare: " . $db->error);
         return false;
     }
-    $stmt->bind_param('sisiisiii', $codigoSeccion, $carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy, $idTrayecto, $idPeriodo);
+    
+    // s = string, i = integer
+    $stmt->bind_param('sisiisiiis', 
+        $codigoSeccion, 
+        $carreraId, 
+        $turno, 
+        $numeroSeccion, 
+        $capacidad, 
+        $horario, 
+        $createdBy, 
+        $idTrayecto, 
+        $idPeriodo, 
+        $inicia
+    );
+    
     $result = $stmt->execute();
+    
+    if (!$result) {
+        error_log("Error execute: " . $stmt->error);
+    }
+    
     $stmt->close();
     return $result;
 }
