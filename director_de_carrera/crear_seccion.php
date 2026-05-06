@@ -36,12 +36,18 @@ $availableCodesByTurno = [
 ];
 $availableNumbers = [];
 
+$datosSelects = obtenerDatosSelects($db);
+$trayectos = $datosSelects['trayectos'] ?? [];
+$periodos = $datosSelects['periodos'] ?? [];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['crear_seccion'])) {
     $turno = trim($_POST['turno'] ?? '');
     $codigoSeccion = trim($_POST['numero_seccion'] ?? '');
     $numeroSeccion = (int)$codigoSeccion;
     $capacidad = (int)($_POST['capacidad'] ?? 30);
     $horario = trim($_POST['horario'] ?? '');
+    $idTrayecto = (int)($_POST['id_trayecto'] ?? 0);
+    $idPeriodo = (int)($_POST['id_periodo'] ?? 0);
 
     $availableCodes = $availableCodesByTurno[$turno] ?? [];
     $config = $cupos[$carreraId][$turno] ?? null;
@@ -57,6 +63,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['crear_seccion'])) {
         $error_message = 'La sección seleccionada no está disponible.';
     } elseif ($capacidad < 1) {
         $error_message = 'Capacidad debe ser mayor a 0.';
+    } elseif ($idTrayecto <= 0) {
+        $error_message = 'Trayecto inválido.';
+    } elseif ($idPeriodo <= 0) {
+        $error_message = 'Periodo inválido.';
     } elseif (empty($horario)) {
         $error_message = 'El horario es obligatorio.';
     } else {
@@ -70,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['crear_seccion'])) {
             $error_message = 'Ya existe una sección con ese código para este turno.';
         } else {
             $stmt->close();
-            if (crearSeccionPreinscripcion($carreraId, $turno, $numeroSeccion, $capacidad, $horario, $_SESSION['user']['id'], $codigoSeccion)) {
+            if (crearSeccionPreinscripcion($carreraId, $turno, $numeroSeccion, $capacidad, $horario, $_SESSION['user']['id'], $codigoSeccion, $idTrayecto, $idPeriodo)) {
                 $success_message = 'Sección creada exitosamente y enviada para aprobación.';
             } else {
                 $error_message = 'Error al crear la sección.';
@@ -138,6 +148,24 @@ include('includes/head.php');
                                     <option value="">Seleccionar sección</option>
                                 </select>
                                 <div id="section-help" class="form-text text-muted">Elige una sección disponible dentro de los rangos habilitados.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="id_trayecto" class="form-label">Trayecto</label>
+                                <select class="form-control" id="id_trayecto" name="id_trayecto" required>
+                                    <option value="">Seleccionar trayecto</option>
+                                    <?php foreach ($trayectos as $trayecto): ?>
+                                        <option value="<?php echo htmlspecialchars($trayecto['id_trayecto']); ?>" <?php echo isset($_POST['id_trayecto']) && (int)$_POST['id_trayecto'] === (int)$trayecto['id_trayecto'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($trayecto['numero_trayecto']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="id_periodo" class="form-label">Periodo Académico</label>
+                                <select class="form-control" id="id_periodo" name="id_periodo" required>
+                                    <option value="">Seleccionar periodo</option>
+                                    <?php foreach ($periodos as $periodo): ?>
+                                        <option value="<?php echo htmlspecialchars($periodo['id_periodo']); ?>" <?php echo isset($_POST['id_periodo']) && (int)$_POST['id_periodo'] === (int)$periodo['id_periodo'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($periodo['nombre_periodo']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
                             <div class="col-md-6">
                                 <label for="capacidad" class="form-label">Capacidad</label>

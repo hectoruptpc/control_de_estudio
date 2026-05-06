@@ -1341,14 +1341,25 @@ function hayCupoDisponible($carreraId, $turno) {
 /**
  * Obtiene secciones aprobadas por carrera y turno
  */
-function obtenerSeccionesAprobadas($carreraId, $turno) {
+function obtenerSeccionesAprobadas($carreraId, $turno = null) {
     global $db;
 
     $secciones = [];
-    $query = "SELECT id_seccion AS id, numero_seccion, capacidad_maxima AS capacidad FROM secciones WHERE id_carrera = ? AND turno = ? AND status = 'Aprobada' ORDER BY numero_seccion";
-    $stmt = $db->prepare($query);
+    if ($turno === null) {
+        $query = "SELECT id_seccion AS id, numero_seccion, capacidad_maxima AS capacidad FROM secciones WHERE id_carrera = ? AND status = 'Aprobada' ORDER BY numero_seccion";
+        $stmt = $db->prepare($query);
+        if ($stmt) {
+            $stmt->bind_param('i', $carreraId);
+        }
+    } else {
+        $query = "SELECT id_seccion AS id, numero_seccion, capacidad_maxima AS capacidad FROM secciones WHERE id_carrera = ? AND turno = ? AND status = 'Aprobada' ORDER BY numero_seccion";
+        $stmt = $db->prepare($query);
+        if ($stmt) {
+            $stmt->bind_param('is', $carreraId, $turno);
+        }
+    }
+
     if ($stmt) {
-        $stmt->bind_param('is', $carreraId, $turno);
         $stmt->execute();
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
@@ -1396,7 +1407,6 @@ function asignarSeccionAutomatica($carreraId, $turno, $userId) {
         foreach ($secciones as $seccion) {
             $ocupados = contarEstudiantesEnSeccion($seccion['id']);
             if ($ocupados < $seccion['capacidad']) {
-                // Asignar aquí
                 $query = "UPDATE users SET seccion_id = ? WHERE id = ?";
                 $stmt = $db->prepare($query);
                 if ($stmt) {
@@ -1407,69 +1417,72 @@ function asignarSeccionAutomatica($carreraId, $turno, $userId) {
                 }
             }
         }
+
         return false; // Todas llenas
-    } else {
-        // Asignar estudiantes sin sección de la carrera a secciones disponibles
-        $secciones = obtenerSeccionesAprobadas($carreraId, null); // Todas las secciones de la carrera
-        if (empty($secciones)) {
-            return false;
-        }
-
-        // Obtener estudiantes sin sección asignada de esta carrera
-        $query_estudiantes = "SELECT id FROM users WHERE carrera = ? AND seccion_id IS NULL AND estudiante = 1 AND status = 'Activo'";
-        $stmt_est = $db->prepare($query_estudiantes);
-        if (!$stmt_est) {
-            return false;
-        }
-        $stmt_est->bind_param('i', $carreraId);
-        $stmt_est->execute();
-        $result_est = $stmt_est->get_result();
-        $estudiantes_sin_seccion = [];
-        while ($row = $result_est->fetch_assoc()) {
-            $estudiantes_sin_seccion[] = $row['id'];
-        }
-        $stmt_est->close();
-
-        if (empty($estudiantes_sin_seccion)) {
-            return true; // No hay estudiantes esperando, pero no es error
-        }
-
-        // Asignar estudiantes a secciones disponibles
-        $asignados = 0;
-        foreach ($secciones as $seccion) {
-            $ocupados = contarEstudiantesEnSeccion($seccion['id']);
-            $capacidad_disponible = $seccion['capacidad'] - $ocupados;
-
-            if ($capacidad_disponible > 0) {
-                $estudiantes_a_asignar = array_slice($estudiantes_sin_seccion, $asignados, $capacidad_disponible);
-
-                if (!empty($estudiantes_a_asignar)) {
-                    $placeholders = str_repeat('?,', count($estudiantes_a_asignar) - 1) . '?';
-                    $query_asignar = "UPDATE users SET seccion_id = ? WHERE id IN ($placeholders)";
-                    $stmt_asignar = $db->prepare($query_asignar);
-                    if ($stmt_asignar) {
-                        $params = array_merge([$seccion['id']], $estudiantes_a_asignar);
-                        $stmt_asignar->bind_param(str_repeat('i', count($params)), ...$params);
-                        $stmt_asignar->execute();
-                        $asignados += $stmt_asignar->affected_rows;
-                        $stmt_asignar->close();
-                    }
-                }
-
-                if ($asignados >= count($estudiantes_sin_seccion)) {
-                    break; // Ya asignamos todos
-                }
-            }
-        }
-
-        return $asignados > 0;
     }
+
+    // Asignar estudiantes sin sección de la carrera y turno a secciones disponibles
+    $secciones = obtenerSeccionesAprobadas($carreraId, $turno);
+    if (empty($secciones)) {
+        return false;
+    }
+
+    // Obtener estudiantes sin sección asignada de esta carrera y turno
+    $query_estudiantes = "SELECT id FROM users WHERE carrera = ? AND turno = ? AND seccion_id IS NULL AND estudiante = 1 AND status = 'Activo'";
+    $stmt_est = $db->prepare($query_estudiantes);
+    if (!$stmt_est) {
+        return false;
+    }
+    $stmt_est->bind_param('is', $carreraId, $turno);
+    $stmt_est->execute();
+    $result_est = $stmt_est->get_result();
+    $estudiantes_sin_seccion = [];
+    while ($row = $result_est->fetch_assoc()) {
+        $estudiantes_sin_seccion[] = $row['id'];
+    }
+    $stmt_est->close();
+
+    if (empty($estudiantes_sin_seccion)) {
+        return true; // No hay estudiantes esperando, pero no es error
+    }
+
+    $asignados = 0;
+    foreach ($secciones as $seccion) {
+        $ocupados = contarEstudiantesEnSeccion($seccion['id']);
+        $capacidad_disponible = $seccion['capacidad'] - $ocupados;
+
+        if ($capacidad_disponible <= 0) {
+            continue;
+        }
+
+        $estudiantes_a_asignar = array_slice($estudiantes_sin_seccion, $asignados, $capacidad_disponible);
+        if (empty($estudiantes_a_asignar)) {
+            break;
+        }
+
+        $placeholders = str_repeat('?,', count($estudiantes_a_asignar) - 1) . '?';
+        $query_asignar = "UPDATE users SET seccion_id = ? WHERE id IN ($placeholders)";
+        $stmt_asignar = $db->prepare($query_asignar);
+        if ($stmt_asignar) {
+            $params = array_merge([$seccion['id']], $estudiantes_a_asignar);
+            $stmt_asignar->bind_param(str_repeat('i', count($params)), ...$params);
+            $stmt_asignar->execute();
+            $asignados += $stmt_asignar->affected_rows;
+            $stmt_asignar->close();
+        }
+
+        if ($asignados >= count($estudiantes_sin_seccion)) {
+            break;
+        }
+    }
+
+    return $asignados > 0;
 }
 
 /**
  * Crea una nueva sección para preinscripciones
  */
-function crearSeccionPreinscripcion($carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy, $codigoSeccion = null) {
+function crearSeccionPreinscripcion($carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy, $codigoSeccion = null, $idTrayecto = null, $idPeriodo = null) {
     global $db;
 
     if (empty($codigoSeccion)) {
@@ -1479,12 +1492,16 @@ function crearSeccionPreinscripcion($carreraId, $turno, $numeroSeccion, $capacid
         }
     }
 
-    $query = "INSERT INTO secciones (codigo_seccion, id_carrera, turno, numero_seccion, capacidad_maxima, horario, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)";
+    if ($idTrayecto === null || $idPeriodo === null || $idTrayecto <= 0 || $idPeriodo <= 0) {
+        return false;
+    }
+
+    $query = "INSERT INTO secciones (codigo_seccion, id_carrera, turno, numero_seccion, capacidad_maxima, horario, created_by, status, estatus, id_trayecto, id_periodo) VALUES (?, ?, ?, ?, ?, ?, ?, 'Pendiente', 'inactiva', ?, ?)";
     $stmt = $db->prepare($query);
     if (!$stmt) {
         return false;
     }
-    $stmt->bind_param('sissisi', $codigoSeccion, $carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy);
+    $stmt->bind_param('sisiisiii', $codigoSeccion, $carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy, $idTrayecto, $idPeriodo);
     $result = $stmt->execute();
     $stmt->close();
     return $result;
@@ -1525,8 +1542,6 @@ function aprobarSeccion($seccionId, $approvedBy) {
     if ($result) {
         // Asignar estudiantes automáticamente a la sección aprobada
         asignarSeccionAutomatica($seccion_info['id_carrera'], $seccion_info['turno'], null);
-        // Nota: asignarSeccionAutomatica asigna estudiantes que no tienen sección asignada
-        // El parámetro userId es opcional, si es null asigna a estudiantes sin sección
     }
 
     return $result;
