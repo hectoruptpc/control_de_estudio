@@ -8809,23 +8809,24 @@ function obtenerSeccionesPorCarrera($db, $carrera_id) {
 function obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno) {
     global $db;
     
+    // Consulta SIMPLE - sin HAVING, sin subconsultas complicadas
     $query = "SELECT 
         s.id_seccion,
         s.codigo_seccion,
         s.capacidad_maxima,
-        s.turno,
-        (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion AND estatus = 'activo') as inscritos
+        s.turno
     FROM secciones s
     INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
     WHERE s.id_carrera = ? 
         AND s.turno = ?
         AND p.activo = 1
-        AND s.status = 'activa'
+        AND s.status = 'Aprobada'
+        AND s.estatus = 'activa'
     ORDER BY s.codigo_seccion ASC";
     
     $stmt = $db->prepare($query);
     if (!$stmt) {
-        error_log("Error en obtenerSeccionesDisponiblesPorCarreraYTurno: " . $db->error);
+        error_log("Error prepare: " . $db->error);
         return [];
     }
     
@@ -8835,12 +8836,27 @@ function obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno) {
     
     $secciones = [];
     while ($row = $result->fetch_assoc()) {
-        $cupos_disponibles = $row['capacidad_maxima'] - ($row['inscritos'] ?? 0);
+        // Contar inscritos actuales
+        $count_query = "SELECT COUNT(*) as inscritos FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'";
+        $count_stmt = $db->prepare($count_query);
+        $count_stmt->bind_param('i', $row['id_seccion']);
+        $count_stmt->execute();
+        $count_result = $count_stmt->get_result();
+        $count_row = $count_result->fetch_assoc();
+        $inscritos = $count_row['inscritos'] ?? 0;
+        
+        $cupos_disponibles = $row['capacidad_maxima'] - $inscritos;
+        
         if ($cupos_disponibles > 0) {
+            $row['inscritos'] = $inscritos;
             $row['cupos_disponibles'] = $cupos_disponibles;
             $secciones[] = $row;
         }
+        
+        $count_stmt->close();
     }
+    
+    $stmt->close();
     
     return $secciones;
 }
@@ -8946,67 +8962,79 @@ function asignarEstudianteASeccionEspecifica($usuario_id, $seccion_id) {
 function asignarEstudianteASeccionDisponible($usuario_id, $carrera_id, $turno) {
     global $db;
     
-    // Buscar sección con cupo disponible (usando JOIN con periodos_academicos)
+    // Buscar la primera sección con cupo disponible
     $query = "SELECT 
         s.id_seccion,
         s.codigo_seccion,
-        s.capacidad_maxima,
-        (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion AND estatus = 'activo') as inscritos
+        s.capacidad_maxima
     FROM secciones s
     INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
     WHERE s.id_carrera = ? 
         AND s.turno = ?
         AND p.activo = 1
-        AND s.status = 'activa'
-    HAVING inscritos < capacidad_maxima
-    ORDER BY inscritos ASC
-    LIMIT 1";
+        AND s.status = 'Aprobada'
+        AND s.estatus = 'activa'
+    ORDER BY s.codigo_seccion ASC";
     
     $stmt = $db->prepare($query);
     if (!$stmt) {
         error_log("Error prepare: " . $db->error);
-        return ['success' => false, 'message' => 'Error al buscar sección: ' . $db->error];
+        return ['success' => false, 'message' => 'Error al buscar sección'];
     }
     
     $stmt->bind_param('is', $carrera_id, $turno);
     $stmt->execute();
     $result = $stmt->get_result();
-    $seccion = $result->fetch_assoc();
     
-    if (!$seccion) {
-        error_log("No se encontró sección para carrera: $carrera_id, turno: $turno");
+    $seccion_asignada = null;
+    while ($row = $result->fetch_assoc()) {
+        // Contar inscritos actuales en esta sección
+        $count_query = "SELECT COUNT(*) as inscritos FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'";
+        $count_stmt = $db->prepare($count_query);
+        $count_stmt->bind_param('i', $row['id_seccion']);
+        $count_stmt->execute();
+        $count_result = $count_stmt->get_result();
+        $count_row = $count_result->fetch_assoc();
+        $inscritos = $count_row['inscritos'] ?? 0;
+        $count_stmt->close();
+        
+        if ($inscritos < $row['capacidad_maxima']) {
+            $seccion_asignada = $row;
+            break;
+        }
+    }
+    $stmt->close();
+    
+    if (!$seccion_asignada) {
+        error_log("No hay secciones disponibles para carrera: $carrera_id, turno: $turno");
         return ['success' => false, 'message' => 'No hay secciones disponibles para esta carrera y turno'];
     }
     
     // Verificar si ya está inscrito
     $check = $db->prepare("SELECT id FROM estudiante_seccion WHERE id_usuario = ? AND id_seccion = ? AND estatus = 'activo'");
-    if (!$check) {
-        return ['success' => false, 'message' => 'Error al verificar inscripción: ' . $db->error];
-    }
-    
-    $check->bind_param('ii', $usuario_id, $seccion['id_seccion']);
+    $check->bind_param('ii', $usuario_id, $seccion_asignada['id_seccion']);
     $check->execute();
     if ($check->get_result()->num_rows > 0) {
+        $check->close();
         return ['success' => false, 'message' => 'El estudiante ya está inscrito en esta sección'];
     }
+    $check->close();
     
     // Inscribir estudiante
     $fecha = date('Y-m-d H:i:s');
     $insert = $db->prepare("INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus) VALUES (?, ?, ?, 'activo')");
-    if (!$insert) {
-        return ['success' => false, 'message' => 'Error al preparar inserción: ' . $db->error];
-    }
-    
-    $insert->bind_param('iis', $usuario_id, $seccion['id_seccion'], $fecha);
+    $insert->bind_param('iis', $usuario_id, $seccion_asignada['id_seccion'], $fecha);
     
     if ($insert->execute()) {
+        $insert->close();
         return [
             'success' => true, 
-            'message' => 'Estudiante asignado a la sección ' . $seccion['codigo_seccion'],
-            'seccion' => $seccion['codigo_seccion']
+            'message' => 'Estudiante asignado a la sección ' . $seccion_asignada['codigo_seccion'],
+            'seccion' => $seccion_asignada['codigo_seccion']
         ];
     }
     
+    $insert->close();
     return ['success' => false, 'message' => 'Error al asignar estudiante a la sección: ' . $insert->error];
 }
 
