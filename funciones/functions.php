@@ -9059,13 +9059,13 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
             throw new Exception('Preinscripción no encontrada');
         }
         
-        error_log("Preinscripción encontrada - Carrera: {$preinscripcion['carrera']}, Turno: {$preinscripcion['turno']}, IDUsuario: {$preinscripcion['idusuario']}");
+        error_log("Preinscripción encontrada - Carrera: {$preinscripcion['carrera']}, Turno: {$preinscripcion['turno']}");
         
         if ($preinscripcion['status'] !== 'Pendiente') {
             throw new Exception('Esta preinscripción ya fue procesada');
         }
         
-        // Verificar si el usuario ya existe
+        // Verificar si el usuario ya existe por cédula
         $check_user = $db->prepare("SELECT id FROM users WHERE idusuario = ?");
         $check_user->bind_param('s', $preinscripcion['idusuario']);
         $check_user->execute();
@@ -9075,51 +9075,163 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
             $usuario_id = $existing_user['id'];
             error_log("Usuario ya existe - ID: $usuario_id");
         } else {
-            // Crear nuevo usuario
-            $password_hash = password_hash($preinscripcion['idusuario'], PASSWORD_DEFAULT);
+            // ============================================================
+            // INSERT DIRECTO EN LA TABLA users
+            // ============================================================
             
-            $insert_user = $db->prepare("INSERT INTO users (
-                idusuario, nombre, username, email, tlf, cel, direccion, ciudad, estado, 
-                municipio, parroquia, fecha_ingreso, fecha_nac, carrera, genero, embarazada, 
-                edo_civil, estudiante, status, password, fecha_act
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, 1, 1, ?, NOW())");
+            $username = $preinscripcion['idusuario']; // Usar cédula como username
+            $password = password_hash($preinscripcion['idusuario'], PASSWORD_DEFAULT);
+            $fecha_act = date('Y-m-d H:i:s');
+            $api_key = bin2hex(random_bytes(16));
+            
+            // Procesar títulos e institutos
+            $titulos = !empty($preinscripcion['titulos']) ? $preinscripcion['titulos'] : '';
+            $institutos = !empty($preinscripcion['institutos']) ? $preinscripcion['institutos'] : '';
+            
+            // Insertar usuario con TODOS los campos
+            $insert_user = $db->prepare("
+                INSERT INTO users SET
+                    idusuario = ?,
+                    nombre = ?,
+                    username = ?,
+                    email = ?,
+                    tlf = ?,
+                    cel = ?,
+                    direccion = ?,
+                    ciudad = ?,
+                    estado = ?,
+                    municipio = ?,
+                    parroquia = ?,
+                    etnia = ?,
+                    casaapto = ?,
+                    punto_referencia = ?,
+                    grupo_familiar = ?,
+                    acargo_usted = ?,
+                    fuente_ingresos = ?,
+                    tipo_vivienda = ?,
+                    tenencia_vivienda = ?,
+                    enfermedad = ?,
+                    discapacidad = ?,
+                    titulos = ?,
+                    institutos = ?,
+                    potencialidades = ?,
+                    fecha_ingreso = ?,
+                    fecha_act = ?,
+                    status = ?,
+                    user_type = ?,
+                    password = ?,
+                    api_key = ?,
+                    carrera = ?,
+                    carrera_di = ?,
+                    genero = ?,
+                    embarazada = ?,
+                    edo_civil = ?,
+                    fecha_nac = ?,
+                    num_telf_opc = ?,
+                    foto_perfil = ?,
+                    usuario = 0,
+                    estudiante = 1,
+                    docente = 0,
+                    admin = 0,
+                    super_user = 0,
+                    editar_user = 0,
+                    editar_nota = 0,
+                    editar_acceso = 0,
+                    editar_valores = 0,
+                    editar_estudiante = 0,
+                    agregar_estudiante = 0,
+                    agregar_docente = 0,
+                    editar_docente = 0,
+                    agregar_carrera = 0,
+                    agregar_materia = 0,
+                    editar_materia = 0,
+                    pagos = 0,
+                    auditoria = 0,
+                    secciones = 0,
+                    rela_materia_carrera = 0,
+                    periodos_academicos = 0,
+                    asig_secciones = 0,
+                    asig_cursos = 0,
+                    horarios = 0,
+                    gestion_director_carrera = 0,
+                    notas_cargadas = 0,
+                    consultar_notas = 0,
+                    consultar_notas_pasadas = 0,
+                    tipos_pago = 0,
+                    tipos_horario = 0,
+                    horario_personal = 0,
+                    respaldo_bd = 0,
+                    gestionar_carrera = 0,
+                    gestion_periodo_academico = 0,
+                    gestion_asig_cursos = 0,
+                    gestion_horario = 0,
+                    titulos_re_materia = 0,
+                    grado = 0,
+                    gestion_grado = 0,
+                    vocero = 0,
+                    visita = 0
+            ");
+            
+            // Valores por defecto para campos que puedan estar vacíos
+            $ciudad = !empty($preinscripcion['ciudad']) ? $preinscripcion['ciudad'] : ($preinscripcion['municipio'] ?? '');
+            $carrera_di = $preinscripcion['carrera'] ?? null;
+            $fecha_nac = !empty($preinscripcion['fecha_nac']) ? $preinscripcion['fecha_nac'] : null;
+            $fecha_ingreso = !empty($preinscripcion['fecha_ingreso']) ? $preinscripcion['fecha_ingreso'] : date('Y-m-d');
+            $foto_perfil = $preinscripcion['foto_perfil'] ?? '';
             
             $insert_user->bind_param(
-                'sssssssssssssssss',
+                'sssssssssssssiissssssssssssssssssss',
                 $preinscripcion['idusuario'],
                 $preinscripcion['nombre'],
-                $preinscripcion['username'],
+                $username,
                 $preinscripcion['email'],
                 $preinscripcion['tlf'],
                 $preinscripcion['cel'],
                 $preinscripcion['direccion'],
-                $preinscripcion['ciudad'],
+                $ciudad,
                 $preinscripcion['estado'],
                 $preinscripcion['municipio'],
                 $preinscripcion['parroquia'],
-                $preinscripcion['fecha_nac'],
+                $preinscripcion['etnia'],
+                $preinscripcion['casaapto'],
+                $preinscripcion['punto_referencia'],
+                $preinscripcion['grupo_familiar'],
+                $preinscripcion['acargo_usted'],
+                $preinscripcion['fuente_ingresos'],
+                $preinscripcion['tipo_vivienda'],
+                $preinscripcion['tenencia_vivienda'],
+                $preinscripcion['enfermedad'],
+                $preinscripcion['discapacidad'],
+                $titulos,
+                $institutos,
+                $preinscripcion['potencialidades'],
+                $fecha_ingreso,
+                $fecha_act,
+                'Activo',
+                'estudiante',
+                $password,
+                $api_key,
                 $preinscripcion['carrera'],
+                $carrera_di,
                 $preinscripcion['genero'],
                 $preinscripcion['embarazada'],
                 $preinscripcion['edo_civil'],
-                $password_hash
+                $fecha_nac,
+                $preinscripcion['num_telf_opc'],
+                $foto_perfil
             );
             
             if (!$insert_user->execute()) {
-                throw new Exception('Error al crear el usuario: ' . $insert_user->error);
+                throw new Exception('Error al insertar usuario: ' . $insert_user->error);
             }
             
-            $usuario_id = $db->insert_id;
-            error_log("Usuario creado - ID: $usuario_id");
+            $usuario_id = $insert_user->insert_id;
+            error_log("Usuario creado exitosamente - ID: $usuario_id");
         }
         
         // Asignar a sección disponible
         $turno = $preinscripcion['turno'] ?? 'Diurno';
-        error_log("Buscando sección para - carrera_id: {$preinscripcion['carrera']}, turno: $turno");
-        
         $asignacion = asignarEstudianteASeccionDisponible($usuario_id, $preinscripcion['carrera'], $turno);
-        
-        error_log("Resultado de asignación: " . print_r($asignacion, true));
         
         if (!$asignacion['success']) {
             throw new Exception($asignacion['message']);
@@ -9143,7 +9255,8 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
         return [
             'success' => true,
             'message' => 'Preinscripción aprobada exitosamente. ' . $asignacion['message'],
-            'seccion_asignada' => $asignacion['seccion']
+            'seccion_asignada' => $asignacion['seccion'],
+            'usuario_id' => $usuario_id
         ];
         
     } catch (Exception $e) {
