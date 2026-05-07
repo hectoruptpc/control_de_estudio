@@ -1324,18 +1324,97 @@ function contarPreinscripcionesPorCupo($carreraId, $turno) {
  * Comprueba si hay cupos disponibles para una carrera y turno
  */
 function hayCupoDisponible($carreraId, $turno) {
-    $cupos = obtenerCuposSecretaria();
-    if (!isset($cupos[$carreraId][$turno])) {
+    global $db;
+    
+    // Validar parámetros
+    if (empty($carreraId) || empty($turno)) {
+        error_log("hayCupoDisponible: Parámetros vacíos - carrera: $carreraId, turno: $turno");
         return false;
     }
-
-    $total = (int)$cupos[$carreraId][$turno];
+    
+    // Obtener cupos de la tabla secretaria_cupos
+    $query = "SELECT cupos_totales FROM secretaria_cupos WHERE carrera_id = ? AND turno = ?";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error preparando consulta hayCupoDisponible: " . $db->error);
+        return false;
+    }
+    
+    $stmt->bind_param('is', $carreraId, $turno);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $cupo = $result->fetch_assoc();
+    
+    if (!$cupo) {
+        error_log("hayCupoDisponible: No hay configuración de cupos para carrera_id: $carreraId, turno: $turno");
+        return false;
+    }
+    
+    $total = (int)$cupo['cupos_totales'];
     if ($total <= 0) {
+        error_log("hayCupoDisponible: Cupos totales es $total para carrera_id: $carreraId, turno: $turno");
         return false;
     }
-
-    $ocupados = contarPreinscripcionesPorCupo($carreraId, $turno);
+    
+    $ocupados = contarPreinscripcionesAprobadasPorCarreraYTurno($carreraId, $turno);
+    $disponibles = $total - $ocupados;
+    
+    error_log("hayCupoDisponible: Carrera $carreraId, Turno $turno - Cupos totales: $total, Ocupados: $ocupados, Disponibles: $disponibles");
+    
     return $ocupados < $total;
+}
+
+/**
+ * Cuenta cuántas preinscripciones APROBADAS existen para una carrera y turno
+ * NOTA: Cambié el nombre para evitar conflicto con la función existente
+ */
+function contarPreinscripcionesAprobadasPorCarreraYTurno($carreraId, $turno) {
+    global $db;
+    
+    // Contar preinscripciones APROBADAS (no pendientes)
+    $query = "SELECT COUNT(*) as total 
+              FROM preinscripcion 
+              WHERE carrera = ? AND turno = ? AND status = 'Aprobada'";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error preparando contarPreinscripcionesAprobadasPorCarreraYTurno: " . $db->error);
+        return 0;
+    }
+    
+    $stmt->bind_param('is', $carreraId, $turno);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    
+    return (int)($row['total'] ?? 0);
+}
+
+/**
+ * Obtiene o crea automáticamente la configuración de cupos para una carrera y turno
+ */
+function obtenerOCrearCupos($carreraId, $turno, $cuposPorDefecto = 30) {
+    global $db;
+    
+    // Verificar si existe
+    $query = "SELECT id, cupos_totales FROM secretaria_cupos WHERE carrera_id = ? AND turno = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param('is', $carreraId, $turno);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $cupo = $result->fetch_assoc();
+    
+    if (!$cupo) {
+        // Crear cupos por defecto
+        $insert = $db->prepare("INSERT INTO secretaria_cupos (carrera_id, turno, cupos_totales, numero_secciones, updated_at) VALUES (?, ?, ?, 1, NOW())");
+        $insert->bind_param('isi', $carreraId, $turno, $cuposPorDefecto);
+        if ($insert->execute()) {
+            error_log("Cupos creados automáticamente para carrera $carreraId, turno $turno con $cuposPorDefecto cupos");
+            return $cuposPorDefecto;
+        }
+        return 0;
+    }
+    
+    return (int)$cupo['cupos_totales'];
 }
 
 /**
@@ -8728,7 +8807,7 @@ function obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno) {
         s.codigo_seccion,
         s.capacidad_maxima,
         s.turno,
-        (SELECT COUNT(*) FROM inscripciones_seccion WHERE id_seccion = s.id_seccion) as inscritos
+        (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion) as inscritos
     FROM secciones s
     WHERE s.id_carrera = ? 
         AND s.turno = ?
@@ -8737,13 +8816,18 @@ function obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno) {
     ORDER BY s.codigo_seccion ASC";
     
     $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error en obtenerSeccionesDisponiblesPorCarreraYTurno: " . $db->error);
+        return [];
+    }
+    
     $stmt->bind_param('is', $carrera_id, $turno);
     $stmt->execute();
     $result = $stmt->get_result();
     
     $secciones = [];
     while ($row = $result->fetch_assoc()) {
-        $cupos_disponibles = $row['capacidad_maxima'] - $row['inscritos'];
+        $cupos_disponibles = $row['capacidad_maxima'] - ($row['inscritos'] ?? 0);
         if ($cupos_disponibles > 0) {
             $row['cupos_disponibles'] = $cupos_disponibles;
             $secciones[] = $row;
@@ -8751,6 +8835,100 @@ function obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno) {
     }
     
     return $secciones;
+}
+
+/**
+ * Obtiene todas las secciones de una carrera (incluyendo llenas o inactivas)
+ */
+function obtenerTodasSeccionesPorCarrera($carrera_id) {
+    global $db;
+    
+    $query = "SELECT 
+        s.id_seccion,
+        s.codigo_seccion,
+        s.capacidad_maxima,
+        s.turno,
+        s.periodo_activo,
+        s.status,
+        (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion) as inscritos
+    FROM secciones s
+    WHERE s.id_carrera = ?
+    ORDER BY s.codigo_seccion ASC";
+    
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error en obtenerTodasSeccionesPorCarrera: " . $db->error);
+        return [];
+    }
+    
+    $stmt->bind_param('i', $carrera_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $secciones = [];
+    while ($row = $result->fetch_assoc()) {
+        $row['inscritos'] = $row['inscritos'] ?? 0;
+        $secciones[] = $row;
+    }
+    
+    return $secciones;
+}
+
+
+
+/**
+ * Asigna un estudiante a una sección específica (selección manual)
+ */
+function asignarEstudianteASeccionEspecifica($usuario_id, $seccion_id) {
+    global $db;
+    
+    // Verificar cupo en la sección
+    $query = "SELECT 
+        s.id_seccion,
+        s.codigo_seccion,
+        s.capacidad_maxima,
+        COUNT(e.id_usuario) as inscritos
+    FROM secciones s
+    LEFT JOIN estudiante_seccion e ON s.id_seccion = e.id_seccion
+    WHERE s.id_seccion = ?
+    GROUP BY s.id_seccion";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param('i', $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $seccion = $result->fetch_assoc();
+    
+    if (!$seccion) {
+        return ['success' => false, 'message' => 'La sección no existe'];
+    }
+    
+    if ($seccion['inscritos'] >= $seccion['capacidad_maxima']) {
+        return ['success' => false, 'message' => 'La sección no tiene cupos disponibles'];
+    }
+    
+    // Verificar si ya está inscrito
+    $check = $db->prepare("SELECT id FROM estudiante_seccion WHERE id_usuario = ? AND id_seccion = ?");
+    $check->bind_param('ii', $usuario_id, $seccion_id);
+    $check->execute();
+    if ($check->get_result()->num_rows > 0) {
+        return ['success' => false, 'message' => 'El estudiante ya está inscrito en esta sección'];
+    }
+    
+    // Inscribir estudiante
+    $fecha = date('Y-m-d H:i:s');
+    $insert = $db->prepare("INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus) VALUES (?, ?, ?, 'activo')");
+    $insert->bind_param('iis', $usuario_id, $seccion_id, $fecha);
+    
+    if ($insert->execute()) {
+        return [
+            'success' => true, 
+            'message' => 'Estudiante asignado a la sección ' . $seccion['codigo_seccion'],
+            'seccion' => $seccion['codigo_seccion']
+        ];
+    }
+    
+    return ['success' => false, 'message' => 'Error al asignar estudiante a la sección'];
 }
 
 /**
