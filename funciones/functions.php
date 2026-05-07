@@ -7644,30 +7644,65 @@ function verificarIdExistente($tabla, $id) {
 
 
 // Constante para el mínimo de estudiantes requeridos
-define('MINIMO_ESTUDIANTES', 10);
+define('MINIMO_ESTUDIANTES', 0);
 
 /**
  * Crea una nueva sección en la base de datos
  * @param mysqli $db Conexión a la base de datos
- * @param array $datos Datos de la sección (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima)
+ * @param array $datos Datos de la sección (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, turno, inicia)
  * @return array Resultado de la operación (éxito, mensaje)
  */
 function crearSeccion($db, $datos) {
     try {
+        // Verificar que los datos necesarios existan
+        if (empty($datos['codigo_seccion'])) {
+            throw new Exception('El código de sección es obligatorio');
+        }
+        if (empty($datos['id_carrera'])) {
+            throw new Exception('La carrera es obligatoria');
+        }
+        if (empty($datos['id_trayecto'])) {
+            throw new Exception('El trayecto es obligatorio');
+        }
+        if (empty($datos['id_periodo'])) {
+            throw new Exception('El período es obligatorio');
+        }
+        if (empty($datos['turno'])) {
+            throw new Exception('El turno es obligatorio');
+        }
+        if (empty($datos['inicia'])) {
+            throw new Exception('La fecha de inicio es obligatoria');
+        }
+        
+        // Capacidad máxima por defecto 30 si no viene
+        $capacidad_maxima = isset($datos['capacidad_maxima']) ? (int)$datos['capacidad_maxima'] : 30;
+        
+        // INSERT con 7 campos (sin status porque se maneja aparte)
         $stmt = $db->prepare("INSERT INTO secciones (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, turno, inicia, estatus) 
                             VALUES (?, ?, ?, ?, ?, ?, ?, 'inactiva')");
         if (!$stmt) {
             throw new Exception("Error en preparación: " . $db->error);
         }
         
-        $stmt->bind_param("siiiisss", 
-            $datos['codigo_seccion'], 
-            $datos['id_carrera'], 
-            $datos['id_trayecto'], 
-            $datos['id_periodo'], 
-            $datos['capacidad_maxima'],
-            $datos['turno'],
-            $datos['inicia']);
+        // bind_param: 7 variables, 7 tipos (siiii s s? No: s=string, i=integer)
+        // Orden: codigo(s), id_carrera(i), id_trayecto(i), id_periodo(i), capacidad_maxima(i), turno(s), inicia(s)
+        // Tipos: "siiiiss" (7 caracteres)
+        $codigo = $datos['codigo_seccion'];
+        $id_carrera = $datos['id_carrera'];
+        $id_trayecto = $datos['id_trayecto'];
+        $id_periodo = $datos['id_periodo'];
+        $turno = $datos['turno'];
+        $inicia = $datos['inicia'];
+        
+        $stmt->bind_param("siiiiss", 
+            $codigo, 
+            $id_carrera, 
+            $id_trayecto, 
+            $id_periodo, 
+            $capacidad_maxima,
+            $turno,
+            $inicia
+        );
         
         if (!$stmt->execute()) {
             throw new Exception("Error en ejecución: " . $stmt->error);
@@ -7685,13 +7720,13 @@ function crearSeccion($db, $datos) {
                     $seccion_id, 
                     null, 
                     [
-                        'codigo_seccion' => $datos['codigo_seccion'],
-                        'id_carrera' => $datos['id_carrera'],
-                        'id_trayecto' => $datos['id_trayecto'],
-                        'id_periodo' => $datos['id_periodo'],
-                        'capacidad_maxima' => $datos['capacidad_maxima'],
-                        'turno' => $datos['turno'],
-                        'inicia' => $datos['inicia'],
+                        'codigo_seccion' => $codigo,
+                        'id_carrera' => $id_carrera,
+                        'id_trayecto' => $id_trayecto,
+                        'id_periodo' => $id_periodo,
+                        'capacidad_maxima' => $capacidad_maxima,
+                        'turno' => $turno,
+                        'inicia' => $inicia,
                         'estatus' => 'inactiva'
                     ], 
                     "Secciones", 
@@ -7704,7 +7739,7 @@ function crearSeccion($db, $datos) {
         
         return [
             'success' => true,
-            'message' => "Sección creada exitosamente! La sección estará inactiva hasta tener al menos ".MINIMO_ESTUDIANTES." estudiantes.",
+            'message' => "Sección creada exitosamente!",
             'id_seccion' => $seccion_id
         ];
     } catch (Exception $e) {
@@ -7742,24 +7777,6 @@ function editarSeccion($db, $datos) {
         // Obtener datos actuales para auditoría
         $datos_antiguos = obtenerDatosSeccion($db, $datos['id_seccion']);
         
-        // Verificar si el período está activo
-        $stmt = $db->prepare("SELECT p.activo FROM periodos_academicos p
-                             JOIN secciones s ON s.id_periodo = p.id_periodo
-                             WHERE s.id_seccion = ?");
-        if (!$stmt) {
-            throw new Exception("Error en preparación: " . $db->error);
-        }
-        
-        $stmt->bind_param("i", $datos['id_seccion']);
-        if (!$stmt->execute()) {
-            throw new Exception("Error en ejecución: " . $stmt->error);
-        }
-        
-        $result = $stmt->get_result();
-        $periodo = $result->fetch_assoc();
-        $stmt->close();
-        
-        // Permitir editar la sección incluso si el período actual está inactivo.
         $stmt = $db->prepare("UPDATE secciones 
                             SET codigo_seccion = ?, 
                                 id_carrera = ?, 
@@ -7773,15 +7790,26 @@ function editarSeccion($db, $datos) {
             throw new Exception("Error en preparación: " . $db->error);
         }
         
+        $codigo = $datos['codigo_seccion'];
+        $id_carrera = $datos['id_carrera'];
+        $id_trayecto = $datos['id_trayecto'];
+        $id_periodo = $datos['id_periodo'];
+        $capacidad_maxima = isset($datos['capacidad_maxima']) ? (int)$datos['capacidad_maxima'] : 30;
+        $turno = $datos['turno'];
+        $inicia = $datos['inicia'];
+        $id_seccion = $datos['id_seccion'];
+        
+        // 8 variables, 8 tipos: s i i i i s s i
         $stmt->bind_param("siiiissi", 
-            $datos['codigo_seccion'], 
-            $datos['id_carrera'], 
-            $datos['id_trayecto'], 
-            $datos['id_periodo'], 
-            $datos['capacidad_maxima'],
-            $datos['turno'],
-            $datos['inicia'],
-            $datos['id_seccion']);
+            $codigo, 
+            $id_carrera, 
+            $id_trayecto, 
+            $id_periodo, 
+            $capacidad_maxima,
+            $turno,
+            $inicia,
+            $id_seccion
+        );
         
         if (!$stmt->execute()) {
             throw new Exception("Error en ejecución: " . $stmt->error);
@@ -7796,8 +7824,7 @@ function editarSeccion($db, $datos) {
                 $valores_antiguos_audit = [];
                 $valores_nuevos_audit = [];
                 
-                // Comparar campos modificados
-                $campos_auditar = ['codigo_seccion', 'id_carrera', 'id_trayecto', 'id_periodo', 'capacidad_maxima', 'inicia'];
+                $campos_auditar = ['codigo_seccion', 'id_carrera', 'id_trayecto', 'id_periodo', 'capacidad_maxima', 'turno', 'inicia'];
                 
                 foreach ($campos_auditar as $campo) {
                     $valor_antiguo = $datos_antiguos[$campo] ?? null;
@@ -7832,26 +7859,6 @@ function editarSeccion($db, $datos) {
         ];
     } catch (Exception $e) {
         error_log("Error en editarSeccion: " . $e->getMessage());
-        
-        // REGISTRAR EN AUDITORÍA - ERROR AL EDITAR SECCIÓN
-        if (function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "ERROR", 
-                    "secciones", 
-                    $datos['id_seccion'] ?? null, 
-                    null, 
-                    [
-                        'codigo_seccion' => $datos['codigo_seccion'] ?? '',
-                        'error' => $e->getMessage()
-                    ], 
-                    "Secciones", 
-                    "Error al editar sección"
-                );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de error editarSeccion: " . $auditError->getMessage());
-            }
-        }
         
         return [
             'success' => false,
@@ -8807,11 +8814,12 @@ function obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno) {
         s.codigo_seccion,
         s.capacidad_maxima,
         s.turno,
-        (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion) as inscritos
+        (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion AND estatus = 'activo') as inscritos
     FROM secciones s
+    INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
     WHERE s.id_carrera = ? 
         AND s.turno = ?
-        AND s.periodo_activo = 1
+        AND p.activo = 1
         AND s.status = 'activa'
     ORDER BY s.codigo_seccion ASC";
     
@@ -8848,10 +8856,11 @@ function obtenerTodasSeccionesPorCarrera($carrera_id) {
         s.codigo_seccion,
         s.capacidad_maxima,
         s.turno,
-        s.periodo_activo,
         s.status,
-        (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion) as inscritos
+        p.activo as periodo_activo,
+        (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion AND estatus = 'activo') as inscritos
     FROM secciones s
+    INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
     WHERE s.id_carrera = ?
     ORDER BY s.codigo_seccion ASC";
     
@@ -8937,33 +8946,44 @@ function asignarEstudianteASeccionEspecifica($usuario_id, $seccion_id) {
 function asignarEstudianteASeccionDisponible($usuario_id, $carrera_id, $turno) {
     global $db;
     
-    // Buscar sección con cupo disponible
+    // Buscar sección con cupo disponible (usando JOIN con periodos_academicos)
     $query = "SELECT 
         s.id_seccion,
         s.codigo_seccion,
         s.capacidad_maxima,
-        (SELECT COUNT(*) FROM inscripciones_seccion WHERE id_seccion = s.id_seccion) as inscritos
+        (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion AND estatus = 'activo') as inscritos
     FROM secciones s
+    INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
     WHERE s.id_carrera = ? 
         AND s.turno = ?
-        AND s.periodo_activo = 1
+        AND p.activo = 1
         AND s.status = 'activa'
     HAVING inscritos < capacidad_maxima
     ORDER BY inscritos ASC
     LIMIT 1";
     
     $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error prepare: " . $db->error);
+        return ['success' => false, 'message' => 'Error al buscar sección: ' . $db->error];
+    }
+    
     $stmt->bind_param('is', $carrera_id, $turno);
     $stmt->execute();
     $result = $stmt->get_result();
     $seccion = $result->fetch_assoc();
     
     if (!$seccion) {
+        error_log("No se encontró sección para carrera: $carrera_id, turno: $turno");
         return ['success' => false, 'message' => 'No hay secciones disponibles para esta carrera y turno'];
     }
     
     // Verificar si ya está inscrito
-    $check = $db->prepare("SELECT id FROM inscripciones_seccion WHERE id_usuario = ? AND id_seccion = ?");
+    $check = $db->prepare("SELECT id FROM estudiante_seccion WHERE id_usuario = ? AND id_seccion = ? AND estatus = 'activo'");
+    if (!$check) {
+        return ['success' => false, 'message' => 'Error al verificar inscripción: ' . $db->error];
+    }
+    
     $check->bind_param('ii', $usuario_id, $seccion['id_seccion']);
     $check->execute();
     if ($check->get_result()->num_rows > 0) {
@@ -8972,7 +8992,11 @@ function asignarEstudianteASeccionDisponible($usuario_id, $carrera_id, $turno) {
     
     // Inscribir estudiante
     $fecha = date('Y-m-d H:i:s');
-    $insert = $db->prepare("INSERT INTO inscripciones_seccion (id_usuario, id_seccion, fecha_inscripcion) VALUES (?, ?, ?)");
+    $insert = $db->prepare("INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus) VALUES (?, ?, ?, 'activo')");
+    if (!$insert) {
+        return ['success' => false, 'message' => 'Error al preparar inserción: ' . $db->error];
+    }
+    
     $insert->bind_param('iis', $usuario_id, $seccion['id_seccion'], $fecha);
     
     if ($insert->execute()) {
@@ -8983,20 +9007,21 @@ function asignarEstudianteASeccionDisponible($usuario_id, $carrera_id, $turno) {
         ];
     }
     
-    return ['success' => false, 'message' => 'Error al asignar estudiante a la sección'];
+    return ['success' => false, 'message' => 'Error al asignar estudiante a la sección: ' . $insert->error];
 }
 
-/**
- * Acepta preinscripción y asigna automáticamente a sección disponible
- */
 function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
     global $db;
+    
+    error_log("=== aceptarPreinscripcionConSeccion ===");
+    error_log("preinscripcion_id: $preinscripcion_id");
+    error_log("admin_id: $admin_id");
     
     $db->begin_transaction();
     
     try {
         // Obtener datos de la preinscripción
-        $query = "SELECT * FROM preinscripciones WHERE id = ?";
+        $query = "SELECT * FROM preinscripcion WHERE id = ?";
         $stmt = $db->prepare($query);
         $stmt->bind_param('i', $preinscripcion_id);
         $stmt->execute();
@@ -9005,6 +9030,8 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
         if (!$preinscripcion) {
             throw new Exception('Preinscripción no encontrada');
         }
+        
+        error_log("Preinscripción encontrada - Carrera: {$preinscripcion['carrera']}, Turno: {$preinscripcion['turno']}, IDUsuario: {$preinscripcion['idusuario']}");
         
         if ($preinscripcion['status'] !== 'Pendiente') {
             throw new Exception('Esta preinscripción ya fue procesada');
@@ -9018,6 +9045,7 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
         
         if ($existing_user) {
             $usuario_id = $existing_user['id'];
+            error_log("Usuario ya existe - ID: $usuario_id");
         } else {
             // Crear nuevo usuario
             $password_hash = password_hash($preinscripcion['idusuario'], PASSWORD_DEFAULT);
@@ -9054,11 +9082,16 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
             }
             
             $usuario_id = $db->insert_id;
+            error_log("Usuario creado - ID: $usuario_id");
         }
         
         // Asignar a sección disponible
         $turno = $preinscripcion['turno'] ?? 'Diurno';
+        error_log("Buscando sección para - carrera_id: {$preinscripcion['carrera']}, turno: $turno");
+        
         $asignacion = asignarEstudianteASeccionDisponible($usuario_id, $preinscripcion['carrera'], $turno);
+        
+        error_log("Resultado de asignación: " . print_r($asignacion, true));
         
         if (!$asignacion['success']) {
             throw new Exception($asignacion['message']);
@@ -9066,7 +9099,7 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
         
         // Actualizar preinscripción
         $fecha_actual = date('Y-m-d H:i:s');
-        $update = $db->prepare("UPDATE preinscripciones SET 
+        $update = $db->prepare("UPDATE preinscripcion SET 
             status = 'Aprobada', 
             aprobado_por = ?, 
             fecha_aprobado = ?,
@@ -9077,14 +9110,17 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
         
         $db->commit();
         
+        error_log("✅ Preinscripción aprobada exitosamente");
+        
         return [
             'success' => true,
             'message' => 'Preinscripción aprobada exitosamente. ' . $asignacion['message'],
-            'seccion_asignada' => 'Sección: ' . $asignacion['seccion']
+            'seccion_asignada' => $asignacion['seccion']
         ];
         
     } catch (Exception $e) {
         $db->rollback();
+        error_log("❌ Error en aceptarPreinscripcionConSeccion: " . $e->getMessage());
         return ['success' => false, 'message' => $e->getMessage()];
     }
 }
