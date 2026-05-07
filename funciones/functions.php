@@ -7727,7 +7727,7 @@ function crearSeccion($db, $datos) {
                         'capacidad_maxima' => $capacidad_maxima,
                         'turno' => $turno,
                         'inicia' => $inicia,
-                        'estatus' => 'inactiva'
+                        'estatus' => 'activa'
                     ], 
                     "Secciones", 
                     "Creación de nueva sección"
