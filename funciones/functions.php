@@ -8804,29 +8804,36 @@ function obtenerSeccionesPorCarrera($db, $carrera_id) {
 
 
 /**
- * Obtiene secciones disponibles por carrera y turno
+ * Obtiene secciones disponibles por carrera y turno (VERSIÓN CORREGIDA)
  */
 function obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno) {
     global $db;
     
-    // Consulta SIMPLE - sin HAVING, sin subconsultas complicadas
+    // Verificar que los parámetros no estén vacíos
+    if (empty($carrera_id) || empty($turno)) {
+        error_log("obtenerSeccionesDisponiblesPorCarreraYTurno: Parámetros vacíos - carrera_id: $carrera_id, turno: $turno");
+        return [];
+    }
+    
+    // Consulta simplificada - obtener secciones activas de la carrera y turno
     $query = "SELECT 
         s.id_seccion,
         s.codigo_seccion,
         s.capacidad_maxima,
-        s.turno
+        s.turno,
+        s.id_carrera,
+        s.id_periodo,
+        s.estatus,
+        s.numero_seccion
     FROM secciones s
-    INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
     WHERE s.id_carrera = ? 
         AND s.turno = ?
-        AND p.activo = 1
-        AND s.status = 'Aprobada'
         AND s.estatus = 'activa'
     ORDER BY s.codigo_seccion ASC";
     
     $stmt = $db->prepare($query);
     if (!$stmt) {
-        error_log("Error prepare: " . $db->error);
+        error_log("Error prepare secciones: " . $db->error);
         return [];
     }
     
@@ -8836,14 +8843,40 @@ function obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno) {
     
     $secciones = [];
     while ($row = $result->fetch_assoc()) {
-        // Contar inscritos actuales
+        // Verificar si el período académico está activo
+        $periodo_activo = true;
+        if (!empty($row['id_periodo'])) {
+            $periodo_query = "SELECT activo FROM periodos_academicos WHERE id_periodo = ?";
+            $periodo_stmt = $db->prepare($periodo_query);
+            if ($periodo_stmt) {
+                $periodo_stmt->bind_param('i', $row['id_periodo']);
+                $periodo_stmt->execute();
+                $periodo_result = $periodo_stmt->get_result();
+                $periodo = $periodo_result->fetch_assoc();
+                $periodo_activo = $periodo && $periodo['activo'] == 1;
+                $periodo_stmt->close();
+            }
+        }
+        
+        // Solo incluir si el período está activo
+        if (!$periodo_activo) {
+            continue;
+        }
+        
+        // Contar inscritos actuales en estudiante_seccion
         $count_query = "SELECT COUNT(*) as inscritos FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'";
         $count_stmt = $db->prepare($count_query);
-        $count_stmt->bind_param('i', $row['id_seccion']);
-        $count_stmt->execute();
-        $count_result = $count_stmt->get_result();
-        $count_row = $count_result->fetch_assoc();
-        $inscritos = $count_row['inscritos'] ?? 0;
+        if (!$count_stmt) {
+            error_log("Error prepare count: " . $db->error);
+            $inscritos = 0;
+        } else {
+            $count_stmt->bind_param('i', $row['id_seccion']);
+            $count_stmt->execute();
+            $count_result = $count_stmt->get_result();
+            $count_row = $count_result->fetch_assoc();
+            $inscritos = $count_row['inscritos'] ?? 0;
+            $count_stmt->close();
+        }
         
         $cupos_disponibles = $row['capacidad_maxima'] - $inscritos;
         
@@ -8852,11 +8885,11 @@ function obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno) {
             $row['cupos_disponibles'] = $cupos_disponibles;
             $secciones[] = $row;
         }
-        
-        $count_stmt->close();
     }
     
     $stmt->close();
+    
+    error_log("Secciones encontradas para carrera $carrera_id, turno $turno: " . count($secciones));
     
     return $secciones;
 }
@@ -8957,93 +8990,66 @@ function asignarEstudianteASeccionEspecifica($usuario_id, $seccion_id) {
 }
 
 /**
- * Asigna un estudiante a una sección disponible automáticamente
+ * Asigna un estudiante a una sección disponible
  */
 function asignarEstudianteASeccionDisponible($usuario_id, $carrera_id, $turno) {
     global $db;
     
-    // Buscar la primera sección con cupo disponible
-    $query = "SELECT 
-        s.id_seccion,
-        s.codigo_seccion,
-        s.capacidad_maxima
-    FROM secciones s
-    INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
-    WHERE s.id_carrera = ? 
-        AND s.turno = ?
-        AND p.activo = 1
-        AND s.status = 'Aprobada'
-        AND s.estatus = 'activa'
-    ORDER BY s.codigo_seccion ASC";
+    // Obtener secciones disponibles
+    $secciones = obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno);
     
-    $stmt = $db->prepare($query);
-    if (!$stmt) {
-        error_log("Error prepare: " . $db->error);
-        return ['success' => false, 'message' => 'Error al buscar sección'];
-    }
-    
-    $stmt->bind_param('is', $carrera_id, $turno);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $seccion_asignada = null;
-    while ($row = $result->fetch_assoc()) {
-        // Contar inscritos actuales en esta sección
-        $count_query = "SELECT COUNT(*) as inscritos FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'";
-        $count_stmt = $db->prepare($count_query);
-        $count_stmt->bind_param('i', $row['id_seccion']);
-        $count_stmt->execute();
-        $count_result = $count_stmt->get_result();
-        $count_row = $count_result->fetch_assoc();
-        $inscritos = $count_row['inscritos'] ?? 0;
-        $count_stmt->close();
-        
-        if ($inscritos < $row['capacidad_maxima']) {
-            $seccion_asignada = $row;
-            break;
-        }
-    }
-    $stmt->close();
-    
-    if (!$seccion_asignada) {
-        error_log("No hay secciones disponibles para carrera: $carrera_id, turno: $turno");
-        return ['success' => false, 'message' => 'No hay secciones disponibles para esta carrera y turno'];
-    }
-    
-    // Verificar si ya está inscrito
-    $check = $db->prepare("SELECT id FROM estudiante_seccion WHERE id_usuario = ? AND id_seccion = ? AND estatus = 'activo'");
-    $check->bind_param('ii', $usuario_id, $seccion_asignada['id_seccion']);
-    $check->execute();
-    if ($check->get_result()->num_rows > 0) {
-        $check->close();
-        return ['success' => false, 'message' => 'El estudiante ya está inscrito en esta sección'];
-    }
-    $check->close();
-    
-    // Inscribir estudiante
-    $fecha = date('Y-m-d H:i:s');
-    $insert = $db->prepare("INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus) VALUES (?, ?, ?, 'activo')");
-    $insert->bind_param('iis', $usuario_id, $seccion_asignada['id_seccion'], $fecha);
-    
-    if ($insert->execute()) {
-        $insert->close();
+    if (empty($secciones)) {
         return [
-            'success' => true, 
-            'message' => 'Estudiante asignado a la sección ' . $seccion_asignada['codigo_seccion'],
-            'seccion' => $seccion_asignada['codigo_seccion']
+            'success' => false,
+            'message' => 'No hay secciones disponibles para esta carrera y turno'
         ];
     }
     
-    $insert->close();
-    return ['success' => false, 'message' => 'Error al asignar estudiante a la sección: ' . $insert->error];
+    // Tomar la primera sección disponible
+    $seccion = $secciones[0];
+    $id_seccion = $seccion['id_seccion'];
+    
+    // Verificar si la tabla estudiante_seccion existe
+    $check_table = $db->query("SHOW TABLES LIKE 'estudiante_seccion'");
+    if ($check_table->num_rows == 0) {
+        // Crear la tabla si no existe
+        $db->query("CREATE TABLE IF NOT EXISTS estudiante_seccion (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            id_usuario INT NOT NULL,
+            id_seccion INT NOT NULL,
+            fecha_inscripcion DATETIME,
+            estatus VARCHAR(20) DEFAULT 'activo',
+            INDEX(id_usuario),
+            INDEX(id_seccion)
+        )");
+    }
+    
+    // Insertar en estudiante_seccion con el nombre correcto de la columna
+    $insert = $db->prepare("INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus) VALUES (?, ?, NOW(), 'activo')");
+    $insert->bind_param('ii', $usuario_id, $id_seccion);
+    
+    if (!$insert->execute()) {
+        return [
+            'success' => false,
+            'message' => 'Error al asignar estudiante a la sección: ' . $insert->error
+        ];
+    }
+    
+    return [
+        'success' => true,
+        'message' => 'Asignado a la sección ' . $seccion['codigo_seccion'],
+        'seccion' => $seccion['codigo_seccion'],
+        'id_seccion' => $id_seccion
+    ];
 }
 
+/**
+ * Acepta una preinscripción y asigna a sección
+ */
 function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
     global $db;
     
     error_log("=== aceptarPreinscripcionConSeccion ===");
-    error_log("preinscripcion_id: $preinscripcion_id");
-    error_log("admin_id: $admin_id");
     
     $db->begin_transaction();
     
@@ -9059,13 +9065,11 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
             throw new Exception('Preinscripción no encontrada');
         }
         
-        error_log("Preinscripción encontrada - Carrera: {$preinscripcion['carrera']}, Turno: {$preinscripcion['turno']}");
-        
         if ($preinscripcion['status'] !== 'Pendiente') {
             throw new Exception('Esta preinscripción ya fue procesada');
         }
         
-        // Verificar si el usuario ya existe por cédula
+        // Verificar si el usuario ya existe
         $check_user = $db->prepare("SELECT id FROM users WHERE idusuario = ?");
         $check_user->bind_param('s', $preinscripcion['idusuario']);
         $check_user->execute();
@@ -9075,158 +9079,93 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
             $usuario_id = $existing_user['id'];
             error_log("Usuario ya existe - ID: $usuario_id");
         } else {
-            // ============================================================
-            // INSERT DIRECTO EN LA TABLA users
-            // ============================================================
-            
-            $username = $preinscripcion['idusuario']; // Usar cédula como username
+            // Insertar nuevo usuario
+            $username = $preinscripcion['idusuario'];
             $password = password_hash($preinscripcion['idusuario'], PASSWORD_DEFAULT);
             $fecha_act = date('Y-m-d H:i:s');
             $api_key = bin2hex(random_bytes(16));
             
-            // Procesar títulos e institutos
-            $titulos = !empty($preinscripcion['titulos']) ? $preinscripcion['titulos'] : '';
-            $institutos = !empty($preinscripcion['institutos']) ? $preinscripcion['institutos'] : '';
-            
-            // Insertar usuario con TODOS los campos
-            $insert_user = $db->prepare("
-                INSERT INTO users SET
-                    idusuario = ?,
-                    nombre = ?,
-                    username = ?,
-                    email = ?,
-                    tlf = ?,
-                    cel = ?,
-                    direccion = ?,
-                    ciudad = ?,
-                    estado = ?,
-                    municipio = ?,
-                    parroquia = ?,
-                    etnia = ?,
-                    casaapto = ?,
-                    punto_referencia = ?,
-                    grupo_familiar = ?,
-                    acargo_usted = ?,
-                    fuente_ingresos = ?,
-                    tipo_vivienda = ?,
-                    tenencia_vivienda = ?,
-                    enfermedad = ?,
-                    discapacidad = ?,
-                    titulos = ?,
-                    institutos = ?,
-                    potencialidades = ?,
-                    fecha_ingreso = ?,
-                    fecha_act = ?,
-                    status = ?,
-                    user_type = ?,
-                    password = ?,
-                    api_key = ?,
-                    carrera = ?,
-                    carrera_di = ?,
-                    genero = ?,
-                    embarazada = ?,
-                    edo_civil = ?,
-                    fecha_nac = ?,
-                    num_telf_opc = ?,
-                    foto_perfil = ?,
-                    usuario = 0,
-                    estudiante = 1,
-                    docente = 0,
-                    admin = 0,
-                    super_user = 0,
-                    editar_user = 0,
-                    editar_nota = 0,
-                    editar_acceso = 0,
-                    editar_valores = 0,
-                    editar_estudiante = 0,
-                    agregar_estudiante = 0,
-                    agregar_docente = 0,
-                    editar_docente = 0,
-                    agregar_carrera = 0,
-                    agregar_materia = 0,
-                    editar_materia = 0,
-                    pagos = 0,
-                    auditoria = 0,
-                    secciones = 0,
-                    rela_materia_carrera = 0,
-                    periodos_academicos = 0,
-                    asig_secciones = 0,
-                    asig_cursos = 0,
-                    horarios = 0,
-                    gestion_director_carrera = 0,
-                    notas_cargadas = 0,
-                    consultar_notas = 0,
-                    consultar_notas_pasadas = 0,
-                    tipos_pago = 0,
-                    tipos_horario = 0,
-                    horario_personal = 0,
-                    respaldo_bd = 0,
-                    gestionar_carrera = 0,
-                    gestion_periodo_academico = 0,
-                    gestion_asig_cursos = 0,
-                    gestion_horario = 0,
-                    titulos_re_materia = 0,
-                    grado = 0,
-                    gestion_grado = 0,
-                    vocero = 0,
-                    visita = 0
-            ");
-            
-            // Valores por defecto para campos que puedan estar vacíos
+            // Valores por defecto
             $ciudad = !empty($preinscripcion['ciudad']) ? $preinscripcion['ciudad'] : ($preinscripcion['municipio'] ?? '');
-            $carrera_di = $preinscripcion['carrera'] ?? null;
             $fecha_nac = !empty($preinscripcion['fecha_nac']) ? $preinscripcion['fecha_nac'] : null;
             $fecha_ingreso = !empty($preinscripcion['fecha_ingreso']) ? $preinscripcion['fecha_ingreso'] : date('Y-m-d');
             $foto_perfil = $preinscripcion['foto_perfil'] ?? '';
+            $titulos = !empty($preinscripcion['titulos']) ? $preinscripcion['titulos'] : '';
+            $institutos = !empty($preinscripcion['institutos']) ? $preinscripcion['institutos'] : '';
             
-            $insert_user->bind_param(
-                'sssssssssssssiissssssssssssssssssss',
-                $preinscripcion['idusuario'],
-                $preinscripcion['nombre'],
-                $username,
-                $preinscripcion['email'],
-                $preinscripcion['tlf'],
-                $preinscripcion['cel'],
-                $preinscripcion['direccion'],
-                $ciudad,
-                $preinscripcion['estado'],
-                $preinscripcion['municipio'],
-                $preinscripcion['parroquia'],
-                $preinscripcion['etnia'],
-                $preinscripcion['casaapto'],
-                $preinscripcion['punto_referencia'],
-                $preinscripcion['grupo_familiar'],
-                $preinscripcion['acargo_usted'],
-                $preinscripcion['fuente_ingresos'],
-                $preinscripcion['tipo_vivienda'],
-                $preinscripcion['tenencia_vivienda'],
-                $preinscripcion['enfermedad'],
-                $preinscripcion['discapacidad'],
-                $titulos,
-                $institutos,
-                $preinscripcion['potencialidades'],
-                $fecha_ingreso,
-                $fecha_act,
-                'Activo',
-                'estudiante',
-                $password,
-                $api_key,
-                $preinscripcion['carrera'],
-                $carrera_di,
-                $preinscripcion['genero'],
-                $preinscripcion['embarazada'],
-                $preinscripcion['edo_civil'],
-                $fecha_nac,
-                $preinscripcion['num_telf_opc'],
-                $foto_perfil
-            );
+            // Escapar valores para evitar inyección SQL
+            $idusuario = $db->real_escape_string($preinscripcion['idusuario']);
+            $nombre = $db->real_escape_string($preinscripcion['nombre']);
+            $email = $db->real_escape_string($preinscripcion['email']);
+            $tlf = $db->real_escape_string($preinscripcion['tlf']);
+            $cel = $db->real_escape_string($preinscripcion['cel']);
+            $direccion = $db->real_escape_string($preinscripcion['direccion']);
+            $estado = $db->real_escape_string($preinscripcion['estado']);
+            $municipio = $db->real_escape_string($preinscripcion['municipio']);
+            $parroquia = $db->real_escape_string($preinscripcion['parroquia']);
+            $etnia = $db->real_escape_string($preinscripcion['etnia']);
+            $casaapto = $db->real_escape_string($preinscripcion['casaapto']);
+            $punto_referencia = $db->real_escape_string($preinscripcion['punto_referencia']);
+            $grupo_familiar = $db->real_escape_string($preinscripcion['grupo_familiar']);
+            $acargo_usted = $db->real_escape_string($preinscripcion['acargo_usted']);
+            $fuente_ingresos = $db->real_escape_string($preinscripcion['fuente_ingresos']);
+            $tipo_vivienda = $db->real_escape_string($preinscripcion['tipo_vivienda']);
+            $tenencia_vivienda = $db->real_escape_string($preinscripcion['tenencia_vivienda']);
+            $enfermedad = $db->real_escape_string($preinscripcion['enfermedad']);
+            $discapacidad = $db->real_escape_string($preinscripcion['discapacidad']);
+            $potencialidades = $db->real_escape_string($preinscripcion['potencialidades']);
+            $carrera = $db->real_escape_string($preinscripcion['carrera']);
+            $genero = $db->real_escape_string($preinscripcion['genero']);
+            $edo_civil = $db->real_escape_string($preinscripcion['edo_civil']);
+            $num_telf_opc = $db->real_escape_string($preinscripcion['num_telf_opc']);
             
-            if (!$insert_user->execute()) {
-                throw new Exception('Error al insertar usuario: ' . $insert_user->error);
+            $insert_sql = "INSERT INTO users SET 
+                idusuario = '$idusuario',
+                nombre = '$nombre',
+                username = '$username',
+                email = '$email',
+                tlf = '$tlf',
+                cel = '$cel',
+                direccion = '$direccion',
+                ciudad = '$ciudad',
+                estado = '$estado',
+                municipio = '$municipio',
+                parroquia = '$parroquia',
+                etnia = '$etnia',
+                casaapto = '$casaapto',
+                punto_referencia = '$punto_referencia',
+                grupo_familiar = '$grupo_familiar',
+                acargo_usted = '$acargo_usted',
+                fuente_ingresos = '$fuente_ingresos',
+                tipo_vivienda = '$tipo_vivienda',
+                tenencia_vivienda = '$tenencia_vivienda',
+                enfermedad = '$enfermedad',
+                discapacidad = '$discapacidad',
+                titulos = '$titulos',
+                institutos = '$institutos',
+                potencialidades = '$potencialidades',
+                fecha_ingreso = '$fecha_ingreso',
+                fecha_act = '$fecha_act',
+                status = 'Activo',
+                user_type = 'estudiante',
+                password = '$password',
+                api_key = '$api_key',
+                carrera = '$carrera',
+                carrera_di = '$carrera',
+                genero = '$genero',
+                embarazada = '$preinscripcion[embarazada]',
+                edo_civil = '$edo_civil',
+                fecha_nac = '$fecha_nac',
+                num_telf_opc = '$num_telf_opc',
+                foto_perfil = '$foto_perfil',
+                estudiante = 1";
+            
+            if (!$db->query($insert_sql)) {
+                throw new Exception('Error al insertar usuario: ' . $db->error);
             }
             
-            $usuario_id = $insert_user->insert_id;
-            error_log("Usuario creado exitosamente - ID: $usuario_id");
+            $usuario_id = $db->insert_id;
+            error_log("Usuario creado - ID: $usuario_id");
         }
         
         // Asignar a sección disponible
@@ -9250,8 +9189,6 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
         
         $db->commit();
         
-        error_log("✅ Preinscripción aprobada exitosamente");
-        
         return [
             'success' => true,
             'message' => 'Preinscripción aprobada exitosamente. ' . $asignacion['message'],
@@ -9261,11 +9198,10 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
         
     } catch (Exception $e) {
         $db->rollback();
-        error_log("❌ Error en aceptarPreinscripcionConSeccion: " . $e->getMessage());
+        error_log("Error en aceptarPreinscripcionConSeccion: " . $e->getMessage());
         return ['success' => false, 'message' => $e->getMessage()];
     }
 }
-
 
 
 

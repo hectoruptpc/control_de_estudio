@@ -47,11 +47,48 @@ if (!$preinscripcion) {
 
 // Obtener secciones disponibles para mostrar
 $seccionesDisponibles = [];
+$mensaje_secciones = '';
 if ($preinscripcion['status'] === 'Pendiente') {
-    $seccionesDisponibles = obtenerSeccionesDisponiblesPorCarreraYTurno(
-        $preinscripcion['carrera'], 
-        $preinscripcion['turno'] ?? 'Diurno'
-    );
+    $carrera_id = $preinscripcion['carrera'];
+    $turno = !empty($preinscripcion['turno']) ? $preinscripcion['turno'] : 'Diurno';
+    
+    $seccionesDisponibles = obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno);
+    
+    if (empty($seccionesDisponibles)) {
+        // Verificar si hay secciones activas en general
+        $check_secciones = $db->query("SELECT COUNT(*) as total FROM secciones WHERE estatus = 'activa'");
+        $total_secciones = $check_secciones ? $check_secciones->fetch_assoc()['total'] : 0;
+        
+        if ($total_secciones == 0) {
+            $mensaje_secciones = "⚠️ No hay secciones activas en el sistema. Debes crear secciones primero.";
+        } else {
+            // Verificar si hay secciones de esta carrera
+            $check_carrera = $db->prepare("SELECT COUNT(*) as total FROM secciones WHERE id_carrera = ? AND estatus = 'activa'");
+            if ($check_carrera) {
+                $check_carrera->bind_param('i', $carrera_id);
+                $check_carrera->execute();
+                $secciones_carrera = $check_carrera->get_result()->fetch_assoc()['total'];
+                
+                if ($secciones_carrera == 0) {
+                    $mensaje_secciones = "⚠️ No hay secciones activas para esta carrera. Debes crear una sección para esta carrera.";
+                } else {
+                    // Verificar si hay del turno correcto
+                    $check_turno = $db->prepare("SELECT COUNT(*) as total FROM secciones WHERE id_carrera = ? AND turno = ? AND estatus = 'activa'");
+                    if ($check_turno) {
+                        $check_turno->bind_param('is', $carrera_id, $turno);
+                        $check_turno->execute();
+                        $secciones_turno = $check_turno->get_result()->fetch_assoc()['total'];
+                        
+                        if ($secciones_turno == 0) {
+                            $mensaje_secciones = "⚠️ No hay secciones activas para el turno '$turno' en esta carrera.";
+                        } else {
+                            $mensaje_secciones = "⚠️ Hay secciones activas, pero todas están llenas (sin cupos disponibles).";
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 $carreras = obtenerTodasLasCarreras();
@@ -126,15 +163,22 @@ include('includes/head.php');
                         <strong>Secciones disponibles para <?= htmlspecialchars($carreraMap[$preinscripcion['carrera']] ?? 'la carrera') ?> (Turno: <?= htmlspecialchars($preinscripcion['turno'] ?? 'Diurno') ?>):</strong>
                         <ul class="mb-0 mt-2">
                             <?php foreach ($seccionesDisponibles as $sec): ?>
-                                <li>Código: <strong><?= htmlspecialchars($sec['codigo_seccion']) ?></strong> - Cupos disponibles: <?= $sec['cupos_disponibles'] ?>/<?= $sec['capacidad_maxima'] ?></li>
+                                <li>
+                                    <strong>Código: <?= htmlspecialchars($sec['codigo_seccion']) ?></strong><br>
+                                    <small>Capacidad: <?= $sec['capacidad_maxima'] ?> | Inscritos: <?= $sec['inscritos'] ?> | Cupos disponibles: <?= $sec['cupos_disponibles'] ?></small>
+                                </li>
                             <?php endforeach; ?>
                         </ul>
                     </div>
                 <?php else: ?>
                     <div class="alert alert-warning mb-3">
                         <i class="fas fa-exclamation-triangle"></i>
-                        <strong>¡Atención!</strong> No hay secciones disponibles para esta carrera y turno. 
-                        Debes crear una sección antes de aprobar esta preinscripción.
+                        <strong>¡Atención!</strong> <?= $mensaje_secciones ?: 'No hay secciones disponibles para esta carrera y turno.' ?>
+                        <div class="mt-2">
+                            <a href="gestion_secciones.php" class="btn btn-sm btn-primary">
+                                <i class="fas fa-plus"></i> Gestionar Secciones
+                            </a>
+                        </div>
                     </div>
                 <?php endif; ?>
 
@@ -164,7 +208,6 @@ include('includes/head.php');
         </div>
     </div>
 
-    <!-- Resto del contenido igual... -->
     <div class="row">
         <div class="col-12 col-xl-8">
             <div class="card mb-4">
@@ -188,6 +231,7 @@ include('includes/head.php');
                         <div class="col-md-6"><strong>Carrera solicitada:</strong> <?php echo htmlspecialchars($carreraMap[$preinscripcion['carrera']] ?? 'No especificada'); ?></div>
                         <div class="col-md-6"><strong>Turno:</strong> <?php echo htmlspecialchars($preinscripcion['turno'] ?? 'No especificado'); ?></div>
                         <div class="col-md-6"><strong>Fecha de solicitud:</strong> <?php echo htmlspecialchars($preinscripcion['fecha_ingreso']); ?></div>
+                        <div class="col-md-6"><strong>Sede:</strong> <?php echo htmlspecialchars($preinscripcion['sede'] ?? 'No especificada'); ?></div>
                     </div>
                 </div>
             </div>
@@ -202,7 +246,6 @@ include('includes/head.php');
                         <div class="col-md-4"><strong>Estado:</strong> <?php echo htmlspecialchars($estadoNombre); ?></div>
                         <div class="col-md-4"><strong>Municipio:</strong> <?php echo htmlspecialchars($municipioNombre); ?></div>
                         <div class="col-md-4"><strong>Parroquia:</strong> <?php echo htmlspecialchars($parroquiaNombre); ?></div>
-                        <div class="col-md-4"><strong>Sede:</strong> <?php echo htmlspecialchars($preinscripcion['sede'] ?? 'No especificada'); ?></div>
                         <div class="col-md-4"><strong>Comuna:</strong> <?php echo htmlspecialchars($preinscripcion['comuna'] ?? 'No especificada'); ?></div>
                         <div class="col-md-4"><strong>Punto de referencia:</strong> <?php echo htmlspecialchars($preinscripcion['punto_referencia']); ?></div>
                         <div class="col-md-4"><strong>Personas a cargo:</strong> <?php echo htmlspecialchars($preinscripcion['acargo_usted']); ?></div>
@@ -220,10 +263,10 @@ include('includes/head.php');
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
-                        <div class="col-md-6"><strong>Etnia:</strong> <?php echo htmlspecialchars($preinscripcion['etnia']); ?></div>
-                        <div class="col-md-6"><strong>Discapacidad:</strong> <?php echo htmlspecialchars($preinscripcion['discapacidad']); ?></div>
-                        <div class="col-md-12"><strong>Enfermedades:</strong> <?php echo nl2br(htmlspecialchars($preinscripcion['enfermedad'])); ?></div>
-                        <div class="col-md-12"><strong>Potencialidades:</strong> <?php echo nl2br(htmlspecialchars($preinscripcion['potencialidades'])); ?></div>
+                        <div class="col-md-6"><strong>Etnia:</strong> <?php echo htmlspecialchars($preinscripcion['etnia'] ?: 'No especificada'); ?></div>
+                        <div class="col-md-6"><strong>Discapacidad:</strong> <?php echo htmlspecialchars($preinscripcion['discapacidad'] ?: 'No especificada'); ?></div>
+                        <div class="col-md-12"><strong>Enfermedades:</strong> <?php echo nl2br(htmlspecialchars($preinscripcion['enfermedad'] ?: 'Ninguna')); ?></div>
+                        <div class="col-md-12"><strong>Potencialidades:</strong> <?php echo nl2br(htmlspecialchars($preinscripcion['potencialidades'] ?: 'No especificadas')); ?></div>
                     </div>
                 </div>
             </div>
@@ -233,13 +276,15 @@ include('includes/head.php');
                     <strong>Títulos obtenidos e instituciones</strong>
                 </div>
                 <div class="card-body">
-                    <?php if (count($titulos) > 0): ?>
+                    <?php if (count($titulos) > 0 && !empty($titulos[0])): ?>
                         <div class="list-group">
                             <?php foreach ($titulos as $index => $titulo): ?>
-                                <div class="list-group-item">
-                                    <strong>Título:</strong> <?php echo htmlspecialchars($titulo); ?><br>
-                                    <strong>Institución:</strong> <?php echo htmlspecialchars($institutos[$index] ?? ''); ?>
-                                </div>
+                                <?php if (!empty($titulo)): ?>
+                                    <div class="list-group-item">
+                                        <strong>Título:</strong> <?php echo htmlspecialchars($titulo); ?><br>
+                                        <strong>Institución:</strong> <?php echo htmlspecialchars($institutos[$index] ?? ''); ?>
+                                    </div>
+                                <?php endif; ?>
                             <?php endforeach; ?>
                         </div>
                     <?php else: ?>
@@ -247,7 +292,7 @@ include('includes/head.php');
                     <?php endif; ?>
                     <div class="mt-3">
                         <strong>País del título:</strong> <?php echo htmlspecialchars($preinscripcion['pais_titulo'] ?? 'No especificado'); ?><br>
-                        <?php if (strtolower(trim($preinscripcion['pais_titulo'] ?? '')) !== 'venezuela'): ?>
+                        <?php if (strtolower(trim($preinscripcion['pais_titulo'] ?? '')) !== 'venezuela' && !empty($preinscripcion['pais_titulo'])): ?>
                             <strong>Legalizado en Venezuela:</strong> <?php echo ($preinscripcion['legalizado_titulo'] ?? 0) ? 'Sí' : 'No'; ?>
                         <?php endif; ?>
                     </div>
@@ -263,7 +308,7 @@ include('includes/head.php');
                 <div class="card-body">
                     <p><strong>Correo:</strong> <?php echo htmlspecialchars($preinscripcion['email']); ?></p>
                     <p><strong>Teléfono principal:</strong> <?php echo htmlspecialchars($preinscripcion['tlf']); ?></p>
-                    <p><strong>Teléfono alternativo:</strong> <?php echo htmlspecialchars($preinscripcion['num_telf_opc']); ?></p>
+                    <p><strong>Teléfono alternativo:</strong> <?php echo htmlspecialchars($preinscripcion['num_telf_opc'] ?: 'No especificado'); ?></p>
                     <p><strong>Fecha de creación:</strong> <?php echo htmlspecialchars($preinscripcion['created_at']); ?></p>
                     <p><strong>Última actualización:</strong> <?php echo htmlspecialchars($preinscripcion['updated_at']); ?></p>
                     <?php if (!empty($preinscripcion['aprobado_por'])): ?>
@@ -286,7 +331,7 @@ include('includes/head.php');
                     <div class="card-body text-center">
                         <?php $ext = pathinfo($fotoPerfilUrl, PATHINFO_EXTENSION); ?>
                         <?php if (in_array(strtolower($ext), ['jpg','jpeg','png','webp'])): ?>
-                            <img src="<?php echo htmlspecialchars($fotoPerfilUrl); ?>" class="img-fluid rounded" alt="Foto de perfil">
+                            <img src="<?php echo htmlspecialchars($fotoPerfilUrl); ?>" class="img-fluid rounded" alt="Foto de perfil" style="max-width: 200px;">
                         <?php else: ?>
                             <a href="<?php echo htmlspecialchars($fotoPerfilUrl); ?>" target="_blank" class="btn btn-outline-primary">
                                 <i class="fas fa-file-download"></i> Descargar documento
