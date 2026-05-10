@@ -1450,24 +1450,55 @@ function obtenerSeccionesTrayecto0($carreraId, $turno = null) {
 }
 
 /**
- * Cuenta estudiantes en una sección
+ * Cuenta los estudiantes inscritos en una sección
  */
-function contarEstudiantesEnSeccion($seccionId) {
+function contarEstudiantesEnSeccion($seccion_id) {
     global $db;
-
-    $query = "SELECT COUNT(*) AS total FROM users WHERE seccion_id = ?";
+    
+    $query = "SELECT COUNT(*) as total FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'";
     $stmt = $db->prepare($query);
     if (!$stmt) {
         return 0;
     }
-    $stmt->bind_param('i', $seccionId);
+    $stmt->bind_param('i', $seccion_id);
     $stmt->execute();
     $result = $stmt->get_result();
     $row = $result->fetch_assoc();
+    $total = $row['total'] ?? 0;
     $stmt->close();
-
-    return (int)($row['total'] ?? 0);
+    
+    return $total;
 }
+
+
+
+/**
+ * Verifica si una sección tiene cupos disponibles
+ */
+function seccionTieneCuposDisponibles($seccion_id) {
+    global $db;
+    
+    // Obtener capacidad máxima
+    $query = "SELECT capacidad_maxima FROM secciones WHERE id_seccion = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param('i', $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $seccion = $result->fetch_assoc();
+    $stmt->close();
+    
+    if (!$seccion) {
+        return false;
+    }
+    
+    $capacidad_maxima = $seccion['capacidad_maxima'];
+    $inscritos = contarEstudiantesEnSeccion($seccion_id);
+    
+    return $inscritos < $capacidad_maxima;
+}
+
+
+
 
 /**
  * Asigna sección automáticamente al estudiante
@@ -1558,54 +1589,71 @@ function asignarSeccionAutomatica($carreraId, $turno, $userId) {
     return $asignados > 0;
 }
 
-/**
- * Crea una nueva sección (para directores)
- */
-function crearSeccionDirector($carreraId, $turno, $numeroSeccion, $capacidad, $horario, $createdBy, $codigoSeccion, $idTrayecto, $idPeriodo, $inicia) {
+function crearSeccionDirector($carreraId, $turno, $numeroSeccion, $capacidad, $horario, $userId, $codigoSeccion, $idTrayecto, $idPeriodo, $fechaInicia) {
     global $db;
     
-    $query = "INSERT INTO secciones (codigo_seccion, id_carrera, turno, numero_seccion, capacidad_maxima, horario, created_by, estatus, id_trayecto, id_periodo, inicia, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'inactiva', ?, ?, ?, NOW())";
+    $estatus = 'inactiva';
+    $status = 'pendiente';
+    $fechaActual = date('Y-m-d H:i:s');
+    
+    $query = "INSERT INTO secciones (
+        codigo_seccion,
+        id_carrera,
+        turno,
+        numero_seccion,
+        id_trayecto,
+        id_periodo,
+        capacidad_maxima,
+        horario,
+        estatus,
+        status,
+        created_by,
+        created_at,
+        inicia
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     
     $stmt = $db->prepare($query);
     if (!$stmt) {
-        error_log("Error prepare: " . $db->error);
+        error_log("Error prepare crearSeccionDirector: " . $db->error);
         return false;
     }
     
-    // s = string, i = integer
-    $stmt->bind_param('sisiisiiis', 
-        $codigoSeccion, 
-        $carreraId, 
-        $turno, 
-        $numeroSeccion, 
-        $capacidad, 
-        $horario, 
-        $createdBy, 
-        $idTrayecto, 
-        $idPeriodo, 
-        $inicia
+    $stmt->bind_param(
+        'sisiiisssssss',
+        $codigoSeccion,
+        $carreraId,
+        $turno,
+        $numeroSeccion,
+        $idTrayecto,
+        $idPeriodo,
+        $capacidad,
+        $horario,
+        $estatus,
+        $status,
+        $userId,
+        $fechaActual,
+        $fechaInicia
     );
     
-    $result = $stmt->execute();
-    
-    if (!$result) {
-        error_log("Error execute: " . $stmt->error);
+    if ($stmt->execute()) {
+        $idSeccion = $stmt->insert_id;
+        $stmt->close();
+        error_log("Sección creada - ID: $idSeccion, estatus: $estatus, status: $status");
+        return $idSeccion;
+    } else {
+        error_log("Error execute crearSeccionDirector: " . $stmt->error);
+        $stmt->close();
+        return false;
     }
-    
-    $stmt->close();
-    return $result;
 }
 
-/**
- * Aprueba una sección
- */
 function aprobarSeccion($seccionId, $approvedBy) {
     global $db;
 
-    // Primero obtener información de la sección antes de aprobar
-    $query_info = "SELECT id_carrera, turno FROM secciones WHERE id_seccion = ?";
+    $query_info = "SELECT id_carrera, turno, capacidad_maxima FROM secciones WHERE id_seccion = ?";
     $stmt_info = $db->prepare($query_info);
     if (!$stmt_info) {
+        error_log("Error prepare aprobarSeccion info: " . $db->error);
         return false;
     }
     $stmt_info->bind_param('i', $seccionId);
@@ -1615,13 +1663,20 @@ function aprobarSeccion($seccionId, $approvedBy) {
     $stmt_info->close();
 
     if (!$seccion_info) {
-        return false; // Sección no existe
+        error_log("Sección no encontrada: $seccionId");
+        return false;
     }
 
-    // Aprobar la sección
-    $query = "UPDATE secciones SET status = 'Aprobada', approved_by = ?, approved_at = NOW() WHERE id_seccion = ?";
+    $query = "UPDATE secciones SET 
+        status = 'aprobada',
+        estatus = 'activa',
+        approved_by = ?, 
+        approved_at = NOW() 
+        WHERE id_seccion = ? AND status = 'pendiente'";
+    
     $stmt = $db->prepare($query);
     if (!$stmt) {
+        error_log("Error prepare aprobarSeccion update: " . $db->error);
         return false;
     }
     $stmt->bind_param('ii', $approvedBy, $seccionId);
@@ -1629,12 +1684,71 @@ function aprobarSeccion($seccionId, $approvedBy) {
     $stmt->close();
 
     if ($result) {
-        // Asignar estudiantes automáticamente a la sección aprobada
-        asignarSeccionAutomatica($seccion_info['id_carrera'], $seccion_info['turno'], null);
+        error_log("Sección $seccionId aprobada y activada exitosamente");
+    } else {
+        error_log("Error al aprobar sección $seccionId");
     }
 
     return $result;
 }
+
+
+
+/**
+ * Obtiene las secciones aprobadas (visibles para estudiantes)
+ */
+function obtenerSeccionesAprobadas($carrera_id = null, $turno = null) {
+    global $db;
+    
+    $query = "SELECT 
+        s.*, 
+        c.nombre_carrera AS carrera_nombre
+    FROM secciones s 
+    JOIN carreras c ON s.id_carrera = c.id_carrera 
+    WHERE s.status = 'aprobada' AND s.estatus = 'activa'";
+    
+    $params = [];
+    $types = "";
+    
+    if ($carrera_id) {
+        $query .= " AND s.id_carrera = ?";
+        $params[] = $carrera_id;
+        $types .= "i";
+    }
+    
+    if ($turno) {
+        $query .= " AND s.turno = ?";
+        $params[] = $turno;
+        $types .= "s";
+    }
+    
+    $query .= " ORDER BY s.codigo_seccion ASC";
+    
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error prepare obtenerSeccionesAprobadas: " . $db->error);
+        return [];
+    }
+    
+    if (!empty($params)) {
+        $stmt->bind_param($types, ...$params);
+    }
+    
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $secciones = [];
+    while ($row = $result->fetch_assoc()) {
+        $secciones[] = $row;
+    }
+    
+    $stmt->close();
+    return $secciones;
+}
+
+
+
+
 
 /**
  * Elimina una sección junto con horarios y asignaciones activas de estudiantes.
@@ -1757,9 +1871,20 @@ function obtenerSeccionesPendientes() {
     global $db;
 
     $secciones = [];
-    $query = "SELECT s.*, s.id_seccion AS id, s.capacidad_maxima AS capacidad, c.nombre_carrera AS carrera_nombre, u.nombre AS creador_nombre FROM secciones s JOIN carreras c ON s.id_carrera = c.id_carrera LEFT JOIN users u ON s.created_by = u.id WHERE s.status = 'Pendiente' ORDER BY s.created_at DESC";
+    $query = "SELECT 
+        s.*, 
+        s.id_seccion AS id, 
+        s.capacidad_maxima AS capacidad, 
+        c.nombre_carrera AS carrera_nombre, 
+        u.nombre AS creador_nombre 
+    FROM secciones s 
+    JOIN carreras c ON s.id_carrera = c.id_carrera 
+    LEFT JOIN users u ON s.created_by = u.id 
+    WHERE s.status = 'pendiente' 
+    ORDER BY s.created_at DESC";
+    
     $result = $db->query($query);
-    if ($result) {
+    if ($result && $result->num_rows > 0) {
         while ($row = $result->fetch_assoc()) {
             $secciones[] = $row;
         }
@@ -8804,31 +8929,27 @@ function obtenerSeccionesPorCarrera($db, $carrera_id) {
 
 
 /**
- * Obtiene secciones disponibles por carrera y turno (VERSIÓN CORREGIDA)
+ * Obtiene secciones disponibles por carrera y turno (SOLO ACTIVAS Y APROBADAS)
  */
 function obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno) {
     global $db;
     
-    // Verificar que los parámetros no estén vacíos
     if (empty($carrera_id) || empty($turno)) {
-        error_log("obtenerSeccionesDisponiblesPorCarreraYTurno: Parámetros vacíos - carrera_id: $carrera_id, turno: $turno");
         return [];
     }
     
-    // Consulta simplificada - obtener secciones activas de la carrera y turno
     $query = "SELECT 
         s.id_seccion,
         s.codigo_seccion,
         s.capacidad_maxima,
         s.turno,
         s.id_carrera,
-        s.id_periodo,
-        s.estatus,
-        s.numero_seccion
+        s.id_periodo
     FROM secciones s
     WHERE s.id_carrera = ? 
         AND s.turno = ?
         AND s.estatus = 'activa'
+        AND s.status = 'aprobada'
     ORDER BY s.codigo_seccion ASC";
     
     $stmt = $db->prepare($query);
@@ -8843,39 +8964,17 @@ function obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno) {
     
     $secciones = [];
     while ($row = $result->fetch_assoc()) {
-        // Verificar si el período académico está activo
-        $periodo_activo = true;
-        if (!empty($row['id_periodo'])) {
-            $periodo_query = "SELECT activo FROM periodos_academicos WHERE id_periodo = ?";
-            $periodo_stmt = $db->prepare($periodo_query);
-            if ($periodo_stmt) {
-                $periodo_stmt->bind_param('i', $row['id_periodo']);
-                $periodo_stmt->execute();
-                $periodo_result = $periodo_stmt->get_result();
-                $periodo = $periodo_result->fetch_assoc();
-                $periodo_activo = $periodo && $periodo['activo'] == 1;
-                $periodo_stmt->close();
-            }
-        }
-        
-        // Solo incluir si el período está activo
-        if (!$periodo_activo) {
-            continue;
-        }
-        
-        // Contar inscritos actuales en estudiante_seccion
         $count_query = "SELECT COUNT(*) as inscritos FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'";
         $count_stmt = $db->prepare($count_query);
-        if (!$count_stmt) {
-            error_log("Error prepare count: " . $db->error);
-            $inscritos = 0;
-        } else {
+        if ($count_stmt) {
             $count_stmt->bind_param('i', $row['id_seccion']);
             $count_stmt->execute();
             $count_result = $count_stmt->get_result();
             $count_row = $count_result->fetch_assoc();
             $inscritos = $count_row['inscritos'] ?? 0;
             $count_stmt->close();
+        } else {
+            $inscritos = 0;
         }
         
         $cupos_disponibles = $row['capacidad_maxima'] - $inscritos;
@@ -8888,9 +8987,6 @@ function obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno) {
     }
     
     $stmt->close();
-    
-    error_log("Secciones encontradas para carrera $carrera_id, turno $turno: " . count($secciones));
-    
     return $secciones;
 }
 
