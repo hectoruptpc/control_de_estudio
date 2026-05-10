@@ -516,9 +516,9 @@ $fechaSolicitud = date('Y-m-d');
                 <i class="fas fa-times me-1"></i> Cancelar
             </button>
         <?php else: ?>
-            <button type="button" onclick="history.back()" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left mr-1"></i> Regresar
-            </button>
+            <button type="button" onclick="window.location.href='index.php'" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left mr-1"></i> Regresar
+        </button>
         <?php endif; ?>
         
         <div>
