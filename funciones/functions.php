@@ -1157,12 +1157,51 @@ function obtenerConfiguracionSecretaria($clave, $default = null) {
 }
 
 /**
- * Guarda o actualiza una configuración de secretaría
+ * Guarda o actualiza cupos por carrera y turno
+ * Guarda EXACTAMENTE los valores que el usuario ingresa
  */
+function guardarCupoSecretaria($carreraId, $turno, $cuposTotales, $numeroSecciones = 1) {
+    global $db;
+
+    // Verificar si ya existe el registro
+    $check = $db->prepare("SELECT id FROM secretaria_cupos WHERE carrera_id = ? AND turno = ?");
+    $check->bind_param('is', $carreraId, $turno);
+    $check->execute();
+    $existe = $check->get_result()->fetch_assoc();
+    $check->close();
+
+    if ($existe) {
+        // Si existe, ACTUALIZAR con los valores exactos
+        $query = "UPDATE secretaria_cupos SET cupos_totales = ?, numero_secciones = ? WHERE carrera_id = ? AND turno = ?";
+        $stmt = $db->prepare($query);
+        $stmt->bind_param('iiis', $cuposTotales, $numeroSecciones, $carreraId, $turno);
+    } else {
+        // Si no existe, INSERTAR con los valores exactos
+        $query = "INSERT INTO secretaria_cupos (carrera_id, turno, cupos_totales, numero_secciones) VALUES (?, ?, ?, ?)";
+        $stmt = $db->prepare($query);
+        $stmt->bind_param('isii', $carreraId, $turno, $cuposTotales, $numeroSecciones);
+    }
+
+    if (!$stmt) {
+        error_log("Error prepare guardarCupoSecretaria: " . $db->error);
+        return false;
+    }
+    
+    $result = $stmt->execute();
+    
+    if (!$result) {
+        error_log("Error execute guardarCupoSecretaria: " . $stmt->error);
+    }
+    
+    $stmt->close();
+    return $result;
+}
+
+
 function guardarConfiguracionSecretaria($clave, $valor) {
     global $db;
 
-    $query = "INSERT INTO secretaria_config (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)";
+    $query = "REPLACE INTO secretaria_config (clave, valor) VALUES (?, ?)";
     $stmt = $db->prepare($query);
     if (!$stmt) {
         return false;
@@ -1172,6 +1211,8 @@ function guardarConfiguracionSecretaria($clave, $valor) {
     $stmt->close();
     return $result;
 }
+
+
 
 /**
  * Obtiene los cupos configurados por carrera y turno
@@ -1196,22 +1237,7 @@ function obtenerCuposSecretaria() {
     return $cupos;
 }
 
-/**
- * Guarda o actualiza cupos por carrera y turno
- */
-function guardarCupoSecretaria($carreraId, $turno, $cuposTotales, $numeroSecciones = 1) {
-    global $db;
 
-    $query = "INSERT INTO secretaria_cupos (carrera_id, turno, cupos_totales, numero_secciones) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE cupos_totales = VALUES(cupos_totales), numero_secciones = VALUES(numero_secciones)";
-    $stmt = $db->prepare($query);
-    if (!$stmt) {
-        return false;
-    }
-    $stmt->bind_param('isii', $carreraId, $turno, $cuposTotales, $numeroSecciones);
-    $result = $stmt->execute();
-    $stmt->close();
-    return $result;
-}
 
 /**
  * Obtiene lista de números de sección autorizados por Secretaría para una carrera y turno.
