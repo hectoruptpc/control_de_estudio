@@ -110,19 +110,7 @@ include('includes/head.php');
                                 <a href="preinscripcion_detalle.php?id=<?php echo (int)$pre['id']; ?>" class="btn btn-sm btn-info mb-1">
                                     <i class="fas fa-eye"></i> Ver planilla
                                 </a>
-                                <form method="post" class="d-inline-block mb-1">
-                                    <input type="hidden" name="aceptar_id" value="<?php echo (int)$pre['id']; ?>">
-                                    <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('¿Aceptar esta preinscripción y crear el usuario?');">
-                                        <i class="fas fa-check"></i> Aceptar
-                                    </button>
-                                </form>
-                                <form method="post" class="d-inline-block">
-                                    <input type="hidden" name="rechazar_id" value="<?php echo (int)$pre['id']; ?>">
-                                    <input type="hidden" name="motivo" value="Preinscripción rechazada por el administrador.">
-                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Rechazar esta preinscripción?');">
-                                        <i class="fas fa-times"></i> Rechazar
-                                    </button>
-                                </form>
+                                
                             </td>
                         </tr>
                     <?php endforeach; ?>
