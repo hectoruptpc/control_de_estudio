@@ -9165,9 +9165,6 @@ function asignarEstudianteASeccionDisponible($usuario_id, $carrera_id, $turno) {
     ];
 }
 
-/**
- * Acepta una preinscripción y asigna a sección
- */
 function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
     global $db;
     
@@ -9268,7 +9265,7 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
                 potencialidades = '$potencialidades',
                 fecha_ingreso = '$fecha_ingreso',
                 fecha_act = '$fecha_act',
-                status = 'Activo',
+                status = '1',
                 user_type = 'estudiante',
                 password = '$password',
                 api_key = '$api_key',
@@ -9298,6 +9295,39 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
             throw new Exception($asignacion['message']);
         }
         
+        // ========== NUEVO: INSCRIBIR MATERIAS DEL TRAYECTO 0 ==========
+        $periodo_activo = obtenerPeriodoActivo();
+        if (!$periodo_activo) {
+            throw new Exception('No hay un período académico activo. No se pueden inscribir las materias.');
+        }
+        
+        $materias_trayecto0 = obtenerMateriasTrayecto0PorCarrera($preinscripcion['carrera']);
+        $inscripciones_exitosas = 0;
+        $inscripciones_fallidas = 0;
+        
+        if (empty($materias_trayecto0)) {
+            error_log("Advertencia: No se encontraron materias del trayecto 0 para la carrera ID: " . $preinscripcion['carrera']);
+        } else {
+            foreach ($materias_trayecto0 as $id_materia) {
+                $inscrito = inscribirEstudianteEnMateria(
+                    $usuario_id, 
+                    $id_materia, 
+                    $asignacion['id_seccion'], 
+                    $periodo_activo['id_periodo']
+                );
+                
+                if ($inscrito) {
+                    $inscripciones_exitosas++;
+                } else {
+                    $inscripciones_fallidas++;
+                    error_log("Error al inscribir materia $id_materia para usuario $usuario_id");
+                }
+            }
+            
+            error_log("Inscripción de materias trayecto 0 - Exitosas: $inscripciones_exitosas, Fallidas: $inscripciones_fallidas");
+        }
+        // ========== FIN DE LA NUEVA PARTE ==========
+        
         // Actualizar preinscripción
         $fecha_actual = date('Y-m-d H:i:s');
         $update = $db->prepare("UPDATE preinscripcion SET 
@@ -9313,9 +9343,10 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
         
         return [
             'success' => true,
-            'message' => 'Preinscripción aprobada exitosamente. ' . $asignacion['message'],
+            'message' => 'Preinscripción aprobada exitosamente. ' . $asignacion['message'] . ". Materias del trayecto 0 inscritas: $inscripciones_exitosas.",
             'seccion_asignada' => $asignacion['seccion'],
-            'usuario_id' => $usuario_id
+            'usuario_id' => $usuario_id,
+            'materias_inscritas' => $inscripciones_exitosas
         ];
         
     } catch (Exception $e) {
@@ -18303,6 +18334,94 @@ function procesarEdicionNota() {
 
 
 //INSCRIPCION DE MATERIAS ***********************************************************************
+
+
+
+
+
+/**
+ * Obtiene todas las materias del trayecto 0 para una carrera específica
+ */
+function obtenerMateriasTrayecto0PorCarrera($carrera_id) {
+    global $db;
+    
+    $query = "SELECT m.id_materia 
+              FROM materias m
+              INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+              WHERE cm.id_carrera = ? 
+              AND m.trayecto = 0 
+              AND m.activa = 1";
+    
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error prepare obtenerMateriasTrayecto0PorCarrera: " . $db->error);
+        return [];
+    }
+    
+    $stmt->bind_param('i', $carrera_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $materias = [];
+    while ($row = $result->fetch_assoc()) {
+        $materias[] = $row['id_materia'];
+    }
+    
+    $stmt->close();
+    return $materias;
+}
+
+/**
+ * Inscribe un estudiante en una materia
+ */
+function inscribirEstudianteEnMateria($usuario_id, $id_materia, $id_seccion, $id_periodo) {
+    global $db;
+    
+    // Verificar si ya está inscrito para evitar duplicados
+    $check_query = "SELECT id_inscripcion FROM estudiante_materias 
+                    WHERE id_usuario = ? AND id_materia = ? AND id_periodo = ?";
+    $check_stmt = $db->prepare($check_query);
+    $check_stmt->bind_param('iii', $usuario_id, $id_materia, $id_periodo);
+    $check_stmt->execute();
+    $check_result = $check_stmt->get_result();
+    
+    if ($check_result->num_rows > 0) {
+        // Ya está inscrito, no hacer nada
+        $check_stmt->close();
+        return true;
+    }
+    $check_stmt->close();
+    
+    // Insertar nueva inscripción
+    $query = "INSERT INTO estudiante_materias 
+              (id_usuario, id_materia, id_seccion, id_periodo, fecha_inscripcion, estatus, nota_final) 
+              VALUES (?, ?, ?, ?, NOW(), 'activo', NULL)";
+    
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error prepare inscribirEstudianteEnMateria: " . $db->error);
+        return false;
+    }
+    
+    $stmt->bind_param('iiii', $usuario_id, $id_materia, $id_seccion, $id_periodo);
+    $result = $stmt->execute();
+    $stmt->close();
+    
+    return $result;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
