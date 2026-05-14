@@ -1375,6 +1375,70 @@ function obtenerCodigosSeccionDisponibles($carreraId, $turno) {
     return $available;
 }
 
+
+
+
+/**
+ * Obtiene los cupos disponibles para una carrera y turno específicos
+ */
+function obtenerCuposDisponiblesPorCarreraYTurno($carreraId, $turno) {
+    global $db;
+    
+    if (empty($carreraId) || empty($turno)) {
+        return ['total' => 0, 'ocupados' => 0, 'disponibles' => 0, 'tiene_cupo' => false];
+    }
+    
+    // Obtener cupos totales de secretaria
+    $query = "SELECT cupos_totales FROM secretaria_cupos WHERE carrera_id = ? AND turno = ?";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return ['total' => 0, 'ocupados' => 0, 'disponibles' => 0, 'tiene_cupo' => false];
+    }
+    
+    $stmt->bind_param('is', $carreraId, $turno);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $cupo = $result->fetch_assoc();
+    $total = $cupo ? (int)$cupo['cupos_totales'] : 0;
+    $stmt->close();
+    
+    // Contar preinscripciones (Pendientes + Aprobadas) usando la función existente
+    $ocupados = contarPreinscripcionesPorCupo($carreraId, $turno);
+    $disponibles = max(0, $total - $ocupados);
+    
+    return [
+        'total' => $total,
+        'ocupados' => $ocupados,
+        'disponibles' => $disponibles,
+        'tiene_cupo' => $disponibles > 0
+    ];
+}
+
+/**
+ * Obtiene todos los cupos disponibles para todas las carreras y turnos
+ */
+function obtenerTodosLosCuposDisponibles() {
+    global $db;
+    
+    $carreras = obtenerTodasLasCarreras();
+    $turnos = ['Diurno', 'Nocturno'];
+    $resultados = [];
+    
+    foreach ($carreras as $carrera) {
+        $carreraId = $carrera['id'];
+        foreach ($turnos as $turno) {
+            $resultados[$carreraId][$turno] = obtenerCuposDisponiblesPorCarreraYTurno($carreraId, $turno);
+        }
+    }
+    
+    return $resultados;
+}
+
+
+
+
+
+
 /**
  * Cuenta cuántas preinscripciones están usando cupos para una carrera+turno
  */

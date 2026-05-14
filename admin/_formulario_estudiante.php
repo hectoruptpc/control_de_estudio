@@ -25,6 +25,15 @@ if (!isset($estados)) {
     $estados = obtenerEstados($db);
 }
 
+// Obtener cupos disponibles para todas las carreras y turnos
+$todosLosCupos = [];
+foreach ($carreras as $carrera) {
+    $turnosCupos = ['Diurno', 'Nocturno'];
+    foreach ($turnosCupos as $turno) {
+        $todosLosCupos[$carrera['id']][$turno] = obtenerCuposDisponiblesPorCarreraYTurno($carrera['id'], $turno);
+    }
+}
+
 // Determinar si estamos en modo modal
 $esModal = isset($esModal) ? $esModal : false;
 $modo_preinscripcion = isset($modo_preinscripcion) ? $modo_preinscripcion : false;
@@ -67,7 +76,7 @@ $fechaSolicitud = date('Y-m-d');
         </div>
     </div>
 
-    <!-- Sección 2: Datos Personales (MODIFICADA - Etnia condicional) -->
+    <!-- Sección 2: Datos Personales -->
     <h5 class="mb-3"><i class="fas fa-user-tag mr-2"></i> Datos Personales</h5>
     <div class="row g-3 mb-4">
         <div class="col-md-6">
@@ -164,21 +173,32 @@ $fechaSolicitud = date('Y-m-d');
                 <select name="carrera" id="carrera<?php echo $prefijo; ?>" class="form-control" required>
                     <option value="">-- Seleccione una carrera --</option>
                     <?php foreach ($carreras as $carrera): ?>
-                        <option value="<?php echo htmlspecialchars($carrera['id']); ?>" <?php echo (isset($_POST['carrera']) && $_POST['carrera'] == $carrera['id']) ? 'selected' : ''; ?>>
+                        <?php 
+                        $cuposDiurno = $todosLosCupos[$carrera['id']]['Diurno'] ?? null;
+                        $cuposNocturno = $todosLosCupos[$carrera['id']]['Nocturno'] ?? null;
+                        $tieneAlgunCupo = ($cuposDiurno['tiene_cupo'] ?? false) || ($cuposNocturno['tiene_cupo'] ?? false);
+                        ?>
+                        <option value="<?php echo htmlspecialchars($carrera['id']); ?>" 
+                            data-cupos='<?php echo htmlspecialchars(json_encode($todosLosCupos[$carrera['id']])); ?>'
+                            data-nombre="<?php echo htmlspecialchars($carrera['nombre']); ?>"
+                            <?php echo (isset($_POST['carrera']) && $_POST['carrera'] == $carrera['id']) ? 'selected' : ''; ?>
+                            style="<?php echo !$tieneAlgunCupo ? 'color: red;' : ''; ?>">
                             <?php echo htmlspecialchars($carrera['nombre']); ?>
+                            <?php if (!$tieneAlgunCupo): ?>
+                                (SIN CUPOS)
+                            <?php endif; ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <div id="cuposInfo<?php echo $prefijo; ?>" class="mt-2 small"></div>
             </div>
         </div>
         <?php if ($modo_preinscripcion): ?>
         <div class="col-md-6">
             <div class="mb-3">
                 <label for="turno<?php echo $prefijo; ?>" class="form-label required">Turno</label>
-                <select name="turno" id="turno<?php echo $prefijo; ?>" class="form-control" required>
-                    <option value="">-- Seleccione un turno --</option>
-                    <option value="Diurno" <?php echo (isset($_POST['turno']) && $_POST['turno'] === 'Diurno') ? 'selected' : ''; ?>>Diurno</option>
-                    <option value="Nocturno" <?php echo (isset($_POST['turno']) && $_POST['turno'] === 'Nocturno') ? 'selected' : ''; ?>>Nocturno</option>
+                <select name="turno" id="turno<?php echo $prefijo; ?>" class="form-control" required disabled>
+                    <option value="">-- Primero seleccione una carrera --</option>
                 </select>
             </div>
         </div>
@@ -387,7 +407,7 @@ $fechaSolicitud = date('Y-m-d');
         </div>
     </div>
 
-    <!-- Sección 6: Salud (REORGANIZADA COMPLETAMENTE) -->
+    <!-- Sección 6: Salud -->
     <h5 class="mb-3"><i class="fas fa-heartbeat mr-2"></i> Salud</h5>
     <div class="row g-3 mb-4">
         <!-- Discapacidad (Condicional) -->
@@ -769,7 +789,6 @@ function previewImage(input, previewId) {
         const file = input.files[0];
         const fileType = file.type;
         
-        // Validar tipo de archivo
         const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
         if (!allowedTypes.includes(fileType)) {
             alert('Error: Solo se permiten archivos JPG, JPEG, PNG, WEBP y PDF.');
@@ -778,7 +797,6 @@ function previewImage(input, previewId) {
             return;
         }
         
-        // Validar tamaño (5MB máximo)
         if (file.size > 5 * 1024 * 1024) {
             alert('Error: El archivo no debe superar los 5MB.');
             input.value = '';
@@ -786,7 +804,6 @@ function previewImage(input, previewId) {
             return;
         }
         
-        // Mostrar vista previa solo para imágenes
         if (fileType.startsWith('image/')) {
             const reader = new FileReader();
             
@@ -797,7 +814,6 @@ function previewImage(input, previewId) {
             
             reader.readAsDataURL(file);
         } else {
-            // Para PDF, mostrar mensaje
             preview.innerHTML = '<div class="alert alert-info p-2">Archivo PDF seleccionado</div>';
             preview.style.display = 'block';
         }
@@ -816,7 +832,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const parroquiaSelect = document.getElementById('parroquia' + prefijo);
     const apiBase = '<?php echo isset($modo_preinscripcion) && $modo_preinscripcion ? 'admin/' : ''; ?>';
     
-    // Campos ocultos para nombres
     const nombreEstadoInput = document.getElementById('nombre_estado' + prefijo);
     const nombreMunicipioInput = document.getElementById('nombre_municipio' + prefijo);
     const nombreParroquiaInput = document.getElementById('nombre_parroquia' + prefijo);
@@ -826,17 +841,14 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    // ========== EVENTO: Cambio de Estado ==========
     estadoSelect.addEventListener('change', function() {
         const estadoId = this.value;
         const estadoTexto = this.options[this.selectedIndex].text;
         
-        // Guardar nombre en campo oculto
         if (nombreEstadoInput) {
             nombreEstadoInput.value = estadoTexto;
         }
         
-        // Resetear municipio y parroquia
         resetSelect(municipioSelect, 'Cargando municipios...', true);
         resetSelect(parroquiaSelect, 'Primero seleccione un municipio', true);
         
@@ -845,21 +857,17 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Cargar municipios del estado seleccionado
         cargarMunicipios(estadoId);
     });
     
-    // ========== EVENTO: Cambio de Municipio ==========
     municipioSelect.addEventListener('change', function() {
         const municipioId = this.value;
         const municipioTexto = this.options[this.selectedIndex].text;
         
-        // Guardar nombre en campo oculto
         if (nombreMunicipioInput) {
             nombreMunicipioInput.value = municipioTexto;
         }
         
-        // Resetear parroquia y limpiar la selección anterior
         resetSelect(parroquiaSelect, 'Cargando parroquias...', true);
         if (nombreParroquiaInput) {
             nombreParroquiaInput.value = '';
@@ -870,21 +878,17 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Cargar parroquias del municipio seleccionado
         cargarParroquias(municipioId);
     });
     
-    // ========== EVENTO: Cambio de Parroquia ==========
     parroquiaSelect.addEventListener('change', function() {
         const parroquiaTexto = this.options[this.selectedIndex].text;
         
-        // Guardar nombre en campo oculto
         if (nombreParroquiaInput) {
             nombreParroquiaInput.value = this.value ? parroquiaTexto : '';
         }
     });
     
-    // Método alternativo GET
     function cargarMunicipiosAlternativo(estadoId, selectedMunicipioId = '', selectedParroquiaId = '') {
         fetch(apiBase + 'api/obtener_municipios.php?estado_id=' + estadoId)
         .then(response => response.json())
@@ -912,7 +916,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ========== FUNCIÓN: Cargar Municipios ==========
     function cargarMunicipios(estadoId, selectedMunicipioId = '', selectedParroquiaId = '') {
         const formData = new FormData();
         formData.append('estado_id', estadoId);
@@ -948,12 +951,10 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             console.error('Error al cargar municipios:', error);
             resetSelect(municipioSelect, 'Error al cargar municipios', true);
-
             cargarMunicipiosAlternativo(estadoId, selectedMunicipioId, selectedParroquiaId);
         });
     }
 
-    // ========== FUNCIÓN: Cargar Parroquias ==========
     function cargarParroquias(municipioId, selectedParroquiaId = '') {
         const formData = new FormData();
         formData.append('municipio_id', municipioId);
@@ -1011,7 +1012,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // ========== FUNCIÓN: Resetear Select ==========
     function resetSelect(selectElement, placeholder, disabled) {
         if (!selectElement) return;
         
@@ -1025,20 +1025,16 @@ document.addEventListener('DOMContentLoaded', function() {
         selectElement.value = '';
     }
     
-    // ========== FUNCIÓN: Actualizar Opciones del Select ==========
     function updateSelect(selectElement, options, placeholder, disabled) {
         if (!selectElement) return;
         
-        // Limpiar opciones actuales
         selectElement.innerHTML = '';
         
-        // Agregar placeholder
         const optionPlaceholder = document.createElement('option');
         optionPlaceholder.value = '';
         optionPlaceholder.textContent = placeholder;
         selectElement.appendChild(optionPlaceholder);
         
-        // Agregar opciones
         options.forEach(option => {
             const opt = document.createElement('option');
             opt.value = option.id;
@@ -1049,7 +1045,6 @@ document.addEventListener('DOMContentLoaded', function() {
         selectElement.disabled = disabled;
     }
     
-    // ========== FUNCIÓN: Cargar Datos si Estamos Editando O Reenviando ==========
     function cargarDatosUbicacionSiExisten() {
         const selectedEstadoId = <?php echo json_encode($_POST['estado'] ?? ''); ?>;
         const selectedMunicipioId = <?php echo json_encode($_POST['municipio'] ?? ''); ?>;
@@ -1076,7 +1071,7 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('DOMContentLoaded', function() {
     const prefijo = '<?php echo $prefijo; ?>';
     
-    // ===== Manejo condicional de Etnia =====
+    // Etnia
     const radioEtniaSi = document.getElementById('etnia_si' + prefijo);
     const radioEtniaNo = document.getElementById('etnia_no' + prefijo);
     const etniaContainer = document.getElementById('etniaContainer' + prefijo);
@@ -1099,7 +1094,7 @@ document.addEventListener('DOMContentLoaded', function() {
         radioEtniaNo.addEventListener('change', toggleEtniaField);
     }
     
-    // ===== Manejo condicional de Discapacidad =====
+    // Discapacidad
     const radioDiscSi = document.getElementById('discapacidad_si' + prefijo);
     const radioDiscNo = document.getElementById('discapacidad_no' + prefijo);
     const discContainer = document.getElementById('discapacidadContainer' + prefijo);
@@ -1122,7 +1117,7 @@ document.addEventListener('DOMContentLoaded', function() {
         radioDiscNo.addEventListener('change', toggleDiscapacidadField);
     }
     
-    // ===== Manejo condicional de Enfermedad =====
+    // Enfermedad
     const radioEnfSi = document.getElementById('enfermedad_si' + prefijo);
     const radioEnfNo = document.getElementById('enfermedad_no' + prefijo);
     const enfContainer = document.getElementById('enfermedadContainer' + prefijo);
@@ -1145,7 +1140,7 @@ document.addEventListener('DOMContentLoaded', function() {
         radioEnfNo.addEventListener('change', toggleEnfermedadField);
     }
 
-    // ===== Manejo condicional de Embarazo =====
+    // Embarazo
     const radioGeneroMasculino = document.getElementById('genero_m' + prefijo);
     const radioGeneroFemenino = document.getElementById('genero_f' + prefijo);
     const radioGeneroOtro = document.getElementById('genero_o' + prefijo);
@@ -1181,6 +1176,181 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleEmbarazoField();
 });
 
+// =============================================
+// SCRIPT PARA CUPOS DINÁMICOS EN CARRERA Y TURNO
+// =============================================
+document.addEventListener('DOMContentLoaded', function() {
+    const prefijo = '<?php echo $prefijo; ?>';
+    const carreraSelect = document.getElementById('carrera' + prefijo);
+    const turnoSelect = document.getElementById('turno' + prefijo);
+    const cuposInfoDiv = document.getElementById('cuposInfo' + prefijo);
+    
+    if (!carreraSelect) return;
+    
+    function actualizarCuposTiempoReal(carreraId, turno) {
+        if (!carreraId || !turno) return;
+        
+        fetch('api/obtener_cupos_disponibles.php?carrera_id=' + carreraId + '&turno=' + turno)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (turnoSelect && turnoSelect.options.length > 0) {
+                        for (let i = 0; i < turnoSelect.options.length; i++) {
+                            const opt = turnoSelect.options[i];
+                            if (opt.value === turno) {
+                                const disponible = data.disponibles;
+                                const total = data.total;
+                                const ocupados = data.ocupados;
+                                
+                                if (disponible > 0) {
+                                    opt.textContent = turno + ' (' + disponible + ' cupos disponibles de ' + total + ')';
+                                    opt.style.color = '';
+                                } else {
+                                    opt.textContent = turno + ' (SIN CUPOS - ' + ocupados + '/' + total + ' ocupados)';
+                                    opt.style.color = 'red';
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (cuposInfoDiv && data.disponibles !== undefined) {
+                        const carreraNombre = carreraSelect.options[carreraSelect.selectedIndex]?.getAttribute('data-nombre') || '';
+                        let infoHtml = '<div class="alert alert-sm p-2 mt-1" style="font-size:11px;">';
+                        infoHtml += '<i class="fas fa-chart-line"></i> <strong>' + carreraNombre + ' - Turno ' + turno + ':</strong><br>';
+                        
+                        if (data.disponibles > 0) {
+                            infoHtml += '<span class="text-success">✓ ' + data.disponibles + ' cupos disponibles</span><br>';
+                            infoHtml += '<small>' + data.ocupados + ' inscritos / ' + data.total + ' total</small>';
+                        } else {
+                            infoHtml += '<span class="text-danger">✗ SIN CUPOS DISPONIBLES</span><br>';
+                            infoHtml += '<small>' + data.ocupados + ' inscritos / ' + data.total + ' total</small>';
+                        }
+                        infoHtml += '</div>';
+                        cuposInfoDiv.innerHTML = infoHtml;
+                    }
+                }
+            })
+            .catch(error => console.error('Error al obtener cupos:', error));
+    }
+    
+    function actualizarTurnos() {
+        const selectedOption = carreraSelect.options[carreraSelect.selectedIndex];
+        const carreraId = carreraSelect.value;
+        
+        if (!carreraId || !selectedOption || !selectedOption.dataset.cupos) {
+            if (turnoSelect) {
+                turnoSelect.disabled = true;
+                turnoSelect.innerHTML = '<option value="">-- Primero seleccione una carrera --</option>';
+            }
+            cuposInfoDiv.innerHTML = '';
+            return;
+        }
+        
+        let cuposData = {};
+        try {
+            cuposData = JSON.parse(selectedOption.dataset.cupos);
+        } catch(e) {
+            cuposData = {};
+        }
+        
+        if (turnoSelect) {
+            turnoSelect.disabled = false;
+            const currentValue = turnoSelect.value;
+            turnoSelect.innerHTML = '<option value="">-- Seleccione un turno --</option>';
+            
+            if (cuposData.Diurno) {
+                const diurno = cuposData.Diurno;
+                const option = document.createElement('option');
+                option.value = 'Diurno';
+                if (diurno.disponibles > 0) {
+                    option.textContent = 'Diurno (' + diurno.disponibles + ' cupos disponibles de ' + diurno.total + ')';
+                    option.style.color = '';
+                } else {
+                    option.textContent = 'Diurno (SIN CUPOS - ' + diurno.ocupados + '/' + diurno.total + ' ocupados)';
+                    option.style.color = 'red';
+                }
+                turnoSelect.appendChild(option);
+            }
+            
+            if (cuposData.Nocturno) {
+                const nocturno = cuposData.Nocturno;
+                const option = document.createElement('option');
+                option.value = 'Nocturno';
+                if (nocturno.disponibles > 0) {
+                    option.textContent = 'Nocturno (' + nocturno.disponibles + ' cupos disponibles de ' + nocturno.total + ')';
+                    option.style.color = '';
+                } else {
+                    option.textContent = 'Nocturno (SIN CUPOS - ' + nocturno.ocupados + '/' + nocturno.total + ' ocupados)';
+                    option.style.color = 'red';
+                }
+                turnoSelect.appendChild(option);
+            }
+            
+            if (turnoSelect.options.length === 1) {
+                turnoSelect.innerHTML = '<option value="">-- No hay turnos disponibles --</option>';
+                turnoSelect.disabled = true;
+            } else if (currentValue && Array.from(turnoSelect.options).some(opt => opt.value === currentValue)) {
+                turnoSelect.value = currentValue;
+                actualizarCuposTiempoReal(carreraId, currentValue);
+                if (window.cuposInterval) clearInterval(window.cuposInterval);
+                window.cuposInterval = setInterval(() => {
+                    if (carreraSelect.value && turnoSelect.value && turnoSelect.value !== '') {
+                        actualizarCuposTiempoReal(carreraSelect.value, turnoSelect.value);
+                    }
+                }, 10000);
+            }
+        }
+        
+        let infoHtml = '<div class="alert alert-sm alert-info p-2 mt-1" style="font-size:11px;">';
+        infoHtml += '<i class="fas fa-chart-line"></i> <strong>Resumen de cupos:</strong><br>';
+        
+        if (cuposData.Diurno) {
+            const d = cuposData.Diurno;
+            infoHtml += '▪️ Diurno: ';
+            if (d.disponibles > 0) {
+                infoHtml += '<span class="text-success">' + d.disponibles + ' disponibles</span>';
+            } else {
+                infoHtml += '<span class="text-danger">Sin cupos</span>';
+            }
+            infoHtml += ' (' + d.ocupados + '/' + d.total + ')<br>';
+        }
+        
+        if (cuposData.Nocturno) {
+            const n = cuposData.Nocturno;
+            infoHtml += '▪️ Nocturno: ';
+            if (n.disponibles > 0) {
+                infoHtml += '<span class="text-success">' + n.disponibles + ' disponibles</span>';
+            } else {
+                infoHtml += '<span class="text-danger">Sin cupos</span>';
+            }
+            infoHtml += ' (' + n.ocupados + '/' + n.total + ')';
+        }
+        
+        infoHtml += '</div>';
+        cuposInfoDiv.innerHTML = infoHtml;
+    }
+    
+    carreraSelect.addEventListener('change', function() {
+        if (window.cuposInterval) clearInterval(window.cuposInterval);
+        actualizarTurnos();
+    });
+    
+    if (turnoSelect) {
+        turnoSelect.addEventListener('change', function() {
+            const carreraId = carreraSelect.value;
+            const turno = turnoSelect.value;
+            if (carreraId && turno) {
+                actualizarCuposTiempoReal(carreraId, turno);
+            }
+        });
+    }
+    
+    if (carreraSelect.value) {
+        actualizarTurnos();
+    }
+});
+
 // Validación del formulario
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('<?php echo $formId; ?>');
@@ -1191,7 +1361,6 @@ document.addEventListener('DOMContentLoaded', function() {
         event.preventDefault();
         
         if (validarFormulario()) {
-            // Si la validación pasa, enviar el formulario
             form.submit();
         }
     });
@@ -1200,52 +1369,44 @@ document.addEventListener('DOMContentLoaded', function() {
         let isValid = true;
         let mensajesError = [];
         
-        // Obtener el prefijo
         const prefijo = '<?php echo $prefijo; ?>';
         
-        // Validar cédula
         const numeroCedula = document.getElementById('numero_cedula' + prefijo).value;
         if (!/^\d{6,9}$/.test(numeroCedula)) {
             mensajesError.push('La cédula debe contener entre 6 y 9 dígitos numéricos');
             isValid = false;
         }
         
-        // Validar nombre
         const nombre = document.getElementById('nombre' + prefijo).value;
         if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s']+$/.test(nombre.trim())) {
             mensajesError.push('El nombre solo puede contener letras, espacios y apóstrofes');
             isValid = false;
         }
         
-        // Validar estado
         const estado = document.getElementById('estado' + prefijo).value;
         if (!estado) {
             mensajesError.push('Debe seleccionar un estado');
             isValid = false;
         }
         
-        // Validar municipio
         const municipio = document.getElementById('municipio' + prefijo).value;
         if (!municipio) {
             mensajesError.push('Debe seleccionar un municipio');
             isValid = false;
         }
 
-        // Validar parroquia
         const parroquia = document.getElementById('parroquia' + prefijo).value;
         if (!parroquia) {
             mensajesError.push('Debe seleccionar una parroquia');
             isValid = false;
         }
         
-        // Validar teléfono
         const telefono = document.getElementById('tlf' + prefijo).value;
         if (!/^[0-9]{10,11}$/.test(telefono.replace(/\D/g, ''))) {
             mensajesError.push('El teléfono debe contener 10 u 11 dígitos');
             isValid = false;
         }
         
-        // Validar email
         const email = document.getElementById('email' + prefijo).value;
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
@@ -1253,7 +1414,6 @@ document.addEventListener('DOMContentLoaded', function() {
             isValid = false;
         }
         
-        // Validar que la fecha de nacimiento sea válida
         const fechaNac = document.getElementById('fecha_nac' + prefijo).value;
         if (fechaNac) {
             const fechaNacDate = new Date(fechaNac);
@@ -1263,7 +1423,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 isValid = false;
             }
             
-            // Calcular edad mínima (15 años)
             const edadMinima = new Date();
             edadMinima.setFullYear(edadMinima.getFullYear() - 15);
             if (fechaNacDate > edadMinima) {
@@ -1272,7 +1431,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // Validar fecha de ingreso
         const fechaIngresoElement = document.getElementById('fecha_ingreso' + prefijo);
         const fechaIngreso = fechaIngresoElement ? fechaIngresoElement.value : '';
         if (fechaNac && fechaIngreso) {
@@ -1284,7 +1442,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // Validar campo de etnia si se seleccionó "Sí"
         const radioEtniaSi = document.getElementById('etnia_si' + prefijo);
         const campoEtnia = document.getElementById('etnia' + prefijo);
         
@@ -1295,7 +1452,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // Validar campo de discapacidad si se seleccionó "Sí"
         const radioDiscSi = document.getElementById('discapacidad_si' + prefijo);
         const campoDisc = document.getElementById('discapacidad' + prefijo);
         
@@ -1306,7 +1462,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // Validar campo de enfermedad si se seleccionó "Sí"
         const radioEnfSi = document.getElementById('enfermedad_si' + prefijo);
         const campoEnf = document.getElementById('enfermedad' + prefijo);
         
@@ -1317,7 +1472,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // Validar campo de embarazo si el género es Femenino
         const radioGeneroFemenino = document.getElementById('genero_f' + prefijo);
         const embarazoSi = document.getElementById('embarazada_si' + prefijo);
         const embarazoNo = document.getElementById('embarazada_no' + prefijo);
@@ -1329,7 +1483,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // Mostrar errores si existen
         if (mensajesError.length > 0) {
             mostrarErrores(mensajesError);
         }
@@ -1338,7 +1491,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function mostrarErrores(errores) {
-        // Crear o actualizar contenedor de errores
         let errorContainer = document.getElementById('errorContainer');
         if (!errorContainer) {
             errorContainer = document.createElement('div');
@@ -1347,15 +1499,12 @@ document.addEventListener('DOMContentLoaded', function() {
             form.prepend(errorContainer);
         }
         
-        // Limpiar contenido anterior
         errorContainer.innerHTML = '';
         
-        // Agregar título
         const titulo = document.createElement('strong');
         titulo.textContent = 'Por favor corrija los siguientes errores:';
         errorContainer.appendChild(titulo);
         
-        // Agregar lista de errores
         const lista = document.createElement('ul');
         lista.className = 'mb-0 mt-2';
         
@@ -1366,12 +1515,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         errorContainer.appendChild(lista);
-        
-        // Desplazar al inicio del formulario
         errorContainer.scrollIntoView({ behavior: 'smooth' });
     }
     
-    // Limpiar errores al cambiar campos
     const inputs = form.querySelectorAll('input, select, textarea');
     inputs.forEach(input => {
         input.addEventListener('change', function() {
