@@ -37,6 +37,10 @@ $datosSelects = obtenerDatosSelects($db);
 $trayectos = $datosSelects['trayectos'] ?? [];
 $periodos = $datosSelects['periodos'] ?? [];
 
+// Variables para límites
+$limitesTurnos = [];
+$periodoSeleccionado = 0;
+
 // Procesar el formulario
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['crear_seccion'])) {
     // Recibir y limpiar datos
@@ -49,79 +53,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['crear_seccion'])) {
     $idPeriodo = (int)($_POST['id_periodo'] ?? 0);
     $inicia = trim($_POST['inicia'] ?? '');
     
-    // Validaciones
-    $errores = [];
+    // Verificar límite de secciones ANTES de crear
+    $limite = obtenerLimiteSeccionesDirector($carreraId, $turno, $idPeriodo);
     
-    if (empty($turno)) {
-        $errores[] = 'Debe seleccionar un turno';
-    }
-    
-    if (empty($codigoSeccion)) {
-        $errores[] = 'El código de sección es obligatorio';
-    }
-    
-    if ($capacidad < 1) {
-        $errores[] = 'La capacidad debe ser mayor a 0';
-    }
-    
-    if ($idTrayecto <= 0) {
-        $errores[] = 'Debe seleccionar un trayecto válido';
-    }
-    
-    if ($idPeriodo <= 0) {
-        $errores[] = 'Debe seleccionar un periodo válido';
-    }
-    
-    if (empty($inicia)) {
-        $errores[] = 'La fecha y hora de inicio es obligatoria';
-    }
-    
-    if (empty($horario)) {
-        $errores[] = 'Debe definir al menos un horario para la sección';
-    }
-    
-    // Formatear fecha para MySQL
-    $fechaFormateada = date('Y-m-d H:i:s', strtotime($inicia));
-    
-    // Verificar si ya existe la sección
-    if (empty($errores)) {
-        $check_query = "SELECT id_seccion FROM secciones WHERE id_carrera = ? AND turno = ? AND codigo_seccion = ? AND id_periodo = ?";
-        $check_stmt = $db->prepare($check_query);
-        $check_stmt->bind_param('issi', $carreraId, $turno, $codigoSeccion, $idPeriodo);
-        $check_stmt->execute();
-        $check_result = $check_stmt->get_result();
-        
-        if ($check_result->num_rows > 0) {
-            $errores[] = "Ya existe una sección con el código '$codigoSeccion' en el turno '$turno' para este periodo";
-        }
-        $check_stmt->close();
-    }
-    
-    // Si no hay errores, proceder a guardar
-    if (empty($errores)) {
-        $resultado = crearSeccionDirector(
-            $carreraId, 
-            $turno, 
-            $numeroSeccion, 
-            $capacidad, 
-            $horario, 
-            $_SESSION['user']['id'], 
-            $codigoSeccion, 
-            $idTrayecto, 
-            $idPeriodo, 
-            $fechaFormateada
-        );
-        
-        if ($resultado) {
-            $success_message = 'Sección creada exitosamente y enviada para aprobación.';
-            // Limpiar formulario
-            $_POST = array();
-        } else {
-            $error_message = 'Error al crear la sección. Por favor, intenta nuevamente.';
-        }
+    if (!$limite['tiene_cupo']) {
+        $error_message = "No puedes crear más secciones para el turno $turno en este periodo. " .
+                         "Límite autorizado: {$limite['autorizadas']}, " .
+                         "Secciones ya creadas: {$limite['creadas']}.";
     } else {
-        $error_message = implode('<br>', $errores);
+        // Validaciones
+        $errores = [];
+        
+        if (empty($turno)) {
+            $errores[] = 'Debe seleccionar un turno';
+        }
+        
+        if (empty($codigoSeccion)) {
+            $errores[] = 'El código de sección es obligatorio';
+        }
+        
+        if ($capacidad < 1) {
+            $errores[] = 'La capacidad debe ser mayor a 0';
+        }
+        
+        if ($idTrayecto <= 0) {
+            $errores[] = 'Debe seleccionar un trayecto válido';
+        }
+        
+        if ($idPeriodo <= 0) {
+            $errores[] = 'Debe seleccionar un periodo válido';
+        }
+        
+        if (empty($inicia)) {
+            $errores[] = 'La fecha y hora de inicio es obligatoria';
+        }
+        
+        if (empty($horario)) {
+            $errores[] = 'Debe definir al menos un horario para la sección';
+        }
+        
+        // Formatear fecha para MySQL
+        $fechaFormateada = date('Y-m-d H:i:s', strtotime($inicia));
+        
+        // Verificar si ya existe la sección
+        if (empty($errores)) {
+            $check_query = "SELECT id_seccion FROM secciones WHERE id_carrera = ? AND turno = ? AND codigo_seccion = ? AND id_periodo = ?";
+            $check_stmt = $db->prepare($check_query);
+            $check_stmt->bind_param('issi', $carreraId, $turno, $codigoSeccion, $idPeriodo);
+            $check_stmt->execute();
+            $check_result = $check_stmt->get_result();
+            
+            if ($check_result->num_rows > 0) {
+                $errores[] = "Ya existe una sección con el código '$codigoSeccion' en el turno '$turno' para este periodo";
+            }
+            $check_stmt->close();
+        }
+        
+        // Si no hay errores, proceder a guardar
+        if (empty($errores)) {
+            $resultado = crearSeccionDirector(
+                $carreraId, 
+                $turno, 
+                $numeroSeccion, 
+                $capacidad, 
+                $horario, 
+                $_SESSION['user']['id'], 
+                $codigoSeccion, 
+                $idTrayecto, 
+                $idPeriodo, 
+                $fechaFormateada
+            );
+            
+            if ($resultado) {
+                $success_message = 'Sección creada exitosamente y enviada para aprobación.';
+                $_POST = array();
+            } else {
+                $error_message = 'Error al crear la sección. Por favor, intenta nuevamente.';
+            }
+        } else {
+            $error_message = implode('<br>', $errores);
+        }
     }
+}
+
+// Obtener límites para cada turno (con el periodo seleccionado o activo)
+$periodoActivo = obtenerPeriodoActivo();
+$periodoPorDefecto = $_POST['id_periodo'] ?? ($periodoActivo['id_periodo'] ?? 0);
+
+foreach ($turnos as $t) {
+    $limitesTurnos[$t] = obtenerLimiteSeccionesDirector($carreraId, $t, $periodoPorDefecto);
 }
 
 $titulopag = 'Crear Sección';
@@ -159,6 +179,69 @@ include('includes/head.php');
         </div>
     <?php endif; ?>
 
+    <!-- Mostrar resumen de límites por turno -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <strong><i class="fas fa-chart-line"></i> Límites de Secciones por Turno</strong>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Turno</th>
+                                    <th>Autorizadas</th>
+                                    <th>Creadas</th>
+                                    <th>Pendientes</th>
+                                    <th>Aprobadas</th>
+                                    <th>Disponibles</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($turnos as $t): ?>
+                                    <?php $lim = $limitesTurnos[$t]; ?>
+                                    <tr>
+                                        <td><strong><?php echo htmlspecialchars($t); ?></strong></td>
+                                        <td class="text-center"><?php echo $lim['autorizadas']; ?></td>
+                                        <td class="text-center"><?php echo $lim['creadas']; ?></td>
+                                        <td class="text-center">
+                                            <?php if ($lim['pendientes'] > 0): ?>
+                                                <span class="badge badge-warning"><?php echo $lim['pendientes']; ?></span>
+                                            <?php else: ?>
+                                                <?php echo $lim['pendientes']; ?>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="text-center"><?php echo $lim['aprobadas']; ?></td>
+                                        <td class="text-center">
+                                            <span class="badge <?php echo $lim['disponibles'] > 0 ? 'badge-success' : 'badge-danger'; ?>">
+                                                <?php echo $lim['disponibles']; ?>
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            <?php if ($lim['tiene_cupo']): ?>
+                                                <span class="badge badge-success">Disponible</span>
+                                            <?php else: ?>
+                                                <span class="badge badge-danger">Límite alcanzado</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle"></i> 
+                        Las secciones <strong>pendientes</strong> están en espera de aprobación por Secretaría.
+                        Las secciones <strong>aprobadas</strong> ya están activas.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row">
         <div class="col-12 col-md-8">
             <div class="card">
@@ -173,11 +256,20 @@ include('includes/head.php');
                                 <select class="form-control" id="turno" name="turno" required>
                                     <option value="">Seleccionar turno</option>
                                     <?php foreach ($turnos as $t): ?>
-                                        <option value="<?php echo htmlspecialchars($t); ?>" <?php echo (isset($_POST['turno']) && $_POST['turno'] === $t) ? 'selected' : ''; ?>>
+                                        <?php $lim = $limitesTurnos[$t]; ?>
+                                        <option value="<?php echo htmlspecialchars($t); ?>" 
+                                            <?php echo (isset($_POST['turno']) && $_POST['turno'] === $t) ? 'selected' : ''; ?>
+                                            <?php echo !$lim['tiene_cupo'] ? 'disabled' : ''; ?>>
                                             <?php echo htmlspecialchars($t); ?>
+                                            <?php echo !$lim['tiene_cupo'] ? ' (Límite alcanzado)' : ' (' . $lim['disponibles'] . ' disponibles)'; ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
+                                <?php if (!empty($_POST['turno']) && !$limitesTurnos[$_POST['turno']]['tiene_cupo']): ?>
+                                    <div class="text-danger mt-1">
+                                        <small>No puedes crear más secciones para este turno. Límite alcanzado.</small>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                             
                             <div class="col-md-6">
@@ -264,7 +356,7 @@ include('includes/head.php');
                         </div>
                         
                         <div class="mt-4">
-                            <button type="submit" name="crear_seccion" class="btn btn-primary btn-lg">
+                            <button type="submit" name="crear_seccion" class="btn btn-primary btn-lg" id="btnCrearSeccion">
                                 <i class="fas fa-save"></i> Crear Sección
                             </button>
                             <button type="reset" class="btn btn-secondary btn-lg">
@@ -291,6 +383,20 @@ include('includes/head.php');
                         <li>Puede agregar múltiples horarios por sección</li>
                         <li>La capacidad máxima recomendada es de 30-40 estudiantes</li>
                     </ul>
+                    <hr>
+                    <h6>Límites:</h6>
+                    <ul>
+                        <?php foreach ($turnos as $t): ?>
+                            <?php $lim = $limitesTurnos[$t]; ?>
+                            <li>
+                                <strong><?php echo $t; ?>:</strong> 
+                                <?php echo $lim['creadas']; ?>/<?php echo $lim['autorizadas']; ?> secciones
+                                <?php if ($lim['pendientes'] > 0): ?>
+                                    <span class="text-warning">(<?php echo $lim['pendientes']; ?> pendientes)</span>
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -302,7 +408,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const container = document.getElementById('horarios-container');
     const agregarBtn = document.getElementById('agregarHorario');
     
-    // Función para actualizar el campo oculto con el horario en formato texto
     function actualizarHorarioJSON() {
         const rows = document.querySelectorAll('.horario-row');
         let horarios = [];
@@ -323,7 +428,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('horario_json').value = horarios.join(' | ');
     }
     
-    // Agregar nuevo horario
     agregarBtn.addEventListener('click', function() {
         const newRow = document.createElement('div');
         newRow.className = 'horario-row mb-2';
@@ -356,11 +460,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         container.appendChild(newRow);
         
-        // Mostrar botones eliminar en todas las filas si hay más de una
         const eliminarBtns = document.querySelectorAll('.eliminar-horario');
         eliminarBtns.forEach(btn => btn.style.display = 'inline-block');
         
-        // Agregar event listeners
         agregarEventListeners(newRow);
     });
     
@@ -377,7 +479,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 row.remove();
                 actualizarHorarioJSON();
                 
-                // Si solo queda una fila, ocultar su botón eliminar
                 const remainingRows = document.querySelectorAll('.horario-row');
                 const allEliminarBtns = document.querySelectorAll('.eliminar-horario');
                 if (remainingRows.length === 1) {
@@ -387,24 +488,36 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Inicializar primera fila
     const primeraFila = document.querySelector('.horario-row');
     agregarEventListeners(primeraFila);
     
-    // Ocultar botón eliminar de la primera fila inicialmente
     const primerEliminar = primeraFila.querySelector('.eliminar-horario');
     if (primerEliminar) {
         primerEliminar.style.display = 'none';
     }
     
-    // Actualizar horario antes de enviar
     const form = document.getElementById('formCrearSeccion');
     form.addEventListener('submit', function() {
         actualizarHorarioJSON();
     });
     
-    // Inicializar horario por si hay datos previos
     actualizarHorarioJSON();
+    
+    // Validar límite al cambiar turno
+    const turnoSelect = document.getElementById('turno');
+    const btnCrear = document.getElementById('btnCrearSeccion');
+    
+    turnoSelect.addEventListener('change', function() {
+        const selectedOption = turnoSelect.options[turnoSelect.selectedIndex];
+        const tieneCupo = !selectedOption.hasAttribute('disabled');
+        
+        if (!tieneCupo && selectedOption.value !== '') {
+            btnCrear.disabled = true;
+            alert('No puedes crear más secciones para este turno. Límite alcanzado.');
+        } else {
+            btnCrear.disabled = false;
+        }
+    });
 });
 </script>
 

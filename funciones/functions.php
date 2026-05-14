@@ -1239,6 +1239,60 @@ function obtenerCuposSecretaria() {
 
 
 
+
+
+/**
+ * Obtiene el límite de secciones autorizadas por secretaria y las ya creadas
+ */
+function obtenerLimiteSeccionesDirector($carrera_id, $turno, $id_periodo) {
+    global $db;
+    
+    // Obtener límite autorizado por secretaria
+    $cuposConfig = obtenerCuposSecretaria();
+    $seccionesAutorizadas = $cuposConfig[$carrera_id][$turno]['numero_secciones'] ?? 0;
+    
+    // Contar secciones ya creadas (pendientes + aprobadas) para este periodo
+    $query = "SELECT COUNT(*) as total FROM secciones 
+              WHERE id_carrera = ? AND turno = ? AND id_periodo = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param('isi', $carrera_id, $turno, $id_periodo);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $seccionesCreadas = $row['total'] ?? 0;
+    $stmt->close();
+    
+    // Contar solo las secciones PENDIENTES (aún no aprobadas)
+    $queryPendientes = "SELECT COUNT(*) as total FROM secciones 
+                        WHERE id_carrera = ? AND turno = ? AND id_periodo = ? AND status = 'pendiente'";
+    $stmtPend = $db->prepare($queryPendientes);
+    $stmtPend->bind_param('isi', $carrera_id, $turno, $id_periodo);
+    $stmtPend->execute();
+    $resultPend = $stmtPend->get_result();
+    $rowPend = $resultPend->fetch_assoc();
+    $seccionesPendientes = $rowPend['total'] ?? 0;
+    $stmtPend->close();
+    
+    // Contar secciones APROBADAS (activas)
+    $seccionesAprobadas = $seccionesCreadas - $seccionesPendientes;
+    
+    return [
+        'autorizadas' => $seccionesAutorizadas,
+        'creadas' => $seccionesCreadas,
+        'pendientes' => $seccionesPendientes,
+        'aprobadas' => $seccionesAprobadas,
+        'disponibles' => max(0, $seccionesAutorizadas - $seccionesCreadas),
+        'tiene_cupo' => ($seccionesCreadas < $seccionesAutorizadas)
+    ];
+}
+
+
+
+
+
+
+
+
 /**
  * Obtiene lista de números de sección autorizados por Secretaría para una carrera y turno.
  */
