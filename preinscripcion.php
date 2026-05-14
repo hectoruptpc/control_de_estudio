@@ -93,7 +93,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="alert alert-danger" role="alert"><?php echo $error_message; ?></div>
                     <?php endif; ?>
 
-                    <p class="mb-4">Complete el formulario de preinscripción. Sus datos serán revisados por el equipo administrativo antes de crear su cuenta de estudiante.</p>
+                    <div class="alert alert-warning mb-4">
+                        <i class="fas fa-file-pdf me-2"></i> 
+                        <strong>IMPORTANTE:</strong> Al finalizar su preinscripción, se descargará automáticamente una planilla en formato PDF. 
+                        Deberá presentar esta planilla impresa en <strong>Control de Estudios</strong> para formalizar su inscripción. 
+                        <strong>La planilla es OBLIGATORIA</strong> y debe ser entregada dentro de los días hábiles siguientes a su preinscripción.
+                    </div>
+
+                    <p class="mb-4">Complete el formulario de preinscripción con sus datos personales, académicos y de contacto. Todos los campos marcados con <span class="text-danger">*</span> son obligatorios.</p>
 
                     <?php if ($mostrarPreinscripcion !== '0'): ?>
                         <?php include 'admin/_formulario_estudiante.php'; ?>
