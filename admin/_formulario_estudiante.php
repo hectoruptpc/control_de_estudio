@@ -965,7 +965,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success && data.parroquias && data.parroquias.length > 0) {
-                updateSelect(parroquiaSelect, data.parroquias, 'Seleccione una parroquia (opcional)', false);
+                updateSelect(parroquiaSelect, data.parroquias, 'Seleccione una parroquia', false);
                 parroquiaSelect.disabled = false;
                 if (selectedParroquiaId) {
                     parroquiaSelect.value = selectedParroquiaId;
@@ -989,7 +989,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.parroquias) {
-                    updateSelect(parroquiaSelect, data.parroquias, 'Seleccione una parroquia (opcional)', false);
+                    updateSelect(parroquiaSelect, data.parroquias, 'Seleccione una parroquia', false);
                     parroquiaSelect.disabled = false;
                     if (selectedParroquiaId) {
                         parroquiaSelect.value = selectedParroquiaId;

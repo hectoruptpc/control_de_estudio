@@ -40,6 +40,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $resultado = insertarPreinscripcion($_POST);
             if ($resultado['success']) {
                 $success_message = $resultado['message'];
+                
+                // Agregar botón para descargar planilla en el mensaje de éxito
+                $success_message .= '<br><br>
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-download"></i> 
+                    <strong>¿No se descargó automáticamente?</strong>
+                    <a href="admin/generar_planilla_pdf.php?id=' . $resultado['id'] . '" class="btn btn-sm btn-primary ms-3" target="_blank">
+                        <i class="fas fa-file-pdf"></i> Descargar Planilla
+                    </a>
+                </div>';
+                
+                // JavaScript para descarga automática del PDF
+                echo '<script>
+                    setTimeout(function() {
+                        window.open("admin/generar_planilla_pdf.php?id=' . $resultado['id'] . '", "_blank");
+                    }, 500);
+                </script>';
+                
                 $_POST = [];
             } else {
                 $error_message = $resultado['message'];
