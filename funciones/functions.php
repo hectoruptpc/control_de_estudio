@@ -12298,31 +12298,22 @@ function enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje) {
 
 function obtenerSeccionEstudiante($db, $estudiante_id) {
     // Consulta SQL para obtener información completa de la sección del estudiante
-    $sql = "SELECT s.id_seccion, s.codigo_seccion, s.id_carrera, c.nombre_carrera, 
+    $sql = "SELECT s.id_seccion, s.codigo_seccion, s.turno, s.id_carrera, c.nombre_carrera, 
                    t.numero_trayecto, p.nombre_periodo, s.capacidad_maxima, s.inicia,
                    s.estatus, COUNT(es.id_usuario) as inscritos, p.activo as periodo_activo
             FROM estudiante_seccion es
             INNER JOIN secciones s ON es.id_seccion = s.id_seccion
             INNER JOIN carreras c ON s.id_carrera = c.id_carrera
             INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
-            INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo  -- Usa periodos_academicos
+            INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
             WHERE es.id_usuario = ? AND es.estatus = 'activo'
             GROUP BY s.id_seccion";
     
-    // Preparar la sentencia SQL para prevenir inyecciones
     $stmt = $db->prepare($sql);
-    
-    // Vincular el parámetro: 'i' indica que es un integer
     $stmt->bind_param("i", $estudiante_id);
-    
-    // Ejecutar la consulta
     $stmt->execute();
-    
-    // Obtener el resultado de la consulta
     $result = $stmt->get_result();
     
-    // Retornar la primera fila como array asociativo
-    // Si no hay resultados, retorna null
     return $result->fetch_assoc();
 }
 
