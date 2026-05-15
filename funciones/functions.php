@@ -9047,11 +9047,11 @@ function obtenerTotalSeccionesActivas($db) {
  * @return array Secciones de la carrera
  */
 function obtenerSeccionesPorCarrera($db, $carrera_id) {
-    $stmt = $db->prepare("SELECT s.id_seccion, s.codigo_seccion, t.numero_trayecto, p.nombre_periodo, s.estatus
+    $stmt = $db->prepare("SELECT s.id_seccion, s.codigo_seccion, t.numero_trayecto, p.nombre_periodo, s.estatus, s.status
                          FROM secciones s
                          JOIN trayectos t ON s.id_trayecto = t.id_trayecto
                          JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
-                         WHERE s.id_carrera = ? AND s.estatus = 'activa'
+                         WHERE s.id_carrera = ?
                          ORDER BY p.nombre_periodo DESC, t.numero_trayecto, s.codigo_seccion");
     if (!$stmt) {
         error_log("Error en preparación obtenerSeccionesPorCarrera: " . $db->error);
@@ -9069,6 +9069,203 @@ function obtenerSeccionesPorCarrera($db, $carrera_id) {
     $stmt->close();
     return $secciones;
 }
+
+
+
+
+
+
+
+
+/**
+ * Obtiene las materias de una sección (según el trayecto de la sección y la carrera)
+ * @param int $id_seccion ID de la sección
+ * @return array Lista de materias del trayecto de esa sección
+ */
+function obtenerMateriasPorSeccion($id_seccion) {
+    global $db;
+    
+    // Obtener el trayecto y carrera de la sección
+    $sql_seccion = "SELECT id_trayecto, id_carrera FROM secciones WHERE id_seccion = ?";
+    $stmt = $db->prepare($sql_seccion);
+    $stmt->bind_param('i', $id_seccion);
+    $stmt->execute();
+    $seccion = $stmt->get_result()->fetch_assoc();
+    
+    if (!$seccion) {
+        return [];
+    }
+    
+    // Obtener materias del trayecto de esa carrera
+    $sql = "SELECT m.id_materia, m.cod_materia, m.nombre_materia, m.creditos
+            FROM materias m
+            INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+            WHERE cm.id_carrera = ? AND m.trayecto = ? AND m.activa = 1
+            ORDER BY m.nombre_materia";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param('ii', $seccion['id_carrera'], $seccion['id_trayecto']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_all(MYSQLI_ASSOC);
+}
+
+/**
+ * Obtiene los docentes disponibles para una materia
+ * @param int $id_materia ID de la materia
+ * @return array Lista de docentes
+ */
+function obtenerDocentesPorMateria($id_materia) {
+    global $db;
+    
+    $sql = "SELECT DISTINCT u.id, u.nombre 
+            FROM docente_seccion ds
+            JOIN users u ON ds.id_usuario = u.id
+            WHERE ds.id_materia = ? AND ds.estatus = 1
+            ORDER BY u.nombre";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param('i', $id_materia);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_all(MYSQLI_ASSOC);
+}
+
+/**
+ * Obtiene o crea la relación docente_seccion
+ * @param int $id_seccion ID de la sección
+ * @param int $id_materia ID de la materia
+ * @param int $id_docente ID del docente
+ * @return int|false ID de docente_seccion o false
+ */
+function obtenerDocenteSeccion($id_seccion, $id_materia, $id_docente) {
+    global $db;
+    
+    // Buscar si ya existe
+    $sql = "SELECT id_docente_seccion FROM docente_seccion 
+            WHERE id_seccion = ? AND id_materia = ? AND id_usuario = ?";
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param('iii', $id_seccion, $id_materia, $id_docente);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    
+    if ($row) {
+        return $row['id_docente_seccion'];
+    }
+    
+    // Crear nueva relación
+    $sql = "INSERT INTO docente_seccion (id_usuario, id_seccion, id_materia, fecha_asignacion, estatus) 
+            VALUES (?, ?, ?, NOW(), 1)";
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param('iii', $id_docente, $id_seccion, $id_materia);
+    
+    if ($stmt->execute()) {
+        return $db->insert_id;
+    }
+    
+    return false;
+}
+
+/**
+ * Guarda un horario para una sección
+ * @param int $id_docente_seccion ID de la relación docente_seccion
+ * @param int $dia Día de la semana (0=Lunes a 5=Sábado)
+ * @param string $hora_inicio Hora de inicio (formato HH:MM)
+ * @param string $hora_fin Hora de fin (formato HH:MM)
+ * @param string $aula Aula asignada
+ * @return bool True si se guardó correctamente
+ */
+function guardarHorarioSeccion($id_docente_seccion, $dia, $hora_inicio, $hora_fin, $aula) {
+    global $db;
+    
+    $sql = "INSERT INTO horarios (id_docente_seccion, dia, hora_inicio, hora_fin, aula) 
+            VALUES (?, ?, ?, ?, ?)";
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param('iisss', $id_docente_seccion, $dia, $hora_inicio, $hora_fin, $aula);
+    
+    return $stmt->execute();
+}
+
+/**
+ * Elimina un horario por su ID
+ * @param int $id_horario ID del horario a eliminar
+ * @return bool True si se eliminó correctamente
+ */
+function eliminarHorarioSeccion($id_horario) {
+    global $db;
+    
+    $sql = "DELETE FROM horarios WHERE id_horario = ?";
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param('i', $id_horario);
+    
+    return $stmt->execute();
+}
+
+/**
+ * Verifica conflictos de horario (misma aula, mismo día, horario traslapado)
+ * @param int $dia Día de la semana (0=Lunes a 5=Sábado)
+ * @param string $hora_inicio Hora de inicio
+ * @param string $hora_fin Hora de fin
+ * @param string $aula Aula
+ * @param int|null $id_seccion ID de la sección a omitir (opcional)
+ * @param int|null $id_horario_omitir ID del horario a omitir (opcional)
+ * @return array|false Array con conflictos o false si no hay
+ */
+function verificarConflictoHorario($dia, $hora_inicio, $hora_fin, $aula, $id_seccion = null, $id_horario_omitir = null) {
+    global $db;
+    
+    $sql = "SELECT h.id_horario, u.nombre as docente, m.nombre_materia, s.codigo_seccion
+            FROM horarios h
+            JOIN docente_seccion ds ON h.id_docente_seccion = ds.id_docente_seccion
+            JOIN users u ON ds.id_usuario = u.id
+            JOIN materias m ON ds.id_materia = m.id_materia
+            JOIN secciones s ON ds.id_seccion = s.id_seccion
+            WHERE h.dia = ? AND h.aula = ? 
+            AND ((h.hora_inicio < ? AND h.hora_fin > ?) OR 
+                 (h.hora_inicio >= ? AND h.hora_inicio < ?))";
+    
+    $params = [$dia, $aula, $hora_fin, $hora_inicio, $hora_inicio, $hora_fin];
+    $types = 'isssss';
+    
+    if ($id_horario_omitir) {
+        $sql .= " AND h.id_horario != ?";
+        $params[] = $id_horario_omitir;
+        $types .= 'i';
+    }
+    
+    if ($id_seccion) {
+        $sql .= " AND ds.id_seccion != ?";
+        $params[] = $id_seccion;
+        $types .= 'i';
+    }
+    
+    $stmt = $db->prepare($sql);
+    if (!$stmt) {
+        return false;
+    }
+    
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+    
+    return false;
+}
+
+
+
+
+
+
+
+
+
 
 
 

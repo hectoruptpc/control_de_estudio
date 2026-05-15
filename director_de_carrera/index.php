@@ -58,11 +58,23 @@ visita();
         .voceros-card {
             border-bottom: 4px solid #28a745;
         }
+        .seccion-card {
+            border-bottom: 4px solid #007bff;
+        }
+        .horario-card {
+            border-bottom: 4px solid #6c757d;
+        }
         .asignacion-card .card-icon {
             color: #fd7e14;
         }
         .voceros-card .card-icon {
             color: #28a745;
+        }
+        .seccion-card .card-icon {
+            color: #007bff;
+        }
+        .horario-card .card-icon {
+            color: #6c757d;
         }
         .btn-access {
             border-radius: 50px;
@@ -87,6 +99,24 @@ visita();
         .btn-voceros:hover {
             background-color: #218838;
             border-color: #1e7e34;
+        }
+        .btn-seccion {
+            background-color: #007bff;
+            border-color: #007bff;
+            color: white;
+        }
+        .btn-seccion:hover {
+            background-color: #0069d9;
+            border-color: #0062cc;
+        }
+        .btn-horario {
+            background-color: #6c757d;
+            border-color: #6c757d;
+            color: white;
+        }
+        .btn-horario:hover {
+            background-color: #5a6268;
+            border-color: #545b62;
         }
         .welcome-message {
             background-color: white;
@@ -147,12 +177,26 @@ visita();
                     </div>
                 </div>
             </div>
+
+            <!-- Tarjeta de Gestionar Horarios de Secciones -->
+            <div class="col-md-5 mb-4">
+                <div class="card feature-card horario-card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="card-icon">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <h3 class="card-title h4 font-weight-bold">Gestionar Horarios de Secciones</h3>
+                        <p class="card-text text-muted">Administre los horarios de las secciones creadas</p>
+                        <a href="gestion_horario_seccion.php" class="btn btn-access btn-horario mt-3">Acceder</a>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Mensaje de bienvenida -->
         <div class="welcome-message p-4 text-center">
             <h4 class="font-weight-bold">Bienvenido al Sistema de Gestión</h4>
-            <p class="text-muted mb-0">Utilice las opciones disponibles para gestionar las asignaciones docentes y de voceros</p>
+            <p class="text-muted mb-0">Utilice las opciones disponibles para gestionar las asignaciones docentes, de voceros y horarios de secciones</p>
         </div>
     </div>
 
