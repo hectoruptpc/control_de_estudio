@@ -9085,7 +9085,7 @@ function obtenerSeccionesPorCarrera($db, $carrera_id) {
 function obtenerMateriasPorSeccion($id_seccion) {
     global $db;
     
-    // Obtener el trayecto y carrera de la sección
+    // Obtener el id_trayecto y carrera de la sección
     $sql_seccion = "SELECT id_trayecto, id_carrera FROM secciones WHERE id_seccion = ?";
     $stmt = $db->prepare($sql_seccion);
     $stmt->bind_param('i', $id_seccion);
@@ -9096,6 +9096,11 @@ function obtenerMateriasPorSeccion($id_seccion) {
         return [];
     }
     
+    // IMPORTANTE: En secciones, id_trayecto=1 es Trayecto 0
+    // En materias, trayecto=0 es Trayecto 0
+    // Por eso restamos 1
+    $trayecto_materia = (int)$seccion['id_trayecto'] - 1;
+    
     // Obtener materias del trayecto de esa carrera
     $sql = "SELECT m.id_materia, m.cod_materia, m.nombre_materia, m.creditos
             FROM materias m
@@ -9104,7 +9109,7 @@ function obtenerMateriasPorSeccion($id_seccion) {
             ORDER BY m.nombre_materia";
     
     $stmt = $db->prepare($sql);
-    $stmt->bind_param('ii', $seccion['id_carrera'], $seccion['id_trayecto']);
+    $stmt->bind_param('ii', $seccion['id_carrera'], $trayecto_materia);
     $stmt->execute();
     $result = $stmt->get_result();
     
