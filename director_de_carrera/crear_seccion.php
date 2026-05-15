@@ -48,7 +48,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['crear_seccion'])) {
     $codigoSeccion = trim($_POST['codigo_seccion'] ?? '');
     $numeroSeccion = (int)$codigoSeccion;
     $capacidad = (int)($_POST['capacidad'] ?? 30);
-    $horario = trim($_POST['horario'] ?? '');
     $idTrayecto = (int)($_POST['id_trayecto'] ?? 0);
     $idPeriodo = (int)($_POST['id_periodo'] ?? 0);
     $inicia = trim($_POST['inicia'] ?? '');
@@ -88,10 +87,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['crear_seccion'])) {
             $errores[] = 'La fecha y hora de inicio es obligatoria';
         }
         
-        if (empty($horario)) {
-            $errores[] = 'Debe definir al menos un horario para la sección';
-        }
-        
         // Formatear fecha para MySQL
         $fechaFormateada = date('Y-m-d H:i:s', strtotime($inicia));
         
@@ -111,12 +106,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['crear_seccion'])) {
         
         // Si no hay errores, proceder a guardar
         if (empty($errores)) {
+            // Crear sección sin horario (el horario se gestiona aparte)
             $resultado = crearSeccionDirector(
                 $carreraId, 
                 $turno, 
                 $numeroSeccion, 
                 $capacidad, 
-                $horario, 
+                '', // horario vacío porque se gestiona aparte
                 $_SESSION['user']['id'], 
                 $codigoSeccion, 
                 $idTrayecto, 
@@ -125,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['crear_seccion'])) {
             );
             
             if ($resultado) {
-                $success_message = 'Sección creada exitosamente y enviada para aprobación.';
+                $success_message = 'Sección creada exitosamente y enviada para aprobación. Puedes gestionar los horarios desde el panel principal.';
                 $_POST = array();
             } else {
                 $error_message = 'Error al crear la sección. Por favor, intenta nuevamente.';
@@ -236,6 +232,7 @@ include('includes/head.php');
                         <i class="fas fa-info-circle"></i> 
                         Las secciones <strong>pendientes</strong> están en espera de aprobación por Secretaría.
                         Las secciones <strong>aprobadas</strong> ya están activas.
+                        Los horarios se gestionan desde el panel principal.
                     </small>
                 </div>
             </div>
@@ -310,48 +307,14 @@ include('includes/head.php');
                                 <label for="capacidad" class="form-label">Capacidad *</label>
                                 <input type="number" class="form-control" id="capacidad" name="capacidad" 
                                        min="1" max="50" value="<?php echo htmlspecialchars($_POST['capacidad'] ?? '30'); ?>" required>
+                                <div class="form-text">Número máximo de estudiantes</div>
                             </div>
                             
                             <div class="col-md-6">
-                                <label for="inicia" class="form-label">Fecha y Hora de Inicio *</label>
-                                <input type="datetime-local" class="form-control" id="inicia" name="inicia" 
+                                <label for="inicia" class="form-label">Fecha de Inicio *</label>
+                                <input type="date" class="form-control" id="inicia" name="inicia" 
                                        value="<?php echo htmlspecialchars($_POST['inicia'] ?? ''); ?>" required>
-                            </div>
-                            
-                            <div class="col-md-12">
-                                <label class="form-label">Horario *</label>
-                                <div id="horarios-container">
-                                    <div class="horario-row mb-2">
-                                        <div class="row g-2">
-                                            <div class="col-md-3">
-                                                <select class="form-control dia" name="horario_dia[]" required>
-                                                    <option value="Lunes">Lunes</option>
-                                                    <option value="Martes">Martes</option>
-                                                    <option value="Miércoles">Miércoles</option>
-                                                    <option value="Jueves">Jueves</option>
-                                                    <option value="Viernes">Viernes</option>
-                                                    <option value="Sábado">Sábado</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <input type="time" class="form-control hora_desde" name="horario_desde[]" value="07:00" required>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <input type="time" class="form-control hora_hasta" name="horario_hasta[]" value="09:00" required>
-                                            </div>
-                                            <div class="col-md-2">
-                                                <input type="text" class="form-control aula" name="aula[]" placeholder="Aula">
-                                            </div>
-                                            <div class="col-md-1">
-                                                <button type="button" class="btn btn-danger btn-sm eliminar-horario" style="display: none;">×</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="agregarHorario">
-                                    <i class="fas fa-plus"></i> Agregar otro horario
-                                </button>
-                                <input type="hidden" name="horario" id="horario_json">
+                                <div class="form-text">Fecha de inicio del período académico</div>
                             </div>
                         </div>
                         
@@ -380,8 +343,8 @@ include('includes/head.php');
                     <ul>
                         <li>Las secciones creadas serán enviadas para aprobación</li>
                         <li>El código de sección debe ser único por turno y periodo</li>
-                        <li>Puede agregar múltiples horarios por sección</li>
                         <li>La capacidad máxima recomendada es de 30-40 estudiantes</li>
+                        <li>Una vez creada la sección, puedes gestionar sus horarios desde el panel principal</li>
                     </ul>
                     <hr>
                     <h6>Límites:</h6>
@@ -405,133 +368,24 @@ include('includes/head.php');
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const container = document.getElementById('horarios-container');
-    const agregarBtn = document.getElementById('agregarHorario');
-    
-    function actualizarHorarioJSON() {
-        const rows = document.querySelectorAll('.horario-row');
-        let horarios = [];
-        
-        rows.forEach(row => {
-            const dia = row.querySelector('.dia').value;
-            const desde = row.querySelector('.hora_desde').value;
-            const hasta = row.querySelector('.hora_hasta').value;
-            const aula = row.querySelector('.aula').value;
-            
-            let horarioStr = `${dia}: ${desde} - ${hasta}`;
-            if (aula) {
-                horarioStr += ` (Aula: ${aula})`;
-            }
-            horarios.push(horarioStr);
-        });
-        
-        document.getElementById('horario_json').value = horarios.join(' | ');
-    }
-    
-    agregarBtn.addEventListener('click', function() {
-        const newRow = document.createElement('div');
-        newRow.className = 'horario-row mb-2';
-        newRow.innerHTML = `
-            <div class="row g-2">
-                <div class="col-md-3">
-                    <select class="form-control dia" required>
-                        <option value="Lunes">Lunes</option>
-                        <option value="Martes">Martes</option>
-                        <option value="Miércoles">Miércoles</option>
-                        <option value="Jueves">Jueves</option>
-                        <option value="Viernes">Viernes</option>
-                        <option value="Sábado">Sábado</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <input type="time" class="form-control hora_desde" value="07:00" required>
-                </div>
-                <div class="col-md-3">
-                    <input type="time" class="form-control hora_hasta" value="09:00" required>
-                </div>
-                <div class="col-md-2">
-                    <input type="text" class="form-control aula" placeholder="Aula">
-                </div>
-                <div class="col-md-1">
-                    <button type="button" class="btn btn-danger btn-sm eliminar-horario">×</button>
-                </div>
-            </div>
-        `;
-        
-        container.appendChild(newRow);
-        
-        const eliminarBtns = document.querySelectorAll('.eliminar-horario');
-        eliminarBtns.forEach(btn => btn.style.display = 'inline-block');
-        
-        agregarEventListeners(newRow);
-    });
-    
-    function agregarEventListeners(row) {
-        const inputs = row.querySelectorAll('select, input');
-        inputs.forEach(input => {
-            input.addEventListener('change', actualizarHorarioJSON);
-            input.addEventListener('input', actualizarHorarioJSON);
-        });
-        
-        const eliminarBtn = row.querySelector('.eliminar-horario');
-        if (eliminarBtn) {
-            eliminarBtn.addEventListener('click', function() {
-                row.remove();
-                actualizarHorarioJSON();
-                
-                const remainingRows = document.querySelectorAll('.horario-row');
-                const allEliminarBtns = document.querySelectorAll('.eliminar-horario');
-                if (remainingRows.length === 1) {
-                    allEliminarBtns.forEach(btn => btn.style.display = 'none');
-                }
-            });
-        }
-    }
-    
-    const primeraFila = document.querySelector('.horario-row');
-    agregarEventListeners(primeraFila);
-    
-    const primerEliminar = primeraFila.querySelector('.eliminar-horario');
-    if (primerEliminar) {
-        primerEliminar.style.display = 'none';
-    }
-    
-    const form = document.getElementById('formCrearSeccion');
-    form.addEventListener('submit', function() {
-        actualizarHorarioJSON();
-    });
-    
-    actualizarHorarioJSON();
-    
     // Validar límite al cambiar turno
     const turnoSelect = document.getElementById('turno');
     const btnCrear = document.getElementById('btnCrearSeccion');
     
-    turnoSelect.addEventListener('change', function() {
-        const selectedOption = turnoSelect.options[turnoSelect.selectedIndex];
-        const tieneCupo = !selectedOption.hasAttribute('disabled');
-        
-        if (!tieneCupo && selectedOption.value !== '') {
-            btnCrear.disabled = true;
-            alert('No puedes crear más secciones para este turno. Límite alcanzado.');
-        } else {
-            btnCrear.disabled = false;
-        }
-    });
+    if (turnoSelect) {
+        turnoSelect.addEventListener('change', function() {
+            const selectedOption = turnoSelect.options[turnoSelect.selectedIndex];
+            const tieneCupo = !selectedOption.hasAttribute('disabled');
+            
+            if (!tieneCupo && selectedOption.value !== '') {
+                btnCrear.disabled = true;
+                alert('No puedes crear más secciones para este turno. Límite alcanzado.');
+            } else {
+                btnCrear.disabled = false;
+            }
+        });
+    }
 });
 </script>
-
-<style>
-.horario-row {
-    background-color: #f8f9fa;
-    padding: 10px;
-    border-radius: 5px;
-    margin-bottom: 10px;
-}
-
-.eliminar-horario {
-    margin-top: 8px;
-}
-</style>
 
 <?php include('includes/footer.php'); ?>
