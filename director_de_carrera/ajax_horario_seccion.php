@@ -9,7 +9,7 @@ switch($action) {
         $horarios = obtenerHorariosSeccion($db, $id_seccion);
         
         $dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-        $horas_tabla = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
+        $horas_tabla = ['07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30'];
         
         $horarios_por_dia = array_fill(0, 6, []);
         foreach ($horarios as $h) {
@@ -55,7 +55,7 @@ switch($action) {
         
     case 'get_info_seccion':
         $id_seccion = (int)$_POST['id_seccion'];
-        $sql = "SELECT s.codigo_seccion, t.numero_trayecto, p.nombre_periodo 
+        $sql = "SELECT s.codigo_seccion, s.turno, t.numero_trayecto, p.nombre_periodo 
                 FROM secciones s
                 JOIN trayectos t ON s.id_trayecto = t.id_trayecto
                 JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
@@ -67,6 +67,7 @@ switch($action) {
         echo json_encode([
             'success' => true, 
             'codigo_seccion' => $seccion['codigo_seccion'],
+            'turno' => $seccion['turno'],
             'numero_trayecto' => $seccion['numero_trayecto'],
             'nombre_periodo' => $seccion['nombre_periodo']
         ]);
@@ -115,14 +116,12 @@ switch($action) {
         $aula = $_POST['aula'];
         $id_horario = (int)($_POST['id_horario_editar'] ?? 0);
         
-        // Verificar conflicto
         $conflicto = verificarConflictoHorario($dia, $hora_inicio, $hora_fin, $aula, $id_seccion, $id_horario);
         if ($conflicto) {
             echo json_encode(['success' => false, 'message' => 'Conflicto de horario detectado']);
             exit;
         }
         
-        // Obtener o crear docente_seccion
         $id_docente_seccion = obtenerDocenteSeccion($id_seccion, $id_materia, $id_docente);
         
         if (!$id_docente_seccion) {
@@ -130,12 +129,10 @@ switch($action) {
             exit;
         }
         
-        // Si es edición, eliminar el horario anterior
         if ($id_horario) {
             eliminarHorarioSeccion($id_horario);
         }
         
-        // Guardar nuevo horario
         $resultado = guardarHorarioSeccion($id_docente_seccion, $dia, $hora_inicio, $hora_fin, $aula);
         
         echo json_encode(['success' => $resultado, 'message' => $resultado ? 'Horario guardado' : 'Error al guardar']);

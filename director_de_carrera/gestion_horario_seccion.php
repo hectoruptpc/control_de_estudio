@@ -142,16 +142,33 @@ include('includes/head.php');
                         <div class="form-group col-md-6">
                             <label for="horaFin">Hora de Fin *</label>
                             <select class="form-control" id="horaFin" name="hora_fin" required>
+                                <option value="07:30">07:30</option>
                                 <option value="08:00">08:00</option>
+                                <option value="08:30">08:30</option>
                                 <option value="09:00">09:00</option>
+                                <option value="09:30">09:30</option>
                                 <option value="10:00">10:00</option>
+                                <option value="10:30">10:30</option>
                                 <option value="11:00">11:00</option>
+                                <option value="11:30">11:30</option>
                                 <option value="12:00">12:00</option>
+                                <option value="12:30">12:30</option>
                                 <option value="13:00">13:00</option>
+                                <option value="13:30">13:30</option>
                                 <option value="14:00">14:00</option>
+                                <option value="14:30">14:30</option>
                                 <option value="15:00">15:00</option>
+                                <option value="15:30">15:30</option>
                                 <option value="16:00">16:00</option>
+                                <option value="16:30">16:30</option>
                                 <option value="17:00">17:00</option>
+                                <option value="17:30">17:30</option>
+                                <option value="18:00">18:00</option>
+                                <option value="18:30">18:30</option>
+                                <option value="19:00">19:00</option>
+                                <option value="19:30">19:30</option>
+                                <option value="20:00">20:00</option>
+                                <option value="20:30">20:30</option>
                             </select>
                         </div>
                         <div class="form-group col-md-6">
@@ -169,7 +186,7 @@ include('includes/head.php');
                     
                     <div class="alert alert-info mt-3">
                         <i class="fas fa-clock"></i>
-                        <strong>Duración:</strong> <span id="duracionInfo">1 hora</span>
+                        <strong>Duración:</strong> <span id="duracionInfo">0.5 hora(s)</span>
                     </div>
                     
                     <div id="conflictoWarning" class="alert alert-danger mt-3" style="display: none;">
@@ -203,6 +220,29 @@ include('includes/head.php');
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmación para horario fuera de rango -->
+<div class="modal fade" id="modalConfirmHorario" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle"></i> Horario fuera del rango normal
+                </h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="modalConfirmMensaje"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" id="btnConfirmarHorario">Continuar</button>
             </div>
         </div>
     </div>
@@ -250,6 +290,60 @@ include('includes/head.php');
 $(document).ready(function() {
     let idSeccionActual = null;
     let idHorarioAEliminar = null;
+    let celdaPendiente = null;
+    let diaPendiente = null;
+    let horaPendiente = null;
+    let turnoSeccionActual = 'Diurno';
+    
+    // Función para verificar si la hora está dentro del rango normal del turno
+    function validarHorarioPorTurno(turno, hora) {
+        let horaNum = parseFloat(hora.replace(':', '.'));
+        
+        if (turno === 'Diurno') {
+            if (horaNum >= 7.00 && horaNum <= 17.30) {
+                return { permitido: true, mensaje: '' };
+            } else {
+                return { 
+                    permitido: false, 
+                    mensaje: `El horario seleccionado (${hora}) está fuera del horario normal del turno Diurno (07:00 - 17:30). ¿Desea continuar?` 
+                };
+            }
+        } else if (turno === 'Nocturno') {
+            if (horaNum >= 17.30 && horaNum <= 20.30) {
+                return { permitido: true, mensaje: '' };
+            } else {
+                return { 
+                    permitido: false, 
+                    mensaje: `El horario seleccionado (${hora}) está fuera del horario normal del turno Nocturno (17:30 - 20:30). ¿Desea continuar?` 
+                };
+            }
+        }
+        
+        return { permitido: true, mensaje: '' };
+    }
+    
+    // Función para abrir el modal de asignación
+    function abrirModalAsignacion(dia, hora) {
+        $('#modalIdSeccion').val(idSeccionActual);
+        $('#modalDia').val(dia);
+        $('#modalHoraInicio').val(hora);
+        $('#modalIdHorario').val('');
+        $('#conflictoWarning').hide();
+        
+        $.ajax({
+            url: 'ajax_horario_seccion.php',
+            type: 'POST',
+            data: { action: 'get_materias_seccion', id_seccion: idSeccionActual },
+            dataType: 'json',
+            success: function(data) {
+                $('#materiaSelect').html('<option value="">-- Seleccione una materia --</option>');
+                $.each(data, function(i, materia) {
+                    $('#materiaSelect').append(`<option value="${materia.id_materia}">${materia.nombre_materia}</option>`);
+                });
+                $('#asignarHorarioModal').modal('show');
+            }
+        });
+    }
     
     // Cargar horario al seleccionar sección
     $('#seccionSelect').change(function() {
@@ -271,11 +365,13 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(data) {
                 if (data.success) {
+                    turnoSeccionActual = data.turno;
                     $('#infoSeccion').html(`
                         <div class="alert alert-info">
                             <strong>${data.codigo_seccion}</strong><br>
                             Trayecto: ${data.numero_trayecto}<br>
-                            Período: ${data.nombre_periodo}
+                            Período: ${data.nombre_periodo}<br>
+                            Turno: ${data.turno}
                         </div>
                     `);
                 }
@@ -304,26 +400,28 @@ $(document).ready(function() {
         var dia = $(this).data('dia');
         var hora = $(this).data('hora');
         
-        $('#modalIdSeccion').val(idSeccionActual);
-        $('#modalDia').val(dia);
-        $('#modalHoraInicio').val(hora);
-        $('#modalIdHorario').val('');
-        $('#conflictoWarning').hide();
+        var validacion = validarHorarioPorTurno(turnoSeccionActual, hora);
         
-        // Cargar materias de la sección
-        $.ajax({
-            url: 'ajax_horario_seccion.php',
-            type: 'POST',
-            data: { action: 'get_materias_seccion', id_seccion: idSeccionActual },
-            dataType: 'json',
-            success: function(data) {
-                $('#materiaSelect').html('<option value="">-- Seleccione una materia --</option>');
-                $.each(data, function(i, materia) {
-                    $('#materiaSelect').append(`<option value="${materia.id_materia}">${materia.nombre_materia}</option>`);
-                });
-                $('#asignarHorarioModal').modal('show');
-            }
-        });
+        if (!validacion.permitido) {
+            celdaPendiente = $(this);
+            diaPendiente = dia;
+            horaPendiente = hora;
+            
+            $('#modalConfirmMensaje').html(validacion.mensaje);
+            $('#modalConfirmHorario').modal('show');
+        } else {
+            abrirModalAsignacion(dia, hora);
+        }
+    });
+    
+    $('#btnConfirmarHorario').click(function() {
+        $('#modalConfirmHorario').modal('hide');
+        if (diaPendiente !== null && horaPendiente !== null) {
+            abrirModalAsignacion(diaPendiente, horaPendiente);
+        }
+        celdaPendiente = null;
+        diaPendiente = null;
+        horaPendiente = null;
     });
     
     // Cargar docentes al seleccionar materia
@@ -357,7 +455,9 @@ $(document).ready(function() {
         var inicio = $('#modalHoraInicio').val();
         var fin = $('#horaFin').val();
         if (inicio && fin) {
-            var horas = parseInt(fin.split(':')[0]) - parseInt(inicio.split(':')[0]);
+            var inicioNum = parseFloat(inicio.replace(':', '.'));
+            var finNum = parseFloat(fin.replace(':', '.'));
+            var horas = finNum - inicioNum;
             $('#duracionInfo').text(horas + ' hora(s)');
         }
     });
