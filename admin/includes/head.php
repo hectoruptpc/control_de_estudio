@@ -254,7 +254,7 @@ if (!isLoggedIn() || !isAdmin()) {
                         <?php endif; ?>
 
                         <?php if (tienePermiso('secciones')): ?>
-                        <a title="Gestionar Secciones" class="dropdown-item" href="gestion_seccion.php">
+                        <a title="Gestionar Secciones" class="dropdown-item" href="gestion_seccion/gestion_seccion.php">
                             <i class="fas fa-object-group fa-fw"></i> Gestionar Secciones
                         </a>
                         <?php endif; ?>
