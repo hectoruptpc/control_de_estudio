@@ -9,6 +9,12 @@ cargarPermisosUsuario();
 verificarPermiso('secciones');
 visita();
 
+// Obtener períodos para el filtro
+$periodos = obtenerPeriodosAcademicos($db);
+
+// Obtener período seleccionado (si existe)
+$periodo_seleccionado = isset($_GET['periodo']) ? (int)$_GET['periodo'] : 0;
+
 include(__DIR__ . '/../includes/head.php');
 ?>
 
@@ -16,6 +22,7 @@ include(__DIR__ . '/../includes/head.php');
 .table-actions{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center}
 .table-actions form{display:inline-flex;margin:0}
 .table-actions .btn{min-width:2.5rem}
+.filtro-periodo{max-width:300px;margin-bottom:10px}
 @media(max-width:991.98px){.card-header.d-flex{flex-direction:column;align-items:stretch;gap:.5rem}.table-actions{width:100%}.table-actions form{flex:1 1 auto}}
 @media(max-width:767.98px){.form-row{display:flex;flex-direction:column}.form-row .form-group{width:100%!important}.table thead th,.table tbody td{padding:.55rem .65rem;font-size:.9rem}.btn-block{width:100%}}
 </style>
@@ -27,21 +34,45 @@ include(__DIR__ . '/../includes/head.php');
     if (isset($_SESSION['warning'])) { mostrarAdvertencia($_SESSION['warning']); unset($_SESSION['warning']); }
     ?>
     
-    <h1 class="h3 mb-2 text-gray-800">Gestión de Secciones</h1>
+    <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
+        <h1 class="h3 mb-0 text-gray-800">Gestión de Secciones</h1>
+        <a href="crear_seccion.php" class="btn btn-success btn-sm">
+            <i class="fas fa-plus-circle"></i> Nueva Sección
+        </a>
+    </div>
     
     <div class="card shadow">
-        <div class="card-header py-2 d-flex justify-content-between align-items-center">
-            <div>
-                <h6 class="m-0 font-weight-bold text-primary">Listado de Secciones</h6>
-                <?php if (tienePermiso('admin')): ?>
-                    <a href="../aprobar_secciones.php" class="btn btn-info btn-sm mt-1">
-                        <i class="fas fa-check-circle"></i> Secciones Pendientes
-                    </a>
-                <?php endif; ?>
+        <div class="card-header py-2">
+            <div class="d-flex justify-content-between align-items-center flex-wrap">
+                <div>
+                    <h6 class="m-0 font-weight-bold text-primary">Listado de Secciones</h6>
+                    <?php if (tienePermiso('admin')): ?>
+                        <a href="../aprobar_secciones.php" class="btn btn-info btn-sm mt-1">
+                            <i class="fas fa-check-circle"></i> Secciones Pendientes
+                        </a>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Filtro por período -->
+                <div class="filtro-periodo">
+                    <form method="get" class="form-inline">
+                        <label class="mr-2 small">Filtrar por período:</label>
+                        <select name="periodo" class="form-control form-control-sm mr-2" onchange="this.form.submit()">
+                            <option value="0">-- Todos los períodos --</option>
+                            <?php foreach ($periodos as $periodo): ?>
+                                <option value="<?= $periodo['id_periodo'] ?>" <?= $periodo_seleccionado == $periodo['id_periodo'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($periodo['nombre_periodo']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php if ($periodo_seleccionado > 0): ?>
+                            <a href="gestion_seccion.php" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-times"></i> Limpiar
+                            </a>
+                        <?php endif; ?>
+                    </form>
+                </div>
             </div>
-            <a href="crear_seccion.php" class="btn btn-success btn-sm">
-                <i class="fas fa-plus-circle"></i> Nueva Sección
-            </a>
         </div>
         <div class="card-body p-2">
             <div class="alert alert-info py-1 mb-2 small">Nota: Las secciones requieren al menos <?= MINIMO_ESTUDIANTES ?> estudiantes para activarse.</div>
@@ -52,7 +83,19 @@ include(__DIR__ . '/../includes/head.php');
                     </thead>
                     <tbody>
                         <?php
-                        $secciones = obtenerListadoSecciones($db);
+                        // Obtener secciones con filtro de período
+                        $secciones = obtenerListadoSecciones($db, $periodo_seleccionado);
+                        
+                        if (empty($secciones)):
+                        ?>
+                            <tr>
+                                <td colspan="10" class="text-center text-muted">
+                                    No hay secciones registradas <?= $periodo_seleccionado > 0 ? 'para el período seleccionado' : '' ?>.
+                                </td>
+                            </tr>
+                        <?php
+                        endif;
+                        
                         foreach ($secciones as $seccion) {
                             $porcentaje = $seccion['capacidad_maxima'] > 0 ? round(($seccion['inscritos'] / $seccion['capacidad_maxima']) * 100) : 0;
                             $ya_inicio = false;

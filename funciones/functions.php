@@ -8611,43 +8611,36 @@ function desactivarSeccionesDePeriodo($db, $periodo_id) {
 }
 
 /**
- * Obtiene el listado de secciones con información relevante
+ * Obtiene el listado de secciones con opción de filtrar por período
  * @param mysqli $db Conexión a la base de datos
+ * @param int $periodo_id ID del período para filtrar (0 = todos)
  * @return array Listado de secciones
  */
-function obtenerListadoSecciones($db) {
-    $stmt = $db->prepare("SELECT 
-                            s.id_seccion, 
-                            s.codigo_seccion, 
-                            c.nombre_carrera, 
-                            t.numero_trayecto, 
-                            p.nombre_periodo, 
-                            p.activo as periodo_activo, 
-                            s.capacidad_maxima,
-                            s.inicia,  
-                            s.status,
-                            CASE WHEN p.activo = 0 THEN 'inactiva' ELSE s.estatus END as estatus,
-                            COUNT(es.id_usuario) as inscritos
-                          FROM secciones s
-                          JOIN carreras c ON s.id_carrera = c.id_carrera
-                          JOIN trayectos t ON s.id_trayecto = t.id_trayecto
-                          JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
-                          LEFT JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion AND es.estatus = 'activo'
-                          GROUP BY s.id_seccion
-                          ORDER BY p.nombre_periodo DESC, s.codigo_seccion");
-    if (!$stmt) {
-        error_log("Error en preparación obtenerListadoSecciones: " . $db->error);
-        return [];
+function obtenerListadoSecciones($db, $periodo_id = 0) {
+    $sql = "SELECT s.id_seccion, s.codigo_seccion, s.id_carrera, c.nombre_carrera, 
+                   t.numero_trayecto, p.nombre_periodo, p.activo as periodo_activo,
+                   s.capacidad_maxima, s.inicia, s.estatus, s.status,
+                   (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion AND estatus = 'activo') as inscritos
+            FROM secciones s
+            INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+            INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+            INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo";
+    
+    if ($periodo_id > 0) {
+        $sql .= " WHERE s.id_periodo = ?";
     }
     
-    if (!$stmt->execute()) {
-        error_log("Error en ejecución obtenerListadoSecciones: " . $stmt->error);
-        return [];
-    }
+    $sql .= " ORDER BY p.nombre_periodo DESC, t.numero_trayecto, s.codigo_seccion";
     
+    $stmt = $db->prepare($sql);
+    if ($periodo_id > 0) {
+        $stmt->bind_param("i", $periodo_id);
+    }
+    $stmt->execute();
     $result = $stmt->get_result();
     $secciones = $result->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
+    
     return $secciones;
 }
 
