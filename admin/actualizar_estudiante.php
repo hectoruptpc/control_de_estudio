@@ -9,9 +9,10 @@ ob_start();
 
 // Configuración
 error_reporting(E_ALL);
-ini_set('display_errors', 0);
+ini_set('display_errors', 0); // IMPORTANTE: Desactivar display_errors para producción
 ini_set('log_errors', 1);
 
+// Función para asegurar que no haya salida accidental
 function clean_output() {
     $level = ob_get_level();
     for ($i = 0; $i < $level; $i++) {
@@ -20,9 +21,13 @@ function clean_output() {
     ob_start();
 }
 
+// Llamar a clean_output antes de cualquier cosa
 clean_output();
+
+// Solo definir el header después de limpiar buffer
 header('Content-Type: application/json; charset=utf-8');
 
+// Desactivar cualquier salida de errores a pantalla
 function shutdown_handler() {
     $error = error_get_last();
     if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
@@ -37,16 +42,23 @@ function shutdown_handler() {
 }
 register_shutdown_function('shutdown_handler');
 
+// Manejador de errores personalizado
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
     error_log("PHP Error [$errno]: $errstr in $errfile:$errline");
     return true;
 }, E_ALL);
 
 try {
+    // ============================
+    // 1. VERIFICAR MÉTODO
+    // ============================
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         throw new Exception('Método no permitido. Se requiere POST.', 405);
     }
 
+    // ============================
+    // 2. VERIFICAR ID
+    // ============================
     if (!isset($_POST['id']) || empty($_POST['id'])) {
         throw new Exception('ID de estudiante no proporcionado', 400);
     }
@@ -56,12 +68,19 @@ try {
         throw new Exception('ID de estudiante no válido', 400);
     }
 
+    // ============================
+    // 3. INCLUIR FUNCIONES
+    // ============================
     require_once('../funciones/functions.php');
     
+    // Verificar que el archivo se cargó correctamente
     if (!function_exists('actualizarEstudiante')) {
         throw new Exception('Función actualizarEstudiante no disponible', 500);
     }
 
+    // ============================
+    // 4. PREPARAR DATOS CON TODOS LOS CAMPOS
+    // ============================
     $datos = [
         'id' => $id,
         'idusuario' => isset($_POST['idusuario']) ? trim($_POST['idusuario']) : '',
@@ -101,6 +120,9 @@ try {
         'status' => isset($_POST['status']) ? (int)$_POST['status'] : 1
     ];
 
+    // ============================
+    // 5. VALIDACIONES BÁSICAS
+    // ============================
     if (empty($datos['idusuario'])) {
         throw new Exception('La cédula es obligatoria', 400);
     }
@@ -109,10 +131,34 @@ try {
         throw new Exception('Formato de cédula inválido. Debe ser V-12345678 o E-12345678', 400);
     }
 
+    if (empty($datos['nombre'])) {
+        throw new Exception('El nombre completo es obligatorio', 400);
+    }
+
+    // Validar formato de email si no está vacío
+    if (!empty($datos['email']) && !filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
+        throw new Exception('Correo electrónico no válido', 400);
+    }
+
+    // Validar sede si está presente
+    if (!empty($datos['sede'])) {
+        $sedesPermitidas = ['Puerto Cabello', 'COEF'];
+        if (!in_array($datos['sede'], $sedesPermitidas)) {
+            throw new Exception('Sede no válida. Las sedes permitidas son: Puerto Cabello, COEF', 400);
+        }
+    }
+
+    // ============================
+    // 6. LLAMAR A LA FUNCIÓN DE ACTUALIZACIÓN
+    // ============================
     $resultado = actualizarEstudiante($datos);
 
+    // ============================
+    // 7. LIMPIAR BUFFER Y ENVIAR RESPUESTA
+    // ============================
     clean_output();
     
+    // Asegurar que solo hay JSON
     if (!headers_sent()) {
         header('Content-Type: application/json; charset=utf-8');
     }
@@ -120,6 +166,9 @@ try {
     echo json_encode($resultado, JSON_UNESCAPED_UNICODE);
 
 } catch (Exception $e) {
+    // ============================
+    // 8. MANEJAR ERRORES
+    // ============================
     clean_output();
     
     if (!headers_sent()) {
@@ -138,9 +187,13 @@ try {
     echo json_encode($response, JSON_UNESCAPED_UNICODE);
 }
 
+// ============================
+// 9. FINALIZAR - ASEGURAR QUE NO HAY NADA MÁS
+// ============================
 $output = ob_get_contents();
 ob_end_clean();
 
+// Si hay algo que no sea JSON, loguearlo
 if ($output) {
     json_decode($output);
     if (json_last_error() !== JSON_ERROR_NONE) {
@@ -156,3 +209,4 @@ if ($output) {
 }
 
 exit;
+?>

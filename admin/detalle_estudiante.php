@@ -24,6 +24,13 @@ if(isset($estudiante['carrera']) && !empty($estudiante['carrera'])) {
     }
 }
 
+// Obtener el nombre de la fuente de ingresos
+$fuenteIngresoNombre = 'No especificado';
+if (isset($estudiante['fuente_ingresos']) && !empty($estudiante['fuente_ingresos'])) {
+    $ingresos = obtenerIngresos($db);
+    $fuenteIngresoNombre = $ingresos[$estudiante['fuente_ingresos']] ?? $estudiante['fuente_ingresos'];
+}
+
 // =============================================
 // OBTENER NOMBRES DE UBICACIÓN
 // =============================================
@@ -389,7 +396,7 @@ if (!$tieneFoto) {
                             </div>
                             <div class="col-12">
                                 <label class="form-label small text-muted mb-1">Fuente de Ingresos</label>
-                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($estudiante['fuente_ingresos'] ?? 'No especificado') ?></p>
+                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($fuenteIngresoNombre) ?></p>
                             </div>
                         </div>
                     </div>

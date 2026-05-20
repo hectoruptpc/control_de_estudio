@@ -2565,7 +2565,7 @@ function actualizarEstudiante(array $datos): array {
         }
         
         // ============================
-        // 5. CONSTRUIR CONSULTA DE ACTUALIZACIÓN (CON NUEVOS CAMPOS)
+        // 5. CONSTRUIR CONSULTA DE ACTUALIZACIÓN
         // ============================
         $campos = [];
         $valores_bind = [];
@@ -9528,6 +9528,9 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
             $foto_perfil = $preinscripcion['foto_perfil'] ?? '';
             $titulos = !empty($preinscripcion['titulos']) ? $preinscripcion['titulos'] : '';
             $institutos = !empty($preinscripcion['institutos']) ? $preinscripcion['institutos'] : '';
+            $pais_titulo = !empty($preinscripcion['pais_titulo']) ? $preinscripcion['pais_titulo'] : '';
+            $legalizado_titulo = !empty($preinscripcion['legalizado_titulo']) ? $preinscripcion['legalizado_titulo'] : '';
+            $potencialidades = !empty($preinscripcion['potencialidades']) ? $preinscripcion['potencialidades'] : '';
             
             // Escapar valores para evitar inyección SQL
             $idusuario = $db->real_escape_string($preinscripcion['idusuario']);
@@ -9549,7 +9552,7 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
             $tenencia_vivienda = $db->real_escape_string($preinscripcion['tenencia_vivienda']);
             $enfermedad = $db->real_escape_string($preinscripcion['enfermedad']);
             $discapacidad = $db->real_escape_string($preinscripcion['discapacidad']);
-            $potencialidades = $db->real_escape_string($preinscripcion['potencialidades']);
+            $potencialidades = $db->real_escape_string($potencialidades);
             $carrera = $db->real_escape_string($preinscripcion['carrera']);
             $genero = $db->real_escape_string($preinscripcion['genero']);
             $edo_civil = $db->real_escape_string($preinscripcion['edo_civil']);
@@ -9580,6 +9583,8 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
                 discapacidad = '$discapacidad',
                 titulos = '$titulos',
                 institutos = '$institutos',
+                pais_titulo = '$pais_titulo',
+                legalizado_titulo = '$legalizado_titulo',
                 potencialidades = '$potencialidades',
                 fecha_ingreso = '$fecha_ingreso',
                 fecha_act = '$fecha_act',
