@@ -20,32 +20,34 @@ if ($carreras && is_array($carreras)) {
     }
 }
 
-// Obtener TODOS los estudiantes
+// Obtener TODOS los estudiantes con JOIN a ciudades
 $query = "SELECT 
-    id,
-    idusuario,
-    nombre,
-    username,
-    email,
-    tlf,
-    cel,
-    direccion,
-    ciudad,
-    estado,
-    municipio,
-    parroquia,
-    fecha_ingreso,
-    fecha_nac,
-    status,
-    carrera,
-    genero,
-    embarazada,
-    edo_civil,
-    num_telf_opc,
-    foto_perfil
-FROM users 
-WHERE estudiante = 1
-ORDER BY nombre ASC";
+    u.id,
+    u.idusuario,
+    u.nombre,
+    u.username,
+    u.email,
+    u.tlf,
+    u.cel,
+    u.direccion,
+    u.ciudad as ciudad_id,
+    u.estado,
+    u.municipio,
+    u.parroquia,
+    u.fecha_ingreso,
+    u.fecha_nac,
+    u.status,
+    u.carrera,
+    u.genero,
+    u.embarazada,
+    u.edo_civil,
+    u.num_telf_opc,
+    u.foto_perfil,
+    c.ciudad as nombre_ciudad
+FROM users u
+LEFT JOIN ciudades c ON u.ciudad = c.id_ciudad
+WHERE u.estudiante = 1
+ORDER BY u.nombre ASC";
 
 $result = $db->query($query);
 $estudiantes = [];
@@ -72,6 +74,10 @@ if ($result && $result->num_rows > 0) {
         // Obtener nombre de la carrera
         $carreraId = $row['carrera'];
         $row['nombre_carrera'] = isset($carreraMap[$carreraId]) ? $carreraMap[$carreraId] : 'Sin Carrera';
+        
+        // Obtener nombre de la ciudad (reemplazar el ID por el nombre)
+        $row['ciudad'] = isset($row['nombre_ciudad']) && !empty($row['nombre_ciudad']) ? $row['nombre_ciudad'] : 'No especificada';
+        
         $estudiantes[] = $row;
     }
 }
@@ -80,8 +86,13 @@ if ($result && $result->num_rows > 0) {
 $carrerasUnicas = array_unique(array_column($estudiantes, 'nombre_carrera'));
 sort($carrerasUnicas);
 
-// Obtener ciudades únicas
+// Obtener ciudades únicas (ahora usando el nombre real)
 $ciudades = array_unique(array_column($estudiantes, 'ciudad'));
+sort($ciudades);
+// Filtrar valores vacíos o nulos
+$ciudades = array_filter($ciudades, function($ciudad) {
+    return !empty($ciudad) && $ciudad !== 'No especificada';
+});
 sort($ciudades);
 
 // Contar estudiantes por status y estadísticas adicionales
@@ -425,21 +436,21 @@ include("includes/head.php");
                                             data-fecha-ingreso="<?php echo $fechaIngreso; ?>"
                                             data-ciudad="<?php echo strtolower($ciudad); ?>"
                                             data-carrera="<?php echo strtolower($carrera); ?>">
-                                            <td><?php echo htmlspecialchars($cedula); ?></div>
-                                            <td><?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?></div>
-                                            <td><?php echo htmlspecialchars($estudiante['username'] ?? ''); ?></div>
-                                            <td><?php echo htmlspecialchars($estudiante['email'] ?? ''); ?></div>
-                                            <td><?php echo htmlspecialchars($estudiante['tlf'] ?? $estudiante['cel'] ?? ''); ?></div>
-                                            <td><?php echo htmlspecialchars($carrera); ?></div>
+                                            <td><?php echo htmlspecialchars($cedula); ?></td>
+                                            <td><?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($estudiante['username'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($estudiante['email'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($estudiante['tlf'] ?? $estudiante['cel'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($carrera); ?></td>
                                             <td>
                                                 <?php echo htmlspecialchars($estudiante['genero'] ?? ''); ?>
                                                 <?php if ($esFemenino && $estaEmbarazada): ?><span class="badge bg-info ms-1" title="Embarazada">🤰</span><?php endif; ?>
-                                            </div>
-                                            <td><?php echo $edad; ?></div>
-                                            <td><?php echo htmlspecialchars($estudiante['edo_civil'] ?? ''); ?></div>
-                                            <td><?php echo htmlspecialchars($ciudad); ?></div>
-                                            <td><?php echo ($status == 1) ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-secondary">Inactivo</span>'; ?></div>
-                                            <td><?php echo !empty($fechaIngreso) ? date('d/m/Y', strtotime($fechaIngreso)) : ''; ?></div>
+                                            </td>
+                                            <td><?php echo $edad; ?></td>
+                                            <td><?php echo htmlspecialchars($estudiante['edo_civil'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($ciudad); ?></td>
+                                            <td><?php echo ($status == 1) ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-secondary">Inactivo</span>'; ?></td>
+                                            <td><?php echo !empty($fechaIngreso) ? date('d/m/Y', strtotime($fechaIngreso)) : ''; ?></td>
                                             <td>
                                                 <div class="d-flex flex-wrap gap-1">
                                                     <button class="btn btn-info btn-details btn-sm" data-id="<?php echo $estudiante['id']; ?>"><i class="fas fa-eye"></i></button>
@@ -447,7 +458,7 @@ include("includes/head.php");
                                                         <button class="btn btn-warning btn-sm btn-edit" data-id="<?php echo $estudiante['id']; ?>"><i class="fas fa-edit"></i></button>
                                                     <?php endif; ?>
                                                 </div>
-                                            </div>
+                                            </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
