@@ -11,7 +11,16 @@ $puedeEditar = isset($_SESSION['user']['editar_estudiante']) && $_SESSION['user'
 // LLAMAR A LA FUNCIÓN DE VISITA
 visita();
 
-// Obtener estudiantes (SOLO los que tienen estudiante = 1)
+// Obtener carreras para mostrar nombres
+$carreras = obtenerTodasLasCarreras();
+$carreraMap = [];
+if ($carreras && is_array($carreras)) {
+    foreach ($carreras as $carrera) {
+        $carreraMap[$carrera['id']] = $carrera['nombre'];
+    }
+}
+
+// Obtener TODOS los estudiantes
 $query = "SELECT 
     id,
     idusuario,
@@ -59,12 +68,16 @@ if ($result && $result->num_rows > 0) {
         }
         $row['edad'] = $edad;
         $row['es_menor'] = $esMenor;
+        
+        // Obtener nombre de la carrera
+        $carreraId = $row['carrera'];
+        $row['nombre_carrera'] = isset($carreraMap[$carreraId]) ? $carreraMap[$carreraId] : 'Sin Carrera';
         $estudiantes[] = $row;
     }
 }
 
 // Obtener carreras únicas para el filtro
-$carrerasUnicas = array_unique(array_column($estudiantes, 'carrera'));
+$carrerasUnicas = array_unique(array_column($estudiantes, 'nombre_carrera'));
 sort($carrerasUnicas);
 
 // Obtener ciudades únicas
@@ -78,7 +91,6 @@ $inactivos = 0;
 $embarazadas = 0;
 $menores = 0;
 $mayores = 0;
-$estudiantesPorCarrera = [];
 $masculinos = 0;
 $femeninos = 0;
 $solteros = 0;
@@ -92,40 +104,62 @@ foreach ($estudiantes as $estudiante) {
         $inactivos++;
     }
 
-    // Contar por género
     $genero = $estudiante['genero'] ?? '';
     if ($genero == 'Masculino') $masculinos++;
     if ($genero == 'Femenino') $femeninos++;
 
-    // Contar mujeres embarazadas
     $esFemenino = isset($estudiante['genero']) && trim($estudiante['genero']) === 'Femenino';
     $estaEmbarazada = isset($estudiante['embarazada']) && trim((string)$estudiante['embarazada']) === '1';
     if ($esFemenino && $estaEmbarazada) {
         $embarazadas++;
     }
 
-    // Contar menores y mayores de edad
     if ($estudiante['es_menor']) {
         $menores++;
     } elseif ($estudiante['edad'] >= 18 && $estudiante['edad'] !== '') {
         $mayores++;
     }
 
-    // Contar estado civil
     $edoCivil = $estudiante['edo_civil'] ?? '';
     if ($edoCivil == 'Soltero/a') $solteros++;
     if ($edoCivil == 'Casado/a') $casados++;
-
-    // Contar por carrera
-    $carrera = $estudiante['carrera'] ?? 'Sin Carrera';
-    if (!isset($estudiantesPorCarrera[$carrera])) {
-        $estudiantesPorCarrera[$carrera] = 0;
-    }
-    $estudiantesPorCarrera[$carrera]++;
 }
 
 include("includes/head.php");
 ?>
+
+<style>
+.pagination-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 20px;
+    gap: 10px;
+}
+.records-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.records-selector select {
+    width: auto;
+    padding: 4px 8px;
+}
+.pagination {
+    margin: 0;
+    flex-wrap: wrap;
+}
+.page-link {
+    cursor: pointer;
+}
+@media (max-width: 768px) {
+    .pagination-bar {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+</style>
 
 <div class="container-fluid px-2 px-sm-3 px-md-4">
     <div class="py-3 py-sm-4">
@@ -155,7 +189,6 @@ include("includes/head.php");
                         </div>
                     </div>
                     <div class="card-body p-2 p-sm-3">
-                        <!-- Conteos de estudiantes -->
                         <div id="estadisticas-row" class="row mb-4">
                             <div class="col-md-3 mb-3">
                                 <div class="card bg-primary text-white h-100 shadow-sm">
@@ -231,219 +264,114 @@ include("includes/head.php");
                             </div>
                         </div>
 
-                        <!-- Filtros Avanzados (con toggle para ocultar/mostrar) -->
                         <div id="filtrosContainer" class="row mb-4">
                             <div class="col-12">
                                 <div class="card border-primary">
                                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                                        <h6 class="mb-0">
-                                            <i class="fas fa-filter me-2"></i>Filtros Avanzados
-                                        </h6>
+                                        <h6 class="mb-0"><i class="fas fa-filter me-2"></i>Filtros Avanzados</h6>
                                         <button type="button" id="btnOcultarFiltros" class="btn btn-sm btn-outline-light">
                                             <i class="fas fa-chevron-up"></i> Ocultar
                                         </button>
                                     </div>
                                     <div class="card-body" id="filtrosBody">
-                                        <!-- Buscador por Cédula -->
                                         <div class="row mb-3">
                                             <div class="col-md-12">
                                                 <div class="input-group">
-                                                    <span class="input-group-text bg-primary text-white">
-                                                        <i class="fas fa-id-card"></i>
-                                                    </span>
-                                                    <input type="text" 
-                                                           id="buscadorCedula" 
-                                                           class="form-control" 
-                                                           placeholder="Buscar por cédula (Ej: V12345678)..."
-                                                           autocomplete="off">
+                                                    <span class="input-group-text bg-primary text-white"><i class="fas fa-id-card"></i></span>
+                                                    <input type="text" id="buscadorCedula" class="form-control" 
+                                                           placeholder="Buscar por cédula (Ej: V12345678)..." autocomplete="off">
                                                     <button type="button" id="limpiarBusqueda" class="btn btn-secondary">
                                                         <i class="fas fa-times"></i> Limpiar todos los filtros
                                                     </button>
                                                 </div>
                                             </div>
                                         </div>
-
                                         <div class="row">
-                                            <!-- Filtro por Carrera -->
                                             <div class="col-md-3 mb-3">
                                                 <div class="card">
-                                                    <div class="card-header bg-light">
-                                                        <strong><i class="fas fa-graduation-cap"></i> Carrera</strong>
-                                                    </div>
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-graduation-cap"></i> Carrera</strong></div>
                                                     <div class="card-body" style="max-height: 250px; overflow-y: auto;">
                                                         <div class="form-check">
                                                             <input class="form-check-input filtro-carrera" type="checkbox" value="todas" id="filtroTodasCarreras" checked>
-                                                            <label class="form-check-label" for="filtroTodasCarreras">
-                                                                <strong>Todas las carreras</strong>
-                                                            </label>
+                                                            <label class="form-check-label" for="filtroTodasCarreras"><strong>Todas las carreras</strong></label>
                                                         </div>
                                                         <hr>
                                                         <?php foreach ($carrerasUnicas as $carrera): ?>
                                                             <?php if (!empty($carrera)): ?>
                                                             <div class="form-check">
                                                                 <input class="form-check-input filtro-carrera" type="checkbox" value="<?php echo htmlspecialchars($carrera); ?>" id="filtroCarrera_<?php echo md5($carrera); ?>">
-                                                                <label class="form-check-label" for="filtroCarrera_<?php echo md5($carrera); ?>">
-                                                                    <?php echo htmlspecialchars($carrera); ?>
-                                                                </label>
+                                                                <label class="form-check-label" for="filtroCarrera_<?php echo md5($carrera); ?>"><?php echo htmlspecialchars($carrera); ?></label>
                                                             </div>
                                                             <?php endif; ?>
                                                         <?php endforeach; ?>
                                                     </div>
                                                 </div>
                                             </div>
-
-                                            <!-- Filtro por Género -->
                                             <div class="col-md-3 mb-3">
                                                 <div class="card">
-                                                    <div class="card-header bg-light">
-                                                        <strong><i class="fas fa-venus-mars"></i> Género</strong>
-                                                    </div>
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-venus-mars"></i> Género</strong></div>
                                                     <div class="card-body">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input filtro" type="checkbox" value="masculino" id="filtroMasculino">
-                                                            <label class="form-check-label" for="filtroMasculino">
-                                                                Masculino
-                                                            </label>
-                                                        </div>
-                                                        <div class="form-check">
-                                                            <input class="form-check-input filtro" type="checkbox" value="femenino" id="filtroFemenino">
-                                                            <label class="form-check-label" for="filtroFemenino">
-                                                                Femenino
-                                                            </label>
-                                                        </div>
+                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="masculino" id="filtroMasculino"><label class="form-check-label" for="filtroMasculino">Masculino</label></div>
+                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="femenino" id="filtroFemenino"><label class="form-check-label" for="filtroFemenino">Femenino</label></div>
                                                     </div>
                                                 </div>
                                             </div>
-
-                                            <!-- Filtro por Estado Civil -->
                                             <div class="col-md-3 mb-3">
                                                 <div class="card">
-                                                    <div class="card-header bg-light">
-                                                        <strong><i class="fas fa-heart"></i> Estado Civil</strong>
-                                                    </div>
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-heart"></i> Estado Civil</strong></div>
                                                     <div class="card-body">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input filtro" type="checkbox" value="soltero" id="filtroSoltero">
-                                                            <label class="form-check-label" for="filtroSoltero">
-                                                                Soltero/a
-                                                            </label>
-                                                        </div>
-                                                        <div class="form-check">
-                                                            <input class="form-check-input filtro" type="checkbox" value="casado" id="filtroCasado">
-                                                            <label class="form-check-label" for="filtroCasado">
-                                                                Casado/a
-                                                            </label>
-                                                        </div>
+                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="soltero" id="filtroSoltero"><label class="form-check-label" for="filtroSoltero">Soltero/a</label></div>
+                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="casado" id="filtroCasado"><label class="form-check-label" for="filtroCasado">Casado/a</label></div>
                                                     </div>
                                                 </div>
                                             </div>
-
-                                            <!-- Filtro por Estado (Activo/Inactivo) -->
                                             <div class="col-md-3 mb-3">
                                                 <div class="card">
-                                                    <div class="card-header bg-light">
-                                                        <strong><i class="fas fa-user-check"></i> Estado</strong>
-                                                    </div>
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-user-check"></i> Estado</strong></div>
                                                     <div class="card-body">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input filtro" type="checkbox" value="activo" id="filtroActivo">
-                                                            <label class="form-check-label" for="filtroActivo">
-                                                                Activo
-                                                            </label>
-                                                        </div>
-                                                        <div class="form-check">
-                                                            <input class="form-check-input filtro" type="checkbox" value="inactivo" id="filtroInactivo">
-                                                            <label class="form-check-label" for="filtroInactivo">
-                                                                Inactivo
-                                                            </label>
-                                                        </div>
+                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="activo" id="filtroActivo"><label class="form-check-label" for="filtroActivo">Activo</label></div>
+                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="inactivo" id="filtroInactivo"><label class="form-check-label" for="filtroInactivo">Inactivo</label></div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
-
                                         <div class="row mt-2">
-                                            <!-- Filtro por Embarazo -->
                                             <div class="col-md-3 mb-3">
                                                 <div class="card">
-                                                    <div class="card-header bg-light">
-                                                        <strong><i class="fas fa-baby-carriage"></i> Embarazo</strong>
-                                                    </div>
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-baby-carriage"></i> Embarazo</strong></div>
                                                     <div class="card-body">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input filtro" type="checkbox" value="embarazada" id="filtroEmbarazada">
-                                                            <label class="form-check-label" for="filtroEmbarazada">
-                                                                Solo Embarazadas
-                                                            </label>
-                                                        </div>
+                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="embarazada" id="filtroEmbarazada"><label class="form-check-label" for="filtroEmbarazada">Solo Embarazadas</label></div>
                                                     </div>
                                                 </div>
                                             </div>
-
-                                            <!-- Filtro por Edad -->
                                             <div class="col-md-3 mb-3">
                                                 <div class="card">
-                                                    <div class="card-header bg-light">
-                                                        <strong><i class="fas fa-child"></i> Edad</strong>
-                                                    </div>
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-child"></i> Edad</strong></div>
                                                     <div class="card-body">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input filtro" type="checkbox" value="menor" id="filtroMenor">
-                                                            <label class="form-check-label" for="filtroMenor">
-                                                                Menores de 18 años
-                                                            </label>
-                                                        </div>
-                                                        <div class="form-check">
-                                                            <input class="form-check-input filtro" type="checkbox" value="mayor" id="filtroMayor">
-                                                            <label class="form-check-label" for="filtroMayor">
-                                                                Mayores de 18 años
-                                                            </label>
-                                                        </div>
-                                                        <div class="row mt-2">
-                                                            <div class="col-6">
-                                                                <input type="number" class="form-control form-control-sm" id="edadMin" placeholder="Edad mín">
-                                                            </div>
-                                                            <div class="col-6">
-                                                                <input type="number" class="form-control form-control-sm" id="edadMax" placeholder="Edad máx">
-                                                            </div>
-                                                        </div>
+                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="menor" id="filtroMenor"><label class="form-check-label" for="filtroMenor">Menores de 18 años</label></div>
+                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="mayor" id="filtroMayor"><label class="form-check-label" for="filtroMayor">Mayores de 18 años</label></div>
+                                                        <div class="row mt-2"><div class="col-6"><input type="number" class="form-control form-control-sm" id="edadMin" placeholder="Edad mín"></div><div class="col-6"><input type="number" class="form-control form-control-sm" id="edadMax" placeholder="Edad máx"></div></div>
                                                     </div>
                                                 </div>
                                             </div>
-
-                                            <!-- Filtro por Rango de Fechas -->
                                             <div class="col-md-3 mb-3">
                                                 <div class="card">
-                                                    <div class="card-header bg-light">
-                                                        <strong><i class="fas fa-calendar-alt"></i> Fecha Ingreso</strong>
-                                                    </div>
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-calendar-alt"></i> Fecha Ingreso</strong></div>
                                                     <div class="card-body">
-                                                        <div class="form-group">
-                                                            <label>Desde</label>
-                                                            <input type="date" class="form-control form-control-sm" id="fechaIngresoDesde">
-                                                        </div>
-                                                        <div class="form-group mt-2">
-                                                            <label>Hasta</label>
-                                                            <input type="date" class="form-control form-control-sm" id="fechaIngresoHasta">
-                                                        </div>
+                                                        <div class="form-group"><label>Desde</label><input type="date" class="form-control form-control-sm" id="fechaIngresoDesde"></div>
+                                                        <div class="form-group mt-2"><label>Hasta</label><input type="date" class="form-control form-control-sm" id="fechaIngresoHasta"></div>
                                                     </div>
                                                 </div>
                                             </div>
-
-                                            <!-- Filtro por Ciudad -->
                                             <div class="col-md-3 mb-3">
                                                 <div class="card">
-                                                    <div class="card-header bg-light">
-                                                        <strong><i class="fas fa-city"></i> Ciudad</strong>
-                                                    </div>
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-city"></i> Ciudad</strong></div>
                                                     <div class="card-body" style="max-height: 250px; overflow-y: auto;">
                                                         <?php foreach ($ciudades as $ciudad): ?>
                                                             <?php if (!empty($ciudad)): ?>
                                                             <div class="form-check">
                                                                 <input class="form-check-input filtro-ciudad" type="checkbox" value="<?php echo htmlspecialchars($ciudad); ?>" id="filtroCiudad_<?php echo md5($ciudad); ?>">
-                                                                <label class="form-check-label" for="filtroCiudad_<?php echo md5($ciudad); ?>">
-                                                                    <?php echo htmlspecialchars($ciudad); ?>
-                                                                </label>
+                                                                <label class="form-check-label" for="filtroCiudad_<?php echo md5($ciudad); ?>"><?php echo htmlspecialchars($ciudad); ?></label>
                                                             </div>
                                                             <?php endif; ?>
                                                         <?php endforeach; ?>
@@ -476,69 +404,74 @@ include("includes/head.php");
                                     </tr>
                                 </thead>
                                 <tbody id="tablaBody">
-                                    <?php if (count($estudiantes) > 0): ?>
-                                        <?php foreach ($estudiantes as $estudiante): 
-                                            $estaEmbarazada = isset($estudiante['embarazada']) && trim((string)$estudiante['embarazada']) === '1';
-                                            $esFemenino = isset($estudiante['genero']) && trim($estudiante['genero']) === 'Femenino';
-                                            $cedula = $estudiante['idusuario'] ?? '';
-                                            $status = $estudiante['status'] ?? 0;
-                                            $genero = strtolower($estudiante['genero'] ?? '');
-                                            $edad = $estudiante['edad'] ?? '';
-                                            $edoCivil = strtolower($estudiante['edo_civil'] ?? '');
-                                            $fechaIngreso = $estudiante['fecha_ingreso'] ?? '';
-                                            $ciudad = $estudiante['ciudad'] ?? '';
-                                            $carrera = $estudiante['carrera'] ?? '';
-                                        ?>
-                                            <tr data-cedula="<?php echo htmlspecialchars(strtoupper($cedula)); ?>"
-                                                data-genero="<?php echo $genero; ?>"
-                                                data-status="<?php echo $status; ?>"
-                                                data-embarazada="<?php echo $estaEmbarazada ? '1' : '0'; ?>"
-                                                data-edad="<?php echo $edad; ?>"
-                                                data-menor="<?php echo $estudiante['es_menor'] ? '1' : '0'; ?>"
-                                                data-mayor="<?php echo ($edad >= 18 && $edad != '') ? '1' : '0'; ?>"
-                                                data-edo-civil="<?php echo $edoCivil; ?>"
-                                                data-fecha-ingreso="<?php echo $fechaIngreso; ?>"
-                                                data-ciudad="<?php echo strtolower($ciudad); ?>"
-                                                data-carrera="<?php echo strtolower($carrera); ?>">
-                                                <td><?php echo htmlspecialchars($cedula); ?></td>
-                                                <td><?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?></td>
-                                                <td><?php echo htmlspecialchars($estudiante['username'] ?? ''); ?></td>
-                                                <td><?php echo htmlspecialchars($estudiante['email'] ?? ''); ?></td>
-                                                <td><?php echo htmlspecialchars($estudiante['tlf'] ?? $estudiante['cel'] ?? ''); ?></td>
-                                                <td><?php echo htmlspecialchars($carrera); ?></td>
-                                                <td>
-                                                    <?php echo htmlspecialchars($estudiante['genero'] ?? ''); ?>
-                                                    <?php if ($esFemenino && $estaEmbarazada): ?>
-                                                        <span class="badge bg-info ms-1" title="Embarazada">🤰</span>
+                                    <?php foreach ($estudiantes as $estudiante): 
+                                        $estaEmbarazada = isset($estudiante['embarazada']) && trim((string)$estudiante['embarazada']) === '1';
+                                        $esFemenino = isset($estudiante['genero']) && trim($estudiante['genero']) === 'Femenino';
+                                        $cedula = $estudiante['idusuario'] ?? '';
+                                        $status = $estudiante['status'] ?? 0;
+                                        $edad = $estudiante['edad'] ?? '';
+                                        $fechaIngreso = $estudiante['fecha_ingreso'] ?? '';
+                                        $ciudad = $estudiante['ciudad'] ?? '';
+                                        $carrera = $estudiante['nombre_carrera'] ?? '';
+                                    ?>
+                                        <tr data-cedula="<?php echo htmlspecialchars(strtoupper($cedula)); ?>"
+                                            data-genero="<?php echo strtolower($estudiante['genero'] ?? ''); ?>"
+                                            data-status="<?php echo $status; ?>"
+                                            data-embarazada="<?php echo $estaEmbarazada ? '1' : '0'; ?>"
+                                            data-edad="<?php echo $edad; ?>"
+                                            data-menor="<?php echo $estudiante['es_menor'] ? '1' : '0'; ?>"
+                                            data-mayor="<?php echo ($edad >= 18 && $edad != '') ? '1' : '0'; ?>"
+                                            data-edo-civil="<?php echo strtolower($estudiante['edo_civil'] ?? ''); ?>"
+                                            data-fecha-ingreso="<?php echo $fechaIngreso; ?>"
+                                            data-ciudad="<?php echo strtolower($ciudad); ?>"
+                                            data-carrera="<?php echo strtolower($carrera); ?>">
+                                            <td><?php echo htmlspecialchars($cedula); ?></div>
+                                            <td><?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?></div>
+                                            <td><?php echo htmlspecialchars($estudiante['username'] ?? ''); ?></div>
+                                            <td><?php echo htmlspecialchars($estudiante['email'] ?? ''); ?></div>
+                                            <td><?php echo htmlspecialchars($estudiante['tlf'] ?? $estudiante['cel'] ?? ''); ?></div>
+                                            <td><?php echo htmlspecialchars($carrera); ?></div>
+                                            <td>
+                                                <?php echo htmlspecialchars($estudiante['genero'] ?? ''); ?>
+                                                <?php if ($esFemenino && $estaEmbarazada): ?><span class="badge bg-info ms-1" title="Embarazada">🤰</span><?php endif; ?>
+                                            </div>
+                                            <td><?php echo $edad; ?></div>
+                                            <td><?php echo htmlspecialchars($estudiante['edo_civil'] ?? ''); ?></div>
+                                            <td><?php echo htmlspecialchars($ciudad); ?></div>
+                                            <td><?php echo ($status == 1) ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-secondary">Inactivo</span>'; ?></div>
+                                            <td><?php echo !empty($fechaIngreso) ? date('d/m/Y', strtotime($fechaIngreso)) : ''; ?></div>
+                                            <td>
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    <button class="btn btn-info btn-details btn-sm" data-id="<?php echo $estudiante['id']; ?>"><i class="fas fa-eye"></i></button>
+                                                    <?php if ($puedeEditar): ?>
+                                                        <button class="btn btn-warning btn-sm btn-edit" data-id="<?php echo $estudiante['id']; ?>"><i class="fas fa-edit"></i></button>
                                                     <?php endif; ?>
-                                                </td>
-                                                <td><?php echo $edad; ?></td>
-                                                <td><?php echo htmlspecialchars($estudiante['edo_civil'] ?? ''); ?></td>
-                                                <td><?php echo htmlspecialchars($ciudad); ?></td>
-                                                <td>
-                                                    <?php echo ($status == 1) ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-secondary">Inactivo</span>'; ?>
-                                                 </td>
-                                                <td><?php echo !empty($fechaIngreso) ? date('d/m/Y', strtotime($fechaIngreso)) : ''; ?></td>
-                                                <td>
-                                                    <div class="d-flex flex-wrap gap-1">
-                                                        <button class="btn btn-info btn-details btn-sm" data-id="<?php echo $estudiante['id']; ?>" title="Ver detalles">
-                                                            <i class="fas fa-eye"></i>
-                                                        </button>
-                                                        <?php if ($puedeEditar): ?>
-                                                            <button class="btn btn-warning btn-sm btn-edit" data-id="<?php echo $estudiante['id']; ?>" title="Editar">
-                                                                <i class="fas fa-edit"></i>
-                                                            </button>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                  </td>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        <tr>
-                                            <td colspan="13" class="text-center">No hay estudiantes registrados</td>
+                                                </div>
+                                            </div>
                                         </tr>
-                                    <?php endif; ?>
+                                    <?php endforeach; ?>
                                 </tbody>
                             </table>
+                        </div>
+                        
+                        <div class="pagination-bar">
+                            <div class="records-selector">
+                                <label class="small mb-0">Mostrar:</label>
+                                <select id="registrosPorPagina" class="form-control form-control-sm">
+                                    <option value="10">10</option>
+                                    <option value="20" selected>20</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                    <option value="999999">Todos</option>
+                                </select>
+                                <span class="small text-muted">registros</span>
+                            </div>
+                            <div class="small text-muted">
+                                Mostrando <span id="mostrandoDesde">0</span> - <span id="mostrandoHasta">0</span> de <span id="totalRegistros"><?php echo $totalEstudiantes; ?></span> estudiantes
+                            </div>
+                            <nav>
+                                <ul class="pagination pagination-sm mb-0" id="paginationControls"></ul>
+                            </nav>
                         </div>
                     </div>
                 </div>
@@ -547,94 +480,39 @@ include("includes/head.php");
     </div>
 </div>
 
-<!-- Modales (igual que antes) -->
-<div class="modal fade" id="reporteModal" tabindex="-1" aria-labelledby="reporteModalLabel" aria-hidden="true">
+<!-- Modales -->
+<div class="modal fade" id="reporteModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title" id="reporteModalLabel">
-                    <i class="fas fa-file-pdf me-2"></i> Generar Reporte de Estudiantes
-                </h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i> Se generará un reporte en PDF con los estudiantes actualmente filtrados.
-                </div>
-                <div class="form-group">
-                    <label><i class="fas fa-chart-bar"></i> Incluir estadísticas</label>
-                    <select id="incluirEstadisticas" class="form-control">
-                        <option value="si">Sí</option>
-                        <option value="no">No</option>
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                <button type="button" id="btnGenerarPDF" class="btn btn-danger">
-                    <i class="fas fa-file-pdf"></i> Generar Reporte PDF
-                </button>
-            </div>
+            <div class="modal-header bg-danger text-white"><h5 class="modal-title"><i class="fas fa-file-pdf me-2"></i> Generar Reporte de Estudiantes</h5><button type="button" class="close text-white" data-dismiss="modal">&times;</button></div>
+            <div class="modal-body"><div class="alert alert-info"><i class="fas fa-info-circle"></i> Se generará un reporte en PDF con los estudiantes actualmente filtrados.</div><div class="form-group"><label><i class="fas fa-chart-bar"></i> Incluir estadísticas</label><select id="incluirEstadisticas" class="form-control"><option value="si">Sí</option><option value="no">No</option></select></div></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button><button type="button" id="btnGenerarPDF" class="btn btn-danger"><i class="fas fa-file-pdf"></i> Generar Reporte PDF</button></div>
         </div>
     </div>
 </div>
 
-<!-- Modal para detalles del estudiante -->
-<div class="modal fade" id="detalleModal" tabindex="-1" aria-labelledby="detalleModalLabel" aria-hidden="true">
+<div class="modal fade" id="detalleModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="detalleModalLabel">Detalles del Estudiante</h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body" id="detalleEstudianteContent">
-                <div class="text-center my-5 py-5">
-                    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-                        <span class="visually-hidden">Cargando...</span>
-                    </div>
-                    <p class="mt-3">Cargando información del estudiante...</p>
-                </div>
-            </div>
+            <div class="modal-header bg-primary text-white"><h5 class="modal-title">Detalles del Estudiante</h5><button type="button" class="close text-white" data-dismiss="modal">&times;</button></div>
+            <div class="modal-body" id="detalleEstudianteContent"><div class="text-center my-5"><div class="spinner-border text-primary"></div><p>Cargando...</p></div></div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="editarEstudianteModal" tabindex="-1" aria-labelledby="editarEstudianteModalLabel" aria-hidden="true">
+<div class="modal fade" id="editarEstudianteModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
-            <div class="modal-header bg-warning text-white">
-                <h5 class="modal-title" id="editarEstudianteModalLabel"><i class="fas fa-user-edit me-2"></i> Editar Estudiante</h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body" id="editarEstudianteContent">
-                <div class="text-center my-5 py-5">
-                    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-                        <span class="visually-hidden">Cargando...</span>
-                    </div>
-                    <p class="mt-3">Cargando formulario de edición...</p>
-                </div>
-            </div>
+            <div class="modal-header bg-warning text-white"><h5 class="modal-title"><i class="fas fa-user-edit me-2"></i> Editar Estudiante</h5><button type="button" class="close text-white" data-dismiss="modal">&times;</button></div>
+            <div class="modal-body" id="editarEstudianteContent"><div class="text-center my-5"><div class="spinner-border text-primary"></div><p>Cargando...</p></div></div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="agregarEstudianteModal" tabindex="-1" aria-labelledby="agregarEstudianteModalLabel" aria-hidden="true">
+<div class="modal fade" id="agregarEstudianteModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title" id="agregarEstudianteModalLabel">
-                    <i class="fas fa-user-plus me-2"></i> Agregar Nuevo Estudiante
-                </h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
+            <div class="modal-header bg-success text-white"><h5 class="modal-title"><i class="fas fa-user-plus me-2"></i> Agregar Nuevo Estudiante</h5><button type="button" class="close text-white" data-dismiss="modal">&times;</button></div>
             <div class="modal-body">
                 <?php 
                 $tiposCedula = obtenerTiposCedula($db);
@@ -646,185 +524,81 @@ include("includes/head.php");
                 $ingresos = obtenerIngresos($db);
                 $esModal = true;
                 ?>
-                
-                <div class="tab-content" id="myTabContent">
-                    <div class="tab-pane fade show active" id="individual" role="tabpanel" aria-labelledby="individual-tab">
-                        <form id="formEstudianteModal" method="post" enctype="multipart/form-data">
-                            <?php 
-                            $esModal = true;
-                            include('_formulario_estudiante.php'); 
-                            ?>
-                        </form>
-                    </div>
-                </div>
+                <div class="tab-content"><div class="tab-pane fade show active" id="individual"><form id="formEstudianteModal" method="post" enctype="multipart/form-data"><?php $esModal = true; include('_formulario_estudiante.php'); ?></form></div></div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="resultadoModal" tabindex="-1" aria-labelledby="resultadoModalLabel" aria-hidden="true">
+<div class="modal fade" id="resultadoModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header" id="resultadoModalHeader">
-                <h5 class="modal-title" id="resultadoModalLabel">Resultado</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body" id="resultadoModalBody">
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-dismiss="modal">Aceptar</button>
-            </div>
+            <div class="modal-header" id="resultadoModalHeader"><h5 class="modal-title">Resultado</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
+            <div class="modal-body" id="resultadoModalBody"></div>
+            <div class="modal-footer"><button type="button" class="btn btn-primary" data-dismiss="modal">Aceptar</button></div>
         </div>
     </div>
 </div>
 
 <style>
-.close {
-    font-size: 1.5rem;
-    font-weight: bold;
-    opacity: 0.8;
-    padding: 0.5rem;
-    line-height: 1;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-}
-
-.close:hover {
-    opacity: 1;
-}
-
-.modal-header {
-    position: relative;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.modal-content {
-    border-radius: 0.5rem;
-    border: none;
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-}
-
-.bg-purple {
-    background-color: #6f42c1 !important;
-}
-
-/* Animación para ocultar/mostrar filtros */
-.filtrosHidden .card-body {
-    display: none !important;
-}
-
-.filtrosHidden .card-header {
-    border-radius: 0.375rem !important;
-}
-
-.transition-fade {
-    transition: all 0.3s ease;
-}
-
+.close { font-size: 1.5rem; font-weight: bold; opacity: 0.8; padding: 0.5rem; line-height: 1; background: transparent; border: none; cursor: pointer; }
+.close:hover { opacity: 1; }
+.modal-header { position: relative; display: flex; justify-content: space-between; align-items: center; }
+.modal-content { border-radius: 0.5rem; border: none; box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15); }
+.bg-purple { background-color: #6f42c1 !important; }
+.filtrosHidden .card-body { display: none !important; }
 @media (max-width: 767.98px) {
-    .card-header h5 {
-        font-size: 1rem;
-    }
-    
-    .btn-sm {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.7rem;
-    }
-    
-    .badge {
-        font-size: 0.65rem;
-        padding: 0.2rem 0.4rem;
-    }
-    
-    .table td, .table th {
-        font-size: 0.75rem;
-        padding: 0.4rem;
-        vertical-align: middle;
-    }
-    
-    .modal-body {
-        padding: 0.75rem;
-    }
-    
-    .d-flex.flex-wrap {
-        gap: 0.25rem !important;
-    }
+    .card-header h5 { font-size: 1rem; }
+    .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
+    .badge { font-size: 0.65rem; padding: 0.2rem 0.4rem; }
+    .table td, .table th { font-size: 0.75rem; padding: 0.4rem; vertical-align: middle; }
+    .modal-body { padding: 0.75rem; }
+    .d-flex.flex-wrap { gap: 0.25rem !important; }
 }
 </style>
 
 <script>
-// Variables para el estado de los filtros
 let filtrosOcultos = false;
+let todasLasFilas = [];
+let filasFiltradas = [];
+let paginaActual = 1;
+let registrosPorPagina = 20;
 
-// Función para ocultar/mostrar filtros
-function toggleFiltros() {
-    const filtrosContainer = document.getElementById('filtrosContainer');
-    const toggleBtn = document.getElementById('toggleFiltros');
-    const toggleText = document.getElementById('toggleFiltrosText');
-    const btnOcultarFiltros = document.getElementById('btnOcultarFiltros');
+document.addEventListener('DOMContentLoaded', function() {
+    cargarEstadoGuardado();
+    todasLasFilas = Array.from(document.querySelectorAll('#tablaBody tr'));
+    configurarFiltros();
     
-    if (filtrosOcultos) {
-        // Mostrar filtros
-        filtrosContainer.style.display = 'block';
-        filtrosOcultos = false;
-        if (toggleText) toggleText.innerHTML = 'Ocultar Filtros';
-        if (btnOcultarFiltros) btnOcultarFiltros.innerHTML = '<i class="fas fa-chevron-up"></i> Ocultar';
-        localStorage.setItem('filtrosOcultos', 'false');
-    } else {
-        // Ocultar filtros
-        filtrosContainer.style.display = 'none';
-        filtrosOcultos = true;
-        if (toggleText) toggleText.innerHTML = 'Mostrar Filtros';
-        if (btnOcultarFiltros) btnOcultarFiltros.innerHTML = '<i class="fas fa-chevron-down"></i> Mostrar';
-        localStorage.setItem('filtrosOcultos', 'true');
+    const selectorRegistros = document.getElementById('registrosPorPagina');
+    if (selectorRegistros) {
+        selectorRegistros.addEventListener('change', function() {
+            registrosPorPagina = parseInt(this.value);
+            paginaActual = 1;
+            aplicarFiltrosYActualizar();
+        });
     }
+    aplicarFiltrosYActualizar();
+});
+
+function configurarFiltros() {
+    document.getElementById('filtroTodasCarreras').addEventListener('change', aplicarFiltrosYActualizar);
+    document.querySelectorAll('.filtro-carrera').forEach(cb => cb.addEventListener('change', aplicarFiltrosYActualizar));
+    document.querySelectorAll('.filtro-ciudad').forEach(cb => cb.addEventListener('change', aplicarFiltrosYActualizar));
+    document.querySelectorAll('.filtro').forEach(cb => cb.addEventListener('change', aplicarFiltrosYActualizar));
+    document.getElementById('edadMin').addEventListener('input', aplicarFiltrosYActualizar);
+    document.getElementById('edadMax').addEventListener('input', aplicarFiltrosYActualizar);
+    document.getElementById('fechaIngresoDesde').addEventListener('change', aplicarFiltrosYActualizar);
+    document.getElementById('fechaIngresoHasta').addEventListener('change', aplicarFiltrosYActualizar);
+    document.getElementById('buscadorCedula').addEventListener('keyup', aplicarFiltrosYActualizar);
 }
 
-// Función para obtener los IDs de los estudiantes filtrados actualmente
-function getEstudiantesFiltrados() {
-    let filas = document.querySelectorAll('#tablaBody tr');
-    let estudiantesFiltrados = [];
-    
-    filas.forEach(fila => {
-        if (fila.style.display !== 'none') {
-            let estudianteId = fila.querySelector('.btn-details')?.getAttribute('data-id');
-            if (estudianteId) {
-                estudiantesFiltrados.push(estudianteId);
-            }
-        }
-    });
-    
-    return estudiantesFiltrados;
+function aplicarFiltrosYActualizar() {
+    aplicarFiltros();
+    actualizarPaginacion();
 }
 
-// Función para generar reporte PDF
-function generarReportePDF() {
-    let estudiantesIds = getEstudiantesFiltrados();
-    let incluirEstadisticas = document.getElementById('incluirEstadisticas').value;
-    
-    if (estudiantesIds.length === 0) {
-        mostrarMensaje('Sin resultados', 'No hay estudiantes con los filtros seleccionados para generar el reporte', false);
-        return;
-    }
-    
-    // Abrir el PDF en una nueva ventana
-    let url = `constancias/generar_reporte_pdf.php?ids=${estudiantesIds.join(',')}&estadisticas=${incluirEstadisticas}`;
-    window.open(url, '_blank');
-    
-    $('#reporteModal').modal('hide');
-    mostrarMensaje('Éxito', 'Reporte PDF generado exitosamente', true);
-}
-
-// Función para aplicar todos los filtros
 function aplicarFiltros() {
     let termino = document.getElementById('buscadorCedula').value.toUpperCase();
-    
-    // Obtener valores de los checkboxes
     let filtroMasculino = document.getElementById('filtroMasculino').checked;
     let filtroFemenino = document.getElementById('filtroFemenino').checked;
     let filtroActivo = document.getElementById('filtroActivo').checked;
@@ -834,13 +608,11 @@ function aplicarFiltros() {
     let filtroMayor = document.getElementById('filtroMayor').checked;
     let filtroSoltero = document.getElementById('filtroSoltero').checked;
     let filtroCasado = document.getElementById('filtroCasado').checked;
-    
     let edadMin = document.getElementById('edadMin').value;
     let edadMax = document.getElementById('edadMax').value;
     let fechaDesde = document.getElementById('fechaIngresoDesde').value;
     let fechaHasta = document.getElementById('fechaIngresoHasta').value;
     
-    // Obtener carreras seleccionadas
     let carrerasSeleccionadas = [];
     let todasCarreras = document.getElementById('filtroTodasCarreras').checked;
     if (!todasCarreras) {
@@ -849,117 +621,64 @@ function aplicarFiltros() {
         });
     }
     
-    // Obtener ciudades seleccionadas
     let ciudadesSeleccionadas = [];
     document.querySelectorAll('.filtro-ciudad:checked').forEach(cb => {
         ciudadesSeleccionadas.push(cb.value.toLowerCase());
     });
     
-    let filas = document.querySelectorAll('#tablaBody tr');
-    let encontrados = 0;
-    
-    filas.forEach(fila => {
-        let mostrar = true;
-        
-        // Filtro por cédula
+    filasFiltradas = todasLasFilas.filter(fila => {
         let cedula = fila.getAttribute('data-cedula') || '';
-        if (termino !== '' && !cedula.includes(termino)) {
-            mostrar = false;
-        }
-        
-        // Filtro por carrera
-        if (mostrar && !todasCarreras && carrerasSeleccionadas.length > 0) {
+        if (termino !== '' && !cedula.includes(termino)) return false;
+        if (!todasCarreras && carrerasSeleccionadas.length > 0) {
             let carrera = fila.getAttribute('data-carrera') || '';
-            if (!carrerasSeleccionadas.includes(carrera)) {
-                mostrar = false;
-            }
+            if (!carrerasSeleccionadas.includes(carrera)) return false;
         }
-        
-        // Filtro por ciudad
-        if (mostrar && ciudadesSeleccionadas.length > 0) {
+        if (ciudadesSeleccionadas.length > 0) {
             let ciudad = fila.getAttribute('data-ciudad') || '';
-            if (!ciudadesSeleccionadas.includes(ciudad)) {
-                mostrar = false;
-            }
+            if (!ciudadesSeleccionadas.includes(ciudad)) return false;
         }
-        
-        // Filtro por género
-        if (mostrar && (filtroMasculino || filtroFemenino)) {
+        if (filtroMasculino || filtroFemenino) {
             let genero = fila.getAttribute('data-genero') || '';
-            if (filtroMasculino && filtroFemenino) {
-                // Ambos seleccionados, mostrar todos
-            } else if (filtroMasculino && genero !== 'masculino') {
-                mostrar = false;
-            } else if (filtroFemenino && genero !== 'femenino') {
-                mostrar = false;
-            }
+            if (filtroMasculino && filtroFemenino) {}
+            else if (filtroMasculino && genero !== 'masculino') return false;
+            else if (filtroFemenino && genero !== 'femenino') return false;
         }
-        
-        // Filtro por estado
-        if (mostrar && (filtroActivo || filtroInactivo)) {
+        if (filtroActivo || filtroInactivo) {
             let status = fila.getAttribute('data-status') || '';
-            if (filtroActivo && filtroInactivo) {
-                // Ambos seleccionados, mostrar todos
-            } else if (filtroActivo && status !== '1') {
-                mostrar = false;
-            } else if (filtroInactivo && status !== '0') {
-                mostrar = false;
-            }
+            if (filtroActivo && filtroInactivo) {}
+            else if (filtroActivo && status !== '1') return false;
+            else if (filtroInactivo && status !== '0') return false;
         }
-        
-        // Filtro por embarazada
-        if (mostrar && filtroEmbarazada) {
+        if (filtroEmbarazada) {
             let embarazada = fila.getAttribute('data-embarazada') || '0';
             let genero = fila.getAttribute('data-genero') || '';
-            if (embarazada !== '1' || genero !== 'femenino') {
-                mostrar = false;
-            }
+            if (embarazada !== '1' || genero !== 'femenino') return false;
         }
-        
-        // Filtro por edad (menor/mayor)
-        if (mostrar && (filtroMenor || filtroMayor)) {
+        if (filtroMenor || filtroMayor) {
             let menor = fila.getAttribute('data-menor') || '0';
             let mayor = fila.getAttribute('data-mayor') || '0';
-            if (filtroMenor && filtroMayor) {
-                // Ambos seleccionados, mostrar todos
-            } else if (filtroMenor && menor !== '1') {
-                mostrar = false;
-            } else if (filtroMayor && mayor !== '1') {
-                mostrar = false;
-            }
+            if (filtroMenor && filtroMayor) {}
+            else if (filtroMenor && menor !== '1') return false;
+            else if (filtroMayor && mayor !== '1') return false;
         }
-        
-        // Filtro por rango de edad
-        if (mostrar && (edadMin !== '' || edadMax !== '')) {
+        if (edadMin !== '' || edadMax !== '') {
             let edad = parseInt(fila.getAttribute('data-edad')) || 0;
-            if (edadMin !== '' && edad < parseInt(edadMin)) mostrar = false;
-            if (edadMax !== '' && edad > parseInt(edadMax)) mostrar = false;
+            if (edadMin !== '' && edad < parseInt(edadMin)) return false;
+            if (edadMax !== '' && edad > parseInt(edadMax)) return false;
         }
-        
-        // Filtro por estado civil
-        if (mostrar && (filtroSoltero || filtroCasado)) {
+        if (filtroSoltero || filtroCasado) {
             let edoCivil = fila.getAttribute('data-edo-civil') || '';
-            if (filtroSoltero && edoCivil !== 'soltero/a') mostrar = false;
-            if (filtroCasado && edoCivil !== 'casado/a') mostrar = false;
+            if (filtroSoltero && edoCivil !== 'soltero/a') return false;
+            if (filtroCasado && edoCivil !== 'casado/a') return false;
         }
-        
-        // Filtro por fecha de ingreso
-        if (mostrar && (fechaDesde !== '' || fechaHasta !== '')) {
+        if (fechaDesde !== '' || fechaHasta !== '') {
             let fechaIngreso = fila.getAttribute('data-fecha-ingreso') || '';
-            if (fechaDesde !== '' && fechaIngreso < fechaDesde) mostrar = false;
-            if (fechaHasta !== '' && fechaIngreso > fechaHasta) mostrar = false;
+            if (fechaDesde !== '' && fechaIngreso < fechaDesde) return false;
+            if (fechaHasta !== '' && fechaIngreso > fechaHasta) return false;
         }
-        
-        // Aplicar visibilidad
-        if (mostrar) {
-            fila.style.display = '';
-            encontrados++;
-        } else {
-            fila.style.display = 'none';
-        }
+        return true;
     });
     
-    // Actualizar mensaje
     let mensajeDiv = document.getElementById('mensajeBusqueda');
     if(!mensajeDiv) {
         mensajeDiv = document.createElement('div');
@@ -967,110 +686,121 @@ function aplicarFiltros() {
         mensajeDiv.className = 'alert alert-info mt-3';
         document.querySelector('.table-responsive').appendChild(mensajeDiv);
     }
-    
-    let totalFilas = filas.length;
-    if(encontrados === 0) {
+    if(filasFiltradas.length === 0) {
         mensajeDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> No se encontraron estudiantes con los filtros seleccionados`;
         mensajeDiv.className = 'alert alert-warning mt-3';
     } else {
-        mensajeDiv.innerHTML = `<i class="fas fa-check-circle"></i> Se encontraron ${encontrados} de ${totalFilas} estudiantes`;
+        mensajeDiv.innerHTML = `<i class="fas fa-check-circle"></i> Se encontraron ${filasFiltradas.length} de ${todasLasFilas.length} estudiantes`;
         mensajeDiv.className = 'alert alert-success mt-3';
     }
 }
 
-// Manejar el checkbox "Todas las carreras"
-document.getElementById('filtroTodasCarreras').addEventListener('change', function() {
-    let checkboxesCarrera = document.querySelectorAll('.filtro-carrera');
-    if (this.checked) {
-        checkboxesCarrera.forEach(cb => {
-            if (cb.value !== 'todas') cb.checked = false;
+function actualizarPaginacion() {
+    const totalFilas = filasFiltradas.length;
+    const totalPaginas = registrosPorPagina === 999999 ? 1 : Math.ceil(totalFilas / registrosPorPagina);
+    if (paginaActual > totalPaginas) paginaActual = totalPaginas;
+    if (paginaActual < 1) paginaActual = 1;
+    const inicio = (paginaActual - 1) * registrosPorPagina;
+    const fin = registrosPorPagina === 999999 ? totalFilas : Math.min(inicio + registrosPorPagina, totalFilas);
+    todasLasFilas.forEach(fila => fila.style.display = 'none');
+    for (let i = inicio; i < fin; i++) {
+        if (filasFiltradas[i]) filasFiltradas[i].style.display = '';
+    }
+    document.getElementById('mostrandoDesde').textContent = totalFilas === 0 ? 0 : inicio + 1;
+    document.getElementById('mostrandoHasta').textContent = fin;
+    document.getElementById('totalRegistros').textContent = totalFilas;
+    
+    const paginationContainer = document.getElementById('paginationControls');
+    paginationContainer.innerHTML = '';
+    if (registrosPorPagina !== 999999 && totalPaginas > 1) {
+        const liPrev = document.createElement('li');
+        liPrev.className = `page-item ${paginaActual === 1 ? 'disabled' : ''}`;
+        liPrev.innerHTML = `<a class="page-link" data-pagina="${paginaActual - 1}"><i class="fas fa-chevron-left"></i> Anterior</a>`;
+        paginationContainer.appendChild(liPrev);
+        
+        let inicioPag = Math.max(1, paginaActual - 2);
+        let finPag = Math.min(totalPaginas, paginaActual + 2);
+        if (inicioPag > 1) {
+            paginationContainer.appendChild(crearItemPagina(1));
+            if (inicioPag > 2) paginationContainer.appendChild(crearItemPuntos());
+        }
+        for (let i = inicioPag; i <= finPag; i++) {
+            paginationContainer.appendChild(crearItemPagina(i));
+        }
+        if (finPag < totalPaginas) {
+            if (finPag < totalPaginas - 1) paginationContainer.appendChild(crearItemPuntos());
+            paginationContainer.appendChild(crearItemPagina(totalPaginas));
+        }
+        const liNext = document.createElement('li');
+        liNext.className = `page-item ${paginaActual === totalPaginas ? 'disabled' : ''}`;
+        liNext.innerHTML = `<a class="page-link" data-pagina="${paginaActual + 1}">Siguiente <i class="fas fa-chevron-right"></i></a>`;
+        paginationContainer.appendChild(liNext);
+        
+        document.querySelectorAll('#paginationControls .page-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const nuevaPagina = parseInt(this.getAttribute('data-pagina'));
+                if (!isNaN(nuevaPagina) && nuevaPagina !== paginaActual && nuevaPagina >= 1 && nuevaPagina <= totalPaginas) {
+                    paginaActual = nuevaPagina;
+                    actualizarPaginacion();
+                }
+            });
         });
     }
-    aplicarFiltros();
-});
+}
 
-// Cuando se selecciona una carrera específica, desmarcar "Todas"
-document.querySelectorAll('.filtro-carrera').forEach(cb => {
-    if (cb.value !== 'todas') {
-        cb.addEventListener('change', function() {
-            if (this.checked) {
-                document.getElementById('filtroTodasCarreras').checked = false;
-            }
-            aplicarFiltros();
-        });
+function crearItemPagina(numero) {
+    const li = document.createElement('li');
+    li.className = `page-item ${numero === paginaActual ? 'active' : ''}`;
+    li.innerHTML = `<a class="page-link" data-pagina="${numero}">${numero}</a>`;
+    return li;
+}
+
+function crearItemPuntos() {
+    const li = document.createElement('li');
+    li.className = 'page-item disabled';
+    li.innerHTML = '<span class="page-link">...</span>';
+    return li;
+}
+
+function toggleFiltros() {
+    const filtrosBody = document.getElementById('filtrosBody');
+    const toggleText = document.getElementById('toggleFiltrosText');
+    const btnOcultarFiltros = document.getElementById('btnOcultarFiltros');
+    if (filtrosOcultos) {
+        filtrosBody.style.display = 'block';
+        filtrosOcultos = false;
+        if (toggleText) toggleText.innerHTML = 'Ocultar Filtros';
+        if (btnOcultarFiltros) btnOcultarFiltros.innerHTML = '<i class="fas fa-chevron-up"></i> Ocultar';
+        localStorage.setItem('filtrosOcultos', 'false');
+    } else {
+        filtrosBody.style.display = 'none';
+        filtrosOcultos = true;
+        if (toggleText) toggleText.innerHTML = 'Mostrar Filtros';
+        if (btnOcultarFiltros) btnOcultarFiltros.innerHTML = '<i class="fas fa-chevron-down"></i> Mostrar';
+        localStorage.setItem('filtrosOcultos', 'true');
     }
-});
+}
 
-// Event listeners para filtros de ciudad
-document.querySelectorAll('.filtro-ciudad').forEach(cb => {
-    cb.addEventListener('change', aplicarFiltros);
-});
-
-// Event listeners para todos los filtros
-const filtros = document.querySelectorAll('.filtro');
-filtros.forEach(checkbox => {
-    checkbox.addEventListener('change', aplicarFiltros);
-});
-
-// Event listeners para inputs de rango
-document.getElementById('edadMin').addEventListener('input', aplicarFiltros);
-document.getElementById('edadMax').addEventListener('input', aplicarFiltros);
-document.getElementById('fechaIngresoDesde').addEventListener('change', aplicarFiltros);
-document.getElementById('fechaIngresoHasta').addEventListener('change', aplicarFiltros);
-document.getElementById('buscadorCedula').addEventListener('keyup', aplicarFiltros);
-
-// Botón limpiar todos los filtros
-document.getElementById('limpiarBusqueda').addEventListener('click', function() {
-    // Limpiar búsqueda
-    document.getElementById('buscadorCedula').value = '';
-    
-    // Limpiar todos los checkboxes de filtros
-    document.querySelectorAll('.filtro').forEach(checkbox => {
-        checkbox.checked = false;
-    });
-    
-    // Limpiar checkboxes de ciudad
-    document.querySelectorAll('.filtro-ciudad').forEach(cb => {
-        cb.checked = false;
-    });
-    
-    // Limpiar checkboxes de carrera
-    document.querySelectorAll('.filtro-carrera').forEach(cb => {
-        if (cb.value !== 'todas') cb.checked = false;
-    });
-    document.getElementById('filtroTodasCarreras').checked = true;
-    
-    // Limpiar inputs de rango
-    document.getElementById('edadMin').value = '';
-    document.getElementById('edadMax').value = '';
-    document.getElementById('fechaIngresoDesde').value = '';
-    document.getElementById('fechaIngresoHasta').value = '';
-    
-    aplicarFiltros();
-    document.getElementById('buscadorCedula').focus();
-});
-
-// Botón para generar reporte
-document.getElementById('btnGenerarReporte').addEventListener('click', function() {
-    let estudiantesFiltrados = getEstudiantesFiltrados();
-    if (estudiantesFiltrados.length === 0) {
-        mostrarMensaje('Sin resultados', 'No hay estudiantes con los filtros seleccionados para generar el reporte', false);
-        return;
+function cargarEstadoGuardado() {
+    const estadisticasOcultas = localStorage.getItem('estadisticasOcultas');
+    if (estadisticasOcultas === 'true') {
+        document.getElementById('estadisticas-row').style.display = 'none';
+        document.getElementById('toggleEstadisticas').innerHTML = '<i class="fas fa-chart-bar"></i> Mostrar Estadísticas';
     }
-    $('#reporteModal').modal('show');
-});
+    const filtrosGuardados = localStorage.getItem('filtrosOcultos');
+    if (filtrosGuardados === 'true') {
+        document.getElementById('filtrosBody').style.display = 'none';
+        filtrosOcultos = true;
+        document.getElementById('toggleFiltrosText').innerHTML = 'Mostrar Filtros';
+        const btnOcultar = document.getElementById('btnOcultarFiltros');
+        if (btnOcultar) btnOcultar.innerHTML = '<i class="fas fa-chevron-down"></i> Mostrar';
+    }
+}
 
-document.getElementById('btnGenerarPDF').addEventListener('click', generarReportePDF);
-
-// Botón para toggle de filtros
-document.getElementById('toggleFiltros').addEventListener('click', toggleFiltros);
-document.getElementById('btnOcultarFiltros').addEventListener('click', toggleFiltros);
-
-// Función para toggle estadísticas
 window.toggleEstadisticas = function() {
     const row = document.getElementById('estadisticas-row');
     const button = document.getElementById('toggleEstadisticas');
-    
     if (row.style.display === 'none') {
         row.style.display = 'flex';
         button.innerHTML = '<i class="fas fa-chart-bar"></i> Ocultar Estadísticas';
@@ -1082,38 +812,53 @@ window.toggleEstadisticas = function() {
     }
 };
 
-// Cargar estado guardado
-function cargarEstadoGuardado() {
-    // Cargar estado de estadísticas
-    const estadisticasOcultas = localStorage.getItem('estadisticasOcultas');
-    if (estadisticasOcultas === 'true') {
-        document.getElementById('estadisticas-row').style.display = 'none';
-        document.getElementById('toggleEstadisticas').innerHTML = '<i class="fas fa-chart-bar"></i> Mostrar Estadísticas';
-    }
-    
-    // Cargar estado de filtros
-    const filtrosGuardados = localStorage.getItem('filtrosOcultos');
-    if (filtrosGuardados === 'true') {
-        document.getElementById('filtrosContainer').style.display = 'none';
-        filtrosOcultos = true;
-        document.getElementById('toggleFiltrosText').innerHTML = 'Mostrar Filtros';
-        const btnOcultar = document.getElementById('btnOcultarFiltros');
-        if (btnOcultar) btnOcultar.innerHTML = '<i class="fas fa-chevron-down"></i> Mostrar';
-    }
+function getEstudiantesFiltrados() {
+    return filasFiltradas.map(fila => fila.querySelector('.btn-details')?.getAttribute('data-id')).filter(id => id);
 }
 
-// Modal handlers
+function generarReportePDF() {
+    let estudiantesIds = getEstudiantesFiltrados();
+    let incluirEstadisticas = document.getElementById('incluirEstadisticas').value;
+    if (estudiantesIds.length === 0) {
+        mostrarMensaje('Sin resultados', 'No hay estudiantes con los filtros seleccionados', false);
+        return;
+    }
+    let url = `constancias/generar_reporte_pdf.php?ids=${estudiantesIds.join(',')}&estadisticas=${incluirEstadisticas}`;
+    window.open(url, '_blank');
+    $('#reporteModal').modal('hide');
+}
+
+document.getElementById('limpiarBusqueda').addEventListener('click', function() {
+    document.getElementById('buscadorCedula').value = '';
+    document.querySelectorAll('.filtro').forEach(cb => cb.checked = false);
+    document.querySelectorAll('.filtro-ciudad').forEach(cb => cb.checked = false);
+    document.querySelectorAll('.filtro-carrera').forEach(cb => { if (cb.value !== 'todas') cb.checked = false; });
+    document.getElementById('filtroTodasCarreras').checked = true;
+    document.getElementById('edadMin').value = '';
+    document.getElementById('edadMax').value = '';
+    document.getElementById('fechaIngresoDesde').value = '';
+    document.getElementById('fechaIngresoHasta').value = '';
+    aplicarFiltrosYActualizar();
+});
+
+document.getElementById('btnGenerarReporte').addEventListener('click', function() {
+    if (getEstudiantesFiltrados().length === 0) {
+        mostrarMensaje('Sin resultados', 'No hay estudiantes con los filtros seleccionados', false);
+        return;
+    }
+    $('#reporteModal').modal('show');
+});
+
+document.getElementById('btnGenerarPDF').addEventListener('click', generarReportePDF);
+document.getElementById('toggleFiltros').addEventListener('click', toggleFiltros);
+document.getElementById('btnOcultarFiltros').addEventListener('click', toggleFiltros);
+
 document.addEventListener('click', function(e) {
     if (e.target.closest('.btn-details')) {
-        const button = e.target.closest('.btn-details');
-        const studentId = button.getAttribute('data-id');
-        loadStudentDetails(studentId);
+        loadStudentDetails(e.target.closest('.btn-details').getAttribute('data-id'));
     }
-    
     if (e.target.closest('.btn-edit')) {
-        const button = e.target.closest('.btn-edit');
-        const studentId = button.getAttribute('data-id');
-        loadEditStudentForm(studentId);
+        loadEditStudentForm(e.target.closest('.btn-edit').getAttribute('data-id'));
     }
 });
 
@@ -1121,92 +866,61 @@ function loadStudentDetails(studentId) {
     const modalContent = document.getElementById('detalleEstudianteContent');
     modalContent.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p>Cargando...</p></div>`;
     $('#detalleModal').modal('show');
-    
-    fetch(`detalle_estudiante.php?id=${studentId}`)
-        .then(response => response.text())
-        .then(data => modalContent.innerHTML = data)
-        .catch(error => modalContent.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`);
+    fetch(`detalle_estudiante.php?id=${studentId}`).then(r => r.text()).then(d => modalContent.innerHTML = d).catch(e => modalContent.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`);
 }
 
 function loadEditStudentForm(studentId) {
     const modalContent = document.getElementById('editarEstudianteContent');
     modalContent.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p>Cargando...</p></div>`;
     $('#editarEstudianteModal').modal('show');
-    
-    fetch(`editar_estudiante_modal.php?id=${studentId}`)
-        .then(response => response.text())
-        .then(data => {
-            modalContent.innerHTML = data;
-            const editForm = document.getElementById('formEditarEstudiante');
-            if (editForm) {
-                editForm.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    submitEditForm(this);
-                });
-            }
-        })
-        .catch(error => modalContent.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`);
+    fetch(`editar_estudiante_modal.php?id=${studentId}`).then(r => r.text()).then(d => {
+        modalContent.innerHTML = d;
+        const editForm = document.getElementById('formEditarEstudiante');
+        if (editForm) editForm.addEventListener('submit', function(e) { e.preventDefault(); submitEditForm(this); });
+    }).catch(e => modalContent.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`);
 }
 
 function submitEditForm(form) {
     const formData = new FormData(form);
     const submitButton = form.querySelector('button[type="submit"]');
     const originalText = submitButton.innerHTML;
-    
     submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
     submitButton.disabled = true;
-    
-    fetch('actualizar_estudiante.php', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            $('#editarEstudianteModal').modal('hide');
-            mostrarMensaje('Éxito', data.message || 'Estudiante actualizado', true, true);
-        } else {
-            mostrarMensaje('Error', data.message || 'Error al actualizar', false);
+    fetch('actualizar_estudiante.php', { method: 'POST', body: formData })
+        .then(r => r.json()).then(d => {
+            if (d.success) {
+                $('#editarEstudianteModal').modal('hide');
+                mostrarMensaje('Éxito', d.message || 'Estudiante actualizado', true, true);
+            } else {
+                mostrarMensaje('Error', d.message || 'Error al actualizar', false);
+                submitButton.innerHTML = originalText;
+                submitButton.disabled = false;
+            }
+        }).catch(e => {
+            mostrarMensaje('Error', 'Error de conexión', false);
             submitButton.innerHTML = originalText;
             submitButton.disabled = false;
-        }
-    })
-    .catch(error => {
-        mostrarMensaje('Error', 'Error de conexión', false);
-        submitButton.innerHTML = originalText;
-        submitButton.disabled = false;
-    });
+        });
 }
 
 function mostrarMensaje(titulo, mensaje, esExito = true, recargar = false) {
     const header = document.getElementById('resultadoModalHeader');
     const body = document.getElementById('resultadoModalBody');
     const label = document.getElementById('resultadoModalLabel');
-    
     if (header && body && label) {
         header.className = `modal-header bg-${esExito ? 'success' : 'danger'} text-white`;
         body.innerHTML = `<div class="text-center"><i class="fas fa-${esExito ? 'check-circle' : 'exclamation-circle'} fa-3x mb-3"></i><h4>${titulo}</h4><p>${mensaje}</p></div>`;
         label.textContent = titulo;
         $('#resultadoModal').modal('show');
-        
-        if (recargar) {
-            $('#resultadoModal').on('hidden.bs.modal', () => location.reload());
-        }
-    } else {
-        alert(mensaje);
-    }
+        if (recargar) $('#resultadoModal').on('hidden.bs.modal', () => location.reload());
+    } else { alert(mensaje); }
 }
 
-// Limpiar modales al cerrar
 $('#detalleModal, #editarEstudianteModal, #agregarEstudianteModal').on('hidden.bs.modal', function() {
-    const contentId = this.id === 'detalleModal' ? 'detalleEstudianteContent' : 
-                     (this.id === 'editarEstudianteModal' ? 'editarEstudianteContent' : null);
-    if (contentId && document.getElementById(contentId)) {
-        if (this.id !== 'agregarEstudianteModal') document.getElementById(contentId).innerHTML = '';
-    }
+    const contentId = this.id === 'detalleModal' ? 'detalleEstudianteContent' : (this.id === 'editarEstudianteModal' ? 'editarEstudianteContent' : null);
+    if (contentId && document.getElementById(contentId)) { if (this.id !== 'agregarEstudianteModal') document.getElementById(contentId).innerHTML = ''; }
 });
 
-// Formulario nuevo estudiante
 const formEstudiante = document.getElementById('formEstudianteModal');
 if (formEstudiante) {
     formEstudiante.addEventListener('submit', function(e) {
@@ -1214,42 +928,27 @@ if (formEstudiante) {
         const formData = new FormData(this);
         const submitButton = this.querySelector('button[type="submit"]');
         const originalText = submitButton.innerHTML;
-        
         submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
         submitButton.disabled = true;
-        
-        fetch('procesar_estudiante.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                $('#agregarEstudianteModal').modal('hide');
-                mostrarMensaje('Éxito', data.message || 'Estudiante registrado', true, true);
-            } else {
-                mostrarMensaje('Error', data.message || 'Error al guardar', false);
+        fetch('procesar_estudiante.php', { method: 'POST', body: formData })
+            .then(r => r.json()).then(d => {
+                if (d.success) {
+                    $('#agregarEstudianteModal').modal('hide');
+                    mostrarMensaje('Éxito', d.message || 'Estudiante registrado', true, true);
+                } else {
+                    mostrarMensaje('Error', d.message || 'Error al guardar', false);
+                    submitButton.innerHTML = originalText;
+                    submitButton.disabled = false;
+                }
+            }).catch(e => {
+                mostrarMensaje('Error', 'Error de conexión', false);
                 submitButton.innerHTML = originalText;
                 submitButton.disabled = false;
-            }
-        })
-        .catch(error => {
-            mostrarMensaje('Error', 'Error de conexión', false);
-            submitButton.innerHTML = originalText;
-            submitButton.disabled = false;
-        });
+            });
     });
 }
 
-function abrirModalNuevoEstudiante() {
-    $('#agregarEstudianteModal').modal('show');
-}
-
-// Aplicar filtros al cargar y cargar estado guardado
-document.addEventListener('DOMContentLoaded', function() {
-    cargarEstadoGuardado();
-    aplicarFiltros();
-});
+function abrirModalNuevoEstudiante() { $('#agregarEstudianteModal').modal('show'); }
 </script>
 
 <?php include("includes/footer.php"); ?>
