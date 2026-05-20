@@ -43,6 +43,7 @@ $query = "SELECT
     u.edo_civil,
     u.num_telf_opc,
     u.foto_perfil,
+    u.sede,
     c.ciudad as nombre_ciudad
 FROM users u
 LEFT JOIN ciudades c ON u.ciudad = c.id_ciudad
@@ -78,6 +79,9 @@ if ($result && $result->num_rows > 0) {
         // Obtener nombre de la ciudad (reemplazar el ID por el nombre)
         $row['ciudad'] = isset($row['nombre_ciudad']) && !empty($row['nombre_ciudad']) ? $row['nombre_ciudad'] : 'No especificada';
         
+        // Asegurar que la sede tenga un valor por defecto
+        $row['sede'] = isset($row['sede']) && !empty($row['sede']) ? $row['sede'] : 'No especificada';
+        
         $estudiantes[] = $row;
     }
 }
@@ -86,7 +90,7 @@ if ($result && $result->num_rows > 0) {
 $carrerasUnicas = array_unique(array_column($estudiantes, 'nombre_carrera'));
 sort($carrerasUnicas);
 
-// Obtener ciudades únicas (ahora usando el nombre real)
+// Obtener ciudades únicas
 $ciudades = array_unique(array_column($estudiantes, 'ciudad'));
 sort($ciudades);
 // Filtrar valores vacíos o nulos
@@ -94,6 +98,15 @@ $ciudades = array_filter($ciudades, function($ciudad) {
     return !empty($ciudad) && $ciudad !== 'No especificada';
 });
 sort($ciudades);
+
+// Obtener sedes únicas para el filtro
+$sedes = array_unique(array_column($estudiantes, 'sede'));
+sort($sedes);
+// Filtrar valores vacíos o nulos
+$sedes = array_filter($sedes, function($sede) {
+    return !empty($sede) && $sede !== 'No especificada';
+});
+sort($sedes);
 
 // Contar estudiantes por status y estadísticas adicionales
 $totalEstudiantes = count($estudiantes);
@@ -376,6 +389,23 @@ include("includes/head.php");
                                             </div>
                                             <div class="col-md-3 mb-3">
                                                 <div class="card">
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-building"></i> Sede</strong></div>
+                                                    <div class="card-body">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input filtro-sede" type="checkbox" value="puerto cabello" id="filtroSedePuertoCabello">
+                                                            <label class="form-check-label" for="filtroSedePuertoCabello">Puerto Cabello</label>
+                                                        </div>
+                                                        <div class="form-check">
+                                                            <input class="form-check-input filtro-sede" type="checkbox" value="coef" id="filtroSedeCOEF">
+                                                            <label class="form-check-label" for="filtroSedeCOEF">COEF</label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row mt-2">
+                                            <div class="col-md-3 mb-3">
+                                                <div class="card">
                                                     <div class="card-header bg-light"><strong><i class="fas fa-city"></i> Ciudad</strong></div>
                                                     <div class="card-body" style="max-height: 250px; overflow-y: auto;">
                                                         <?php foreach ($ciudades as $ciudad): ?>
@@ -409,6 +439,7 @@ include("includes/head.php");
                                         <th>Edad</th>
                                         <th>Estado Civil</th>
                                         <th>Ciudad</th>
+                                        <th>Sede</th>
                                         <th>Status</th>
                                         <th>Fecha Ingreso</th>
                                         <th>Acciones</th>
@@ -424,6 +455,7 @@ include("includes/head.php");
                                         $fechaIngreso = $estudiante['fecha_ingreso'] ?? '';
                                         $ciudad = $estudiante['ciudad'] ?? '';
                                         $carrera = $estudiante['nombre_carrera'] ?? '';
+                                        $sede = $estudiante['sede'] ?? '';
                                     ?>
                                         <tr data-cedula="<?php echo htmlspecialchars(strtoupper($cedula)); ?>"
                                             data-genero="<?php echo strtolower($estudiante['genero'] ?? ''); ?>"
@@ -435,7 +467,8 @@ include("includes/head.php");
                                             data-edo-civil="<?php echo strtolower($estudiante['edo_civil'] ?? ''); ?>"
                                             data-fecha-ingreso="<?php echo $fechaIngreso; ?>"
                                             data-ciudad="<?php echo strtolower($ciudad); ?>"
-                                            data-carrera="<?php echo strtolower($carrera); ?>">
+                                            data-carrera="<?php echo strtolower($carrera); ?>"
+                                            data-sede="<?php echo strtolower($sede); ?>">
                                             <td><?php echo htmlspecialchars($cedula); ?></td>
                                             <td><?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?></td>
                                             <td><?php echo htmlspecialchars($estudiante['username'] ?? ''); ?></td>
@@ -445,12 +478,13 @@ include("includes/head.php");
                                             <td>
                                                 <?php echo htmlspecialchars($estudiante['genero'] ?? ''); ?>
                                                 <?php if ($esFemenino && $estaEmbarazada): ?><span class="badge bg-info ms-1" title="Embarazada">🤰</span><?php endif; ?>
-                                            </td>
-                                            <td><?php echo $edad; ?></td>
-                                            <td><?php echo htmlspecialchars($estudiante['edo_civil'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($ciudad); ?></td>
-                                            <td><?php echo ($status == 1) ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-secondary">Inactivo</span>'; ?></td>
-                                            <td><?php echo !empty($fechaIngreso) ? date('d/m/Y', strtotime($fechaIngreso)) : ''; ?></td>
+                                            </div>
+                                            <td><?php echo $edad; ?></div>
+                                            <td><?php echo htmlspecialchars($estudiante['edo_civil'] ?? ''); ?></div>
+                                            <td><?php echo htmlspecialchars($ciudad); ?></div>
+                                            <td><?php echo htmlspecialchars($sede); ?></div>
+                                            <td><?php echo ($status == 1) ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-secondary">Inactivo</span>'; ?></div>
+                                            <td><?php echo !empty($fechaIngreso) ? date('d/m/Y', strtotime($fechaIngreso)) : ''; ?></div>
                                             <td>
                                                 <div class="d-flex flex-wrap gap-1">
                                                     <button class="btn btn-info btn-details btn-sm" data-id="<?php echo $estudiante['id']; ?>"><i class="fas fa-eye"></i></button>
@@ -458,7 +492,7 @@ include("includes/head.php");
                                                         <button class="btn btn-warning btn-sm btn-edit" data-id="<?php echo $estudiante['id']; ?>"><i class="fas fa-edit"></i></button>
                                                     <?php endif; ?>
                                                 </div>
-                                            </td>
+                                            </div>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -595,6 +629,7 @@ function configurarFiltros() {
     document.getElementById('filtroTodasCarreras').addEventListener('change', aplicarFiltrosYActualizar);
     document.querySelectorAll('.filtro-carrera').forEach(cb => cb.addEventListener('change', aplicarFiltrosYActualizar));
     document.querySelectorAll('.filtro-ciudad').forEach(cb => cb.addEventListener('change', aplicarFiltrosYActualizar));
+    document.querySelectorAll('.filtro-sede').forEach(cb => cb.addEventListener('change', aplicarFiltrosYActualizar));
     document.querySelectorAll('.filtro').forEach(cb => cb.addEventListener('change', aplicarFiltrosYActualizar));
     document.getElementById('edadMin').addEventListener('input', aplicarFiltrosYActualizar);
     document.getElementById('edadMax').addEventListener('input', aplicarFiltrosYActualizar);
@@ -637,6 +672,11 @@ function aplicarFiltros() {
         ciudadesSeleccionadas.push(cb.value.toLowerCase());
     });
     
+    let sedesSeleccionadas = [];
+    document.querySelectorAll('.filtro-sede:checked').forEach(cb => {
+        sedesSeleccionadas.push(cb.value.toLowerCase());
+    });
+    
     filasFiltradas = todasLasFilas.filter(fila => {
         let cedula = fila.getAttribute('data-cedula') || '';
         if (termino !== '' && !cedula.includes(termino)) return false;
@@ -647,6 +687,10 @@ function aplicarFiltros() {
         if (ciudadesSeleccionadas.length > 0) {
             let ciudad = fila.getAttribute('data-ciudad') || '';
             if (!ciudadesSeleccionadas.includes(ciudad)) return false;
+        }
+        if (sedesSeleccionadas.length > 0) {
+            let sede = fila.getAttribute('data-sede') || '';
+            if (!sedesSeleccionadas.includes(sede)) return false;
         }
         if (filtroMasculino || filtroFemenino) {
             let genero = fila.getAttribute('data-genero') || '';
@@ -843,6 +887,7 @@ document.getElementById('limpiarBusqueda').addEventListener('click', function() 
     document.getElementById('buscadorCedula').value = '';
     document.querySelectorAll('.filtro').forEach(cb => cb.checked = false);
     document.querySelectorAll('.filtro-ciudad').forEach(cb => cb.checked = false);
+    document.querySelectorAll('.filtro-sede').forEach(cb => cb.checked = false);
     document.querySelectorAll('.filtro-carrera').forEach(cb => { if (cb.value !== 'todas') cb.checked = false; });
     document.getElementById('filtroTodasCarreras').checked = true;
     document.getElementById('edadMin').value = '';
