@@ -2374,7 +2374,6 @@ function actualizarEstudiante(array $datos): array {
     $fotoEliminada = false;
     
     try {
-        // Iniciar transacción
         $db->begin_transaction();
         
         // ============================
@@ -2382,19 +2381,16 @@ function actualizarEstudiante(array $datos): array {
         // ============================
         $errores_validacion = [];
         
-        // Validar ID
         if (empty($datos['id']) || !is_numeric($datos['id'])) {
             $errores_validacion[] = "ID de estudiante no válido";
         }
         
-        // Validar cédula
         if (empty($datos['idusuario'])) {
             $errores_validacion[] = "La cédula es obligatoria";
         } elseif (!preg_match('/^[VE]-\d{6,9}$/', $datos['idusuario'])) {
             $errores_validacion[] = "Formato de cédula inválido. Debe ser V-12345678 o E-12345678";
         }
         
-        // Validar nombre (permite apóstrofes, NO números)
         if (empty($datos['nombre'])) {
             $errores_validacion[] = "El nombre completo es obligatorio";
         } else {
@@ -2415,7 +2411,6 @@ function actualizarEstudiante(array $datos): array {
             }
         }
         
-        // Validar email
         if (!empty($datos['email'])) {
             if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
                 $errores_validacion[] = "Correo electrónico no válido. Ejemplo: estudiante@universidad.edu";
@@ -2425,7 +2420,6 @@ function actualizarEstudiante(array $datos): array {
             }
         }
         
-        // Validar teléfono
         if (!empty($datos['tlf'])) {
             $telefono_limpio = preg_replace('/\D/', '', $datos['tlf']);
             if (!preg_match('/^[0-9]{10,11}$/', $telefono_limpio)) {
@@ -2433,7 +2427,6 @@ function actualizarEstudiante(array $datos): array {
             }
         }
         
-        // Validar celular
         if (!empty($datos['cel'])) {
             $celular_limpio = preg_replace('/\D/', '', $datos['cel']);
             if (!preg_match('/^[0-9]{10,11}$/', $celular_limpio)) {
@@ -2441,7 +2434,6 @@ function actualizarEstudiante(array $datos): array {
             }
         }
         
-        // Validar fecha de nacimiento
         if (!empty($datos['fecha_nac'])) {
             if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $datos['fecha_nac'])) {
                 $errores_validacion[] = "Formato de fecha de nacimiento inválido. Use: AAAA-MM-DD";
@@ -2460,7 +2452,6 @@ function actualizarEstudiante(array $datos): array {
             }
         }
         
-        // Validar fecha de ingreso
         if (!empty($datos['fecha_ingreso'])) {
             if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $datos['fecha_ingreso'])) {
                 $errores_validacion[] = "Formato de fecha de ingreso inválido. Use: AAAA-MM-DD";
@@ -2474,6 +2465,14 @@ function actualizarEstudiante(array $datos): array {
             }
         }
         
+        // Validar sede
+        if (!empty($datos['sede'])) {
+            $sedesPermitidas = ['Puerto Cabello', 'COEF'];
+            if (!in_array($datos['sede'], $sedesPermitidas)) {
+                $errores_validacion[] = "Sede no válida. Las sedes permitidas son: Puerto Cabello, COEF";
+            }
+        }
+        
         // Validar campos de texto con caracteres permitidos
         $camposTexto = [
             'etnia' => 'Etnia',
@@ -2482,7 +2481,10 @@ function actualizarEstudiante(array $datos): array {
             'enfermedad' => 'Enfermedades',
             'discapacidad' => 'Discapacidad',
             'titulos' => 'Títulos obtenidos',
-            'institutos' => 'Instituciones'
+            'institutos' => 'Instituciones',
+            'pais_titulo' => 'País del título',
+            'legalizado_titulo' => 'Legalizado en Venezuela',
+            'potencialidades' => 'Potencialidades'
         ];
         
         foreach ($camposTexto as $campo => $nombre) {
@@ -2497,7 +2499,6 @@ function actualizarEstudiante(array $datos): array {
             }
         }
         
-        // Validar campos numéricos
         if (isset($datos['grupo_familiar']) && $datos['grupo_familiar'] < 0) {
             $errores_validacion[] = "El grupo familiar no puede ser negativo";
         }
@@ -2506,7 +2507,6 @@ function actualizarEstudiante(array $datos): array {
             $errores_validacion[] = "Las personas a cargo no pueden ser negativas";
         }
         
-        // Si hay errores de validación, lanzar excepción
         if (!empty($errores_validacion)) {
             $mensajeError = "❌ ERRORES DE VALIDACIÓN:\n\n• " . implode("\n• ", $errores_validacion);
             throw new Exception($mensajeError, 400);
@@ -2565,7 +2565,7 @@ function actualizarEstudiante(array $datos): array {
         }
         
         // ============================
-        // 5. CONSTRUIR CONSULTA DE ACTUALIZACIÓN
+        // 5. CONSTRUIR CONSULTA DE ACTUALIZACIÓN (CON NUEVOS CAMPOS)
         // ============================
         $campos = [];
         $valores_bind = [];
@@ -2596,7 +2596,11 @@ function actualizarEstudiante(array $datos): array {
             'discapacidad' => 's',
             'titulos' => 's',
             'institutos' => 's',
+            'pais_titulo' => 's',
+            'legalizado_titulo' => 's',
+            'potencialidades' => 's',
             'carrera' => 's',
+            'sede' => 's',
             'genero' => 's',
             'embarazada' => 'i',
             'edo_civil' => 's',
@@ -9550,6 +9554,7 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
             $genero = $db->real_escape_string($preinscripcion['genero']);
             $edo_civil = $db->real_escape_string($preinscripcion['edo_civil']);
             $num_telf_opc = $db->real_escape_string($preinscripcion['num_telf_opc']);
+            $sede = $db->real_escape_string($preinscripcion['sede'] ?? '');
             
             $insert_sql = "INSERT INTO users SET 
                 idusuario = '$idusuario',
@@ -9590,6 +9595,7 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
                 fecha_nac = '$fecha_nac',
                 num_telf_opc = '$num_telf_opc',
                 foto_perfil = '$foto_perfil',
+                sede = '$sede',
                 estudiante = 1";
             
             if (!$db->query($insert_sql)) {

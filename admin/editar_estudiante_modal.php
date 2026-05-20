@@ -10,7 +10,6 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
 
 $id = $_GET['id'];
 
-// Consulta modificada para formatear las fechas TIMESTAMP
 $query = "SELECT *, 
           DATE(fecha_nac) as fecha_nac_format, 
           DATE(fecha_ingreso) as fecha_ingreso_format 
@@ -26,7 +25,6 @@ if ($result->num_rows === 0) {
 
 $estudiante = $result->fetch_assoc();
 
-// Obtener listados necesarios
 $carreras = obtenerTodasLasCarreras();
 $generos = obtenerGeneros($db);
 $estadosCiviles = obtenerEstadosCiviless($db);
@@ -35,7 +33,6 @@ $tenenciasVivienda = obtenerTenenciaViviendas($db);
 $ingresos = obtenerIngresos($db);
 $tiposCedula = obtenerTiposCedula($db);
 
-// Manejo de foto de perfil
 $fotoPerfil = '';
 if (!empty($estudiante['foto_perfil'])) {
     $rutaFoto = '../foto_perfil/' . $estudiante['foto_perfil'];
@@ -50,7 +47,6 @@ if (empty($fotoPerfil)) {
 ?>
 
 <div class="modal-body p-0">
-    <!-- Header con foto -->
     <div class="bg-light py-3 px-4 border-bottom">
         <div class="row align-items-center">
             <div class="col-auto">
@@ -82,7 +78,6 @@ if (empty($fotoPerfil)) {
         <form id="formEditarEstudiante" method="post" enctype="multipart/form-data">
             <input type="hidden" name="id" value="<?= $estudiante['id'] ?>">
             
-            <!-- Pestañas para organizar la información - Bootstrap 4.5 -->
             <ul class="nav nav-tabs mb-4" id="editTabs" role="tablist">
                 <li class="nav-item">
                     <a class="nav-link active" id="personal-tab" data-toggle="tab" href="#personal" role="tab">
@@ -118,7 +113,6 @@ if (empty($fotoPerfil)) {
                             </div>
                         </div>
                         
-                        <!-- CAMPO CÉDULA SIMPLIFICADO -->
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="idusuario" class="form-label">Cédula</label>
@@ -223,6 +217,17 @@ if (empty($fotoPerfil)) {
                         
                         <div class="col-md-6">
                             <div class="form-group">
+                                <label for="sede" class="form-label">Sede</label>
+                                <select class="custom-select" id="sede" name="sede">
+                                    <option value="">-- Seleccione una sede --</option>
+                                    <option value="Puerto Cabello" <?= ($estudiante['sede'] ?? '') == 'Puerto Cabello' ? 'selected' : '' ?>>Puerto Cabello</option>
+                                    <option value="COEF" <?= ($estudiante['sede'] ?? '') == 'COEF' ? 'selected' : '' ?>>COEF</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
                                 <label for="fecha_ingreso" class="form-label">Fecha de Ingreso</label>
                                 <input type="date" class="form-control" id="fecha_ingreso" name="fecha_ingreso" 
                                        value="<?= htmlspecialchars($estudiante['fecha_ingreso_format'] ?? '') ?>">
@@ -244,6 +249,7 @@ if (empty($fotoPerfil)) {
                                 <label class="form-label">Títulos Obtenidos</label>
                                 <input type="text" class="form-control" id="titulos" name="titulos" 
                                        value="<?= htmlspecialchars($estudiante['titulos'] ?? '') ?>">
+                                <small class="text-muted">Separe múltiples títulos con |||</small>
                             </div>
                         </div>
                         
@@ -252,6 +258,35 @@ if (empty($fotoPerfil)) {
                                 <label class="form-label">Instituciones Anteriores</label>
                                 <input type="text" class="form-control" id="institutos" name="institutos" 
                                        value="<?= htmlspecialchars($estudiante['institutos'] ?? '') ?>">
+                                <small class="text-muted">Separe múltiples instituciones con |||</small>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label class="form-label">País del Título</label>
+                                <input type="text" class="form-control" id="pais_titulo" name="pais_titulo" 
+                                       value="<?= htmlspecialchars($estudiante['pais_titulo'] ?? '') ?>">
+                                <small class="text-muted">Separe múltiples países con |||</small>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label class="form-label">Legalizado en Venezuela</label>
+                                <select class="custom-select" id="legalizado_titulo" name="legalizado_titulo">
+                                    <option value="">-- Seleccione --</option>
+                                    <option value="Sí" <?= ($estudiante['legalizado_titulo'] ?? '') == 'Sí' ? 'selected' : '' ?>>Sí</option>
+                                    <option value="No" <?= ($estudiante['legalizado_titulo'] ?? '') == 'No' ? 'selected' : '' ?>>No</option>
+                                </select>
+                                <small class="text-muted">Separe múltiples opciones con |||</small>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label class="form-label">Potencialidades</label>
+                                <textarea class="form-control" id="potencialidades" name="potencialidades" rows="2"><?= htmlspecialchars($estudiante['potencialidades'] ?? '') ?></textarea>
                             </div>
                         </div>
                     </div>
@@ -424,7 +459,6 @@ if (empty($fotoPerfil)) {
                 </div>
             </div>
 
-            <!-- Botones dentro del formulario -->
             <div class="row mt-4">
                 <div class="col-12">
                     <div class="d-flex justify-content-end gap-2 border-top pt-3">
@@ -443,13 +477,11 @@ if (empty($fotoPerfil)) {
 
 <script>
 $(document).ready(function() {
-    // Inicializar pestañas de Bootstrap 4
     $('#editTabs a').on('click', function (e) {
         e.preventDefault();
         $(this).tab('show');
     });
 
-    // Vista previa de foto de perfil
     $('#foto_perfil').on('change', function(e) {
         const file = e.target.files[0];
         if (file) {
@@ -461,7 +493,6 @@ $(document).ready(function() {
         }
     });
 
-    // VALIDACIÓN EN TIEMPO REAL
     $('#nombre').on('blur', function() {
         const nombre = $(this).val().trim();
         const $feedback = $(this).siblings('.invalid-feedback');
@@ -484,7 +515,6 @@ $(document).ready(function() {
         }
     });
 
-    // Validar cédula en tiempo real
     $('#idusuario').on('blur', function() {
         const cedula = $(this).val().trim();
         const $feedback = $(this).siblings('.invalid-feedback');
@@ -502,7 +532,6 @@ $(document).ready(function() {
         }
     });
 
-    // Validar email en tiempo real
     $('#email').on('blur', function() {
         const email = $(this).val().trim();
         const $feedback = $(this).siblings('.invalid-feedback');
@@ -520,7 +549,6 @@ $(document).ready(function() {
         }
     });
 
-    // Mostrar campo embarazada solo si el género es femenino
     function toggleEmbarazadaField() {
         const genero = $('#genero').val();
         const wrapper = $('#embarazadaGroup');
@@ -536,128 +564,85 @@ $(document).ready(function() {
     $('#genero').on('change', toggleEmbarazadaField);
     toggleEmbarazadaField();
 
-    // VALIDACIÓN DEL FORMULARIO AL ENVIAR
-   // En el evento submit del formulario, actualiza el AJAX:
-$('#formEstudiante').on('submit', function(e) {
-    e.preventDefault();
-    
-    // Limpiar errores previos
-    $('.is-invalid').removeClass('is-invalid');
-    $('.invalid-feedback').remove();
-    
-    let errores = [];
-    
-    // Validar cédula
-    const cedula = $('#idusuario').val().trim();
-    if (!cedula) {
-        errores.push('La cédula es obligatoria');
-        $('#idusuario').addClass('is-invalid').after('<div class="invalid-feedback">La cédula es obligatoria</div>');
-    } else if (!/^[VE]-\d{6,9}$/.test(cedula)) {
-        errores.push('Formato de cédula inválido. Debe ser V-12345678 o E-12345678');
-        $('#idusuario').addClass('is-invalid').after('<div class="invalid-feedback">Formato: V-12345678 o E-12345678</div>');
-    }
-    
-    // Validar nombre
-    const nombre = $('#nombre').val().trim();
-    if (!nombre) {
-        errores.push('El nombre es obligatorio');
-        $('#nombre').addClass('is-invalid').after('<div class="invalid-feedback">El nombre es obligatorio</div>');
-    } else if (/[0-9]/.test(nombre)) {
-        errores.push('El nombre no puede contener números. Solo letras, espacios y apóstrofes (\')');
-        $('#nombre').addClass('is-invalid').after('<div class="invalid-feedback">El nombre no puede contener números</div>');
-    }
-    
-    // Mostrar errores si existen
-    if (errores.length > 0) {
-        alert('❌ Errores de validación:\n\n• ' + errores.join('\n• '));
-        $('.is-invalid').first().focus();
-        return;
-    }
-    
-    // Mostrar loading
-    const submitBtn = $('button[type="submit"]', this);
-    const originalText = submitBtn.html();
-    submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i>Guardando...');
-    
-    // Enviar formulario via AJAX
-    const formData = new FormData(this);
-    
-    $.ajax({
-        url: $(this).attr('action'),
-        type: 'POST',
-        data: formData,
-        processData: false,
-        contentType: false,
-        dataType: 'json',
-        success: function(response) {
-            // Verificar si response es string (necesita parse)
-            if (typeof response === 'string') {
-                try {
-                    response = JSON.parse(response);
-                } catch (e) {
-                    console.error('Error al parsear JSON:', e);
-                    alert('❌ Error: Respuesta del servidor no es JSON válido.');
-                    return;
-                }
-            }
-            
-            if (response && response.success) {
-                alert(response.message || '✅ Estudiante registrado exitosamente');
-                
-                // Si es modal, cerrarlo
-                if ($('#formEstudiante').closest('.modal').length > 0) {
-                    $('#formEstudiante').closest('.modal').modal('hide');
-                }
-                
-                // Recargar o redirigir
-                setTimeout(function() {
-                    if (response.redirect_url) {
-                        window.location.href = response.redirect_url;
-                    } else {
-                        location.reload();
-                    }
-                }, 1000);
-            } else {
-                const errorMsg = response && response.message 
-                    ? response.message 
-                    : 'Error desconocido al registrar estudiante';
-                
-                // Mostrar errores específicos
-                if (errorMsg.includes('Errores de validación')) {
-                    alert(errorMsg);
-                } else {
-                    alert('❌ Error: ' + errorMsg);
-                }
-            }
-        },
-        error: function(xhr, status, error) {
-            let mensajeError = '❌ Error de conexión\n\n';
-            
-            if (xhr.status === 0) {
-                mensajeError += 'No hay conexión con el servidor.';
-            } else if (xhr.status === 500) {
-                mensajeError += 'Error interno del servidor.';
-            } else {
-                mensajeError += 'Detalles: ' + error;
-                
-                // Intentar mostrar respuesta del servidor
-                if (xhr.responseText) {
-                    try {
-                        const serverResponse = JSON.parse(xhr.responseText);
-                        if (serverResponse.message) {
-                            mensajeError += '\n\nMensaje: ' + serverResponse.message;
-                        }
-                    } catch (e) {
-                        mensajeError += '\n\nRespuesta: ' + xhr.responseText.substring(0, 200);
-                    }
-                }
-            }
-            
-            alert(mensajeError);
-        },
-        complete: function() {
-            submitBtn.prop('disabled', false).html(originalText);
+    $('#formEditarEstudiante').on('submit', function(e) {
+        e.preventDefault();
+        
+        $('.is-invalid').removeClass('is-invalid');
+        $('.invalid-feedback').remove();
+        
+        let errores = [];
+        
+        const cedula = $('#idusuario').val().trim();
+        if (!cedula) {
+            errores.push('La cédula es obligatoria');
+            $('#idusuario').addClass('is-invalid').after('<div class="invalid-feedback">La cédula es obligatoria</div>');
+        } else if (!/^[VE]-\d{6,9}$/.test(cedula)) {
+            errores.push('Formato de cédula inválido. Debe ser V-12345678 o E-12345678');
+            $('#idusuario').addClass('is-invalid').after('<div class="invalid-feedback">Formato: V-12345678 o E-12345678</div>');
         }
+        
+        const nombre = $('#nombre').val().trim();
+        if (!nombre) {
+            errores.push('El nombre es obligatorio');
+            $('#nombre').addClass('is-invalid').after('<div class="invalid-feedback">El nombre es obligatorio</div>');
+        } else if (/[0-9]/.test(nombre)) {
+            errores.push('El nombre no puede contener números');
+            $('#nombre').addClass('is-invalid').after('<div class="invalid-feedback">El nombre no puede contener números</div>');
+        }
+        
+        if (errores.length > 0) {
+            alert('❌ Errores de validación:\n\n• ' + errores.join('\n• '));
+            $('.is-invalid').first().focus();
+            return;
+        }
+        
+        const submitBtn = $('button[type="submit"]', this);
+        const originalText = submitBtn.html();
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i>Guardando...');
+        
+        const formData = new FormData(this);
+        
+        $.ajax({
+            url: 'actualizar_estudiante.php',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            dataType: 'json',
+            success: function(response) {
+                if (typeof response === 'string') {
+                    try {
+                        response = JSON.parse(response);
+                    } catch (e) {
+                        console.error('Error al parsear JSON:', e);
+                        alert('❌ Error: Respuesta del servidor no es JSON válido.');
+                        return;
+                    }
+                }
+                
+                if (response && response.success) {
+                    alert(response.message || '✅ Estudiante actualizado exitosamente');
+                    $('#editarEstudianteModal').modal('hide');
+                    setTimeout(function() { location.reload(); }, 1000);
+                } else {
+                    alert('❌ Error: ' + (response.message || 'Error desconocido'));
+                }
+            },
+            error: function(xhr, status, error) {
+                let mensajeError = '❌ Error de conexión\n\n';
+                if (xhr.status === 0) {
+                    mensajeError += 'No hay conexión con el servidor.';
+                } else if (xhr.status === 500) {
+                    mensajeError += 'Error interno del servidor.';
+                } else {
+                    mensajeError += 'Detalles: ' + error;
+                }
+                alert(mensajeError);
+            },
+            complete: function() {
+                submitBtn.prop('disabled', false).html(originalText);
+            }
+        });
     });
 });
 </script>
@@ -706,7 +691,6 @@ $('#formEstudiante').on('submit', function(e) {
     min-height: 400px;
 }
 
-/* Asegurar que las pestañas se vean bien en Bootstrap 4 */
 .nav-tabs {
     border-bottom: 1px solid #dee2e6;
 }
@@ -731,7 +715,6 @@ $('#formEstudiante').on('submit', function(e) {
     border-color: #dee2e6 #dee2e6 #fff;
 }
 
-/* Mejorar espaciado de los botones */
 .gap-2 > * {
     margin-left: 0.5rem;
 }

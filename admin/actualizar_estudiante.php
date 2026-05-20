@@ -9,10 +9,9 @@ ob_start();
 
 // Configuración
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // IMPORTANTE: Desactivar display_errors para producción
+ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
-// Función para asegurar que no haya salida accidental
 function clean_output() {
     $level = ob_get_level();
     for ($i = 0; $i < $level; $i++) {
@@ -21,13 +20,9 @@ function clean_output() {
     ob_start();
 }
 
-// Llamar a clean_output antes de cualquier cosa
 clean_output();
-
-// Solo definir el header después de limpiar buffer
 header('Content-Type: application/json; charset=utf-8');
 
-// Desactivar cualquier salida de errores a pantalla
 function shutdown_handler() {
     $error = error_get_last();
     if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
@@ -42,24 +37,16 @@ function shutdown_handler() {
 }
 register_shutdown_function('shutdown_handler');
 
-// Manejador de errores personalizado
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
-    // No mostrar errores, solo log
     error_log("PHP Error [$errno]: $errstr in $errfile:$errline");
-    return true; // No ejecutar el manejador interno de PHP
+    return true;
 }, E_ALL);
 
 try {
-    // ============================
-    // 1. VERIFICAR MÉTODO
-    // ============================
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         throw new Exception('Método no permitido. Se requiere POST.', 405);
     }
 
-    // ============================
-    // 2. VERIFICAR ID
-    // ============================
     if (!isset($_POST['id']) || empty($_POST['id'])) {
         throw new Exception('ID de estudiante no proporcionado', 400);
     }
@@ -69,19 +56,12 @@ try {
         throw new Exception('ID de estudiante no válido', 400);
     }
 
-    // ============================
-    // 3. INCLUIR FUNCIONES
-    // ============================
     require_once('../funciones/functions.php');
     
-    // Verificar que el archivo se cargó correctamente
     if (!function_exists('actualizarEstudiante')) {
         throw new Exception('Función actualizarEstudiante no disponible', 500);
     }
 
-    // ============================
-    // 4. PREPARAR DATOS
-    // ============================
     $datos = [
         'id' => $id,
         'idusuario' => isset($_POST['idusuario']) ? trim($_POST['idusuario']) : '',
@@ -108,7 +88,11 @@ try {
         'discapacidad' => isset($_POST['discapacidad']) ? trim($_POST['discapacidad']) : '',
         'titulos' => isset($_POST['titulos']) ? trim($_POST['titulos']) : '',
         'institutos' => isset($_POST['institutos']) ? trim($_POST['institutos']) : '',
+        'pais_titulo' => isset($_POST['pais_titulo']) ? trim($_POST['pais_titulo']) : '',
+        'legalizado_titulo' => isset($_POST['legalizado_titulo']) ? trim($_POST['legalizado_titulo']) : '',
+        'potencialidades' => isset($_POST['potencialidades']) ? trim($_POST['potencialidades']) : '',
         'carrera' => isset($_POST['carrera']) ? trim($_POST['carrera']) : '',
+        'sede' => isset($_POST['sede']) ? trim($_POST['sede']) : '',
         'genero' => isset($_POST['genero']) ? trim($_POST['genero']) : '',
         'embarazada' => isset($_POST['embarazada']) ? (int)$_POST['embarazada'] : 0,
         'edo_civil' => isset($_POST['edo_civil']) ? trim($_POST['edo_civil']) : '',
@@ -117,9 +101,6 @@ try {
         'status' => isset($_POST['status']) ? (int)$_POST['status'] : 1
     ];
 
-    // ============================
-    // 5. VALIDACIONES BÁSICAS
-    // ============================
     if (empty($datos['idusuario'])) {
         throw new Exception('La cédula es obligatoria', 400);
     }
@@ -128,17 +109,10 @@ try {
         throw new Exception('Formato de cédula inválido. Debe ser V-12345678 o E-12345678', 400);
     }
 
-    // ============================
-    // 6. LLAMAR A LA FUNCIÓN
-    // ============================
     $resultado = actualizarEstudiante($datos);
 
-    // ============================
-    // 7. LIMPIAR BUFFER Y ENVIAR RESPUESTA
-    // ============================
     clean_output();
     
-    // Asegurar que solo hay JSON
     if (!headers_sent()) {
         header('Content-Type: application/json; charset=utf-8');
     }
@@ -146,9 +120,6 @@ try {
     echo json_encode($resultado, JSON_UNESCAPED_UNICODE);
 
 } catch (Exception $e) {
-    // ============================
-    // 8. MANEJAR ERRORES
-    // ============================
     clean_output();
     
     if (!headers_sent()) {
@@ -167,19 +138,12 @@ try {
     echo json_encode($response, JSON_UNESCAPED_UNICODE);
 }
 
-// ============================
-// 9. FINALIZAR - ASEGURAR QUE NO HAY NADA MÁS
-// ============================
-// Capturar cualquier salida restante
 $output = ob_get_contents();
 ob_end_clean();
 
-// Si hay algo que no sea JSON, loguearlo
 if ($output) {
-    // Verificar si ya es JSON válido
     json_decode($output);
     if (json_last_error() !== JSON_ERROR_NONE) {
-        // No es JSON válido, crear JSON de error
         $errorResponse = [
             'success' => false,
             'message' => 'Error en la respuesta del servidor',
@@ -187,10 +151,8 @@ if ($output) {
         ];
         echo json_encode($errorResponse, JSON_UNESCAPED_UNICODE);
     } else {
-        // Es JSON válido, enviarlo
         echo $output;
     }
 }
 
 exit;
-?>
