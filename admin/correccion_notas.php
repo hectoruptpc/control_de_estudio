@@ -27,12 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $cedula = trim($_POST['cedula'] ?? '');
                 if (!empty($cedula)) {
                     $estudiante = buscarEstudiantePorCedula($cedula);
-                    
-                    echo "<!-- DEBUG: Estudiante encontrado: " . print_r($estudiante, true) . " -->";
-
                     if ($estudiante) {
                         $carreras = obtenerCarrerasEstudiante($estudiante['id']);
-                        echo "<!-- DEBUG: Carreras encontradas: " . print_r($carreras, true) . " -->";
                     } else {
                         $mensaje = 'No se encontró ningún estudiante con esa cédula';
                         $tipo_mensaje = 'warning';
@@ -45,9 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $id_carrera = $_POST['id_carrera'] ?? '';
                 if (!empty($estudiante_id) && !empty($id_carrera)) {
                     $estudiante = obtenerEstudiantePorId($estudiante_id);
-                    $materias = obtenerMateriasConNotas($estudiante_id, $id_carrera);
                     $carreras = obtenerCarrerasEstudiante($estudiante_id);
-                    echo "<!-- DEBUG: Materias con notas encontradas: " . print_r($materias, true) . " -->";
+                    $materias = obtenerMateriasInscritasPorEstudiante($estudiante_id, $id_carrera);
                 }
                 break;
                 
@@ -58,14 +53,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!empty($estudiante_id) && !empty($id_materia)) {
                     $estudiante = obtenerEstudiantePorId($estudiante_id);
                     $carreras = obtenerCarrerasEstudiante($estudiante_id);
-                    $materias = obtenerMateriasConNotas($estudiante_id, $id_carrera);
-                    $notas = obtenerNotasEstudianteMateria($estudiante_id, $id_materia);
-                    echo "<!-- DEBUG: Notas encontradas para materia $id_materia: " . print_r($notas, true) . " -->";
+                    $materias = obtenerMateriasInscritasPorEstudiante($estudiante_id, $id_carrera);
+                    $notas = obtenerNotasTrimestresPorMateria($estudiante_id, $id_materia);
                 }
                 break;
                 
             case 'editar_nota':
-                $resultado = procesarEdicionNota();
+                $resultado = procesarEdicionNotaTrimestral();
                 if ($resultado['success']) {
                     $mensaje = $resultado['message'];
                     $tipo_mensaje = 'success';
@@ -75,8 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!empty($estudiante_id)) {
                         $estudiante = obtenerEstudiantePorId($estudiante_id);
                         $carreras = obtenerCarrerasEstudiante($estudiante_id);
-                        $materias = obtenerMateriasConNotas($estudiante_id, $id_carrera);
-                        $notas = obtenerNotasEstudianteMateria($estudiante_id, $id_materia);
+                        $materias = obtenerMateriasInscritasPorEstudiante($estudiante_id, $id_carrera);
+                        $notas = obtenerNotasTrimestresPorMateria($estudiante_id, $id_materia);
                     }
                 } else {
                     $mensaje = $resultado['message'];
@@ -117,7 +111,6 @@ include("includes/head.php");
     z-index: 10;
 }
 
-/* Estilos para los botones */
 .btn-reporte {
     background-color: #17a2b8;
     border-color: #17a2b8;
@@ -133,6 +126,7 @@ include("includes/head.php");
 .btn-group-actions {
     display: flex;
     gap: 5px;
+    flex-wrap: wrap;
 }
 </style>
 
@@ -174,7 +168,6 @@ include("includes/head.php");
                         <h6>Estudiante Encontrado:</h6>
                         <p><strong>Nombre:</strong> <?php echo htmlspecialchars($estudiante['nombre']); ?></p>
                         <p><strong>Cédula:</strong> <?php echo htmlspecialchars($estudiante['idusuario']); ?></p>
-                        <p><strong>Carrera:</strong> <?php echo htmlspecialchars($estudiante['carrera']); ?></p>
                         <p><strong>ID Estudiante:</strong> <?php echo $estudiante['id']; ?></p>
                     </div>
                     <?php endif; ?>
@@ -201,8 +194,7 @@ include("includes/head.php");
                                 <?php foreach ($carreras as $carrera): ?>
                                 <option value="<?php echo $carrera['id_carrera']; ?>" 
                                     <?php echo (isset($_POST['id_carrera']) && $_POST['id_carrera'] == $carrera['id_carrera']) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($carrera['nombre_carrera']); ?> 
-                                    (ID: <?php echo $carrera['id_carrera']; ?>)
+                                    <?php echo htmlspecialchars($carrera['nombre_carrera']); ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -212,17 +204,16 @@ include("includes/head.php");
             </div>
             <?php elseif ($estudiante && empty($carreras)): ?>
             <div class="alert alert-warning">
-                No se encontraron carreras para este estudiante. La carrera registrada es: 
-                <strong><?php echo htmlspecialchars($estudiante['carrera']); ?></strong>
+                No se encontraron carreras para este estudiante.
             </div>
             <?php endif; ?>
 
             <!-- Paso 3: Seleccionar Materia -->
-            <?php if ($estudiante && !empty($materias)): ?>
+            <?php if ($estudiante && !empty($materias) && $materias->num_rows > 0): ?>
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-primary">Paso 3: Seleccionar Materia</h6>
-                    <small>Se encontraron <?php echo count($materias); ?> materia(s) con notas</small>
+                    <small>Se encontraron <?php echo $materias->num_rows; ?> materia(s) inscritas</small>
                 </div>
                 <div class="card-body">
                     <form method="POST">
@@ -235,180 +226,216 @@ include("includes/head.php");
                             <label for="id_materia">Seleccione la Materia:</label>
                             <select name="id_materia" id="id_materia" class="form-control" required onchange="this.form.submit()">
                                 <option value="">Seleccionar Materia</option>
-                                <?php foreach ($materias as $materia): ?>
+                                <?php 
+                                $materias->data_seek(0);
+                                while ($materia = $materias->fetch_assoc()): 
+                                ?>
                                 <option value="<?php echo $materia['id_materia']; ?>" 
                                     <?php echo (isset($_POST['id_materia']) && $_POST['id_materia'] == $materia['id_materia']) ? 'selected' : ''; ?>>
                                     <?php echo htmlspecialchars($materia['nombre_materia']); ?> 
                                     - Trayecto <?php echo $materia['trayecto']; ?>
-                                    - Semestre <?php echo $materia['semestre']; ?>
                                 </option>
-                                <?php endforeach; ?>
+                                <?php endwhile; ?>
                             </select>
                         </div>
                     </form>
                 </div>
             </div>
-            <?php elseif ($estudiante && isset($_POST['id_carrera']) && empty($materias)): ?>
+            <?php elseif ($estudiante && isset($_POST['id_carrera']) && ($materias->num_rows == 0)): ?>
             <div class="alert alert-warning">
-                No se encontraron materias con notas para este estudiante en la carrera seleccionada.
+                No se encontraron materias inscritas para este estudiante en la carrera seleccionada.
             </div>
             <?php endif; ?>
 
-            <!-- Paso 4: Mostrar y Editar Notas -->
-            <?php if ($estudiante && isset($_POST['id_materia'])): ?>
-                <?php if (!empty($notas)): ?>
-                <div class="card shadow">
-                    <div class="card-header py-3">
-                        <h6 class="m-0 font-weight-bold text-primary">
-                            Paso 4: Notas del Estudiante - 
-                            <?php 
-                            $materia_seleccionada = null;
-                            if (isset($_POST['id_materia']) && !empty($materias)) {
-                                foreach ($materias as $materia) {
-                                    if ($materia['id_materia'] == $_POST['id_materia']) {
-                                        $materia_seleccionada = $materia;
-                                        break;
+            <!-- Paso 4: Mostrar y Editar Notas (Trimestres) -->
+            <?php if ($estudiante && isset($_POST['id_materia']) && !empty($notas)): ?>
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        Paso 4: Notas del Estudiante - Trimestres
+                    </h6>
+                    <small>Se encontraron <?php echo count($notas); ?> registro(s) de notas</small>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>Periodo Académico</th>
+                                    <th class="text-center">Trimestre 1</th>
+                                    <th class="text-center">Trimestre 2</th>
+                                    <th class="text-center">Trimestre 3</th>
+                                    <th class="text-center">Nota Final</th>
+                                    <th class="text-center">Estado</th>
+                                    <th class="text-center">Fecha Registro</th>
+                                    <th class="text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($notas as $nota): 
+                                    // Calcular nota final
+                                    $t1 = $nota['trimestre_1'];
+                                    $t2 = $nota['trimestre_2'];
+                                    $t3 = $nota['trimestre_3'];
+                                    
+                                    $suma = 0;
+                                    $count = 0;
+                                    if ($t1 !== null) { $suma += $t1; $count++; }
+                                    if ($t2 !== null) { $suma += $t2; $count++; }
+                                    if ($t3 !== null) { $suma += $t3; $count++; }
+                                    $nota_final = $count > 0 ? round($suma / $count, 1) : null;
+                                    
+                                    $estado = $nota['estado'];
+                                    $badge_class = 'secondary';
+                                    $badge_text = 'Pendiente';
+                                    
+                                    if ($estado === 'aprobada') {
+                                        $badge_class = 'success';
+                                        $badge_text = 'Aprobada';
+                                    } elseif ($estado === 'rechazada') {
+                                        $badge_class = 'danger';
+                                        $badge_text = 'Rechazada';
+                                    } elseif ($estado === 'en_revision') {
+                                        $badge_class = 'warning';
+                                        $badge_text = 'En Revisión';
                                     }
-                                }
-                            }
-                            if ($materia_seleccionada) {
-                                echo htmlspecialchars($materia_seleccionada['nombre_materia']);
-                            }
-                            ?>
-                        </h6>
-                        <small>Se encontraron <?php echo count($notas); ?> registro(s) de notas</small>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-hover">
-                                <thead class="thead-dark">
-                                    <tr>
-                                        <th>Periodo Académico</th>
-                                        <th>Trayecto 0</th>
-                                        <th>Trayecto 1</th>
-                                        <th>Trayecto 2</th>
-                                        <th>Trayecto 3</th>
-                                        <th>Trayecto 4</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($notas as $nota): ?>
-                                    <tr>
-                                        <td class="font-weight-bold"><?php echo htmlspecialchars($nota['nombre_periodo'] ?? 'Sin periodo'); ?></td>
-                                        <td>
-                                            <span class="badge badge-<?php echo ($nota['trayecto_0'] === null || $nota['trayecto_0'] === '') ? 'secondary' : ($nota['trayecto_0'] >= 10 ? 'success' : 'danger'); ?> p-2">
-                                                <?php echo ($nota['trayecto_0'] !== null && $nota['trayecto_0'] !== '') ? number_format($nota['trayecto_0'], 2) : 'N/A'; ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span class="badge badge-<?php echo ($nota['trayecto_1'] === null || $nota['trayecto_1'] === '') ? 'secondary' : ($nota['trayecto_1'] >= 10 ? 'success' : 'danger'); ?> p-2">
-                                                <?php echo ($nota['trayecto_1'] !== null && $nota['trayecto_1'] !== '') ? number_format($nota['trayecto_1'], 2) : 'N/A'; ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span class="badge badge-<?php echo ($nota['trayecto_2'] === null || $nota['trayecto_2'] === '') ? 'secondary' : ($nota['trayecto_2'] >= 10 ? 'success' : 'danger'); ?> p-2">
-                                                <?php echo ($nota['trayecto_2'] !== null && $nota['trayecto_2'] !== '') ? number_format($nota['trayecto_2'], 2) : 'N/A'; ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span class="badge badge-<?php echo ($nota['trayecto_3'] === null || $nota['trayecto_3'] === '') ? 'secondary' : ($nota['trayecto_3'] >= 10 ? 'success' : 'danger'); ?> p-2">
-                                                <?php echo ($nota['trayecto_3'] !== null && $nota['trayecto_3'] !== '') ? number_format($nota['trayecto_3'], 2) : 'N/A'; ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span class="badge badge-<?php echo ($nota['trayecto_4'] === null || $nota['trayecto_4'] === '') ? 'secondary' : ($nota['trayecto_4'] >= 10 ? 'success' : 'danger'); ?> p-2">
-                                                <?php echo ($nota['trayecto_4'] !== null && $nota['trayecto_4'] !== '') ? number_format($nota['trayecto_4'], 2) : 'N/A'; ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="btn-group-actions">
-                                                <button type="button" class="btn btn-warning btn-sm" data-toggle="modal" data-target="#modalEditarNota<?php echo $nota['id']; ?>">
-                                                    <i class="fas fa-edit"></i> Editar
-                                                </button>
-                                                <!-- Botón de Reporte PDF que genera directamente -->
-                                                <a href="generar_reporte_solicitud.php?estudiante_id=<?php echo $estudiante['id']; ?>&estudiante_nombre=<?php echo urlencode($estudiante['nombre']); ?>&estudiante_cedula=<?php echo urlencode($estudiante['idusuario']); ?>&nota_id=<?php echo $nota['id']; ?>&periodo_academico=<?php echo urlencode($nota['nombre_periodo'] ?? 'Sin periodo'); ?>" 
-                                                   class="btn btn-reporte btn-sm" target="_blank">
-                                                    <i class="fas fa-file-pdf"></i> Reporte
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
-
-                                    <!-- Modal para Editar Nota (se mantiene igual) -->
-                                    <div class="modal fade" id="modalEditarNota<?php echo $nota['id']; ?>" tabindex="-1" role="dialog" aria-labelledby="modalEditarNotaLabel<?php echo $nota['id']; ?>" aria-hidden="true">
-                                        <div class="modal-dialog" role="document">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title" id="modalEditarNotaLabel<?php echo $nota['id']; ?>">Editar Nota - <?php echo htmlspecialchars($nota['nombre_periodo'] ?? 'Sin periodo'); ?></h5>
-                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                                        <span aria-hidden="true">&times;</span>
-                                                    </button>
-                                                </div>
-                                                <form method="POST">
-                                                    <div class="modal-body">
-                                                        <input type="hidden" name="accion" value="editar_nota">
-                                                        <input type="hidden" name="id_nota" value="<?php echo $nota['id']; ?>">
-                                                        <input type="hidden" name="id_usuario" value="<?php echo $estudiante['id']; ?>">
-                                                        <input type="hidden" name="id_carrera" value="<?php echo htmlspecialchars($_POST['id_carrera'] ?? ''); ?>">
-                                                        <input type="hidden" name="id_materia" value="<?php echo htmlspecialchars($_POST['id_materia'] ?? ''); ?>">
-                                                        <input type="hidden" name="cedula" value="<?php echo htmlspecialchars($_POST['cedula'] ?? ''); ?>">
-                                                        
-                                                        <div class="form-group">
-                                                            <label for="trayecto_<?php echo $nota['id']; ?>">Seleccione el Trayecto a Editar:</label>
-                                                            <select name="trayecto" id="trayecto_<?php echo $nota['id']; ?>" class="form-control" required>
-                                                                <option value="">Seleccionar Trayecto</option>
-                                                                <?php if ($nota['trayecto_0'] !== null): ?>
-                                                                <option value="trayecto_0">Trayecto 0: <?php echo number_format($nota['trayecto_0'], 2); ?></option>
-                                                                <?php endif; ?>
-                                                                <?php if ($nota['trayecto_1'] !== null): ?>
-                                                                <option value="trayecto_1">Trayecto 1: <?php echo number_format($nota['trayecto_1'], 2); ?></option>
-                                                                <?php endif; ?>
-                                                                <?php if ($nota['trayecto_2'] !== null): ?>
-                                                                <option value="trayecto_2">Trayecto 2: <?php echo number_format($nota['trayecto_2'], 2); ?></option>
-                                                                <?php endif; ?>
-                                                                <?php if ($nota['trayecto_3'] !== null): ?>
-                                                                <option value="trayecto_3">Trayecto 3: <?php echo number_format($nota['trayecto_3'], 2); ?></option>
-                                                                <?php endif; ?>
-                                                                <?php if ($nota['trayecto_4'] !== null): ?>
-                                                                <option value="trayecto_4">Trayecto 4: <?php echo number_format($nota['trayecto_4'], 2); ?></option>
-                                                                <?php endif; ?>
-                                                            </select>
-                                                        </div>
-                                                        
-                                                        <div class="form-group">
-                                                            <label for="nueva_nota_<?php echo $nota['id']; ?>">Nueva Nota:</label>
-                                                            <input type="number" name="nueva_nota" id="nueva_nota_<?php echo $nota['id']; ?>" 
-                                                                   class="form-control" step="0.01" min="0" max="20" required>
-                                                            <small class="form-text text-muted">La nota debe estar entre 0 y 20</small>
-                                                        </div>
-                                                        
-                                                        <div class="form-group">
-                                                            <label for="justificacion_<?php echo $nota['id']; ?>">Justificación del Cambio:</label>
-                                                            <textarea name="justificacion" id="justificacion_<?php echo $nota['id']; ?>" 
-                                                                      class="form-control" rows="3" required 
-                                                                      placeholder="Explique detalladamente por qué se realiza este cambio..."></textarea>
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer">
-                                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                                                        <button type="submit" class="btn btn-primary">Guardar Cambios</button>
-                                                    </div>
-                                                </form>
-                                            </div>
+                                ?>
+                                <tr>
+                                    <td class="font-weight-bold"><?php echo htmlspecialchars($nota['nombre_periodo'] ?? 'Sin periodo'); ?></td>
+                                    
+                                    <td class="text-center">
+                                        <span class="badge <?php echo ($t1 === null) ? 'bg-secondary' : ($t1 >= 12 ? 'bg-success' : 'bg-danger'); ?> p-2" style="font-size: 0.9rem;">
+                                            <?php echo ($t1 !== null) ? number_format($t1, 1) : 'N/A'; ?>
+                                        </span>
+                                    </div>
+                                    
+                                    <td class="text-center">
+                                        <span class="badge <?php echo ($t2 === null) ? 'bg-secondary' : ($t2 >= 12 ? 'bg-success' : 'bg-danger'); ?> p-2" style="font-size: 0.9rem;">
+                                            <?php echo ($t2 !== null) ? number_format($t2, 1) : 'N/A'; ?>
+                                        </span>
+                                    </div>
+                                    
+                                    <td class="text-center">
+                                        <span class="badge <?php echo ($t3 === null) ? 'bg-secondary' : ($t3 >= 12 ? 'bg-success' : 'bg-danger'); ?> p-2" style="font-size: 0.9rem;">
+                                            <?php echo ($t3 !== null) ? number_format($t3, 1) : 'N/A'; ?>
+                                        </span>
+                                    </div>
+                                    
+                                    <td class="text-center">
+                                        <span class="badge <?php echo ($nota_final === null) ? 'bg-secondary' : ($nota_final >= 12 ? 'bg-success' : 'bg-danger'); ?> p-2" style="font-size: 1rem; font-weight: bold;">
+                                            <?php echo ($nota_final !== null) ? number_format($nota_final, 1) : 'N/A'; ?>
+                                        </span>
+                                    </div>
+                                    
+                                    <td class="text-center">
+                                        <span class="badge badge-<?php echo $badge_class; ?> px-3 py-2"><?php echo $badge_text; ?></span>
+                                    </div>
+                                    
+                                    <td class="text-center"><?php echo !empty($nota['fecha_registro']) ? date('d/m/Y H:i', strtotime($nota['fecha_registro'])) : '-'; ?></div>
+                                    
+                                    <td class="text-center">
+                                        <div class="btn-group-actions">
+                                            <button type="button" class="btn btn-warning btn-sm" data-toggle="modal" data-target="#modalEditarNota<?php echo $nota['id']; ?>">
+                                                <i class="fas fa-edit"></i> Editar
+                                            </button>
+                                            <a href="generar_reporte_solicitud.php?estudiante_id=<?php echo $estudiante['id']; ?>&estudiante_nombre=<?php echo urlencode($estudiante['nombre']); ?>&estudiante_cedula=<?php echo urlencode($estudiante['idusuario']); ?>&nota_id=<?php echo $nota['id']; ?>&periodo_academico=<?php echo urlencode($nota['nombre_periodo'] ?? 'Sin periodo'); ?>" 
+                                               class="btn btn-reporte btn-sm" target="_blank">
+                                                <i class="fas fa-file-pdf"></i> Reporte
+                                            </a>
                                         </div>
                                     </div>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
+                                </tr>
+
+                                <!-- Modal para Editar Nota Trimestral -->
+                                <div class="modal fade" id="modalEditarNota<?php echo $nota['id']; ?>" tabindex="-1" role="dialog" aria-hidden="true">
+                                    <div class="modal-dialog modal-lg" role="document">
+                                        <div class="modal-content">
+                                            <div class="modal-header bg-warning">
+                                                <h5 class="modal-title">Editar Nota - <?php echo htmlspecialchars($nota['nombre_periodo'] ?? 'Sin periodo'); ?></h5>
+                                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                    <span aria-hidden="true">&times;</span>
+                                                </button>
+                                            </div>
+                                            <form method="POST">
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="accion" value="editar_nota">
+                                                    <input type="hidden" name="id_nota" value="<?php echo $nota['id']; ?>">
+                                                    <input type="hidden" name="id_usuario" value="<?php echo $estudiante['id']; ?>">
+                                                    <input type="hidden" name="id_carrera" value="<?php echo htmlspecialchars($_POST['id_carrera'] ?? ''); ?>">
+                                                    <input type="hidden" name="id_materia" value="<?php echo htmlspecialchars($_POST['id_materia'] ?? ''); ?>">
+                                                    <input type="hidden" name="cedula" value="<?php echo htmlspecialchars($_POST['cedula'] ?? ''); ?>">
+                                                    
+                                                    <div class="alert alert-info">
+                                                        <i class="fas fa-info-circle"></i> 
+                                                        <strong>Información:</strong> Puede editar cualquier trimestre. La nota final se recalculará automáticamente.
+                                                    </div>
+                                                    
+                                                    <div class="row">
+                                                        <div class="col-md-4">
+                                                            <div class="form-group">
+                                                                <label for="trimestre_1_<?php echo $nota['id']; ?>">Trimestre 1:</label>
+                                                                <input type="number" name="trimestre_1" id="trimestre_1_<?php echo $nota['id']; ?>" 
+                                                                       class="form-control" step="1" min="1" max="20" 
+                                                                       value="<?php echo $t1; ?>">
+                                                                <small class="form-text text-muted">Valor actual: <?php echo $t1 !== null ? number_format($t1, 1) : 'No registrado'; ?></small>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <div class="form-group">
+                                                                <label for="trimestre_2_<?php echo $nota['id']; ?>">Trimestre 2:</label>
+                                                                <input type="number" name="trimestre_2" id="trimestre_2_<?php echo $nota['id']; ?>" 
+                                                                       class="form-control" step="1" min="1" max="20" 
+                                                                       value="<?php echo $t2; ?>">
+                                                                <small class="form-text text-muted">Valor actual: <?php echo $t2 !== null ? number_format($t2, 1) : 'No registrado'; ?></small>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <div class="form-group">
+                                                                <label for="trimestre_3_<?php echo $nota['id']; ?>">Trimestre 3:</label>
+                                                                <input type="number" name="trimestre_3" id="trimestre_3_<?php echo $nota['id']; ?>" 
+                                                                       class="form-control" step="1" min="1" max="20" 
+                                                                       value="<?php echo $t3; ?>">
+                                                                <small class="form-text text-muted">Valor actual: <?php echo $t3 !== null ? number_format($t3, 1) : 'No registrado'; ?></small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="form-group mt-3">
+                                                        <label for="estado_<?php echo $nota['id']; ?>">Estado de la Nota:</label>
+                                                        <select name="estado" id="estado_<?php echo $nota['id']; ?>" class="form-control">
+                                                            <option value="pendiente" <?php echo $estado === 'pendiente' ? 'selected' : ''; ?>>Pendiente</option>
+                                                            <option value="aprobada" <?php echo $estado === 'aprobada' ? 'selected' : ''; ?>>Aprobada</option>
+                                                            <option value="rechazada" <?php echo $estado === 'rechazada' ? 'selected' : ''; ?>>Rechazada</option>
+                                                            <option value="en_revision" <?php echo $estado === 'en_revision' ? 'selected' : ''; ?>>En Revisión</option>
+                                                        </select>
+                                                        <small class="form-text text-muted">Si cambia el estado, se actualizará automáticamente.</small>
+                                                    </div>
+                                                    
+                                                    <div class="form-group">
+                                                        <label for="justificacion_<?php echo $nota['id']; ?>">Justificación del Cambio:</label>
+                                                        <textarea name="justificacion" id="justificacion_<?php echo $nota['id']; ?>" 
+                                                                  class="form-control" rows="3" required 
+                                                                  placeholder="Explique detalladamente por qué se realiza este cambio..."></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                <?php else: ?>
-                <div class="alert alert-info">
-                    No se encontraron notas registradas para esta materia.
-                </div>
-                <?php endif; ?>
+            </div>
+            <?php elseif ($estudiante && isset($_POST['id_materia']) && empty($notas)): ?>
+            <div class="alert alert-info">
+                No se encontraron notas registradas para esta materia.
+            </div>
             <?php endif; ?>
         </div>
     </div>

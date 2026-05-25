@@ -11332,6 +11332,174 @@ function obtenerNotasEstudianteConTrimestres($estudiante_id) {
 
 
 
+/**
+ * Obtener notas trimestrales por materia y estudiante
+ * @param int $estudiante_id ID del estudiante
+ * @param int $materia_id ID de la materia
+ * @return array Array con las notas
+ */
+function obtenerNotasTrimestresPorMateria($estudiante_id, $materia_id) {
+    global $db;
+    
+    $notas = [];
+    
+    $query = "SELECT 
+                nt.id,
+                nt.id_usuario,
+                nt.id_materia,
+                nt.id_periodo,
+                nt.trimestre_num,
+                nt.nota,
+                nt.estado,
+                nt.fecha_registro,
+                nt.id_admin_aprobador,
+                pa.nombre_periodo
+              FROM notas_trimestres nt
+              LEFT JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
+              WHERE nt.id_usuario = " . intval($estudiante_id) . "
+              AND nt.id_materia = " . intval($materia_id) . "
+              ORDER BY nt.id_periodo DESC, nt.trimestre_num ASC";
+    
+    $result = $db->query($query);
+    
+    if ($result && $result->num_rows > 0) {
+        $temp = [];
+        while ($row = $result->fetch_assoc()) {
+            $periodo_id = $row['id_periodo'];
+            $trimestre = $row['trimestre_num'];
+            
+            if (!isset($temp[$periodo_id])) {
+                $temp[$periodo_id] = [
+                    'id' => $row['id'],
+                    'id_usuario' => $row['id_usuario'],
+                    'id_materia' => $row['id_materia'],
+                    'id_periodo' => $periodo_id,
+                    'nombre_periodo' => $row['nombre_periodo'],
+                    'trimestre_1' => null,
+                    'trimestre_2' => null,
+                    'trimestre_3' => null,
+                    'estado' => $row['estado'],
+                    'fecha_registro' => $row['fecha_registro'],
+                    'id_admin_aprobador' => $row['id_admin_aprobador']
+                ];
+            }
+            
+            $temp[$periodo_id]["trimestre_$trimestre"] = $row['nota'];
+        }
+        $notas = array_values($temp);
+    }
+    
+    return $notas;
+}
+
+/**
+ * Procesar la edición de una nota trimestral
+ * @return array Resultado de la operación
+ */
+function procesarEdicionNotaTrimestral() {
+    global $db;
+    
+    $id_nota = (int)($_POST['id_nota'] ?? 0);
+    $trimestre_1 = isset($_POST['trimestre_1']) && $_POST['trimestre_1'] !== '' ? (float)$_POST['trimestre_1'] : null;
+    $trimestre_2 = isset($_POST['trimestre_2']) && $_POST['trimestre_2'] !== '' ? (float)$_POST['trimestre_2'] : null;
+    $trimestre_3 = isset($_POST['trimestre_3']) && $_POST['trimestre_3'] !== '' ? (float)$_POST['trimestre_3'] : null;
+    $nuevo_estado = $_POST['estado'] ?? 'pendiente';
+    $justificacion = trim($_POST['justificacion'] ?? '');
+    $admin_id = $_SESSION['user']['id'] ?? 0;
+    
+    if (!$id_nota) {
+        return ['success' => false, 'message' => 'ID de nota no válido'];
+    }
+    
+    if (empty($justificacion)) {
+        return ['success' => false, 'message' => 'Debe ingresar una justificación para el cambio'];
+    }
+    
+    // Validar rangos de notas
+    if ($trimestre_1 !== null && ($trimestre_1 < 1 || $trimestre_1 > 20)) {
+        return ['success' => false, 'message' => 'Trimestre 1 debe estar entre 1 y 20'];
+    }
+    if ($trimestre_2 !== null && ($trimestre_2 < 1 || $trimestre_2 > 20)) {
+        return ['success' => false, 'message' => 'Trimestre 2 debe estar entre 1 y 20'];
+    }
+    if ($trimestre_3 !== null && ($trimestre_3 < 1 || $trimestre_3 > 20)) {
+        return ['success' => false, 'message' => 'Trimestre 3 debe estar entre 1 y 20'];
+    }
+    
+    // Obtener la nota actual antes de modificar
+    $query_actual = "SELECT * FROM notas_trimestres WHERE id = $id_nota";
+    $result_actual = $db->query($query_actual);
+    $nota_actual = $result_actual->fetch_assoc();
+    
+    if (!$nota_actual) {
+        return ['success' => false, 'message' => 'Nota no encontrada'];
+    }
+    
+    $trimestre_num = $nota_actual['trimestre_num'];
+    $nota_anterior = $nota_actual['nota'];
+    $nueva_nota = null;
+    
+    // Determinar qué trimestre se está editando
+    if ($trimestre_num == 1 && $trimestre_1 !== null) {
+        $nueva_nota = $trimestre_1;
+    } elseif ($trimestre_num == 2 && $trimestre_2 !== null) {
+        $nueva_nota = $trimestre_2;
+    } elseif ($trimestre_num == 3 && $trimestre_3 !== null) {
+        $nueva_nota = $trimestre_3;
+    }
+    
+    if ($nueva_nota === null) {
+        return ['success' => false, 'message' => 'No se especificó una nota válida para este trimestre'];
+    }
+    
+    // Si la nota no cambió, no hacer nada
+    if ($nueva_nota == $nota_anterior) {
+        return ['success' => false, 'message' => 'La nota no ha cambiado'];
+    }
+    
+    // Iniciar transacción
+    $db->begin_transaction();
+    
+    try {
+        // Actualizar la nota
+        $query_update = "UPDATE notas_trimestres 
+                         SET nota = $nueva_nota, 
+                             estado = '$nuevo_estado', 
+                             fecha_registro = NOW()
+                         WHERE id = $id_nota";
+        
+        if (!$db->query($query_update)) {
+            throw new Exception('Error al actualizar la nota: ' . $db->error);
+        }
+        
+        // Registrar en historial_cambios_notas usando id_nota_trimestre (no id_nota)
+        $query_historial = "INSERT INTO historial_cambios_notas 
+                            (id_nota_trimestre, trayecto, nota_anterior, nota_nueva, justificacion, id_admin, fecha_cambio) 
+                            VALUES 
+                            ($id_nota, $trimestre_num, $nota_anterior, $nueva_nota, 
+                             '" . $db->real_escape_string($justificacion) . "', $admin_id, NOW())";
+        
+        if (!$db->query($query_historial)) {
+            throw new Exception('Error al guardar el historial: ' . $db->error);
+        }
+        
+        $db->commit();
+        
+        return ['success' => true, 'message' => 'Nota actualizada correctamente'];
+        
+    } catch (Exception $e) {
+        $db->rollback();
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+
+
+
+
+
+
+
 
 
 /**
