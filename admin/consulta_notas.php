@@ -24,32 +24,36 @@ $notas_estudiante = [];
 $mensaje_error = '';
 $info_apto = null;
 
+// Aceptar búsqueda tanto por POST como por GET
+$cedula = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
     $cedula = trim($_POST['cedula']);
+} elseif (isset($_GET['cedula']) && !empty($_GET['cedula'])) {
+    $cedula = trim($_GET['cedula']);
+}
+
+if (!empty($cedula)) {
+    $estudiante = buscarEstudiantePorCedulaConsulta($cedula);
     
-    if (!empty($cedula)) {
-        $estudiante = buscarEstudiantePorCedulaConsulta($cedula);
+    if ($estudiante) {
+        // Obtener información de la carrera
+        $carrera = obtenerCarreraEstudiante($estudiante['id']);
         
-        if ($estudiante) {
-            // Obtener información de la carrera
-            $carrera = obtenerCarreraEstudiante($estudiante['id']);
+        if ($carrera) {
+            // Obtener todas las materias de la carrera
+            $materias_carrera = obtenerMateriasCarrera($carrera['id_carrera']);
             
-            if ($carrera) {
-                // Obtener todas las materias de la carrera
-                $materias_carrera = obtenerMateriasCarrera($carrera['id_carrera']);
-                
-                // Obtener notas del estudiante (si existen)
-                $notas_estudiante = obtenerNotasEstudianteConsulta($estudiante['id']);
-                
-                // Determinar si es apto para grado
-                $info_apto = esAptoParaGradoConsulta($estudiante['id'], $carrera['id_carrera']);
-            }
-        } else {
-            $mensaje_error = "No se encontró ningún estudiante con la cédula: " . htmlspecialchars($cedula);
+            // Obtener notas del estudiante (si existen)
+            $notas_estudiante = obtenerNotasEstudianteConsulta($estudiante['id']);
+            
+            // Determinar si es apto para grado
+            $info_apto = esAptoParaGradoConsulta($estudiante['id'], $carrera['id_carrera']);
         }
     } else {
-        $mensaje_error = "Por favor, ingrese una cédula para buscar.";
+        $mensaje_error = "No se encontró ningún estudiante con la cédula: " . htmlspecialchars($cedula);
     }
+} else if (isset($_GET['cedula']) && empty($_GET['cedula'])) {
+    $mensaje_error = "Por favor, ingrese una cédula válida para buscar.";
 }
 ?>
 
@@ -65,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                 <div class="form-group mr-2 mb-2">
                     <label for="cedula" class="mr-2">Cédula del Estudiante:</label>
                     <input type="text" class="form-control" id="cedula" name="cedula" 
-                           placeholder="Ej: V12345678" value="<?= isset($_POST['cedula']) ? htmlspecialchars($_POST['cedula']) : '' ?>" required>
+                           placeholder="Ej: V12345678" value="<?= isset($_POST['cedula']) ? htmlspecialchars($_POST['cedula']) : (isset($_GET['cedula']) ? htmlspecialchars($_GET['cedula']) : '') ?>" required>
                 </div>
                 <button type="submit" class="btn btn-success mb-2">
                     <i class="fas fa-search"></i> Buscar
@@ -243,13 +247,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
-                                </td>
+                                 </div>
                                 
                                 <td class="text-center">
                                     <span class="badge badge-<?= $badge_estado ?>">
                                         <?= $estado ?>
                                     </span>
-                                </td>
+                                 </div>
                                 
                                 <td>
                                     <?php if ($nota): ?>
@@ -257,7 +261,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
-                                </td>
+                                 </div>
                                 
                                 <td>
                                     <?php if ($nota && $nota['fecha_registro']): ?>
@@ -265,7 +269,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
-                                </td>
+                                 </div>
                                 
                                 <td>
                                     <?php if ($nota && !empty($nota['nombre_admin'])): ?>
@@ -273,11 +277,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
-                                </td>
+                                 </div>
                             </tr>
                         <?php endwhile; ?>
                     </tbody>
-                </table>
+                </div>
             </div>
             
             <!-- Resumen estadístico -->

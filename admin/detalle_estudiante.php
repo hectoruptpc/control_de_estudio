@@ -145,26 +145,38 @@ if (!$tieneFoto) {
                 </div>
             </div>
             <div class="col">
-                <h4 class="mb-1 text-dark"><?= htmlspecialchars($estudiante['nombre'] ?? '') ?></h4>
-                <p class="text-muted mb-1">
-                    <i class="fas fa-id-card me-1"></i>
-                    <?= htmlspecialchars($estudiante['idusuario'] ?? '') ?> 
-                    | ID: <?= htmlspecialchars($estudiante['id'] ?? '') ?>
-                </p>
-                <p class="mb-1">
-                    <span class="badge bg-primary">
-                        <i class="fas fa-graduation-cap me-1"></i>
-                        <?= htmlspecialchars($nombreCarrera) ?>
-                    </span>
-                    <span class="badge <?= ($estudiante['status'] ?? 0) == 1 ? 'bg-success' : 'bg-secondary' ?> ms-2">
-                        <?= ($estudiante['status'] ?? 0) == 1 ? 'Activo' : 'Inactivo' ?>
-                    </span>
-                    <?php if (!$tieneFoto): ?>
-                        <span class="badge bg-warning ms-2">
-                            <i class="fas fa-camera me-1"></i>Sin foto
-                        </span>
-                    <?php endif; ?>
-                </p>
+                <div class="d-flex justify-content-between align-items-start flex-wrap">
+                    <div>
+                        <h4 class="mb-1 text-dark"><?= htmlspecialchars($estudiante['nombre'] ?? '') ?></h4>
+                        <p class="text-muted mb-1">
+                            <i class="fas fa-id-card me-1"></i>
+                            <?= htmlspecialchars($estudiante['idusuario'] ?? '') ?> 
+                            | ID: <?= htmlspecialchars($estudiante['id'] ?? '') ?>
+                        </p>
+                        <p class="mb-1">
+                            <span class="badge bg-primary">
+                                <i class="fas fa-graduation-cap me-1"></i>
+                                <?= htmlspecialchars($nombreCarrera) ?>
+                            </span>
+                            <span class="badge <?= ($estudiante['status'] ?? 0) == 1 ? 'bg-success' : 'bg-secondary' ?> ms-2">
+                                <?= ($estudiante['status'] ?? 0) == 1 ? 'Activo' : 'Inactivo' ?>
+                            </span>
+                            <?php if (!$tieneFoto): ?>
+                                <span class="badge bg-warning ms-2">
+                                    <i class="fas fa-camera me-1"></i>Sin foto
+                                </span>
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                    <div>
+                        <a href="consulta_notas.php?cedula=<?= urlencode($estudiante['idusuario'] ?? '') ?>" 
+                           class="btn btn-info btn-sm" 
+                           target="_blank"
+                           title="Ver historial académico">
+                            <i class="fas fa-book-open me-1"></i> Historial Académico
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
