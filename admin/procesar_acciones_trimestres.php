@@ -26,7 +26,8 @@ if (!$materia_id || !$periodo_id) {
 global $db;
 $admin_id = $_SESSION['user']['id'];
 
-if (isset($_POST['accion_grupo']) && $_POST['accion_grupo'] === true) {
+// Acción grupal (todos los estudiantes del docente/materia/periodo)
+if (isset($_POST['accion_grupo']) && $_POST['accion_grupo'] === 'true') {
     $docente_id = (int)($_POST['docente_id'] ?? 0);
     if (!$docente_id) {
         echo json_encode(['success' => false, 'message' => 'Docente no especificado']);
@@ -44,14 +45,16 @@ if (isset($_POST['accion_grupo']) && $_POST['accion_grupo'] === true) {
                      AND estado = 'pendiente'";
     
     if ($db->query($update_query)) {
-        registrarAccionAdmin($admin_id, $accion, $materia_id, $periodo_id, null, $mensaje, true);
-        echo json_encode(['success' => true, 'message' => 'Acción grupal ejecutada correctamente']);
+        $afectadas = $db->affected_rows;
+        registrarLogAdmin($admin_id, $accion, $materia_id, $periodo_id, null, $mensaje, true);
+        echo json_encode(['success' => true, 'message' => "$afectadas nota(s) $nuevo_estado correctamente"]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Error al ejecutar acción grupal: ' . $db->error]);
     }
     exit;
 }
 
+// Acción individual o por selección
 $usuario_ids = $_POST['usuario_ids'] ?? [];
 if (empty($usuario_ids)) {
     echo json_encode(['success' => false, 'message' => 'No se especificaron estudiantes']);
@@ -75,13 +78,13 @@ $update_query = "UPDATE notas_trimestres
 
 if ($db->query($update_query)) {
     $afectadas = $db->affected_rows;
-    registrarAccionAdmin($admin_id, $accion, $materia_id, $periodo_id, $usuario_ids, $mensaje);
+    registrarLogAdmin($admin_id, $accion, $materia_id, $periodo_id, $usuario_ids, $mensaje);
     echo json_encode(['success' => true, 'message' => "$afectadas nota(s) $nuevo_estado correctamente"]);
 } else {
     echo json_encode(['success' => false, 'message' => 'Error al procesar: ' . $db->error]);
 }
 
-function registrarAccionAdmin($admin_id, $accion, $materia_id, $periodo_id, $usuario_ids, $mensaje, $es_grupal = false) {
+function registrarLogAdmin($admin_id, $accion, $materia_id, $periodo_id, $usuario_ids, $mensaje, $es_grupal = false) {
     global $db;
     $tipo = $es_grupal ? 'GRUPAL' : 'INDIVIDUAL';
     $estudiantes = $es_grupal ? 'TODOS' : (is_array($usuario_ids) ? implode(',', $usuario_ids) : $usuario_ids);
@@ -93,3 +96,4 @@ function registrarAccionAdmin($admin_id, $accion, $materia_id, $periodo_id, $usu
                    '" . $db->real_escape_string($mensaje) . "', '$tipo', NOW())";
     $db->query($log_query);
 }
+?>

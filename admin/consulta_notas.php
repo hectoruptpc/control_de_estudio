@@ -43,7 +43,7 @@ if (!empty($cedula)) {
             // Obtener todas las materias de la carrera
             $materias_carrera = obtenerMateriasCarrera($carrera['id_carrera']);
             
-            // Obtener notas del estudiante (incluyendo trimestres)
+            // Obtener notas APROBADAS del estudiante (solo las que tienen estado = 'aprobada')
             $notas_estudiante = obtenerNotasEstudianteConTrimestres($estudiante['id']);
             
             // Determinar si es apto para grado

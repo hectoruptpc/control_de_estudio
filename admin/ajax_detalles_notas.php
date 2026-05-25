@@ -24,8 +24,7 @@ switch ($seccion) {
         <h4>Lista de Estudiantes</h4>
         <div class="alert alert-info">
             <i class="fas fa-info-circle"></i> 
-            <strong>Aprobación:</strong> Nota final ≥ 12pts (promedio de los 3 trimestres)<br>
-            <strong>Estado:</strong> Pendiente = Sin revisar | Aprobado = Nota final ≥ 12 | Reprobado = Nota final &lt; 12
+            <strong>Aprobación:</strong> Nota final ≥ 12pts (promedio de los 3 trimestres)
         </div>
         
         <!-- Botones Aprobar/Rechazar Todo -->
@@ -80,7 +79,6 @@ switch ($seccion) {
                     </thead>
                     <tbody>
                         <?php while ($estudiante = $estudiantes->fetch_assoc()): 
-                            // Calcular nota final
                             $t1 = $estudiante['trimestre_1'];
                             $t2 = $estudiante['trimestre_2'];
                             $t3 = $estudiante['trimestre_3'];
@@ -106,9 +104,6 @@ switch ($seccion) {
                                 $badge_class = 'warning';
                                 $badge_text = 'En Revisión';
                             }
-                            
-                            $puede_aprobar = ($estado !== 'aprobada');
-                            $puede_rechazar = ($estado !== 'aprobada');
                         ?>
                             <tr>
                                 <td>
@@ -122,59 +117,52 @@ switch ($seccion) {
                                 
                                 <td class="text-center">
                                     <?php if ($t1 !== null): ?>
-                                        <span class="badge <?= $t1 >= 12 ? 'bg-success' : 'bg-danger' ?> p-2" style="font-size: 0.9rem;">
+                                        <span class="badge <?= $t1 >= 12 ? 'bg-success' : 'bg-danger' ?> p-2">
                                             <?= number_format($t1, 1) ?>
                                         </span>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
                                 </div>
-                                
                                 <td class="text-center">
                                     <?php if ($t2 !== null): ?>
-                                        <span class="badge <?= $t2 >= 12 ? 'bg-success' : 'bg-danger' ?> p-2" style="font-size: 0.9rem;">
+                                        <span class="badge <?= $t2 >= 12 ? 'bg-success' : 'bg-danger' ?> p-2">
                                             <?= number_format($t2, 1) ?>
                                         </span>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
                                 </div>
-                                
                                 <td class="text-center">
                                     <?php if ($t3 !== null): ?>
-                                        <span class="badge <?= $t3 >= 12 ? 'bg-success' : 'bg-danger' ?> p-2" style="font-size: 0.9rem;">
+                                        <span class="badge <?= $t3 >= 12 ? 'bg-success' : 'bg-danger' ?> p-2">
                                             <?= number_format($t3, 1) ?>
                                         </span>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
                                 </div>
-                                
                                 <td class="text-center">
                                     <?php if ($nota_final !== null): ?>
-                                        <span class="badge <?= $nota_final >= 12 ? 'bg-success' : 'bg-danger' ?> p-2" style="font-size: 1rem; font-weight: bold;">
+                                        <span class="badge <?= $nota_final >= 12 ? 'bg-success' : 'bg-danger' ?> p-2" style="font-size: 1rem;">
                                             <?= number_format($nota_final, 1) ?>
                                         </span>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
                                 </div>
-                                
                                 <td class="text-center">
                                     <span class="badge badge-<?= $badge_class ?> px-3 py-2"><?= $badge_text ?></span>
                                 </div>
-                                
                                 <td class="text-center">
                                     <div class="btn-group btn-group-sm">
-                                        <?php if ($puede_aprobar): ?>
+                                        <?php if ($estado !== 'aprobada'): ?>
                                             <button type="button" class="btn btn-success accion-individual" 
                                                     data-accion="aprobar"
                                                     data-usuario-id="<?= $estudiante['id_usuario'] ?>"
                                                     data-estudiante-nombre="<?= htmlspecialchars($estudiante['nombre_estudiante']) ?>">
                                                 <i class="fas fa-check"></i> Aprobar
                                             </button>
-                                        <?php endif; ?>
-                                        <?php if ($puede_rechazar): ?>
                                             <button type="button" class="btn btn-danger accion-individual" 
                                                     data-accion="rechazar"
                                                     data-usuario-id="<?= $estudiante['id_usuario'] ?>"
@@ -183,7 +171,7 @@ switch ($seccion) {
                                             </button>
                                         <?php endif; ?>
                                     </div>
-                                </td>
+                                </div>
                             </tr>
                         <?php endwhile; ?>
                     </tbody>
@@ -191,24 +179,201 @@ switch ($seccion) {
             </div>
         </form>
 
-        <style>
-        .bg-success {
-            background-color: #28a745 !important;
-            color: white !important;
-        }
-        .bg-danger {
-            background-color: #dc3545 !important;
-            color: white !important;
-        }
-        .bg-warning {
-            background-color: #ffc107 !important;
-            color: #000 !important;
-        }
-        .bg-secondary {
-            background-color: #6c757d !important;
-            color: white !important;
-        }
-        </style>
+        <!-- Modales -->
+        <div class="modal fade" id="modalMensajeRechazo" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning">
+                        <h5 class="modal-title">Rechazar Notas</h5>
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info"><strong>Estudiantes:</strong> <span id="estudiantesRechazados"></span></div>
+                        <textarea class="form-control" id="mensajeRechazo" rows="4" placeholder="Motivo del rechazo..."></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="btnRechazar">Enviar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="modalMensajeAprobacion" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-success">
+                        <h5 class="modal-title">Aprobar Notas</h5>
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info"><strong>Estudiantes:</strong> <span id="estudiantesAprobados"></span></div>
+                        <textarea class="form-control" id="mensajeAprobacion" rows="4" placeholder="Mensaje de aprobación..."></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="btnAprobar">Enviar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="modalResultado" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header" id="modalResultadoHeader">
+                        <h5 class="modal-title">Resultado</h5>
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    </div>
+                    <div class="modal-body" id="modalResultadoBody"></div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" data-dismiss="modal">Aceptar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        (function() {
+            let accionPendiente = null;
+            let notasIdsPendientes = [];
+            let esAccionGrupal = false;
+            let docenteIdGlobal = <?= $docente_id ?>;
+            let materiaIdGlobal = <?= $materia_id ?>;
+            let periodoIdGlobal = <?= $periodo_id ?>;
+            
+            function actualizarBotones() {
+                const selected = $('.estudiante-checkbox:checked');
+                if (selected.length === 0) {
+                    $('#botonesGrupo').show();
+                    $('#botonesSeleccion').hide();
+                } else {
+                    $('#botonesGrupo').hide();
+                    $('#botonesSeleccion').show();
+                    $('#contadorSeleccion').text(selected.length === 1 ? '1 estudiante' : selected.length + ' estudiantes');
+                }
+            }
+            
+            window.limpiarSeleccion = function() {
+                $('.estudiante-checkbox').prop('checked', false);
+                $('#selectAllEstudiantes').prop('checked', false);
+                actualizarBotones();
+            };
+            
+            window.aplicarAccion = function(accion) {
+                const selected = $('.estudiante-checkbox:checked');
+                if (selected.length === 0) {
+                    alert('Seleccione al menos un estudiante');
+                    return;
+                }
+                const usuarioIds = selected.map(function() { return $(this).val(); }).get();
+                const nombres = selected.map(function() { return $(this).data('estudiante-nombre'); }).get();
+                
+                accionPendiente = accion;
+                notasIdsPendientes = usuarioIds;
+                esAccionGrupal = false;
+                
+                if (accion === 'rechazar') {
+                    $('#estudiantesRechazados').text(nombres.join(", "));
+                    $('#modalMensajeRechazo').modal('show');
+                } else {
+                    $('#estudiantesAprobados').text(nombres.join(", "));
+                    $('#modalMensajeAprobacion').modal('show');
+                }
+            };
+            
+            window.accionGrupo = function(accion) {
+                accionPendiente = accion;
+                esAccionGrupal = true;
+                if (accion === 'rechazar') {
+                    $('#estudiantesRechazados').text('TODOS los estudiantes del grupo');
+                    $('#modalMensajeRechazo').modal('show');
+                } else {
+                    $('#estudiantesAprobados').text('TODOS los estudiantes del grupo');
+                    $('#modalMensajeAprobacion').modal('show');
+                }
+            };
+            
+            function procesarAccion() {
+                const mensaje = accionPendiente === 'rechazar' ? $('#mensajeRechazo').val().trim() : $('#mensajeAprobacion').val().trim();
+                if (!mensaje) {
+                    alert('Por favor, ingrese un mensaje');
+                    return;
+                }
+                
+                let datos = {
+                    accion: accionPendiente,
+                    materia_id: materiaIdGlobal,
+                    periodo_id: periodoIdGlobal,
+                    mensaje: mensaje
+                };
+                
+                if (esAccionGrupal) {
+                    datos.accion_grupo = 'true';
+                    datos.docente_id = docenteIdGlobal;
+                } else {
+                    datos.usuario_ids = notasIdsPendientes;
+                }
+                
+                $('#modalMensajeRechazo').modal('hide');
+                $('#modalMensajeAprobacion').modal('hide');
+                
+                $.ajax({
+                    url: 'procesar_acciones_trimestres.php',
+                    type: 'POST',
+                    data: datos,
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            $('#modalResultadoHeader').removeClass('bg-danger').addClass('bg-success');
+                            $('#modalResultadoBody').html('<div class="text-center"><i class="fas fa-check-circle fa-3x text-success mb-3"></i><p>' + response.message + '</p></div>');
+                            $('#modalResultado').modal('show');
+                            $('#modalResultado').on('hidden.bs.modal', function() { location.reload(); });
+                        } else {
+                            $('#modalResultadoHeader').removeClass('bg-success').addClass('bg-danger');
+                            $('#modalResultadoBody').html('<div class="text-center"><i class="fas fa-exclamation-circle fa-3x text-danger mb-3"></i><p>' + response.message + '</p></div>');
+                            $('#modalResultado').modal('show');
+                        }
+                    },
+                    error: function(xhr) {
+                        $('#modalResultadoHeader').removeClass('bg-success').addClass('bg-danger');
+                        $('#modalResultadoBody').html('<div class="text-center"><i class="fas fa-exclamation-circle fa-3x text-danger mb-3"></i><p>Error al procesar: ' + xhr.status + '</p></div>');
+                        $('#modalResultado').modal('show');
+                    }
+                });
+            }
+            
+            $('#selectAllEstudiantes').change(function() {
+                $('.estudiante-checkbox').prop('checked', this.checked);
+                actualizarBotones();
+            });
+            
+            $('.estudiante-checkbox').change(actualizarBotones);
+            
+            $('.accion-individual').click(function() {
+                const usuarioId = $(this).data('usuario-id');
+                const accion = $(this).data('accion');
+                const nombre = $(this).data('estudiante-nombre');
+                
+                accionPendiente = accion;
+                notasIdsPendientes = [usuarioId];
+                esAccionGrupal = false;
+                
+                if (accion === 'rechazar') {
+                    $('#estudiantesRechazados').text(nombre);
+                    $('#modalMensajeRechazo').modal('show');
+                } else {
+                    $('#estudiantesAprobados').text(nombre);
+                    $('#modalMensajeAprobacion').modal('show');
+                }
+            });
+            
+            $('#btnRechazar').click(procesarAccion);
+            $('#btnAprobar').click(procesarAccion);
+            
+            actualizarBotones();
+        })();
+        </script>
         <?php
         break;
         
@@ -216,7 +381,6 @@ switch ($seccion) {
         $estadisticas = obtenerEstadisticasGrupoTrimestres($docente_id, $materia_id, $periodo_id);
         ?>
         <h4>Resumen del Grupo</h4>
-        
         <div class="row">
             <div class="col-md-6">
                 <div class="card mb-3">
@@ -230,341 +394,34 @@ switch ($seccion) {
                     </div>
                 </div>
             </div>
-            
             <div class="col-md-6">
                 <div class="card mb-3">
                     <div class="card-header bg-light">Estadísticas</div>
                     <div class="card-body">
-                        <div class="stats-container">
-                            <div class="stat-item">
-                                <div class="stat-value h4 text-primary"><?= $estadisticas['total_estudiantes'] ?></div>
-                                <div class="stat-label">Total Estudiantes</div>
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <h3 class="text-primary"><?= $estadisticas['total_estudiantes'] ?></h3>
+                                <small>Total</small>
                             </div>
-                            
-                            <div class="stat-item">
-                                <div class="stat-value h4 <?= $estadisticas['promedio_general'] >= 12 ? 'text-success' : 'text-warning' ?>">
-                                    <?= $estadisticas['promedio_general'] ?>
-                                </div>
-                                <div class="stat-label">Promedio General</div>
+                            <div class="col-4">
+                                <h3 class="text-success"><?= $estadisticas['aprobados'] ?></h3>
+                                <small>Aprobados</small>
                             </div>
-                            
-                            <div class="stat-item">
-                                <div class="stat-value h4 text-success"><?= $estadisticas['aprobados'] ?></div>
-                                <div class="stat-label">Aprobados</div>
-                            </div>
-                            
-                            <div class="stat-item">
-                                <div class="stat-value h4 text-danger"><?= $estadisticas['reprobados'] ?></div>
-                                <div class="stat-label">Reprobados</div>
-                            </div>
-                            
-                            <div class="stat-item">
-                                <div class="stat-value h4 text-warning"><?= $estadisticas['pendientes'] ?></div>
-                                <div class="stat-label">Pendientes</div>
+                            <div class="col-4">
+                                <h3 class="text-danger"><?= $estadisticas['reprobados'] ?></h3>
+                                <small>Reprobados</small>
                             </div>
                         </div>
-                        
-                        <?php if ($estadisticas['total_estudiantes'] > 0): ?>
-                        <div class="progress mt-3" style="height: 20px;">
-                            <div class="progress-bar bg-success" 
-                                 style="width: <?= ($estadisticas['aprobados'] / $estadisticas['total_estudiantes']) * 100 ?>%">
-                                <?= $estadisticas['aprobados'] ?>
-                            </div>
-                            <div class="progress-bar bg-danger" 
-                                 style="width: <?= ($estadisticas['reprobados'] / $estadisticas['total_estudiantes']) * 100 ?>%">
-                                <?= $estadisticas['reprobados'] ?>
-                            </div>
-                            <div class="progress-bar bg-secondary" 
-                                 style="width: <?= ($estadisticas['pendientes'] / $estadisticas['total_estudiantes']) * 100 ?>%">
-                                <?= $estadisticas['pendientes'] ?>
-                            </div>
+                        <div class="progress mt-3">
+                            <div class="progress-bar bg-success" style="width: <?= ($estadisticas['aprobados'] / max(1, $estadisticas['total_estudiantes'])) * 100 ?>%"><?= $estadisticas['aprobados'] ?></div>
+                            <div class="progress-bar bg-danger" style="width: <?= ($estadisticas['reprobados'] / max(1, $estadisticas['total_estudiantes'])) * 100 ?>%"><?= $estadisticas['reprobados'] ?></div>
+                            <div class="progress-bar bg-secondary" style="width: <?= ($estadisticas['pendientes'] / max(1, $estadisticas['total_estudiantes'])) * 100 ?>%"><?= $estadisticas['pendientes'] ?></div>
                         </div>
-                        <div class="text-center mt-2">
-                            <small>
-                                Aprobados: <?= round(($estadisticas['aprobados'] / $estadisticas['total_estudiantes']) * 100, 1) ?>% | 
-                                Reprobados: <?= round(($estadisticas['reprobados'] / $estadisticas['total_estudiantes']) * 100, 1) ?>% | 
-                                Pendientes: <?= round(($estadisticas['pendientes'] / $estadisticas['total_estudiantes']) * 100, 1) ?>%
-                            </small>
-                        </div>
-                        <?php endif; ?>
                     </div>
                 </div>
             </div>
         </div>
-
-        <style>
-        .stats-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-        .stat-item {
-            text-align: center;
-            padding: 8px;
-            border-radius: 6px;
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
-        }
-        .stat-value {
-            font-weight: bold;
-            margin-bottom: 2px;
-        }
-        .stat-label {
-            font-size: 0.8rem;
-            color: #6c757d;
-        }
-        </style>
         <?php
         break;
 }
 ?>
-
-<!-- JavaScript -->
-<script>
-let accionPendiente = null;
-let notasIdsPendientes = [];
-let estudianteNombrePendiente = "";
-
-function actualizarBotones() {
-    const selected = $('.estudiante-checkbox:checked');
-    const botonesGrupo = $('#botonesGrupo');
-    const botonesSeleccion = $('#botonesSeleccion');
-    
-    if (selected.length === 0) {
-        botonesGrupo.show();
-        botonesSeleccion.hide();
-    } else {
-        botonesGrupo.hide();
-        botonesSeleccion.show();
-        const contador = selected.length === 1 ? '1 estudiante' : selected.length + ' estudiantes';
-        $('#contadorSeleccion').text(contador);
-    }
-}
-
-function limpiarSeleccion() {
-    $('.estudiante-checkbox').prop('checked', false);
-    $('#selectAllEstudiantes').prop('checked', false);
-    actualizarBotones();
-}
-
-function aplicarAccion(accion) {
-    const selected = $('.estudiante-checkbox:checked');
-    if (selected.length === 0) {
-        alert('Seleccione al menos un estudiante');
-        return;
-    }
-    
-    const usuarioIds = selected.map(function() {
-        return $(this).val();
-    }).get();
-    
-    const nombresEstudiantes = [];
-    selected.each(function() {
-        const nombre = $(this).data('estudiante-nombre');
-        nombresEstudiantes.push(nombre);
-    });
-    
-    if (accion === 'rechazar') {
-        accionPendiente = accion;
-        notasIdsPendientes = usuarioIds;
-        estudianteNombrePendiente = nombresEstudiantes.join(", ");
-        $('#mensajeRechazoModal').modal('show');
-        $('#estudiantesRechazados').text(estudianteNombrePendiente);
-        $('#mensajeRechazoTexto').val("Las notas han sido rechazadas debido a: [ESPECIFIQUE EL MOTIVO]");
-    } else if (accion === 'aprobar') {
-        accionPendiente = accion;
-        notasIdsPendientes = usuarioIds;
-        estudianteNombrePendiente = nombresEstudiantes.join(", ");
-        $('#mensajeAprobacionModal').modal('show');
-        $('#estudiantesAprobados').text(estudianteNombrePendiente);
-        $('#mensajeAprobacionTexto').val("Las notas han sido aprobadas exitosamente.");
-    }
-}
-
-function accionGrupo(accion) {
-    if (accion === 'rechazar') {
-        $('#mensajeRechazoGrupoModal').modal('show');
-        $('#mensajeRechazoGrupoTexto').val("Las notas de todo el grupo han sido rechazadas debido a: [ESPECIFIQUE EL MOTIVO]");
-    } else if (accion === 'aprobar') {
-        $('#mensajeAprobacionGrupoModal').modal('show');
-        $('#mensajeAprobacionGrupoTexto').val("Las notas de todo el grupo han sido aprobadas exitosamente.");
-    }
-}
-
-function confirmarRechazo() {
-    const mensaje = $('#mensajeRechazoTexto').val().trim();
-    if (!mensaje) { alert('Por favor, ingrese un mensaje'); return; }
-    $('#mensajeRechazoModal').modal('hide');
-    
-    $.ajax({
-        url: 'procesar_acciones_trimestres.php',
-        type: 'POST',
-        data: {
-            accion: 'rechazar',
-            usuario_ids: notasIdsPendientes,
-            materia_id: <?= $materia_id ?>,
-            periodo_id: <?= $periodo_id ?>,
-            mensaje: mensaje
-        },
-        success: function(response) {
-            if (response.success) location.reload();
-            else alert('Error: ' + response.message);
-        },
-        error: function() { alert('Error al procesar'); }
-    });
-}
-
-function confirmarAprobacion() {
-    const mensaje = $('#mensajeAprobacionTexto').val().trim();
-    if (!mensaje) { alert('Por favor, ingrese un mensaje'); return; }
-    $('#mensajeAprobacionModal').modal('hide');
-    
-    $.ajax({
-        url: 'procesar_acciones_trimestres.php',
-        type: 'POST',
-        data: {
-            accion: 'aprobar',
-            usuario_ids: notasIdsPendientes,
-            materia_id: <?= $materia_id ?>,
-            periodo_id: <?= $periodo_id ?>,
-            mensaje: mensaje
-        },
-        success: function(response) {
-            if (response.success) location.reload();
-            else alert('Error: ' + response.message);
-        },
-        error: function() { alert('Error al procesar'); }
-    });
-}
-
-function confirmarRechazoGrupo() {
-    const mensaje = $('#mensajeRechazoGrupoTexto').val().trim();
-    if (!mensaje) { alert('Por favor, ingrese un mensaje'); return; }
-    $('#mensajeRechazoGrupoModal').modal('hide');
-    
-    $.ajax({
-        url: 'procesar_acciones_trimestres.php',
-        type: 'POST',
-        data: {
-            accion: 'rechazar',
-            docente_id: <?= $docente_id ?>,
-            materia_id: <?= $materia_id ?>,
-            periodo_id: <?= $periodo_id ?>,
-            accion_grupo: true,
-            mensaje: mensaje
-        },
-        success: function(response) {
-            if (response.success) location.reload();
-            else alert('Error: ' + response.message);
-        },
-        error: function() { alert('Error al procesar'); }
-    });
-}
-
-function confirmarAprobacionGrupo() {
-    const mensaje = $('#mensajeAprobacionGrupoTexto').val().trim();
-    if (!mensaje) { alert('Por favor, ingrese un mensaje'); return; }
-    $('#mensajeAprobacionGrupoModal').modal('hide');
-    
-    $.ajax({
-        url: 'procesar_acciones_trimestres.php',
-        type: 'POST',
-        data: {
-            accion: 'aprobar',
-            docente_id: <?= $docente_id ?>,
-            materia_id: <?= $materia_id ?>,
-            periodo_id: <?= $periodo_id ?>,
-            accion_grupo: true,
-            mensaje: mensaje
-        },
-        success: function(response) {
-            if (response.success) location.reload();
-            else alert('Error: ' + response.message);
-        },
-        error: function() { alert('Error al procesar'); }
-    });
-}
-
-$('#selectAllEstudiantes').change(function() {
-    $('.estudiante-checkbox').prop('checked', this.checked);
-    actualizarBotones();
-});
-
-$('.estudiante-checkbox').change(function() {
-    const total = $('.estudiante-checkbox').length;
-    const checked = $('.estudiante-checkbox:checked').length;
-    $('#selectAllEstudiantes').prop('checked', total === checked);
-    actualizarBotones();
-});
-
-$('.accion-individual').click(function() {
-    const usuarioId = $(this).data('usuario-id');
-    const accion = $(this).data('accion');
-    const estudianteNombre = $(this).data('estudiante-nombre');
-    
-    if (accion === 'rechazar') {
-        notasIdsPendientes = [usuarioId];
-        estudianteNombrePendiente = estudianteNombre;
-        $('#mensajeRechazoModal').modal('show');
-        $('#estudiantesRechazados').text(estudianteNombre);
-        $('#mensajeRechazoTexto').val("La nota ha sido rechazada debido a: [ESPECIFIQUE EL MOTIVO]");
-    } else if (accion === 'aprobar') {
-        notasIdsPendientes = [usuarioId];
-        estudianteNombrePendiente = estudianteNombre;
-        $('#mensajeAprobacionModal').modal('show');
-        $('#estudiantesAprobados').text(estudianteNombre);
-        $('#mensajeAprobacionTexto').val("La nota ha sido aprobada exitosamente.");
-    }
-});
-
-$(document).ready(function() {
-    actualizarBotones();
-});
-</script>
-
-<!-- Modales -->
-<div class="modal fade" id="mensajeRechazoModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-warning"><h5 class="modal-title">Rechazar Notas</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
-            <div class="modal-body">
-                <div class="alert alert-info"><strong>Estudiantes:</strong> <span id="estudiantesRechazados"></span></div>
-                <textarea class="form-control" id="mensajeRechazoTexto" rows="4" placeholder="Motivo del rechazo..."></textarea>
-            </div>
-            <div class="modal-footer"><button class="btn btn-secondary" data-dismiss="modal">Cancelar</button><button class="btn btn-primary" onclick="confirmarRechazo()">Enviar</button></div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="mensajeAprobacionModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-success"><h5 class="modal-title">Aprobar Notas</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
-            <div class="modal-body">
-                <div class="alert alert-info"><strong>Estudiantes:</strong> <span id="estudiantesAprobados"></span></div>
-                <textarea class="form-control" id="mensajeAprobacionTexto" rows="4" placeholder="Mensaje de aprobación..."></textarea>
-            </div>
-            <div class="modal-footer"><button class="btn btn-secondary" data-dismiss="modal">Cancelar</button><button class="btn btn-primary" onclick="confirmarAprobacion()">Enviar</button></div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="mensajeRechazoGrupoModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-warning"><h5 class="modal-title">Rechazar Todo el Grupo</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
-            <div class="modal-body"><textarea class="form-control" id="mensajeRechazoGrupoTexto" rows="4" placeholder="Motivo del rechazo grupal..."></textarea></div>
-            <div class="modal-footer"><button class="btn btn-secondary" data-dismiss="modal">Cancelar</button><button class="btn btn-primary" onclick="confirmarRechazoGrupo()">Enviar</button></div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="mensajeAprobacionGrupoModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-success"><h5 class="modal-title">Aprobar Todo el Grupo</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
-            <div class="modal-body"><textarea class="form-control" id="mensajeAprobacionGrupoTexto" rows="4" placeholder="Mensaje de aprobación grupal..."></textarea></div>
-            <div class="modal-footer"><button class="btn btn-secondary" data-dismiss="modal">Cancelar</button><button class="btn btn-primary" onclick="confirmarAprobacionGrupo()">Enviar</button></div>
-        </div>
-    </div>
-</div>

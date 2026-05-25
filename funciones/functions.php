@@ -11264,6 +11264,7 @@ function generarPDFDesdeHTML($elementoHTML, $nombreArchivo = 'documento.pdf') {
 
 /**
  * Obtener notas del estudiante incluyendo los 3 trimestres
+ * SOLO muestra notas que han sido APROBADAS por el administrador
  * @param int $estudiante_id ID del estudiante
  * @return array Array con las notas por materia
  */
@@ -11283,6 +11284,7 @@ function obtenerNotasEstudianteConTrimestres($estudiante_id) {
     FROM notas_trimestres nt
     LEFT JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
     WHERE nt.id_usuario = " . intval($estudiante_id) . "
+    AND nt.estado = 'aprobada'
     ORDER BY nt.id_materia, nt.trimestre_num";
     
     $result = $db->query($query);
@@ -11326,7 +11328,6 @@ function obtenerNotasEstudianteConTrimestres($estudiante_id) {
     
     return $notas;
 }
-
 
 
 
