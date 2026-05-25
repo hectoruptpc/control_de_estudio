@@ -18,38 +18,35 @@ visita();
 $titulopag = "Administrar Notas Pendientes";
 include("includes/head.php");
 
-// Obtener grupos de notas pendientes agrupados por docente/materia/periodo
+// Obtener grupos de notas pendientes desde notas_trimestres
 function obtenerGruposNotasPendientes() {
     global $db;
     
-    $query = "SELECT np.id_docente, np.id_materia, np.id_periodo,
-                     ud.nombre as nombre_docente, m.nombre_materia, 
-                     pa.nombre_periodo, s.codigo_seccion, c.nombre_carrera,
-                     COUNT(np.id) as total_notas, MAX(np.fecha_envio) as ultima_fecha
-              FROM notas_pendientes np
-              INNER JOIN users ud ON np.id_docente = ud.id
-              INNER JOIN materias m ON np.id_materia = m.id_materia
-              INNER JOIN periodos_academicos pa ON np.id_periodo = pa.id_periodo
-              INNER JOIN docente_seccion ds ON np.id_docente = ds.id_usuario 
-                                           AND np.id_materia = ds.id_materia
+    $query = "SELECT 
+                nt.id_docente, 
+                nt.id_materia, 
+                nt.id_periodo,
+                MAX(ud.nombre) as nombre_docente, 
+                MAX(m.nombre_materia) as nombre_materia, 
+                MAX(pa.nombre_periodo) as nombre_periodo, 
+                MAX(s.codigo_seccion) as codigo_seccion, 
+                MAX(c.nombre_carrera) as nombre_carrera,
+                COUNT(DISTINCT nt.id_usuario) as total_estudiantes,
+                MAX(nt.fecha_registro) as ultima_fecha
+              FROM notas_trimestres nt
+              INNER JOIN users ud ON nt.id_docente = ud.id
+              INNER JOIN materias m ON nt.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
+              INNER JOIN docente_seccion ds ON nt.id_docente = ds.id_usuario 
+                                           AND nt.id_materia = ds.id_materia
               INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
               INNER JOIN carreras c ON s.id_carrera = c.id_carrera
-              WHERE np.estado = 'pendiente'
-              GROUP BY np.id_docente, np.id_materia, np.id_periodo, s.codigo_seccion, c.nombre_carrera
+              WHERE nt.estado = 'pendiente'
+              GROUP BY nt.id_docente, nt.id_materia, nt.id_periodo
               ORDER BY ultima_fecha DESC";
     
     $result = $db->query($query);
     return $result;
-}
-
-// Procesar aprobación/rechazo - versión simplificada que redirige a procesar_acciones.php
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['accion']) && isset($_POST['notas_ids'])) {
-        // Esta lógica ahora se maneja en procesar_acciones.php
-        // Solo redirigimos si es una acción directa del formulario principal
-        $_SESSION['msg'] = "Procesando acción...";
-        // La lógica detallada está en procesar_acciones.php
-    }
 }
 
 $grupos_notas = obtenerGruposNotasPendientes();
@@ -68,7 +65,7 @@ $grupos_notas = obtenerGruposNotasPendientes();
             <h5>Cargas de Notas Pendientes por Docente</h5>
         </div>
         <div class="card-body">
-            <?php if ($grupos_notas->num_rows > 0): ?>
+            <?php if ($grupos_notas && $grupos_notas->num_rows > 0): ?>
                 <div class="table-responsive">
                     <table class="table table-bordered table-hover">
                         <thead class="thead-light">
@@ -78,7 +75,7 @@ $grupos_notas = obtenerGruposNotasPendientes();
                                 <th>Periodo</th>
                                 <th>Sección</th>
                                 <th>Carrera</th>
-                                <th># Notas</th>
+                                <th># Estudiantes</th>
                                 <th>Última Actualización</th>
                                 <th>Acciones</th>
                             </tr>
@@ -91,7 +88,7 @@ $grupos_notas = obtenerGruposNotasPendientes();
                                     <td><?= htmlspecialchars($grupo['nombre_periodo']) ?></td>
                                     <td><?= htmlspecialchars($grupo['codigo_seccion']) ?></td>
                                     <td><?= htmlspecialchars($grupo['nombre_carrera']) ?></td>
-                                    <td><span class="badge badge-info"><?= $grupo['total_notas'] ?></span></td>
+                                    <td><span class="badge badge-info"><?= $grupo['total_estudiantes'] ?></span></td>
                                     <td><?= date('d/m/Y H:i', strtotime($grupo['ultima_fecha'])) ?></td>
                                     <td>
                                         <button type="button" class="btn btn-sm btn-info btn-detalles" 
@@ -106,7 +103,7 @@ $grupos_notas = obtenerGruposNotasPendientes();
                                                 data-carrera="<?= htmlspecialchars($grupo['nombre_carrera']) ?>">
                                             Gestionar Notas
                                         </button>
-                                    </td>
+                                    </div>
                                 </tr>
                             <?php endwhile; ?>
                         </tbody>
@@ -133,7 +130,6 @@ $grupos_notas = obtenerGruposNotasPendientes();
             </div>
             <div class="modal-body">
                 <div class="row">
-                    <!-- Sidebar de navegación -->
                     <div class="col-md-3">
                         <div class="list-group" id="sidebarDetalles">
                             <a href="#lista-estudiantes" class="list-group-item list-group-item-action active" data-toggle="tab">
@@ -142,14 +138,9 @@ $grupos_notas = obtenerGruposNotasPendientes();
                             <a href="#resumen" class="list-group-item list-group-item-action" data-toggle="tab">
                                 <i class="fas fa-chart-bar"></i> Resumen
                             </a>
-                            <a href="#soporte" class="list-group-item list-group-item-action" data-toggle="tab">
-                                <i class="fas fa-paperclip"></i> Soporte
-                            </a>
-                            
                         </div>
                     </div>
                     
-                    <!-- Contenido de las pestañas -->
                     <div class="col-md-9">
                         <div class="tab-content" id="contenidoDetalles">
                             <div class="tab-pane fade show active" id="lista-estudiantes">
@@ -164,18 +155,6 @@ $grupos_notas = obtenerGruposNotasPendientes();
                                     <p>Cargando resumen...</p>
                                 </div>
                             </div>
-                            <div class="tab-pane fade" id="soporte">
-                                <div class="text-center">
-                                    <div class="spinner-border text-primary"></div>
-                                    <p>Cargando soporte...</p>
-                                </div>
-                            </div>
-                            <div class="tab-pane fade" id="acciones-grupo">
-                                <div class="text-center">
-                                    <div class="spinner-border text-primary"></div>
-                                    <p>Cargando acciones grupales...</p>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -186,7 +165,6 @@ $grupos_notas = obtenerGruposNotasPendientes();
 
 <script>
 $(document).ready(function() {
-    // Cargar detalles del grupo via AJAX
     $('.btn-detalles').click(function() {
         const docenteId = $(this).data('docente-id');
         const materiaId = $(this).data('materia-id');
@@ -197,7 +175,6 @@ $(document).ready(function() {
         const seccion = $(this).data('seccion');
         const carrera = $(this).data('carrera');
         
-        // Actualizar título del modal
         $('#tituloGrupo').text(`${docente} - ${materia} - ${periodo}`);
         
         // Cargar lista de estudiantes
@@ -227,36 +204,6 @@ $(document).ready(function() {
             },
             success: function(data) {
                 $('#resumen').html(data);
-            }
-        });
-        
-        // Cargar soporte
-        $.ajax({
-            url: 'ajax_detalles_notas.php',
-            type: 'POST',
-            data: { 
-                docente_id: docenteId, 
-                materia_id: materiaId, 
-                periodo_id: periodoId,
-                seccion: 'soporte'
-            },
-            success: function(data) {
-                $('#soporte').html(data);
-            }
-        });
-        
-        // Cargar acciones grupales
-        $.ajax({
-            url: 'ajax_detalles_notas.php',
-            type: 'POST',
-            data: { 
-                docente_id: docenteId, 
-                materia_id: materiaId, 
-                periodo_id: periodoId,
-                seccion: 'acciones-grupo'
-            },
-            success: function(data) {
-                $('#acciones-grupo').html(data);
             }
         });
     });

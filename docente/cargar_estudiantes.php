@@ -45,18 +45,88 @@ $trayecto_a_mostrar = determinarTrayectoAMostrar($id_trayecto_seccion);
 // Obtener ID del docente
 $docente_id = obtenerIdUsuario();
 
-// Verificar estados de notas
-$estados_notas = verificarEstadosNotas($estudiantes, $materia_id, $periodo_id, $docente_id, $trayecto_a_mostrar);
-
-// Actualizar la lógica para mostrar campo de soporte - incluir rechazadas
-$mostrar_campo_soporte = false;
-foreach ($estados_notas['estudiantes_info'] as $info) {
-    // Se puede editar si está pendiente O rechazada
-    if ($info['estado'] === 'pendiente' || $info['estado'] === 'rechazada') {
-        $mostrar_campo_soporte = true;
-        break;
+// Obtener notas existentes de los estudiantes (para los 3 trimestres)
+global $db;
+$notas_existentes = [];
+$query_notas = "SELECT id_usuario, trimestre_num, nota, estado 
+                FROM notas_trimestres 
+                WHERE id_materia = $materia_id 
+                AND id_periodo = $periodo_id";
+$result_notas = $db->query($query_notas);
+if ($result_notas && $result_notas->num_rows > 0) {
+    while ($row = $result_notas->fetch_assoc()) {
+        $notas_existentes[$row['id_usuario']][$row['trimestre_num']] = [
+            'nota' => $row['nota'],
+            'estado' => $row['estado'] ?? 'pendiente'
+        ];
     }
 }
+
+// Verificar estados de notas (adaptado para trimestres)
+$estados_notas = [
+    'notas_aprobadas' => false,
+    'notas_rechazadas' => false,
+    'notas_en_revision' => false,
+    'notas_pendientes' => false,
+    'estudiantes_con_notas_aprobadas' => [],
+    'estudiantes_con_notas_rechazadas' => [],
+    'estudiantes_con_notas_en_revision' => [],
+    'estudiantes_con_notas_pendientes' => [],
+    'estudiantes_info' => []
+];
+
+foreach ($estudiantes as $estudiante) {
+    $estudiante_id = $estudiante['id'];
+    $info_estudiante = ['datos' => $estudiante];
+    $tiene_notas_aprobadas = false;
+    $tiene_notas_rechazadas = false;
+    $tiene_notas_revision = false;
+    $tiene_notas_pendientes = false;
+    
+    for ($trimestre = 1; $trimestre <= 3; $trimestre++) {
+        $nota_info = $notas_existentes[$estudiante_id][$trimestre] ?? null;
+        if ($nota_info) {
+            $estado = $nota_info['estado'] ?? 'pendiente';
+            if ($estado === 'aprobada') {
+                $tiene_notas_aprobadas = true;
+                $estados_notas['notas_aprobadas'] = true;
+            } elseif ($estado === 'rechazada') {
+                $tiene_notas_rechazadas = true;
+                $estados_notas['notas_rechazadas'] = true;
+            } elseif ($estado === 'en_revision') {
+                $tiene_notas_revision = true;
+                $estados_notas['notas_en_revision'] = true;
+            } else {
+                $tiene_notas_pendientes = true;
+                $estados_notas['notas_pendientes'] = true;
+            }
+        } else {
+            $tiene_notas_pendientes = true;
+            $estados_notas['notas_pendientes'] = true;
+        }
+        
+        $info_estudiante["trimestre_{$trimestre}_estado"] = $nota_info['estado'] ?? 'pendiente';
+        $info_estudiante["trimestre_{$trimestre}_nota"] = $nota_info['nota'] ?? '';
+    }
+    
+    if ($tiene_notas_aprobadas) {
+        $estados_notas['estudiantes_con_notas_aprobadas'][] = $estudiante['nombre'];
+    }
+    if ($tiene_notas_rechazadas) {
+        $estados_notas['estudiantes_con_notas_rechazadas'][] = $estudiante['nombre'];
+    }
+    if ($tiene_notas_revision) {
+        $estados_notas['estudiantes_con_notas_en_revision'][] = $estudiante['nombre'];
+    }
+    if ($tiene_notas_pendientes) {
+        $estados_notas['estudiantes_con_notas_pendientes'][] = $estudiante['nombre'];
+    }
+    
+    $estados_notas['estudiantes_info'][] = $info_estudiante;
+}
+
+// Mostrar campo de soporte si hay notas pendientes o rechazadas
+$mostrar_campo_soporte = $estados_notas['notas_pendientes'] || $estados_notas['notas_rechazadas'];
 ?>
 
 <!-- Mostrar mensajes de éxito/error -->
@@ -161,12 +231,11 @@ foreach ($estados_notas['estudiantes_info'] as $info) {
                 <div class="card-body">
                     <div class="form-group">
                         <label for="soporte_grupo"><strong>Imagen/PDF de Soporte:</strong></label>
-                           <input type="file" 
+                        <input type="file" 
                                name="soporte_grupo" 
                                id="soporte_grupo"
                                class="form-control-file soporte-grupo" 
-                               accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
-                               required>
+                               accept=".jpg,.jpeg,.png,.gif,.webp,.pdf">
                         <small class="form-text text-muted">
                             Formatos permitidos: JPG, PNG, GIF, WEBP, PDF. Tamaño máximo: 5MB
                         </small>
@@ -190,77 +259,140 @@ foreach ($estados_notas['estudiantes_info'] as $info) {
                         <tr>
                             <th>Cédula</th>
                             <th>Nombre</th>
-                            <th class="text-center">Nota Trayecto <?= $trayecto_actual ?></th>
+                            <th class="text-center">Trimestre 1</th>
+                            <th class="text-center">Trimestre 2</th>
+                            <th class="text-center">Trimestre 3</th>
+                            <th class="text-center">Promedio Final</th>
                             <th>Estado</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($estados_notas['estudiantes_info'] as $info): 
                             $estudiante = $info['datos'];
-                            $estado = $info['estado'];
-                            $valor_nota = $info['valor_nota'];
-                            
-                            // Determinar si se puede editar
-                            $puede_editar = ($estado === 'pendiente' || $estado === 'rechazada');
-                            $campo_trayecto = 'trayecto_' . $trayecto_a_mostrar;
                         ?>
                             <tr>
                                 <td><?= htmlspecialchars($estudiante['idusuario']) ?></td>
                                 <td><?= htmlspecialchars($estudiante['nombre']) ?></td>
+                                
+                                <!-- Trimestre 1 -->
                                 <td class="text-center">
-                                    <?php if ($puede_editar): ?>
-                                        <div class="d-inline-block">
-                                            <input type="number" 
-                                                   name="notas[<?= $estudiante['id'] ?>][<?= $campo_trayecto ?>]" 
-                                                   class="form-control nota-input two-digit" 
-                                                   min="1" 
-                                                   max="20" 
-                                                   step="1"
-                                                   value="<?= $valor_nota ?>"
-                                                   oninput="validarNota(this)"
-                                                   onkeydown="limitarDigitos(event, this)"
-                                                   maxlength="2"
-                                                   required
-                                                   style="width: 80px; text-align: center; margin: 0 auto;">
-                                        </div>
+                                    <?php 
+                                    $estado_t1 = $info['trimestre_1_estado'] ?? 'pendiente';
+                                    $puede_editar_t1 = ($estado_t1 === 'pendiente' || $estado_t1 === 'rechazada');
+                                    $valor_t1 = $info['trimestre_1_nota'] ?? '';
+                                    ?>
+                                    <?php if ($puede_editar_t1): ?>
+                                        <input type="number" 
+                                               name="notas[<?= $estudiante['id'] ?>][trimestre_1]" 
+                                               class="form-control nota-input text-center" 
+                                               min="1" 
+                                               max="20" 
+                                               step="1"
+                                               value="<?= $valor_t1 ?>"
+                                               style="width: 80px; margin: 0 auto;"
+                                               onchange="calcularPromedio(this, <?= $estudiante['id'] ?>)">
                                     <?php else: ?>
-                                        <div class="d-inline-block">
-                                            <input type="text" 
-                                                   class="form-control two-digit-display" 
-                                                   value="<?= str_pad($valor_nota, 2, '0', STR_PAD_LEFT) ?>"
-                                                   readonly
-                                                   style="width: 80px; text-align: center; margin: 0 auto; background-color: #f8f9fa; cursor: not-allowed;">
-                                            <input type="hidden" 
-                                                   name="notas[<?= $estudiante['id'] ?>][<?= $campo_trayecto ?>]" 
-                                                   value="<?= $valor_nota ?>">
-                                        </div>
+                                        <input type="text" 
+                                               class="form-control text-center" 
+                                               value="<?= $valor_t1 ?: '-' ?>"
+                                               readonly
+                                               style="width: 80px; margin: 0 auto; background-color: #f8f9fa;">
+                                        <input type="hidden" 
+                                               name="notas[<?= $estudiante['id'] ?>][trimestre_1]" 
+                                               value="<?= $valor_t1 ?>">
                                     <?php endif; ?>
                                 </td>
+                                
+                                <!-- Trimestre 2 -->
+                                <td class="text-center">
+                                    <?php 
+                                    $estado_t2 = $info['trimestre_2_estado'] ?? 'pendiente';
+                                    $puede_editar_t2 = ($estado_t2 === 'pendiente' || $estado_t2 === 'rechazada');
+                                    $valor_t2 = $info['trimestre_2_nota'] ?? '';
+                                    ?>
+                                    <?php if ($puede_editar_t2): ?>
+                                        <input type="number" 
+                                               name="notas[<?= $estudiante['id'] ?>][trimestre_2]" 
+                                               class="form-control nota-input text-center" 
+                                               min="1" 
+                                               max="20" 
+                                               step="1"
+                                               value="<?= $valor_t2 ?>"
+                                               style="width: 80px; margin: 0 auto;"
+                                               onchange="calcularPromedio(this, <?= $estudiante['id'] ?>)">
+                                    <?php else: ?>
+                                        <input type="text" 
+                                               class="form-control text-center" 
+                                               value="<?= $valor_t2 ?: '-' ?>"
+                                               readonly
+                                               style="width: 80px; margin: 0 auto; background-color: #f8f9fa;">
+                                        <input type="hidden" 
+                                               name="notas[<?= $estudiante['id'] ?>][trimestre_2]" 
+                                               value="<?= $valor_t2 ?>">
+                                    <?php endif; ?>
+                                </td>
+                                
+                                <!-- Trimestre 3 -->
+                                <td class="text-center">
+                                    <?php 
+                                    $estado_t3 = $info['trimestre_3_estado'] ?? 'pendiente';
+                                    $puede_editar_t3 = ($estado_t3 === 'pendiente' || $estado_t3 === 'rechazada');
+                                    $valor_t3 = $info['trimestre_3_nota'] ?? '';
+                                    ?>
+                                    <?php if ($puede_editar_t3): ?>
+                                        <input type="number" 
+                                               name="notas[<?= $estudiante['id'] ?>][trimestre_3]" 
+                                               class="form-control nota-input text-center" 
+                                               min="1" 
+                                               max="20" 
+                                               step="1"
+                                               value="<?= $valor_t3 ?>"
+                                               style="width: 80px; margin: 0 auto;"
+                                               onchange="calcularPromedio(this, <?= $estudiante['id'] ?>)">
+                                    <?php else: ?>
+                                        <input type="text" 
+                                               class="form-control text-center" 
+                                               value="<?= $valor_t3 ?: '-' ?>"
+                                               readonly
+                                               style="width: 80px; margin: 0 auto; background-color: #f8f9fa;">
+                                        <input type="hidden" 
+                                               name="notas[<?= $estudiante['id'] ?>][trimestre_3]" 
+                                               value="<?= $valor_t3 ?>">
+                                    <?php endif; ?>
+                                </td>
+                                
+                                <!-- Promedio Final (solo lectura, se calcula automáticamente) -->
+                                <td class="text-center">
+                                    <input type="text" 
+                                           id="promedio_<?= $estudiante['id'] ?>"
+                                           class="form-control text-center bg-light"
+                                           readonly
+                                           style="width: 80px; margin: 0 auto; font-weight: bold;">
+                                    <input type="hidden" 
+                                           name="notas[<?= $estudiante['id'] ?>][nota_final]"
+                                           id="promedio_hidden_<?= $estudiante['id'] ?>"
+                                           value="">
+                                </td>
+                                
                                 <td>
                                     <?php
-                                    $badge_class = 'secondary';
-                                    $badge_text = 'Pendiente';
-                                    $descripcion_estado = 'No se ha subido la nota';
-                                    
-                                    if ($estado === 'en_revision') {
-                                        $badge_class = 'warning';
-                                        $badge_text = 'En Revisión';
-                                        $descripcion_estado = 'En revisión por administradores';
-                                    } elseif ($estado === 'aprobada') {
+                                    // Determinar el estado general (el más crítico)
+                                    $estados_temp = [$estado_t1 ?? 'pendiente', $estado_t2 ?? 'pendiente', $estado_t3 ?? 'pendiente'];
+                                    if (in_array('aprobada', $estados_temp)) {
                                         $badge_class = 'success';
                                         $badge_text = 'Aprobada';
-                                        $descripcion_estado = 'No se puede modificar';
-                                    } elseif ($estado === 'rechazada') {
+                                    } elseif (in_array('en_revision', $estados_temp)) {
+                                        $badge_class = 'warning';
+                                        $badge_text = 'En Revisión';
+                                    } elseif (in_array('rechazada', $estados_temp)) {
                                         $badge_class = 'danger';
                                         $badge_text = 'Rechazada';
-                                        $descripcion_estado = 'Puede corregir y reenviar';
+                                    } else {
+                                        $badge_class = 'secondary';
+                                        $badge_text = 'Pendiente';
                                     }
                                     ?>
-                                    <span class="badge badge-<?= $badge_class ?>">
-                                        <?= $badge_text ?>
-                                    </span>
-                                    <br>
-                                    <small class="text-muted"><?= $descripcion_estado ?></small>
+                                    <span class="badge badge-<?= $badge_class ?>"><?= $badge_text ?></span>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -278,86 +410,61 @@ foreach ($estados_notas['estudiantes_info'] as $info) {
             
             <button type="submit" class="btn btn-success btn-lg">
                 <i class="fas fa-save"></i> 
-                <?= ($estados_notas['notas_pendientes'] || $estados_notas['notas_rechazadas']) ? 'Enviar Notas y Soporte' : 'Actualizar Notas' ?>
+                Guardar Notas
             </button>
-            
-            <?php if ($estados_notas['notas_en_revision']): ?>
-                <div class="mt-3 alert alert-info">
-                    <i class="fas fa-info-circle"></i>
-                    <strong>Nota:</strong> Las notas en revisión no pueden ser modificadas hasta que los administradores completen su evaluación.
-                </div>
-            <?php endif; ?>
         </form>
     </div>
 </div>
 
-<style>
-.nota-input.two-digit {
-    font-variant-numeric: tabular-nums;
-    font-weight: bold;
-    letter-spacing: 2px;
-}
-
-.nota-input.two-digit::-webkit-outer-spin-button,
-.nota-input.two-digit::-webkit-inner-spin-button {
-    opacity: 1;
-    height: 30px;
-}
-
-.two-digit-display {
-    font-variant-numeric: tabular-nums;
-    font-weight: bold;
-    letter-spacing: 2px;
-}
-
-.img-preview img {
-    max-width: 100%;
-    height: auto;
-}
-
-#preview-grupo img {
-    max-height: 150px;
-    max-width: 100%;
-}
-</style>
-
 <script>
-function limitarDigitos(event, input) {
-    if (event.key === 'Backspace' || event.key === 'Delete' || event.key === 'Tab' || 
-        event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'Home' || event.key === 'End') {
-        return;
+function calcularPromedio(input, estudianteId) {
+    // Obtener valores de los 3 trimestres
+    const t1 = parseFloat(document.querySelector(`input[name="notas[${estudianteId}][trimestre_1]"]`)?.value) || 0;
+    const t2 = parseFloat(document.querySelector(`input[name="notas[${estudianteId}][trimestre_2]"]`)?.value) || 0;
+    const t3 = parseFloat(document.querySelector(`input[name="notas[${estudianteId}][trimestre_3]"]`)?.value) || 0;
+    
+    // Calcular promedio simple
+    let promedio = 0;
+    let notasValidas = 0;
+    
+    if (t1 > 0) { promedio += t1; notasValidas++; }
+    if (t2 > 0) { promedio += t2; notasValidas++; }
+    if (t3 > 0) { promedio += t3; notasValidas++; }
+    
+    if (notasValidas > 0) {
+        promedio = (promedio / notasValidas).toFixed(1);
+    } else {
+        promedio = '';
     }
     
-    if (input.value.length >= 2 && !event.ctrlKey && !event.metaKey) {
-        event.preventDefault();
-        
-        if (event.key >= '0' && event.key <= '9') {
-            input.value = event.key;
-            validarNota(input);
-        }
+    // Mostrar en el campo de texto
+    const promedioField = document.getElementById(`promedio_${estudianteId}`);
+    const promedioHidden = document.getElementById(`promedio_hidden_${estudianteId}`);
+    
+    if (promedioField) {
+        promedioField.value = promedio;
+    }
+    if (promedioHidden) {
+        promedioHidden.value = promedio;
     }
 }
 
-function validarNota(input) {
-    input.value = input.value.replace(/[^0-9]/g, '');
+// Calcular promedios al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    <?php foreach ($estudiantes as $estudiante): ?>
+        calcularPromedio(null, <?= $estudiante['id'] ?>);
+    <?php endforeach; ?>
     
-    if (input.value === '') {
-        input.value = '1';
-        return;
-    }
-    
-    let valor = parseInt(input.value);
-    
-    if (valor < 1) {
-        input.value = '1';
-    } else if (valor > 20) {
-        input.value = '20';
-    }
-    
-    if (input.value.length > 2) {
-        input.value = input.value.slice(0, 2);
-    }
-}
+    // Validar notas
+    document.querySelectorAll('.nota-input').forEach(input => {
+        input.addEventListener('input', function() {
+            let val = parseInt(this.value);
+            if (isNaN(val)) val = 1;
+            if (val < 1) this.value = 1;
+            if (val > 20) this.value = 20;
+        });
+    });
+});
 
 // Preview para el soporte del grupo
 document.addEventListener('DOMContentLoaded', function() {
@@ -373,7 +480,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     if (file.type.startsWith('image/')) {
-                        previewGrupo.innerHTML = `<img src="${e.target.result}" class="img-thumbnail">`;
+                        previewGrupo.innerHTML = `<img src="${e.target.result}" class="img-thumbnail" style="max-height:150px;">`;
                     } else {
                         previewGrupo.innerHTML = `
                             <div class="alert alert-info text-center">
@@ -391,41 +498,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
-    // Validar todas las notas al cargar la página
-    document.querySelectorAll('.nota-input').forEach(input => {
-        let valor = parseInt(input.value);
-        input.value = valor;
-        
-        input.addEventListener('blur', function() {
-            validarNota(this);
-        });
-        
-        input.addEventListener('focus', function() {
-            this.select();
-        });
-        
-        input.addEventListener('change', function() {
-            validarNota(this);
-        });
-        
-        input.addEventListener('input', function(e) {
-            if (this.value === '') {
-                setTimeout(() => {
-                    this.value = '1';
-                }, 10);
-            }
-        });
-        
-        input.addEventListener('paste', function(e) {
-            e.preventDefault();
-            let pastedData = e.clipboardData.getData('text');
-            let numero = parseInt(pastedData.replace(/[^0-9]/g, ''));
-            if (!isNaN(numero) && numero >= 1 && numero <= 20) {
-                this.value = numero;
-                validarNota(this);
-            }
-        });
-    });
 });
 </script>
+
+<style>
+.nota-input {
+    font-weight: bold;
+    text-align: center;
+}
+</style>

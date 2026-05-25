@@ -11260,6 +11260,206 @@ function generarPDFDesdeHTML($elementoHTML, $nombreArchivo = 'documento.pdf') {
 //CARGA DE NOTAS ***********************************************************************
 
 
+
+
+/**
+ * Obtener notas del estudiante incluyendo los 3 trimestres
+ * @param int $estudiante_id ID del estudiante
+ * @return array Array con las notas por materia
+ */
+function obtenerNotasEstudianteConTrimestres($estudiante_id) {
+    global $db;
+    
+    $notas = [];
+    
+    $query = "SELECT 
+        nt.id_materia,
+        nt.trimestre_num,
+        nt.nota,
+        nt.estado,
+        nt.fecha_registro,
+        nt.id_periodo,
+        pa.nombre_periodo
+    FROM notas_trimestres nt
+    LEFT JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
+    WHERE nt.id_usuario = " . intval($estudiante_id) . "
+    ORDER BY nt.id_materia, nt.trimestre_num";
+    
+    $result = $db->query($query);
+    
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $materia_id = $row['id_materia'];
+            $trimestre = $row['trimestre_num'];
+            
+            if (!isset($notas[$materia_id])) {
+                $notas[$materia_id] = [
+                    'trimestre_1' => null,
+                    'trimestre_2' => null,
+                    'trimestre_3' => null,
+                    'nota_final' => null,
+                    'id_periodo' => $row['id_periodo'],
+                    'nombre_periodo' => $row['nombre_periodo'],
+                    'fecha_registro' => $row['fecha_registro'],
+                    'estado' => $row['estado']
+                ];
+            }
+            
+            $notas[$materia_id]["trimestre_$trimestre"] = $row['nota'];
+        }
+    }
+    
+    // Calcular nota final para cada materia
+    foreach ($notas as $materia_id => $nota_data) {
+        $suma = 0;
+        $count = 0;
+        for ($i = 1; $i <= 3; $i++) {
+            if ($nota_data["trimestre_$i"] !== null && $nota_data["trimestre_$i"] > 0) {
+                $suma += $nota_data["trimestre_$i"];
+                $count++;
+            }
+        }
+        if ($count > 0) {
+            $notas[$materia_id]['nota_final'] = round($suma / $count, 1);
+        }
+    }
+    
+    return $notas;
+}
+
+
+
+
+
+
+/**
+ * Obtener información del grupo para notas trimestrales
+ */
+function obtenerInfoGrupoNotasTrimestres($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT 
+                ud.nombre as nombre_docente,
+                m.nombre_materia,
+                pa.nombre_periodo,
+                s.codigo_seccion,
+                c.nombre_carrera
+              FROM notas_trimestres nt
+              INNER JOIN users ud ON nt.id_docente = ud.id
+              INNER JOIN materias m ON nt.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
+              INNER JOIN docente_seccion ds ON nt.id_docente = ds.id_usuario AND nt.id_materia = ds.id_materia
+              INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              WHERE nt.id_docente = $docente_id 
+              AND nt.id_materia = $materia_id 
+              AND nt.id_periodo = $periodo_id
+              LIMIT 1";
+    
+    $result = $db->query($query);
+    return $result->fetch_assoc();
+}
+
+/**
+ * Obtener estudiantes con sus notas trimestrales
+ */
+function obtenerEstudiantesConNotasTrimestres($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT 
+                u.id as id_usuario,
+                u.idusuario as cedula,
+                u.nombre as nombre_estudiante,
+                MAX(CASE WHEN nt.trimestre_num = 1 THEN nt.nota END) as trimestre_1,
+                MAX(CASE WHEN nt.trimestre_num = 2 THEN nt.nota END) as trimestre_2,
+                MAX(CASE WHEN nt.trimestre_num = 3 THEN nt.nota END) as trimestre_3,
+                nt.estado
+              FROM users u
+              INNER JOIN estudiante_seccion es ON u.id = es.id_usuario
+              INNER JOIN docente_seccion ds ON es.id_seccion = ds.id_seccion
+              LEFT JOIN notas_trimestres nt ON u.id = nt.id_usuario 
+                  AND nt.id_materia = $materia_id 
+                  AND nt.id_periodo = $periodo_id
+              WHERE ds.id_usuario = $docente_id 
+              AND ds.id_materia = $materia_id
+              AND u.estudiante = 1
+              GROUP BY u.id, u.idusuario, u.nombre, nt.estado
+              ORDER BY u.nombre ASC";
+    
+    return $db->query($query);
+}
+
+/**
+ * Obtener estadísticas del grupo para notas trimestrales
+ */
+function obtenerEstadisticasGrupoTrimestres($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $estadisticas = [
+        'total_estudiantes' => 0,
+        'aprobados' => 0,
+        'reprobados' => 0,
+        'pendientes' => 0,
+        'promedio_general' => 0
+    ];
+    
+    $query = "SELECT 
+                u.id as id_usuario,
+                MAX(CASE WHEN nt.trimestre_num = 1 THEN nt.nota END) as trimestre_1,
+                MAX(CASE WHEN nt.trimestre_num = 2 THEN nt.nota END) as trimestre_2,
+                MAX(CASE WHEN nt.trimestre_num = 3 THEN nt.nota END) as trimestre_3,
+                nt.estado
+              FROM users u
+              INNER JOIN estudiante_seccion es ON u.id = es.id_usuario
+              INNER JOIN docente_seccion ds ON es.id_seccion = ds.id_seccion
+              LEFT JOIN notas_trimestres nt ON u.id = nt.id_usuario 
+                  AND nt.id_materia = $materia_id 
+                  AND nt.id_periodo = $periodo_id
+              WHERE ds.id_usuario = $docente_id 
+              AND ds.id_materia = $materia_id
+              AND u.estudiante = 1
+              GROUP BY u.id, nt.estado";
+    
+    $result = $db->query($query);
+    $suma_notas = 0;
+    $count_notas = 0;
+    
+    while ($row = $result->fetch_assoc()) {
+        $estadisticas['total_estudiantes']++;
+        
+        $t1 = $row['trimestre_1'];
+        $t2 = $row['trimestre_2'];
+        $t3 = $row['trimestre_3'];
+        
+        $suma = 0;
+        $cnt = 0;
+        if ($t1 !== null) { $suma += $t1; $cnt++; }
+        if ($t2 !== null) { $suma += $t2; $cnt++; }
+        if ($t3 !== null) { $suma += $t3; $cnt++; }
+        $nota_final = $cnt > 0 ? round($suma / $cnt, 1) : null;
+        
+        if ($row['estado'] === 'aprobada') {
+            $estadisticas['aprobados']++;
+            if ($nota_final !== null) { $suma_notas += $nota_final; $count_notas++; }
+        } elseif ($row['estado'] === 'rechazada') {
+            $estadisticas['reprobados']++;
+        } else {
+            $estadisticas['pendientes']++;
+        }
+    }
+    
+    $estadisticas['promedio_general'] = $count_notas > 0 ? round($suma_notas / $count_notas, 1) : 0;
+    
+    return $estadisticas;
+}
+
+
+
+
+
+
+
+
 // FUNCIÓN PARA OBTENER NOTAS DEFINITIVAS (SOLO LECTURA - SIN AUDITORÍA)
 function obtenerNotasDefinitivas($estudiante_id, $materia_id) {
     global $db;
