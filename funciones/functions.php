@@ -11333,6 +11333,40 @@ function obtenerNotasEstudianteConTrimestres($estudiante_id) {
 
 
 
+
+/**
+ * Obtener SOLO las materias que un estudiante tiene inscritas
+ * @param int $estudiante_id ID del estudiante
+ * @param int $carrera_id ID de la carrera
+ * @return mysqli_result|false
+ */
+function obtenerMateriasInscritasPorEstudiante($estudiante_id, $carrera_id) {
+    global $db;
+    
+    $query = "SELECT DISTINCT 
+                m.id_materia,
+                m.nombre_materia,
+                m.cod_materia,
+                m.trayecto,
+                m.creditos
+              FROM estudiante_materias em
+              INNER JOIN materias m ON em.id_materia = m.id_materia
+              INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+              WHERE em.id_usuario = " . intval($estudiante_id) . "
+              AND cm.id_carrera = " . intval($carrera_id) . "
+              AND em.estatus = 'activo'
+              ORDER BY m.trayecto ASC, m.nombre_materia ASC";
+    
+    return $db->query($query);
+}
+
+
+
+
+
+
+
+
 /**
  * Obtener información del grupo para notas trimestrales
  */
@@ -16218,7 +16252,7 @@ function obtenerNotasEstudianteConsulta($estudiante_id) {
     return $notas;
 }
 
-// Función para determinar si el estudiante es apto para grado (CON AUDITORÍA PARA CASOS ESPECIALES)
+// Función para determinar si el estudiante es apto para grado (SOLO MATERIAS INSCRITAS)
 function esAptoParaGradoConsulta($estudiante_id, $carrera_id) {
     global $db;
     
@@ -16228,22 +16262,9 @@ function esAptoParaGradoConsulta($estudiante_id, $carrera_id) {
         $carrera_info = obtenerCarreraPorId($carrera_id);
         
         if (!$estudiante_info) {
-            // REGISTRAR EN AUDITORÍA - ESTUDIANTE NO ENCONTRADO
             if (function_exists('registrarAuditoria')) {
                 try {
-                    registrarAuditoria(
-                        "ERROR", 
-                        "users", 
-                        $estudiante_id, 
-                        null, 
-                        [
-                            'id_estudiante' => $estudiante_id,
-                            'id_carrera' => $carrera_id,
-                            'error' => 'Estudiante no encontrado'
-                        ], 
-                        "Consulta de Grado", 
-                        "Error en consulta de aptitud para grado - Estudiante no existe"
-                    );
+                    registrarAuditoria("ERROR", "users", $estudiante_id, null, ['id_estudiante' => $estudiante_id, 'id_carrera' => $carrera_id, 'error' => 'Estudiante no encontrado'], "Consulta de Grado", "Error en consulta de aptitud para grado - Estudiante no existe");
                 } catch (Exception $auditError) {
                     error_log("Error en auditoría esAptoParaGradoConsulta: " . $auditError->getMessage());
                 }
@@ -16262,44 +16283,51 @@ function esAptoParaGradoConsulta($estudiante_id, $carrera_id) {
             ];
         }
 
-        // Obtener todas las materias de la carrera
-        $materias_carrera = obtenerMateriasCarrera($carrera_id);
-        $total_materias_carrera = $materias_carrera->num_rows;
+        // Obtener SOLO las materias que el estudiante tiene INSCRITAS
+        $materias_inscritas = obtenerMateriasInscritasPorEstudiante($estudiante_id, $carrera_id);
         
-        // Obtener notas del estudiante
-        $notas_estudiante = obtenerNotasEstudianteConsulta($estudiante_id);
+        if (!$materias_inscritas) {
+            return [
+                'apto_tsu' => false,
+                'apto_grado_completo' => false,
+                'materias_aprobadas_tsu' => 0,
+                'total_materias_tsu' => 0,
+                'porcentaje_tsu' => 0,
+                'materias_aprobadas_completo' => 0,
+                'total_materias_carrera' => 0,
+                'porcentaje_completo' => 0
+            ];
+        }
         
-        // Contadores para TSU (trayectos 0, 1, 2)
+        // Obtener notas del estudiante (solo aprobadas)
+        $notas_estudiante = obtenerNotasEstudianteConTrimestres($estudiante_id);
+        
+        // Contadores
         $materias_aprobadas_tsu = 0;
         $total_materias_tsu = 0;
-        
-        // Contadores para carrera completa
         $materias_aprobadas_completo = 0;
+        $total_materias_carrera = 0;
         
-        // Recorrer todas las materias de la carrera
-        while ($materia = $materias_carrera->fetch_assoc()) {
+        // Recorrer SOLO las materias inscritas
+        while ($materia = $materias_inscritas->fetch_assoc()) {
             $trayecto = (int)$materia['trayecto'];
             $materia_id = $materia['id_materia'];
+            $total_materias_carrera++;
             
             // Verificar si es materia de TSU (trayectos 0, 1, 2)
             if ($trayecto <= 2) {
                 $total_materias_tsu++;
             }
             
-            // Verificar si el estudiante aprobó esta materia
+            // Verificar si el estudiante aprobó esta materia (nota final >= 12)
             if (isset($notas_estudiante[$materia_id])) {
-                $nota = $notas_estudiante[$materia_id];
-                $campo_trayecto = 'trayecto_' . $trayecto;
+                $nota_data = $notas_estudiante[$materia_id];
+                $nota_final = $nota_data['nota_final'] ?? null;
                 
-                if (isset($nota[$campo_trayecto]) && $nota[$campo_trayecto] !== null) {
-                    $nota_valor = (float)$nota[$campo_trayecto];
-                    if ($nota_valor >= 12) {
-                        $materias_aprobadas_completo++;
-                        
-                        // Si es materia de TSU, contar para TSU también
-                        if ($trayecto <= 2) {
-                            $materias_aprobadas_tsu++;
-                        }
+                if ($nota_final !== null && $nota_final >= 12) {
+                    $materias_aprobadas_completo++;
+                    if ($trayecto <= 2) {
+                        $materias_aprobadas_tsu++;
                     }
                 }
             }
@@ -16310,8 +16338,8 @@ function esAptoParaGradoConsulta($estudiante_id, $carrera_id) {
         $porcentaje_completo = $total_materias_carrera > 0 ? round(($materias_aprobadas_completo / $total_materias_carrera) * 100, 1) : 0;
         
         // Determinar si es apto
-        $apto_tsu = ($porcentaje_tsu >= 90); // 90% o más para TSU
-        $apto_grado_completo = ($porcentaje_completo >= 100); // 100% para grado completo
+        $apto_tsu = ($porcentaje_tsu >= 90);
+        $apto_grado_completo = ($porcentaje_completo >= 100);
         
         $resultado = [
             'apto_tsu' => $apto_tsu,
@@ -16324,31 +16352,22 @@ function esAptoParaGradoConsulta($estudiante_id, $carrera_id) {
             'porcentaje_completo' => $porcentaje_completo
         ];
         
-        // REGISTRAR EN AUDITORÍA - CONSULTA DE APTITUD PARA GRADO (SOLO SI ES APTO)
+        // REGISTRAR EN AUDITORÍA
         if (function_exists('registrarAuditoria') && ($apto_tsu || $apto_grado_completo)) {
             try {
                 $tipo_aptitud = $apto_grado_completo ? 'GRADO_COMPLETO' : ($apto_tsu ? 'TSU' : 'NO_APTO');
-                
-                registrarAuditoria(
-                    "CONSULTA", 
-                    "notas_definitivas", 
-                    $estudiante_id, 
-                    null, 
-                    [
-                        'id_estudiante' => $estudiante_id,
-                        'cedula_estudiante' => $estudiante_info['idusuario'] ?? '',
-                        'nombre_estudiante' => $estudiante_info['nombre'] ?? '',
-                        'id_carrera' => $carrera_id,
-                        'carrera_nombre' => $carrera_info['nombre_carrera'] ?? '',
-                        'apto_tsu' => $apto_tsu,
-                        'apto_grado_completo' => $apto_grado_completo,
-                        'porcentaje_tsu' => $porcentaje_tsu,
-                        'porcentaje_completo' => $porcentaje_completo,
-                        'tipo_aptitud' => $tipo_aptitud
-                    ], 
-                    "Consulta de Grado", 
-                    "Consulta de aptitud para grado - " . $tipo_aptitud
-                );
+                registrarAuditoria("CONSULTA", "notas_trimestres", $estudiante_id, null, [
+                    'id_estudiante' => $estudiante_id,
+                    'cedula_estudiante' => $estudiante_info['idusuario'] ?? '',
+                    'nombre_estudiante' => $estudiante_info['nombre'] ?? '',
+                    'id_carrera' => $carrera_id,
+                    'carrera_nombre' => $carrera_info['nombre_carrera'] ?? '',
+                    'apto_tsu' => $apto_tsu,
+                    'apto_grado_completo' => $apto_grado_completo,
+                    'porcentaje_tsu' => $porcentaje_tsu,
+                    'porcentaje_completo' => $porcentaje_completo,
+                    'tipo_aptitud' => $tipo_aptitud
+                ], "Consulta de Grado", "Consulta de aptitud para grado - " . $tipo_aptitud);
             } catch (Exception $e) {
                 error_log("Error en auditoría esAptoParaGradoConsulta: " . $e->getMessage());
             }
@@ -16358,27 +16377,6 @@ function esAptoParaGradoConsulta($estudiante_id, $carrera_id) {
         
     } catch (Exception $e) {
         error_log("Error en esAptoParaGradoConsulta: " . $e->getMessage());
-        
-        // REGISTRAR EN AUDITORÍA - ERROR EN CONSULTA DE GRADO
-        if (function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "ERROR", 
-                    "notas_definitivas", 
-                    $estudiante_id, 
-                    null, 
-                    [
-                        'id_estudiante' => $estudiante_id,
-                        'id_carrera' => $carrera_id,
-                        'error' => $e->getMessage()
-                    ], 
-                    "Consulta de Grado", 
-                    "Error en consulta de aptitud para grado"
-                );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de error esAptoParaGradoConsulta: " . $auditError->getMessage());
-            }
-        }
         
         return [
             'apto_tsu' => false,

@@ -40,8 +40,8 @@ if (!empty($cedula)) {
         $carrera = obtenerCarreraEstudiante($estudiante['id']);
         
         if ($carrera) {
-            // Obtener todas las materias de la carrera
-            $materias_carrera = obtenerMateriasCarrera($carrera['id_carrera']);
+            // Obtener SOLO las materias que el estudiante tiene inscritas
+            $materias_carrera = obtenerMateriasInscritasPorEstudiante($estudiante['id'], $carrera['id_carrera']);
             
             // Obtener notas APROBADAS del estudiante (solo las que tienen estado = 'aprobada')
             $notas_estudiante = obtenerNotasEstudianteConTrimestres($estudiante['id']);
@@ -82,7 +82,7 @@ if (!empty($cedula)) {
         </div>
     </div>
     
-    <?php if ($estudiante && $carrera): ?>
+    <?php if ($estudiante && $carrera && $materias_carrera && $materias_carrera->num_rows > 0): ?>
 <div class="card mb-4">
     <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Información del Estudiante</h5>
@@ -109,7 +109,7 @@ if (!empty($cedula)) {
             </div>
             <div class="col-md-6">
                 <p><strong>Carrera:</strong> <?= htmlspecialchars($carrera['nombre_carrera']) ?> (<?= htmlspecialchars($carrera['cod_carrera']) ?>)</p>
-                <p><strong>Total de Materias:</strong> <span class="badge badge-primary"><?= $materias_carrera->num_rows ?></span></p>
+                <p><strong>Materias Inscritas:</strong> <span class="badge badge-primary"><?= $materias_carrera->num_rows ?></span></p>
                 <?php if ($info_apto): ?>
                 <p><strong>Estado para Grado:</strong> 
                     <?= obtenerBadgeEstadoConsulta($info_apto) ?>
@@ -152,10 +152,9 @@ if (!empty($cedula)) {
     </div>
 </div>
 
-<?php if ($materias_carrera && $materias_carrera->num_rows > 0): ?>
 <div class="card">
     <div class="card-header bg-success text-white">
-        <h5>Plan de Estudios y Notas por Trimestre</h5>
+        <h5>Materias Inscritas y Notas por Trimestre</h5>
     </div>
     <div class="card-body">
         <div class="table-responsive">
@@ -290,7 +289,7 @@ if (!empty($cedula)) {
                         <div class="row">
                             <div class="col-6 text-center mb-3">
                                 <h3 class="text-primary"><?= $total_materias ?></h3>
-                                <small>Total Materias</small>
+                                <small>Materias Inscritas</small>
                             </div>
                             <div class="col-6 text-center mb-3">
                                 <h3 class="<?= $promedio_general >= 12 ? 'text-success' : ($promedio_general > 0 ? 'text-warning' : 'text-secondary') ?>">
@@ -313,7 +312,7 @@ if (!empty($cedula)) {
                                 <?= $porcentaje_completado ?>%
                             </div>
                         </div>
-                        <p class="mt-2 text-center"><small>Progreso de la carrera</small></p>
+                        <p class="mt-2 text-center"><small>Progreso de materias cursadas</small></p>
                     </div>
                 </div>
             </div>
@@ -335,13 +334,13 @@ if (!empty($cedula)) {
         </div>
     </div>
 </div>
-<?php else: ?>
+
+<?php elseif ($estudiante && $carrera && (!$materias_carrera || $materias_carrera->num_rows == 0)): ?>
     <div class="alert alert-warning">
-        No se encontraron materias para la carrera: <?= htmlspecialchars($carrera['nombre_carrera']) ?>
+        Este estudiante no tiene materias inscritas en la carrera: <?= htmlspecialchars($carrera['nombre_carrera']) ?>
     </div>
 <?php endif; ?>
 
-<?php endif; ?>
 </div>
 
 <style>
