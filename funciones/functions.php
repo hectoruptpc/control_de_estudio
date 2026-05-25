@@ -11496,6 +11496,86 @@ function procesarEdicionNotaTrimestral() {
 
 
 
+/**
+ * Obtener historial de cambios de notas por estudiante y materia
+ * @param int $estudiante_id ID del estudiante
+ * @param int $materia_id ID de la materia
+ * @return array Array con el historial de cambios
+ */
+function obtenerHistorialCambiosNotasPorMateria($estudiante_id, $materia_id) {
+    global $db;
+    
+    $historial = [];
+    
+    $query = "SELECT 
+                hc.id,
+                hc.trayecto,
+                hc.nota_anterior,
+                hc.nota_nueva,
+                hc.justificacion,
+                hc.fecha_cambio,
+                u.nombre as nombre_admin
+              FROM historial_cambios_notas hc
+              INNER JOIN notas_trimestres nt ON hc.id_nota_trimestre = nt.id
+              LEFT JOIN users u ON hc.id_admin = u.id
+              WHERE nt.id_usuario = " . intval($estudiante_id) . "
+              AND nt.id_materia = " . intval($materia_id) . "
+              ORDER BY hc.fecha_cambio DESC";
+    
+    $result = $db->query($query);
+    
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $historial[] = $row;
+        }
+    }
+    
+    return $historial;
+}
+
+
+
+
+/**
+ * Obtener historial completo de cambios de notas de un estudiante
+ * @param int $estudiante_id ID del estudiante
+ * @return array Array con el historial de cambios
+ */
+function obtenerHistorialCambiosNotasEstudiante($estudiante_id) {
+    global $db;
+    
+    $historial = [];
+    
+    $query = "SELECT 
+                hc.id,
+                hc.trayecto,
+                hc.nota_anterior,
+                hc.nota_nueva,
+                hc.justificacion,
+                hc.fecha_cambio,
+                u.nombre as nombre_admin,
+                m.nombre_materia,
+                pa.nombre_periodo
+              FROM historial_cambios_notas hc
+              INNER JOIN notas_trimestres nt ON hc.id_nota_trimestre = nt.id
+              INNER JOIN materias m ON nt.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
+              LEFT JOIN users u ON hc.id_admin = u.id
+              WHERE nt.id_usuario = " . intval($estudiante_id) . "
+              ORDER BY hc.fecha_cambio DESC";
+    
+    $result = $db->query($query);
+    
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $historial[] = $row;
+        }
+    }
+    
+    return $historial;
+}
+
+
 
 
 

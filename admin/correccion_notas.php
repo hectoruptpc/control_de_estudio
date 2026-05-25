@@ -19,6 +19,8 @@ $estudiante = null;
 $carreras = [];
 $materias = [];
 $notas = [];
+$historial_cambios = [];
+$historial_completo = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['accion'])) {
@@ -29,6 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $estudiante = buscarEstudiantePorCedula($cedula);
                     if ($estudiante) {
                         $carreras = obtenerCarrerasEstudiante($estudiante['id']);
+                        $historial_completo = obtenerHistorialCambiosNotasEstudiante($estudiante['id']);
                     } else {
                         $mensaje = 'No se encontró ningún estudiante con esa cédula';
                         $tipo_mensaje = 'warning';
@@ -43,6 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $estudiante = obtenerEstudiantePorId($estudiante_id);
                     $carreras = obtenerCarrerasEstudiante($estudiante_id);
                     $materias = obtenerMateriasInscritasPorEstudiante($estudiante_id, $id_carrera);
+                    $historial_completo = obtenerHistorialCambiosNotasEstudiante($estudiante_id);
                 }
                 break;
                 
@@ -55,6 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $carreras = obtenerCarrerasEstudiante($estudiante_id);
                     $materias = obtenerMateriasInscritasPorEstudiante($estudiante_id, $id_carrera);
                     $notas = obtenerNotasTrimestresPorMateria($estudiante_id, $id_materia);
+                    $historial_completo = obtenerHistorialCambiosNotasEstudiante($estudiante_id);
                 }
                 break;
                 
@@ -71,6 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $carreras = obtenerCarrerasEstudiante($estudiante_id);
                         $materias = obtenerMateriasInscritasPorEstudiante($estudiante_id, $id_carrera);
                         $notas = obtenerNotasTrimestresPorMateria($estudiante_id, $id_materia);
+                        $historial_completo = obtenerHistorialCambiosNotasEstudiante($estudiante_id);
                     }
                 } else {
                     $mensaje = $resultado['message'];
@@ -104,13 +110,6 @@ include("includes/head.php");
     padding: 0.4em 0.6em;
 }
 
-.historial-table th {
-    position: sticky;
-    top: 0;
-    background-color: #343a40;
-    z-index: 10;
-}
-
 .btn-reporte {
     background-color: #17a2b8;
     border-color: #17a2b8;
@@ -127,6 +126,30 @@ include("includes/head.php");
     display: flex;
     gap: 5px;
     flex-wrap: wrap;
+}
+
+.historial-row:hover {
+    background-color: #f8f9fa;
+}
+
+.bg-danger {
+    background-color: #dc3545 !important;
+    color: white !important;
+}
+
+.bg-success {
+    background-color: #28a745 !important;
+    color: white !important;
+}
+
+.bg-secondary {
+    background-color: #6c757d !important;
+    color: white !important;
+}
+
+.bg-warning {
+    background-color: #ffc107 !important;
+    color: #212529 !important;
 }
 </style>
 
@@ -147,7 +170,7 @@ include("includes/head.php");
             <!-- Paso 1: Buscar estudiante por cédula -->
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Paso 1: Buscar Estudiante</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">Buscar Estudiante</h6>
                 </div>
                 <div class="card-body">
                     <form method="POST" class="form-inline">
@@ -165,20 +188,26 @@ include("includes/head.php");
                     
                     <?php if ($estudiante): ?>
                     <div class="mt-3 p-3 bg-light rounded">
-                        <h6>Estudiante Encontrado:</h6>
-                        <p><strong>Nombre:</strong> <?php echo htmlspecialchars($estudiante['nombre']); ?></p>
-                        <p><strong>Cédula:</strong> <?php echo htmlspecialchars($estudiante['idusuario']); ?></p>
-                        <p><strong>ID Estudiante:</strong> <?php echo $estudiante['id']; ?></p>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Nombre:</strong> <?php echo htmlspecialchars($estudiante['nombre']); ?></p>
+                                <p><strong>Cédula:</strong> <?php echo htmlspecialchars($estudiante['idusuario']); ?></p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>ID Estudiante:</strong> <?php echo $estudiante['id']; ?></p>
+                                <p><strong>Total de cambios:</strong> <span class="badge badge-info"><?php echo count($historial_completo); ?></span></p>
+                            </div>
+                        </div>
                     </div>
                     <?php endif; ?>
                 </div>
             </div>
 
-            <!-- Paso 2: Seleccionar Carrera -->
+            <!-- Paso 2: Seleccionar Carrera (opcional para editar) -->
             <?php if ($estudiante && !empty($carreras)): ?>
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Paso 2: Seleccionar Carrera</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">Seleccionar Carrera (para editar notas)</h6>
                     <small>Se encontraron <?php echo count($carreras); ?> carrera(s)</small>
                 </div>
                 <div class="card-body">
@@ -202,17 +231,13 @@ include("includes/head.php");
                     </form>
                 </div>
             </div>
-            <?php elseif ($estudiante && empty($carreras)): ?>
-            <div class="alert alert-warning">
-                No se encontraron carreras para este estudiante.
-            </div>
             <?php endif; ?>
 
-            <!-- Paso 3: Seleccionar Materia -->
+            <!-- Paso 3: Seleccionar Materia (opcional para editar) -->
             <?php if ($estudiante && !empty($materias) && $materias->num_rows > 0): ?>
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Paso 3: Seleccionar Materia</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">Seleccionar Materia (para editar notas)</h6>
                     <small>Se encontraron <?php echo $materias->num_rows; ?> materia(s) inscritas</small>
                 </div>
                 <div class="card-body">
@@ -241,18 +266,14 @@ include("includes/head.php");
                     </form>
                 </div>
             </div>
-            <?php elseif ($estudiante && isset($_POST['id_carrera']) && ($materias->num_rows == 0)): ?>
-            <div class="alert alert-warning">
-                No se encontraron materias inscritas para este estudiante en la carrera seleccionada.
-            </div>
             <?php endif; ?>
 
-            <!-- Paso 4: Mostrar y Editar Notas (Trimestres) -->
+            <!-- Paso 4: Mostrar y Editar Notas (Trimestres) - solo si hay materia seleccionada -->
             <?php if ($estudiante && isset($_POST['id_materia']) && !empty($notas)): ?>
             <div class="card shadow">
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-primary">
-                        Paso 4: Notas del Estudiante - Trimestres
+                        Notas del Estudiante - Trimestres
                     </h6>
                     <small>Se encontraron <?php echo count($notas); ?> registro(s) de notas</small>
                 </div>
@@ -273,7 +294,6 @@ include("includes/head.php");
                             </thead>
                             <tbody>
                                 <?php foreach ($notas as $nota): 
-                                    // Calcular nota final
                                     $t1 = $nota['trimestre_1'];
                                     $t2 = $nota['trimestre_2'];
                                     $t3 = $nota['trimestre_3'];
@@ -304,25 +324,25 @@ include("includes/head.php");
                                     <td class="font-weight-bold"><?php echo htmlspecialchars($nota['nombre_periodo'] ?? 'Sin periodo'); ?></td>
                                     
                                     <td class="text-center">
-                                        <span class="badge <?php echo ($t1 === null) ? 'bg-secondary' : ($t1 >= 12 ? 'bg-success' : 'bg-danger'); ?> p-2" style="font-size: 0.9rem;">
+                                        <span class="badge <?php echo ($t1 === null) ? 'bg-secondary' : ($t1 >= 12 ? 'bg-success' : 'bg-danger'); ?> p-2">
                                             <?php echo ($t1 !== null) ? number_format($t1, 1) : 'N/A'; ?>
                                         </span>
                                     </div>
                                     
                                     <td class="text-center">
-                                        <span class="badge <?php echo ($t2 === null) ? 'bg-secondary' : ($t2 >= 12 ? 'bg-success' : 'bg-danger'); ?> p-2" style="font-size: 0.9rem;">
+                                        <span class="badge <?php echo ($t2 === null) ? 'bg-secondary' : ($t2 >= 12 ? 'bg-success' : 'bg-danger'); ?> p-2">
                                             <?php echo ($t2 !== null) ? number_format($t2, 1) : 'N/A'; ?>
                                         </span>
                                     </div>
                                     
                                     <td class="text-center">
-                                        <span class="badge <?php echo ($t3 === null) ? 'bg-secondary' : ($t3 >= 12 ? 'bg-success' : 'bg-danger'); ?> p-2" style="font-size: 0.9rem;">
+                                        <span class="badge <?php echo ($t3 === null) ? 'bg-secondary' : ($t3 >= 12 ? 'bg-success' : 'bg-danger'); ?> p-2">
                                             <?php echo ($t3 !== null) ? number_format($t3, 1) : 'N/A'; ?>
                                         </span>
                                     </div>
                                     
                                     <td class="text-center">
-                                        <span class="badge <?php echo ($nota_final === null) ? 'bg-secondary' : ($nota_final >= 12 ? 'bg-success' : 'bg-danger'); ?> p-2" style="font-size: 1rem; font-weight: bold;">
+                                        <span class="badge <?php echo ($nota_final === null) ? 'bg-secondary' : ($nota_final >= 12 ? 'bg-success' : 'bg-danger'); ?> p-2" style="font-size: 1rem;">
                                             <?php echo ($nota_final !== null) ? number_format($nota_final, 1) : 'N/A'; ?>
                                         </span>
                                     </div>
@@ -432,9 +452,75 @@ include("includes/head.php");
                     </div>
                 </div>
             </div>
-            <?php elseif ($estudiante && isset($_POST['id_materia']) && empty($notas)): ?>
-            <div class="alert alert-info">
-                No se encontraron notas registradas para esta materia.
+            <?php endif; ?>
+
+            <!-- HISTORIAL DE CAMBIOS - Se muestra inmediatamente al buscar el estudiante -->
+            <?php if ($estudiante): ?>
+            <div class="card shadow mt-4">
+                <div class="card-header bg-info text-white">
+                    <h6 class="m-0 font-weight-bold">
+                        <i class="fas fa-history"></i> Historial de Cambios de Notas
+                    </h6>
+                    <small>Todos los cambios realizados a las notas de <?php echo htmlspecialchars($estudiante['nombre']); ?></small>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($historial_completo)): ?>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Materia</th>
+                                    <th>Periodo</th>
+                                    <th>Trayecto</th>
+                                    <th>Nota Anterior</th>
+                                    <th>Nota Nueva</th>
+                                    <th>Administrador</th>
+                                    <th>Justificación</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($historial_completo as $cambio): ?>
+                                <tr class="historial-row">
+                                    <td><?php echo date('d/m/Y H:i', strtotime($cambio['fecha_cambio'])); ?></td>
+                                    <td><?php echo htmlspecialchars($cambio['nombre_materia']); ?></td>
+                                    <td><?php echo htmlspecialchars($cambio['nombre_periodo']); ?></td>
+                                    <td>
+                                        <?php 
+                                        $trayecto = $cambio['trayecto'];
+                                        if ($trayecto == 0) echo '<span class="badge badge-secondary">Trayecto 0</span>';
+                                        elseif ($trayecto == 1) echo '<span class="badge badge-secondary">Trayecto 1</span>';
+                                        elseif ($trayecto == 2) echo '<span class="badge badge-secondary">Trayecto 2</span>';
+                                        elseif ($trayecto == 3) echo '<span class="badge badge-secondary">Trayecto 3</span>';
+                                        elseif ($trayecto == 4) echo '<span class="badge badge-secondary">Trayecto 4</span>';
+                                        else echo '<span class="badge badge-info">Trimestre ' . $trayecto . '</span>';
+                                        ?>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-danger p-2" style="font-size: 0.9rem;">
+                                            <?php echo number_format($cambio['nota_anterior'], 1); ?>
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-success p-2" style="font-size: 0.9rem;">
+                                            <?php echo number_format($cambio['nota_nueva'], 1); ?>
+                                        </span>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($cambio['nombre_admin'] ?? 'Desconocido'); ?></td>
+                                    <td style="max-width: 250px;">
+                                        <?php echo nl2br(htmlspecialchars($cambio['justificacion'])); ?>
+                                    </div>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php else: ?>
+                    <div class="alert alert-light text-center mb-0">
+                        <i class="fas fa-info-circle"></i> No hay registros de cambios de notas para este estudiante.
+                    </div>
+                    <?php endif; ?>
+                </div>
             </div>
             <?php endif; ?>
         </div>
