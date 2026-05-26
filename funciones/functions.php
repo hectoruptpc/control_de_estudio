@@ -15774,6 +15774,116 @@ if (isset($_GET['materia_id']) && isset($_GET['docente_id']) && isset($_GET['per
     $pdf->generarReporte($datos_pdf, $nombre_usuario_reporte);
 }
 
+
+
+
+
+
+
+/**
+ * Obtener grupos de notas aprobadas con filtros
+ */
+function obtenerGruposNotasAprobadas($profesor_id = '', $materia_id = '', $periodo_id = '', $seccion_id = '', $fecha_desde = '', $fecha_hasta = '') {
+    global $db;
+    
+    $where = array();
+    $where[] = "nt.estado = 'aprobada'";
+    
+    if (!empty($profesor_id)) {
+        $where[] = "nt.id_docente = " . intval($profesor_id);
+    }
+    
+    if (!empty($materia_id)) {
+        $where[] = "nt.id_materia = " . intval($materia_id);
+    }
+    
+    if (!empty($periodo_id)) {
+        $where[] = "nt.id_periodo = " . intval($periodo_id);
+    }
+    
+    if (!empty($seccion_id)) {
+        $where[] = "ds.id_seccion = " . intval($seccion_id);
+    }
+    
+    if (!empty($fecha_desde)) {
+        $where[] = "nt.fecha_registro >= '" . $db->real_escape_string($fecha_desde) . "'";
+    }
+    
+    if (!empty($fecha_hasta)) {
+        $where[] = "nt.fecha_registro <= '" . $db->real_escape_string($fecha_hasta) . " 23:59:59'";
+    }
+    
+    $where_clause = implode(" AND ", $where);
+    
+    $query = "SELECT 
+                nt.id_docente,
+                nt.id_materia,
+                nt.id_periodo,
+                MAX(u.nombre) as nombre_docente,
+                MAX(u.idusuario) as cedula_docente,
+                MAX(m.nombre_materia) as nombre_materia,
+                MAX(pa.nombre_periodo) as nombre_periodo,
+                MAX(s.codigo_seccion) as codigo_seccion,
+                MAX(c.nombre_carrera) as nombre_carrera,
+                COUNT(DISTINCT nt.id_usuario) as total_estudiantes,
+                MAX(nt.fecha_registro) as ultima_fecha
+              FROM notas_trimestres nt
+              INNER JOIN users u ON nt.id_docente = u.id
+              INNER JOIN materias m ON nt.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
+              INNER JOIN docente_seccion ds ON nt.id_docente = ds.id_usuario AND nt.id_materia = ds.id_materia
+              INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              WHERE $where_clause
+              GROUP BY nt.id_docente, nt.id_materia, nt.id_periodo
+              ORDER BY ultima_fecha DESC";
+    
+    return $db->query($query);
+}
+
+/**
+ * Obtener todas las materias para filtros
+ */
+function obtenerTodasLasMaterias() {
+    global $db;
+    $materias = [];
+    $query = "SELECT id_materia as id, nombre_materia as nombre FROM materias ORDER BY nombre_materia ASC";
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $materias[] = $row;
+        }
+    }
+    return $materias;
+}
+
+/**
+ * Obtener todas las secciones para filtros
+ */
+function obtenerTodasLasSecciones() {
+    global $db;
+    $secciones = [];
+    $query = "SELECT id_seccion, codigo_seccion FROM secciones ORDER BY codigo_seccion ASC";
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $secciones[] = $row;
+        }
+    }
+    return $secciones;
+}
+
+
+
+
+
+
+
+
+
+
+
+
 /**
  * LOGICA DE PROCESAMIENTO
  */
