@@ -30,144 +30,36 @@ include("includes/head.php");
 <!-- Añadir meta viewport y estilos responsivos adicionales -->
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=yes">
 <style>
-    /* Estilos responsivos adicionales */
     @media (max-width: 768px) {
-        .container-fluid {
-            padding-left: 10px;
-            padding-right: 10px;
-        }
-        h2.my-4 {
-            font-size: 1.5rem;
-            margin-top: 1rem !important;
-            margin-bottom: 1rem !important;
-        }
-        .card-header h5 {
-            font-size: 1rem;
-        }
-        .table-responsive {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-        .btn-group-mobile {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .btn-group-mobile .btn {
-            width: 100%;
-            margin: 0 !important;
-        }
-        .btn-sm {
-            padding: 6px 8px;
-            font-size: 0.75rem;
-            margin-bottom: 5px;
-            display: inline-block;
-            width: auto;
-        }
-        td:last-child {
-            min-width: 180px;
-        }
-        .estudiante-card {
-            margin-bottom: 15px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 12px;
-            background: #f9f9f9;
-        }
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            font-size: 16px !important;
-        }
-        label {
-            font-size: 0.85rem;
-        }
-        .modal-dialog {
-            margin: 10px;
-            max-width: calc(100% - 20px);
-        }
-        .modal-body {
-            padding: 12px;
-        }
-        #preview-table {
-            font-size: 0.75rem;
-        }
-        #preview-table th,
-        #preview-table td {
-            padding: 6px;
-            white-space: nowrap;
-        }
-        #volver-container {
-            position: sticky;
-            top: 0;
-            background: white;
-            z-index: 100;
-            padding: 10px 0;
-            margin-bottom: 15px;
-            border-bottom: 1px solid #ddd;
-        }
-        .text-center.py-4 {
-            padding: 2rem 0;
-        }
-        input[type="number"] {
-            font-size: 16px;
-            width: 80px;
-        }
-        .card {
-            margin-bottom: 15px;
-        }
-        .alert {
-            font-size: 0.85rem;
-            padding: 10px;
-        }
+        .container-fluid { padding-left: 10px; padding-right: 10px; }
+        h2.my-4 { font-size: 1.5rem; margin-top: 1rem !important; margin-bottom: 1rem !important; }
+        .card-header h5 { font-size: 1rem; }
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .btn-sm { padding: 6px 8px; font-size: 0.75rem; margin-bottom: 5px; }
+        td:last-child { min-width: 180px; }
+        .form-group input, .form-group select, .form-group textarea { font-size: 16px !important; }
+        label { font-size: 0.85rem; }
+        .modal-dialog { margin: 10px; max-width: calc(100% - 20px); }
+        .modal-body { padding: 12px; }
+        #preview-table { font-size: 0.75rem; }
+        #preview-table th, #preview-table td { padding: 6px; white-space: nowrap; }
+        #volver-container { position: sticky; top: 0; background: white; z-index: 100; padding: 10px 0; margin-bottom: 15px; border-bottom: 1px solid #ddd; }
+        input[type="number"] { font-size: 16px; width: 80px; }
+        .card { margin-bottom: 15px; }
+        .alert { font-size: 0.85rem; padding: 10px; }
     }
-    
     @media (max-width: 480px) {
-        .btn-sm {
-            font-size: 0.7rem;
-            padding: 5px 6px;
-        }
-        td:last-child {
-            min-width: 200px;
-        }
-        .table th,
-        .table td {
-            padding: 6px;
-            font-size: 0.75rem;
-        }
-        h2.my-4 {
-            font-size: 1.3rem;
-        }
+        .btn-sm { font-size: 0.7rem; padding: 5px 6px; }
+        td:last-child { min-width: 200px; }
+        .table th, .table td { padding: 6px; font-size: 0.75rem; }
+        h2.my-4 { font-size: 1.3rem; }
     }
-    
-    .estudiante-row {
-        transition: all 0.3s ease;
-    }
-    .estudiante-row:hover {
-        background-color: #f5f5f5;
-    }
-    .acciones-botones {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 5px;
-        align-items: center;
-    }
-    
+    .estudiante-row { transition: all 0.3s ease; }
+    .estudiante-row:hover { background-color: #f5f5f5; }
+    .acciones-botones { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
     @media (max-width: 768px) {
-        .acciones-botones {
-            flex-direction: column;
-            align-items: stretch;
-        }
-        .acciones-botones .btn,
-        .acciones-botones label {
-            width: 100%;
-            margin: 2px 0 !important;
-            text-align: center;
-        }
-    }
-    
-    .required-field {
-        color: red;
+        .acciones-botones { flex-direction: column; align-items: stretch; }
+        .acciones-botones .btn, .acciones-botones label { width: 100%; margin: 2px 0 !important; text-align: center; }
     }
 </style>
 
@@ -200,12 +92,12 @@ include("includes/head.php");
                         <tbody>
                             <?php while ($seccion = $result_secciones->fetch_assoc()): ?>
                                 <tr class="seccion-row">
-                                    <td data-label="Sección"><?= htmlspecialchars($seccion['codigo_seccion']) ?></td>
-                                    <td data-label="Carrera"><?= htmlspecialchars($seccion['nombre_carrera']) ?></td>
-                                    <td data-label="Trayecto"><?= htmlspecialchars($seccion['nombre_trayecto']) ?></td>
-                                    <td data-label="Periodo"><?= htmlspecialchars($seccion['nombre_periodo']) ?></td>
-                                    <td data-label="Materia"><?= htmlspecialchars($seccion['nombre_materia']) ?></td>
-                                    <td data-label="Acciones">
+                                    <td><?= htmlspecialchars($seccion['codigo_seccion']) ?></td>
+                                    <td><?= htmlspecialchars($seccion['nombre_carrera']) ?></td>
+                                    <td><?= htmlspecialchars($seccion['nombre_trayecto']) ?></td>
+                                    <td><?= htmlspecialchars($seccion['nombre_periodo']) ?></td>
+                                    <td><?= htmlspecialchars($seccion['nombre_materia']) ?></td>
+                                    <td>
                                         <div class="acciones-botones">
                                             <button class="btn btn-sm btn-primary btn-cargar" 
                                                     data-seccion="<?= $seccion['id_seccion'] ?>"
@@ -227,7 +119,7 @@ include("includes/head.php");
                                                 <input type="file" accept=".csv,text/csv,application/vnd.ms-excel" class="d-none input-import-csv" data-seccion="<?= $seccion['id_seccion'] ?>" data-materia="<?= $seccion['id_materia'] ?>">
                                             </label>
                                         </div>
-                                    </td>
+                                    </div>
                                 </tr>
                             <?php endwhile; ?>
                         </tbody>
@@ -244,14 +136,14 @@ include("includes/head.php");
     <!-- Resultados -->
     <div id="resultados">
         <div class="text-right mb-3" id="volver-container" style="display: none;">
-            <button class="btn btn-secondary btn-block-mobile" id="btn-volver">
+            <button class="btn btn-secondary" id="btn-volver">
                 <i class="fas fa-arrow-left"></i> Volver a Secciones
             </button>
         </div>
     </div>
 </div>
 
-<!-- Modal resultado (éxito / error) -->
+<!-- Modal resultado -->
 <div class="modal fade" id="modalResultado" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
@@ -288,7 +180,7 @@ include("includes/head.php");
                                 <th>Línea</th>
                                 <th>Cédula</th>
                                 <th>Nombres</th>
-                                <th>Nota</th>
+                                <th>Notas</th>
                                 <th>Campo</th>
                                 <th>Mensaje</th>
                             </tr>
@@ -314,7 +206,7 @@ $(document).ready(function() {
         
         $('#resultados').html(`
             <div class="text-right mb-3" id="volver-container">
-                <button class="btn btn-secondary btn-block-mobile" id="btn-volver">
+                <button class="btn btn-secondary" id="btn-volver">
                     <i class="fas fa-arrow-left"></i> Volver a Secciones
                 </button>
             </div>
@@ -328,21 +220,14 @@ $(document).ready(function() {
         
         fetch('cargar_estudiantes.php', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: `seccion_id=${seccionId}&materia_id=${materiaId}`
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Error en la respuesta del servidor');
-            }
-            return response.text();
-        })
+        .then(response => response.text())
         .then(html => {
             $('#resultados').html(`
                 <div class="text-right mb-3" id="volver-container">
-                    <button class="btn btn-secondary btn-block-mobile" id="btn-volver">
+                    <button class="btn btn-secondary" id="btn-volver">
                         <i class="fas fa-arrow-left"></i> Volver a Secciones
                     </button>
                 </div>
@@ -353,18 +238,16 @@ $(document).ready(function() {
         .catch(error => {
             $('#resultados').html(`
                 <div class="text-right mb-3" id="volver-container">
-                    <button class="btn btn-secondary btn-block-mobile" id="btn-volver">
+                    <button class="btn btn-secondary" id="btn-volver">
                         <i class="fas fa-arrow-left"></i> Volver a Secciones
                     </button>
                 </div>
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-circle"></i> Error: ${error.message}
-                </div>
+                <div class="alert alert-danger">Error: ${error.message}</div>
             `);
         });
     });
     
-    // Función para volver a secciones
+    // Volver a secciones
     $(document).on('click', '#btn-volver', function() {
         $('#resultados').html(`
             <div class="text-right mb-3" id="volver-container" style="display: none;">
@@ -373,50 +256,37 @@ $(document).ready(function() {
                 </button>
             </div>
         `);
-        
-        $('html, body').animate({ 
-            scrollTop: $('.card').first().offset().top - 20 
-        }, 400);
+        $('html, body').animate({ scrollTop: $('.card').first().offset().top - 20 }, 400);
     });
     
-    // Descargar planilla PDF
+    // Descargar PDF
     $(document).on('click', '.btn-descargar-pdf', function() {
         const seccionId = $(this).data('seccion');
         const materiaId = $(this).data('materia');
-        
-        const btn = $(this);
-        const originalHtml = btn.html();
-        btn.html('<i class="fas fa-spinner fa-spin"></i>');
-        btn.prop('disabled', true);
-        
         window.location.href = `descargar_planilla.php?seccion_id=${seccionId}&materia_id=${materiaId}`;
-        
-        setTimeout(() => {
-            btn.html(originalHtml);
-            btn.prop('disabled', false);
-        }, 2000);
     });
 
-    // Descargar plantilla CSV
+    // Descargar CSV
     $(document).on('click', '.btn-descargar-csv', function() {
         const seccionId = $(this).data('seccion');
         const materiaId = $(this).data('materia');
         window.location.href = `descargar_planilla_csv.php?seccion_id=${seccionId}&materia_id=${materiaId}`;
     });
 
+    let currentSeccionId = null;
+    let currentMateriaId = null;
+    
     // Importar CSV
     $(document).on('change', '.input-import-csv', function(e) {
         const file = this.files[0];
-        const seccionId = $(this).data('seccion');
-        const materiaId = $(this).data('materia');
+        currentSeccionId = $(this).data('seccion');
+        currentMateriaId = $(this).data('materia');
         if (!file) return;
 
         const fd = new FormData();
         fd.append('file', file);
-        fd.append('seccion_id', seccionId);
-        fd.append('materia_id', materiaId);
-        const tray = $('#trayecto_actual').val() || 0;
-        fd.append('trayecto_actual', tray);
+        fd.append('seccion_id', currentSeccionId);
+        fd.append('materia_id', currentMateriaId);
 
         $('#preview-table tbody').html('<tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-info"></div> Procesando...<\/td><\/tr>');
         $('#preview-summary').html('<span class="text-info">Procesando archivo...</span>');
@@ -445,10 +315,10 @@ $(document).ready(function() {
                 rows.forEach(r => {
                     const tr = $('<tr>');
                     tr.append($('<td>').text(r.line));
-                    tr.append($('<td>').text(r.idusuario || r.identificador || ''));
+                    tr.append($('<td>').text(r.identificador || ''));
                     tr.append($('<td>').text(r.nombre || ''));
-                    tr.append($('<td>').text(r.nota));
-                    tr.append($('<td>').text(r.campo || ('trayecto_' + ($('#trayecto_actual').val() || 0))));
+                    tr.append($('<td>').text(r.notas_texto || '-'));
+                    tr.append($('<td>').text('Trimestres'));
                     tr.append($('<td>').html(r.mensaje));
                     tr.data('row', r);
                     tbody.append(tr);
@@ -474,45 +344,70 @@ $(document).ready(function() {
 
         let applied = 0;
         let missing = 0;
+        
         rows.forEach(r => {
             const estudianteId = r.estudiante_id;
-            const nota = r.nota;
-            const campoTrayecto = r.campo || ('trayecto_' + ($('#trayecto_actual').val() || 0));
-            const selector = `input[name="notas[${estudianteId}][${campoTrayecto}]"]`;
-            const input = document.querySelector(selector);
-            if (input) {
-                input.value = nota;
-                $(input).trigger('change');
-                applied++;
-            } else {
-                missing++;
+            const notas = r.notas || {};
+            
+            if (notas.trimestre_1) {
+                const selector = `input[name="notas[${estudianteId}][trimestre_1]"]`;
+                const input = document.querySelector(selector);
+                if (input) {
+                    input.value = notas.trimestre_1;
+                    $(input).trigger('change');
+                    applied++;
+                } else {
+                    missing++;
+                }
+            }
+            
+            if (notas.trimestre_2) {
+                const selector = `input[name="notas[${estudianteId}][trimestre_2]"]`;
+                const input = document.querySelector(selector);
+                if (input) {
+                    input.value = notas.trimestre_2;
+                    $(input).trigger('change');
+                    applied++;
+                } else {
+                    missing++;
+                }
+            }
+            
+            if (notas.trimestre_3) {
+                const selector = `input[name="notas[${estudianteId}][trimestre_3]"]`;
+                const input = document.querySelector(selector);
+                if (input) {
+                    input.value = notas.trimestre_3;
+                    $(input).trigger('change');
+                    applied++;
+                } else {
+                    missing++;
+                }
             }
         });
 
         $('#modalPreviewCSV').modal('hide');
         let msg = `✅ Se aplicaron ${applied} notas al formulario.`;
-        if (missing) msg += ` ⚠️ ${missing} entradas no se encontraron.`;
+        if (missing) msg += ` ⚠️ ${missing} campos no se encontraron.`;
         alert(msg);
     });
     
-    // Guardar notas - CON VALIDACIÓN OBLIGATORIA DE SOPORTE
+    // Guardar notas
     $(document).on('submit', '#form-notas', function(e) {
         e.preventDefault();
         
-        // VALIDAR QUE SE HAYA SELECCIONADO UN ARCHIVO DE SOPORTE
         const soporteFile = $('#soporte_grupo')[0].files[0];
         if (!soporteFile) {
-            alert('❌ Debes adjuntar un archivo de soporte (imagen o PDF) para poder guardar las notas. Este campo es obligatorio.');
+            alert('❌ Debes adjuntar un archivo de soporte (imagen o PDF) para poder guardar las notas.');
             $('#soporte_grupo').focus();
             return;
         }
         
-        const confirmMsg = confirm('¿Estás seguro de guardar las notas?');
-        if (!confirmMsg) return;
+        if (!confirm('¿Estás seguro de guardar las notas?')) return;
         
         $('#resultados').html(`
             <div class="text-right mb-3" id="volver-container">
-                <button class="btn btn-secondary btn-block-mobile" id="btn-volver">
+                <button class="btn btn-secondary" id="btn-volver">
                     <i class="fas fa-arrow-left"></i> Volver a Secciones
                 </button>
             </div>
@@ -532,7 +427,7 @@ $(document).ready(function() {
         .then(data => {
             $('#resultados').html(`
                 <div class="text-right mb-3" id="volver-container">
-                    <button class="btn btn-secondary btn-block-mobile" id="btn-volver">
+                    <button class="btn btn-secondary" id="btn-volver">
                         <i class="fas fa-arrow-left"></i> Volver a Secciones
                     </button>
                 </div>
@@ -557,18 +452,16 @@ $(document).ready(function() {
         .catch(error => {
             $('#resultados').html(`
                 <div class="text-right mb-3" id="volver-container">
-                    <button class="btn btn-secondary btn-block-mobile" id="btn-volver">
+                    <button class="btn btn-secondary" id="btn-volver">
                         <i class="fas fa-arrow-left"></i> Volver a Secciones
                     </button>
                 </div>
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-triangle"></i> Error al guardar: ${error.message}
-                </div>
+                <div class="alert alert-danger">Error al guardar: ${error.message}</div>
             `);
         });
     });
     
-    // Preview de imagen antes de subir
+    // Preview de imagen
     $(document).on('change', '.soporte-grupo', function() {
         const file = this.files[0];
         const preview = $('#preview-grupo');
@@ -594,11 +487,6 @@ $(document).ready(function() {
             preview.html('<small class="text-muted">No se ha seleccionado ningún archivo</small>');
             fileName.text('Ningún archivo seleccionado');
         }
-    });
-    
-    // Mejorar experiencia en inputs numéricos en móvil
-    $(document).on('focus', 'input[type="number"]', function() {
-        $(this).attr('inputmode', 'numeric');
     });
 });
 </script>

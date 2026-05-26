@@ -31,10 +31,11 @@ if (function_exists('obtenerEstudiantesDeSeccion')) {
     }
 }
 
-// Obtener nombres descriptivos de sección, carrera y materia
+// Obtener información de la materia, sección y carrera
 $materia_nombre = '';
 $codigo_seccion = '';
 $carrera_nombre = '';
+
 if (isset($db) && $db) {
     $mres = $db->query("SELECT nombre_materia FROM materias WHERE id_materia = " . intval($materia_id) . " LIMIT 1");
     if ($mres && $mrow = $mres->fetch_assoc()) $materia_nombre = $mrow['nombre_materia'];
@@ -50,20 +51,40 @@ if (isset($db) && $db) {
     }
 }
 
-$filename = "planilla_seccion_{$seccion_id}_materia_{$materia_id}.csv";
+$filename = "planilla_trimestres_seccion_{$seccion_id}.csv";
 header('Content-Type: text/csv; charset=utf-8');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
 $out = fopen('php://output', 'w');
 
-// Encabezado: incluir `idusuario` (cédula) y `nombres`, dejar `nota` vacía
-fputcsv($out, ['idusuario','nombres','codigo_seccion','carrera','materia','nota']);
+// Encabezado
+$encabezado = [
+    'CEDULA', 
+    'NOMBRES', 
+    'SECCION', 
+    'CARRERA', 
+    'MATERIA', 
+    'TRIMESTRE_1',
+    'TRIMESTRE_2',
+    'TRIMESTRE_3'
+];
+fputcsv($out, $encabezado);
 
+// Escribir filas de estudiantes
 foreach ($students as $s) {
-    // Preferir campo `idusuario` (cedula) si existe
-    $idusuario = $s['idusuario'] ?? $s['cedula'] ?? $s['identificacion'] ?? $s['numero_cedula'] ?? '';
-    $nombres = $s['nombres'] ?? $s['nombre'] ?? $s['nombres_completos'] ?? '';
-
-    fputcsv($out, [$idusuario, $nombres, $codigo_seccion, $carrera_nombre, $materia_nombre, '']);
+    $cedula = $s['idusuario'] ?? $s['cedula'] ?? $s['identificacion'] ?? $s['numero_cedula'] ?? '';
+    $nombres = $s['nombre'] ?? $s['nombres'] ?? $s['nombres_completos'] ?? '';
+    
+    $fila = [
+        $cedula,
+        $nombres,
+        $codigo_seccion,
+        $carrera_nombre,
+        $materia_nombre,
+        '',  // Trimestre 1
+        '',  // Trimestre 2
+        ''   // Trimestre 3
+    ];
+    fputcsv($out, $fila);
 }
 
 fclose($out);

@@ -1,7 +1,6 @@
 <?php
 require_once('../funciones/functions.php');
 
-// Buffer para capturar cualquier salida extra
 ob_start();
 header('Content-Type: application/json; charset=utf-8');
 
@@ -19,7 +18,6 @@ if (!isLoggedIn() || !isDocente()) {
     respondJson(['error' => 'Acceso denegado'], 403);
 }
 
-$docente_id = obtenerIdUsuario();
 $seccion_id = $_POST['seccion_id'] ?? null;
 $materia_id = $_POST['materia_id'] ?? null;
 
@@ -31,10 +29,24 @@ if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
     respondJson(['error' => 'No se recibió el archivo o hubo un error en la subida'], 400);
 }
 
-// Límite 5 MB
 $maxBytes = 5 * 1024 * 1024;
 if ($_FILES['file']['size'] > $maxBytes) {
     respondJson(['error' => 'Archivo demasiado grande (máx 5MB)'], 413);
+}
+
+global $db;
+$estudiantes_seccion = [];
+$query = "SELECT u.id, u.idusuario, u.nombre 
+          FROM estudiante_seccion es
+          INNER JOIN users u ON es.id_usuario = u.id
+          WHERE es.id_seccion = " . intval($seccion_id) . "
+          AND u.estudiante = 1
+          ORDER BY u.nombre ASC";
+$result = $db->query($query);
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        $estudiantes_seccion[$row['idusuario']] = $row;
+    }
 }
 
 $tmp = $_FILES['file']['tmp_name'];
@@ -43,154 +55,97 @@ if (!$handle) {
     respondJson(['error' => 'No se pudo procesar el archivo'], 500);
 }
 
-// Obtener lista de estudiantes de la sección
-$seccionMap = [];
-$idMap = [];
-if (function_exists('obtenerEstudiantesDeSeccion')) {
-    global $db;
-    $res = obtenerEstudiantesDeSeccion($db, $seccion_id);
-    if (is_object($res)) {
-        while ($r = $res->fetch_assoc()) {
-            $ced = $r['idusuario'] ?? $r['cedula'] ?? $r['identificacion'] ?? $r['numero_cedula'] ?? '';
-            $key = preg_replace('/\s+/', '', strtolower((string)$ced));
-            $idVal = $r['id'] ?? $r['id_usuario'] ?? $r['usuario_id'] ?? null;
-            $nombreVal = trim($r['nombre'] ?? $r['nombres'] ?? $r['nombres_completos'] ?? '');
-            $seccionMap[$key] = ['id' => $idVal, 'nombre' => $nombreVal, 'idusuario' => $ced];
-            if ($idVal) $idMap[(string)$idVal] = ['id' => $idVal, 'nombre' => $nombreVal, 'idusuario' => $ced];
-        }
-    }
-}
-
 $rows = [];
-$line = 0;
 $validCount = 0;
 $invalidCount = 0;
-$maxRows = 2000;
+$line = 0;
+$isFirstLine = true;
 
-// Detectar columna de trimestre (puede ser T1, T2, T3 o similar)
-$trimestre_map = ['trimestre_1' => null, 'trimestre_2' => null, 'trimestre_3' => null];
-
-while (($data = fgetcsv($handle, 1000, ',')) !== false) {
+while (($data = fgetcsv($handle, 10000, ',')) !== false) {
     $line++;
     
-    // Normalizar celdas (eliminar BOM)
     foreach ($data as $k => $v) {
-        $cell = (string)$v;
-        $cell = preg_replace('/^\xEF\xBB\xBF/', '', $cell);
-        $data[$k] = trim($cell);
+        $data[$k] = trim(preg_replace('/^\xEF\xBB\xBF/', '', $v));
     }
     
-    // Detectar encabezados en la primera línea
-    if ($line == 1) {
-        $headers = array_map('strtolower', array_map('trim', $data));
-        
-        // Buscar columnas de trimestres
-        foreach ($headers as $idx => $header) {
-            if (strpos($header, 't1') !== false || strpos($header, 'trim1') !== false || strpos($header, 'trimestre1') !== false || $header === 'trimestre_1') {
-                $trimestre_map['trimestre_1'] = $idx;
-            } elseif (strpos($header, 't2') !== false || strpos($header, 'trim2') !== false || strpos($header, 'trimestre2') !== false || $header === 'trimestre_2') {
-                $trimestre_map['trimestre_2'] = $idx;
-            } elseif (strpos($header, 't3') !== false || strpos($header, 'trim3') !== false || strpos($header, 'trimestre3') !== false || $header === 'trimestre_3') {
-                $trimestre_map['trimestre_3'] = $idx;
-            }
-        }
-        
-        // Buscar columna de identificación (cédula)
-        $ident_index = null;
-        foreach ($headers as $idx => $header) {
-            if (strpos($header, 'cedula') !== false || strpos($header, 'ced') !== false || 
-                strpos($header, 'ident') !== false || strpos($header, 'id') === 0) {
-                $ident_index = $idx;
-                break;
-            }
-        }
-        
-        if ($ident_index === null) $ident_index = 0;
-        
-        $headerDetected = true;
+    $isEmpty = true;
+    foreach ($data as $cell) {
+        if ($cell !== '') { $isEmpty = false; break; }
+    }
+    if ($isEmpty) continue;
+    
+    if ($isFirstLine) {
+        $isFirstLine = false;
         continue;
     }
     
-    // Saltar filas vacías
-    $allEmpty = true;
-    foreach ($data as $cell) {
-        if (trim((string)$cell) !== '') { $allEmpty = false; break; }
-    }
-    if ($allEmpty) continue;
+    $cedula = isset($data[0]) ? strtoupper(trim($data[0])) : '';
+    $estudiante = $estudiantes_seccion[$cedula] ?? null;
     
-    // Obtener identificador del estudiante (primera columna o columna de identificación)
-    $ident = trim($data[$ident_index] ?? $data[0] ?? '');
+    $nota1 = isset($data[5]) ? trim($data[5]) : '';
+    $nota2 = isset($data[6]) ? trim($data[6]) : '';
+    $nota3 = isset($data[7]) ? trim($data[7]) : '';
     
-    // Crear objeto de fila
     $rowObj = [
         'line' => $line,
-        'identificador' => $ident,
+        'identificador' => $cedula,
+        'nombre' => $estudiante['nombre'] ?? '',
         'valido' => false,
         'mensaje' => '',
-        'estudiante_id' => null,
-        'nombre' => '',
-        'notas' => [] // Array de notas por trimestre
+        'estudiante_id' => $estudiante['id'] ?? null,
+        'notas' => [],
+        'notas_texto' => ''
     ];
     
-    if ($ident === '') {
-        $rowObj['mensaje'] = 'Identificador vacío';
-        $invalidCount++;
-        $rows[] = $rowObj;
-        continue;
-    }
-    
-    // Resolver estudiante
-    $resolved = false;
-    $key = preg_replace('/\s+/', '', strtolower($ident));
-    if ($key !== '' && isset($seccionMap[$key]) && $seccionMap[$key]['id']) {
-        $rowObj['estudiante_id'] = $seccionMap[$key]['id'];
-        $rowObj['nombre'] = $seccionMap[$key]['nombre'];
-        $resolved = true;
-    } elseif (is_numeric($ident) && isset($idMap[(string)(int)$ident])) {
-        $rowObj['estudiante_id'] = $idMap[(string)(int)$ident]['id'];
-        $rowObj['nombre'] = $idMap[(string)(int)$ident]['nombre'];
-        $resolved = true;
-    }
-    
-    if (!$resolved) {
+    if (!$estudiante) {
         $rowObj['mensaje'] = 'Estudiante no encontrado en la sección';
         $invalidCount++;
         $rows[] = $rowObj;
         continue;
     }
     
-    // Procesar notas de trimestres
-    $valid_trimestres = 0;
-    $trimestres_notas = [];
+    $notas_trimestres = [];
+    $notas_texto = [];
     
-    foreach ($trimestre_map as $trimestre => $col_idx) {
-        if ($col_idx !== null && isset($data[$col_idx])) {
-            $notaRaw = trim($data[$col_idx]);
-            if ($notaRaw !== '') {
-                $notaNormalized = str_replace(',', '.', $notaRaw);
-                if (is_numeric($notaNormalized)) {
-                    $notaVal = (float)$notaNormalized;
-                    if ($notaVal >= 1 && $notaVal <= 20) {
-                        $trimestres_notas[$trimestre] = $notaVal;
-                        $valid_trimestres++;
-                    } else {
-                        $rowObj['mensaje'] .= "Nota $trimestre fuera de rango (1-20). ";
-                    }
-                } else {
-                    $rowObj['mensaje'] .= "Nota $trimestre no numérica. ";
-                }
-            }
+    if ($nota1 !== '') {
+        $val = floatval(str_replace(',', '.', $nota1));
+        if ($val >= 1 && $val <= 20) {
+            $notas_trimestres['trimestre_1'] = $val;
+            $notas_texto[] = "T1:$val";
+        } else {
+            $rowObj['mensaje'] .= 'T1 inválido (' . $nota1 . '); ';
         }
     }
     
-    if ($valid_trimestres > 0) {
-        $rowObj['valido'] = true;
-        $rowObj['mensaje'] = 'OK - ' . $valid_trimestres . ' trimestre(s) válido(s)';
-        $rowObj['notas'] = $trimestres_notas;
-        $validCount++;
-    } else {
+    if ($nota2 !== '') {
+        $val = floatval(str_replace(',', '.', $nota2));
+        if ($val >= 1 && $val <= 20) {
+            $notas_trimestres['trimestre_2'] = $val;
+            $notas_texto[] = "T2:$val";
+        } else {
+            $rowObj['mensaje'] .= 'T2 inválido (' . $nota2 . '); ';
+        }
+    }
+    
+    if ($nota3 !== '') {
+        $val = floatval(str_replace(',', '.', $nota3));
+        if ($val >= 1 && $val <= 20) {
+            $notas_trimestres['trimestre_3'] = $val;
+            $notas_texto[] = "T3:$val";
+        } else {
+            $rowObj['mensaje'] .= 'T3 inválido (' . $nota3 . '); ';
+        }
+    }
+    
+    if (empty($notas_trimestres)) {
         $rowObj['mensaje'] = $rowObj['mensaje'] ?: 'No se encontraron notas válidas';
         $invalidCount++;
+    } else {
+        $rowObj['valido'] = true;
+        $rowObj['notas'] = $notas_trimestres;
+        $rowObj['notas_texto'] = implode(' | ', $notas_texto);
+        $rowObj['mensaje'] = 'OK';
+        $validCount++;
     }
     
     $rows[] = $rowObj;
