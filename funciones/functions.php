@@ -11334,9 +11334,6 @@ function obtenerNotasEstudianteConTrimestres($estudiante_id) {
 
 /**
  * Obtener notas trimestrales por materia y estudiante
- * @param int $estudiante_id ID del estudiante
- * @param int $materia_id ID de la materia
- * @return array Array con las notas
  */
 function obtenerNotasTrimestresPorMateria($estudiante_id, $materia_id) {
     global $db;
@@ -11352,7 +11349,6 @@ function obtenerNotasTrimestresPorMateria($estudiante_id, $materia_id) {
                 nt.nota,
                 nt.estado,
                 nt.fecha_registro,
-                nt.id_admin_aprobador,
                 pa.nombre_periodo
               FROM notas_trimestres nt
               LEFT JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
@@ -11380,7 +11376,7 @@ function obtenerNotasTrimestresPorMateria($estudiante_id, $materia_id) {
                     'trimestre_3' => null,
                     'estado' => $row['estado'],
                     'fecha_registro' => $row['fecha_registro'],
-                    'id_admin_aprobador' => $row['id_admin_aprobador']
+                    'trimestre_actual' => $trimestre
                 ];
             }
             
@@ -11392,104 +11388,106 @@ function obtenerNotasTrimestresPorMateria($estudiante_id, $materia_id) {
     return $notas;
 }
 
-/**
- * Procesar la edición de una nota trimestral
- * @return array Resultado de la operación
- */
 function procesarEdicionNotaTrimestral() {
     global $db;
     
-    $id_nota = (int)($_POST['id_nota'] ?? 0);
-    $trimestre_1 = isset($_POST['trimestre_1']) && $_POST['trimestre_1'] !== '' ? (float)$_POST['trimestre_1'] : null;
-    $trimestre_2 = isset($_POST['trimestre_2']) && $_POST['trimestre_2'] !== '' ? (float)$_POST['trimestre_2'] : null;
-    $trimestre_3 = isset($_POST['trimestre_3']) && $_POST['trimestre_3'] !== '' ? (float)$_POST['trimestre_3'] : null;
-    $nuevo_estado = $_POST['estado'] ?? 'pendiente';
+    $id_usuario = (int)($_POST['id_usuario'] ?? 0);
+    $id_materia = (int)($_POST['id_materia'] ?? 0);
+    $id_periodo = (int)($_POST['id_periodo'] ?? 0);
     $justificacion = trim($_POST['justificacion'] ?? '');
     $admin_id = $_SESSION['user']['id'] ?? 0;
+    $nuevo_estado = $_POST['estado'] ?? 'pendiente';
     
-    if (!$id_nota) {
-        return ['success' => false, 'message' => 'ID de nota no válido'];
+    if (!$id_usuario || !$id_materia || !$id_periodo) {
+        return ['success' => false, 'message' => 'Datos incompletos'];
     }
     
     if (empty($justificacion)) {
-        return ['success' => false, 'message' => 'Debe ingresar una justificación para el cambio'];
+        return ['success' => false, 'message' => 'Debe ingresar una justificación'];
     }
     
-    // Validar rangos de notas
-    if ($trimestre_1 !== null && ($trimestre_1 < 1 || $trimestre_1 > 20)) {
+    // Obtener las notas actuales de los 3 trimestres
+    $notas_actuales = [];
+    $result_actual = $db->query("SELECT trimestre_num, nota FROM notas_trimestres 
+                                  WHERE id_usuario = $id_usuario 
+                                  AND id_materia = $id_materia 
+                                  AND id_periodo = $id_periodo");
+    
+    while ($row = $result_actual->fetch_assoc()) {
+        $notas_actuales[$row['trimestre_num']] = $row['nota'];
+    }
+    
+    // Obtener las nuevas notas del formulario
+    $t1_nueva = isset($_POST['trimestre_1']) && $_POST['trimestre_1'] !== '' ? (float)$_POST['trimestre_1'] : null;
+    $t2_nueva = isset($_POST['trimestre_2']) && $_POST['trimestre_2'] !== '' ? (float)$_POST['trimestre_2'] : null;
+    $t3_nueva = isset($_POST['trimestre_3']) && $_POST['trimestre_3'] !== '' ? (float)$_POST['trimestre_3'] : null;
+    
+    // Validar rangos
+    if ($t1_nueva !== null && ($t1_nueva < 1 || $t1_nueva > 20)) {
         return ['success' => false, 'message' => 'Trimestre 1 debe estar entre 1 y 20'];
     }
-    if ($trimestre_2 !== null && ($trimestre_2 < 1 || $trimestre_2 > 20)) {
+    if ($t2_nueva !== null && ($t2_nueva < 1 || $t2_nueva > 20)) {
         return ['success' => false, 'message' => 'Trimestre 2 debe estar entre 1 y 20'];
     }
-    if ($trimestre_3 !== null && ($trimestre_3 < 1 || $trimestre_3 > 20)) {
+    if ($t3_nueva !== null && ($t3_nueva < 1 || $t3_nueva > 20)) {
         return ['success' => false, 'message' => 'Trimestre 3 debe estar entre 1 y 20'];
     }
     
-    // Obtener la nota actual antes de modificar
-    $query_actual = "SELECT * FROM notas_trimestres WHERE id = $id_nota";
-    $result_actual = $db->query($query_actual);
-    $nota_actual = $result_actual->fetch_assoc();
+    // Verificar si hubo algún cambio
+    $cambio_t1 = ($t1_nueva !== null && $t1_nueva != ($notas_actuales[1] ?? null));
+    $cambio_t2 = ($t2_nueva !== null && $t2_nueva != ($notas_actuales[2] ?? null));
+    $cambio_t3 = ($t3_nueva !== null && $t3_nueva != ($notas_actuales[3] ?? null));
     
-    if (!$nota_actual) {
-        return ['success' => false, 'message' => 'Nota no encontrada'];
+    if (!$cambio_t1 && !$cambio_t2 && !$cambio_t3) {
+        return ['success' => false, 'message' => 'No se detectaron cambios en las notas'];
     }
     
-    $trimestre_num = $nota_actual['trimestre_num'];
-    $nota_anterior = $nota_actual['nota'];
-    $nueva_nota = null;
-    
-    // Determinar qué trimestre se está editando
-    if ($trimestre_num == 1 && $trimestre_1 !== null) {
-        $nueva_nota = $trimestre_1;
-    } elseif ($trimestre_num == 2 && $trimestre_2 !== null) {
-        $nueva_nota = $trimestre_2;
-    } elseif ($trimestre_num == 3 && $trimestre_3 !== null) {
-        $nueva_nota = $trimestre_3;
-    }
-    
-    if ($nueva_nota === null) {
-        return ['success' => false, 'message' => 'No se especificó una nota válida para este trimestre'];
-    }
-    
-    // Si la nota no cambió, no hacer nada
-    if ($nueva_nota == $nota_anterior) {
-        return ['success' => false, 'message' => 'La nota no ha cambiado'];
-    }
-    
-    // Iniciar transacción
     $db->begin_transaction();
     
     try {
-        // Actualizar la nota
-        $query_update = "UPDATE notas_trimestres 
-                         SET nota = $nueva_nota, 
-                             estado = '$nuevo_estado', 
-                             fecha_registro = NOW()
-                         WHERE id = $id_nota";
-        
-        if (!$db->query($query_update)) {
-            throw new Exception('Error al actualizar la nota: ' . $db->error);
+        // Actualizar Trimestre 1
+        if ($t1_nueva !== null) {
+            $db->query("UPDATE notas_trimestres SET nota = $t1_nueva, estado = '$nuevo_estado', fecha_registro = NOW() 
+                        WHERE id_usuario = $id_usuario AND id_materia = $id_materia AND id_periodo = $id_periodo AND trimestre_num = 1");
         }
         
-        // Registrar en historial_cambios_notas usando id_nota_trimestre (no id_nota)
-        $query_historial = "INSERT INTO historial_cambios_notas 
-                            (id_nota_trimestre, trayecto, nota_anterior, nota_nueva, justificacion, id_admin, fecha_cambio) 
-                            VALUES 
-                            ($id_nota, $trimestre_num, $nota_anterior, $nueva_nota, 
-                             '" . $db->real_escape_string($justificacion) . "', $admin_id, NOW())";
-        
-        if (!$db->query($query_historial)) {
-            throw new Exception('Error al guardar el historial: ' . $db->error);
+        // Actualizar Trimestre 2
+        if ($t2_nueva !== null) {
+            $db->query("UPDATE notas_trimestres SET nota = $t2_nueva, estado = '$nuevo_estado', fecha_registro = NOW() 
+                        WHERE id_usuario = $id_usuario AND id_materia = $id_materia AND id_periodo = $id_periodo AND trimestre_num = 2");
         }
+        
+        // Actualizar Trimestre 3
+        if ($t3_nueva !== null) {
+            $db->query("UPDATE notas_trimestres SET nota = $t3_nueva, estado = '$nuevo_estado', fecha_registro = NOW() 
+                        WHERE id_usuario = $id_usuario AND id_materia = $id_materia AND id_periodo = $id_periodo AND trimestre_num = 3");
+        }
+        
+        // Guardar en historial (un solo registro con los 3 cambios)
+        $t1_anterior = $notas_actuales[1] ?? null;
+        $t2_anterior = $notas_actuales[2] ?? null;
+        $t3_anterior = $notas_actuales[3] ?? null;
+        
+        $db->query("INSERT INTO historial_cambios_notas 
+                    (id_usuario, id_materia, id_periodo, 
+                     trimestre_1_anterior, trimestre_2_anterior, trimestre_3_anterior,
+                     trimestre_1_nuevo, trimestre_2_nuevo, trimestre_3_nuevo,
+                     justificacion, id_admin, fecha_cambio) 
+                    VALUES ($id_usuario, $id_materia, $id_periodo, 
+                    " . ($t1_anterior !== null ? $t1_anterior : 'NULL') . ", 
+                    " . ($t2_anterior !== null ? $t2_anterior : 'NULL') . ", 
+                    " . ($t3_anterior !== null ? $t3_anterior : 'NULL') . ",
+                    " . ($t1_nueva !== null ? $t1_nueva : 'NULL') . ", 
+                    " . ($t2_nueva !== null ? $t2_nueva : 'NULL') . ", 
+                    " . ($t3_nueva !== null ? $t3_nueva : 'NULL') . ",
+                    '" . $db->real_escape_string($justificacion) . "', $admin_id, NOW())");
         
         $db->commit();
-        
-        return ['success' => true, 'message' => 'Nota actualizada correctamente'];
+        return ['success' => true, 'message' => 'Notas actualizadas correctamente'];
         
     } catch (Exception $e) {
         $db->rollback();
-        return ['success' => false, 'message' => $e->getMessage()];
+        return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
     }
 }
 
@@ -11536,11 +11534,6 @@ function obtenerHistorialCambiosNotasPorMateria($estudiante_id, $materia_id) {
 
 
 
-/**
- * Obtener historial completo de cambios de notas de un estudiante
- * @param int $estudiante_id ID del estudiante
- * @return array Array con el historial de cambios
- */
 function obtenerHistorialCambiosNotasEstudiante($estudiante_id) {
     global $db;
     
@@ -11548,20 +11541,22 @@ function obtenerHistorialCambiosNotasEstudiante($estudiante_id) {
     
     $query = "SELECT 
                 hc.id,
-                hc.trayecto,
-                hc.nota_anterior,
-                hc.nota_nueva,
-                hc.justificacion,
                 hc.fecha_cambio,
+                hc.justificacion,
+                hc.trimestre_1_anterior,
+                hc.trimestre_2_anterior,
+                hc.trimestre_3_anterior,
+                hc.trimestre_1_nuevo,
+                hc.trimestre_2_nuevo,
+                hc.trimestre_3_nuevo,
                 u.nombre as nombre_admin,
                 m.nombre_materia,
                 pa.nombre_periodo
               FROM historial_cambios_notas hc
-              INNER JOIN notas_trimestres nt ON hc.id_nota_trimestre = nt.id
-              INNER JOIN materias m ON nt.id_materia = m.id_materia
-              INNER JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
+              INNER JOIN materias m ON hc.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON hc.id_periodo = pa.id_periodo
               LEFT JOIN users u ON hc.id_admin = u.id
-              WHERE nt.id_usuario = " . intval($estudiante_id) . "
+              WHERE hc.id_usuario = " . intval($estudiante_id) . "
               ORDER BY hc.fecha_cambio DESC";
     
     $result = $db->query($query);
@@ -11583,10 +11578,7 @@ function obtenerHistorialCambiosNotasEstudiante($estudiante_id) {
 
 
 /**
- * Obtener SOLO las materias que un estudiante tiene inscritas
- * @param int $estudiante_id ID del estudiante
- * @param int $carrera_id ID de la carrera
- * @return mysqli_result|false
+ * Obtener materias inscritas por estudiante
  */
 function obtenerMateriasInscritasPorEstudiante($estudiante_id, $carrera_id) {
     global $db;
@@ -18892,64 +18884,26 @@ function obtenerEstudiantePorId($id) {
 }
 
 /**
- * Obtener carreras del estudiante - VERSIÓN CORREGIDA CON RELACIÓN
+ * Obtener carreras de un estudiante
  */
-function obtenerCarrerasEstudiante($id_estudiante) {
+function obtenerCarrerasEstudiante($estudiante_id) {
     global $db;
     
-    try {
-        // Primero obtenemos el ID de la carrera del estudiante
-        $query_user = "SELECT carrera FROM users WHERE id = ? LIMIT 1";
-        $stmt_user = $db->prepare($query_user);
-        if (!$stmt_user) {
-            throw new Exception("Error en preparación user: " . $db->error);
-        }
-
-        $stmt_user->bind_param("i", $id_estudiante);
-        if (!$stmt_user->execute()) {
-            throw new Exception("Error en ejecución user: " . $stmt_user->error);
-        }
-
-        $result_user = $stmt_user->get_result();
-        $user = $result_user->fetch_assoc();
-        $stmt_user->close();
-
-        if (!$user || empty($user['carrera'])) {
-            return [];
-        }
-
-        $carrera_id = $user['carrera'];
-        
-        // Buscamos la carrera por ID
-        $query_carreras = "SELECT id_carrera, nombre_carrera 
-                          FROM carreras 
-                          WHERE id_carrera = ? 
-                          AND activa = 1";
-        
-        $stmt_carreras = $db->prepare($query_carreras);
-        if (!$stmt_carreras) {
-            throw new Exception("Error en preparación carreras: " . $db->error);
-        }
-
-        $stmt_carreras->bind_param("i", $carrera_id);
-        if (!$stmt_carreras->execute()) {
-            throw new Exception("Error en ejecución carreras: " . $stmt_carreras->error);
-        }
-
-        $result_carreras = $stmt_carreras->get_result();
-        $carreras = [];
-        while ($row = $result_carreras->fetch_assoc()) {
+    $carreras = [];
+    $query = "SELECT DISTINCT c.id_carrera, c.nombre_carrera
+              FROM estudiante_materias em
+              INNER JOIN carrera_materia cm ON em.id_materia = cm.id_materia
+              INNER JOIN carreras c ON cm.id_carrera = c.id_carrera
+              WHERE em.id_usuario = " . intval($estudiante_id) . "
+              AND em.estatus = 'activo'";
+    
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
             $carreras[] = $row;
         }
-
-        $stmt_carreras->close();
-        
-        return $carreras;
-        
-    } catch (Exception $e) {
-        error_log("Error al obtener carreras: " . $e->getMessage());
-        return [];
     }
+    return $carreras;
 }
 
 /**
