@@ -32,42 +32,31 @@ include("includes/head.php");
 <style>
     /* Estilos responsivos adicionales */
     @media (max-width: 768px) {
-        /* Contenedor principal */
         .container-fluid {
             padding-left: 10px;
             padding-right: 10px;
         }
-        
-        /* Títulos más pequeños en móvil */
         h2.my-4 {
             font-size: 1.5rem;
             margin-top: 1rem !important;
             margin-bottom: 1rem !important;
         }
-        
         .card-header h5 {
             font-size: 1rem;
         }
-        
-        /* Tabla responsiva con scroll horizontal */
         .table-responsive {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
         }
-        
-        /* Botones en columna para móvil */
         .btn-group-mobile {
             display: flex;
             flex-direction: column;
             gap: 8px;
         }
-        
         .btn-group-mobile .btn {
             width: 100%;
             margin: 0 !important;
         }
-        
-        /* Botones individuales en móvil */
         .btn-sm {
             padding: 6px 8px;
             font-size: 0.75rem;
@@ -75,13 +64,9 @@ include("includes/head.php");
             display: inline-block;
             width: auto;
         }
-        
-        /* Para la columna de acciones en móvil */
         td:last-child {
             min-width: 180px;
         }
-        
-        /* Tarjeta de estudiante en móvil (para cuando se cargan estudiantes) */
         .estudiante-card {
             margin-bottom: 15px;
             border: 1px solid #ddd;
@@ -89,41 +74,29 @@ include("includes/head.php");
             padding: 12px;
             background: #f9f9f9;
         }
-        
-        /* Formularios responsivos */
         .form-group input,
         .form-group select,
         .form-group textarea {
-            font-size: 16px !important; /* Evita zoom en iOS */
+            font-size: 16px !important;
         }
-        
-        /* Labels más pequeños en móvil */
         label {
             font-size: 0.85rem;
         }
-        
-        /* Modales responsivos */
         .modal-dialog {
             margin: 10px;
             max-width: calc(100% - 20px);
         }
-        
         .modal-body {
             padding: 12px;
         }
-        
-        /* Tabla de preview en móvil */
         #preview-table {
             font-size: 0.75rem;
         }
-        
         #preview-table th,
         #preview-table td {
             padding: 6px;
             white-space: nowrap;
         }
-        
-        /* Botón volver mejor posicionado */
         #volver-container {
             position: sticky;
             top: 0;
@@ -133,62 +106,46 @@ include("includes/head.php");
             margin-bottom: 15px;
             border-bottom: 1px solid #ddd;
         }
-        
-        /* Spinner centrado correctamente */
         .text-center.py-4 {
             padding: 2rem 0;
         }
-        
-        /* Ajustes para inputs de notas */
         input[type="number"] {
             font-size: 16px;
             width: 80px;
         }
-        
-        /* Cards en general */
         .card {
             margin-bottom: 15px;
         }
-        
-        /* Alertas */
         .alert {
             font-size: 0.85rem;
             padding: 10px;
         }
     }
     
-    /* Para pantallas muy pequeñas (menos de 480px) */
     @media (max-width: 480px) {
         .btn-sm {
             font-size: 0.7rem;
             padding: 5px 6px;
         }
-        
         td:last-child {
             min-width: 200px;
         }
-        
         .table th,
         .table td {
             padding: 6px;
             font-size: 0.75rem;
         }
-        
         h2.my-4 {
             font-size: 1.3rem;
         }
     }
     
-    /* Estilos para la vista de estudiantes (mejora visual) */
     .estudiante-row {
         transition: all 0.3s ease;
     }
-    
     .estudiante-row:hover {
         background-color: #f5f5f5;
     }
-    
-    /* Botones de acción en grupo */
     .acciones-botones {
         display: flex;
         flex-wrap: wrap;
@@ -201,13 +158,16 @@ include("includes/head.php");
             flex-direction: column;
             align-items: stretch;
         }
-        
         .acciones-botones .btn,
         .acciones-botones label {
             width: 100%;
             margin: 2px 0 !important;
             text-align: center;
         }
+    }
+    
+    .required-field {
+        color: red;
     }
 </style>
 
@@ -352,9 +312,6 @@ $(document).ready(function() {
         const seccionId = $(this).data('seccion');
         const materiaId = $(this).data('materia');
         
-        // Guardar posición del scroll
-        const scrollPosition = $(window).scrollTop();
-        
         $('#resultados').html(`
             <div class="text-right mb-3" id="volver-container">
                 <button class="btn btn-secondary btn-block-mobile" id="btn-volver">
@@ -367,7 +324,6 @@ $(document).ready(function() {
             </div>
         `);
         
-        // Scroll suave al inicio
         $('html, body').animate({ scrollTop: 0 }, 300);
         
         fetch('cargar_estudiantes.php', {
@@ -392,8 +348,6 @@ $(document).ready(function() {
                 </div>
                 ${html}
             `);
-            
-            // Añadir clases responsivas a los inputs si es necesario
             $('input[type="number"]').addClass('form-control');
         })
         .catch(error => {
@@ -420,7 +374,6 @@ $(document).ready(function() {
             </div>
         `);
         
-        // Scroll suave hacia las secciones
         $('html, body').animate({ 
             scrollTop: $('.card').first().offset().top - 20 
         }, 400);
@@ -431,16 +384,13 @@ $(document).ready(function() {
         const seccionId = $(this).data('seccion');
         const materiaId = $(this).data('materia');
         
-        // Mostrar loading
         const btn = $(this);
         const originalHtml = btn.html();
         btn.html('<i class="fas fa-spinner fa-spin"></i>');
         btn.prop('disabled', true);
         
-        // Descargar PDF
         window.location.href = `descargar_planilla.php?seccion_id=${seccionId}&materia_id=${materiaId}`;
         
-        // Restaurar botón después de 2 segundos
         setTimeout(() => {
             btn.html(originalHtml);
             btn.prop('disabled', false);
@@ -454,7 +404,7 @@ $(document).ready(function() {
         window.location.href = `descargar_planilla_csv.php?seccion_id=${seccionId}&materia_id=${materiaId}`;
     });
 
-    // Importar CSV (input change)
+    // Importar CSV
     $(document).on('change', '.input-import-csv', function(e) {
         const file = this.files[0];
         const seccionId = $(this).data('seccion');
@@ -468,8 +418,7 @@ $(document).ready(function() {
         const tray = $('#trayecto_actual').val() || 0;
         fd.append('trayecto_actual', tray);
 
-        // Mostrar modal y spinner
-        $('#preview-table tbody').html('<tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-info"></div> Procesando...</td></td>');
+        $('#preview-table tbody').html('<tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-info"></div> Procesando...<\/td><\/tr>');
         $('#preview-summary').html('<span class="text-info">Procesando archivo...</span>');
         $('#modalPreviewCSV').modal('show');
 
@@ -533,7 +482,6 @@ $(document).ready(function() {
             const input = document.querySelector(selector);
             if (input) {
                 input.value = nota;
-                // Disparar evento change para actualizar cualquier validación
                 $(input).trigger('change');
                 applied++;
             } else {
@@ -547,11 +495,18 @@ $(document).ready(function() {
         alert(msg);
     });
     
-    // Guardar notas
+    // Guardar notas - CON VALIDACIÓN OBLIGATORIA DE SOPORTE
     $(document).on('submit', '#form-notas', function(e) {
         e.preventDefault();
         
-        // Confirmar antes de guardar en móvil
+        // VALIDAR QUE SE HAYA SELECCIONADO UN ARCHIVO DE SOPORTE
+        const soporteFile = $('#soporte_grupo')[0].files[0];
+        if (!soporteFile) {
+            alert('❌ Debes adjuntar un archivo de soporte (imagen o PDF) para poder guardar las notas. Este campo es obligatorio.');
+            $('#soporte_grupo').focus();
+            return;
+        }
+        
         const confirmMsg = confirm('¿Estás seguro de guardar las notas?');
         if (!confirmMsg) return;
         
@@ -590,17 +545,11 @@ $(document).ready(function() {
             if (data.success) {
                 header.removeClass('bg-danger').addClass('bg-success text-white');
                 title.text('Éxito');
-                let soporteInfo = '';
-                if (data.soporte) {
-                    soporteInfo = '<p class="mb-2"><i class="fas fa-check-circle"></i> <strong>Soporte:</strong> Subido correctamente.</p>';
-                } else {
-                    soporteInfo = '<p class="mb-2 text-warning"><i class="fas fa-info-circle"></i> <strong>Soporte:</strong> No se subió.</p>';
-                }
-                body.html(soporteInfo + '<div class="alert alert-success">' + data.message + '</div>');
+                body.html('<div class="alert alert-success">' + data.message + '</div>');
             } else {
                 header.removeClass('bg-success').addClass('bg-danger text-white');
                 title.text('Error');
-                body.html(`<div class="alert alert-danger">${data.message}</div>`);
+                body.html('<div class="alert alert-danger">' + data.message + '</div>');
             }
 
             $('#modalResultado').modal('show');

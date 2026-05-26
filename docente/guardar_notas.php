@@ -36,17 +36,46 @@ if (isset($_SESSION['user']['id'])) {
     exit;
 }
 
+// ============================================
+// VALIDACIÓN OBLIGATORIA DEL SOPORTE
+// ============================================
+if (!isset($_FILES['soporte_grupo']) || empty($_FILES['soporte_grupo']['name'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => '❌ Debes adjuntar un archivo de soporte (imagen o PDF) para poder guardar las notas. Este campo es obligatorio.']);
+    exit;
+}
+
+// Validar tamaño del archivo (máximo 5MB)
+if ($_FILES['soporte_grupo']['size'] > 5 * 1024 * 1024) {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => '❌ El archivo de soporte es demasiado grande. Máximo 5MB.']);
+    exit;
+}
+
+// Validar tipo de archivo
+$tipos_permitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+$extensiones_permitidas = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
+$tipo_archivo = $_FILES['soporte_grupo']['type'];
+$extension = strtolower(pathinfo($_FILES['soporte_grupo']['name'], PATHINFO_EXTENSION));
+
+if (!in_array($tipo_archivo, $tipos_permitidos) && !in_array($extension, $extensiones_permitidas)) {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => '❌ Tipo de archivo no permitido. Solo JPG, PNG, GIF, WEBP y PDF.']);
+    exit;
+}
+
 // Procesar soporte del grupo
 $soporte_grupo_nombre = null;
 $tipo_archivo_grupo = null;
 
-// El soporte es opcional pero se guarda si se proporciona
-if (isset($_FILES['soporte_grupo']) && !empty($_FILES['soporte_grupo']['name'])) {
-    $resultadoSoporte = subirSoporte($_FILES['soporte_grupo']);
-    if ($resultadoSoporte['success']) {
-        $soporte_grupo_nombre = $resultadoSoporte['ruta'];
-        $tipo_archivo_grupo = $resultadoSoporte['tipo'];
-    }
+$resultadoSoporte = subirSoporte($_FILES['soporte_grupo']);
+if ($resultadoSoporte['success']) {
+    $soporte_grupo_nombre = $resultadoSoporte['ruta'];
+    $tipo_archivo_grupo = $resultadoSoporte['tipo'];
+} else {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => 'Error al subir el archivo de soporte: ' . ($resultadoSoporte['error'] ?? 'Error desconocido')]);
+    exit;
 }
 
 global $db;
@@ -78,7 +107,6 @@ try {
                     $row = $result_check->fetch_assoc();
                     $estado_actual = $row['estado'] ?? 'pendiente';
                     
-                    // Solo actualizar si no está aprobada
                     if ($estado_actual !== 'aprobada') {
                         $update_query = "UPDATE notas_trimestres SET 
                                         nota = $nota_valor,
@@ -93,7 +121,6 @@ try {
                         $notas_actualizadas++;
                     }
                 } else {
-                    // Insertar nueva nota
                     $insert_query = "INSERT INTO notas_trimestres 
                                     (id_usuario, id_materia, id_periodo, id_docente, trimestre_num, nota, fecha_registro, estado) 
                                     VALUES 
@@ -104,21 +131,27 @@ try {
             }
         }
         
-        // Guardar nota final si existe
+        // Guardar nota final en notas_pendientes
         if (isset($notas_trimestres['nota_final']) && $notas_trimestres['nota_final'] !== '') {
             $nota_final = (float)$notas_trimestres['nota_final'];
             
-            // Guardar en notas_pendientes o notas_definitivas según corresponda
-            // Por ahora, guardamos en notas_pendientes como referencia
+            $trayecto_a_guardar = isset($_POST['trayecto_actual']) ? (int)$_POST['trayecto_actual'] : 0;
+            
             $check_pendientes = "SELECT id FROM notas_pendientes 
                                 WHERE id_usuario = $estudiante_id 
                                 AND id_materia = $materia_id 
                                 AND id_periodo = $periodo_id";
             $result_pend = $db->query($check_pendientes);
             
+            $soporte_sql = "";
+            $soporte_values = "";
+            if ($soporte_grupo_nombre) {
+                $soporte_sql = ", soporte, tipo_archivo, fecha_subida";
+                $soporte_values = ", '" . $db->real_escape_string($soporte_grupo_nombre) . "', 
+                                   '" . $db->real_escape_string($tipo_archivo_grupo) . "', NOW()";
+            }
+            
             if ($result_pend && $result_pend->num_rows > 0) {
-                // Actualizar trayecto correspondiente
-                $trayecto_a_guardar = isset($_POST['trayecto_actual']) ? (int)$_POST['trayecto_actual'] : 0;
                 $campo_trayecto = "trayecto_$trayecto_a_guardar";
                 $update_pend = "UPDATE notas_pendientes SET 
                                 $campo_trayecto = $nota_final,
@@ -128,8 +161,6 @@ try {
                                 AND id_periodo = $periodo_id";
                 $db->query($update_pend);
             } else {
-                // Insertar en notas_pendientes
-                $trayecto_a_guardar = isset($_POST['trayecto_actual']) ? (int)$_POST['trayecto_actual'] : 0;
                 $campos_trayectos = '';
                 $valores_trayectos = '';
                 for ($i = 0; $i <= 4; $i++) {
@@ -139,14 +170,6 @@ try {
                 }
                 $campos_trayectos = rtrim($campos_trayectos, ', ');
                 $valores_trayectos = rtrim($valores_trayectos, ', ');
-                
-                $soporte_sql = "";
-                $soporte_values = "";
-                if ($soporte_grupo_nombre) {
-                    $soporte_sql = ", soporte, tipo_archivo, fecha_subida";
-                    $soporte_values = ", '" . $db->real_escape_string($soporte_grupo_nombre) . "', 
-                                       '" . $db->real_escape_string($tipo_archivo_grupo) . "', NOW()";
-                }
                 
                 $insert_pend = "INSERT INTO notas_pendientes 
                                 (id_usuario, id_materia, id_periodo, id_docente, $campos_trayectos, fecha_envio, estado $soporte_sql) 
@@ -159,19 +182,23 @@ try {
     
     $db->commit();
     
-    $mensaje = "✅ Procesamiento completado exitosamente.<br>";
-    $mensaje .= "• Notas nuevas guardadas: $notas_guardadas<br>";
+    $mensaje = "✅ Notas guardadas exitosamente.<br>";
+    $mensaje .= "• Notas nuevas: $notas_guardadas<br>";
     $mensaje .= "• Notas actualizadas: $notas_actualizadas<br>";
-    
-    if ($soporte_grupo_nombre) {
-        $mensaje .= "• Soporte del grupo subido: Sí<br>";
-    }
+    $mensaje .= "• Archivo de soporte: " . ($soporte_grupo_nombre ? '✅ Subido correctamente' : '❌ No subido');
     
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => true, 'message' => $mensaje, 'soporte' => (bool)$soporte_grupo_nombre]);
     
 } catch (Exception $e) {
     $db->rollback();
+    if ($soporte_grupo_nombre) {
+        // Eliminar el archivo subido si hay error
+        $ruta_archivo = '../soportes/' . $soporte_grupo_nombre;
+        if (file_exists($ruta_archivo)) {
+            unlink($ruta_archivo);
+        }
+    }
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => false, 'message' => 'Error al guardar notas: ' . $e->getMessage()]);
     exit;
