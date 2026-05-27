@@ -303,7 +303,7 @@ include('includes/head.php');
         <div class="col-12 col-xl-4">
             <div class="card mb-4">
                 <div class="card-header bg-light">
-                    <strong>Contacto y estado administrativo</strong>
+                    <strong>Contacto</strong>
                 </div>
                 <div class="card-body">
                     <p><strong>Correo:</strong> <?php echo htmlspecialchars($preinscripcion['email']); ?></p>
