@@ -462,7 +462,7 @@ $fechaSolicitud = date('Y-m-d');
     <div class="row g-3 mb-4">
         <div class="col-md-6">
             <div class="mb-3">
-                <label for="tlf<?php echo $prefijo; ?>" class="form-label required">Teléfono Principal</label>
+                <label for="tlf<?php echo $prefijo; ?>" class="form-label required">Teléfono Casa</label>
                 <input type="tel" class="form-control" id="tlf<?php echo $prefijo; ?>" name="tlf" required value="<?php echo htmlspecialchars($_POST['tlf'] ?? ''); ?>">
             </div>
             
