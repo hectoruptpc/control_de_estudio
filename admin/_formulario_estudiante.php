@@ -82,15 +82,15 @@ $fechaSolicitud = date('Y-m-d');
         <div class="col-md-6">
             <!-- Foto de Perfil -->
             <div class="mb-3">
-                <label for="foto_perfil<?php echo $prefijo; ?>" class="form-label">Foto de Perfil</label>
-                <input type="file" class="form-control" id="foto_perfil<?php echo $prefijo; ?>" name="foto_perfil" 
-                       accept=".jpg,.jpeg,.png,.pdf,.webp" 
-                       onchange="previewImage(this, 'preview<?php echo $prefijo; ?>')">
-                <small class="text-muted">Formatos permitidos: JPG, JPEG, PNG, WEBP, PDF (Máx: 5MB)</small>
-                <div id="preview<?php echo $prefijo; ?>" class="mt-2" style="display:none;">
-                    <img id="previewImage<?php echo $prefijo; ?>" src="#" alt="Vista previa" style="max-width: 150px; max-height: 150px; border-radius: 8px;">
-                </div>
-            </div>
+    <label for="foto_perfil<?php echo $prefijo; ?>" class="form-label required">Foto de Perfil <span class="text-danger">*</span></label>
+    <input type="file" class="form-control" id="foto_perfil<?php echo $prefijo; ?>" name="foto_perfil" 
+           accept=".jpg,.jpeg,.png,.pdf,.webp" required
+           onchange="previewImage(this, 'preview<?php echo $prefijo; ?>')">
+    <small class="text-muted">Formatos permitidos: JPG, JPEG, PNG, WEBP, PDF (Máx: 5MB). <span class="text-danger">Este campo es obligatorio.</span></small>
+    <div id="preview<?php echo $prefijo; ?>" class="mt-2" style="display:none;">
+        <img id="previewImage<?php echo $prefijo; ?>" src="#" alt="Vista previa" style="max-width: 150px; max-height: 150px; border-radius: 8px;">
+    </div>
+</div>
 
             <div class="mb-3">
                 <label for="fecha_nac<?php echo $prefijo; ?>" class="form-label required">Fecha de Nacimiento</label>
@@ -1376,6 +1376,14 @@ document.addEventListener('DOMContentLoaded', function() {
             mensajesError.push('La cédula debe contener entre 6 y 9 dígitos numéricos');
             isValid = false;
         }
+
+
+        // Validación de foto de perfil
+const fotoPerfil = document.getElementById('foto_perfil' + prefijo);
+if (fotoPerfil && !fotoPerfil.files.length) {
+    mensajesError.push('Debe seleccionar una foto de perfil (JPG, PNG, WEBP o PDF)');
+    isValid = false;
+}
         
         const nombre = document.getElementById('nombre' + prefijo).value;
         if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s']+$/.test(nombre.trim())) {
