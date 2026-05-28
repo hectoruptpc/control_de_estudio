@@ -35,19 +35,26 @@ function obtenerCarreraEstudiante($estudiante_id) {
 }
 }
 
-// Función para obtener todas las materias de la carrera
-if (!function_exists('obtenerMateriasCarrera')) {
-function obtenerMateriasCarrera($carrera_id) {
+// Función para obtener SOLO las materias que el estudiante tiene inscritas
+if (!function_exists('obtenerMateriasInscritasEstudiante')) {
+function obtenerMateriasInscritasEstudiante($estudiante_id, $carrera_id) {
     global $db;
     
-    $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto
-              FROM carrera_materia cm
-              INNER JOIN materias m ON cm.id_materia = m.id_materia
-              WHERE cm.id_carrera = ?
+    $query = "SELECT DISTINCT 
+                m.id_materia, 
+                m.nombre_materia, 
+                m.cod_materia, 
+                m.trayecto
+              FROM estudiante_materias em
+              INNER JOIN materias m ON em.id_materia = m.id_materia
+              INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+              WHERE em.id_usuario = ?
+              AND cm.id_carrera = ?
+              AND em.estatus = 'activo'
               ORDER BY m.trayecto, m.nombre_materia";
     
     $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $carrera_id);
+    $stmt->bind_param("ii", $estudiante_id, $carrera_id);
     $stmt->execute();
     return $stmt->get_result();
 }
@@ -70,7 +77,6 @@ function obtenerInfoTrayecto($numero_trayecto) {
         return $result->fetch_assoc();
     }
     
-    // Si no encuentra el trayecto, crear uno basado en el número
     $nombres_trayectos = [
         0 => 'Trayecto Inicial',
         1 => 'Trayecto 1',
@@ -87,7 +93,7 @@ function obtenerInfoTrayecto($numero_trayecto) {
 }
 }
 
-// Función para obtener las notas APROBADAS del estudiante (solo trimestres aprobados)
+// Función para obtener las notas APROBADAS del estudiante
 if (!function_exists('obtenerNotasEstudianteTrimestres')) {
 function obtenerNotasEstudianteTrimestres($estudiante_id) {
     global $db;
@@ -135,7 +141,6 @@ function obtenerNotasEstudianteTrimestres($estudiante_id) {
         $notas[$materia_id]["trimestre_$trimestre"] = $row['nota'];
     }
     
-    // Calcular nota final para cada materia
     foreach ($notas as $materia_id => $nota_data) {
         $suma = 0;
         $count = 0;
@@ -185,12 +190,11 @@ $materias_carrera = [];
 $notas_estudiante = [];
 
 if ($estudiante) {
-    // Obtener información de la carrera
     $carrera = obtenerCarreraEstudiante($estudiante['id']);
     
     if ($carrera) {
-        // Obtener todas las materias de la carrera
-        $materias_carrera = obtenerMateriasCarrera($carrera['id_carrera']);
+        // Obtener SOLO las materias que el estudiante tiene inscritas
+        $materias_carrera = obtenerMateriasInscritasEstudiante($estudiante['id'], $carrera['id_carrera']);
         
         // Obtener notas APROBADAS del estudiante
         $notas_estudiante = obtenerNotasEstudianteTrimestres($estudiante['id']);
@@ -202,14 +206,9 @@ $puede_ver_tsu = false;
 $puede_ver_ingenieria = false;
 $puede_ver_completo = false;
 
-if ($estudiante && $carrera && $materias_carrera) {
-    // TSU: Debe tener notas aprobadas en trayectos 0,1,2
+if ($estudiante && $carrera && $materias_carrera && $materias_carrera->num_rows > 0) {
     $puede_ver_tsu = tieneNotasEnTrayectos($materias_carrera, $notas_estudiante, [0, 1, 2]);
-    
-    // Ingeniería: Debe tener notas aprobadas en trayectos 3,4
     $puede_ver_ingenieria = tieneNotasEnTrayectos($materias_carrera, $notas_estudiante, [3, 4]);
-    
-    // Completo: Debe tener al menos una nota aprobada en cualquier trayecto
     $puede_ver_completo = tieneNotasEnTrayectos($materias_carrera, $notas_estudiante, [0, 1, 2, 3, 4]);
 }
 ?>
@@ -255,7 +254,7 @@ if ($estudiante && $carrera && $materias_carrera) {
                 </div>
                 <div class="col-12 col-md-6">
                     <p><strong><i class="fas fa-graduation-cap"></i> Carrera:</strong> <?= htmlspecialchars($carrera['nombre_carrera']) ?> (<?= htmlspecialchars($carrera['cod_carrera']) ?>)</p>
-                    <p><strong><i class="fas fa-book"></i> Total de Materias:</strong> <span class="badge badge-primary"><?= $materias_carrera->num_rows ?></span></p>
+                    <p><strong><i class="fas fa-book"></i> Materias Inscritas:</strong> <span class="badge badge-primary"><?= $materias_carrera->num_rows ?></span></p>
                 </div>
             </div>
             
@@ -282,13 +281,13 @@ if ($estudiante && $carrera && $materias_carrera) {
         </div>
     </div>
     
-    <?php if ($materias_carrera->num_rows > 0): ?>
+    <?php if ($materias_carrera && $materias_carrera->num_rows > 0): ?>
     <div class="card shadow mb-4">
         <div class="card-header bg-success text-white">
-            <h5 class="mb-0">Plan de Estudios y Notas por Trimestre</h5>
+            <h5 class="mb-0">Materias Inscritas y Notas por Trimestre</h5>
         </div>
         <div class="card-body p-2 p-sm-3">
-            <!-- Vista para escritorio: tabla completa -->
+            <!-- Vista para escritorio -->
             <div class="table-responsive d-none d-md-block">
                 <table class="table table-bordered table-striped">
                     <thead class="thead-dark">
@@ -360,7 +359,7 @@ if ($estudiante && $carrera && $materias_carrera) {
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
-                                 </div>
+                                </div>
                                 <td class="text-center">
                                     <?php if ($t2 !== null): ?>
                                         <span class="badge <?= $t2 >= 12 ? 'bg-success' : 'bg-danger' ?>">
@@ -369,7 +368,7 @@ if ($estudiante && $carrera && $materias_carrera) {
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
-                                 </div>
+                                </div>
                                 <td class="text-center">
                                     <?php if ($t3 !== null): ?>
                                         <span class="badge <?= $t3 >= 12 ? 'bg-success' : 'bg-danger' ?>">
@@ -378,7 +377,7 @@ if ($estudiante && $carrera && $materias_carrera) {
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
-                                 </div>
+                                </div>
                                 <td class="text-center">
                                     <?php if ($nota_final !== null): ?>
                                         <span class="badge <?= $nota_final >= 12 ? 'bg-success' : 'bg-danger' ?>">
@@ -387,12 +386,10 @@ if ($estudiante && $carrera && $materias_carrera) {
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
-                                 </div>
+                                </div>
                                 <td class="text-center">
-                                    <span class="badge badge-<?= $badge_estado ?>">
-                                        <?= $estado ?>
-                                    </span>
-                                 </div>
+                                    <span class="badge badge-<?= $badge_estado ?>"><?= $estado ?></span>
+                                </div>
                                 <td><?= $nota ? htmlspecialchars($nota['nombre_periodo']) : '-' ?></td>
                                 <td><?= $nota && $nota['fecha_registro'] ? date('d/m/Y', strtotime($nota['fecha_registro'])) : '-' ?></td>
                                 <td><?= $nota && !empty($nota['nombre_admin']) ? htmlspecialchars($nota['nombre_admin']) : '-' ?></td>
@@ -402,7 +399,7 @@ if ($estudiante && $carrera && $materias_carrera) {
                 </table>
             </div>
             
-            <!-- Vista para móviles: tarjetas -->
+            <!-- Vista para móviles -->
             <div class="d-block d-md-none">
                 <?php 
                 $materias_carrera->data_seek(0);
@@ -508,19 +505,19 @@ if ($estudiante && $carrera && $materias_carrera) {
                             <div class="row text-center mb-3">
                                 <div class="col-6 col-md-3 mb-2">
                                     <div class="h4 text-primary"><?= $total_materias ?></div>
-                                    <small class="text-muted">Total Materias</small>
+                                    <small>Materias Inscritas</small>
                                 </div>
                                 <div class="col-6 col-md-3 mb-2">
                                     <div class="h4 text-success"><?= $materias_aprobadas ?></div>
-                                    <small class="text-muted">Aprobadas</small>
+                                    <small>Aprobadas</small>
                                 </div>
                                 <div class="col-6 col-md-3 mb-2">
                                     <div class="h4 text-danger"><?= $materias_reprobadas ?></div>
-                                    <small class="text-muted">Reprobadas</small>
+                                    <small>Reprobadas</small>
                                 </div>
                                 <div class="col-6 col-md-3 mb-2">
                                     <div class="h4 text-warning"><?= $materias_sin_notas ?></div>
-                                    <small class="text-muted">Pendientes</small>
+                                    <small>Pendientes</small>
                                 </div>
                             </div>
                             
@@ -546,7 +543,7 @@ if ($estudiante && $carrera && $materias_carrera) {
                 <div class="col-12 col-md-6">
                     <div class="card h-100">
                         <div class="card-header bg-light">
-                            <h6 class="mb-0"><i class="fas fa-chart-bar"></i> Progreso de la Carrera</h6>
+                            <h6 class="mb-0"><i class="fas fa-chart-bar"></i> Progreso de Materias Inscritas</h6>
                         </div>
                         <div class="card-body">
                             <?php if ($total_materias > 0): 
@@ -557,11 +554,7 @@ if ($estudiante && $carrera && $materias_carrera) {
                                     $materias_por_trayecto[$trayecto]++;
                                 }
                             }
-                            
-                            $materias_tsu = $materias_por_trayecto[0] + $materias_por_trayecto[1] + $materias_por_trayecto[2];
-                            $porcentaje_meta_tsu = ($materias_tsu / $total_materias) * 100;
                             ?>
-                            
                             <div class="progress mb-3" style="height: 25px;">
                                 <div class="progress-bar bg-success" style="width: <?= $porcentaje_completado ?>%">
                                     <?= $porcentaje_completado ?>%
@@ -592,7 +585,6 @@ if ($estudiante && $carrera && $materias_carrera) {
                                     <?php endfor; ?>
                                 </div>
                             </div>
-                            
                             <?php endif; ?>
                         </div>
                     </div>
@@ -602,13 +594,13 @@ if ($estudiante && $carrera && $materias_carrera) {
     </div>
     <?php else: ?>
         <div class="alert alert-warning">
-            No se encontraron materias para la carrera: <?= htmlspecialchars($carrera['nombre_carrera']) ?>
+            No tienes materias inscritas en la carrera: <?= htmlspecialchars($carrera['nombre_carrera']) ?>
         </div>
     <?php endif; ?>
     
     <?php else: ?>
         <div class="alert alert-danger">
-            No se pudo cargar la información del estudiante. Por favor, contacte con administración.
+            No se pudo cargar la información del estudiante.
         </div>
     <?php endif; ?>
 </div>
@@ -618,12 +610,6 @@ if ($estudiante && $carrera && $materias_carrera) {
     .h2-sm { font-size: 1.4rem; }
     .card-header { padding: 0.75rem; }
     .btn-group { display: flex; flex-wrap: wrap; gap: 0.25rem; }
-    .btn-group .btn { margin: 0; }
-    .d-block.d-md-none .card { border-radius: 8px; }
-    .d-block.d-md-none .card-header { background-color: #f8f9fc; }
-    .d-block.d-md-none .card-title { font-size: 0.9rem; line-height: 1.3; }
-    .d-block.d-md-none .row { margin-bottom: 0.5rem; }
-    .d-block.d-md-none .col-5, .d-block.d-md-none .col-7 { font-size: 0.85rem; padding-left: 0.25rem; padding-right: 0.25rem; }
     .h4 { font-size: 1.2rem; }
 }
 @media (min-width: 768px) and (max-width: 991.98px) {
