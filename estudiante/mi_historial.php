@@ -5,8 +5,6 @@ error_reporting(E_ALL);
 
 require_once('../funciones/functions.php');
 
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
 // Verificar que el usuario es un estudiante
 if (!isset($_SESSION['user']) || $_SESSION['user']['estudiante'] != 1) {
     header('location: ../index.php');
@@ -89,66 +87,93 @@ function obtenerInfoTrayecto($numero_trayecto) {
 }
 }
 
-// Función para obtener las notas definitivas del estudiante
-if (!function_exists('obtenerNotasEstudianteConsulta')) {
-function obtenerNotasEstudianteConsulta($estudiante_id) {
+// Función para obtener las notas APROBADAS del estudiante (solo trimestres aprobados)
+if (!function_exists('obtenerNotasEstudianteTrimestres')) {
+function obtenerNotasEstudianteTrimestres($estudiante_id) {
     global $db;
     
-    $query = "SELECT nd.*, 
-                     m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto,
-                     pa.nombre_periodo,
-                     ud.nombre as nombre_docente,
-                     ua.nombre as nombre_admin
-              FROM notas_definitivas nd
-              INNER JOIN materias m ON nd.id_materia = m.id_materia
-              INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
-              LEFT JOIN users ud ON nd.id_docente = ud.id
-              LEFT JOIN users ua ON nd.id_admin_aprobador = ua.id
-              WHERE nd.id_usuario = ?
-              ORDER BY pa.nombre_periodo, m.nombre_materia";
+    $notas = [];
+    
+    $query = "SELECT 
+                nt.id_materia,
+                nt.trimestre_num,
+                nt.nota,
+                nt.estado,
+                nt.fecha_registro,
+                nt.id_periodo,
+                pa.nombre_periodo,
+                u.nombre as nombre_admin
+              FROM notas_trimestres nt
+              LEFT JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
+              LEFT JOIN users u ON nt.id_admin_aprobador = u.id
+              WHERE nt.id_usuario = ?
+              AND nt.estado = 'aprobada'
+              ORDER BY nt.id_materia, nt.trimestre_num";
     
     $stmt = $db->prepare($query);
     $stmt->bind_param("i", $estudiante_id);
     $stmt->execute();
-    
-    // Convertir to array asociativo con id_materia como clave
     $result = $stmt->get_result();
-    $notas = [];
+    
     while ($row = $result->fetch_assoc()) {
-        $notas[$row['id_materia']] = $row;
+        $materia_id = $row['id_materia'];
+        $trimestre = $row['trimestre_num'];
+        
+        if (!isset($notas[$materia_id])) {
+            $notas[$materia_id] = [
+                'trimestre_1' => null,
+                'trimestre_2' => null,
+                'trimestre_3' => null,
+                'nota_final' => null,
+                'nombre_periodo' => $row['nombre_periodo'],
+                'fecha_registro' => $row['fecha_registro'],
+                'nombre_admin' => $row['nombre_admin'],
+                'estado' => $row['estado']
+            ];
+        }
+        
+        $notas[$materia_id]["trimestre_$trimestre"] = $row['nota'];
+    }
+    
+    // Calcular nota final para cada materia
+    foreach ($notas as $materia_id => $nota_data) {
+        $suma = 0;
+        $count = 0;
+        for ($i = 1; $i <= 3; $i++) {
+            if ($nota_data["trimestre_$i"] !== null && $nota_data["trimestre_$i"] > 0) {
+                $suma += $nota_data["trimestre_$i"];
+                $count++;
+            }
+        }
+        if ($count > 0) {
+            $notas[$materia_id]['nota_final'] = round($suma / $count, 1);
+        }
     }
     
     return $notas;
 }
 }
 
-// Función para verificar si tiene notas en trayectos específicos
+// Función para verificar si tiene notas aprobadas en trayectos específicos
 if (!function_exists('tieneNotasEnTrayectos')) {
 function tieneNotasEnTrayectos($materias_carrera, $notas_estudiante, $trayectos) {
     $tiene_notas = false;
-    $materias_carrera->data_seek(0); // Reiniciar puntero
+    $materias_carrera->data_seek(0);
     
     while ($materia = $materias_carrera->fetch_assoc()) {
         $trayecto = (int)$materia['trayecto'];
         
-        // Verificar si la materia pertenece a los trayectos solicitados
         if (in_array($trayecto, $trayectos)) {
             $nota = isset($notas_estudiante[$materia['id_materia']]) ? $notas_estudiante[$materia['id_materia']] : null;
             
-            if ($nota) {
-                $campo_trayecto = 'trayecto_' . $trayecto;
-                if (isset($nota[$campo_trayecto]) && $nota[$campo_trayecto] !== null) {
-                    $nota_trayecto = (float)$nota[$campo_trayecto];
-                    if ($nota_trayecto >= 12) { // Solo contar notas aprobadas
-                        $tiene_notas = true;
-                        break;
-                    }
-                }
+            if ($nota && isset($nota['nota_final']) && $nota['nota_final'] !== null && $nota['nota_final'] >= 12) {
+                $tiene_notas = true;
+                break;
             }
         }
     }
     
-    $materias_carrera->data_seek(0); // Reiniciar puntero de nuevo
+    $materias_carrera->data_seek(0);
     return $tiene_notas;
 }
 }
@@ -167,8 +192,8 @@ if ($estudiante) {
         // Obtener todas las materias de la carrera
         $materias_carrera = obtenerMateriasCarrera($carrera['id_carrera']);
         
-        // Obtener notas del estudiante (si existen)
-        $notas_estudiante = obtenerNotasEstudianteConsulta($estudiante['id']);
+        // Obtener notas APROBADAS del estudiante
+        $notas_estudiante = obtenerNotasEstudianteTrimestres($estudiante['id']);
     }
 }
 
@@ -197,7 +222,6 @@ if ($estudiante && $carrera && $materias_carrera) {
         <div class="card-header bg-info text-white d-flex flex-column flex-sm-row justify-content-between align-items-center">
             <h5 class="mb-2 mb-sm-0">Información del Estudiante</h5>
             
-            <!-- Botones de reportes condicionales - Responsive -->
             <?php if ($puede_ver_tsu || $puede_ver_ingenieria || $puede_ver_completo): ?>
             <div class="btn-group btn-group-sm flex-wrap justify-content-center" role="group">
                 <?php if ($puede_ver_tsu): ?>
@@ -235,7 +259,6 @@ if ($estudiante && $carrera && $materias_carrera) {
                 </div>
             </div>
             
-            <!-- Mensaje informativo sobre disponibilidad de reportes -->
             <?php if (!$puede_ver_tsu && !$puede_ver_ingenieria && !$puede_ver_completo): ?>
             <div class="alert alert-info mt-3">
                 <i class="fas fa-info-circle"></i> 
@@ -262,7 +285,7 @@ if ($estudiante && $carrera && $materias_carrera) {
     <?php if ($materias_carrera->num_rows > 0): ?>
     <div class="card shadow mb-4">
         <div class="card-header bg-success text-white">
-            <h5 class="mb-0">Plan de Estudios y Notas</h5>
+            <h5 class="mb-0">Plan de Estudios y Notas por Trimestre</h5>
         </div>
         <div class="card-body p-2 p-sm-3">
             <!-- Vista para escritorio: tabla completa -->
@@ -273,8 +296,11 @@ if ($estudiante && $carrera && $materias_carrera) {
                             <th>Trayecto</th>
                             <th>Materia</th>
                             <th>Código</th>
-                            <th>Nota</th>
-                            <th>Estado</th>
+                            <th class="text-center">Trimestre 1</th>
+                            <th class="text-center">Trimestre 2</th>
+                            <th class="text-center">Trimestre 3</th>
+                            <th class="text-center">Nota Final</th>
+                            <th class="text-center">Estado</th>
                             <th>Periodo</th>
                             <th>Fecha</th>
                             <th>Aprobado por</th>
@@ -298,22 +324,16 @@ if ($estudiante && $carrera && $materias_carrera) {
                             $info_trayecto = obtenerInfoTrayecto($numero_trayecto_materia);
                             $nombre_trayecto = $info_trayecto['nombre_trayecto'];
                             
-                            $nota_trayecto = null;
-                            $tiene_nota = false;
-                            
-                            if ($nota) {
-                                $campo_trayecto = 'trayecto_' . $numero_trayecto_materia;
-                                if (isset($nota[$campo_trayecto]) && $nota[$campo_trayecto] !== null) {
-                                    $nota_trayecto = (float)$nota[$campo_trayecto];
-                                    $tiene_nota = true;
-                                }
-                            }
+                            $t1 = $nota['trimestre_1'] ?? null;
+                            $t2 = $nota['trimestre_2'] ?? null;
+                            $t3 = $nota['trimestre_3'] ?? null;
+                            $nota_final = $nota['nota_final'] ?? null;
                             
                             $estado = 'Sin notas';
                             $badge_estado = 'secondary';
                             
-                            if ($tiene_nota) {
-                                if ($nota_trayecto >= 12) {
+                            if ($nota_final !== null) {
+                                if ($nota_final >= 12) {
                                     $estado = 'Aprobado';
                                     $badge_estado = 'success';
                                     $materias_aprobadas++;
@@ -322,7 +342,7 @@ if ($estudiante && $carrera && $materias_carrera) {
                                     $badge_estado = 'danger';
                                     $materias_reprobadas++;
                                 }
-                                $suma_promedios += $nota_trayecto;
+                                $suma_promedios += $nota_final;
                                 $materias_con_notas++;
                             } else {
                                 $materias_sin_notas++;
@@ -333,19 +353,46 @@ if ($estudiante && $carrera && $materias_carrera) {
                                 <td><?= htmlspecialchars($materia['nombre_materia']) ?></td>
                                 <td><?= htmlspecialchars($materia['cod_materia']) ?></td>
                                 <td class="text-center">
-                                    <?php if ($tiene_nota): ?>
-                                        <span class="badge badge-<?= $nota_trayecto >= 12 ? 'success' : 'danger' ?>">
-                                            <?= $nota_trayecto ?>
+                                    <?php if ($t1 !== null): ?>
+                                        <span class="badge <?= $t1 >= 12 ? 'bg-success' : 'bg-danger' ?>">
+                                            <?= number_format($t1, 1) ?>
                                         </span>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
-                                </td>
+                                 </div>
+                                <td class="text-center">
+                                    <?php if ($t2 !== null): ?>
+                                        <span class="badge <?= $t2 >= 12 ? 'bg-success' : 'bg-danger' ?>">
+                                            <?= number_format($t2, 1) ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                 </div>
+                                <td class="text-center">
+                                    <?php if ($t3 !== null): ?>
+                                        <span class="badge <?= $t3 >= 12 ? 'bg-success' : 'bg-danger' ?>">
+                                            <?= number_format($t3, 1) ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                 </div>
+                                <td class="text-center">
+                                    <?php if ($nota_final !== null): ?>
+                                        <span class="badge <?= $nota_final >= 12 ? 'bg-success' : 'bg-danger' ?>">
+                                            <?= number_format($nota_final, 1) ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                 </div>
                                 <td class="text-center">
                                     <span class="badge badge-<?= $badge_estado ?>">
                                         <?= $estado ?>
                                     </span>
-                                </td>
+                                 </div>
                                 <td><?= $nota ? htmlspecialchars($nota['nombre_periodo']) : '-' ?></td>
                                 <td><?= $nota && $nota['fecha_registro'] ? date('d/m/Y', strtotime($nota['fecha_registro'])) : '-' ?></td>
                                 <td><?= $nota && !empty($nota['nombre_admin']) ? htmlspecialchars($nota['nombre_admin']) : '-' ?></td>
@@ -365,22 +412,16 @@ if ($estudiante && $carrera && $materias_carrera) {
                     $info_trayecto = obtenerInfoTrayecto($numero_trayecto_materia);
                     $nombre_trayecto = $info_trayecto['nombre_trayecto'];
                     
-                    $nota_trayecto = null;
-                    $tiene_nota = false;
-                    
-                    if ($nota) {
-                        $campo_trayecto = 'trayecto_' . $numero_trayecto_materia;
-                        if (isset($nota[$campo_trayecto]) && $nota[$campo_trayecto] !== null) {
-                            $nota_trayecto = (float)$nota[$campo_trayecto];
-                            $tiene_nota = true;
-                        }
-                    }
+                    $t1 = $nota['trimestre_1'] ?? null;
+                    $t2 = $nota['trimestre_2'] ?? null;
+                    $t3 = $nota['trimestre_3'] ?? null;
+                    $nota_final = $nota['nota_final'] ?? null;
                     
                     $estado = 'Sin notas';
                     $badge_estado = 'secondary';
                     
-                    if ($tiene_nota) {
-                        if ($nota_trayecto >= 12) {
+                    if ($nota_final !== null) {
+                        if ($nota_final >= 12) {
                             $estado = 'Aprobado';
                             $badge_estado = 'success';
                         } else {
@@ -400,61 +441,56 @@ if ($estudiante && $carrera && $materias_carrera) {
                             <h6 class="card-title mb-3"><?= htmlspecialchars($materia['nombre_materia']) ?></h6>
                             
                             <div class="row mb-2">
-                                <div class="col-5 text-muted">
-                                    <i class="fas fa-layer-group"></i> Trayecto:
-                                </div>
-                                <div class="col-7">
-                                    <?= htmlspecialchars($nombre_trayecto) ?>
-                                </div>
+                                <div class="col-5 text-muted"><i class="fas fa-layer-group"></i> Trayecto:</div>
+                                <div class="col-7"><?= htmlspecialchars($nombre_trayecto) ?></div>
                             </div>
                             
                             <div class="row mb-2">
-                                <div class="col-5 text-muted">
-                                    <i class="fas fa-star"></i> Nota:
-                                </div>
+                                <div class="col-5 text-muted"><i class="fas fa-chart-line"></i> Trimestres:</div>
                                 <div class="col-7">
-                                    <?php if ($tiene_nota): ?>
-                                        <span class="badge badge-<?= $nota_trayecto >= 12 ? 'success' : 'danger' ?>">
-                                            <?= $nota_trayecto ?>
-                                        </span>
+                                    <?php if ($t1 || $t2 || $t3): ?>
+                                        T1: <?= $t1 ? number_format($t1,1) : '-' ?> |
+                                        T2: <?= $t2 ? number_format($t2,1) : '-' ?> |
+                                        T3: <?= $t3 ? number_format($t3,1) : '-' ?>
                                     <?php else: ?>
-                                        <span class="text-muted">Sin nota</span>
+                                        <span class="text-muted">Sin notas</span>
                                     <?php endif; ?>
                                 </div>
                             </div>
                             
                             <div class="row mb-2">
-                                <div class="col-5 text-muted">
-                                    <i class="fas fa-calendar-alt"></i> Periodo:
-                                </div>
+                                <div class="col-5 text-muted"><i class="fas fa-star"></i> Nota Final:</div>
                                 <div class="col-7">
-                                    <?= $nota ? htmlspecialchars($nota['nombre_periodo']) : '-' ?>
+                                    <?php if ($nota_final !== null): ?>
+                                        <span class="badge <?= $nota_final >= 12 ? 'bg-success' : 'bg-danger' ?>">
+                                            <?= number_format($nota_final, 1) ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             
                             <div class="row mb-2">
-                                <div class="col-5 text-muted">
-                                    <i class="fas fa-calendar-check"></i> Fecha:
-                                </div>
-                                <div class="col-7">
-                                    <?= $nota && $nota['fecha_registro'] ? date('d/m/Y', strtotime($nota['fecha_registro'])) : '-' ?>
-                                </div>
+                                <div class="col-5 text-muted"><i class="fas fa-calendar-alt"></i> Periodo:</div>
+                                <div class="col-7"><?= $nota ? htmlspecialchars($nota['nombre_periodo']) : '-' ?></div>
                             </div>
                             
                             <div class="row mb-2">
-                                <div class="col-5 text-muted">
-                                    <i class="fas fa-user-check"></i> Aprobado por:
-                                </div>
-                                <div class="col-7">
-                                    <?= $nota && !empty($nota['nombre_admin']) ? htmlspecialchars($nota['nombre_admin']) : '-' ?>
-                                </div>
+                                <div class="col-5 text-muted"><i class="fas fa-calendar-check"></i> Fecha:</div>
+                                <div class="col-7"><?= $nota && $nota['fecha_registro'] ? date('d/m/Y', strtotime($nota['fecha_registro'])) : '-' ?></div>
+                            </div>
+                            
+                            <div class="row mb-2">
+                                <div class="col-5 text-muted"><i class="fas fa-user-check"></i> Aprobado por:</div>
+                                <div class="col-7"><?= $nota && !empty($nota['nombre_admin']) ? htmlspecialchars($nota['nombre_admin']) : '-' ?></div>
                             </div>
                         </div>
                     </div>
                 <?php endwhile; ?>
             </div>
             
-            <!-- Resumen estadístico - Responsive -->
+            <!-- Resumen estadístico -->
             <div class="row mt-4">
                 <div class="col-12 col-md-6 mb-3 mb-md-0">
                     <div class="card h-100">
@@ -526,14 +562,12 @@ if ($estudiante && $carrera && $materias_carrera) {
                             $porcentaje_meta_tsu = ($materias_tsu / $total_materias) * 100;
                             ?>
                             
-                            <!-- Barra de progreso principal -->
                             <div class="progress mb-3" style="height: 25px;">
                                 <div class="progress-bar bg-success" style="width: <?= $porcentaje_completado ?>%">
                                     <?= $porcentaje_completado ?>%
                                 </div>
                             </div>
                             
-                            <!-- Barra de progreso por estados -->
                             <div class="progress mb-3" style="height: 20px;">
                                 <div class="progress-bar bg-success" style="width: <?= ($materias_aprobadas / $total_materias) * 100 ?>%">
                                     Aprob: <?= $materias_aprobadas ?>
@@ -546,16 +580,13 @@ if ($estudiante && $carrera && $materias_carrera) {
                                 </div>
                             </div>
                             
-                            <!-- Distribución por trayectos -->
                             <div class="mt-3">
                                 <small class="text-muted">Distribución por Trayectos:</small>
                                 <div class="row mt-1">
                                     <?php for ($i = 0; $i <= 4; $i++): 
                                         if ($materias_por_trayecto[$i] > 0): ?>
                                         <div class="col-3 col-md-2 mb-1">
-                                            <small>
-                                                <strong>T<?= $i ?>:</strong> <?= $materias_por_trayecto[$i] ?>
-                                            </small>
+                                            <small><strong>T<?= $i ?>:</strong> <?= $materias_por_trayecto[$i] ?></small>
                                         </div>
                                         <?php endif; ?>
                                     <?php endfor; ?>
@@ -583,91 +614,26 @@ if ($estudiante && $carrera && $materias_carrera) {
 </div>
 
 <style>
-/* Estilos responsivos */
 @media (max-width: 767.98px) {
-    .h2-sm {
-        font-size: 1.4rem;
-    }
-    
-    .card-header {
-        padding: 0.75rem;
-    }
-    
-    .btn-group {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.25rem;
-    }
-    
-    .btn-group .btn {
-        margin: 0;
-    }
-    
-    /* Mejoras para tarjetas en móviles */
-    .d-block.d-md-none .card {
-        border-radius: 8px;
-    }
-    
-    .d-block.d-md-none .card-header {
-        background-color: #f8f9fc;
-    }
-    
-    .d-block.d-md-none .card-title {
-        font-size: 0.9rem;
-        line-height: 1.3;
-    }
-    
-    .d-block.d-md-none .row {
-        margin-bottom: 0.5rem;
-    }
-    
-    .d-block.d-md-none .col-5, 
-    .d-block.d-md-none .col-7 {
-        font-size: 0.85rem;
-        padding-left: 0.25rem;
-        padding-right: 0.25rem;
-    }
-    
-    /* Ajustes para el resumen */
-    .h4 {
-        font-size: 1.2rem;
-    }
+    .h2-sm { font-size: 1.4rem; }
+    .card-header { padding: 0.75rem; }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+    .btn-group .btn { margin: 0; }
+    .d-block.d-md-none .card { border-radius: 8px; }
+    .d-block.d-md-none .card-header { background-color: #f8f9fc; }
+    .d-block.d-md-none .card-title { font-size: 0.9rem; line-height: 1.3; }
+    .d-block.d-md-none .row { margin-bottom: 0.5rem; }
+    .d-block.d-md-none .col-5, .d-block.d-md-none .col-7 { font-size: 0.85rem; padding-left: 0.25rem; padding-right: 0.25rem; }
+    .h4 { font-size: 1.2rem; }
 }
-
-/* Ajustes para tablets */
 @media (min-width: 768px) and (max-width: 991.98px) {
-    .table th, .table td {
-        padding: 0.5rem;
-        font-size: 0.8rem;
-    }
+    .table th, .table td { padding: 0.5rem; font-size: 0.8rem; }
 }
-
-/* Estilos generales */
-.card {
-    border-radius: 0.5rem;
-    overflow: hidden;
-}
-
-.badge {
-    font-size: 0.75rem;
-    padding: 0.35rem 0.65rem;
-}
-
-.btn-group .btn {
-    margin-right: 0.25rem;
-}
-
-.btn-group .btn:last-child {
-    margin-right: 0;
-}
-
-/* Animación suave para tarjetas móviles */
-@media (max-width: 767.98px) {
-    .d-block.d-md-none .card:active {
-        transform: scale(0.98);
-        transition: transform 0.1s ease;
-    }
-}
+.card { border-radius: 0.5rem; overflow: hidden; }
+.badge { font-size: 0.75rem; padding: 0.35rem 0.65rem; }
+.bg-success { background-color: #28a745 !important; color: white !important; }
+.bg-danger { background-color: #dc3545 !important; color: white !important; }
+.bg-warning { background-color: #ffc107 !important; color: #212529 !important; }
 </style>
 
 <?php include("includes/footer.php"); ?>
