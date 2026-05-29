@@ -1,7 +1,6 @@
 <?php
 require_once('../funciones/functions.php');
 
-// Verificar autenticación y rol
 if (!isLoggedIn() || !isDocente()) {
     $_SESSION['msg'] = "Debes iniciar sesión como docente para acceder";
     header('location: ../login.php');
@@ -41,18 +40,16 @@ if (isset($_SESSION['user']['id'])) {
 // ============================================
 if (!isset($_FILES['soporte_grupo']) || empty($_FILES['soporte_grupo']['name'])) {
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['success' => false, 'message' => '❌ Debes adjuntar un archivo de soporte (imagen o PDF) para poder guardar las notas. Este campo es obligatorio.']);
+    echo json_encode(['success' => false, 'message' => '❌ Debes adjuntar un archivo de soporte (imagen o PDF) para poder guardar las notas.']);
     exit;
 }
 
-// Validar tamaño del archivo (máximo 5MB)
 if ($_FILES['soporte_grupo']['size'] > 5 * 1024 * 1024) {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => false, 'message' => '❌ El archivo de soporte es demasiado grande. Máximo 5MB.']);
     exit;
 }
 
-// Validar tipo de archivo
 $tipos_permitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
 $extensiones_permitidas = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
 $tipo_archivo = $_FILES['soporte_grupo']['type'];
@@ -68,7 +65,6 @@ if (!in_array($tipo_archivo, $tipos_permitidos) && !in_array($extension, $extens
 // VALIDACIÓN DE DISPONIBILIDAD DE TRIMESTRES
 // ============================================
 foreach ($notas as $estudiante_id => $notas_trimestres) {
-    // Trimestre 1
     if (isset($notas_trimestres['trimestre_1']) && $notas_trimestres['trimestre_1'] !== '') {
         $disponibilidad = verificarDisponibilidadTrimestre(1);
         if (!$disponibilidad['disponible']) {
@@ -77,8 +73,6 @@ foreach ($notas as $estudiante_id => $notas_trimestres) {
             exit;
         }
     }
-    
-    // Trimestre 2
     if (isset($notas_trimestres['trimestre_2']) && $notas_trimestres['trimestre_2'] !== '') {
         $disponibilidad = verificarDisponibilidadTrimestre(2);
         if (!$disponibilidad['disponible']) {
@@ -87,8 +81,6 @@ foreach ($notas as $estudiante_id => $notas_trimestres) {
             exit;
         }
     }
-    
-    // Trimestre 3
     if (isset($notas_trimestres['trimestre_3']) && $notas_trimestres['trimestre_3'] !== '') {
         $disponibilidad = verificarDisponibilidadTrimestre(3);
         if (!$disponibilidad['disponible']) {
@@ -99,19 +91,16 @@ foreach ($notas as $estudiante_id => $notas_trimestres) {
     }
 }
 
-// Procesar soporte del grupo
-$soporte_grupo_nombre = null;
-$tipo_archivo_grupo = null;
-
+// Subir soporte
 $resultadoSoporte = subirSoporte($_FILES['soporte_grupo']);
-if ($resultadoSoporte['success']) {
-    $soporte_grupo_nombre = $resultadoSoporte['ruta'];
-    $tipo_archivo_grupo = $resultadoSoporte['tipo'];
-} else {
+if (!$resultadoSoporte['success']) {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => false, 'message' => 'Error al subir el archivo de soporte: ' . ($resultadoSoporte['error'] ?? 'Error desconocido')]);
     exit;
 }
+
+$soporte_grupo_nombre = $resultadoSoporte['ruta'];
+$tipo_archivo_grupo = $resultadoSoporte['tipo'];
 
 global $db;
 $db->begin_transaction();
@@ -123,7 +112,6 @@ try {
     foreach ($notas as $estudiante_id => $notas_trimestres) {
         $estudiante_id = (int)$estudiante_id;
         
-        // Procesar cada trimestre (1, 2, 3)
         for ($trimestre = 1; $trimestre <= 3; $trimestre++) {
             $campo = "trimestre_$trimestre";
             if (isset($notas_trimestres[$campo]) && $notas_trimestres[$campo] !== '') {
@@ -142,64 +130,60 @@ try {
                     $row = $result_check->fetch_assoc();
                     $estado_actual = $row['estado'] ?? 'pendiente';
                     
-                    if ($estado_actual !== 'aprobada') {
-                        $update_query = "UPDATE notas_trimestres SET 
-                                        nota = $nota_valor,
-                                        id_docente = $docente_id,
-                                        fecha_registro = NOW(),
-                                        estado = 'pendiente'
-                                        WHERE id_usuario = $estudiante_id 
-                                        AND id_materia = $materia_id 
-                                        AND id_periodo = $periodo_id 
-                                        AND trimestre_num = $trimestre";
-                        $db->query($update_query);
-                        $notas_actualizadas++;
+                    // NO actualizar si está aprobada
+                    if ($estado_actual === 'aprobada') {
+                        continue;
                     }
+                    
+                    // Actualizar con estado 'en_revision'
+                    $update_query = "UPDATE notas_trimestres SET 
+                                    nota = $nota_valor,
+                                    id_docente = $docente_id,
+                                    fecha_registro = NOW(),
+                                    estado = 'en_revision'
+                                    WHERE id_usuario = $estudiante_id 
+                                    AND id_materia = $materia_id 
+                                    AND id_periodo = $periodo_id 
+                                    AND trimestre_num = $trimestre";
+                    $db->query($update_query);
+                    $notas_actualizadas++;
                 } else {
+                    // Insertar nueva nota con estado 'en_revision'
                     $insert_query = "INSERT INTO notas_trimestres 
                                     (id_usuario, id_materia, id_periodo, id_docente, trimestre_num, nota, fecha_registro, estado) 
                                     VALUES 
-                                    ($estudiante_id, $materia_id, $periodo_id, $docente_id, $trimestre, $nota_valor, NOW(), 'pendiente')";
+                                    ($estudiante_id, $materia_id, $periodo_id, $docente_id, $trimestre, $nota_valor, NOW(), 'en_revision')";
                     $db->query($insert_query);
                     $notas_guardadas++;
                 }
             }
         }
         
-        // Guardar nota final en notas_pendientes
-        if (isset($notas_trimestres['nota_final']) && $notas_trimestres['nota_final'] !== '') {
-            $nota_final = (float)$notas_trimestres['nota_final'];
-            
-            $trayecto_a_guardar = isset($_POST['trayecto_actual']) ? (int)$_POST['trayecto_actual'] : 0;
-            
+        // Actualizar notas_pendientes SOLO con el soporte, sin modificar estado
+        if ($soporte_grupo_nombre) {
             $check_pendientes = "SELECT id FROM notas_pendientes 
                                 WHERE id_usuario = $estudiante_id 
                                 AND id_materia = $materia_id 
                                 AND id_periodo = $periodo_id";
             $result_pend = $db->query($check_pendientes);
             
-            $soporte_sql = "";
-            $soporte_values = "";
-            if ($soporte_grupo_nombre) {
-                $soporte_sql = ", soporte, tipo_archivo, fecha_subida";
-                $soporte_values = ", '" . $db->real_escape_string($soporte_grupo_nombre) . "', 
-                                   '" . $db->real_escape_string($tipo_archivo_grupo) . "', NOW()";
-            }
-            
             if ($result_pend && $result_pend->num_rows > 0) {
-                $campo_trayecto = "trayecto_$trayecto_a_guardar";
                 $update_pend = "UPDATE notas_pendientes SET 
-                                $campo_trayecto = $nota_final,
-                                fecha_envio = NOW()
+                                soporte = '" . $db->real_escape_string($soporte_grupo_nombre) . "',
+                                tipo_archivo = '" . $db->real_escape_string($tipo_archivo_grupo) . "',
+                                fecha_subida = NOW()
                                 WHERE id_usuario = $estudiante_id 
                                 AND id_materia = $materia_id 
                                 AND id_periodo = $periodo_id";
                 $db->query($update_pend);
             } else {
+                // Obtener el trayecto de la sección
+                $trayecto_a_guardar = isset($_POST['trayecto_actual']) ? (int)$_POST['trayecto_actual'] : 0;
+                
                 $campos_trayectos = '';
                 $valores_trayectos = '';
                 for ($i = 0; $i <= 4; $i++) {
-                    $valor = ($i == $trayecto_a_guardar) ? $nota_final : 'NULL';
+                    $valor = ($i == $trayecto_a_guardar) ? 1 : 'NULL';
                     $campos_trayectos .= "trayecto_$i, ";
                     $valores_trayectos .= "$valor, ";
                 }
@@ -207,9 +191,11 @@ try {
                 $valores_trayectos = rtrim($valores_trayectos, ', ');
                 
                 $insert_pend = "INSERT INTO notas_pendientes 
-                                (id_usuario, id_materia, id_periodo, id_docente, $campos_trayectos, fecha_envio, estado $soporte_sql) 
+                                (id_usuario, id_materia, id_periodo, id_docente, $campos_trayectos, fecha_envio, soporte, tipo_archivo, fecha_subida) 
                                 VALUES 
-                                ($estudiante_id, $materia_id, $periodo_id, $docente_id, $valores_trayectos, NOW(), 'pendiente' $soporte_values)";
+                                ($estudiante_id, $materia_id, $periodo_id, $docente_id, $valores_trayectos, NOW(), 
+                                '" . $db->real_escape_string($soporte_grupo_nombre) . "', 
+                                '" . $db->real_escape_string($tipo_archivo_grupo) . "', NOW())";
                 $db->query($insert_pend);
             }
         }
@@ -217,7 +203,7 @@ try {
     
     $db->commit();
     
-    $mensaje = "✅ Notas guardadas exitosamente.<br>";
+    $mensaje = "✅ Notas enviadas a revisión exitosamente.<br>";
     $mensaje .= "• Notas nuevas: $notas_guardadas<br>";
     $mensaje .= "• Notas actualizadas: $notas_actualizadas<br>";
     $mensaje .= "• Archivo de soporte: " . ($soporte_grupo_nombre ? '✅ Subido correctamente' : '❌ No subido');

@@ -18636,9 +18636,11 @@ function procesarNotasEstudiantes() {
 }
 
 /**
- * Verificar estados de notas de estudiantes
+ * Verificar estados de notas de estudiantes (TRIMESTRES)
  */
 function verificarEstadosNotas($estudiantes, $materia_id, $periodo_id, $docente_id, $trayecto_a_mostrar) {
+    global $db;
+    
     $notas_aprobadas = false;
     $notas_rechazadas = false;
     $notas_en_revision = false;
@@ -18651,62 +18653,86 @@ function verificarEstadosNotas($estudiantes, $materia_id, $periodo_id, $docente_
 
     $estudiantes_info = [];
     
+    // Obtener todas las notas de notas_trimestres para esta materia y periodo
+    $notas_trimestres_data = [];
+    $query = "SELECT id_usuario, trimestre_num, nota, estado 
+              FROM notas_trimestres 
+              WHERE id_materia = $materia_id 
+              AND id_periodo = $periodo_id";
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $notas_trimestres_data[$row['id_usuario']][$row['trimestre_num']] = [
+                'nota' => $row['nota'],
+                'estado' => $row['estado']
+            ];
+        }
+    }
+    
+    // Reiniciar el puntero del resultado de estudiantes
+    $estudiantes->data_seek(0);
+    
     while ($estudiante = $estudiantes->fetch_assoc()) {
-        $notas_definitivas = obtenerNotasDefinitivas($estudiante['id'], $materia_id);
-        $notas_pendientes_data = obtenerNotasPendientes($estudiante['id'], $materia_id, $periodo_id, $docente_id);
+        $estudiante_id = $estudiante['id'];
         
-        // JERARQUÍA CORRECTA DE ESTADOS:
-        // 1. Aprobada (máxima prioridad) - tabla de notas_definitivas
-        // 2. Rechazada - si está en notas_pendientes con estado 'rechazada'
-        // 3. En Revisión - si está en tabla notas_pendientes con cualquier otro estado
-        // 4. Pendiente - no está en ninguna tabla
+        // Inicializar valores para los 3 trimestres
+        $trimestre_1_nota = '';
+        $trimestre_1_estado = 'pendiente';
+        $trimestre_2_nota = '';
+        $trimestre_2_estado = 'pendiente';
+        $trimestre_3_nota = '';
+        $trimestre_3_estado = 'pendiente';
         
-        $estado = 'pendiente'; // Por defecto
-        $valor_nota = 1; // Valor por defecto
-        $campo_trayecto = 'trayecto_' . $trayecto_a_mostrar;
+        // Buscar notas existentes para este estudiante
+        if (isset($notas_trimestres_data[$estudiante_id])) {
+            $notas_est = $notas_trimestres_data[$estudiante_id];
+            
+            // Trimestre 1
+            if (isset($notas_est[1])) {
+                $trimestre_1_nota = $notas_est[1]['nota'];
+                $trimestre_1_estado = $notas_est[1]['estado'];
+            }
+            
+            // Trimestre 2
+            if (isset($notas_est[2])) {
+                $trimestre_2_nota = $notas_est[2]['nota'];
+                $trimestre_2_estado = $notas_est[2]['estado'];
+            }
+            
+            // Trimestre 3
+            if (isset($notas_est[3])) {
+                $trimestre_3_nota = $notas_est[3]['nota'];
+                $trimestre_3_estado = $notas_est[3]['estado'];
+            }
+        }
         
-        // PRIMERO: Verificar si existe en la tabla de notas_definitivas (APROBADA - MÁXIMA PRIORIDAD)
-        if ($notas_definitivas) {
-            $estado = 'aprobada';
+        // Determinar estados globales para los mensajes
+        if ($trimestre_1_estado === 'aprobada' || $trimestre_2_estado === 'aprobada' || $trimestre_3_estado === 'aprobada') {
             $notas_aprobadas = true;
             $estudiantes_con_notas_aprobadas[] = $estudiante['nombre'];
-            // Obtener la nota de la tabla definitiva
-            if (isset($notas_definitivas[$campo_trayecto]) && $notas_definitivas[$campo_trayecto] !== null) {
-                $valor_nota = (int)$notas_definitivas[$campo_trayecto];
-            }
-        } 
-        // SEGUNDO: Si no está aprobada, verificar si está en notas_pendientes y su estado
-        elseif ($notas_pendientes_data) {
-            // Verificar el estado en notas_pendientes
-            $estado_pendiente = isset($notas_pendientes_data['estado_pendiente']) ? $notas_pendientes_data['estado_pendiente'] : 'en_revision';
-            
-            if ($estado_pendiente === 'rechazada') {
-                $estado = 'rechazada';
-                $notas_rechazadas = true;
-                $estudiantes_con_notas_rechazadas[] = $estudiante['nombre'];
-            } else {
-                $estado = 'en_revision';
-                $notas_en_revision = true;
-                $estudiantes_con_notas_en_revision[] = $estudiante['nombre'];
-            }
-            
-            // Obtener la nota de la tabla notas_pendientes
-            if (isset($notas_pendientes_data[$campo_trayecto]) && $notas_pendientes_data[$campo_trayecto] !== null) {
-                $valor_nota = (int)$notas_pendientes_data[$campo_trayecto];
-            }
-        } 
-        // TERCERO: Si no está en ninguna tabla, es pendiente
-        else {
-            $estado = 'pendiente';
+        }
+        if ($trimestre_1_estado === 'rechazada' || $trimestre_2_estado === 'rechazada' || $trimestre_3_estado === 'rechazada') {
+            $notas_rechazadas = true;
+            $estudiantes_con_notas_rechazadas[] = $estudiante['nombre'];
+        }
+        if ($trimestre_1_estado === 'en_revision' || $trimestre_2_estado === 'en_revision' || $trimestre_3_estado === 'en_revision') {
+            $notas_en_revision = true;
+            $estudiantes_con_notas_en_revision[] = $estudiante['nombre'];
+        }
+        if ($trimestre_1_estado === 'pendiente' && $trimestre_2_estado === 'pendiente' && $trimestre_3_estado === 'pendiente' && 
+            $trimestre_1_nota === '' && $trimestre_2_nota === '' && $trimestre_3_nota === '') {
             $notas_pendientes = true;
             $estudiantes_con_notas_pendientes[] = $estudiante['nombre'];
-            // Mantener el valor por defecto de 1
         }
         
         $estudiantes_info[] = [
             'datos' => $estudiante,
-            'estado' => $estado,
-            'valor_nota' => $valor_nota
+            'trimestre_1_nota' => $trimestre_1_nota,
+            'trimestre_1_estado' => $trimestre_1_estado,
+            'trimestre_2_nota' => $trimestre_2_nota,
+            'trimestre_2_estado' => $trimestre_2_estado,
+            'trimestre_3_nota' => $trimestre_3_nota,
+            'trimestre_3_estado' => $trimestre_3_estado
         ];
     }
     
