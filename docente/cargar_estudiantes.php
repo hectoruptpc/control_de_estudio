@@ -50,6 +50,13 @@ $estados_notas = verificarEstadosNotas($estudiantes, $materia_id, $periodo_id, $
 
 // Actualizar la lógica para mostrar campo de soporte - SIEMPRE OBLIGATORIO
 $mostrar_campo_soporte = true;
+
+// Verificar disponibilidad de los trimestres
+$disponibilidad_trimestres = [];
+for ($t = 1; $t <= 3; $t++) {
+    $disponibilidad_trimestres[$t] = verificarDisponibilidadTrimestre($t);
+}
+$disponibilidad_json = json_encode($disponibilidad_trimestres);
 ?>
 
 <!-- Mostrar mensajes de éxito/error -->
@@ -181,9 +188,30 @@ $mostrar_campo_soporte = true;
                         <tr>
                             <th>Cédula</th>
                             <th>Nombre</th>
-                            <th class="text-center">Trimestre 1</th>
-                            <th class="text-center">Trimestre 2</th>
-                            <th class="text-center">Trimestre 3</th>
+                            <th class="text-center">
+                                Trimestre 1
+                                <?php if (!$disponibilidad_trimestres[1]['disponible']): ?>
+                                    <i class="fas fa-lock text-danger" title="<?php echo htmlspecialchars($disponibilidad_trimestres[1]['mensaje']); ?>"></i>
+                                <?php else: ?>
+                                    <i class="fas fa-check-circle text-success" title="<?php echo htmlspecialchars($disponibilidad_trimestres[1]['mensaje']); ?>"></i>
+                                <?php endif; ?>
+                            </th>
+                            <th class="text-center">
+                                Trimestre 2
+                                <?php if (!$disponibilidad_trimestres[2]['disponible']): ?>
+                                    <i class="fas fa-lock text-danger" title="<?php echo htmlspecialchars($disponibilidad_trimestres[2]['mensaje']); ?>"></i>
+                                <?php else: ?>
+                                    <i class="fas fa-check-circle text-success" title="<?php echo htmlspecialchars($disponibilidad_trimestres[2]['mensaje']); ?>"></i>
+                                <?php endif; ?>
+                            </th>
+                            <th class="text-center">
+                                Trimestre 3
+                                <?php if (!$disponibilidad_trimestres[3]['disponible']): ?>
+                                    <i class="fas fa-lock text-danger" title="<?php echo htmlspecialchars($disponibilidad_trimestres[3]['mensaje']); ?>"></i>
+                                <?php else: ?>
+                                    <i class="fas fa-check-circle text-success" title="<?php echo htmlspecialchars($disponibilidad_trimestres[3]['mensaje']); ?>"></i>
+                                <?php endif; ?>
+                            </th>
                             <th class="text-center">Promedio Final</th>
                             <th>Estado</th>
                         </tr>
@@ -200,39 +228,45 @@ $mostrar_campo_soporte = true;
                                 <td class="text-center">
                                     <input type="number" 
                                            name="notas[<?= $estudiante['id'] ?>][trimestre_1]" 
-                                           class="form-control nota-input text-center" 
+                                           class="form-control nota-input text-center trimestre-input" 
+                                           data-trimestre="1"
                                            min="1" 
                                            max="20" 
                                            step="1"
                                            value="<?= $info['trimestre_1_nota'] ?? '' ?>"
                                            style="width: 80px; margin: 0 auto;"
-                                           onchange="calcularPromedio(this, <?= $estudiante['id'] ?>)">
+                                           onchange="calcularPromedio(this, <?= $estudiante['id'] ?>)"
+                                           <?php echo !$disponibilidad_trimestres[1]['disponible'] ? 'disabled' : ''; ?>>
                                 </div>
                                 
                                 <!-- Trimestre 2 -->
                                 <td class="text-center">
                                     <input type="number" 
                                            name="notas[<?= $estudiante['id'] ?>][trimestre_2]" 
-                                           class="form-control nota-input text-center" 
+                                           class="form-control nota-input text-center trimestre-input" 
+                                           data-trimestre="2"
                                            min="1" 
                                            max="20" 
                                            step="1"
                                            value="<?= $info['trimestre_2_nota'] ?? '' ?>"
                                            style="width: 80px; margin: 0 auto;"
-                                           onchange="calcularPromedio(this, <?= $estudiante['id'] ?>)">
+                                           onchange="calcularPromedio(this, <?= $estudiante['id'] ?>)"
+                                           <?php echo !$disponibilidad_trimestres[2]['disponible'] ? 'disabled' : ''; ?>>
                                  </div>
                                 
                                 <!-- Trimestre 3 -->
                                 <td class="text-center">
                                     <input type="number" 
                                            name="notas[<?= $estudiante['id'] ?>][trimestre_3]" 
-                                           class="form-control nota-input text-center" 
+                                           class="form-control nota-input text-center trimestre-input" 
+                                           data-trimestre="3"
                                            min="1" 
                                            max="20" 
                                            step="1"
                                            value="<?= $info['trimestre_3_nota'] ?? '' ?>"
                                            style="width: 80px; margin: 0 auto;"
-                                           onchange="calcularPromedio(this, <?= $estudiante['id'] ?>)">
+                                           onchange="calcularPromedio(this, <?= $estudiante['id'] ?>)"
+                                           <?php echo !$disponibilidad_trimestres[3]['disponible'] ? 'disabled' : ''; ?>>
                                  </div>
                                 
                                 <!-- Promedio Final -->
@@ -250,7 +284,6 @@ $mostrar_campo_soporte = true;
                                 
                                 <td class="text-center">
                                     <?php
-                                    // Determinar el estado general
                                     $estado_t1 = $info['trimestre_1_estado'] ?? 'pendiente';
                                     $estado_t2 = $info['trimestre_2_estado'] ?? 'pendiente';
                                     $estado_t3 = $info['trimestre_3_estado'] ?? 'pendiente';
@@ -283,7 +316,7 @@ $mostrar_campo_soporte = true;
                 Formatos permitidos: imágenes (JPG, PNG, GIF, WEBP) o PDF. Tamaño máximo: 5MB.
             </div>
             
-            <button type="submit" class="btn btn-success btn-lg">
+            <button type="submit" class="btn btn-success btn-lg" id="btnGuardarNotas">
                 <i class="fas fa-save"></i> 
                 Guardar Notas
             </button>
@@ -292,6 +325,9 @@ $mostrar_campo_soporte = true;
 </div>
 
 <script>
+// Disponibilidad de trimestres desde PHP
+const disponibilidadTrimestres = <?php echo $disponibilidad_json; ?>;
+
 function calcularPromedio(input, estudianteId) {
     const t1 = parseFloat(document.querySelector(`input[name="notas[${estudianteId}][trimestre_1]"]`)?.value) || 0;
     const t2 = parseFloat(document.querySelector(`input[name="notas[${estudianteId}][trimestre_2]"]`)?.value) || 0;
@@ -317,6 +353,27 @@ function calcularPromedio(input, estudianteId) {
     if (promedioHidden) promedioHidden.value = promedio;
 }
 
+// Validar trimestres antes de guardar
+document.getElementById('btnGuardarNotas')?.addEventListener('click', function(e) {
+    // Verificar si algún trimestre no disponible tiene contenido
+    for (let trimestre = 1; trimestre <= 3; trimestre++) {
+        if (!disponibilidadTrimestres[trimestre].disponible) {
+            const inputs = document.querySelectorAll(`input[name*="trimestre_${trimestre}"]`);
+            let tieneNota = false;
+            inputs.forEach(input => {
+                if (input.value && input.value !== '') {
+                    tieneNota = true;
+                }
+            });
+            if (tieneNota) {
+                e.preventDefault();
+                alert('❌ ' + disponibilidadTrimestres[trimestre].mensaje);
+                return false;
+            }
+        }
+    }
+});
+
 document.addEventListener('DOMContentLoaded', function() {
     <?php foreach ($estudiantes as $estudiante): ?>
         calcularPromedio(null, <?= $estudiante['id'] ?>);
@@ -328,6 +385,15 @@ document.addEventListener('DOMContentLoaded', function() {
             if (isNaN(val)) val = 1;
             if (val < 1) this.value = 1;
             if (val > 20) this.value = 20;
+        });
+        
+        // Mostrar alerta si el trimestre no está disponible y el usuario intenta enfocar
+        input.addEventListener('focus', function() {
+            const trimestre = this.getAttribute('data-trimestre');
+            if (trimestre && !disponibilidadTrimestres[trimestre].disponible) {
+                alert('❌ ' + disponibilidadTrimestres[trimestre].mensaje);
+                this.blur();
+            }
         });
     });
 });
@@ -371,5 +437,9 @@ document.addEventListener('DOMContentLoaded', function() {
 .nota-input {
     font-weight: bold;
     text-align: center;
+}
+.nota-input:disabled {
+    background-color: #e9ecef;
+    cursor: not-allowed;
 }
 </style>

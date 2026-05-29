@@ -20993,6 +20993,109 @@ function obtenerHistorialNotasDesglozado($estudiante_id) {
 
 
 
+//SECRETARIA**********************************************************************
+
+
+
+/**
+ * Obtener la configuración de fechas para un trimestre específico
+ * @param int $trimestre_num Número del trimestre (1, 2, 3)
+ * @return array|null Configuración del trimestre o null si no existe
+ */
+function obtenerConfiguracionCargaTrimestre($trimestre_num) {
+    global $db;
+    
+    $query = "SELECT * FROM secretaria_configuracion_carga WHERE trimestre_num = ? AND activo = 1";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $trimestre_num);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Obtener todas las configuraciones de carga de notas
+ * @return array Lista de configuraciones por trimestre
+ */
+function obtenerTodasConfiguracionesCarga() {
+    global $db;
+    
+    $configuraciones = [];
+    $query = "SELECT * FROM secretaria_configuracion_carga ORDER BY trimestre_num ASC";
+    $result = $db->query($query);
+    
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $configuraciones[$row['trimestre_num']] = $row;
+        }
+    }
+    
+    return $configuraciones;
+}
+
+/**
+ * Guardar configuración de fechas para un trimestre
+ * @param int $trimestre_num Número del trimestre
+ * @param string $fecha_inicio Fecha de inicio (Y-m-d)
+ * @param string $fecha_fin Fecha de fin (Y-m-d)
+ * @return bool True si se guardó correctamente
+ */
+function guardarConfiguracionCargaTrimestre($trimestre_num, $fecha_inicio, $fecha_fin) {
+    global $db;
+    
+    $query = "INSERT INTO secretaria_configuracion_carga (trimestre_num, fecha_inicio, fecha_fin, activo) 
+              VALUES (?, ?, ?, 1) 
+              ON DUPLICATE KEY UPDATE fecha_inicio = ?, fecha_fin = ?, activo = 1";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("issss", $trimestre_num, $fecha_inicio, $fecha_fin, $fecha_inicio, $fecha_fin);
+    
+    return $stmt->execute();
+}
+
+/**
+ * Verificar si un trimestre está disponible para carga
+ * @param int $trimestre_num Número del trimestre
+ * @return array ['disponible' => bool, 'mensaje' => string]
+ */
+function verificarDisponibilidadTrimestre($trimestre_num) {
+    $config = obtenerConfiguracionCargaTrimestre($trimestre_num);
+    
+    if (!$config) {
+        return [
+            'disponible' => false,
+            'mensaje' => "El Trimestre $trimestre_num no está configurado. Contacte con secretaría."
+        ];
+    }
+    
+    $hoy = date('Y-m-d');
+    $fecha_inicio = $config['fecha_inicio'];
+    $fecha_fin = $config['fecha_fin'];
+    
+    if ($hoy < $fecha_inicio) {
+        return [
+            'disponible' => false,
+            'mensaje' => "El Trimestre $trimestre_num estará disponible para carga a partir del " . date('d/m/Y', strtotime($fecha_inicio))
+        ];
+    }
+    
+    if ($hoy > $fecha_fin) {
+        return [
+            'disponible' => false,
+            'mensaje' => "El período de carga del Trimestre $trimestre_num finalizó el " . date('d/m/Y', strtotime($fecha_fin))
+        ];
+    }
+    
+    return [
+        'disponible' => true,
+        'mensaje' => "Trimestre $trimestre_num disponible para carga (hasta " . date('d/m/Y', strtotime($fecha_fin)) . ")"
+    ];
+}
+
+
+
+
+
 
 
 

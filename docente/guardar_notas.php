@@ -64,6 +64,41 @@ if (!in_array($tipo_archivo, $tipos_permitidos) && !in_array($extension, $extens
     exit;
 }
 
+// ============================================
+// VALIDACIÓN DE DISPONIBILIDAD DE TRIMESTRES
+// ============================================
+foreach ($notas as $estudiante_id => $notas_trimestres) {
+    // Trimestre 1
+    if (isset($notas_trimestres['trimestre_1']) && $notas_trimestres['trimestre_1'] !== '') {
+        $disponibilidad = verificarDisponibilidadTrimestre(1);
+        if (!$disponibilidad['disponible']) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => false, 'message' => '❌ Trimestre 1: ' . $disponibilidad['mensaje']]);
+            exit;
+        }
+    }
+    
+    // Trimestre 2
+    if (isset($notas_trimestres['trimestre_2']) && $notas_trimestres['trimestre_2'] !== '') {
+        $disponibilidad = verificarDisponibilidadTrimestre(2);
+        if (!$disponibilidad['disponible']) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => false, 'message' => '❌ Trimestre 2: ' . $disponibilidad['mensaje']]);
+            exit;
+        }
+    }
+    
+    // Trimestre 3
+    if (isset($notas_trimestres['trimestre_3']) && $notas_trimestres['trimestre_3'] !== '') {
+        $disponibilidad = verificarDisponibilidadTrimestre(3);
+        if (!$disponibilidad['disponible']) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => false, 'message' => '❌ Trimestre 3: ' . $disponibilidad['mensaje']]);
+            exit;
+        }
+    }
+}
+
 // Procesar soporte del grupo
 $soporte_grupo_nombre = null;
 $tipo_archivo_grupo = null;
@@ -193,7 +228,6 @@ try {
 } catch (Exception $e) {
     $db->rollback();
     if ($soporte_grupo_nombre) {
-        // Eliminar el archivo subido si hay error
         $ruta_archivo = '../soportes/' . $soporte_grupo_nombre;
         if (file_exists($ruta_archivo)) {
             unlink($ruta_archivo);
