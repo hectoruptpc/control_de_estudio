@@ -9684,6 +9684,435 @@ function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
 
 
 
+
+/**
+ * Verificar si un estudiante cumple los requisitos para avanzar al siguiente trayecto
+ * @param int $id_usuario ID del estudiante
+ * @param int $trayecto_actual Número del trayecto actual (0,1,2,3)
+ * @param int $id_carrera ID de la carrera
+ * @return array ['puede_avanzar' => bool, 'motivo' => string, 'detalles' => array]
+ */
+function verificarRequisitosAvanceEstudiante($id_usuario, $trayecto_actual, $id_carrera) {
+    global $db;
+    
+    $resultado = [
+        'puede_avanzar' => false,
+        'motivo' => '',
+        'detalles' => []
+    ];
+    
+    switch ($trayecto_actual) {
+        case 0: // Trayecto 0 → Trayecto 1: Aprobar el 50% de las materias del trayecto 0
+            // Obtener materias del trayecto 0
+            $materias = obtenerMateriasPorTrayecto($id_carrera, 0);
+            $total_materias = count($materias);
+            $aprobadas = 0;
+            
+            foreach ($materias as $materia) {
+                $nota = obtenerNotaFinalMateria($id_usuario, $materia['id_materia']);
+                if ($nota !== null && $nota >= 12) {
+                    $aprobadas++;
+                }
+            }
+            
+            $porcentaje = $total_materias > 0 ? ($aprobadas / $total_materias) * 100 : 0;
+            $resultado['detalles'] = [
+                'total_materias' => $total_materias,
+                'aprobadas' => $aprobadas,
+                'porcentaje' => round($porcentaje, 1)
+            ];
+            
+            if ($porcentaje >= 50) {
+                $resultado['puede_avanzar'] = true;
+                $resultado['motivo'] = "Aprobó $aprobadas de $total_materias materias ({$resultado['detalles']['porcentaje']}% ≥ 50%)";
+            } else {
+                $resultado['motivo'] = "Solo aprobó $aprobadas de $total_materias materias ({$resultado['detalles']['porcentaje']}% < 50%)";
+            }
+            break;
+            
+        case 1: // Trayecto 1 → Trayecto 2: Aprobar Proyecto Socio Integrador (nota ≥ 16)
+            $proyecto = obtenerProyectoSocioIntegrador($id_carrera, 1);
+            if ($proyecto) {
+                $nota = obtenerNotaFinalMateria($id_usuario, $proyecto['id_materia']);
+                $resultado['detalles'] = [
+                    'materia' => $proyecto['nombre_materia'],
+                    'nota_requerida' => 16,
+                    'nota_obtenida' => $nota
+                ];
+                
+                if ($nota !== null && $nota >= 16) {
+                    $resultado['puede_avanzar'] = true;
+                    $resultado['motivo'] = "Aprobó {$proyecto['nombre_materia']} con $nota (≥ 16)";
+                } else {
+                    $resultado['motivo'] = "No aprobó {$proyecto['nombre_materia']} con nota ≥ 16. Nota actual: " . ($nota ?? 'Sin nota');
+                }
+            } else {
+                $resultado['motivo'] = "No se encontró la materia Proyecto Socio Integrador";
+            }
+            break;
+            
+        case 2: // Trayecto 2 → Trayecto 3: Aprobar todas las materias y obtener primer título (TSU)
+            // Verificar si ya tiene título TSU
+            $tiene_titulo = verificarTituloTSU($id_usuario);
+            
+            if (!$tiene_titulo) {
+                $resultado['motivo'] = "No tiene registrado el título TSU en el sistema de graduación";
+                $resultado['detalles'] = ['pendiente_titulo' => true];
+                break;
+            }
+            
+            // Verificar que aprobó todas las materias hasta trayecto 2
+            $materias = obtenerMateriasPorTrayecto($id_carrera, 0, 1, 2);
+            $total_materias = count($materias);
+            $aprobadas = 0;
+            $materias_pendientes = [];
+            
+            foreach ($materias as $materia) {
+                $nota = obtenerNotaFinalMateria($id_usuario, $materia['id_materia']);
+                if ($nota !== null && $nota >= 12) {
+                    $aprobadas++;
+                } else {
+                    $materias_pendientes[] = $materia['nombre_materia'];
+                }
+            }
+            
+            $resultado['detalles'] = [
+                'total_materias' => $total_materias,
+                'aprobadas' => $aprobadas,
+                'pendientes' => $materias_pendientes,
+                'tiene_titulo' => $tiene_titulo
+            ];
+            
+            if ($aprobadas == $total_materias && $tiene_titulo) {
+                $resultado['puede_avanzar'] = true;
+                $resultado['motivo'] = "Aprobó todas las materias ($aprobadas/$total_materias) y tiene título TSU";
+            } else {
+                $resultado['motivo'] = "Faltan " . ($total_materias - $aprobadas) . " materias por aprobar";
+                if (!$tiene_titulo) $resultado['motivo'] .= " y título TSU pendiente";
+            }
+            break;
+            
+        case 3: // Trayecto 3 → Trayecto 4: Aprobar Proyecto Socio Integrador (nota ≥ 16)
+            $proyecto = obtenerProyectoSocioIntegrador($id_carrera, 3);
+            if ($proyecto) {
+                $nota = obtenerNotaFinalMateria($id_usuario, $proyecto['id_materia']);
+                $resultado['detalles'] = [
+                    'materia' => $proyecto['nombre_materia'],
+                    'nota_requerida' => 16,
+                    'nota_obtenida' => $nota
+                ];
+                
+                if ($nota !== null && $nota >= 16) {
+                    $resultado['puede_avanzar'] = true;
+                    $resultado['motivo'] = "Aprobó {$proyecto['nombre_materia']} con $nota (≥ 16)";
+                } else {
+                    $resultado['motivo'] = "No aprobó {$proyecto['nombre_materia']} con nota ≥ 16. Nota actual: " . ($nota ?? 'Sin nota');
+                }
+            } else {
+                $resultado['motivo'] = "No se encontró la materia Proyecto Socio Integrador para trayecto 3";
+            }
+            break;
+            
+        case 4: // Trayecto 4: Último trayecto, no puede avanzar más
+            $resultado['puede_avanzar'] = false;
+            $resultado['motivo'] = "Es el último trayecto (4), no puede avanzar más";
+            break;
+            
+        default:
+            $resultado['motivo'] = "Trayecto no válido";
+    }
+    
+    return $resultado;
+}
+
+/**
+ * Obtener materias por trayecto(s)
+ */
+function obtenerMateriasPorTrayecto($id_carrera, ...$trayectos) {
+    global $db;
+    $materias = [];
+    
+    $trayectos_str = implode(',', array_map('intval', $trayectos));
+    $query = "SELECT m.id_materia, m.nombre_materia, m.trayecto
+              FROM carrera_materia cm
+              INNER JOIN materias m ON cm.id_materia = m.id_materia
+              WHERE cm.id_carrera = $id_carrera 
+              AND m.trayecto IN ($trayectos_str)
+              ORDER BY m.trayecto, m.nombre_materia";
+    
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $materias[] = $row;
+        }
+    }
+    return $materias;
+}
+
+/**
+ * Obtener nota final de una materia para un estudiante
+ */
+function obtenerNotaFinalMateria($id_usuario, $id_materia) {
+    global $db;
+    
+    $query = "SELECT nota_final FROM estudiante_materias 
+              WHERE id_usuario = $id_usuario 
+              AND id_materia = $id_materia 
+              AND estatus = 'activo'
+              ORDER BY id_inscripcion DESC LIMIT 1";
+    
+    $result = $db->query($query);
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        return $row['nota_final'];
+    }
+    return null;
+}
+
+/**
+ * Obtener el Proyecto Socio Integrador de un trayecto
+ */
+function obtenerProyectoSocioIntegrador($id_carrera, $trayecto) {
+    global $db;
+    
+    $query = "SELECT m.id_materia, m.nombre_materia
+              FROM carrera_materia cm
+              INNER JOIN materias m ON cm.id_materia = m.id_materia
+              WHERE cm.id_carrera = $id_carrera 
+              AND m.trayecto = $trayecto
+              AND m.es_proyecto_socio = 1
+              LIMIT 1";
+    
+    $result = $db->query($query);
+    if ($result && $result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    return null;
+}
+
+/**
+ * Verificar si un estudiante tiene título TSU
+ */
+function verificarTituloTSU($id_usuario) {
+    global $db;
+    
+    $query = "SELECT id FROM graduados 
+              WHERE id_usuario = $id_usuario 
+              AND estado = 'graduado'
+              LIMIT 1";
+    
+    $result = $db->query($query);
+    return $result && $result->num_rows > 0;
+}
+
+/**
+ * Obtener estudiantes de una sección con evaluación de requisitos
+ */
+function obtenerEstudiantesSeccionConRequisitos($id_seccion) {
+    global $db;
+    
+    $seccion = obtenerDetalleSeccion($db, $id_seccion);
+    $estudiantes = obtenerEstudiantesDeSeccion($db, $id_seccion);
+    $resultado = [];
+    
+    foreach ($estudiantes as $estudiante) {
+        $evaluacion = verificarRequisitosAvanceEstudiante(
+            $estudiante['id'], 
+            $seccion['numero_trayecto'], 
+            $seccion['id_carrera']
+        );
+        
+        $resultado[] = [
+            'id' => $estudiante['id'],
+            'nombre' => $estudiante['nombre'],
+            'idusuario' => $estudiante['idusuario'],
+            'fecha_inscripcion' => $estudiante['fecha_inscripcion'],
+            'puede_avanzar' => $evaluacion['puede_avanzar'],
+            'motivo' => $evaluacion['motivo'],
+            'detalles' => $evaluacion['detalles']
+        ];
+    }
+    
+    return $resultado;
+}
+
+/**
+ * Avanzar una sección al siguiente trayecto
+ */
+function avanzarSeccionTrayecto($id_seccion, $id_admin) {
+    global $db;
+    
+    $seccion = obtenerDetalleSeccion($db, $id_seccion);
+    $nuevo_trayecto = $seccion['numero_trayecto'] + 1;
+    
+    if ($nuevo_trayecto > 4) {
+        return ['success' => false, 'message' => 'No se puede avanzar más allá del trayecto 4'];
+    }
+    
+    // Obtener el id_trayecto correspondiente
+    $query_trayecto = "SELECT id_trayecto FROM trayectos WHERE numero_trayecto = $nuevo_trayecto";
+    $result = $db->query($query_trayecto);
+    $nuevo_id_trayecto = $result->fetch_assoc()['id_trayecto'];
+    
+    // Obtener estudiantes que pueden avanzar
+    $estudiantes = obtenerEstudiantesSeccionConRequisitos($id_seccion);
+    $estudiantes_avanzan = array_filter($estudiantes, function($e) {
+        return $e['puede_avanzar'];
+    });
+    
+    if (count($estudiantes_avanzan) == 0) {
+        return ['success' => false, 'message' => 'No hay estudiantes que cumplan los requisitos para avanzar'];
+    }
+    
+    // Crear nueva sección para el siguiente trayecto
+    $nuevo_codigo = $seccion['codigo_seccion'] . '-T' . $nuevo_trayecto;
+    
+    $insert_seccion = "INSERT INTO secciones 
+                       (codigo_seccion, id_carrera, turno, id_trayecto, id_periodo, 
+                        capacidad_maxima, capacidad_minima, inicia, created_by, created_at) 
+                       VALUES 
+                       ('$nuevo_codigo', {$seccion['id_carrera']}, '{$seccion['turno']}', 
+                        $nuevo_id_trayecto, {$seccion['id_periodo']}, 
+                        {$seccion['capacidad_maxima']}, " . MINIMO_ESTUDIANTES . ", 
+                        NOW(), $id_admin, NOW())";
+    
+    if (!$db->query($insert_seccion)) {
+        return ['success' => false, 'message' => 'Error al crear nueva sección: ' . $db->error];
+    }
+    
+    $nueva_seccion_id = $db->insert_id;
+    
+    // Mover estudiantes que cumplen requisitos a la nueva sección
+    $movidos = 0;
+    foreach ($estudiantes_avanzan as $estudiante) {
+        // Actualizar estudiante_seccion
+        $update = "UPDATE estudiante_seccion 
+                   SET id_seccion = $nueva_seccion_id, fecha_inscripcion = NOW() 
+                   WHERE id_usuario = {$estudiante['id']} AND id_seccion = $id_seccion";
+        $db->query($update);
+        
+        // Inscribir materias del nuevo trayecto
+        inscribirMateriasNuevoTrayecto($estudiante['id'], $nueva_seccion_id, $nuevo_trayecto, $seccion['id_carrera']);
+        $movidos++;
+    }
+    
+    return [
+        'success' => true, 
+        'message' => "Sección avanzada correctamente. $movidos estudiantes movidos al trayecto $nuevo_trayecto",
+        'nueva_seccion_id' => $nueva_seccion_id,
+        'movidos' => $movidos
+    ];
+}
+
+/**
+ * Inscribir materias del nuevo trayecto para un estudiante
+ */
+function inscribirMateriasNuevoTrayecto($id_usuario, $id_seccion, $nuevo_trayecto, $id_carrera) {
+    global $db;
+    
+    // Obtener período de la sección
+    $query_periodo = "SELECT id_periodo FROM secciones WHERE id_seccion = $id_seccion";
+    $result = $db->query($query_periodo);
+    $periodo_id = $result->fetch_assoc()['id_periodo'];
+    
+    // Obtener materias del nuevo trayecto
+    $materias = obtenerMateriasPorTrayecto($id_carrera, $nuevo_trayecto);
+    
+    foreach ($materias as $materia) {
+        // Verificar si ya está inscrito
+        $check = "SELECT id_inscripcion FROM estudiante_materias 
+                  WHERE id_usuario = $id_usuario AND id_materia = {$materia['id_materia']} AND id_periodo = $periodo_id";
+        $check_result = $db->query($check);
+        
+        if ($check_result->num_rows == 0) {
+            $insert = "INSERT INTO estudiante_materias 
+                       (id_usuario, id_materia, id_seccion, id_periodo, fecha_inscripcion, estatus) 
+                       VALUES 
+                       ($id_usuario, {$materia['id_materia']}, $id_seccion, $periodo_id, NOW(), 'activo')";
+            $db->query($insert);
+        }
+    }
+}
+
+/**
+ * Obtener secciones disponibles para rezagados
+ */
+function obtenerSeccionesDisponiblesParaRezagados($id_carrera, $id_trayecto, $id_periodo) {
+    global $db;
+    
+    $query = "SELECT s.id_seccion, s.codigo_seccion, s.capacidad_maxima, 
+                     (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion) as inscritos
+              FROM secciones s
+              WHERE s.id_carrera = $id_carrera 
+              AND s.id_trayecto = $id_trayecto
+              AND s.id_periodo = $id_periodo
+              AND s.estatus = 'activa'
+              HAVING inscritos < capacidad_maxima
+              ORDER BY s.codigo_seccion";
+    
+    $result = $db->query($query);
+    $secciones = [];
+    while ($row = $result->fetch_assoc()) {
+        $secciones[] = $row;
+    }
+    return $secciones;
+}
+
+/**
+ * Mover un estudiante a otra sección (para rezagados)
+ */
+function moverEstudianteAOtraSeccion($id_usuario, $id_seccion_origen, $id_seccion_destino, $id_admin) {
+    global $db;
+    
+    // Verificar cupo en sección destino
+    $query_cupo = "SELECT s.capacidad_maxima, 
+                   (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion) as inscritos
+                   FROM secciones s WHERE s.id_seccion = $id_seccion_destino";
+    $result = $db->query($query_cupo);
+    $cupo = $result->fetch_assoc();
+    
+    if ($cupo['inscritos'] >= $cupo['capacidad_maxima']) {
+        return ['success' => false, 'message' => 'La sección destino no tiene cupos disponibles'];
+    }
+    
+    // Mover estudiante
+    $update = "UPDATE estudiante_seccion 
+               SET id_seccion = $id_seccion_destino, fecha_inscripcion = NOW() 
+               WHERE id_usuario = $id_usuario AND id_seccion = $id_seccion_origen";
+    
+    if ($db->query($update)) {
+        // Registrar en log
+        $log = "INSERT INTO logs_administrativos 
+                (id_admin, accion, descripcion, fecha) 
+                VALUES 
+                ($id_admin, 'mover_estudiante', 'Movido estudiante $id_usuario de seccion $id_seccion_origen a $id_seccion_destino', NOW())";
+        $db->query($log);
+        
+        return ['success' => true, 'message' => 'Estudiante movido correctamente'];
+    }
+    
+    return ['success' => false, 'message' => 'Error al mover estudiante: ' . $db->error];
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 //ASIGNAR SECCIONES A DOCENTES ***********************************************************************************************
 
 
