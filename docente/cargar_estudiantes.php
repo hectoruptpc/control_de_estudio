@@ -228,17 +228,19 @@ $disponibilidad_json = json_encode($disponibilidad_trimestres);
                                 
                                 <td class="text-center">
                                     <?php
-                                    $badge_class = 'secondary';
-                                    $badge_text = 'Pendiente';
-                                    if (in_array('aprobada', [$estado_t1, $estado_t2, $estado_t3])) {
-                                        $badge_class = 'success';
-                                        $badge_text = 'Aprobada';
-                                    } elseif (in_array('en_revision', [$estado_t1, $estado_t2, $estado_t3])) {
+                                    // Prioridad: En Revisión > Rechazada > Aprobada > Pendiente
+                                    if (in_array('en_revision', [$estado_t1, $estado_t2, $estado_t3])) {
                                         $badge_class = 'warning';
                                         $badge_text = 'En Revisión';
                                     } elseif (in_array('rechazada', [$estado_t1, $estado_t2, $estado_t3])) {
                                         $badge_class = 'danger';
                                         $badge_text = 'Rechazada';
+                                    } elseif (in_array('aprobada', [$estado_t1, $estado_t2, $estado_t3])) {
+                                        $badge_class = 'success';
+                                        $badge_text = 'Aprobada';
+                                    } else {
+                                        $badge_class = 'secondary';
+                                        $badge_text = 'Pendiente';
                                     }
                                     ?>
                                     <span class="badge badge-<?= $badge_class ?>"><?= $badge_text ?></span>
