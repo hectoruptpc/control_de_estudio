@@ -37,7 +37,7 @@ $info = $info_result->fetch_assoc();
 
 switch ($seccion) {
     case 'lista-estudiantes':
-        // Obtener estudiantes con sus notas trimestrales
+        // Obtener estudiantes con sus 3 notas trimestrales en UNA SOLA FILA
         $query = "SELECT 
                     u.id as id_usuario,
                     u.idusuario as cedula,
@@ -45,8 +45,12 @@ switch ($seccion) {
                     MAX(CASE WHEN nt.trimestre_num = 1 THEN nt.nota END) as trimestre_1,
                     MAX(CASE WHEN nt.trimestre_num = 2 THEN nt.nota END) as trimestre_2,
                     MAX(CASE WHEN nt.trimestre_num = 3 THEN nt.nota END) as trimestre_3,
-                    nt.estado,
-                    nt.id as id_nota
+                    MAX(CASE WHEN nt.trimestre_num = 1 THEN nt.estado END) as estado_1,
+                    MAX(CASE WHEN nt.trimestre_num = 2 THEN nt.estado END) as estado_2,
+                    MAX(CASE WHEN nt.trimestre_num = 3 THEN nt.estado END) as estado_3,
+                    MAX(CASE WHEN nt.trimestre_num = 1 THEN nt.id END) as id_nota_1,
+                    MAX(CASE WHEN nt.trimestre_num = 2 THEN nt.id END) as id_nota_2,
+                    MAX(CASE WHEN nt.trimestre_num = 3 THEN nt.id END) as id_nota_3
                   FROM estudiante_seccion es
                   INNER JOIN users u ON es.id_usuario = u.id
                   INNER JOIN docente_seccion ds ON es.id_seccion = ds.id_seccion
@@ -56,7 +60,7 @@ switch ($seccion) {
                   WHERE ds.id_usuario = $docente_id 
                   AND ds.id_materia = $materia_id
                   AND u.estudiante = 1
-                  GROUP BY u.id, u.idusuario, u.nombre, nt.estado, nt.id
+                  GROUP BY u.id, u.idusuario, u.nombre
                   ORDER BY u.nombre ASC";
         
         $result = $db->query($query);
@@ -131,28 +135,39 @@ switch ($seccion) {
                         if ($t3 !== null) { $suma += $t3; $count++; }
                         $nota_final = $count > 0 ? round($suma / $count, 1) : null;
                         
-                        $estado = $row['estado'] ?? 'pendiente';
+                        // Determinar el estado general
+                        $estados = [];
+                        if ($row['estado_1']) $estados[] = $row['estado_1'];
+                        if ($row['estado_2']) $estados[] = $row['estado_2'];
+                        if ($row['estado_3']) $estados[] = $row['estado_3'];
+                        
                         $badge_class = 'secondary';
                         $badge_text = 'Pendiente';
                         
-                        if ($estado === 'aprobada') {
-                            $badge_class = 'success';
-                            $badge_text = 'Aprobada';
-                        } elseif ($estado === 'rechazada') {
-                            $badge_class = 'danger';
-                            $badge_text = 'Rechazada';
-                        } elseif ($estado === 'en_revision') {
+                        if (in_array('en_revision', $estados)) {
                             $badge_class = 'warning';
                             $badge_text = 'En Revisión';
+                        } elseif (in_array('rechazada', $estados)) {
+                            $badge_class = 'danger';
+                            $badge_text = 'Rechazada';
+                        } elseif (in_array('aprobada', $estados)) {
+                            $badge_class = 'success';
+                            $badge_text = 'Aprobada';
                         }
+                        
+                        $id_nota_1 = $row['id_nota_1'];
+                        $id_nota_2 = $row['id_nota_2'];
+                        $id_nota_3 = $row['id_nota_3'];
                     ?>
-                        <tr>
+                        <tr data-estudiante-id="<?= $row['id_usuario'] ?>">
                             <td>
-                                <input type="checkbox" name="notas_ids[]" 
-                                       value="<?= $row['id_nota'] ?>" 
+                                <input type="checkbox" name="estudiantes_ids[]" 
+                                       value="<?= $row['id_usuario'] ?>" 
                                        class="estudiante-checkbox"
-                                       data-estudiante-id="<?= $row['id_usuario'] ?>"
-                                       data-estudiante-nombre="<?= htmlspecialchars($row['nombre_estudiante']) ?>">
+                                       data-estudiante-nombre="<?= htmlspecialchars($row['nombre_estudiante']) ?>"
+                                       data-nota-1="<?= $id_nota_1 ?>"
+                                       data-nota-2="<?= $id_nota_2 ?>"
+                                       data-nota-3="<?= $id_nota_3 ?>">
                             </div>
                             <td><?= htmlspecialchars($row['cedula']) ?></div>
                             <td><?= htmlspecialchars($row['nombre_estudiante']) ?></div>
@@ -205,13 +220,19 @@ switch ($seccion) {
                                 <div class="btn-group btn-group-sm">
                                     <button type="button" class="btn btn-success accion-individual" 
                                             data-accion="aprobar"
-                                            data-id-nota="<?= $row['id_nota'] ?>"
+                                            data-estudiante-id="<?= $row['id_usuario'] ?>"
+                                            data-nota-1="<?= $id_nota_1 ?>"
+                                            data-nota-2="<?= $id_nota_2 ?>"
+                                            data-nota-3="<?= $id_nota_3 ?>"
                                             data-estudiante-nombre="<?= htmlspecialchars($row['nombre_estudiante']) ?>">
                                         <i class="fas fa-check"></i> Aprobar
                                     </button>
                                     <button type="button" class="btn btn-danger accion-individual" 
                                             data-accion="rechazar"
-                                            data-id-nota="<?= $row['id_nota'] ?>"
+                                            data-estudiante-id="<?= $row['id_usuario'] ?>"
+                                            data-nota-1="<?= $id_nota_1 ?>"
+                                            data-nota-2="<?= $id_nota_2 ?>"
+                                            data-nota-3="<?= $id_nota_3 ?>"
                                             data-estudiante-nombre="<?= htmlspecialchars($row['nombre_estudiante']) ?>">
                                         <i class="fas fa-times"></i> Rechazar
                                     </button>
@@ -219,6 +240,13 @@ switch ($seccion) {
                             </div>
                         </tr>
                     <?php endwhile; ?>
+                    <?php if ($result->num_rows == 0): ?>
+                        <tr>
+                            <td colspan="9" class="text-center text-muted">
+                                No hay estudiantes en esta sección
+                            </td>
+                        </tr>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
@@ -244,14 +272,22 @@ switch ($seccion) {
         $('.estudiante-checkbox').change(actualizarBotones);
         
         $('.accion-individual').click(function() {
-            const idNota = $(this).data('id-nota');
             const accion = $(this).data('accion');
+            const estudianteId = $(this).data('estudiante-id');
             const estudianteNombre = $(this).data('estudiante-nombre');
+            const nota1 = $(this).data('nota-1');
+            const nota2 = $(this).data('nota-2');
+            const nota3 = $(this).data('nota-3');
             
-            window.notasIdsPendientes = [idNota];
-            window.estudianteNombrePendiente = estudianteNombre;
-            window.esAccionGrupal = false;
+            // Recolectar IDs de notas no nulas
+            const notasIds = [];
+            if (nota1) notasIds.push(nota1);
+            if (nota2) notasIds.push(nota2);
+            if (nota3) notasIds.push(nota3);
+            
             window.accionPendiente = accion;
+            window.notasIdsPendientes = notasIds;
+            window.esAccionGrupal = false;
             
             if (accion === 'rechazar') {
                 $('#estudiantesRechazados').text(estudianteNombre);
@@ -262,6 +298,14 @@ switch ($seccion) {
                 $('#mensajeAprobacionTexto').val('');
                 $('#modalMensajeAprobacion').modal('show');
             }
+            
+            setTimeout(function() {
+                if (accion === 'rechazar') {
+                    $('#mensajeRechazoTexto').focus();
+                } else {
+                    $('#mensajeAprobacionTexto').focus();
+                }
+            }, 500);
         });
         
         actualizarBotones();
