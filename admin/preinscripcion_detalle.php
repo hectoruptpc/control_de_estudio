@@ -45,49 +45,18 @@ if (!$preinscripcion) {
     exit;
 }
 
-// Obtener secciones disponibles para mostrar
+// Obtener secciones disponibles del TRAYECTO 0
 $seccionesDisponibles = [];
 $mensaje_secciones = '';
 if ($preinscripcion['status'] === 'Pendiente') {
     $carrera_id = $preinscripcion['carrera'];
     $turno = !empty($preinscripcion['turno']) ? $preinscripcion['turno'] : 'Diurno';
     
-    $seccionesDisponibles = obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno);
+    // Solo obtener secciones del Trayecto 0
+    $seccionesDisponibles = obtenerSeccionesDisponiblesPorCarreraYTurnoYTrayecto($carrera_id, $turno, 0);
     
     if (empty($seccionesDisponibles)) {
-        // Verificar si hay secciones activas en general
-        $check_secciones = $db->query("SELECT COUNT(*) as total FROM secciones WHERE estatus = 'activa'");
-        $total_secciones = $check_secciones ? $check_secciones->fetch_assoc()['total'] : 0;
-        
-        if ($total_secciones == 0) {
-            $mensaje_secciones = "⚠️ No hay secciones activas en el sistema. Debes crear secciones primero.";
-        } else {
-            // Verificar si hay secciones de esta carrera
-            $check_carrera = $db->prepare("SELECT COUNT(*) as total FROM secciones WHERE id_carrera = ? AND estatus = 'activa'");
-            if ($check_carrera) {
-                $check_carrera->bind_param('i', $carrera_id);
-                $check_carrera->execute();
-                $secciones_carrera = $check_carrera->get_result()->fetch_assoc()['total'];
-                
-                if ($secciones_carrera == 0) {
-                    $mensaje_secciones = "⚠️ No hay secciones activas para esta carrera. Debes crear una sección para esta carrera.";
-                } else {
-                    // Verificar si hay del turno correcto
-                    $check_turno = $db->prepare("SELECT COUNT(*) as total FROM secciones WHERE id_carrera = ? AND turno = ? AND estatus = 'activa'");
-                    if ($check_turno) {
-                        $check_turno->bind_param('is', $carrera_id, $turno);
-                        $check_turno->execute();
-                        $secciones_turno = $check_turno->get_result()->fetch_assoc()['total'];
-                        
-                        if ($secciones_turno == 0) {
-                            $mensaje_secciones = "⚠️ No hay secciones activas para el turno '$turno' en esta carrera.";
-                        } else {
-                            $mensaje_secciones = "⚠️ Hay secciones activas, pero todas están llenas (sin cupos disponibles).";
-                        }
-                    }
-                }
-            }
-        }
+        $mensaje_secciones = "No hay secciones disponibles para el Trayecto 0 (Inicial) en esta carrera y turno.";
     }
 }
 
@@ -156,11 +125,10 @@ include('includes/head.php');
     <div class="row mb-3">
         <div class="col-12">
             <?php if ($preinscripcion['status'] === 'Pendiente'): ?>
-                <!-- Mostrar secciones disponibles -->
                 <?php if (!empty($seccionesDisponibles)): ?>
                     <div class="alert alert-info mb-3">
                         <i class="fas fa-info-circle"></i> 
-                        <strong>Secciones disponibles para <?= htmlspecialchars($carreraMap[$preinscripcion['carrera']] ?? 'la carrera') ?> (Turno: <?= htmlspecialchars($preinscripcion['turno'] ?? 'Diurno') ?>):</strong>
+                        <strong>Secciones disponibles para Trayecto 0 (Inicial) - <?= htmlspecialchars($carreraMap[$preinscripcion['carrera']] ?? 'la carrera') ?> (Turno: <?= htmlspecialchars($preinscripcion['turno'] ?? 'Diurno') ?>):</strong>
                         <ul class="mb-0 mt-2">
                             <?php foreach ($seccionesDisponibles as $sec): ?>
                                 <li>
@@ -173,9 +141,9 @@ include('includes/head.php');
                 <?php else: ?>
                     <div class="alert alert-warning mb-3">
                         <i class="fas fa-exclamation-triangle"></i>
-                        <strong>¡Atención!</strong> <?= $mensaje_secciones ?: 'No hay secciones disponibles para esta carrera y turno.' ?>
+                        <strong>¡Atención!</strong> <?= $mensaje_secciones ?>
                         <div class="mt-2">
-                            <a href="gestion_secciones.php" class="btn btn-sm btn-primary">
+                            <a href="gestion_seccion.php" class="btn btn-sm btn-primary">
                                 <i class="fas fa-plus"></i> Gestionar Secciones
                             </a>
                         </div>
@@ -188,7 +156,7 @@ include('includes/head.php');
                         <button type="submit" class="btn btn-success" 
                                 id="btnAceptar"
                                 <?php echo empty($seccionesDisponibles) ? 'disabled' : ''; ?>
-                                onclick="return confirm('¿Aceptar esta preinscripción? Se creará el usuario y se asignará automáticamente a una sección disponible.');">
+                                onclick="return confirm('¿Aceptar esta preinscripción? Se creará el usuario y se asignará automáticamente a una sección del Trayecto 0.');">
                             <i class="fas fa-check"></i> Aprobar y Asignar a Sección
                         </button>
                     </form>
@@ -208,6 +176,7 @@ include('includes/head.php');
         </div>
     </div>
 
+    <!-- Resto del código igual (los detalles de la preinscripción) -->
     <div class="row">
         <div class="col-12 col-xl-8">
             <div class="card mb-4">
@@ -362,5 +331,4 @@ include('includes/head.php');
     });
 </script>
 
-</body>
-</html>
+<?php include('includes/footer.php'); ?>

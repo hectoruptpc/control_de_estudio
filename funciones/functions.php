@@ -9430,6 +9430,65 @@ function verificarConflictoHorario($dia, $hora_inicio, $hora_fin, $aula, $id_sec
 
 
 
+/**
+ * Obtener secciones disponibles por carrera, turno y trayecto específico (solo Trayecto 0)
+ * @param int $id_carrera ID de la carrera
+ * @param string $turno Turno (Diurno/Nocturno)
+ * @param int $numero_trayecto Número del trayecto (0,1,2,3,4)
+ * @return array Lista de secciones con cupos disponibles
+ */
+function obtenerSeccionesDisponiblesPorCarreraYTurnoYTrayecto($id_carrera, $turno, $numero_trayecto) {
+    global $db;
+    
+    $secciones = [];
+    
+    // Primero obtener el id_trayecto correspondiente al número
+    $query_trayecto = "SELECT id_trayecto FROM trayectos WHERE numero_trayecto = $numero_trayecto";
+    $result_trayecto = $db->query($query_trayecto);
+    $trayecto = $result_trayecto->fetch_assoc();
+    $id_trayecto = $trayecto ? $trayecto['id_trayecto'] : 0;
+    
+    if (!$id_trayecto) {
+        return $secciones;
+    }
+    
+    $query = "SELECT s.*, 
+                     (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion) as inscritos,
+                     (s.capacidad_maxima - (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion)) as cupos_disponibles
+              FROM secciones s
+              WHERE s.id_carrera = $id_carrera 
+              AND s.turno = '$turno'
+              AND s.id_trayecto = $id_trayecto
+              AND s.estatus = 'activa'
+              AND s.status = 'Aprobada'
+              HAVING cupos_disponibles > 0
+              ORDER BY s.codigo_seccion ASC";
+    
+    $result = $db->query($query);
+    
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $secciones[] = $row;
+        }
+    }
+    
+    return $secciones;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
