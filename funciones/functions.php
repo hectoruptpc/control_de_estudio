@@ -8045,6 +8045,168 @@ function crearSeccion($db, $datos) {
     }
 }
 
+
+
+
+
+
+/**
+ * Obtener una sección por ID
+ * @param int $id_seccion ID de la sección
+ * @return array|null Datos de la sección o null si no existe
+ */
+function obtenerSeccionPorId($id_seccion) {
+    global $db;
+    
+    $query = "SELECT s.*, 
+                     c.nombre_carrera,
+                     t.numero_trayecto,
+                     t.nombre_trayecto,
+                     pa.nombre_periodo
+              FROM secciones s
+              LEFT JOIN carreras c ON s.id_carrera = c.id_carrera
+              LEFT JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+              LEFT JOIN periodos_academicos pa ON s.id_periodo = pa.id_periodo
+              WHERE s.id_seccion = " . intval($id_seccion);
+    
+    $result = $db->query($query);
+    if ($result && $result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    return null;
+}
+
+/**
+ * Obtener todos los trayectos
+ * @return array Lista de trayectos
+ */
+function obtenerTodosLosTrayectos() {
+    global $db;
+    $trayectos = [];
+    
+    $query = "SELECT id_trayecto, numero_trayecto, nombre_trayecto 
+              FROM trayectos 
+              ORDER BY numero_trayecto ASC";
+    
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $trayectos[] = $row;
+        }
+    }
+    return $trayectos;
+}
+
+/**
+ * Obtener todos los períodos académicos
+ * @return array Lista de períodos
+ */
+function obtenerTodosLosPeriodos() {
+    global $db;
+    $periodos = [];
+    
+    $query = "SELECT id_periodo, nombre_periodo 
+              FROM periodos_academicos 
+              ORDER BY id_periodo DESC";
+    
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $periodos[] = $row;
+        }
+    }
+    return $periodos;
+}
+
+/**
+ * Actualizar una sección
+ * @param int $id_seccion ID de la sección
+ * @param string $codigo_seccion Código de la sección
+ * @param int $id_carrera ID de la carrera
+ * @param int $id_trayecto ID del trayecto
+ * @param string $turno Turno (Diurno/Nocturno)
+ * @param int $id_periodo ID del período
+ * @param int $capacidad_maxima Capacidad máxima
+ * @param string $inicia Fecha de inicio
+ * @return array Resultado de la operación
+ */
+function actualizarSeccion($id_seccion, $codigo_seccion, $id_carrera, $id_trayecto, $turno, $id_periodo, $capacidad_maxima, $inicia) {
+    global $db;
+    
+    // Verificar que la sección existe
+    $check = "SELECT id_seccion FROM secciones WHERE id_seccion = $id_seccion";
+    $check_result = $db->query($check);
+    if (!$check_result || $check_result->num_rows == 0) {
+        return ['success' => false, 'message' => 'La sección no existe'];
+    }
+    
+    // Verificar que la carrera existe
+    $check_carrera = "SELECT id_carrera FROM carreras WHERE id_carrera = $id_carrera";
+    $check_carrera_result = $db->query($check_carrera);
+    if (!$check_carrera_result || $check_carrera_result->num_rows == 0) {
+        return ['success' => false, 'message' => 'La carrera seleccionada no existe'];
+    }
+    
+    // Verificar que el trayecto existe
+    $check_trayecto = "SELECT id_trayecto FROM trayectos WHERE id_trayecto = $id_trayecto";
+    $check_trayecto_result = $db->query($check_trayecto);
+    if (!$check_trayecto_result || $check_trayecto_result->num_rows == 0) {
+        return ['success' => false, 'message' => 'El trayecto seleccionado no existe'];
+    }
+    
+    // Verificar que el período existe
+    $check_periodo = "SELECT id_periodo FROM periodos_academicos WHERE id_periodo = $id_periodo";
+    $check_periodo_result = $db->query($check_periodo);
+    if (!$check_periodo_result || $check_periodo_result->num_rows == 0) {
+        return ['success' => false, 'message' => 'El período seleccionado no existe'];
+    }
+    
+    // Actualizar
+    $query = "UPDATE secciones SET 
+                id_carrera = $id_carrera,
+                id_trayecto = $id_trayecto,
+                turno = '$turno',
+                id_periodo = $id_periodo,
+                capacidad_maxima = $capacidad_maxima,
+                inicia = '$inicia'
+              WHERE id_seccion = $id_seccion";
+    
+    if ($db->query($query)) {
+        // Registrar en auditoría
+        if (function_exists('registrarAuditoria')) {
+            registrarAuditoria(
+                "UPDATE",
+                "secciones",
+                $id_seccion,
+                null,
+                [
+                    'id_carrera' => $id_carrera,
+                    'id_trayecto' => $id_trayecto,
+                    'turno' => $turno,
+                    'id_periodo' => $id_periodo,
+                    'capacidad_maxima' => $capacidad_maxima,
+                    'inicia' => $inicia
+                ],
+                "Edición de Sección",
+                "Sección actualizada correctamente"
+            );
+        }
+        
+        return ['success' => true, 'message' => 'Sección actualizada correctamente'];
+    } else {
+        return ['success' => false, 'message' => 'Error al actualizar: ' . $db->error];
+    }
+}
+
+
+
+
+
+
+
+
+
+
 function editarSeccion($db, $datos) {
     try {
         // Obtener datos actuales para auditoría
