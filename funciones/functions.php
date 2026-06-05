@@ -13109,16 +13109,23 @@ function marcarMensajeLeido($mensaje_id, $user_id) {
     }
 }
 
-// Enviar mensaje
+// Enviar mensaje - VERSIÓN CORREGIDA PARA TU TABLA
 function enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje) {
     global $db;
     
+    // Validar que los IDs existan
+    if (!$remitente_id || !$destinatario_id) {
+        error_log("Error en enviarMensaje: IDs inválidos - remitente: $remitente_id, destinatario: $destinatario_id");
+        return [
+            'success' => false,
+            'message' => 'IDs de usuario inválidos'
+        ];
+    }
+    
     try {
-        // Iniciar transacción
-        $db->begin_transaction();
-
-        $query = "INSERT INTO mensajeria (id_usuario_remitente, id_usuario_destinatario, titulo, mensaje)
-                  VALUES (?, ?, ?, ?)";
+        // SIN transacción para evitar conflictos
+        $query = "INSERT INTO mensajeria (id_usuario_remitente, id_usuario_destinatario, titulo, mensaje, fecha_envio, leido, archivado_remitente, archivado_destinatario, eliminado_remitente, eliminado_destinatario) 
+                  VALUES (?, ?, ?, ?, NOW(), 0, 0, 0, 0, 0)";
         $stmt = $db->prepare($query);
         if (!$stmt) {
             throw new Exception("Error en preparar consulta: " . $db->error);
@@ -13126,35 +13133,9 @@ function enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje) {
         
         $stmt->bind_param("iiss", $remitente_id, $destinatario_id, $titulo, $mensaje);
         
-        $result = $stmt->execute();
-        
-        if ($result) {
+        if ($stmt->execute()) {
             $mensaje_id = $stmt->insert_id;
-            
-            // Auditoría solo si la función existe
-            if (function_exists('registrarAuditoria')) {
-                try {
-                    registrarAuditoria(
-                        "INSERT", 
-                        "mensajeria", 
-                        $mensaje_id, 
-                        null, 
-                        [
-                            'id_usuario_remitente' => $remitente_id,
-                            'id_usuario_destinatario' => $destinatario_id,
-                            'titulo' => $titulo,
-                            'mensaje_length' => strlen($mensaje)
-                        ], 
-                        "Mensajería", 
-                        "Nuevo mensaje enviado"
-                    );
-                } catch (Exception $e) {
-                    error_log("Error en auditoría enviarMensaje: " . $e->getMessage());
-                }
-            }
-
-            // Confirmar transacción
-            $db->commit();
+            $stmt->close();
             
             return [
                 'success' => true,
@@ -13166,31 +13147,6 @@ function enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje) {
         }
         
     } catch(Exception $e) {
-        // Revertir transacción en caso de error
-        $db->rollback();
-        
-        // Auditoría de error solo si la función existe
-        if (function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "ERROR", 
-                    "mensajeria", 
-                    null, 
-                    null, 
-                    [
-                        'remitente_id' => $remitente_id,
-                        'destinatario_id' => $destinatario_id,
-                        'titulo' => $titulo,
-                        'error' => $e->getMessage()
-                    ], 
-                    "Mensajería", 
-                    "Error al enviar mensaje"
-                );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de error enviarMensaje: " . $auditError->getMessage());
-            }
-        }
-        
         error_log("Error en enviarMensaje: " . $e->getMessage());
         return [
             'success' => false,

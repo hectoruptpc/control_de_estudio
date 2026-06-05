@@ -78,7 +78,7 @@ $grupos_notas = obtenerGruposNotasPendientes();
                                 <th># Estudiantes</th>
                                 <th>Última Actualización</th>
                                 <th>Acciones</th>
-                            </tr>
+                            <tr>
                         </thead>
                         <tbody>
                             <?php while ($grupo = $grupos_notas->fetch_assoc()): ?>
@@ -104,7 +104,7 @@ $grupos_notas = obtenerGruposNotasPendientes();
                                             Gestionar Notas
                                         </button>
                                     </div>
-                                <tr>
+                                </tr>
                             <?php endwhile; ?>
                         </tbody>
                     </table>
@@ -172,66 +172,6 @@ $grupos_notas = obtenerGruposNotasPendientes();
     </div>
 </div>
 
-<!-- Modal para mensaje de rechazo -->
-<div class="modal fade" id="modalMensajeRechazo" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title"><i class="fas fa-times-circle"></i> Rechazar Notas</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-info">
-                    <strong>Estudiantes:</strong> <span id="estudiantesRechazados"></span>
-                </div>
-                <div class="form-group">
-                    <label for="mensajeRechazoTexto">Motivo del rechazo:</label>
-                    <textarea class="form-control" id="mensajeRechazoTexto" rows="4" placeholder="Explique detalladamente el motivo del rechazo..."></textarea>
-                    <small class="form-text text-muted">Este mensaje será visible para el docente.</small>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnConfirmarRechazo">
-                    <i class="fas fa-paper-plane"></i> Enviar Rechazo
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal para mensaje de aprobación -->
-<div class="modal fade" id="modalMensajeAprobacion" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title"><i class="fas fa-check-circle"></i> Aprobar Notas</h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-info">
-                    <strong>Estudiantes:</strong> <span id="estudiantesAprobados"></span>
-                </div>
-                <div class="form-group">
-                    <label for="mensajeAprobacionTexto">Mensaje de confirmación:</label>
-                    <textarea class="form-control" id="mensajeAprobacionTexto" rows="4" placeholder="Mensaje de aprobación..."></textarea>
-                    <small class="form-text text-muted">Este mensaje será visible para el docente.</small>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnConfirmarAprobacion">
-                    <i class="fas fa-paper-plane"></i> Enviar Aprobación
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Modal para mostrar resultado -->
 <div class="modal fade" id="modalResultado" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-dialog-centered" role="document">
@@ -256,8 +196,7 @@ $grupos_notas = obtenerGruposNotasPendientes();
 </div>
 
 <script>
-// Todo el código JavaScript usando jQuery pero de manera segura
-// Aseguramos que jQuery esté disponible
+// Todo el código JavaScript
 (function($) {
     $(document).ready(function() {
         let currentDocenteId = null;
@@ -300,31 +239,56 @@ $grupos_notas = obtenerGruposNotasPendientes();
             }
         }
         
-        // Función para procesar la acción
-        function procesarAccion() {
-            const mensaje = accionPendiente === 'rechazar' ? $('#mensajeRechazoTexto').val().trim() : $('#mensajeAprobacionTexto').val().trim();
-            
-            if (!mensaje) {
-                alert('⚠️ Por favor, ingrese un mensaje antes de continuar.');
-                return;
+        // Función para obtener el mensaje predefinido
+        function obtenerMensajePredefinido(accion) {
+            if (accion === 'aprobar') {
+                return `========================================
+✅ APROBACIÓN DE NOTAS
+========================================
+
+Estimado(a) docente,
+
+Le informamos que las notas que usted registró para la materia ${currentMateria} han sido APROBADAS por el administrador.
+
+✅ Las notas ya están disponibles para que los estudiantes las consulten.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sistema de Gestión de Notas - UPT Puerto Cabello`;
+            } else {
+                return `========================================
+❌ RECHAZO DE NOTAS
+========================================
+
+Estimado(a) docente,
+
+Lamentamos informarle que las notas que usted registró para la materia ${currentMateria} han sido RECHAZADAS por el administrador.
+
+⚠️ Por favor, revise y corrija las observaciones, luego vuelva a enviar las notas.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sistema de Gestión de Notas - UPT Puerto Cabello`;
             }
+        }
+        
+        // Función para procesar la acción (sin modal de mensaje)
+        function procesarAccion(accion, notasIds, esGrupo) {
+            // Mostrar loading
+            $('#modalResultadoBody').html('<div class="text-center"><div class="spinner-border text-primary"></div><p>Procesando...</p></div>');
+            $('#modalResultado').modal('show');
             
             let datos = {
-                accion: accionPendiente,
+                accion: accion,
                 materia_id: currentMateriaId,
                 periodo_id: currentPeriodoId,
-                mensaje: mensaje
+                mensaje: obtenerMensajePredefinido(accion)
             };
             
-            if (esAccionGrupal) {
+            if (esGrupo) {
                 datos.accion_grupo = true;
                 datos.docente_id = currentDocenteId;
             } else {
-                datos.notas_ids = notasIdsPendientes;
+                datos.notas_ids = notasIds;
             }
-            
-            $('#modalMensajeRechazo, #modalMensajeAprobacion').modal('hide');
-            $('#mensajeRechazoTexto, #mensajeAprobacionTexto').val('');
             
             $.ajax({
                 url: 'procesar_acciones_notas_admin.php',
@@ -332,13 +296,15 @@ $grupos_notas = obtenerGruposNotasPendientes();
                 data: datos,
                 dataType: 'json',
                 success: function(response) {
+                    $('#modalResultado').modal('hide');
                     if (response.success) {
                         mostrarModalResultado('Éxito', response.message, 'success', true);
                     } else {
                         mostrarModalResultado('Error', response.message, 'danger');
                     }
                 },
-                error: function() {
+                error: function(xhr) {
+                    $('#modalResultado').modal('hide');
                     mostrarModalResultado('Error', 'Error al procesar la solicitud. Intente nuevamente.', 'danger');
                 }
             });
@@ -353,52 +319,11 @@ $grupos_notas = obtenerGruposNotasPendientes();
             }
             
             const usuarioIds = selected.map(function() { return $(this).val(); }).get();
-            const nombres = selected.map(function() { return $(this).data('estudiante-nombre'); }).get();
-            
-            accionPendiente = accion;
-            notasIdsPendientes = usuarioIds;
-            esAccionGrupal = false;
-            
-            if (accion === 'rechazar') {
-                $('#estudiantesRechazados').text(nombres.join(", "));
-                $('#mensajeRechazoTexto').val('');
-                $('#modalMensajeRechazo').modal('show');
-            } else {
-                $('#estudiantesAprobados').text(nombres.join(", "));
-                $('#mensajeAprobacionTexto').val('');
-                $('#modalMensajeAprobacion').modal('show');
-            }
-            
-            setTimeout(function() {
-                if (accion === 'rechazar') {
-                    $('#mensajeRechazoTexto').focus();
-                } else {
-                    $('#mensajeAprobacionTexto').focus();
-                }
-            }, 500);
+            procesarAccion(accion, usuarioIds, false);
         };
         
         window.accionGrupo = function(accion) {
-            accionPendiente = accion;
-            esAccionGrupal = true;
-            
-            if (accion === 'rechazar') {
-                $('#estudiantesRechazados').text('TODOS los estudiantes del grupo');
-                $('#mensajeRechazoTexto').val('');
-                $('#modalMensajeRechazo').modal('show');
-            } else {
-                $('#estudiantesAprobados').text('TODOS los estudiantes del grupo');
-                $('#mensajeAprobacionTexto').val('');
-                $('#modalMensajeAprobacion').modal('show');
-            }
-            
-            setTimeout(function() {
-                if (accion === 'rechazar') {
-                    $('#mensajeRechazoTexto').focus();
-                } else {
-                    $('#mensajeAprobacionTexto').focus();
-                }
-            }, 500);
+            procesarAccion(accion, [], true);
         };
         
         window.limpiarSeleccion = function() {
@@ -418,17 +343,6 @@ $grupos_notas = obtenerGruposNotasPendientes();
                 $('#contadorSeleccion').text(selected.length === 1 ? '1 estudiante' : selected.length + ' estudiantes');
             }
         }
-        
-        // Eventos
-        $('#btnConfirmarRechazo, #btnConfirmarAprobacion').off('click').on('click', procesarAccion);
-        
-        // Permitir Ctrl+Enter
-        $(document).on('keydown', '#mensajeRechazoTexto, #mensajeAprobacionTexto', function(e) {
-            if (e.ctrlKey && e.which === 13) {
-                e.preventDefault();
-                procesarAccion();
-            }
-        });
         
         // Cargar detalles
         $('.btn-detalles').off('click').on('click', function() {
@@ -459,29 +373,7 @@ $grupos_notas = obtenerGruposNotasPendientes();
                     $('.accion-individual').off('click').on('click', function() {
                         const idNota = $(this).data('id-nota');
                         const accion = $(this).data('accion');
-                        const estudianteNombre = $(this).data('estudiante-nombre') || '';
-                        
-                        accionPendiente = accion;
-                        notasIdsPendientes = [idNota];
-                        esAccionGrupal = false;
-                        
-                        if (accion === 'rechazar') {
-                            $('#estudiantesRechazados').text(estudianteNombre);
-                            $('#mensajeRechazoTexto').val('');
-                            $('#modalMensajeRechazo').modal('show');
-                        } else {
-                            $('#estudiantesAprobados').text(estudianteNombre);
-                            $('#mensajeAprobacionTexto').val('');
-                            $('#modalMensajeAprobacion').modal('show');
-                        }
-                        
-                        setTimeout(function() {
-                            if (accion === 'rechazar') {
-                                $('#mensajeRechazoTexto').focus();
-                            } else {
-                                $('#mensajeAprobacionTexto').focus();
-                            }
-                        }, 500);
+                        procesarAccion(accion, [idNota], false);
                     });
                     
                     $('#selectAllEstudiantes').off('change').on('change', function() {
