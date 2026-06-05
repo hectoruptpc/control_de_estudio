@@ -16444,8 +16444,8 @@ function obtenerGruposNotasAprobadas($profesor_id = '', $materia_id = '', $perio
                 nt.id_docente,
                 nt.id_materia,
                 nt.id_periodo,
-                MAX(u.nombre) as nombre_docente,
-                MAX(u.idusuario) as cedula_docente,
+                MAX(ud.nombre) as nombre_docente,
+                MAX(ud.idusuario) as cedula_docente,
                 MAX(m.nombre_materia) as nombre_materia,
                 MAX(pa.nombre_periodo) as nombre_periodo,
                 MAX(s.codigo_seccion) as codigo_seccion,
@@ -16453,7 +16453,7 @@ function obtenerGruposNotasAprobadas($profesor_id = '', $materia_id = '', $perio
                 COUNT(DISTINCT nt.id_usuario) as total_estudiantes,
                 MAX(nt.fecha_registro) as ultima_fecha
               FROM notas_trimestres nt
-              INNER JOIN users u ON nt.id_docente = u.id
+              INNER JOIN users ud ON nt.id_docente = ud.id
               INNER JOIN materias m ON nt.id_materia = m.id_materia
               INNER JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
               INNER JOIN docente_seccion ds ON nt.id_docente = ds.id_usuario AND nt.id_materia = ds.id_materia
@@ -16463,7 +16463,15 @@ function obtenerGruposNotasAprobadas($profesor_id = '', $materia_id = '', $perio
               GROUP BY nt.id_docente, nt.id_materia, nt.id_periodo
               ORDER BY ultima_fecha DESC";
     
-    return $db->query($query);
+    $result = $db->query($query);
+    
+    if (!$result) {
+        error_log("Error en obtenerGruposNotasAprobadas: " . $db->error);
+        // Retornar un resultado vacío pero válido
+        return new mysqli_result();
+    }
+    
+    return $result;
 }
 
 /**
