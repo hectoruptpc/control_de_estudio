@@ -9827,10 +9827,17 @@ function verificarRequisitosAvanceEstudiante($id_usuario, $trayecto_actual, $id_
 
 /**
  * Obtener materias por trayecto(s)
+ * @param int $id_carrera ID de la carrera
+ * @param int ...$trayectos Números de trayectos (0,1,2,3,4)
+ * @return array Lista de materias
  */
 function obtenerMateriasPorTrayecto($id_carrera, ...$trayectos) {
     global $db;
     $materias = [];
+    
+    if (empty($trayectos)) {
+        return $materias;
+    }
     
     $trayectos_str = implode(',', array_map('intval', $trayectos));
     $query = "SELECT m.id_materia, m.nombre_materia, m.trayecto
@@ -9850,27 +9857,47 @@ function obtenerMateriasPorTrayecto($id_carrera, ...$trayectos) {
 }
 
 /**
- * Obtener nota final de una materia para un estudiante
+ * Obtener nota final de una materia para un estudiante desde notas_trimestres
+ * @param int $id_usuario ID del estudiante
+ * @param int $id_materia ID de la materia
+ * @return float|null Nota final (promedio de trimestres aprobados) o null si no hay
  */
 function obtenerNotaFinalMateria($id_usuario, $id_materia) {
     global $db;
     
-    $query = "SELECT nota_final FROM estudiante_materias 
+    // Obtener las 3 notas trimestrales
+    $query = "SELECT trimestre_num, nota, estado 
+              FROM notas_trimestres 
               WHERE id_usuario = $id_usuario 
-              AND id_materia = $id_materia 
-              AND estatus = 'activo'
-              ORDER BY id_inscripcion DESC LIMIT 1";
+              AND id_materia = $id_materia
+              AND estado = 'aprobada'
+              ORDER BY trimestre_num";
     
     $result = $db->query($query);
+    
+    $suma = 0;
+    $count = 0;
+    
     if ($result && $result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        return $row['nota_final'];
+        while ($row = $result->fetch_assoc()) {
+            $suma += $row['nota'];
+            $count++;
+        }
     }
+    
+    // Calcular promedio si hay al menos una nota
+    if ($count > 0) {
+        return round($suma / $count, 1);
+    }
+    
     return null;
 }
 
 /**
  * Obtener el Proyecto Socio Integrador de un trayecto
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto Número del trayecto (1 o 3)
+ * @return array|null Información de la materia o null
  */
 function obtenerProyectoSocioIntegrador($id_carrera, $trayecto) {
     global $db;
