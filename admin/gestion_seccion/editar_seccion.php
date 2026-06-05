@@ -17,7 +17,7 @@ if (!$id_seccion) {
     exit();
 }
 
-// Obtener datos actuales de la sección directamente con consulta
+// Obtener datos actuales de la sección
 $query_seccion = "SELECT * FROM secciones WHERE id_seccion = $id_seccion";
 $result_seccion = $db->query($query_seccion);
 $seccion = $result_seccion->fetch_assoc();
@@ -56,6 +56,7 @@ $error_message = '';
 $success_message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $codigo_seccion = trim($_POST['codigo_seccion'] ?? '');
     $id_carrera = (int)($_POST['id_carrera'] ?? 0);
     $id_trayecto = (int)($_POST['id_trayecto'] ?? 0);
     $turno = trim($_POST['turno'] ?? '');
@@ -64,7 +65,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $inicia = $_POST['inicia'] ?? '';
     $status = trim($_POST['status'] ?? '');
     
-    if ($id_carrera <= 0) {
+    if (empty($codigo_seccion)) {
+        $error_message = "Debe ingresar un código de sección";
+    } elseif ($id_carrera <= 0) {
         $error_message = "Debe seleccionar una carrera";
     } elseif ($id_trayecto <= 0) {
         $error_message = "Debe seleccionar un trayecto";
@@ -79,25 +82,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (empty($status)) {
         $error_message = "Debe seleccionar un estado";
     } else {
-        // Actualizar sección
-        $update_query = "UPDATE secciones SET 
-                            id_carrera = $id_carrera,
-                            id_trayecto = $id_trayecto,
-                            turno = '$turno',
-                            id_periodo = $id_periodo,
-                            capacidad_maxima = $capacidad_maxima,
-                            inicia = '$inicia',
-                            status = '$status'
-                         WHERE id_seccion = $id_seccion";
+        // Verificar si el código ya existe en otra sección del MISMO período
+        $check_query = "SELECT id_seccion FROM secciones 
+                        WHERE codigo_seccion = '$codigo_seccion' 
+                        AND id_periodo = $id_periodo
+                        AND id_seccion != $id_seccion";
+        $check_result = $db->query($check_query);
         
-        if ($db->query($update_query)) {
-            $success_message = "Sección actualizada correctamente";
-            // Recargar datos de la sección
-            $query_seccion = "SELECT * FROM secciones WHERE id_seccion = $id_seccion";
-            $result_seccion = $db->query($query_seccion);
-            $seccion = $result_seccion->fetch_assoc();
+        if ($check_result && $check_result->num_rows > 0) {
+            $error_message = "El código de sección '$codigo_seccion' ya existe en el período seleccionado";
         } else {
-            $error_message = "Error al actualizar: " . $db->error;
+            // Actualizar sección
+            $update_query = "UPDATE secciones SET 
+                                codigo_seccion = '$codigo_seccion',
+                                id_carrera = $id_carrera,
+                                id_trayecto = $id_trayecto,
+                                turno = '$turno',
+                                id_periodo = $id_periodo,
+                                capacidad_maxima = $capacidad_maxima,
+                                inicia = '$inicia',
+                                status = '$status'
+                             WHERE id_seccion = $id_seccion";
+            
+            if ($db->query($update_query)) {
+                $success_message = "Sección actualizada correctamente";
+                // Recargar datos de la sección
+                $query_seccion = "SELECT * FROM secciones WHERE id_seccion = $id_seccion";
+                $result_seccion = $db->query($query_seccion);
+                $seccion = $result_seccion->fetch_assoc();
+            } else {
+                $error_message = "Error al actualizar: " . $db->error;
+            }
         }
     }
 }
@@ -108,7 +123,7 @@ include(__DIR__ . '/../includes/head.php');
 <div class="container-fluid py-2">
     <div class="row mb-2">
         <div class="col-12 d-flex justify-content-between">
-            <h2 class="h4 mb-0">Editar Sección: <?= htmlspecialchars($seccion['codigo_seccion']) ?></h2>
+            <h2 class="h4 mb-0">Editar Sección</h2>
             <a href="gestion_seccion.php" class="btn btn-secondary btn-sm">← Volver</a>
         </div>
     </div>
@@ -139,10 +154,10 @@ include(__DIR__ . '/../includes/head.php');
             <form method="POST">
                 <div class="row">
                     <div class="col-md-3 mb-3">
-                        <label class="form-label">Código de Sección</label>
-                        <input type="text" class="form-control" value="<?= htmlspecialchars($seccion['codigo_seccion']) ?>" disabled readonly>
-                        <small class="text-muted">El código no puede ser modificado</small>
-                        <input type="hidden" name="codigo_seccion" value="<?= htmlspecialchars($seccion['codigo_seccion']) ?>">
+                        <label class="form-label">Código de Sección <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="codigo_seccion" 
+                               value="<?= htmlspecialchars($seccion['codigo_seccion']) ?>" required>
+                        <small class="text-muted">Puede modificar el código. Debe ser único dentro del mismo período.</small>
                     </div>
                     
                     <div class="col-md-3 mb-3">
@@ -235,6 +250,13 @@ include(__DIR__ . '/../includes/head.php');
 
 <script>
 document.querySelector('form').addEventListener('submit', function(e) {
+    const codigo = document.querySelector('input[name="codigo_seccion"]').value.trim();
+    if (!codigo) {
+        e.preventDefault();
+        alert('Debe ingresar un código de sección');
+        return false;
+    }
+    
     const capacidad = document.querySelector('input[name="capacidad_maxima"]').value;
     if (capacidad < 1) {
         e.preventDefault();
