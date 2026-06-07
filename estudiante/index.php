@@ -14,6 +14,24 @@ if (!isLoggedIn() || !isEstudiante()) {
 
 // LLAMAR A LA FUNCIÓN DE VISITA
 visita();
+
+// Determinar si el usuario es vocero (usar sesión si está, sino consultar DB)
+$is_vocero = false;
+if (isset($_SESSION['user']['vocero'])) {
+    $is_vocero = intval($_SESSION['user']['vocero']) === 1;
+} else {
+    if (isset($_SESSION['user']['id'])) {
+        $uid = intval($_SESSION['user']['id']);
+        $qv = $db->prepare("SELECT vocero FROM users WHERE id = ? LIMIT 1");
+        $qv->bind_param('i', $uid);
+        $qv->execute();
+        $rv = $qv->get_result();
+        if ($rv && $rv->num_rows > 0) {
+            $rowv = $rv->fetch_assoc();
+            $is_vocero = intval($rowv['vocero']) === 1;
+        }
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -75,6 +93,19 @@ visita();
         .historial-card .card-icon {
             color: #f6c23e;
         }
+        /* Estilos para la nueva tarjeta de Constancias y Solicitudes */
+        .constancias-card {
+            border-bottom: 4px solid #e74a3b;
+        }
+        .constancias-card .card-icon {
+            color: #e74a3b;
+        }
+        .vocero-card {
+            border-bottom: 4px solid #28a745;
+        }
+        .vocero-card .card-icon {
+            color: #28a745;
+        }
         .btn-access {
             border-radius: 50px;
             padding: 0.5rem 1.5rem;
@@ -117,6 +148,16 @@ visita();
             background-color: #f4b619;
             border-color: #f4b30d;
         }
+        /* Estilo para el botón de constancias */
+        .btn-constancias {
+            background-color: #e74a3b;
+            border-color: #e74a3b;
+            color: white;
+        }
+        .btn-constancias:hover {
+            background-color: #d13a2b;
+            border-color: #c73627;
+        }
         .welcome-message {
             background-color: white;
             border-radius: 10px;
@@ -127,6 +168,13 @@ visita();
             border-radius: 10px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
             margin-top: 2rem;
+        }
+        /* Ajuste para fila de 5 tarjetas */
+        @media (min-width: 1200px) {
+            .col-xl-custom {
+                flex: 0 0 20%;
+                max-width: 20%;
+            }
         }
     </style>
 </head>
@@ -139,10 +187,10 @@ visita();
             <p class="lead mb-0">Bienvenido, <?php echo $_SESSION['user']['nombre_completo'] ?? $_SESSION['user']['username']; ?></p>
         </div>
 
-        <!-- Tarjetas de acceso -->
+        <!-- Tarjetas de acceso - Ahora con 5 tarjetas -->
         <div class="row justify-content-center mb-5">
             <!-- Tarjeta de Mi Horario -->
-            <div class="col-md-5 col-lg-3 mb-4">
+            <div class="col-md-5 col-lg-3 col-xl-custom mb-4">
                 <div class="card feature-card horario-card h-100">
                     <div class="card-body text-center p-4">
                         <div class="card-icon">
@@ -156,7 +204,7 @@ visita();
             </div>
 
             <!-- Tarjeta de Mis Secciones -->
-            <div class="col-md-5 col-lg-3 mb-4">
+            <div class="col-md-5 col-lg-3 col-xl-custom mb-4">
                 <div class="card feature-card secciones-card h-100">
                     <div class="card-body text-center p-4">
                         <div class="card-icon">
@@ -170,7 +218,7 @@ visita();
             </div>
 
             <!-- Tarjeta de Mi Pensum -->
-            <div class="col-md-5 col-lg-3 mb-4">
+            <div class="col-md-5 col-lg-3 col-xl-custom mb-4">
                 <div class="card feature-card pensum-card h-100">
                     <div class="card-body text-center p-4">
                         <div class="card-icon">
@@ -184,7 +232,7 @@ visita();
             </div>
 
             <!-- Tarjeta de Historial Académico -->
-            <div class="col-md-5 col-lg-3 mb-4">
+            <div class="col-md-5 col-lg-3 col-xl-custom mb-4">
                 <div class="card feature-card historial-card h-100">
                     <div class="card-body text-center p-4">
                         <div class="card-icon">
@@ -196,6 +244,35 @@ visita();
                     </div>
                 </div>
             </div>
+
+            <!-- NUEVA TARJETA: Constancias y Solicitudes -->
+            <div class="col-md-5 col-lg-3 col-xl-custom mb-4">
+                <div class="card feature-card constancias-card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="card-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <h3 class="card-title h4 font-weight-bold">Constancias y Solicitudes</h3>
+                        <p class="card-text text-muted">Solicita constancias de estudio, notas y otros documentos</p>
+                        <a href="mis_constancias.php" class="btn btn-access btn-constancias mt-3">Acceder</a>
+                    </div>
+                </div>
+            </div>
+                <?php if ($is_vocero): ?>
+                <!-- Tarjeta de Vocero (visible solo para voceros) -->
+                <div class="col-md-5 col-lg-3 col-xl-custom mb-4">
+                    <div class="card feature-card vocero-card h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="card-icon">
+                                <i class="fas fa-user-tie"></i>
+                            </div>
+                            <h3 class="card-title h4 font-weight-bold">Vocero</h3>
+                            <p class="card-text text-muted">Accede a herramientas y opciones para voceros estudiantiles</p>
+                            <a href="vocero.php" class="btn btn-access btn-vocero mt-3">Acceder</a>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
         </div>
 
         <!-- Mensaje de bienvenida -->
@@ -205,6 +282,7 @@ visita();
         </div>
 
         
+
     </div>
 
     <?php include("includes/footer.php"); ?>

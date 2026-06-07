@@ -1,13 +1,15 @@
 <?php
 
 error_reporting(E_ALL);
-ini_set('display_errors', '0');
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
 
 
 $titulo ="Ingreso al Sistema";
 include('funciones/functions.php');
 
-
+$mostrarPreinscripcion = obtenerConfiguracionSecretaria('mostrar_preinscripcion', '1');
+$mostrarProsecucion = obtenerConfiguracionSecretaria('mostrar_prosecucion', '1');
 
 ?>
 
@@ -18,39 +20,43 @@ include('funciones/functions.php');
 <title>Ingreso al Sistema</title>
 <?php echo $bootstrap_head; ?>
 
-<!-- FAVICON EN LOGIN -->
 
-<link rel="apple-touch-icon" href="images/favicon/apple-touch-icon.png" sizes="180x180">
-<link rel="icon" href="images/favicon/favicon-32x32.png" sizes="32x32" type="image/png">
-<link rel="icon" href="images/favicon/favicon-16x16.png" sizes="16x16" type="image/png">
-<link rel="icon" href="images/favicon/favicon.ico">
 
 </head>
 <body>
 
-<style>
-.carousel-control-prev-icon {
-  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23f00' viewBox='0 0 8 8'%3E%3Cpath d='M5.25 0l-4 4 4 4 1.5-1.5-2.5-2.5 2.5-2.5-1.5-1.5z'/%3E%3C/svg%3E");
-}
 
-.carousel-control-next-icon {
-  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23f00' viewBox='0 0 8 8'%3E%3Cpath d='M2.75 0l-1.5 1.5 2.5 2.5-2.5 2.5 1.5 1.5 4-4-4-4z'/%3E%3C/svg%3E");
-}
-</style>
 
 <div class="container text-center">
 
-        <?php echo $logopertenenciag; ?>
+        <?php echo $logopertenencia; ?>
        
 </div>
 
 
-</div> <!-- CIERRE DE GRUPO DE BOTONES 2 -->
-</nav>
 <hr>
 
 <nav class="nav nav-pills justify-content-end"> 
         <div class="btn-group-horizontal" >
+            <!-- Botón de Preinscripción -->
+            <?php if ($mostrarPreinscripcion !== '0'): ?>
+            <span class="d-inline-block" data-toggle="popover" data-content="Complete el formulario de preinscripción para iniciar su proceso de admisión.">
+                <a type="link" class="btn btn-outline-success" href="preinscripcion.php">
+                    <i class="fa fa-edit"></i> Preinscripción
+                </a>
+            </span>
+            <?php endif; ?>
+            
+            <!-- Botón de Prosecución -->
+            <?php if ($mostrarProsecucion !== '0'): ?>
+            <span class="d-inline-block" data-toggle="popover" data-content="Continúe con su proceso de prosecución académica.">
+                <a type="link" class="btn btn-outline-info" href="prosecucion.php">
+                    <i class="fa fa-graduation-cap"></i> Prosecución
+                </a>
+            </span>
+            <?php endif; ?>
+            
+            <!-- Botones de Recuperar Contraseña -->
             <span class="d-inline-block" data-toggle="popover" data-content="...">
                 <a type="link" class="btn btn-outline-danger" href="recuperar_password.php">
                     <i class="fa fa-unlock-alt"></i> Recuperar Contraseña
@@ -59,11 +65,7 @@ include('funciones/functions.php');
                     <i class="fa fa-unlock-alt"></i> Recuperar Contraseña provicional
                 </a>
             </span>
-            <span class="d-inline-block" data-toggle="popover" data-content="...">
-                <a id="afiliarse" class="btn btn-outline-success" href="registro.php">
-                    <i class="fas fa-key"></i> Afiliarse al Servicio
-                </a>
-            </span>
+            
         </div>
     </nav>
 
@@ -119,19 +121,3 @@ unset($_SESSION['msg']);
 </div>
 
 <hr>
-<?php
-conteo();
-contenido('login');
-?>
-
-<script>
-animacion = function(){
-
-  document.getElementById('afiliarse').classList.toggle('fade');
-}
-
-setInterval(animacion, 200);
-</script>
-
-
-

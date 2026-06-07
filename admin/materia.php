@@ -39,6 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             'activa' => isset($_POST['activa']) ? 1 : 0,
             'horas_teoricas' => $_POST['horas_teoricas'],
             'horas_practicas' => $_POST['horas_practicas'],
+            'horas_laboratorio' => isset($_POST['horas_laboratorio']) ? $_POST['horas_laboratorio'] : 0,
+            'horas_semanales' => isset($_POST['horas_semanales']) ? $_POST['horas_semanales'] : 0,
             'trayecto' => $_POST['trayecto'] // Este campo ahora guardará el numero_trayecto
         ];
         
@@ -131,7 +133,7 @@ include("includes/head.php");
                             
                             <div class="form-group col-md-2">
                                 <label for="creditos">Créditos</label>
-                                <input type="number" class="form-control" id="creditos" name="creditos" min="1" value="1" required>
+                                <input type="number" class="form-control" id="creditos" name="creditos" min="0" value="1" required>
                             </div>
                         </div>
                         
@@ -176,6 +178,18 @@ include("includes/head.php");
                                 </select>
                             </div>
                         </div>
+
+                        <div class="form-row">
+                            <div class="form-group col-md-3">
+                                <label for="horas_laboratorio">Horas Laboratorio</label>
+                                <input type="number" class="form-control" id="horas_laboratorio" name="horas_laboratorio" min="0" value="0">
+                            </div>
+
+                            <div class="form-group col-md-3">
+                                <label for="horas_semanales">Horas Semanales</label>
+                                <input type="number" class="form-control" id="horas_semanales" name="horas_semanales" min="0" value="0">
+                            </div>
+                        </div>
                         
                         <button type="submit" name="guardar_materia" class="btn btn-primary">
                             Guardar Materia
@@ -199,7 +213,7 @@ include("includes/head.php");
                                     <th>Nombre</th>
                                     <th>Tipo/Duración</th>
                                     <th>Créditos</th>
-                                    <th>Horas T/P</th>
+                                    <th>Horas T/P/L/S</th>
                                     <th>Trayecto</th>
                                     <th>Estado</th>
                                     <?php if ($permiso_editar): ?>
@@ -232,7 +246,7 @@ include("includes/head.php");
                                                 'No definido' ?>)</small>
                                         </td>
                                         <td><?= $materia['creditos'] ?></td>
-                                        <td><?= $materia['horas_teoricas'] ?> / <?= $materia['horas_practicas'] ?></td>
+                                        <td><?= $materia['horas_teoricas'] ?> / <?= $materia['horas_practicas'] ?> / <?= isset($materia['horas_laboratorio']) ? $materia['horas_laboratorio'] : 0 ?> / <?= isset($materia['horas_semanales']) ? $materia['horas_semanales'] : 0 ?></td>
                                         <td>
                                             <?php if ($trayecto_info): ?>
                                                 Trayecto <?= $trayecto_info['numero_trayecto'] ?><br>
@@ -257,12 +271,19 @@ include("includes/head.php");
                                                         data-creditos="<?= $materia['creditos'] ?>" 
                                                         data-activa="<?= $materia['activa'] ? '1' : '0' ?>" 
                                                         data-teoricas="<?= $materia['horas_teoricas'] ?>" 
-                                                        data-practicas="<?= $materia['horas_practicas'] ?>" 
+                                                            data-practicas="<?= $materia['horas_practicas'] ?>" 
+                                                            data-laboratorio="<?= isset($materia['horas_laboratorio']) ? $materia['horas_laboratorio'] : 0 ?>"
+                                                            data-semanales="<?= isset($materia['horas_semanales']) ? $materia['horas_semanales'] : 0 ?>"
                                                         data-duracion="<?= isset($materia['duracion_periodo']) ? $materia['duracion_periodo'] : '1' ?>"
                                                         data-trayecto="<?= isset($materia['trayecto']) ? $materia['trayecto'] : '' ?>">
                                                     <i class="fas fa-edit"></i> Editar
                                                 </button>
                                                 
+                                                <a href="carrera_materias.php?id_materia=<?= intval($materia['id_materia']) ?>" 
+                                                   class="btn btn-sm btn-info" title="Relacionar con Carrera (versión/año)">
+                                                    <i class="fas fa-link"></i> Relacionar
+                                                </a>
+
                                                 <button type="button" class="btn btn-sm btn-<?= $materia['activa'] ? 'danger' : 'success' ?>" 
                                                         data-toggle="modal" data-target="#modalDeshabilitar" 
                                                         data-id="<?= $materia['id_materia'] ?>" 
@@ -321,7 +342,7 @@ include("includes/head.php");
                         
                         <div class="form-group col-md-2">
                             <label for="edit-creditos">Créditos</label>
-                            <input type="number" class="form-control" id="edit-creditos" name="creditos" min="1" required>
+                            <input type="number" class="form-control" id="edit-creditos" name="creditos" min="0" required>
                         </div>
                     </div>
                     
@@ -365,6 +386,17 @@ include("includes/head.php");
                                     </option>
                                 <?php endforeach; ?>
                             </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-md-3">
+                            <label for="edit-horas_laboratorio">Horas Laboratorio</label>
+                            <input type="number" class="form-control" id="edit-horas_laboratorio" name="horas_laboratorio" min="0">
+                        </div>
+
+                        <div class="form-group col-md-3">
+                            <label for="edit-horas_semanales">Horas Semanales</label>
+                            <input type="number" class="form-control" id="edit-horas_semanales" name="horas_semanales" min="0">
                         </div>
                     </div>
                 </div>
@@ -415,6 +447,8 @@ $(document).ready(function() {
         var activa = button.data('activa');
         var teoricas = button.data('teoricas');
         var practicas = button.data('practicas');
+        var laboratorio = button.data('laboratorio');
+        var semanales = button.data('semanales');
         var duracion = button.data('duracion');
         var trayecto = button.data('trayecto');
         
@@ -426,6 +460,8 @@ $(document).ready(function() {
         modal.find('#edit-creditos').val(creditos);
         modal.find('#edit-horas_teoricas').val(teoricas);
         modal.find('#edit-horas_practicas').val(practicas);
+        modal.find('#edit-horas_laboratorio').val(laboratorio);
+        modal.find('#edit-horas_semanales').val(semanales);
         modal.find('#edit-duracion_periodo').val(duracion);
         modal.find('#edit-trayecto').val(trayecto || '');
         

@@ -3,8 +3,8 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: localhost:3306
--- Tiempo de generación: 04-12-2025 a las 17:46:59
--- Versión del servidor: 8.0.44-0ubuntu0.24.04.1
+-- Tiempo de generación: 25-03-2026 a las 16:26:22
+-- Versión del servidor: 8.0.45-0ubuntu0.24.04.1
 -- Versión de PHP: 8.3.6
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -29,9 +29,9 @@ SET time_zone = "+00:00";
 
 CREATE TABLE `agenda` (
   `id` int NOT NULL,
-  `id_user` varchar(20) COLLATE latin1_spanish_ci NOT NULL,
-  `first_name` varchar(200) COLLATE latin1_spanish_ci NOT NULL,
-  `numero` varchar(50) COLLATE latin1_spanish_ci NOT NULL,
+  `id_user` varchar(20) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `first_name` varchar(200) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `numero` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
   `fecha` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
 
@@ -57,7 +57,7 @@ CREATE TABLE `aprobaciones_avance` (
   `trayecto_destino` int NOT NULL,
   `aprobado_por` int DEFAULT NULL,
   `fecha_aprobacion` datetime DEFAULT NULL,
-  `motivo` text COLLATE utf8mb3_spanish_ci,
+  `motivo` text CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_spanish_ci;
 
@@ -70,16 +70,16 @@ CREATE TABLE `aprobaciones_avance` (
 CREATE TABLE `auditoria` (
   `id` bigint NOT NULL,
   `usuario_id` int NOT NULL,
-  `accion` varchar(50) COLLATE utf8mb4_spanish_ci NOT NULL,
-  `tabla_afectada` varchar(100) COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `accion` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL,
+  `tabla_afectada` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
   `registro_id` int DEFAULT NULL,
   `fecha_hora` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `valores_antiguos` text COLLATE utf8mb4_spanish_ci,
-  `valores_nuevos` text COLLATE utf8mb4_spanish_ci,
-  `ip_origen` varchar(45) COLLATE utf8mb4_spanish_ci DEFAULT NULL,
-  `user_agent` text COLLATE utf8mb4_spanish_ci,
-  `modulo_sistema` varchar(100) COLLATE utf8mb4_spanish_ci DEFAULT NULL,
-  `descripcion` text COLLATE utf8mb4_spanish_ci
+  `valores_antiguos` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci,
+  `valores_nuevos` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci,
+  `ip_origen` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `user_agent` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci,
+  `modulo_sistema` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `descripcion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -259,7 +259,319 @@ INSERT INTO `auditoria` (`id`, `usuario_id`, `accion`, `tabla_afectada`, `regist
 (279, 4, 'LOGIN', 'users', 4, '2025-12-04 12:18:20', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
 (280, 4, 'LOGOUT', 'users', 4, '2025-12-04 12:19:11', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
 (281, 2, 'LOGIN', 'users', 2, '2025-12-04 12:19:14', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
-(282, 2, 'CONSULTA', 'users', 5, '2025-12-04 12:20:46', NULL, '{\"cedula_buscada\":null,\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO');
+(282, 2, 'CONSULTA', 'users', 5, '2025-12-04 12:20:46', NULL, '{\"cedula_buscada\":null,\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(283, 2, 'LOGIN', 'users', 2, '2026-01-13 10:24:04', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(284, 2, 'CONSULTA', 'users', 5, '2026-01-13 10:25:54', NULL, '{\"cedula_buscada\":null,\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(285, 2, 'INSERT', 'carreras', 12, '2026-01-13 11:28:52', NULL, '{\"nombre_carrera\":\"Mecanica\",\"cod_carrera\":\"1122\",\"tipo_formacion\":\"2\",\"duracion_semestres\":8,\"duracion_anios\":4,\"titulo_principal\":\"TSU Mecanica\",\"titulo_opcional\":\"\",\"vigencia_fecha\":\"2005-01-13 00:00:00\",\"activa\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Nueva carrera registrada'),
+(286, 2, 'LOGIN', 'users', 2, '2026-01-13 11:51:13', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(287, 2, 'INSERT', 'materias', 29, '2026-01-13 12:15:00', NULL, '{\"cod_materia\":\"MAT-154\",\"nombre_materia\":\"Matem\\u00e1tica I\",\"pnf_ptf\":\"PTF\",\"duracion_periodo\":1,\"trayecto\":1,\"creditos\":4,\"activa\":1,\"horas_teoricas\":3,\"horas_practicas\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Materias', 'Nueva materia creada'),
+(288, 2, 'INSERT', 'carrera_materia', 33, '2026-01-13 12:15:43', NULL, '{\"id_carrera\":12,\"carrera_nombre\":\"Mecanica\",\"carrera_codigo\":\"1122\",\"id_materia\":29,\"materia_nombre\":\"Matem\\u00e1tica I\",\"materia_codigo\":\"MAT-154\",\"semestre\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras-Materias', 'Asignación de materia a carrera'),
+(289, 2, 'INSERT', 'carreras', 13, '2026-01-13 12:28:09', NULL, '{\"copiado_de\":12,\"created_at\":\"2000-01-13 00:00:00\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Duplicado/versionado de carrera'),
+(290, 2, 'INSERT', 'carrera_versiones', 1, '2026-01-13 12:38:46', NULL, '{\"copiado_de\":12,\"fecha_vigencia\":\"1977-01-13 00:00:00\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Creación de versión de carrera'),
+(291, 2, 'INSERT', 'materias', 30, '2026-01-13 12:41:36', NULL, '{\"cod_materia\":\"AE-1111\",\"nombre_materia\":\"Fisica\",\"pnf_ptf\":\"PTF\",\"duracion_periodo\":1,\"trayecto\":1,\"creditos\":5,\"activa\":1,\"horas_teoricas\":2,\"horas_practicas\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Materias', 'Nueva materia creada'),
+(292, 2, 'INSERT', 'carreras', 14, '2026-01-13 12:46:03', NULL, '{\"nombre_carrera\":\"Mecanica\",\"cod_carrera\":\"1122\",\"tipo_formacion\":\"2\",\"duracion_semestres\":8,\"duracion_anios\":4,\"titulo_principal\":\"TSU Mecanica\",\"titulo_opcional\":\"Ing. Mecanica\",\"vigencia_fecha\":\"2005-01-13 00:00:00\",\"activa\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Nueva carrera registrada'),
+(293, 2, 'INSERT', 'carrera_materia', 35, '2026-01-13 12:46:42', NULL, '{\"id_carrera\":14,\"carrera_nombre\":\"Mecanica\",\"carrera_codigo\":\"1122\",\"id_materia\":29,\"materia_nombre\":\"Matem\\u00e1tica I\",\"materia_codigo\":\"MAT-154\",\"semestre\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras-Materias', 'Asignación de materia a carrera'),
+(294, 2, 'INSERT', 'carrera_versiones', 2, '2026-01-13 12:48:01', NULL, '{\"copiado_de\":14,\"fecha_vigencia\":\"2000-01-13 00:00:00\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Creación de versión de carrera'),
+(295, 2, 'INSERT', 'carrera_versiones', 3, '2026-01-13 13:36:25', NULL, '{\"copiado_de\":14,\"fecha_vigencia\":\"1977-01-01 00:00:00\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Creación de versión de carrera'),
+(296, 2, 'INSERT', 'materias', 31, '2026-01-13 13:37:32', NULL, '{\"cod_materia\":\"AE-1241\",\"nombre_materia\":\"Deporte I\",\"pnf_ptf\":\"PTF\",\"duracion_periodo\":1,\"trayecto\":1,\"creditos\":2,\"activa\":1,\"horas_teoricas\":2,\"horas_practicas\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Materias', 'Nueva materia creada'),
+(297, 2, 'SEARCH', 'users', 5, '2026-01-13 14:15:45', NULL, '{\"cedula\":\"V-30692052\",\"estudiante\":\"Hector\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Pagos', 'Búsqueda exitosa de estudiante por cédula'),
+(298, 2, 'LOGIN', 'users', 2, '2026-01-14 09:51:18', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(299, 2, 'UPDATE', 'carreras', 1, '2026-01-14 09:58:56', '{\"nombre_carrera\":\"Informatica\",\"cod_carrera\":\"1234\"}', '{\"nombre_carrera\":null,\"cod_carrera\":null}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Actualización de datos de carrera'),
+(300, 2, 'UPDATE', 'carreras', 5, '2026-01-14 09:59:41', '{\"nombre_carrera\":\"Logistica y Distribucion\",\"cod_carrera\":\"3\"}', '{\"nombre_carrera\":null,\"cod_carrera\":null}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Actualización de datos de carrera'),
+(301, 2, 'UPDATE', 'carreras', 14, '2026-01-14 10:00:01', '{\"nombre_carrera\":\"Mecanica\",\"cod_carrera\":\"1122\"}', '{\"nombre_carrera\":null,\"cod_carrera\":null}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Actualización de datos de carrera'),
+(302, 2, 'ERROR', 'carreras', 2, '2026-01-14 10:00:39', NULL, '{\"nombre_carrera\":\"Turismo\",\"cod_carrera\":\"13569\",\"error\":\"Data too long for column \'titulo_otorga\' at row 1\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Error al actualizar carrera'),
+(303, 2, 'UPDATE', 'carreras', 2, '2026-01-14 10:11:15', '{\"nombre_carrera\":\"Turismo\",\"cod_carrera\":\"2\",\"duracion_semestres\":null,\"titulo_otorga\":null}', '{\"nombre_carrera\":null,\"cod_carrera\":null,\"duracion_semestres\":8,\"titulo_otorga\":\"TSU turismo\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras', 'Actualización de datos de carrera'),
+(304, 2, 'INSERT', 'materias', 32, '2026-01-14 12:11:55', NULL, '{\"cod_materia\":\"MAT-253\",\"nombre_materia\":\"Matem\\u00e1tica II\",\"pnf_ptf\":\"PTF\",\"duracion_periodo\":1,\"trayecto\":1,\"creditos\":3,\"activa\":1,\"horas_teoricas\":2,\"horas_practicas\":3,\"horas_laboratorio\":0,\"horas_semanales\":4}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Materias', 'Nueva materia creada'),
+(305, 2, 'UPDATE', 'materias', 32, '2026-01-14 12:22:55', '{\"trayecto\":1}', '{\"trayecto\":\"2\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Materias', 'Actualización de datos de materia'),
+(306, 2, 'INSERT', 'carrera_materia', 36, '2026-01-14 12:26:45', NULL, '{\"id_carrera\":14,\"carrera_nombre\":\"Mecanica\",\"carrera_codigo\":\"13351\",\"id_materia\":32,\"materia_nombre\":\"Matem\\u00e1tica II\",\"materia_codigo\":\"MAT-253\",\"semestre\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Carreras-Materias', 'Asignación de materia a carrera'),
+(307, 2, 'LOGIN', 'users', 2, '2026-01-16 09:48:33', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(308, 2, 'LOGIN', 'users', 2, '2026-01-16 09:59:56', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(309, 2, 'LOGOUT', 'users', 2, '2026-01-16 10:00:03', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(310, 2, 'LOGIN', 'users', 2, '2026-01-16 10:00:11', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(311, 2, 'LOGOUT', 'users', 2, '2026-01-16 10:19:23', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(312, 5, 'LOGIN', 'users', 5, '2026-01-16 10:19:27', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(313, 5, 'LOGOUT', 'users', 5, '2026-01-16 10:20:34', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(314, 2, 'LOGIN', 'users', 2, '2026-01-16 10:20:36', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(315, 2, 'LOGOUT', 'users', 2, '2026-01-16 10:40:17', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(316, 5, 'LOGIN', 'users', 5, '2026-01-16 10:40:29', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(317, 5, 'LOGOUT', 'users', 5, '2026-01-16 11:02:34', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(318, 2, 'LOGIN', 'users', 2, '2026-01-16 11:02:37', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(319, 2, 'LOGOUT', 'users', 2, '2026-01-16 11:11:08', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(320, 5, 'LOGIN', 'users', 5, '2026-01-16 11:11:12', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(321, 5, 'LOGOUT', 'users', 5, '2026-01-16 11:27:50', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(322, 2, 'LOGIN', 'users', 2, '2026-01-16 11:27:53', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(323, 2, 'CONSULTA', 'users', NULL, '2026-01-16 12:07:36', NULL, '{\"cedula_buscada\":\"30692052\",\"resultado_busqueda\":\"NO_ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"resultado\":\"Estudiante no encontrado\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - NO_ENCONTRADO'),
+(324, 2, 'CONSULTA', 'users', NULL, '2026-01-16 12:08:18', NULL, '{\"cedula_buscada\":\"30692052\",\"resultado_busqueda\":\"NO_ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"resultado\":\"Estudiante no encontrado\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - NO_ENCONTRADO'),
+(325, 2, 'CONSULTA', 'users', NULL, '2026-01-16 12:10:24', NULL, '{\"cedula_buscada\":\"30692052\",\"resultado_busqueda\":\"NO_ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"resultado\":\"Estudiante no encontrado\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - NO_ENCONTRADO'),
+(326, 2, 'CONSULTA', 'users', 5, '2026-01-16 12:10:36', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(327, 2, 'CONSULTA', 'users', 5, '2026-01-16 12:14:42', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(328, 2, 'CONSULTA', 'users', 2607, '2026-01-16 12:15:10', NULL, '{\"cedula_buscada\":\"V-12345678\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":2607,\"nombre_estudiante\":\"Nombre Ejemplo\",\"cedula\":\"V-12345678\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(329, 2, 'CONSULTA', 'users', 2607, '2026-01-16 12:15:17', NULL, '{\"cedula_buscada\":\"V-12345678\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":2607,\"nombre_estudiante\":\"Nombre Ejemplo\",\"cedula\":\"V-12345678\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(330, 2, 'CONSULTA', 'users', 2607, '2026-01-16 12:15:21', NULL, '{\"cedula_buscada\":\"V-12345678\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":2607,\"nombre_estudiante\":\"Nombre Ejemplo\",\"cedula\":\"V-12345678\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO');
+INSERT INTO `auditoria` (`id`, `usuario_id`, `accion`, `tabla_afectada`, `registro_id`, `fecha_hora`, `valores_antiguos`, `valores_nuevos`, `ip_origen`, `user_agent`, `modulo_sistema`, `descripcion`) VALUES
+(331, 2, 'CONSULTA', 'users', NULL, '2026-01-16 12:15:22', NULL, '{\"cedula_buscada\":\"V-\",\"resultado_busqueda\":\"NO_ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"resultado\":\"Estudiante no encontrado\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - NO_ENCONTRADO'),
+(332, 2, 'CONSULTA', 'users', 5, '2026-01-16 12:15:31', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(333, 2, 'CONSULTA', 'users', 5, '2026-01-16 12:34:44', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(334, 2, 'CONSULTA', 'users', 5, '2026-01-16 12:48:13', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(335, 2, 'CONSULTA', 'users', 5, '2026-01-16 12:59:36', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(336, 2, 'INSERT', 'periodos_academicos', 5, '2026-01-16 13:01:32', NULL, '{\"nombre_periodo\":\"2026-1\",\"fecha_inicio\":\"2026-01-16\",\"fecha_fin\":\"2026-03-16\",\"activo\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Periodos Académicos', 'Nuevo período académico creado'),
+(337, 2, 'CONSULTA', 'users', 5, '2026-01-16 13:13:39', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(338, 2, 'CONSULTA', 'users', 5, '2026-01-16 13:14:52', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(339, 2, 'LOGIN', 'users', 2, '2026-01-16 13:17:07', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(340, 2, 'CONSULTA', 'users', 5, '2026-01-16 13:17:19', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(341, 2, 'CONSULTA', 'users', 5, '2026-01-16 13:17:43', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(342, 2, 'CONSULTA', 'users', 5, '2026-01-16 13:19:02', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(343, 2, 'CONSULTA', 'users', 5, '2026-01-16 13:20:30', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(344, 2, 'CONSULTA', 'users', 5, '2026-01-16 13:23:38', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(345, 2, 'LOGIN', 'users', 2, '2026-01-19 09:19:19', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(346, 2, 'LOGOUT', 'users', 2, '2026-01-19 09:20:24', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(347, 4, 'LOGIN', 'users', 4, '2026-01-19 09:20:48', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(348, 2, 'LOGIN', 'users', 2, '2026-01-20 10:43:41', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(349, 2, 'CONSULTA', 'users', 5, '2026-01-20 10:44:43', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(350, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 10:45:06', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(351, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 11:49:06', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(352, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 12:01:31', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(353, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 12:16:50', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(354, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 12:20:31', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(355, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 12:47:44', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(356, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 12:55:33', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(357, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 12:55:34', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(358, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 12:56:50', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(359, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:01:29', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(360, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:09:27', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(361, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:09:30', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(362, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:12:34', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(363, 2, 'CONSULTA', 'users', 5, '2026-01-20 13:12:42', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(364, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:15:43', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(365, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:18:40', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(366, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:19:05', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(367, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:19:43', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(368, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:22:11', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(369, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:24:34', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(370, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-20 13:28:03', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(371, 2, 'CONSULTA', 'users', 5, '2026-01-20 13:28:09', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(372, 2, 'LOGOUT', 'users', 2, '2026-01-20 13:45:43', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(373, 4, 'LOGIN', 'users', 4, '2026-01-20 13:46:25', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(374, 4, 'LOGOUT', 'users', 4, '2026-01-20 13:49:55', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(375, 2, 'LOGIN', 'users', 2, '2026-01-20 13:49:58', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(376, 4, 'LOGIN', 'users', 4, '2026-01-20 13:50:07', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(377, 2, 'LOGIN', 'users', 2, '2026-01-21 09:33:14', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(378, 2, 'LOGOUT', 'users', 2, '2026-01-21 09:53:20', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(379, 4, 'LOGIN', 'users', 4, '2026-01-21 09:53:24', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(380, 4, 'LOGOUT', 'users', 4, '2026-01-21 10:26:06', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(381, 2, 'LOGIN', 'users', 2, '2026-01-21 10:26:08', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(382, 2, 'LOGOUT', 'users', 2, '2026-01-21 11:20:14', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(383, 4, 'LOGIN', 'users', 4, '2026-01-21 11:20:17', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(384, 4, 'LOGOUT', 'users', 4, '2026-01-21 11:20:28', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(385, 2, 'LOGIN', 'users', 2, '2026-01-21 11:20:32', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(386, 2, 'LOGOUT', 'users', 2, '2026-01-21 11:21:46', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(387, 4, 'LOGIN', 'users', 4, '2026-01-21 11:21:50', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(388, 4, 'LOGOUT', 'users', 4, '2026-01-21 11:23:54', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(389, 2, 'LOGIN', 'users', 2, '2026-01-21 11:23:57', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(390, 2, 'LOGIN', 'users', 2, '2026-01-22 09:56:12', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(391, 2, 'LOGOUT', 'users', 2, '2026-01-22 09:57:00', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(392, 4, 'LOGIN', 'users', 4, '2026-01-22 09:57:07', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(393, 4, 'LOGOUT', 'users', 4, '2026-01-22 11:01:18', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(394, 4, 'LOGIN', 'users', 4, '2026-01-22 11:17:20', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(395, 4, 'LOGOUT', 'users', 4, '2026-01-22 11:17:25', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(396, 2, 'LOGIN', 'users', 2, '2026-01-23 09:33:23', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(397, 2, 'LOGOUT', 'users', 2, '2026-01-23 09:35:28', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(398, 4, 'LOGIN', 'users', 4, '2026-01-23 09:35:34', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(399, 4, 'LOGOUT', 'users', 4, '2026-01-23 09:35:52', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(400, 2, 'LOGIN', 'users', 2, '2026-01-23 09:35:57', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(401, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-23 09:36:05', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(402, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-23 09:37:47', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(403, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-23 09:55:05', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(404, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-23 10:20:14', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(405, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-23 11:43:05', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(406, 2, 'CONSULTA', 'users', 5, '2026-01-23 12:14:58', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(407, 2, 'CONSULTA', 'users', 5, '2026-01-23 12:49:03', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(408, 2, 'CONSULTA', 'users', 5, '2026-01-23 12:50:22', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(409, 2, 'LOGIN', 'users', 2, '2026-01-26 10:58:49', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(410, 2, 'CONSULTA', 'users', 5, '2026-01-26 10:59:14', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(411, 2, 'CONSULTA', 'users', 5, '2026-01-26 11:00:33', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(412, 2, 'UPDATE', 'secciones', 10, '2026-01-26 11:07:47', '{\"id_trayecto\":1,\"inicia\":\"2026-08-02 12:00:00\"}', '{\"id_trayecto\":2,\"inicia\":\"2026-08-02T12:00\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Secciones', 'Edición de datos de sección'),
+(413, 2, 'ERROR', 'docente_seccion', NULL, '2026-01-26 11:09:43', NULL, '{\"id_usuario\":\"4\",\"id_seccion\":\"10\",\"id_materia\":\"11\",\"error\":\"Duplicate entry \'4-10\' for key \'docente_seccion.id_usuario\'\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Asignaciones Docentes', 'Error al asignar sección a docente'),
+(414, 2, 'ERROR', 'docente_seccion', NULL, '2026-01-26 12:04:24', NULL, '{\"id_usuario\":\"4\",\"id_seccion\":\"10\",\"id_materia\":\"11\",\"error\":\"Duplicate entry \'4-10\' for key \'docente_seccion.id_usuario\'\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Asignaciones Docentes', 'Error al asignar sección a docente'),
+(415, 2, 'ERROR', 'docente_seccion', NULL, '2026-01-26 12:05:45', NULL, '{\"id_usuario\":\"4\",\"id_seccion\":\"10\",\"id_materia\":\"11\",\"error\":\"Duplicate entry \'4-10\' for key \'docente_seccion.id_usuario\'\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Asignaciones Docentes', 'Error al asignar sección a docente'),
+(416, 2, 'ERROR', 'docente_seccion', NULL, '2026-01-26 12:05:48', NULL, '{\"id_usuario\":\"4\",\"id_seccion\":\"10\",\"id_materia\":\"11\",\"error\":\"Duplicate entry \'4-10\' for key \'docente_seccion.id_usuario\'\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Asignaciones Docentes', 'Error al asignar sección a docente'),
+(417, 2, 'ERROR', 'docente_seccion', NULL, '2026-01-26 12:28:46', NULL, '{\"id_usuario\":\"4\",\"id_seccion\":\"10\",\"id_materia\":\"11\",\"error\":\"Duplicate entry \'4-10\' for key \'docente_seccion.id_usuario\'\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Asignaciones Docentes', 'Error al asignar sección a docente'),
+(418, 2, 'INSERT', 'docente_seccion', 23, '2026-01-26 12:29:51', NULL, '{\"id_usuario\":\"4\",\"docente_nombre\":\"hector\",\"docente_cedula\":\"123456789\",\"id_seccion\":\"10\",\"seccion_codigo\":\"1-70\",\"carrera_seccion\":\"Informatica\",\"id_materia\":\"11\",\"materia_nombre\":\"Algor\\u00edtmica y Programaci\\u00f3n\",\"materia_codigo\":\"APT1312\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Asignaciones Docentes', 'Asignación de sección a docente'),
+(419, 4, 'LOGIN', 'users', 4, '2026-01-26 12:36:38', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(420, 4, 'LOGOUT', 'users', 4, '2026-01-26 12:37:14', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(421, 2, 'LOGIN', 'users', 2, '2026-01-26 12:37:20', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(422, 2, 'LOGOUT', 'users', 2, '2026-01-26 12:38:23', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(423, 4, 'LOGIN', 'users', 4, '2026-01-26 12:38:28', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(424, 4, 'DENEGADO', 'users', 4, '2026-01-26 13:13:03', NULL, '{\"permiso_solicitado\":\"editar_nota\",\"usuario\":\"hero\",\"usuario_id\":\"4\",\"ip_address\":\"::1\",\"user_agent\":\"Mozilla\\/5.0 (X11; Linux x86_64) AppleWebKit\\/537.36 (KHTML, like Gecko) Chrome\\/144.0.0.0 Safari\\/537.36\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Control de Acceso', 'Acceso denegado a: editar_nota'),
+(425, 2, 'LOGIN', 'users', 2, '2026-01-26 13:13:06', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(426, 2, 'CONSULTA', 'users', 5, '2026-01-26 13:13:21', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(427, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-26 13:13:56', NULL, '{\"cantidad_grupos\":1,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(428, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-26 13:14:04', NULL, '{\"cantidad_grupos\":1,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(429, 2, 'LOGOUT', 'users', 2, '2026-01-26 13:16:54', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(430, 4, 'LOGIN', 'users', 4, '2026-01-26 13:16:58', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(431, 4, 'LOGOUT', 'users', 4, '2026-01-26 14:24:34', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(432, 2, 'LOGIN', 'users', 2, '2026-01-26 14:24:37', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(433, 2, 'CONSULTA', 'users', 5, '2026-01-26 14:24:44', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(434, 2, 'CONSULTA', 'users', 5, '2026-01-26 14:33:55', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(435, 2, 'CONSULTA', 'users', 5, '2026-01-26 14:42:53', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(436, 2, 'CONSULTA', 'users', 5, '2026-01-26 14:44:04', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(437, 2, 'LOGIN', 'users', 2, '2026-01-28 09:35:20', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(438, 2, 'CONSULTA', 'users', 5, '2026-01-28 09:35:30', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(439, 2, 'SELECT', 'users', NULL, '2026-01-28 09:35:49', NULL, '{\"filtros_aplicados\":[],\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":108}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(440, 2, 'SELECT', 'users', NULL, '2026-01-28 09:35:53', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":0}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(441, 2, 'SELECT', 'users', NULL, '2026-01-28 09:36:08', NULL, '{\"filtros_aplicados\":[],\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":108}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(442, 2, 'CONSULTA', 'users', 5, '2026-01-28 09:57:34', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(443, 5, 'LOGIN', 'users', 5, '2026-01-28 09:57:55', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(444, 5, 'DENEGADO', 'users', 5, '2026-01-28 09:58:58', NULL, '{\"permiso_solicitado\":\"admin\",\"usuario\":\"heroestudiante\",\"usuario_id\":\"5\",\"ip_address\":\"::1\",\"user_agent\":\"Mozilla\\/5.0 (X11; Linux x86_64) AppleWebKit\\/537.36 (KHTML, like Gecko) Chrome\\/144.0.0.0 Safari\\/537.36\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Control de Acceso', 'Acceso denegado a: admin'),
+(445, 2, 'LOGIN', 'users', 2, '2026-01-28 09:59:06', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(446, 2, 'SELECT', 'users', NULL, '2026-01-28 09:59:10', NULL, '{\"filtros_aplicados\":[],\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":108}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(447, 2, 'CONSULTA', 'users', 2607, '2026-01-28 09:59:20', NULL, '{\"cedula_buscada\":\"V-12345678\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":2607,\"nombre_estudiante\":\"Nombre Ejemplo\",\"cedula\":\"V-12345678\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(448, 2, 'CONSULTA', 'users', 5, '2026-01-28 09:59:30', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(449, 2, 'CONSULTA', 'users', 2607, '2026-01-28 09:59:40', NULL, '{\"cedula_buscada\":\"V-12345678\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":2607,\"nombre_estudiante\":\"Nombre Ejemplo\",\"cedula\":\"V-12345678\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(450, 2, 'CONSULTA', 'users', 5, '2026-01-28 09:59:50', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(451, 2, 'SELECT', 'users', NULL, '2026-01-28 10:01:32', NULL, '{\"filtros_aplicados\":[],\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":108}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(452, 2, 'SELECT', 'users', NULL, '2026-01-28 10:25:30', NULL, '{\"filtros_aplicados\":[],\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":108}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(453, 2, 'SELECT', 'users', NULL, '2026-01-28 10:25:41', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":3}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(454, 2, 'CONSULTA', 'users', 2560, '2026-01-28 10:50:52', NULL, '{\"cedula_buscada\":\"E-22789012\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":2560,\"nombre_estudiante\":\"Alberto M\\u00e1rquez\",\"cedula\":\"E-22789012\",\"id_carrera\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(455, 2, 'CONSULTA', 'notas_definitivas', 2560, '2026-01-28 10:50:52', NULL, '{\"id_estudiante\":2560,\"cedula_estudiante\":\"E-22789012\",\"nombre_estudiante\":\"Alberto M\\u00e1rquez\",\"id_carrera\":2,\"carrera_nombre\":\"Turismo\",\"apto_tsu\":true,\"apto_grado_completo\":true,\"porcentaje_tsu\":100,\"porcentaje_completo\":100,\"tipo_aptitud\":\"GRADO_COMPLETO\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Grado', 'Consulta de aptitud para grado - GRADO_COMPLETO'),
+(456, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-28 11:03:02', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(457, 2, 'CONSULTA', 'notas_definitivas', NULL, '2026-01-28 11:03:31', NULL, '{\"cantidad_grupos\":2,\"filtros_aplicados\":\"ninguno\",\"filtro_profesor\":\"todos\",\"filtro_fecha_desde\":\"sin_filtro\",\"filtro_fecha_hasta\":\"sin_filtro\",\"tipo_consulta\":\"grupos_notas_definitivas\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Notas Definitivas', 'Consulta de grupos de notas definitivas'),
+(458, 2, 'SELECT', 'users', NULL, '2026-01-28 11:05:55', NULL, '{\"filtros_aplicados\":[],\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":108}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(459, 2, 'SELECT', 'users', NULL, '2026-01-28 11:05:57', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":3}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(460, 2, 'SELECT', 'users', NULL, '2026-01-28 11:40:42', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":3}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(461, 2, 'INSERT', 'graduados', 2, '2026-01-28 12:42:57', NULL, '{\"estado\":\"graduado\",\"id_usuario\":\"2560\",\"estudiante_nombre\":\"Alberto M\\u00e1rquez\",\"estudiante_cedula\":\"E-22789012\",\"carrera\":\"Turismo\",\"id_admin_graduacion\":1,\"observaciones\":\"prueba\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Estudiante marcado como graduado'),
+(462, 2, 'SELECT', 'users', NULL, '2026-01-28 12:42:58', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(463, 2, 'SELECT', 'users', NULL, '2026-01-28 12:43:37', NULL, '{\"filtros_aplicados\":{\"pagina\":\"1\",\"buscar\":\"\",\"estado\":\"graduado\",\"carrera\":\"\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación');
+INSERT INTO `auditoria` (`id`, `usuario_id`, `accion`, `tabla_afectada`, `registro_id`, `fecha_hora`, `valores_antiguos`, `valores_nuevos`, `ip_origen`, `user_agent`, `modulo_sistema`, `descripcion`) VALUES
+(464, 2, 'UPDATE', 'graduados', 2, '2026-01-28 12:43:40', '{\"titulo_entregado\":\"0\",\"estado\":\"graduado\"}', '{\"titulo_entregado\":1,\"estado\":\"titulo_entregado\",\"id_usuario\":\"2560\",\"estudiante_nombre\":\"Alberto M\\u00e1rquez\",\"estudiante_cedula\":\"E-22789012\",\"carrera\":\"Turismo\",\"id_admin_entrega_titulo\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Título marcado como entregado'),
+(465, 2, 'SELECT', 'users', NULL, '2026-01-28 12:43:40', NULL, '{\"filtros_aplicados\":{\"pagina\":\"1\",\"buscar\":\"\",\"estado\":\"graduado\",\"carrera\":\"\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":0}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(466, 2, 'SELECT', 'users', NULL, '2026-01-28 12:43:45', NULL, '{\"filtros_aplicados\":{\"pagina\":\"1\",\"buscar\":\"\",\"estado\":\"titulo_entregado\",\"carrera\":\"\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(467, 2, 'SELECT', 'users', NULL, '2026-01-28 12:43:57', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(468, 2, 'INSERT', 'carreras', 15, '2026-01-28 12:50:21', NULL, '{\"nombre_carrera\":\"Mecanica Automotriz\",\"cod_carrera\":\"12932\",\"tipo_formacion\":\"2\",\"duracion_semestres\":6,\"duracion_anios\":3,\"titulo_principal\":\"TSU Mecanica Automotriz\",\"titulo_opcional\":\"\",\"vigencia_fecha\":\"2026-01-28 00:00:00\",\"activa\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Carreras', 'Nueva carrera registrada'),
+(469, 2, 'SELECT', 'users', NULL, '2026-01-28 12:59:39', NULL, '{\"filtros_aplicados\":[],\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":108}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(470, 2, 'SELECT', 'users', NULL, '2026-01-28 12:59:42', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(471, 2, 'SELECT', 'users', NULL, '2026-01-28 13:03:03', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(472, 2, 'SELECT', 'users', NULL, '2026-01-28 13:18:13', NULL, '{\"filtros_aplicados\":[],\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":108}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(473, 2, 'SELECT', 'users', NULL, '2026-01-28 13:18:35', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(474, 2, 'UPDATE', 'users', 2, '2026-01-28 13:20:21', '{\"username\":\"V-12345678\",\"usuario\":1,\"estudiante\":1,\"docente\":1,\"admin\":1,\"super_user\":0,\"editar_user\":1,\"editar_nota\":1,\"editar_acceso\":1,\"editar_valores\":1,\"editar_estudiante\":1,\"agregar_estudiante\":1,\"agregar_docente\":1,\"editar_docente\":1,\"agregar_carrera\":1,\"agregar_materia\":1,\"editar_materia\":1,\"pagos\":1,\"auditoria\":1,\"secciones\":1,\"rela_materia_carrera\":1,\"periodos_academicos\":1,\"asig_secciones\":1,\"asig_cursos\":1,\"horarios\":1,\"gestion_director_carrera\":1,\"notas_cargadas\":1,\"consultar_notas\":1,\"consultar_notas_pasadas\":1,\"tipos_pago\":1,\"tipos_horario\":1,\"horario_personal\":1,\"respaldo_bd\":1,\"gestionar_carrera\":1,\"gestion_periodo_academico\":1,\"gestion_asig_cursos\":1,\"gestion_horario\":1,\"titulos_re_materia\":1,\"grado\":1,\"gestion_grado\":1,\"visita\":1}', '{\"usuario_afectado\":\"V-12345678\",\"usuario_afectado_id\":2,\"usuario_editor\":\"V-12345678\",\"usuario_editor_id\":\"2\",\"accesos_otorgados\":\"super_user\",\"accesos_quitados\":\"\",\"total_otorgados\":1,\"total_quitados\":0,\"super_user_anterior\":0,\"super_user_nuevo\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Gestión de Permisos', 'Permisos actualizados para usuario: V-12345678 - Accesos OTORGADOS: super_user'),
+(475, 2, 'SELECT', 'users', NULL, '2026-01-28 13:20:42', NULL, '{\"filtros_aplicados\":[],\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":108}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(476, 2, 'SELECT', 'users', NULL, '2026-01-28 13:20:45', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(477, 2, 'SELECT', 'users', NULL, '2026-01-28 13:31:53', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(478, 2, 'SELECT', 'users', NULL, '2026-01-28 13:33:49', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(479, 2, 'SELECT', 'users', NULL, '2026-01-28 13:33:56', NULL, '{\"filtros_aplicados\":[],\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":108}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(480, 2, 'SELECT', 'users', NULL, '2026-01-28 13:34:06', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(481, 2, 'SELECT', 'users', NULL, '2026-01-28 13:39:43', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(482, 2, 'SELECT', 'users', NULL, '2026-01-28 13:45:19', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(483, 2, 'SELECT', 'users', NULL, '2026-01-28 13:45:39', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(484, 2, 'SELECT', 'users', NULL, '2026-01-28 13:47:02', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(485, 2, 'SELECT', 'users', NULL, '2026-01-28 13:49:47', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(486, 2, 'SELECT', 'users', NULL, '2026-01-28 13:56:47', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(487, 2, 'SELECT', 'users', NULL, '2026-01-28 14:21:41', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(488, 2, 'SELECT', 'users', NULL, '2026-01-28 14:22:03', NULL, '{\"filtros_aplicados\":{\"estado\":\"cumple_requisitos\",\"pagina\":\"1\"},\"pagina\":1,\"registros_por_pagina\":20,\"total_registros\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Graduación', 'Consulta de estudiantes para graduación'),
+(489, 2, 'LOGIN', 'users', 2, '2026-01-29 09:28:44', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(490, 2, 'CONSULTA', 'users', 5, '2026-01-29 09:29:34', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(491, 2, 'CONSULTA', 'users', 2607, '2026-01-29 09:29:56', NULL, '{\"cedula_buscada\":\"V-12345678\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":2607,\"nombre_estudiante\":\"Nombre Ejemplo\",\"cedula\":\"V-12345678\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(492, 2, 'CONSULTA', 'users', 5, '2026-01-29 09:30:03', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(493, 2, 'CONSULTA', 'users', 5, '2026-01-29 10:20:32', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(494, 2, 'CONSULTA', 'users', 5, '2026-01-29 10:21:18', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(495, 2, 'CONSULTA', 'users', 5, '2026-01-29 11:11:44', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(496, 2, 'CONSULTA', 'users', 5, '2026-01-29 12:09:14', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(497, 2, 'CONSULTA', 'users', 5, '2026-01-29 12:27:38', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(498, 2, 'CONSULTA', 'users', 5, '2026-01-29 12:27:48', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(499, 2, 'CONSULTA', 'users', 5, '2026-01-29 12:29:38', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(500, 2, 'CONSULTA', 'users', 5, '2026-01-29 12:32:02', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(501, 2, 'CONSULTA', 'users', 5, '2026-01-29 12:50:04', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(502, 2, 'LOGIN', 'users', 2, '2026-01-29 12:50:58', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(503, 2, 'CONSULTA', 'users', 5, '2026-01-29 12:51:06', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(504, 2, 'CONSULTA', 'users', 5, '2026-01-29 12:51:22', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(505, 2, 'CONSULTA', 'users', 5, '2026-01-29 12:55:27', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(506, 2, 'CONSULTA', 'users', 5, '2026-01-29 13:17:40', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(507, 2, 'CONSULTA', 'users', 5, '2026-01-29 13:37:28', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(508, 2, 'LOGIN', 'users', 2, '2026-01-30 09:13:12', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(509, 2, 'INSERT', 'materias', 33, '2026-01-30 09:17:19', NULL, '{\"cod_materia\":\"MAT -154\",\"nombre_materia\":\"Matem\\u00e1tica I\",\"pnf_ptf\":\"PTF\",\"duracion_periodo\":1,\"trayecto\":1,\"creditos\":4,\"activa\":1,\"horas_teoricas\":3,\"horas_practicas\":2,\"horas_laboratorio\":0,\"horas_semanales\":0}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Materias', 'Nueva materia creada'),
+(510, 2, 'INSERT', 'carrera_materia', 37, '2026-01-30 09:18:13', NULL, '{\"id_carrera\":15,\"carrera_nombre\":\"Mecanica Automotriz\",\"carrera_codigo\":\"12932\",\"id_materia\":29,\"materia_nombre\":\"Matem\\u00e1tica I\",\"materia_codigo\":\"MAT-154\",\"semestre\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Carreras-Materias', 'Asignación de materia a carrera'),
+(511, 2, 'INSERT', 'materias', 34, '2026-01-30 09:20:21', NULL, '{\"cod_materia\":\"GEA -142\",\"nombre_materia\":\"GEOMETR\\u00cdA ANAL\\u00cdTICA\",\"pnf_ptf\":\"PTF\",\"duracion_periodo\":1,\"trayecto\":1,\"creditos\":2,\"activa\":1,\"horas_teoricas\":1,\"horas_practicas\":3,\"horas_laboratorio\":0,\"horas_semanales\":0}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Materias', 'Nueva materia creada'),
+(512, 2, 'INSERT', 'carrera_materia', 38, '2026-01-30 09:20:38', NULL, '{\"id_carrera\":15,\"carrera_nombre\":\"Mecanica Automotriz\",\"carrera_codigo\":\"12932\",\"id_materia\":34,\"materia_nombre\":\"GEOMETR\\u00cdA ANAL\\u00cdTICA\",\"materia_codigo\":\"GEA -142\",\"semestre\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Carreras-Materias', 'Asignación de materia a carrera'),
+(513, 2, 'UPDATE', 'carreras', 15, '2026-01-30 09:21:46', '{\"nombre_carrera\":\"Mecanica Automotriz\",\"cod_carrera\":\"12932\"}', '{\"nombre_carrera\":null,\"cod_carrera\":null}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Carreras', 'Actualización de datos de carrera'),
+(514, 2, 'INSERT', 'materias', 35, '2026-01-30 10:17:14', NULL, '{\"cod_materia\":\"LDIEP006000\",\"nombre_materia\":\"Instituciones de Educaci\\u00f3n Universitaria y los  Programas Nacionales de Formaci\\u00f3n\",\"pnf_ptf\":\"PTF\",\"duracion_periodo\":1,\"trayecto\":1,\"creditos\":0,\"activa\":1,\"horas_teoricas\":1,\"horas_practicas\":1,\"horas_laboratorio\":0,\"horas_semanales\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Materias', 'Nueva materia creada'),
+(515, 2, 'INSERT', 'carrera_materia', 39, '2026-01-30 10:18:25', NULL, '{\"id_carrera\":5,\"carrera_nombre\":\"Logistica y Distribucion\",\"carrera_codigo\":\"14231\",\"id_materia\":35,\"materia_nombre\":\"Instituciones de Educaci\\u00f3n Universitaria y los  Programas Nacionales de Formaci\\u00f3n\",\"materia_codigo\":\"LDIEP006000\",\"semestre\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Carreras-Materias', 'Asignación de materia a carrera'),
+(516, 2, 'UPDATE', 'materias', 35, '2026-01-30 10:24:55', '{\"trayecto\":1}', '{\"trayecto\":\"0\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Materias', 'Actualización de datos de materia'),
+(517, 2, 'INSERT', 'materias', 36, '2026-01-30 10:50:18', NULL, '{\"cod_materia\":\"LDEOE006000\",\"nombre_materia\":\"Expresi\\u00f3n Oral y Escrita\",\"pnf_ptf\":\"PTF\",\"duracion_periodo\":1,\"trayecto\":1,\"creditos\":0,\"activa\":1,\"horas_teoricas\":1,\"horas_practicas\":1,\"horas_laboratorio\":0,\"horas_semanales\":2}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Materias', 'Nueva materia creada'),
+(518, 2, 'UPDATE', 'materias', 36, '2026-01-30 11:07:30', '{\"trayecto\":1}', '{\"trayecto\":\"0\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Materias', 'Actualización de datos de materia'),
+(519, 2, 'LOGIN', 'users', 2, '2026-02-02 09:41:28', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(520, 2, 'LOGOUT', 'users', 2, '2026-02-02 10:08:38', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(521, 2, 'LOGIN', 'users', 2, '2026-02-02 10:08:45', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(522, 2, 'DELETE', 'respaldos_descargas', 2, '2026-02-02 10:24:06', '{\"id\":2,\"usuario\":\"PRUEBA\",\"nombre_archivo\":\"respaldo_PRUEBA_2025-09-08_12-43-25.sql\",\"fecha_descarga\":\"2025-09-08 12:43:25\",\"ip_address\":\"::1\",\"user_agent\":\"Mozilla\\/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit\\/537.36 (KHTML, like Gecko) Chrome\\/135.0.0.0 Safari\\/537.36 OPR\\/120.0.0.0 (Edition std-2)\"}', '{\"usuario_eliminacion\":\"PRUEBA\",\"usuario_id_eliminacion\":\"2\",\"fecha_eliminacion\":\"2026-02-02 10:24:06\",\"dias_transcurridos\":146}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Sistema', 'Eliminación de registro de respaldo: respaldo_PRUEBA_2025-09-08_12-43-25.sql'),
+(523, 2, 'DELETE_SUCCESS', 'respaldos_descargas', 2, '2026-02-02 10:24:06', NULL, '{\"id_respaldo\":2,\"nombre_archivo\":\"respaldo_PRUEBA_2025-09-08_12-43-25.sql\",\"usuario_original\":\"PRUEBA\",\"fecha_descarga_original\":\"2025-09-08 12:43:25\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Sistema', 'Respaldo eliminado exitosamente'),
+(524, 2, 'DELETE', 'respaldos_descargas', 3, '2026-02-02 10:24:08', '{\"id\":3,\"usuario\":\"PRUEBA\",\"nombre_archivo\":\"respaldo_PRUEBA_2025-09-08_13-01-06.sql\",\"fecha_descarga\":\"2025-09-08 13:01:06\",\"ip_address\":\"::1\",\"user_agent\":\"Mozilla\\/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit\\/537.36 (KHTML, like Gecko) Chrome\\/135.0.0.0 Safari\\/537.36 OPR\\/120.0.0.0 (Edition std-2)\"}', '{\"usuario_eliminacion\":\"PRUEBA\",\"usuario_id_eliminacion\":\"2\",\"fecha_eliminacion\":\"2026-02-02 10:24:08\",\"dias_transcurridos\":146}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Sistema', 'Eliminación de registro de respaldo: respaldo_PRUEBA_2025-09-08_13-01-06.sql'),
+(525, 2, 'DELETE_SUCCESS', 'respaldos_descargas', 3, '2026-02-02 10:24:09', NULL, '{\"id_respaldo\":3,\"nombre_archivo\":\"respaldo_PRUEBA_2025-09-08_13-01-06.sql\",\"usuario_original\":\"PRUEBA\",\"fecha_descarga_original\":\"2025-09-08 13:01:06\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Sistema', 'Respaldo eliminado exitosamente'),
+(526, 2, 'DELETE', 'respaldos_descargas', 4, '2026-02-02 10:24:11', '{\"id\":4,\"usuario\":\"PRUEBA\",\"nombre_archivo\":\"respaldo_PRUEBA_2025-10-01_15-47-31.sql\",\"fecha_descarga\":\"2025-10-01 15:47:31\",\"ip_address\":\"::1\",\"user_agent\":\"Mozilla\\/5.0 (X11; Linux x86_64) AppleWebKit\\/537.36 (KHTML, like Gecko) Chrome\\/141.0.0.0 Safari\\/537.36\"}', '{\"usuario_eliminacion\":\"PRUEBA\",\"usuario_id_eliminacion\":\"2\",\"fecha_eliminacion\":\"2026-02-02 10:24:11\",\"dias_transcurridos\":123}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Sistema', 'Eliminación de registro de respaldo: respaldo_PRUEBA_2025-10-01_15-47-31.sql'),
+(527, 2, 'DELETE_SUCCESS', 'respaldos_descargas', 4, '2026-02-02 10:24:11', NULL, '{\"id_respaldo\":4,\"nombre_archivo\":\"respaldo_PRUEBA_2025-10-01_15-47-31.sql\",\"usuario_original\":\"PRUEBA\",\"fecha_descarga_original\":\"2025-10-01 15:47:31\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Sistema', 'Respaldo eliminado exitosamente'),
+(528, 2, 'DELETE', 'respaldos_descargas', 5, '2026-02-02 10:24:14', '{\"id\":5,\"usuario\":\"PRUEBA\",\"nombre_archivo\":\"respaldo_PRUEBA_2025-10-27_11-58-54.sql\",\"fecha_descarga\":\"2025-10-27 11:58:54\",\"ip_address\":\"::1\",\"user_agent\":\"Mozilla\\/5.0 (X11; Linux x86_64) AppleWebKit\\/537.36 (KHTML, like Gecko) Chrome\\/141.0.0.0 Safari\\/537.36\"}', '{\"usuario_eliminacion\":\"PRUEBA\",\"usuario_id_eliminacion\":\"2\",\"fecha_eliminacion\":\"2026-02-02 10:24:14\",\"dias_transcurridos\":97}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Sistema', 'Eliminación de registro de respaldo: respaldo_PRUEBA_2025-10-27_11-58-54.sql'),
+(529, 2, 'DELETE_SUCCESS', 'respaldos_descargas', 5, '2026-02-02 10:24:14', NULL, '{\"id_respaldo\":5,\"nombre_archivo\":\"respaldo_PRUEBA_2025-10-27_11-58-54.sql\",\"usuario_original\":\"PRUEBA\",\"fecha_descarga_original\":\"2025-10-27 11:58:54\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Sistema', 'Respaldo eliminado exitosamente'),
+(530, 2, 'DELETE', 'respaldos_descargas', 6, '2026-02-02 10:24:35', '{\"id\":6,\"usuario\":\"PRUEBA\",\"nombre_archivo\":\"respaldo_PRUEBA_2025-10-27_12-06-37.sql\",\"fecha_descarga\":\"2025-10-27 12:06:37\",\"ip_address\":\"::1\",\"user_agent\":\"Mozilla\\/5.0 (X11; Linux x86_64) AppleWebKit\\/537.36 (KHTML, like Gecko) Chrome\\/141.0.0.0 Safari\\/537.36\"}', '{\"usuario_eliminacion\":\"PRUEBA\",\"usuario_id_eliminacion\":\"2\",\"fecha_eliminacion\":\"2026-02-02 10:24:35\",\"dias_transcurridos\":97}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Sistema', 'Eliminación de registro de respaldo: respaldo_PRUEBA_2025-10-27_12-06-37.sql'),
+(531, 2, 'DELETE_SUCCESS', 'respaldos_descargas', 6, '2026-02-02 10:24:35', NULL, '{\"id_respaldo\":6,\"nombre_archivo\":\"respaldo_PRUEBA_2025-10-27_12-06-37.sql\",\"usuario_original\":\"PRUEBA\",\"fecha_descarga_original\":\"2025-10-27 12:06:37\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Sistema', 'Respaldo eliminado exitosamente'),
+(532, 2, 'LOGIN', 'users', 2, '2026-02-05 10:57:36', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(533, 5, 'LOGIN', 'users', 5, '2026-02-10 14:48:44', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(534, 5, 'LOGOUT', 'users', 5, '2026-02-10 14:50:10', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(535, 2615, 'LOGIN', 'users', 2615, '2026-02-10 14:52:22', NULL, '{\"username\":\"o.connor\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(536, 2615, 'LOGOUT', 'users', 2615, '2026-02-10 14:52:39', NULL, '{\"username\":\"o.connor\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(537, 2, 'LOGIN', 'users', 2, '2026-02-10 14:52:44', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(538, 2, 'INSERT', 'users', 2616, '2026-02-10 14:55:17', NULL, '{\"idusuario\":\"E-30123458\",\"nombre\":\"Luis Miguel\",\"carrera\":\"5\",\"status\":\"1\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Estudiantes', 'Registro de nuevo estudiante'),
+(539, 2, 'LOGOUT', 'users', 2, '2026-02-10 14:55:54', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(540, 2616, 'LOGIN', 'users', 2616, '2026-02-10 14:56:12', NULL, '{\"username\":\"luis.miguel\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(541, 2616, 'LOGOUT', 'users', 2616, '2026-02-10 15:06:30', NULL, '{\"username\":\"luis.miguel\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(542, 2, 'LOGIN', 'users', 2, '2026-02-12 09:50:44', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(543, 2, 'LOGOUT', 'users', 2, '2026-02-12 09:52:03', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(544, 4, 'LOGIN', 'users', 4, '2026-02-12 09:52:09', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(545, 4, 'LOGOUT', 'users', 4, '2026-02-12 09:52:25', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(546, 5, 'LOGIN', 'users', 5, '2026-02-12 09:52:28', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(547, 2, 'LOGIN', 'users', 2, '2026-02-12 09:58:36', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(548, 2, 'CONSULTA', 'users', 5, '2026-02-12 09:59:02', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(549, 2, 'LOGOUT', 'users', 2, '2026-02-12 10:29:47', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(550, 5, 'LOGIN', 'users', 5, '2026-02-12 10:29:51', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(551, 5, 'DENEGADO', 'users', 5, '2026-02-12 11:29:20', NULL, '{\"permiso_solicitado\":\"admin\",\"usuario\":\"heroestudiante\",\"usuario_id\":\"5\",\"ip_address\":\"::1\",\"user_agent\":\"Mozilla\\/5.0 (X11; Linux x86_64) AppleWebKit\\/537.36 (KHTML, like Gecko) Chrome\\/144.0.0.0 Safari\\/537.36\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Control de Acceso', 'Acceso denegado a: admin'),
+(552, 2, 'LOGIN', 'users', 2, '2026-02-12 11:29:25', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(553, 2, 'CONSULTA', 'users', 5, '2026-02-12 11:29:32', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(554, 2, 'CONSULTA', 'users', 5, '2026-02-12 12:06:00', NULL, '{\"cedula_buscada\":\"V-30692052\",\"resultado_busqueda\":\"ENCONTRADO\",\"tipo_consulta\":\"busqueda_estudiante\",\"id_estudiante\":5,\"nombre_estudiante\":\"Hector\",\"cedula\":\"V-30692052\",\"id_carrera\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Consulta de Estudiantes', 'Búsqueda de estudiante por cédula - ENCONTRADO'),
+(555, 2, 'LOGOUT', 'users', 2, '2026-02-12 12:55:45', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(556, 5, 'LOGIN', 'users', 5, '2026-02-12 12:55:50', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(557, 5, 'LOGOUT', 'users', 5, '2026-02-12 12:57:19', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(558, 2, 'LOGIN', 'users', 2, '2026-02-12 12:57:21', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(559, 2, 'LOGIN', 'users', 2, '2026-02-23 09:18:06', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(560, 2, 'INSERT', 'secciones', 12, '2026-02-23 09:27:41', NULL, '{\"codigo_seccion\":\"4-80\",\"id_carrera\":5,\"id_trayecto\":1,\"id_periodo\":5,\"capacidad_maxima\":30,\"inicia\":\"2026-02-23T07:00\",\"estatus\":\"inactiva\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Secciones', 'Creación de nueva sección'),
+(561, 2, 'UPDATE', 'estudiante_seccion', 12, '2026-02-23 09:28:02', '{\"estudiantes_anteriores\":0,\"estudiantes_retirados\":0}', '{\"estudiantes_nuevos\":6,\"estudiantes_totales\":6,\"estudiantes_asignados\":[\"2600\",\"2602\",\"2598\",\"2599\",\"2597\",\"2616\"]}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Secciones', 'Asignación de estudiantes a sección'),
+(562, 2, 'INSERT', 'users', 2617, '2026-02-23 09:35:37', NULL, '{\"idusuario\":\"V-54123456\",\"nombre\":\"una pruba\",\"username\":\"V-54123456\",\"carrera\":\"5\",\"status\":\"1\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Estudiantes', 'Registro de nuevo estudiante. Username: V-54123456'),
+(563, 2, 'INSERT', 'users', 2618, '2026-02-23 09:41:38', NULL, '{\"idusuario\":\"V-53123456\",\"nombre\":\"Otra Prueba\",\"username\":\"V-53123456\",\"carrera\":\"5\",\"status\":\"1\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Estudiantes', 'Registro de nuevo estudiante. Username: V-53123456'),
+(564, 2, 'UPDATE', 'estudiante_seccion', 12, '2026-02-23 09:42:12', '{\"estudiantes_anteriores\":6,\"estudiantes_retirados\":0}', '{\"estudiantes_nuevos\":2,\"estudiantes_totales\":8,\"estudiantes_asignados\":[\"2600\",\"2602\",\"2598\",\"2599\",\"2597\",\"2616\",\"2618\",\"2617\"]}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Secciones', 'Asignación de estudiantes a sección'),
+(565, 2, 'INSERT', 'users', 2619, '2026-02-23 09:45:21', NULL, '{\"idusuario\":\"V-98123456\",\"nombre\":\"Diosito Otra Prueba\",\"username\":\"V-98123456\",\"carrera\":\"5\",\"status\":\"1\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Estudiantes', 'Registro de nuevo estudiante. Username: V-98123456'),
+(566, 2, 'INSERT', 'users', 2620, '2026-02-23 09:47:58', NULL, '{\"idusuario\":\"V-45123456\",\"nombre\":\"Papadio Super Prueba\",\"username\":\"V-45123456\",\"carrera\":\"5\",\"status\":\"1\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Estudiantes', 'Registro de nuevo estudiante. Username: V-45123456'),
+(567, 2, 'UPDATE', 'secciones', 12, '2026-02-23 09:50:18', '{\"estatus\":\"inactiva\"}', '{\"estatus\":\"activa\",\"estudiantes_activos\":10,\"minimo_requerido\":10}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Secciones', 'Cambio de estado de sección'),
+(568, 2, 'UPDATE', 'estudiante_seccion', 12, '2026-02-23 09:50:18', '{\"estudiantes_anteriores\":8,\"estudiantes_retirados\":0}', '{\"estudiantes_nuevos\":2,\"estudiantes_totales\":10,\"estudiantes_asignados\":[\"2600\",\"2602\",\"2619\",\"2598\",\"2599\",\"2597\",\"2616\",\"2618\",\"2620\",\"2617\"]}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Secciones', 'Asignación de estudiantes a sección'),
+(569, 2, 'INSERT', 'docente_seccion', 24, '2026-02-23 09:50:33', NULL, '{\"id_usuario\":\"2\",\"docente_nombre\":\"PRUEBA\",\"docente_cedula\":\"12345678\",\"id_seccion\":\"12\",\"seccion_codigo\":\"4-80\",\"carrera_seccion\":\"Logistica y Distribucion\",\"id_materia\":\"35\",\"materia_nombre\":\"Instituciones de Educaci\\u00f3n Universitaria y los  Programas Nacionales de Formaci\\u00f3n\",\"materia_codigo\":\"LDIEP006000\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Asignaciones Docentes', 'Asignación de sección a docente'),
+(570, 2, 'LOGIN', 'users', 2, '2026-02-24 09:44:57', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(571, 2, 'LOGIN', 'users', 2, '2026-03-02 09:12:20', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(572, 2, 'UPDATE', 'users', 2, '2026-03-02 10:34:26', '{\"vocero\":0}', '{\"vocero\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Voceros', 'Asignación/retirada de vocero para usuario: 12345678'),
+(573, 2, 'UPDATE', 'users', 2, '2026-03-02 10:41:43', '{\"vocero\":1}', '{\"vocero\":0}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Voceros', 'Asignación/retirada de vocero para usuario: 12345678'),
+(574, 2, 'UPDATE', 'users', 5, '2026-03-02 10:41:56', '{\"vocero\":0}', '{\"vocero\":1}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Voceros', 'Asignación/retirada de vocero para usuario: V-30692052'),
+(575, 5, 'LOGIN', 'users', 5, '2026-03-02 10:42:14', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(576, 5, 'LOGIN', 'users', 5, '2026-03-03 09:30:22', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(577, 5, 'LOGIN', 'users', 5, '2026-03-04 09:37:20', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(578, 5, 'LOGOUT', 'users', 5, '2026-03-04 10:31:40', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(579, 2, 'LOGIN', 'users', 2, '2026-03-12 09:20:25', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(580, 2, 'LOGOUT', 'users', 2, '2026-03-12 09:20:41', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(581, 5, 'LOGIN', 'users', 5, '2026-03-12 09:20:44', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(582, 5, 'LOGIN', 'users', 5, '2026-03-25 11:32:44', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(583, 5, 'SELECT', 'mensajeria', 20, '2026-03-25 11:55:47', NULL, '{\"usuario_id\":\"5\",\"tipo_mensaje\":\"recibidos\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', 'Mensajería', 'Consulta de mensaje específico'),
+(584, 5, 'INSERT', 'mensajeria', 29, '2026-03-25 12:11:33', NULL, '{\"id_usuario_remitente\":\"5\",\"id_usuario_destinatario\":4,\"titulo\":\"prueba de vocero\",\"mensaje_length\":6}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', 'Mensajería', 'Nuevo mensaje enviado'),
+(585, 5, 'SELECT', 'mensajeria', 29, '2026-03-25 12:11:38', NULL, '{\"usuario_id\":\"5\",\"tipo_mensaje\":\"enviados\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', 'Mensajería', 'Consulta de mensaje específico'),
+(586, 5, 'LOGOUT', 'users', 5, '2026-03-25 12:11:54', NULL, '{\"username\":\"heroestudiante\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', 'Autenticación', 'Cierre de sesión del sistema'),
+(587, 4, 'LOGIN', 'users', 4, '2026-03-25 12:12:03', NULL, '{\"username\":\"hero\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso'),
+(588, 4, 'SELECT', 'mensajeria', 29, '2026-03-25 12:12:22', NULL, '{\"usuario_id\":\"4\",\"tipo_mensaje\":\"recibidos\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', 'Mensajería', 'Consulta de mensaje específico'),
+(589, 4, 'UPDATE', 'mensajeria', 29, '2026-03-25 12:12:23', '{\"leido\":\"0\"}', '{\"leido\":\"1\",\"usuario_id\":\"4\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', 'Mensajería', 'Mensaje marcado como leído'),
+(590, 4, 'SELECT', 'mensajeria', 29, '2026-03-25 12:24:02', NULL, '{\"usuario_id\":\"4\",\"tipo_mensaje\":\"recibidos\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', 'Mensajería', 'Consulta de mensaje específico'),
+(591, 4, 'SELECT', 'mensajeria', 28, '2026-03-25 12:24:19', NULL, '{\"usuario_id\":\"4\",\"tipo_mensaje\":\"recibidos\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', 'Mensajería', 'Consulta de mensaje específico'),
+(592, 2, 'LOGIN', 'users', 2, '2026-03-25 12:26:04', NULL, '{\"username\":\"V-12345678\"}', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', 'Autenticación', 'Inicio de sesión exitoso');
 
 -- --------------------------------------------------------
 
@@ -269,8 +581,8 @@ INSERT INTO `auditoria` (`id`, `usuario_id`, `accion`, `tabla_afectada`, `regist
 
 CREATE TABLE `aulas` (
   `id` int NOT NULL,
-  `nave` varchar(1) COLLATE utf8mb4_spanish_ci NOT NULL,
-  `aula` varchar(5) COLLATE utf8mb4_spanish_ci NOT NULL
+  `nave` varchar(1) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL,
+  `aula` varchar(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -303,7 +615,7 @@ INSERT INTO `aulas` (`id`, `nave`, `aula`) VALUES
 
 CREATE TABLE `bancos` (
   `id` int NOT NULL,
-  `nombre_banco` varchar(100) COLLATE utf8mb3_spanish_ci NOT NULL,
+  `nombre_banco` varchar(100) CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_spanish_ci;
 
@@ -348,9 +660,9 @@ INSERT INTO `bancos` (`id`, `nombre_banco`, `created_at`) VALUES
 CREATE TABLE `bitacora` (
   `id` int NOT NULL,
   `id_pedido` int NOT NULL,
-  `status` varchar(50) COLLATE latin1_spanish_ci NOT NULL,
-  `admin` varchar(50) COLLATE latin1_spanish_ci NOT NULL,
-  `concepto` varchar(50) COLLATE latin1_spanish_ci NOT NULL,
+  `status` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `admin` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `concepto` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
   `fecha` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
 
@@ -362,15 +674,15 @@ CREATE TABLE `bitacora` (
 
 CREATE TABLE `carreras` (
   `id_carrera` int NOT NULL,
-  `nombre_carrera` varchar(100) COLLATE utf32_spanish2_ci NOT NULL,
-  `cod_carrera` varchar(100) COLLATE utf32_spanish2_ci NOT NULL,
+  `nombre_carrera` varchar(100) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
+  `cod_carrera` varchar(100) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
   `activa` tinyint(1) NOT NULL DEFAULT '1',
   `duracion_semestres` int DEFAULT NULL,
-  `titulo_otorga` varchar(80) COLLATE utf32_spanish2_ci DEFAULT NULL,
-  `otro_titulo` varchar(20) COLLATE utf32_spanish2_ci DEFAULT NULL,
-  `descripcion` text COLLATE utf32_spanish2_ci,
+  `titulo_otorga` varchar(80) CHARACTER SET utf32 COLLATE utf32_spanish2_ci DEFAULT NULL,
+  `otro_titulo` varchar(20) CHARACTER SET utf32 COLLATE utf32_spanish2_ci DEFAULT NULL,
+  `descripcion` text CHARACTER SET utf32 COLLATE utf32_spanish2_ci,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `tipo_formacion` enum('PNF','PTF') COLLATE utf32_spanish2_ci NOT NULL DEFAULT 'PNF'
+  `tipo_formacion` enum('PNF','PTF') CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL DEFAULT 'PNF'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -379,9 +691,41 @@ CREATE TABLE `carreras` (
 
 INSERT INTO `carreras` (`id_carrera`, `nombre_carrera`, `cod_carrera`, `activa`, `duracion_semestres`, `titulo_otorga`, `otro_titulo`, `descripcion`, `created_at`, `tipo_formacion`) VALUES
 (0, 'No Especificado', 'NES', 1, 0, 'Ninguno', NULL, 'Carrera genérica para docentes sin asignación específica', '2025-08-01 22:39:06', ''),
-(1, 'Informatica', '1234', 1, 8, 'TSU Informatica', 'Ing. Informatica', '0', '2025-06-02 14:08:44', 'PNF'),
-(2, 'Turismo', '2', 1, NULL, NULL, NULL, NULL, '2025-06-16 18:07:13', 'PNF'),
-(5, 'Logistica y Distribucion', '3', 1, 4, 'Licenciado en Distribucion y Logistica', 'oooo', '0', '2025-08-10 22:26:32', 'PNF');
+(1, 'Informatica', '14232', 1, 8, 'TSU Informatica', 'Ing. Informatica', '0', '2025-06-02 14:08:44', 'PNF'),
+(2, 'Turismo', '13569', 1, 8, 'TSU turismo', '', '0', '2025-06-16 18:07:13', 'PNF'),
+(5, 'Logistica y Distribucion', '14231', 1, 4, 'Licenciado en Distribucion y Logistica', 'oooo', '0', '2025-08-10 22:26:32', 'PNF'),
+(14, 'Mecanica', '13351', 1, 8, 'TSU Mecanica', 'Ing. Mecanica', '0', '2005-01-13 04:00:00', 'PTF'),
+(15, 'Mecanica Automotriz', '12932', 1, 6, 'TSU Mecanica Automotriz', '', '0', '2026-01-28 04:00:00', 'PTF');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `secretaria_config`
+--
+
+CREATE TABLE `secretaria_config` (
+  `clave` varchar(100) NOT NULL,
+  `valor` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`clave`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `secretaria_cupos`
+--
+
+CREATE TABLE `secretaria_cupos` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `carrera_id` int NOT NULL,
+  `turno` varchar(50) NOT NULL,
+  `cupos_totales` int NOT NULL DEFAULT 0,
+  `numero_secciones` int NOT NULL DEFAULT 1,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_carrera_turno` (`carrera_id`, `turno`),
+  KEY `idx_carrera` (`carrera_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -423,7 +767,33 @@ INSERT INTO `carrera_materia` (`id_relacion`, `id_carrera`, `id_materia`, `semes
 (29, 2, 15, 1),
 (30, 1, 26, 1),
 (31, 1, 27, 3),
-(32, 1, 28, 3);
+(32, 1, 28, 3),
+(35, 14, 29, 1),
+(36, 14, 32, 1),
+(37, 15, 29, 1),
+(38, 15, 34, 1),
+(39, 5, 35, 1);
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `carrera_versiones`
+--
+
+CREATE TABLE `carrera_versiones` (
+  `id_version` int NOT NULL,
+  `id_carrera` int NOT NULL,
+  `fecha_vigencia` datetime NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
+
+--
+-- Volcado de datos para la tabla `carrera_versiones`
+--
+
+INSERT INTO `carrera_versiones` (`id_version`, `id_carrera`, `fecha_vigencia`, `created_at`) VALUES
+(2, 14, '2000-01-13 00:00:00', '2026-01-13 16:48:01'),
+(3, 14, '1977-01-01 00:00:00', '2026-01-13 17:36:25');
 
 -- --------------------------------------------------------
 
@@ -950,7 +1320,7 @@ INSERT INTO `ciudades` (`id_ciudad`, `id_estado`, `ciudad`, `capital`) VALUES
 
 CREATE TABLE `contenido` (
   `id` int NOT NULL,
-  `seccion` varchar(50) COLLATE latin1_spanish_ci NOT NULL,
+  `seccion` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
   `contenido` longblob NOT NULL,
   `fecha` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
@@ -969,10 +1339,17 @@ CREATE TABLE `control_avance_trayecto` (
   `puede_avanzar` tinyint(1) DEFAULT '0',
   `aprobado_por` int DEFAULT NULL,
   `fecha_aprobacion` datetime DEFAULT NULL,
-  `motivo` text COLLATE utf8mb3_spanish_ci,
+  `motivo` text CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_spanish_ci;
+
+--
+-- Volcado de datos para la tabla `control_avance_trayecto`
+--
+
+INSERT INTO `control_avance_trayecto` (`id`, `id_usuario`, `id_carrera`, `trayecto_actual`, `puede_avanzar`, `aprobado_por`, `fecha_aprobacion`, `motivo`, `created_at`, `updated_at`) VALUES
+(2, 5, 1, 0, 1, 2, '2026-01-26 11:04:31', '', '2026-01-26 15:04:31', '2026-01-26 15:04:31');
 
 -- --------------------------------------------------------
 
@@ -1000,7 +1377,8 @@ INSERT INTO `docente_materia` (`id`, `id_usuario`, `id_materia`, `fecha_asignaci
 (13, 2, 9, '2025-08-22 16:26:50'),
 (14, 4, 5, '2025-08-22 16:43:47'),
 (15, 2, 15, '2025-08-22 20:17:24'),
-(17, 4, 15, '2025-10-02 12:45:47');
+(17, 4, 15, '2025-10-02 12:45:47'),
+(18, 2, 35, '2026-02-23 09:25:52');
 
 -- --------------------------------------------------------
 
@@ -1022,11 +1400,11 @@ CREATE TABLE `docente_seccion` (
 --
 
 INSERT INTO `docente_seccion` (`id_docente_seccion`, `id_usuario`, `id_seccion`, `id_materia`, `fecha_asignacion`, `estatus`) VALUES
-(7, 2585, 11, 15, '2025-08-08 19:43:14', 1),
 (12, 2, 10, 9, '2025-08-22 20:44:08', 1),
 (14, 2, 11, 15, '2025-08-23 00:18:06', 1),
-(15, 4, 10, 5, '2025-08-23 01:03:57', 1),
-(17, 2585, 10, 10, '2025-10-23 18:05:46', 1);
+(17, 2585, 10, 10, '2025-10-23 18:05:46', 1),
+(23, 4, 10, 11, '2026-01-26 16:29:51', 1),
+(24, 2, 12, 35, '2026-02-23 13:50:33', 1);
 
 -- --------------------------------------------------------
 
@@ -1079,7 +1457,7 @@ INSERT INTO `estados` (`id_estado`, `estado`, `iso_3166-2`) VALUES
 
 CREATE TABLE `estado_civil` (
   `id` int NOT NULL,
-  `estado_civil` varchar(20) COLLATE utf32_spanish2_ci NOT NULL
+  `estado_civil` varchar(20) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -1103,7 +1481,7 @@ CREATE TABLE `estudiante_seccion` (
   `id_usuario` int NOT NULL,
   `id_seccion` int NOT NULL,
   `fecha_inscripcion` date NOT NULL,
-  `estatus` enum('activo','retirado','aprobado','reprobado') COLLATE utf8mb4_spanish_ci DEFAULT 'activo'
+  `estatus` enum('activo','retirado','aprobado','reprobado') CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT 'activo'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -1144,7 +1522,17 @@ INSERT INTO `estudiante_seccion` (`id_usuario`, `id_seccion`, `fecha_inscripcion
 (2567, 10, '2025-08-13', 'activo'),
 (2568, 11, '2025-08-22', 'activo'),
 (2570, 11, '2025-08-22', 'retirado'),
-(2571, 10, '2025-08-13', 'activo');
+(2571, 10, '2025-08-13', 'activo'),
+(2597, 12, '2026-02-23', 'activo'),
+(2598, 12, '2026-02-23', 'activo'),
+(2599, 12, '2026-02-23', 'activo'),
+(2600, 12, '2026-02-23', 'activo'),
+(2602, 12, '2026-02-23', 'activo'),
+(2616, 12, '2026-02-23', 'activo'),
+(2617, 12, '2026-02-23', 'activo'),
+(2618, 12, '2026-02-23', 'activo'),
+(2619, 12, '2026-02-23', 'activo'),
+(2620, 12, '2026-02-23', 'activo');
 
 -- --------------------------------------------------------
 
@@ -1169,7 +1557,7 @@ CREATE TABLE `evaluacion` (
 
 CREATE TABLE `genero` (
   `id` int NOT NULL,
-  `genero` varchar(9) COLLATE utf8mb4_spanish_ci NOT NULL
+  `genero` varchar(9) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -1192,14 +1580,21 @@ CREATE TABLE `graduados` (
   `fecha_graduacion` date DEFAULT NULL,
   `titulo_entregado` tinyint(1) DEFAULT '0',
   `fecha_entrega_titulo` date DEFAULT NULL,
-  `acta_entrega` text COLLATE utf8mb3_spanish_ci,
-  `observaciones` text COLLATE utf8mb3_spanish_ci,
-  `estado` enum('cumple_requisitos','graduado','titulo_entregado') COLLATE utf8mb3_spanish_ci DEFAULT 'cumple_requisitos',
+  `acta_entrega` text CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci,
+  `observaciones` text CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci,
+  `estado` enum('cumple_requisitos','graduado','titulo_entregado') CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci DEFAULT 'cumple_requisitos',
   `id_admin_graduacion` int DEFAULT NULL,
   `id_admin_entrega_titulo` int DEFAULT NULL,
   `fecha_registro` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `fecha_actualizacion` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_spanish_ci;
+
+--
+-- Volcado de datos para la tabla `graduados`
+--
+
+INSERT INTO `graduados` (`id`, `id_usuario`, `fecha_graduacion`, `titulo_entregado`, `fecha_entrega_titulo`, `acta_entrega`, `observaciones`, `estado`, `id_admin_graduacion`, `id_admin_entrega_titulo`, `fecha_registro`, `fecha_actualizacion`) VALUES
+(2, 2560, '2026-01-28', 1, '2026-01-28', NULL, 'prueba', 'titulo_entregado', 1, 1, '2026-01-28 16:42:57', '2026-01-28 16:43:40');
 
 -- --------------------------------------------------------
 
@@ -1213,7 +1608,7 @@ CREATE TABLE `historial_cambios_notas` (
   `trayecto` int NOT NULL,
   `nota_anterior` decimal(4,2) DEFAULT NULL,
   `nota_nueva` decimal(4,2) NOT NULL,
-  `justificacion` text COLLATE utf8mb3_spanish_ci NOT NULL,
+  `justificacion` text CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci NOT NULL,
   `id_admin` int NOT NULL,
   `fecha_cambio` datetime DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_spanish_ci;
@@ -1240,7 +1635,7 @@ CREATE TABLE `horarios` (
   `dia` tinyint NOT NULL COMMENT '0=Lunes, 1=Martes, ..., 5=Sábado',
   `hora_inicio` time NOT NULL,
   `hora_fin` time NOT NULL,
-  `aula` varchar(50) COLLATE utf8mb4_spanish_ci DEFAULT NULL
+  `aula` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -1252,8 +1647,6 @@ INSERT INTO `horarios` (`id_horario`, `id_docente_seccion`, `dia`, `hora_inicio`
 (203, 12, 1, '07:00:00', '08:00:00', 'D - 1'),
 (204, 14, 2, '07:00:00', '08:00:00', 'A - 3'),
 (205, 14, 3, '07:00:00', '08:00:00', 'C - 2'),
-(212, 15, 0, '10:00:00', '11:00:00', 'A - 1'),
-(213, 15, 2, '10:00:00', '11:00:00', 'A - 1'),
 (217, 7, 5, '07:00:00', '08:00:00', 'D - 1'),
 (218, 7, 5, '08:00:00', '09:00:00', 'B - 2');
 
@@ -1265,7 +1658,7 @@ INSERT INTO `horarios` (`id_horario`, `id_docente_seccion`, `dia`, `hora_inicio`
 
 CREATE TABLE `ingresos` (
   `id` int NOT NULL,
-  `ingreso` varchar(100) COLLATE utf32_spanish2_ci NOT NULL
+  `ingreso` varchar(100) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -1281,14 +1674,88 @@ INSERT INTO `ingresos` (`id`, `ingreso`) VALUES
 -- --------------------------------------------------------
 
 --
+-- Estructura de tabla para la tabla `mallas`
+--
+
+CREATE TABLE `mallas` (
+  `id_malla` int NOT NULL,
+  `id_carrera` int NOT NULL,
+  `codigo_malla` varchar(100) NOT NULL,
+  `anio` int NOT NULL,
+  `descripcion` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
+
+--
+-- Volcado de datos para la tabla `mallas`
+--
+
+INSERT INTO `mallas` (`id_malla`, `id_carrera`, `codigo_malla`, `anio`, `descripcion`, `created_at`) VALUES
+(1, 14, '133512000', 2000, 'Migrada desde carrera_versiones id_version=2', '2026-01-14 14:40:32'),
+(2, 14, '133511977', 1977, 'Migrada desde carrera_versiones id_version=3', '2026-01-14 14:40:32'),
+(3, 1, '142322025', 2025, 'Malla generada automáticamente', '2026-01-14 15:22:34'),
+(4, 5, '142312025', 2025, 'Malla generada automáticamente', '2026-01-14 15:22:39'),
+(5, 2, '135692025', 2025, 'Malla generada automáticamente', '2026-01-14 15:22:40');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `malla_materia`
+--
+
+CREATE TABLE `malla_materia` (
+  `id` int NOT NULL,
+  `id_malla` int NOT NULL,
+  `id_materia` int NOT NULL,
+  `semestre` int NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
+
+--
+-- Volcado de datos para la tabla `malla_materia`
+--
+
+INSERT INTO `malla_materia` (`id`, `id_malla`, `id_materia`, `semestre`) VALUES
+(1, 1, 29, 1),
+(2, 1, 30, 1),
+(3, 2, 31, 1),
+(4, 3, 5, 1),
+(5, 3, 7, 3),
+(6, 3, 6, 1),
+(7, 3, 9, 1),
+(8, 3, 10, 3),
+(9, 3, 11, 3),
+(10, 3, 12, 3),
+(11, 3, 13, 3),
+(12, 3, 14, 3),
+(13, 3, 16, 2),
+(14, 3, 17, 2),
+(15, 3, 18, 3),
+(16, 3, 19, 1),
+(17, 3, 21, 3),
+(18, 3, 22, 3),
+(19, 3, 20, 1),
+(20, 3, 23, 2),
+(21, 3, 24, 1),
+(22, 3, 25, 1),
+(23, 3, 26, 1),
+(24, 3, 27, 3),
+(25, 3, 28, 3),
+(26, 5, 15, 1),
+(28, 1, 32, 3),
+(29, 4, 35, 1),
+(30, 4, 36, 1);
+
+-- --------------------------------------------------------
+
+--
 -- Estructura de tabla para la tabla `materias`
 --
 
 CREATE TABLE `materias` (
   `id_materia` int NOT NULL,
-  `cod_materia` varchar(20) COLLATE utf32_spanish2_ci NOT NULL,
-  `pnf_ptf` varchar(3) COLLATE utf32_spanish2_ci NOT NULL,
-  `nombre_materia` varchar(100) COLLATE utf32_spanish2_ci NOT NULL,
+  `cod_materia` varchar(20) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
+  `pnf_ptf` varchar(3) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
+  `nombre_materia` varchar(100) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
   `creditos` int DEFAULT '3',
   `activa` tinyint(1) DEFAULT '1',
   `horas_teoricas` int DEFAULT NULL,
@@ -1296,37 +1763,47 @@ CREATE TABLE `materias` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `duracion_periodo` int NOT NULL,
   `trayecto` tinyint NOT NULL DEFAULT '1',
-  `es_proyecto_socio` tinyint(1) DEFAULT '0'
+  `es_proyecto_socio` tinyint(1) DEFAULT '0',
+  `horas_laboratorio` int DEFAULT NULL,
+  `horas_semanales` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
 -- Volcado de datos para la tabla `materias`
 --
 
-INSERT INTO `materias` (`id_materia`, `cod_materia`, `pnf_ptf`, `nombre_materia`, `creditos`, `activa`, `horas_teoricas`, `horas_practicas`, `created_at`, `duracion_periodo`, `trayecto`, `es_proyecto_socio`) VALUES
-(5, 'MAC015', 'PNF', 'Matematica', 5, 1, 2, 2, '2025-06-04 18:21:13', 1, 0, 0),
-(6, 'PNS013', 'PNF', 'Proyecto Nacional y Nueva Ciudadania', 3, 1, 2, 2, '2025-06-04 18:22:37', 1, 0, 0),
-(7, 'MAC139', 'PNF', 'Matemática I', 9, 1, 2, 2, '2025-06-16 15:21:07', 3, 1, 0),
-(9, 'IPC012', 'PNF', 'Introducción a los Proyectos y al PNF', 2, 1, 2, 2, '2025-08-01 19:51:18', 1, 0, 0),
-(10, 'ACT139', 'PNF', 'Arquitectura del Computador', 9, 1, 2, 2, '2025-08-01 19:58:28', 3, 1, 0),
-(11, 'APT1312', 'PNF', 'Algorítmica y Programación', 12, 1, 2, 2, '2025-08-01 20:03:19', 3, 1, 0),
-(12, 'FCS133', 'PNF', 'Formación Crítica I', 3, 1, 2, 2, '2025-08-01 20:05:28', 3, 1, 0),
-(13, 'PTP139', 'PNF', 'Proyecto Socio tecnológico I', 9, 1, 2, 2, '2025-08-01 20:07:21', 3, 1, 1),
-(14, 'IDC133', 'PNF', 'Inglés', 3, 1, 2, 2, '2025-08-01 20:08:35', 3, 1, 0),
-(15, 'TTIU40', 'PNF', 'Introducción a la Universidad y El Turismo', 1, 1, 2, 2, '2025-08-07 22:35:15', 1, 0, 0),
-(16, 'MAC226', 'PNF', 'Matematica II', 6, 1, 2, 2, '2025-08-24 18:14:27', 2, 2, 0),
-(17, 'RCT226', 'PNF', 'Redes de Computadoras', 6, 1, 2, 2, '2025-08-24 18:18:37', 2, 2, 0),
-(18, 'POT2312', 'PNF', 'Programacion II', 12, 1, 2, 2, '2025-08-24 18:48:27', 3, 2, 0),
-(19, 'ISC213', 'PNF', 'Ingenieria del Software I', 3, 1, 2, 2, '2025-08-24 18:50:56', 1, 2, 0),
-(20, 'BDC213', 'PNF', 'Base de Datos', 3, 1, 2, 2, '2025-08-24 18:53:03', 1, 2, 0),
-(21, 'FCS233', 'PNF', 'Formación Crítica II', 3, 1, 2, 2, '2025-08-24 18:57:07', 3, 2, 0),
-(22, 'PTP239', 'PNF', 'Proyecto Socio tecnológico II', 9, 1, 2, 2, '2025-08-24 19:00:14', 3, 2, 0),
-(23, 'MAC326', 'PNF', 'Matematica Aplicada', 6, 1, 2, 2, '2025-08-24 20:09:26', 2, 3, 0),
-(24, 'IOC313', 'PNF', 'Investigación de Operaciones', 3, 1, 2, 2, '2025-08-24 20:12:20', 1, 3, 0),
-(25, 'SOC313', 'PNF', 'Sistemas Operativos', 3, 1, 2, 2, '2025-08-24 20:14:44', 1, 3, 0),
-(26, 'BDC313', 'PNF', 'Modelado de Bases de Datos', 3, 1, 2, 2, '2025-08-29 19:20:37', 1, 3, 0),
-(27, 'FCS333', 'PNF', 'Formación Crítica III', 3, 1, 2, 2, '2025-08-29 19:33:31', 3, 3, 0),
-(28, 'ISC339', 'PNF', 'Ingeniería del Software II', 9, 1, 2, 2, '2025-08-29 19:44:59', 3, 3, 0);
+INSERT INTO `materias` (`id_materia`, `cod_materia`, `pnf_ptf`, `nombre_materia`, `creditos`, `activa`, `horas_teoricas`, `horas_practicas`, `created_at`, `duracion_periodo`, `trayecto`, `es_proyecto_socio`, `horas_laboratorio`, `horas_semanales`) VALUES
+(5, 'MAC015', 'PNF', 'Matematica', 5, 1, 2, 2, '2025-06-04 18:21:13', 1, 0, 0, NULL, NULL),
+(6, 'PNS013', 'PNF', 'Proyecto Nacional y Nueva Ciudadania', 3, 1, 2, 2, '2025-06-04 18:22:37', 1, 0, 0, NULL, NULL),
+(7, 'MAC139', 'PNF', 'Matemática I', 9, 1, 2, 2, '2025-06-16 15:21:07', 3, 1, 0, NULL, NULL),
+(9, 'IPC012', 'PNF', 'Introducción a los Proyectos y al PNF', 2, 1, 2, 2, '2025-08-01 19:51:18', 1, 0, 0, NULL, NULL),
+(10, 'ACT139', 'PNF', 'Arquitectura del Computador', 9, 1, 2, 2, '2025-08-01 19:58:28', 3, 1, 0, NULL, NULL),
+(11, 'APT1312', 'PNF', 'Algorítmica y Programación', 12, 1, 2, 2, '2025-08-01 20:03:19', 3, 1, 0, NULL, NULL),
+(12, 'FCS133', 'PNF', 'Formación Crítica I', 3, 1, 2, 2, '2025-08-01 20:05:28', 3, 1, 0, NULL, NULL),
+(13, 'PTP139', 'PNF', 'Proyecto Socio tecnológico I', 9, 1, 2, 2, '2025-08-01 20:07:21', 3, 1, 1, NULL, NULL),
+(14, 'IDC133', 'PNF', 'Inglés', 3, 1, 2, 2, '2025-08-01 20:08:35', 3, 1, 0, NULL, NULL),
+(15, 'TTIU40', 'PNF', 'Introducción a la Universidad y El Turismo', 1, 1, 2, 2, '2025-08-07 22:35:15', 1, 0, 0, NULL, NULL),
+(16, 'MAC226', 'PNF', 'Matematica II', 6, 1, 2, 2, '2025-08-24 18:14:27', 2, 2, 0, NULL, NULL),
+(17, 'RCT226', 'PNF', 'Redes de Computadoras', 6, 1, 2, 2, '2025-08-24 18:18:37', 2, 2, 0, NULL, NULL),
+(18, 'POT2312', 'PNF', 'Programacion II', 12, 1, 2, 2, '2025-08-24 18:48:27', 3, 2, 0, NULL, NULL),
+(19, 'ISC213', 'PNF', 'Ingenieria del Software I', 3, 1, 2, 2, '2025-08-24 18:50:56', 1, 2, 0, NULL, NULL),
+(20, 'BDC213', 'PNF', 'Base de Datos', 3, 1, 2, 2, '2025-08-24 18:53:03', 1, 2, 0, NULL, NULL),
+(21, 'FCS233', 'PNF', 'Formación Crítica II', 3, 1, 2, 2, '2025-08-24 18:57:07', 3, 2, 0, NULL, NULL),
+(22, 'PTP239', 'PNF', 'Proyecto Socio tecnológico II', 9, 1, 2, 2, '2025-08-24 19:00:14', 3, 2, 0, NULL, NULL),
+(23, 'MAC326', 'PNF', 'Matematica Aplicada', 6, 1, 2, 2, '2025-08-24 20:09:26', 2, 3, 0, NULL, NULL),
+(24, 'IOC313', 'PNF', 'Investigación de Operaciones', 3, 1, 2, 2, '2025-08-24 20:12:20', 1, 3, 0, NULL, NULL),
+(25, 'SOC313', 'PNF', 'Sistemas Operativos', 3, 1, 2, 2, '2025-08-24 20:14:44', 1, 3, 0, NULL, NULL),
+(26, 'BDC313', 'PNF', 'Modelado de Bases de Datos', 3, 1, 2, 2, '2025-08-29 19:20:37', 1, 3, 0, NULL, NULL),
+(27, 'FCS333', 'PNF', 'Formación Crítica III', 3, 1, 2, 2, '2025-08-29 19:33:31', 3, 3, 0, NULL, NULL),
+(28, 'ISC339', 'PNF', 'Ingeniería del Software II', 9, 1, 2, 2, '2025-08-29 19:44:59', 3, 3, 0, NULL, NULL),
+(29, 'MAT-154', 'PTF', 'Matemática I', 4, 1, 3, 2, '2026-01-13 16:15:00', 1, 1, 0, NULL, NULL),
+(30, 'AE-1111', 'PTF', 'Fisica', 5, 1, 2, 2, '2026-01-13 16:41:36', 1, 1, 0, NULL, NULL),
+(31, 'AE-1241', 'PTF', 'Deporte I', 2, 1, 2, 2, '2026-01-13 17:37:32', 1, 1, 0, NULL, NULL),
+(32, 'MAT-253', 'PTF', 'Matemática II', 3, 1, 2, 3, '2026-01-14 16:11:55', 1, 2, 0, 0, 4),
+(33, 'MAT -154', 'PTF', 'Matemática I', 4, 1, 3, 2, '2026-01-30 13:17:19', 1, 1, 0, 0, 0),
+(34, 'GEA -142', 'PTF', 'GEOMETRÍA ANALÍTICA', 2, 1, 1, 3, '2026-01-30 13:20:21', 1, 1, 0, 0, 0),
+(35, 'LDIEP006000', 'PTF', 'Instituciones de Educación Universitaria y los  Programas Nacionales de Formación', 0, 1, 1, 1, '2026-01-30 14:17:14', 1, 0, 0, 0, 2),
+(36, 'LDEOE006000', 'PTF', 'Expresión Oral y Escrita', 0, 1, 1, 1, '2026-01-30 14:50:18', 1, 0, 0, 0, 2);
 
 -- --------------------------------------------------------
 
@@ -1338,8 +1815,8 @@ CREATE TABLE `mensajeria` (
   `id` int NOT NULL,
   `id_usuario_remitente` int NOT NULL,
   `id_usuario_destinatario` int NOT NULL,
-  `titulo` varchar(255) COLLATE utf8mb4_spanish_ci NOT NULL,
-  `mensaje` text COLLATE utf8mb4_spanish_ci NOT NULL,
+  `titulo` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL,
+  `mensaje` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL,
   `fecha_envio` datetime DEFAULT CURRENT_TIMESTAMP,
   `leido` tinyint(1) DEFAULT '0',
   `archivado_remitente` tinyint(1) DEFAULT '0',
@@ -1375,7 +1852,8 @@ INSERT INTO `mensajeria` (`id`, `id_usuario_remitente`, `id_usuario_destinatario
 (25, 2, 2, 'Notas Rechazadas', 'La nota del estudiante Adriana Ríos ha sido rechazada debido a: prueba', '2025-10-09 11:27:31', 1, 0, 0, 0, 0),
 (26, 2, 2, 'Notas Rechazadas', 'Las notas de los estudiantes Adriana Ríos, Ana Rodríguez, Anaa Rodríguez han sido rechazadas debido a:prueba', '2025-10-09 11:31:05', 1, 0, 0, 0, 0),
 (27, 2, 2, 'Notas Aprobadas', 'Las notas de todos los estudiantes del grupo han sido aprobadas exitosamente.', '2025-10-16 11:12:55', 1, 0, 0, 0, 0),
-(28, 2, 4, 'prueba de auditoria', 'prueba de auditoria', '2025-10-23 10:22:49', 1, 0, 0, 0, 0);
+(28, 2, 4, 'prueba de auditoria', 'prueba de auditoria', '2025-10-23 10:22:49', 1, 0, 0, 0, 0),
+(29, 5, 4, 'prueba de vocero', 'prueba', '2026-03-25 12:11:33', 1, 0, 0, 0, 0);
 
 -- --------------------------------------------------------
 
@@ -1738,16 +2216,16 @@ INSERT INTO `municipios` (`id_municipio`, `id_estado`, `municipio`) VALUES
 
 CREATE TABLE `nombre_curso` (
   `id` int NOT NULL,
-  `titulo` varchar(200) COLLATE latin1_spanish_ci NOT NULL,
-  `sub_titulo` varchar(500) COLLATE latin1_spanish_ci NOT NULL,
-  `contenido` text COLLATE latin1_spanish_ci NOT NULL,
-  `ponente1` varchar(50) COLLATE latin1_spanish_ci NOT NULL,
-  `cedula1` varchar(10) COLLATE latin1_spanish_ci NOT NULL,
-  `ponente2` varchar(50) COLLATE latin1_spanish_ci NOT NULL,
-  `cedula2` varchar(10) COLLATE latin1_spanish_ci NOT NULL,
-  `lugar` varchar(25) COLLATE latin1_spanish_ci NOT NULL,
+  `titulo` varchar(200) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `sub_titulo` varchar(500) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `contenido` text CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `ponente1` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `cedula1` varchar(10) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `ponente2` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `cedula2` varchar(10) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `lugar` varchar(25) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
   `fecha` date NOT NULL,
-  `horas` varchar(3) COLLATE latin1_spanish_ci NOT NULL
+  `horas` varchar(3) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
 
 -- --------------------------------------------------------
@@ -1767,8 +2245,8 @@ CREATE TABLE `notas_definitivas` (
   `trayecto_2` int DEFAULT NULL,
   `trayecto_3` int DEFAULT NULL,
   `trayecto_4` int DEFAULT NULL,
-  `soporte` varchar(255) COLLATE utf8mb4_spanish_ci DEFAULT NULL,
-  `tipo_archivo` varchar(10) COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `soporte` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `tipo_archivo` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
   `fecha_registro` datetime DEFAULT NULL,
   `id_admin_aprobador` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
@@ -1813,7 +2291,27 @@ INSERT INTO `notas_definitivas` (`id`, `id_usuario`, `id_materia`, `id_periodo`,
 (272, 2571, 9, 2, 2, 1, NULL, NULL, NULL, NULL, NULL, NULL, '2025-12-04 12:20:18', 2),
 (273, 2557, 9, 2, 2, 1, NULL, NULL, NULL, NULL, NULL, NULL, '2025-12-04 12:20:18', 2),
 (274, 5, 9, 2, 2, 19, NULL, NULL, NULL, NULL, NULL, NULL, '2025-12-04 12:20:18', 2),
-(275, 2455, 9, 2, 2, 1, NULL, NULL, NULL, NULL, NULL, NULL, '2025-12-04 12:20:18', 2);
+(275, 2455, 9, 2, 2, 1, NULL, NULL, NULL, NULL, NULL, NULL, '2025-12-04 12:20:18', 2),
+(289, 5, 7, 5, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2026-01-26 11:04:51', NULL),
+(290, 5, 10, 5, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2026-01-26 11:04:51', NULL),
+(292, 5, 12, 5, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2026-01-26 11:04:51', NULL),
+(293, 5, 13, 5, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2026-01-26 11:04:51', NULL),
+(295, 2560, 15, 2, 2, 16, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2),
+(296, 2570, 15, 2, 2, 20, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2),
+(297, 2462, 15, 2, 2, 15, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2),
+(298, 2540, 15, 2, 2, 1, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2),
+(299, 2554, 15, 2, 2, 1, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2),
+(300, 2476, 15, 2, 2, 1, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2),
+(301, 2564, 15, 2, 2, 1, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2),
+(302, 2450, 15, 2, 2, 1, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2),
+(303, 2530, 15, 2, 2, 1, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2),
+(304, 2538, 15, 2, 2, 1, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2),
+(305, 2464, 15, 2, 2, 1, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2),
+(306, 2562, 15, 2, 2, 1, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2),
+(307, 2566, 15, 2, 2, 1, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2),
+(308, 2454, 15, 2, 2, 1, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2),
+(309, 2550, 15, 2, 2, 1, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2),
+(310, 2568, 15, 2, 2, 1, NULL, NULL, NULL, NULL, 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:25:19', 2);
 
 -- --------------------------------------------------------
 
@@ -1834,8 +2332,8 @@ CREATE TABLE `notas_pendientes` (
   `trayecto_4` int DEFAULT NULL,
   `fecha_envio` datetime DEFAULT NULL,
   `estado` enum('pendiente','aprobada','rechazada','en revision') CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT 'en revision',
-  `soporte` varchar(255) COLLATE utf8mb4_spanish_ci DEFAULT NULL COMMENT 'Ruta o nombre del archivo de imagen de soporte',
-  `tipo_archivo` varchar(10) COLLATE utf8mb4_spanish_ci DEFAULT NULL COMMENT 'jpg, png, jpeg, etc',
+  `soporte` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL COMMENT 'Ruta o nombre del archivo de imagen de soporte',
+  `tipo_archivo` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL COMMENT 'jpg, png, jpeg, etc',
   `fecha_subida` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
@@ -1879,7 +2377,23 @@ INSERT INTO `notas_pendientes` (`id`, `id_usuario`, `id_materia`, `id_periodo`, 
 (599, 2571, 9, 2, 2, 1, NULL, NULL, NULL, NULL, '2025-12-04 12:20:06', 'aprobada', NULL, NULL, NULL),
 (600, 2557, 9, 2, 2, 1, NULL, NULL, NULL, NULL, '2025-12-04 12:20:06', 'aprobada', NULL, NULL, NULL),
 (601, 5, 9, 2, 2, 19, NULL, NULL, NULL, NULL, '2025-12-04 12:20:06', 'aprobada', NULL, NULL, NULL),
-(602, 2455, 9, 2, 2, 1, NULL, NULL, NULL, NULL, '2025-12-04 12:20:06', 'aprobada', NULL, NULL, NULL);
+(602, 2455, 9, 2, 2, 1, NULL, NULL, NULL, NULL, '2025-12-04 12:20:06', 'aprobada', NULL, NULL, NULL),
+(621, 2560, 15, 2, 2, 16, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05'),
+(622, 2570, 15, 2, 2, 20, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05'),
+(623, 2462, 15, 2, 2, 15, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05'),
+(624, 2540, 15, 2, 2, 1, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05'),
+(625, 2554, 15, 2, 2, 1, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05'),
+(626, 2476, 15, 2, 2, 1, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05'),
+(627, 2564, 15, 2, 2, 1, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05'),
+(628, 2450, 15, 2, 2, 1, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05'),
+(629, 2530, 15, 2, 2, 1, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05'),
+(630, 2538, 15, 2, 2, 1, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05'),
+(631, 2464, 15, 2, 2, 1, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05'),
+(632, 2562, 15, 2, 2, 1, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05'),
+(633, 2566, 15, 2, 2, 1, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05'),
+(634, 2454, 15, 2, 2, 1, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05'),
+(635, 2550, 15, 2, 2, 1, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05'),
+(636, 2568, 15, 2, 2, 1, NULL, NULL, NULL, NULL, '2026-01-28 10:24:05', 'aprobada', 'soporte_697a1c05ad0270.30546288_1769610245.pdf', 'pdf', '2026-01-28 10:24:05');
 
 -- --------------------------------------------------------
 
@@ -1890,12 +2404,12 @@ INSERT INTO `notas_pendientes` (`id`, `id_usuario`, `id_materia`, `id_periodo`, 
 CREATE TABLE `pagos` (
   `id` int NOT NULL,
   `estudiante_id` int DEFAULT NULL,
-  `tipo_pago` enum('inscripcion','reincorporacion_estudio_expediente','cambio_programa','cambio_sede','inscripcion_pasantias_practica_profesional','expedicion_constancia_certificada_notas','expedicion_constancia_simple_notas','expedicion_constancia_buena_conducta','expedicion_constancia_culminacion_academica','expedicion_constancia_estudios','expedicion_constancia_inscripcion','expedicion_constancia_servicio_comunitario','carnet_estudiantil','uniforme_franela_estudiantil','certificado_titulo','autenticacion_titulo','pensum_estudios_certificados','programas_analiticos_vigencia_programas','expedicion_constancia_modalidad_estudios','certificacion_acta_grado','grado_titulo_medalla_notas_certificadas_ubicacion_rango_buena_conducta_servicio_comunitario','derecho_grado','certificacion_saberes','examen_suficiencia','examen_extraordinario','cursos','talleres','diplomado','especializacion','maestria','otro') COLLATE utf32_spanish2_ci NOT NULL,
-  `otro_concepto` varchar(100) COLLATE utf32_spanish2_ci DEFAULT NULL,
+  `tipo_pago` enum('inscripcion','reincorporacion_estudio_expediente','cambio_programa','cambio_sede','inscripcion_pasantias_practica_profesional','expedicion_constancia_certificada_notas','expedicion_constancia_simple_notas','expedicion_constancia_buena_conducta','expedicion_constancia_culminacion_academica','expedicion_constancia_estudios','expedicion_constancia_inscripcion','expedicion_constancia_servicio_comunitario','carnet_estudiantil','uniforme_franela_estudiantil','certificado_titulo','autenticacion_titulo','pensum_estudios_certificados','programas_analiticos_vigencia_programas','expedicion_constancia_modalidad_estudios','certificacion_acta_grado','grado_titulo_medalla_notas_certificadas_ubicacion_rango_buena_conducta_servicio_comunitario','derecho_grado','certificacion_saberes','examen_suficiencia','examen_extraordinario','cursos','talleres','diplomado','especializacion','maestria','otro') CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
+  `otro_concepto` varchar(100) CHARACTER SET utf32 COLLATE utf32_spanish2_ci DEFAULT NULL,
   `monto` decimal(10,2) NOT NULL,
   `banco_id` int DEFAULT NULL,
   `fecha_pago` datetime DEFAULT CURRENT_TIMESTAMP,
-  `observaciones` text COLLATE utf32_spanish2_ci,
+  `observaciones` text CHARACTER SET utf32 COLLATE utf32_spanish2_ci,
   `registrado_por` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
@@ -3074,7 +3588,7 @@ INSERT INTO `parroquias` (`id_parroquia`, `id_municipio`, `parroquia`) VALUES
 
 CREATE TABLE `periodos_academicos` (
   `id_periodo` int NOT NULL,
-  `nombre_periodo` varchar(50) COLLATE utf8mb4_spanish_ci NOT NULL,
+  `nombre_periodo` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL,
   `fecha_inicio` date NOT NULL,
   `fecha_fin` date NOT NULL,
   `activo` tinyint(1) DEFAULT '0',
@@ -3087,9 +3601,32 @@ CREATE TABLE `periodos_academicos` (
 
 INSERT INTO `periodos_academicos` (`id_periodo`, `nombre_periodo`, `fecha_inicio`, `fecha_fin`, `activo`, `created_at`) VALUES
 (1, '2024-1', '2024-01-15', '2024-04-15', 0, '2025-07-25 17:28:39'),
-(2, '2025-2', '2025-07-01', '2025-12-10', 1, '2025-07-31 19:13:38'),
+(2, '2025-2', '2025-07-01', '2025-12-10', 0, '2025-07-31 19:13:38'),
 (3, '2027-1', '2027-06-09', '2028-07-05', 0, '2025-08-24 01:06:13'),
-(4, '2026-1', '2025-12-13', '2026-02-10', 0, '2025-12-03 18:33:00');
+(4, '2026-1', '2025-12-13', '2026-02-10', 0, '2025-12-03 18:33:00'),
+(5, '2026-1', '2026-01-16', '2026-03-16', 1, '2026-01-16 17:01:32');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `prelaciones`
+--
+
+CREATE TABLE `prelaciones` (
+  `id` int NOT NULL,
+  `id_carrera` int NOT NULL,
+  `id_materia` int NOT NULL,
+  `id_prerequisito` int NOT NULL,
+  `tipo` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
+
+--
+-- Volcado de datos para la tabla `prelaciones`
+--
+
+INSERT INTO `prelaciones` (`id`, `id_carrera`, `id_materia`, `id_prerequisito`, `tipo`, `created_at`) VALUES
+(2, 14, 32, 29, 'optativo', '2026-01-14 16:31:43');
 
 -- --------------------------------------------------------
 
@@ -3101,7 +3638,7 @@ CREATE TABLE `relacion_cursos` (
   `id` int NOT NULL,
   `id_usuario` int NOT NULL,
   `id_curso` int NOT NULL,
-  `codigo` varchar(10) COLLATE latin1_spanish_ci NOT NULL
+  `codigo` varchar(10) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
 
 -- --------------------------------------------------------
@@ -3112,23 +3649,12 @@ CREATE TABLE `relacion_cursos` (
 
 CREATE TABLE `respaldos_descargas` (
   `id` int NOT NULL,
-  `usuario` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
-  `nombre_archivo` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `usuario` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `nombre_archivo` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `fecha_descarga` datetime DEFAULT CURRENT_TIMESTAMP,
-  `ip_address` varchar(45) COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `user_agent` text COLLATE utf8mb4_general_ci
+  `ip_address` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `user_agent` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `respaldos_descargas`
---
-
-INSERT INTO `respaldos_descargas` (`id`, `usuario`, `nombre_archivo`, `fecha_descarga`, `ip_address`, `user_agent`) VALUES
-(2, 'PRUEBA', 'respaldo_PRUEBA_2025-09-08_12-43-25.sql', '2025-09-08 12:43:25', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 OPR/120.0.0.0 (Edition std-2)'),
-(3, 'PRUEBA', 'respaldo_PRUEBA_2025-09-08_13-01-06.sql', '2025-09-08 13:01:06', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 OPR/120.0.0.0 (Edition std-2)'),
-(4, 'PRUEBA', 'respaldo_PRUEBA_2025-10-01_15-47-31.sql', '2025-10-01 15:47:31', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'),
-(5, 'PRUEBA', 'respaldo_PRUEBA_2025-10-27_11-58-54.sql', '2025-10-27 11:58:54', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'),
-(6, 'PRUEBA', 'respaldo_PRUEBA_2025-10-27_12-06-37.sql', '2025-10-27 12:06:37', '::1', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36');
 
 -- --------------------------------------------------------
 
@@ -3140,7 +3666,7 @@ CREATE TABLE `revision_mensajes` (
   `id` int NOT NULL,
   `id_usuario` int NOT NULL,
   `fecha` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `ip` varchar(15) COLLATE latin1_spanish_ci NOT NULL
+  `ip` varchar(15) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
 
 -- --------------------------------------------------------
@@ -3150,19 +3676,26 @@ CREATE TABLE `revision_mensajes` (
 --
 
 CREATE TABLE `secciones` (
-  `id_seccion` int NOT NULL,
-  `codigo_seccion` varchar(20) COLLATE utf8mb4_spanish_ci NOT NULL,
+  `id_seccion` int NOT NULL AUTO_INCREMENT,
+  `codigo_seccion` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL,
   `id_carrera` int NOT NULL,
+  `turno` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `numero_seccion` int DEFAULT NULL,
   `id_trayecto` int NOT NULL,
   `id_periodo` int NOT NULL,
   `capacidad_maxima` int NOT NULL,
   `capacidad_minima` int DEFAULT '10',
-  `aula_asignada` varchar(50) COLLATE utf8mb4_spanish_ci DEFAULT NULL,
-  `horario` text COLLATE utf8mb4_spanish_ci,
-  `estatus` enum('activa','inactiva','completa') COLLATE utf8mb4_spanish_ci DEFAULT 'activa',
+  `aula_asignada` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `horario` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci,
+  `estatus` enum('activa','inactiva','completa') CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT 'activa',
+  `status` enum('Pendiente','Aprobada','Rechazada') CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT 'Pendiente',
+  `created_by` int DEFAULT NULL,
+  `approved_by` int DEFAULT NULL,
+  `approved_at` timestamp NULL DEFAULT NULL,
   `inicia` datetime DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_seccion`)
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
 -- Volcado de datos para la tabla `secciones`
@@ -3170,8 +3703,9 @@ CREATE TABLE `secciones` (
 
 INSERT INTO `secciones` (`id_seccion`, `codigo_seccion`, `id_carrera`, `id_trayecto`, `id_periodo`, `capacidad_maxima`, `capacidad_minima`, `aula_asignada`, `horario`, `estatus`, `inicia`, `created_at`) VALUES
 (9, '1-70', 1, 1, 1, 30, 10, NULL, NULL, 'inactiva', NULL, '2025-07-25 21:05:43'),
-(10, '1-70', 1, 1, 2, 40, 10, NULL, '{\"lunes\":[\"07:00\",\"11:30\"],\"martes\":null,\"miercoles\":null,\"jueves\":null,\"viernes\":null}', 'activa', '2025-08-14 12:00:00', '2025-07-31 22:15:49'),
-(11, '1-80', 2, 1, 2, 30, 10, NULL, NULL, 'activa', '2025-08-14 12:00:00', '2025-08-05 17:14:39');
+(10, '1-70', 1, 2, 5, 40, 10, NULL, '{\"lunes\":[\"07:00\",\"11:30\"],\"martes\":null,\"miercoles\":null,\"jueves\":null,\"viernes\":null}', 'activa', '2026-08-02 12:00:00', '2025-07-31 22:15:49'),
+(11, '1-80', 2, 1, 2, 30, 10, NULL, NULL, 'activa', '2025-08-14 12:00:00', '2025-08-05 17:14:39'),
+(12, '4-80', 5, 1, 5, 30, 10, NULL, NULL, 'activa', '2026-02-23 07:00:00', '2026-02-23 13:27:41');
 
 -- --------------------------------------------------------
 
@@ -3181,7 +3715,7 @@ INSERT INTO `secciones` (`id_seccion`, `codigo_seccion`, `id_carrera`, `id_traye
 
 CREATE TABLE `status` (
   `id` int NOT NULL,
-  `status` varchar(10) COLLATE utf32_spanish2_ci NOT NULL
+  `status` varchar(10) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -3200,7 +3734,7 @@ INSERT INTO `status` (`id`, `status`) VALUES
 
 CREATE TABLE `tenencia_vivienda` (
   `id` int NOT NULL,
-  `tenencia` varchar(20) COLLATE utf32_spanish2_ci NOT NULL
+  `tenencia` varchar(20) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -3221,7 +3755,7 @@ INSERT INTO `tenencia_vivienda` (`id`, `tenencia`) VALUES
 
 CREATE TABLE `tipos_horario` (
   `id` int NOT NULL,
-  `nombre` varchar(50) COLLATE utf8mb3_spanish_ci NOT NULL,
+  `nombre` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci NOT NULL,
   `horas_academicas` int DEFAULT '0',
   `horas_atendiendo` int DEFAULT '0'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_spanish_ci;
@@ -3244,7 +3778,7 @@ INSERT INTO `tipos_horario` (`id`, `nombre`, `horas_academicas`, `horas_atendien
 
 CREATE TABLE `tipo_cedula` (
   `id` int NOT NULL,
-  `tipo` varchar(2) COLLATE utf32_spanish2_ci NOT NULL
+  `tipo` varchar(2) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -3263,7 +3797,7 @@ INSERT INTO `tipo_cedula` (`id`, `tipo`) VALUES
 
 CREATE TABLE `tipo_formacion` (
   `id` int NOT NULL,
-  `tipo` varchar(50) COLLATE utf8mb4_spanish_ci NOT NULL
+  `tipo` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -3303,7 +3837,7 @@ INSERT INTO `tipo_horario_personal` (`id`, `id_usuario`, `id_tipo_horario`) VALU
 
 CREATE TABLE `tipo_pago` (
   `id` int NOT NULL,
-  `tipopago` varchar(100) COLLATE utf8mb4_spanish_ci NOT NULL
+  `tipopago` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -3353,7 +3887,7 @@ INSERT INTO `tipo_pago` (`id`, `tipopago`) VALUES
 
 CREATE TABLE `tipo_vivienda` (
   `id` int NOT NULL,
-  `vivienda` varchar(20) COLLATE utf32_spanish2_ci NOT NULL
+  `vivienda` varchar(20) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -3374,8 +3908,8 @@ INSERT INTO `tipo_vivienda` (`id`, `vivienda`) VALUES
 
 CREATE TABLE `titulos` (
   `id` int NOT NULL,
-  `nombre` varchar(100) COLLATE utf8mb4_spanish_ci NOT NULL,
-  `descripcion` text COLLATE utf8mb4_spanish_ci
+  `nombre` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci NOT NULL,
+  `descripcion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -3522,9 +4056,9 @@ INSERT INTO `titulos` (`id`, `nombre`, `descripcion`) VALUES
 CREATE TABLE `titulos_obtenidos` (
   `id` int NOT NULL,
   `id_usuario` int NOT NULL,
-  `nombre` varchar(255) COLLATE utf32_spanish2_ci NOT NULL,
-  `titulo_obtenido` varchar(255) COLLATE utf32_spanish2_ci NOT NULL,
-  `instituto` varchar(255) COLLATE utf32_spanish2_ci NOT NULL
+  `nombre` varchar(255) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
+  `titulo_obtenido` varchar(255) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL,
+  `instituto` varchar(255) CHARACTER SET utf32 COLLATE utf32_spanish2_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf32 COLLATE=utf32_spanish2_ci;
 
 --
@@ -3552,7 +4086,11 @@ INSERT INTO `titulos_obtenidos` (`id`, `id_usuario`, `nombre`, `titulo_obtenido`
 (35, 2607, 'Nombre Ejemplo', 'Bachiller', 'Liceo XYZ'),
 (36, 2607, 'Nombre Ejemplo', 'Licenciatura', 'Universidad ABC'),
 (37, 2608, 'bhuftyfu', 'Bachiller', 'U.E Freancis de Miranda'),
-(38, 2609, 'Perdomo Albañil', 'Ingeniería Mecánica', 'U.E Manuel Gual');
+(38, 2609, 'Perdomo Albañil', 'Ingeniería Mecánica', 'U.E Manuel Gual'),
+(39, 2617, 'una pruba', 'Bachiller', 'U.E Freancis de Miranda'),
+(40, 2618, 'Otra Prueba', 'Bachiller', 'U.E Freancis de Miranda'),
+(41, 2619, 'Diosito Otra Prueba', 'Bachiller', 'U.E Freancis de Miranda'),
+(42, 2620, 'Papadio Super Prueba', 'Bachiller', 'U.E Freancis de Miranda');
 
 -- --------------------------------------------------------
 
@@ -3622,8 +4160,8 @@ INSERT INTO `titulo_materia` (`id_relacion`, `id_titulo`, `id_materia`, `priorid
 CREATE TABLE `trayectos` (
   `id_trayecto` int NOT NULL,
   `numero_trayecto` int NOT NULL,
-  `nombre_trayecto` varchar(50) COLLATE utf8mb4_spanish_ci DEFAULT NULL,
-  `descripcion` text COLLATE utf8mb4_spanish_ci
+  `nombre_trayecto` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci DEFAULT NULL,
+  `descripcion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
 --
@@ -3645,43 +4183,44 @@ INSERT INTO `trayectos` (`id_trayecto`, `numero_trayecto`, `nombre_trayecto`, `d
 
 CREATE TABLE `users` (
   `id` int NOT NULL,
-  `idusuario` varchar(20) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `nombre` varchar(200) COLLATE latin1_spanish_ci NOT NULL,
-  `username` varchar(100) COLLATE latin1_spanish_ci NOT NULL,
-  `email` varchar(100) COLLATE latin1_spanish_ci NOT NULL,
-  `tlf` varchar(11) COLLATE latin1_spanish_ci NOT NULL,
-  `cel` varchar(11) COLLATE latin1_spanish_ci NOT NULL,
-  `direccion` varchar(300) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `ciudad` varchar(100) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `estado` varchar(100) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `municipio` varchar(100) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `parroquia` varchar(100) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `etnia` varchar(50) COLLATE latin1_spanish_ci DEFAULT 'Ninguna',
-  `casaapto` varchar(50) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `punto_referencia` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `grupo_familiar` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `acargo_usted` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `fuente_ingresos` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `tipo_vivienda` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `tenencia_vivienda` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `enfermedad` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `discapacidad` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `titulos` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `institutos` varchar(255) COLLATE latin1_spanish_ci DEFAULT 'No especificado',
-  `potencialidades` varchar(100) COLLATE latin1_spanish_ci NOT NULL,
+  `idusuario` varchar(20) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `nombre` varchar(200) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `username` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `email` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `tlf` varchar(11) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `cel` varchar(11) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `direccion` varchar(300) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `ciudad` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `estado` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `municipio` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `parroquia` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `etnia` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'Ninguna',
+  `casaapto` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `punto_referencia` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `grupo_familiar` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `acargo_usted` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `fuente_ingresos` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `tipo_vivienda` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `tenencia_vivienda` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `enfermedad` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `discapacidad` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `titulos` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `institutos` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT 'No especificado',
+  `potencialidades` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
   `fecha_ingreso` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `fecha_act` timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `status` int NOT NULL DEFAULT '1',
-  `user_type` varchar(200) COLLATE latin1_spanish_ci NOT NULL DEFAULT 'user',
+  `user_type` varchar(200) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL DEFAULT 'user',
   `password` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
-  `api_key` varchar(255) COLLATE latin1_spanish_ci DEFAULT NULL,
+  `api_key` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
   `carrera` int DEFAULT NULL,
   `carrera_di` int DEFAULT NULL,
-  `genero` varchar(50) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `edo_civil` varchar(50) COLLATE latin1_spanish_ci DEFAULT NULL,
+  `genero` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `embarazada` tinyint(1) DEFAULT 0,
+  `edo_civil` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
   `fecha_nac` date DEFAULT NULL,
-  `num_telf_opc` varchar(50) COLLATE latin1_spanish_ci DEFAULT NULL,
-  `foto_perfil` varchar(255) COLLATE latin1_spanish_ci DEFAULT NULL,
+  `num_telf_opc` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
+  `foto_perfil` varchar(255) CHARACTER SET latin1 COLLATE latin1_spanish_ci DEFAULT NULL,
   `usuario` int NOT NULL,
   `estudiante` int NOT NULL,
   `docente` int NOT NULL,
@@ -3721,6 +4260,7 @@ CREATE TABLE `users` (
   `titulos_re_materia` int DEFAULT NULL,
   `grado` int DEFAULT NULL,
   `gestion_grado` int DEFAULT NULL,
+  `vocero` tinyint(1) DEFAULT NULL,
   `visita` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
 
@@ -3728,122 +4268,127 @@ CREATE TABLE `users` (
 -- Volcado de datos para la tabla `users`
 --
 
-INSERT INTO `users` (`id`, `idusuario`, `nombre`, `username`, `email`, `tlf`, `cel`, `direccion`, `ciudad`, `estado`, `municipio`, `parroquia`, `etnia`, `casaapto`, `punto_referencia`, `grupo_familiar`, `acargo_usted`, `fuente_ingresos`, `tipo_vivienda`, `tenencia_vivienda`, `enfermedad`, `discapacidad`, `titulos`, `institutos`, `potencialidades`, `fecha_ingreso`, `fecha_act`, `status`, `user_type`, `password`, `api_key`, `carrera`, `carrera_di`, `genero`, `edo_civil`, `fecha_nac`, `num_telf_opc`, `foto_perfil`, `usuario`, `estudiante`, `docente`, `admin`, `super_user`, `editar_user`, `editar_nota`, `editar_acceso`, `editar_valores`, `editar_estudiante`, `agregar_estudiante`, `agregar_docente`, `editar_docente`, `agregar_carrera`, `agregar_materia`, `editar_materia`, `pagos`, `auditoria`, `secciones`, `rela_materia_carrera`, `periodos_academicos`, `asig_secciones`, `asig_cursos`, `horarios`, `gestion_director_carrera`, `notas_cargadas`, `consultar_notas`, `consultar_notas_pasadas`, `tipos_pago`, `tipos_horario`, `horario_personal`, `respaldo_bd`, `gestionar_carrera`, `gestion_periodo_academico`, `gestion_asig_cursos`, `gestion_horario`, `titulos_re_materia`, `grado`, `gestion_grado`, `visita`) VALUES
-(1, 'J-294444890', 'J.E Suministros y Mas, C.A.', 'jesuministrosymas', 'info@jesuministrosymas.com.ve', '02423644304', '0416777777', 'San Esteban Urb, avenida principal casa 23', 'Puerto Cabello', 'Carabobo', '', '', '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2025-10-23 04:00:00', '2025-10-23 17:52:50', 1, 'admin', 'f51ac20f477ebab234109d3865ff8ff0', '', 1, 0, 'masculino', '', NULL, '', NULL, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2, '12345678', 'PRUEBA', 'V-12345678', 'herrejose@gmail.com', '02423644304', '04124372322', 'DEBE COMPLETAR', '123', '7', '87', '278', '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2018-09-15 04:49:29', '2025-12-01 17:45:39', 1, 'admin', '$2y$10$kM/1lGzaZGYo/T94hI12d.wEfFl.QVq0Mj61v8PuySCF1KhWxl/jy', 'API_LIMP_67cf30d4ae5de', 1, 1, 'masculino', NULL, NULL, NULL, NULL, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
-(3, '15949430', 'JOSE HERRERA', 'V-15949430', 'jose@jesuministrosymas.com.ve', '04141448515', '02436721452', 'Maracay', 'Maracay', 'Aragua', 'MBI', 'Caña de Azucar', '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2018-09-27 03:10:20', '2025-10-01 18:20:39', 1, 'admin', '2ee3c27d9ea2416f9279ec18117311a1', '', 1, 0, NULL, NULL, NULL, NULL, NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(4, '123456789', 'hector', 'hero', 'hectorlamaquina14@gmail.com', '0412555555', '', '', '', '', NULL, NULL, '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2025-06-17 14:47:06', '2025-10-22 15:38:24', 1, 'docente', '$2y$10$cpzUQk3toJ9QIrP30CHBreyr/AbJQP2oC5GBhSpO9fZL7fIUkN2nu', '', 1, 2, 'masculino', NULL, NULL, NULL, NULL, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(5, 'V-30692052', 'Hector', 'heroestudiante', 'heroestudiante@gmail.com', '0412555555', '', 'lol', NULL, 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', 'wayoyo', '03', 'frente al parque', '4', '2', 'Salario', 'Urbana', 'familiar', 'Ninguna', 'Ninguna', 'Bachiller', 'U.E Manuel Gual', '', '2025-06-17 16:07:22', '2025-10-22 15:38:52', 1, 'estudiante', '$2y$10$q3Jrf5ys6uo9CrkYscOfw.L5iydeKL94foqwatyGE96LFJGiLbobG', '', 1, 0, 'Masculino', 'Soltero/a', '2004-04-14', '04124122996', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2372, 'V-28596315', 'Manuel Aponte Diaz Romero', 'V-154545454545', 'manuel@gmail.com', '04125555557', '04167777777', 'porai siuuuu', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Juan Jose Flores', '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2025-05-13 04:00:00', '2025-10-01 18:20:39', 1, 'estudiante', '6917fc789d762d53c70bec13497c6921d189e0930ff7d3d99fe7a23d9fbd6884', NULL, 1, 0, 'Masculino', 'Casado/a', '2000-07-22', '04167777777', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2377, 'V-11111111', 'Juan Sambrano', '12345610', 'juansambrano@gmail.com', '0412555555', '0416777777', 'jguyhfyt', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2025-07-03 04:00:00', '2025-10-01 18:20:27', 1, 'estudiante', '1bbd886460827015e5d605ed44252251', NULL, 1, 0, 'Masculino', 'Soltero/a', '2000-07-19', '4568426513', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2378, 'V-29565454', 'Sara Miller', 'sara.miller', 'saramiller@gmail.com', '0412555777', '0416777555', 'hgytdrrt', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2025-06-19 04:00:00', '2025-10-01 18:20:38', 1, 'estudiante', '29b3b2d836fbea2589c7383ae8bba39f', NULL, 1, 0, 'Femenino', 'Soltero/a', '2003-06-19', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2379, 'V-30762211', 'Eliud Miguel Mendoza Perez', 'eliud.miguel.mendoza.perez', 'eliud@gmail.com', '7525254542', '5542643534', 'hgfsvsfr', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2025-06-19 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', '478727529f93cfe6013d31fcc9773633', NULL, 1, 0, 'Masculino', 'Soltero/a', '2004-10-06', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2449, '1', 'María González', 'maría.gonzález', 'maria.gonzalez@example.com', '2125551234', '4125551234', 'Calle 1 #23', 'Caracas', 'Distrito Capital', 'Libertador', 'El Recreo', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-01-15 04:00:00', '2025-10-23 15:10:03', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'Femenino', 'Soltera', '1995-05-20', '2125551235', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2450, '2', 'Carlos López', 'carlos.lópez', 'carlos.lopez@example.com', '2125552345', '4125552345', 'Avenida 2 #45', 'Caracas', 'Distrito Capital', 'Libertador', 'San Agustín', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-02-10 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Casado', '1990-08-15', '2125552346', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2451, '3', 'Ana Rodríguez', 'ana.rodríguez', 'ana.rodriguez@example.com', '2125553456', '4125553456', 'Calle 3 #67', 'Valencia', 'Carabobo', 'Valencia', 'Naguanagua', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-03-05 04:00:00', '2025-10-01 18:20:28', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Divorciada', '1988-11-25', '2125553457', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2452, '4', 'Luis Pérez', 'luis.pérez', 'luis.perez@example.com', '2125554567', '4125554567', 'Avenida 4 #89', 'Maracaibo', 'Zulia', 'Maracaibo', 'Coquivacoa', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-04-20 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1993-07-10', '2125554568', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2453, '5', 'Sofía Martínez', 'sofía.martínez', 'sofia.martinez@example.com', '2125555678', '4125555678', 'Calle 5 #12', 'Barcelona', 'Anzoátegui', 'Simón Bolívar', 'El Carmen', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-05-15 04:00:00', '2025-10-01 18:20:38', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Casada', '1992-02-28', '2125555679', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2454, '6', 'Jorge Hernández', 'jorge.hernández', 'jorge.hernandez@example.com', '2125556789', '4125556789', 'Avenida 6 #34', 'Barquisimeto', 'Lara', 'Iribarren', 'Concepción', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-06-10 04:00:00', '2025-10-01 18:20:33', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1994-09-15', '2125556790', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2455, '7', 'Isabel Díaz', 'isabel.díaz', 'isabel.diaz@example.com', '2125557890', '4125557890', 'Calle 7 #56', 'Mérida', 'Mérida', 'Libertador', 'Milla', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-07-05 04:00:00', '2025-10-01 18:20:32', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Soltera', '1991-12-05', '2125557891', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2456, '8', 'Pablo Sánchez', 'pablo.sánchez', 'pablo.sanchez@example.com', '2125558901', '4125558901', 'Avenida 8 #78', 'San Cristóbal', 'Táchira', 'San Cristóbal', 'San Juan Bautista', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-08-20 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Casado', '1989-04-20', '2125558902', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2457, '9', 'Valeria Ramírez', 'valeria.ramírez', 'valeria.ramirez@example.com', '2125559012', '4125559012', 'Calle 9 #90', 'Ciudad Guayana', 'Bolívar', 'Caroní', 'Unare', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-09-15 04:00:00', '2025-10-01 18:20:39', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Soltera', '1996-01-30', '2125559013', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2458, '10', 'Daniel Torres', 'daniel.torres', 'daniel.torres@example.com', '2125550123', '4125550123', 'Avenida 10 #11', 'Puerto La Cruz', 'Anzoátegui', 'Sotillo', 'Guanta', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-10-10 04:00:00', '2025-10-23 15:10:12', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'Masculino', 'Divorciado', '1990-06-25', '2125550124', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2459, '11', 'Adriana Castro', 'adriana.castro', 'adriana.castro@example.com', '2125551122', '4125551122', 'Calle 11 #22', 'Maracay', 'Aragua', 'Girardot', 'Choroní', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-11-05 04:00:00', '2025-10-23 15:10:20', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'Femenino', 'Casada', '1987-03-15', '2125551123', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2460, '12', 'Roberto Núñez', 'roberto.núñez', 'roberto.nunez@example.com', '2125552233', '4125552233', 'Avenida 12 #33', 'Barinas', 'Barinas', 'Barinas', 'Alto Barinas', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-12-20 04:00:00', '2025-10-23 15:10:32', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'Masculino', 'Soltero', '1995-10-10', '2125552234', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2461, '13', 'Gabriela Rojas', 'gabriela.rojas', 'gabriela.rojas@example.com', '2125553344', '4125553344', 'Calle 13 #44', 'Los Teques', 'Miranda', 'Guaicaipuro', 'Los Teques', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-01-15 04:00:00', '2025-10-23 15:10:54', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'Femenino', 'Soltera', '1994-07-20', '2125553345', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2462, '14', 'Andrés Mendoza', 'andrés.mendoza', 'andres.mendoza@example.com', '2125554455', '4125554455', 'Avenida 14 #55', 'Punto Fijo', 'Falcón', 'Carirubana', 'Punto Fijo', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-02-10 04:00:00', '2025-10-23 15:10:59', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'Masculino', 'Casado', '1991-04-05', '2125554456', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2463, '15', 'Natalia Guzmán', 'natalia.guzmán', 'natalia.guzman@example.com', '2125555566', '4125555566', 'Calle 15 #66', 'Coro', 'Falcón', 'Colina', 'Coro', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-03-05 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Divorciada', '1989-11-30', '2125555567', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2464, '16', 'Fernando Herrera', 'fernando.herrera', 'fernando.herrera@example.com', '2125556677', '4125556677', 'Avenida 16 #77', 'San Fernando', 'Apure', 'San Fernando', 'San Fernando', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-04-20 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1993-08-15', '2125556678', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2465, '17', 'Carolina Silva', 'carolina.silva', 'carolina.silva@example.com', '2125557788', '4125557788', 'Calle 17 #88', 'La Victoria', 'Aragua', 'José Félix Ribas', 'La Victoria', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-05-15 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Casada', '1992-05-20', '2125557789', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2466, '18', 'Ricardo Peña', 'ricardo.peña', 'ricardo.pena@example.com', '2125558899', '4125558899', 'Avenida 18 #99', 'El Tigre', 'Anzoátegui', 'Simón Rodríguez', 'El Tigre', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-06-10 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1996-02-25', '2125558900', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2467, '19', 'Patricia Flores', 'patricia.flores', 'patricia.flores@example.com', '2125559900', '4125559900', 'Calle 19 #00', 'Acarigua', 'Portuguesa', 'Páez', 'Acarigua', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-07-05 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Soltera', '1990-09-10', '2125559901', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2468, '20', 'José Ruiz', 'josé.ruiz', 'jose.ruiz@example.com', '2125550011', '4125550011', 'Avenida 20 #11', 'Valera', 'Trujillo', 'Valera', 'Valera', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-08-20 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Casado', '1988-12-05', '2125550012', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2469, '21', 'Luisa Vargas', 'luisa.vargas', 'luisa.vargas@example.com', '2125551123', '4125551123', 'Calle 21 #22', 'Cabimas', 'Zulia', 'Cabimas', 'Cabimas', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-09-15 04:00:00', '2025-10-01 18:20:35', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Divorciada', '1994-06-15', '2125551124', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2470, '22', 'Manuel Ortega', 'manuel.ortega', 'manuel.ortega@example.com', '2125552234', '4125552234', 'Avenida 22 #33', 'Carúpano', 'Sucre', 'Bermúdez', 'Carúpano', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-10-10 04:00:00', '2025-10-01 18:20:35', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1995-03-20', '2125552235', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2471, '23', 'Andrea Medina', 'andrea.medina', 'andrea.medina@example.com', '2125553345', '4125553345', 'Calle 23 #44', 'Porlamar', 'Nueva Esparta', 'Mariño', 'Porlamar', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-11-05 04:00:00', '2025-10-01 18:20:28', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Casada', '1991-10-25', '2125553346', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2472, '24', 'Diego Rivas', 'diego.rivas', 'diego.rivas@example.com', '2125554456', '4125554456', 'Avenida 24 #55', 'San Carlos', 'Cojedes', 'San Carlos', 'San Carlos', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-12-20 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1993-07-30', '2125554457', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2473, '25', 'Elena Cordero', 'elena.cordero', 'elena.cordero@example.com', '2125555567', '4125555567', 'Calle 25 #66', 'Tucupita', 'Delta Amacuro', 'Tucupita', 'Tucupita', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2025-01-15 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Soltera', '1996-04-05', '2125555568', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2474, '26', 'Oscar Romero', 'oscar.romero', 'oscar.romero@example.com', '2125556678', '4125556678', 'Avenida 26 #77', 'La Grita', 'Táchira', 'Jáuregui', 'La Grita', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2025-02-10 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Casado', '1989-01-10', '2125556679', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2475, '27', 'Vanessa Gil', 'vanessa.gil', 'vanessa.gil@example.com', '2125557789', '4125557789', 'Calle 27 #88', 'San Felipe', 'Yaracuy', 'San Felipe', 'San Felipe', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2025-03-05 04:00:00', '2025-10-01 18:20:39', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Divorciada', '1992-08-15', '2125557790', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2476, '28', 'Arturo Mora', 'arturo.mora', 'arturo.mora@example.com', '2125558890', '4125558890', 'Avenida 28 #99', 'San Juan de los Morros', 'Guárico', 'Roscio', 'San Juan', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2025-04-20 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1995-05-20', '2125558891', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2477, '29', 'Mariana León', 'mariana.león', 'mariana.leon@example.com', '2125559901', '4125559901', 'Calle 29 #00', 'San Antonio de Los Altos', 'Miranda', 'Los Salias', 'San Antonio', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2025-05-15 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Casada', '1990-12-25', '2125559902', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2478, '30', 'Julio Espinoza', 'julio.espinoza', 'julio.espinoza@example.com', '2125550012', '4125550012', 'Avenida 30 #11', 'El Vigía', 'Mérida', 'Alberto Adriani', 'El Vigía', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2025-06-10 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1994-09-30', '2125550013', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2527, 'V-15678901', 'Maríaa Gonzálezz', 'maríaa.gonzálezz', 'mgonzalez@example.com', '2125550101', '4125550101', 'Calle 1 #101', 'Caracas', 'Distrito Capital', 'Libertador', 'El Recreo', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-03-15 04:00:00', '2025-10-01 18:20:35', 1, 'estudiante', 'db0789017e0d5a2484886c25c7bbffd1', '', 1, 0, 'F', 'soltera', '2000-05-20', '2125550102', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2528, 'E-20345678', 'Juan Pérez', 'juan.pérez', 'jperez@example.com', '2125550202', '4125550202', 'Avenida 2 #202', 'Caracas', 'Distrito Capital', 'Libertador', 'San Agustín', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-08-10 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', '6a37eebd4f766baee264c59ee1bbca02', '', 2, 0, 'M', 'casado', '1999-11-15', '2125550203', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2529, 'V-17432109', 'Anaa Rodríguez', 'anaa.rodríguez', 'arodriguez@example.com', '2125550303', '4125550303', 'Calle 3 #303', 'Valencia', 'Carabobo', 'Valencia', 'San Blas', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-01-20 04:00:00', '2025-10-01 18:20:28', 1, 'estudiante', '89451e2737f7a3a6c46d060107dc708b', '', 1, 0, 'F', 'soltera', '2001-02-28', '2125550304', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2530, 'E-18765432', 'Carloss López', 'carloss.lópez', 'clopez@example.com', '2125550404', '4125550404', 'Avenida 4 #404', 'Maracaibo', 'Zulia', 'Maracaibo', 'Juana de Ávila', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-11-05 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', 'b145ec79b1151099b9570d4e3b29aeca', '', 2, 0, 'M', 'soltero', '2000-07-10', '2125550405', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2531, 'V-23456789', 'Laura Martínez', 'laura.martínez', 'lmartinez@example.com', '2125550505', '4125550505', 'Calle 5 #505', 'Barquisimeto', 'Lara', 'Iribarren', 'Concepción', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-05-12 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', '4428c6c474502e61151877825bb41961', '', 1, 0, 'F', 'casada', '1999-09-25', '2125550506', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2532, 'E-19876543', 'Pedro Gómez', 'pedro.gómez', 'pgomez@example.com', '2125550606', '4125550606', 'Avenida 6 #606', 'Maracay', 'Aragua', 'Girardot', 'Choroní', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-09-18 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', 'dd26143c452d55054355fdbd5c92e398', '', 2, 0, 'M', 'soltero', '2001-04-05', '2125550607', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2533, 'V-21567890', 'Sofía Hernández', 'sofía.hernández', 'shernandez@example.com', '2125550707', '4125550707', 'Calle 7 #707', 'San Cristóbal', 'Táchira', 'San Cristóbal', 'La Concordia', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-02-22 04:00:00', '2025-10-01 18:20:38', 1, 'estudiante', 'f5ece76723ac1b6ae3bb9e99bbf26f68', '', 1, 0, 'F', 'soltera', '2000-12-12', '2125550708', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2534, 'E-17654321', 'José Ramírez', 'josé.ramírez', 'jramirez@example.com', '2125550808', '4125550808', 'Avenida 8 #808', 'Barcelona', 'Anzoátegui', 'Simón Bolívar', 'El Carmen', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-10-30 04:00:00', '2025-10-01 18:20:33', 1, 'estudiante', 'e068ff48f0966deade935517d6b4686a', '', 2, 0, 'M', 'casado', '1999-08-17', '2125550809', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2535, 'V-22345678', 'Isabel Torres', 'isabel.torres', 'itorres@example.com', '2125550909', '4125550909', 'Calle 9 #909', 'Mérida', 'Mérida', 'Libertador', 'Milla', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-04-05 04:00:00', '2025-10-01 18:20:32', 1, 'estudiante', '08e0750210f66396eb83957973705aad', '', 1, 0, 'F', 'soltera', '2001-01-30', '2125550910', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2536, 'E-19456789', 'Miguel Díaz', 'miguel.díaz', 'mdiaz@example.com', '2125551010', '4125551010', 'Avenida 10 #1010', 'Ciudad Guayana', 'Bolívar', 'Caroní', 'Unare', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-12-15 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', '7df8c11bddbef2f19bb65c22b1d6c7e6', '', 2, 0, 'M', 'soltero', '2000-06-22', '2125551011', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2537, 'V-20654321', 'Valentina Rojas', 'valentina.rojas', 'vrojas@example.com', '2125551111', '4125551111', 'Calle 11 #1111', 'Barinas', 'Barinas', 'Barinas', 'Alto Barinas', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-06-20 04:00:00', '2025-10-01 18:20:39', 1, 'estudiante', '0295896c168f4a350adf4cdf464198d7', '', 1, 0, 'F', 'soltera', '2001-03-14', '2125551112', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2538, 'E-18543210', 'Daniel Castro', 'daniel.castro', 'dcastro@example.com', '2125551212', '4125551212', 'Avenida 12 #1212', 'Coro', 'Falcón', 'Colina', 'San Antonio', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-07-25 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', '8249bfa20206fc926e206d9fad918ca1', '', 2, 0, 'M', 'casado', '1999-10-08', '2125551213', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2539, 'V-21789012', 'Gabriela Mendoza', 'gabriela.mendoza', 'gmendoza@example.com', '2125551313', '4125551313', 'Calle 13 #1313', 'Puerto La Cruz', 'Anzoátegui', 'Sotillo', 'Los Taques', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-03-10 04:00:00', '2025-10-01 18:20:31', 1, 'estudiante', 'bb1426e76d77f79cc3e5ae1de1e024d6', '', 1, 0, 'F', 'soltera', '2000-09-19', '2125551314', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2540, 'E-19876540', 'Andrés Silva', 'andrés.silva', 'asilva@example.com', '2125551414', '4125551414', 'Avenida 14 #1414', 'San Fernando', 'Apure', 'San Fernando', 'El Recreo', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-09-05 04:00:00', '2025-10-01 18:20:28', 1, 'estudiante', 'd70e78c0ed5accbec273cea8884902ff', '', 2, 0, 'M', 'soltero', '2001-05-25', '2125551415', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2541, 'V-22456789', 'Carolina Herrera', 'carolina.herrera', 'cherrera@example.com', '2125551515', '4125551515', 'Calle 15 #1515', 'Los Teques', 'Miranda', 'Guaicaipuro', 'Paracotos', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-01-12 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', 'a8567e2d80e3d52ac3c81825d3b211fb', '', 1, 0, 'F', 'casada', '1999-12-30', '2125551516', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2542, 'E-20765432', 'Ricardo Núñez', 'ricardo.núñez', 'rnunez@example.com', '2125551616', '4125551616', 'Avenida 16 #1616', 'Punto Fijo', 'Falcón', 'Carirubana', 'Amuay', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-11-20 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', '5bd83db2c82e0eae9f59a479fc1d1bd1', '', 2, 0, 'M', 'soltero', '2000-08-15', '2125551617', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2543, 'V-19345678', 'Patricia Vargas', 'patricia.vargas', 'pvargas@example.com', '2125551717', '4125551717', 'Calle 17 #1717', 'El Tigre', 'Anzoátegui', 'Simón Rodríguez', 'San José de Guanipa', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-05-18 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', '49cfc1380a9ce7380c9cc29813e3b326', '', 1, 0, 'F', 'soltera', '2001-02-10', '2125551718', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2544, 'E-21654321', 'Roberto Medina', 'roberto.medina', 'rmedina@example.com', '2125551818', '4125551818', 'Avenida 18 #1818', 'Cúa', 'Miranda', 'Urdaneta', 'Cúa', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-08-22 04:00:00', '2025-10-01 18:20:38', 1, 'estudiante', 'a52104978231c9a62c4e8a097922ddd9', '', 2, 0, 'M', 'casado', '1999-07-05', '2125551819', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2545, 'V-18456789', 'Adriana Ríos', 'adriana.ríos', 'arios@example.com', '2125551919', '4125551919', 'Calle 19 #1919', 'Ocumare del Tuy', 'Miranda', 'Lander', 'Ocumare', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-02-28 04:00:00', '2025-10-01 18:20:27', 1, 'estudiante', 'fe07e07d7cbbff8b42f6544553763d8a', '', 1, 0, 'F', 'soltera', '2000-11-20', '2125551920', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2546, 'E-22567890', 'Fernando Guzmán', 'fernando.guzmán', 'fguzman@example.com', '2125552020', '4125552020', 'Avenida 20 #2020', 'La Victoria', 'Aragua', 'Jose Felix Ribas', 'La Victoria', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-10-12 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', '9d610e830da7d54e118c00518d7a9b64', '', 2, 0, 'M', 'soltero', '2001-04-15', '2125552021', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2547, 'V-19765432', 'Natalia Blanco', 'natalia.blanco', 'nblanco@example.com', '2125552121', '4125552121', 'Calle 21 #2121', 'San Juan de los Morros', 'Guárico', 'Roscio', 'San Juan', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-04-30 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', '24288ed4283a8c2cc350f035337e84a7', '', 1, 0, 'F', 'soltera', '2000-10-05', '2125552122', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2548, 'E-21456789', 'Eduardo Salas', 'eduardo.salas', 'esalas@example.com', '2125552222', '4125552222', 'Avenida 22 #2222', 'Valera', 'Trujillo', 'Valera', 'La Puerta', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-12-08 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', 'e275c58706ae71adb5bf8942eca845ba', '', 2, 0, 'M', 'casado', '1999-09-12', '2125552223', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2549, 'V-18654321', 'Mariana Cordero', 'mariana.cordero', 'mcordero@example.com', '2125552323', '4125552323', 'Calle 23 #2323', 'Porlamar', 'Nueva Esparta', 'Maneiro', 'Pampatar', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-06-15 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', '11c54f59eb081bcbbcfc65c8bd4772b8', '', 1, 0, 'F', 'soltera', '2001-01-25', '2125552324', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2550, 'E-23567890', 'Jorge Paredes', 'jorge.paredes', 'jparedes@example.com', '2125552424', '4125552424', 'Avenida 24 #2424', 'Carúpano', 'Sucre', 'Bermúdez', 'Carúpano', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-09-30 04:00:00', '2025-10-01 18:20:33', 1, 'estudiante', '9929b8ec6b8b4edfe2ab26c25b1e4a58', '', 2, 0, 'M', 'soltero', '2000-07-18', '2125552425', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2551, 'V-20456789', 'Luisa Fuentes', 'luisa.fuentes', 'lfuentes@example.com', '2125552525', '4125552525', 'Calle 25 #2525', 'La Asunción', 'Nueva Esparta', 'Arismendi', 'La Asunción', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-03-05 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', 'b13e714608fcd3f0fb7f936e1dbd5310', '', 1, 0, 'F', 'casada', '1999-12-08', '2125552526', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2552, 'E-17654320', 'Manuel Alvarado', 'manuel.alvarado', 'malvarado@example.com', '2125552626', '4125552626', 'Avenida 26 #2626', 'Tucupita', 'Delta Amacuro', 'Tucupita', 'Tucupita', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-11-15 04:00:00', '2025-10-01 18:20:35', 1, 'estudiante', '7e6c056718d8497121412444db238f51', '', 2, 0, 'M', 'soltero', '2001-05-30', '2125552627', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2553, 'V-22678901', 'Daniela Mora', 'daniela.mora', 'dmora@example.com', '2125552727', '4125552727', 'Calle 27 #2727', 'Santa Teresa del Tuy', 'Miranda', 'Independencia', 'Santa Teresa', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-01-25 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', 'a0c79045aa1f687714256873c0d9fbde', '', 1, 0, 'F', 'soltera', '2000-09-15', '2125552728', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2554, 'E-19543210', 'Antonio Peña', 'antonio.peña', 'apena@example.com', '2125552828', '4125552828', 'Avenida 28 #2828', 'San Felipe', 'Yaracuy', 'San Felipe', 'San Felipe', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-10-05 04:00:00', '2025-10-01 18:20:28', 1, 'estudiante', '552b566abe41b5f4b7a328382eac6290', '', 2, 0, 'M', 'casado', '1999-08-22', '2125552829', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2555, 'V-23678901', 'Verónica León', 'verónica.león', 'vleon@example.com', '2125552929', '4125552929', 'Calle 29 #2929', 'San Carlos', 'Cojedes', 'San Carlos', 'San Carlos', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-05-10 04:00:00', '2025-10-01 18:20:39', 1, 'estudiante', 'd8b9bf41fc29d33ff8a0d642caf11247', '', 1, 0, 'F', 'soltera', '2001-02-20', '2125552930', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2556, 'E-18765430', 'Oscar Rivas', 'oscar.rivas', 'orivas@example.com', '2125553030', '4125553030', 'Avenida 30 #3030', 'Achaguas', 'Apure', 'Achaguas', 'Achaguas', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-12-20 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', '8c5e3e201833318627b5a3a3d1fb0801', '', 2, 0, 'M', 'soltero', '2000-06-12', '2125553031', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2557, 'V-24567890', 'Gladys Suárez', 'gladys.suárez', 'gsuarez@example.com', '2125553131', '4125553131', 'Calle 31 #3131', 'San Antonio del Táchira', 'Táchira', 'Bolívar', 'San Antonio', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-04-08 04:00:00', '2025-10-01 18:20:32', 1, 'estudiante', 'a7b69682aeedae2e01d506d05cef0933', '', 1, 0, 'F', 'casada', '1999-11-25', '2125553132', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2558, 'E-21654320', 'Raúl Espinoza', 'raúl.espinoza', 'respinoza@example.com', '2125553232', '4125553232', 'Avenida 32 #3232', 'San Carlos de Zulia', 'Zulia', 'Mara', 'San Carlos', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-08-15 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', '66f633b7a86d055da5b9f8b4c5aa172c', '', 2, 0, 'M', 'soltero', '2001-03-10', '2125553233', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2559, 'V-19567890', 'Teresa Acosta', 'teresa.acosta', 'tacosta@example.com', '2125553333', '4125553333', 'Calle 33 #3333', 'Upata', 'Bolívar', 'Piar', 'Upata', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-02-10 04:00:00', '2025-10-01 18:20:39', 1, 'estudiante', 'd6d77546e16bffd6c9768db15103139f', '', 1, 0, 'F', 'soltera', '2000-10-30', '2125553334', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2560, 'E-22789012', 'Alberto Márquez', 'alberto.márquez', 'amarquez@example.com', '2125553434', '4125553434', 'Avenida 34 #3434', 'Guasdualito', 'Apure', 'Páez', 'Guasdualito', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-09-22 04:00:00', '2025-10-01 18:20:27', 1, 'estudiante', 'd84de70c483dc10e4d05955c5e6c864c', '', 2, 0, 'M', 'casado', '1999-07-15', '2125553435', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2561, 'V-20654320', 'Yolanda Cárdenas', 'yolanda.cárdenas', 'ycardenas@example.com', '2125553535', '4125553535', 'Calle 35 #3535', 'Carora', 'Lara', 'Torres', 'Carora', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-06-05 04:00:00', '2025-10-01 18:20:40', 1, 'estudiante', 'd6bde420f4c5b1e80215fb12fbb8a267', '', 1, 0, 'F', 'soltera', '2001-01-10', '2125553536', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL);
-INSERT INTO `users` (`id`, `idusuario`, `nombre`, `username`, `email`, `tlf`, `cel`, `direccion`, `ciudad`, `estado`, `municipio`, `parroquia`, `etnia`, `casaapto`, `punto_referencia`, `grupo_familiar`, `acargo_usted`, `fuente_ingresos`, `tipo_vivienda`, `tenencia_vivienda`, `enfermedad`, `discapacidad`, `titulos`, `institutos`, `potencialidades`, `fecha_ingreso`, `fecha_act`, `status`, `user_type`, `password`, `api_key`, `carrera`, `carrera_di`, `genero`, `edo_civil`, `fecha_nac`, `num_telf_opc`, `foto_perfil`, `usuario`, `estudiante`, `docente`, `admin`, `super_user`, `editar_user`, `editar_nota`, `editar_acceso`, `editar_valores`, `editar_estudiante`, `agregar_estudiante`, `agregar_docente`, `editar_docente`, `agregar_carrera`, `agregar_materia`, `editar_materia`, `pagos`, `auditoria`, `secciones`, `rela_materia_carrera`, `periodos_academicos`, `asig_secciones`, `asig_cursos`, `horarios`, `gestion_director_carrera`, `notas_cargadas`, `consultar_notas`, `consultar_notas_pasadas`, `tipos_pago`, `tipos_horario`, `horario_personal`, `respaldo_bd`, `gestionar_carrera`, `gestion_periodo_academico`, `gestion_asig_cursos`, `gestion_horario`, `titulos_re_materia`, `grado`, `gestion_grado`, `visita`) VALUES
-(2562, 'E-17654329', 'Francisco Parra', 'francisco.parra', 'fparra@example.com', '2125553636', '4125553636', 'Avenida 36 #3636', 'La Grita', 'Táchira', 'Jáuregui', 'La Grita', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-10-30 04:00:00', '2025-10-01 18:20:31', 1, 'estudiante', 'd9d1ca317c8468142d784f3569fff65c', '', 2, 0, 'M', 'soltero', '2000-05-25', '2125553637', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2563, 'V-23789012', 'Leticia Romero', 'leticia.romero', 'lromero@example.com', '2125553737', '4125553737', 'Calle 37 #3737', 'San Cristóbal', 'Táchira', 'San Cristóbal', 'San Juan Bautista', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-03-18 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', '7d6afc7443c6f54340b730698e04688a', '', 1, 0, 'F', 'casada', '1999-12-15', '2125553738', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2564, 'E-19876532', 'Arturoo Mora', 'arturoo.mora', 'amora@example.com', '2125553838', '4125553838', 'Avenida 38 #3838', 'San Joaquín', 'Carabobo', 'San Joaquín', 'San Joaquín', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-11-28 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', '9cb1f9517363737ed3a32082ec88fe93', '', 2, 0, 'M', 'soltero', '2001-04-20', '2125553839', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2565, 'V-24678901', 'Beatriz Rangel', 'beatriz.rangel', 'brangel@example.com', '2125553939', '4125553939', 'Calle 39 #3939', 'San Mateo', 'Aragua', 'Bolívar', 'San Mateo', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-01-10 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', '2da3acf9de8c82b1fd4c40d0f85a59fd', '', 1, 0, 'F', 'soltera', '2000-08-05', '2125553940', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2566, 'E-21567890', 'Héctor Zambrano', 'héctor.zambrano', 'hzambrano@example.com', '2125554040', '4125554040', 'Avenida 40 #4040', 'San José de Guanipa', 'Anzoátegui', 'Simón Rodríguez', 'San José de Guanipa', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-12-05 04:00:00', '2025-10-01 18:20:32', 1, 'estudiante', 'f5ece76723ac1b6ae3bb9e99bbf26f68', '', 2, 0, 'M', 'casado', '1999-09-30', '2125554041', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2567, 'V-18543219', 'Diana Contreras', 'diana.contreras', 'dcontreras@example.com', '2125554141', '4125554141', 'Calle 41 #4141', 'San Antonio de Los Altos', 'Miranda', 'Los Salias', 'San Antonio', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-05-22 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', '66a65afa7f551b2197845c4ad1754889', '', 1, 0, 'F', 'soltera', '2001-02-15', '2125554142', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2568, 'E-22678901', 'José Gregorio Peñalver', 'josé.gregorio.peñalver', 'jpenalver@example.com', '2125554242', '4125554242', 'Avenida 42 #4242', 'Sanare', 'Lara', 'Jiménez', 'Sanare', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-08-28 04:00:00', '2025-10-01 18:20:33', 1, 'estudiante', 'a0c79045aa1f687714256873c0d9fbde', '', 2, 0, 'M', 'soltero', '2000-07-08', '2125554243', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2569, 'V-19765430', 'Rosaura Velásquez', 'rosaura.velásquez', 'rvelasquez@example.com', '2125554343', '4125554343', 'Calle 43 #4343', 'Quíbor', 'Lara', 'Jiménez', 'Quíbor', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-02-15 04:00:00', '2025-10-01 18:20:38', 1, 'estudiante', '0f05d09833979bbf49c467800c9f7631', '', 1, 0, 'F', 'casada', '1999-11-20', '2125554344', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2570, 'E-24789012', 'Alfredo Delgado', 'alfredo.delgado', 'adelgado@example.com', '2125554444', '4125554444', 'Avenida 44 #4444', 'San Juan de Colón', 'Táchira', 'Ayacucho', 'San Juan de Colón', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-10-12 04:00:00', '2025-10-01 18:20:27', 1, 'estudiante', '0b4954ba6a5e405ad4ed717f14c72764', '', 2, 0, 'M', 'soltero', '2001-03-25', '2125554445', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2571, 'V-21654329', 'Gisela Ferrer', 'gisela.ferrer', 'gferrer@example.com', '2125554545', '4125554545', 'Calle 45 #4545', 'San Luis', 'Falcón', 'Federación', 'San Luis', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-06-10 04:00:00', '2025-10-01 18:20:31', 1, 'estudiante', 'fcd54cbd301c33304cab2820a6e7a553', '', 1, 0, 'F', 'soltera', '2000-09-30', '2125554546', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2572, 'E-18654320', 'René Márquez', 'rené.márquez', 'rmarquez@example.com', '2125554646', '4125554646', 'Avenida 46 #4646', 'San Francisco', 'Zulia', 'San Francisco', 'San Francisco', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-09-05 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', '92f34bbe48e19810ec7e9f232e35e309', '', 2, 0, 'M', 'casado', '1999-08-10', '2125554647', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2573, 'V-25678901', 'Marisol Rivas', 'marisol.rivas', 'mrivas@example.com', '2125554747', '4125554747', 'Calle 47 #4747', 'San Simón', 'Zulia', 'Francisco Javier Pulgar', 'San Simón', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-03-22 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', '16ad8043ae4b9817b7409e6e7fb90dc3', '', 1, 0, 'F', 'soltera', '2001-01-15', '2125554748', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2574, 'E-20765431', 'Wilmer Castillo', 'wilmer.castillo', 'wcastillo@example.com', '2125554848', '4125554848', 'Avenida 48 #4848', 'San Pablo', 'Zulia', 'Almirante Padilla', 'San Pablo', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-11-10 04:00:00', '2025-10-01 18:20:39', 1, 'estudiante', '15314e6f381ff9b044d7eb8595636fbe', '', 2, 0, 'M', 'soltero', '2000-04-28', '2125554849', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2575, 'V-22789013', 'Yusmery Del Moral', 'yusmery.del.moral', 'ydelmoral@example.com', '2125554949', '4125554949', 'Calle 49 #4949', 'San Rafael del Moján', 'Zulia', 'Almirante Padilla', 'San Rafael', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-01-18 04:00:00', '2025-10-01 18:20:40', 1, 'estudiante', 'efe9efc9276e537d2f1450885df651b3', '', 1, 0, 'F', 'casada', '1999-10-12', '2125554950', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2576, 'E-23678902', 'Richard Briceño', 'richard.briceño', 'rbriceno@example.com', '2125555050', '4125555050', 'Avenida 50 #5050', 'San Timote', 'Zulia', 'Baralt', 'San Timote', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-12-30 04:00:00', '2025-10-01 18:20:38', 1, 'estudiante', 'c146a97d5173f9f25c8fb142cf207ecd', '', 2, 0, 'M', 'soltero', '2001-05-05', '2125555051', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2584, 'V-14123524', 'Manuel Turiso', 'manuel.turiso', 'kol@gmail.com', '0412777777', '0412777777', 'qedwq', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', 'Ninguna', 'No especificado', 'poraiiii', '1', '0', '1', 'Casa', 'Alquilada', '', 'no', '', '', 'lol', '2025-08-03 04:00:00', '2025-10-01 18:20:35', 1, 'docente', '$2y$10$RxKomMmQumrSU9DFowD7mOriXhK6oOW/GYMLm6DvO7NSJQsPh/wiS', '7e140884c26c97f6f6bcce3a20b0a2c3', 0, 0, 'Masculino', '2', '2000-03-09', '', NULL, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2585, 'V-13123524', 'Alberto Lopez', 'alberto.lopez', 'zol@gmail.com', '0412777777', '0412777777', 'mjdncja', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', 'Ninguna', 'No especificado', 'poraiiii', '2', '0', '1', 'Apartamento', 'Alquilada', '', 'no', '', '', 'lol', '2025-08-03 04:00:00', '2025-10-01 18:20:27', 1, 'docente', '$2y$10$hXIRvrslTjCvVisOvsBMl.iNHitesSiFKTolJ5KObfnr6oCk3NwpC', 'af2c2755c1f3498a955651ad7dcc156a', 0, 0, 'Masculino', '2', '1991-07-11', '', NULL, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2586, 'E-12569002', 'Francisco Torrealba', 'francisco.torrealba', 'pol@gmail.com', '0412777777', '0412777777', 'jdNJDSANJ', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', 'Ninguna', 'No especificado', 'poraiiii', '2', '0', '2', 'Casa', 'Alquilada', '', 'no', '', '', 'lol', '2025-08-03 04:00:00', '2025-10-01 18:20:31', 1, 'docente', '$2y$10$JkE3FtgVlymcKJRtI4w6CeecP8Dk93HQO59D6CwgFGeKgBYsDuUKy', '0cc8939b4524580c7589a64aa3e59ae9', 0, 0, 'Masculino', '2', '1991-03-13', '', NULL, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2588, 'V-24765890', 'Sarsamora Vegano', 'sarsamora.vegano', 'rol@gmail.com', '0412777777', '0412777777', 'siuuuuu', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', 'Ninguna', 'No especificado', 'poraiiii', '3', '0', '', 'Apartamento', 'Alquilada', '', 'no', '', '', 'lol', '2025-08-03 04:00:00', '2025-10-01 18:20:38', 1, 'docente', '$2y$10$xgVIJqKbEPm/HJTfyUx5/.xF9YGPlLFioOENtL4gjqfDB13ybb8h2', '226af57221e592d91a033ecc16491a1d', 0, 0, 'Femenino', '2', '1988-07-13', '', NULL, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2589, 'V--21456555', 'Palmera Kazekage', 'palmera.kazekage', 'kazekage@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-08-24 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', 'b71219d2ea11fb066d298edbadf67b19', '', 1, 0, 'Masculino', 'Soltero', '2000-06-15', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2590, 'V--24648009', 'Francisco Mendoza', 'francisco.mendoza', 'rolllll@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-08-31 04:00:00', '2025-10-01 18:20:31', 1, 'estudiante', '3f718eb49861ad69bd0ddaa7c94974c9', '', 1, 0, 'Masculino', 'Casado', '1989-07-19', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2591, 'V-32567456', 'Claudia Lopez', 'claudia.lopez', 'kollllll@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-08-31 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', '377d6bc1b54ba0f6d729651c9195c205', '', 1, 0, 'Femenino', 'Casado', '2006-07-13', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2592, 'V-54678943', 'Jose Manuel', 'jose.manuel', 'ggol@gmail.com', '04125777777', '', 'lol', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:33', 1, 'estudiante', '92fa6a601065ef1d62cf229a40642da1', '', 1, 0, 'Masculino', 'Soltero', '2002-06-13', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2593, 'V--45324567', 'Jose Manuel Lopez', 'jose.manuel.lopez', 'rrollll@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:33', 1, 'estudiante', '3fe63d34589ba217e4824534c4582578', '', 2, 0, 'Masculino', 'Casado', '1995-07-13', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2594, 'V--21456565', 'Maria Antonieta', 'maria.antonieta', 'mariaantonieta@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:35', 1, 'estudiante', '78f0a70fb42e54b223544eec88e2d052', '', 1, 0, 'Femenino', 'Soltero', '2001-07-19', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2595, 'V--34678324', 'Sofia Fernandez', 'sofia.fernandez', 'sofilol@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:38', 1, 'estudiante', '97f1db41887d87caa54e276ad7b2c312', '', 1, 0, 'Masculino', 'Casado', '1998-06-10', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2596, 'V--20456543', 'Hector Gutierrez', 'hector.gutierrez', 'hectorgu@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:32', 1, 'estudiante', 'd5d6bb5424a9d4f9dc9c1092477fdfc3', '', 1, 0, 'Masculino', 'Casado', '2001-03-08', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2597, 'V--36789546', 'Luis Aguilar', 'luis.aguilar', 'luisaguila@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', '3e6d29ef91fedd06772de7b754316a2a', '', 5, 0, 'Masculino', 'Soltero', '2007-06-28', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2598, 'V--31789321', 'Laura Colores', 'laura.colores', 'lauracolores@gmail.com', '04125777777', '', 'lol', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', '8f467697120171c90181e9a3241fd529', '', 5, 0, 'Masculino', 'Casado', '2003-10-17', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2599, 'V--31789324', 'Laura Coloress', 'laura.coloress', 'lauracolores2@gmail.com', '04125777777', '', 'lol', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', '6b2af18350070cc63a2cf6988b872f38', '', 5, 0, 'Masculino', 'Casado', '2003-10-17', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2600, 'V--12345677', 'Anabelle Carroza', 'anabelle.carroza', 'carroza@gmail.com', '04125777777', '', 'lol', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:28', 1, 'estudiante', '02b89b15f7210b47c94e79f08f62704a', '', 5, 0, 'Masculino', 'Casado', '2004-07-15', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2601, 'E--34511211', 'Manuel Turisooo', 'manuel.turisooo', 'turisoo@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-03 04:00:00', '2025-10-01 18:20:35', 1, 'estudiante', '8059f1d1a0accf2c3aa27dd0c89dfb0f', '', 1, 0, 'Masculino', 'Casado', '2001-12-13', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2602, 'E--34678900', 'Carlos Humberto Morales', 'carlos.humberto.morales', 'calos@gmail.com', '04125777777', '', 'lol', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-03 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', '777419bcad989fde187a64f51be7b4ea', '', 5, 0, 'Masculino', 'Soltero', '2001-07-18', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2603, 'E--30567435', 'Manteca De Colesterol', 'manteca.de.colesterol', 'manteca@gmail.com', '04125777777', '', 'lol', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-03 04:00:00', '2025-10-01 18:20:35', 1, 'estudiante', '8f908f3eb2d5f7305f17fa9837f591f6', '', 1, 0, 'Masculino', 'Casado', '2004-07-16', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2604, 'V--21456544', 'Jose Manuel Lopezz', 'jose.manuel.lopezz', 'pgol@gmail.com', '04125777777', '', 'lol', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-03 04:00:00', '2025-10-01 18:20:33', 1, 'estudiante', '37ce9255f0c8e6dfca1e811959ead689', '', 1, 0, 'Masculino', 'Casado', '2000-07-12', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2607, 'V-12345678', 'Nombre Ejemplo', 'nombre.ejemplo', 'ejemplo@correo.com', '02121234567', '04141234567', 'Dirección Ejemplo', 'Caracas', 'Distrito Capital', 'Libertador', 'La Candelaria', '', 'Casa', 'Frente a la plaza', '4', '2', 'Trabajo formal', 'Casa', 'Propia', 'Ninguna', 'No especificado', 'Bachiller,Licenciatura', 'Liceo XYZ,Universidad ABC', '', '2023-01-15 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', '25d55ad283aa400af464c76d713c07ad', '', 1, NULL, 'Masculino', 'Soltero', '1990-01-01', '02121234568', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2608, 'E-8549625', 'bhuftyfu', 'bhuftyfu', 'frthft@gmail.com', '0412555777', '', 'guygyh', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Juan Jose Flores', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-10-01 04:00:00', '2025-10-23 14:25:07', 1, 'estudiante', '92a0159e815657aeab28ac8a935cf1ca', '', 1, NULL, 'Masculino', 'Soltero', '1979-07-19', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2609, 'V-12345555', 'Perdomo Albañil', 'perdomo.albañil', 'perdomo@gmail.com', '0412555555', '0412555555', 'rdrhv', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', 'Ninguna', 'No especificado', 'frente a una farmacia', '2', '0', '1', 'Apartamento', 'Familiar', '', 'no', '', '', 'esfdfs', '2025-10-02 04:00:00', '2025-10-23 17:26:26', 1, 'docente', '$2y$10$8lPuQS3UuMISfjSY7Cwuc.QToyk85yB/Nz3MfIXd13zi4705M6ivC', '97610812c565e1a74c3478ae6bc6c099', 0, NULL, 'Masculino', '1', '1992-06-11', '', NULL, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL),
-(2610, 'V-30123456', 'alberto guerra', 'alberto.guerra', 'infos@guerra.com', '0416598362', '0416777777', 'prueba', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Juan Jose Flores', 'Ninguna', 'Apartamento', 'frente a un campo', '6', '2', '2', '', 'Alquilada', 'no', 'No', '', '', '', '2025-11-24 04:00:00', '2025-11-25 15:28:10', 1, 'estudiante', '$2y$10$OMS2YHLfEYa3n1Y1RPoj5eDq200OinIjuH9sdPP0G/ryY0C8xK4T.', '', 1, NULL, 'Masculino', 'Casado', '1975-06-12', '04163333333', '69247f8403325_1763999620.png', 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-(2615, 'V-30123123', 'O\'Connor', 'o.connor', 'validacion@example.com', '0412555777', '0416777777', 'kvftfvgghjkf', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', 'Ninguna', 'Apartamento', 'frente a una farmacia', '3', '2', '1', '', 'Alquilada', 'no', 'No', '', '', '', '2025-12-03 04:00:00', '2025-12-03 17:03:32', 1, 'estudiante', '$2y$10$sNBUvk9vofry5VPN75ebbeJbLAuhSt61bziRN.ANpmDw3fFHm3Wj.', '854d0aa4bec27560ebb7550a3f9600a4', 1, 1, 'Masculino', 'Divorciado', '2002-06-19', '04163333333', 'foto_69305f0b6200d9.46312539.jpeg', 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+INSERT INTO `users` (`id`, `idusuario`, `nombre`, `username`, `email`, `tlf`, `cel`, `direccion`, `ciudad`, `estado`, `municipio`, `parroquia`, `etnia`, `casaapto`, `punto_referencia`, `grupo_familiar`, `acargo_usted`, `fuente_ingresos`, `tipo_vivienda`, `tenencia_vivienda`, `enfermedad`, `discapacidad`, `titulos`, `institutos`, `potencialidades`, `fecha_ingreso`, `fecha_act`, `status`, `user_type`, `password`, `api_key`, `carrera`, `carrera_di`, `genero`, `edo_civil`, `fecha_nac`, `num_telf_opc`, `foto_perfil`, `usuario`, `estudiante`, `docente`, `admin`, `super_user`, `editar_user`, `editar_nota`, `editar_acceso`, `editar_valores`, `editar_estudiante`, `agregar_estudiante`, `agregar_docente`, `editar_docente`, `agregar_carrera`, `agregar_materia`, `editar_materia`, `pagos`, `auditoria`, `secciones`, `rela_materia_carrera`, `periodos_academicos`, `asig_secciones`, `asig_cursos`, `horarios`, `gestion_director_carrera`, `notas_cargadas`, `consultar_notas`, `consultar_notas_pasadas`, `tipos_pago`, `tipos_horario`, `horario_personal`, `respaldo_bd`, `gestionar_carrera`, `gestion_periodo_academico`, `gestion_asig_cursos`, `gestion_horario`, `titulos_re_materia`, `grado`, `gestion_grado`, `vocero`, `visita`) VALUES
+(1, 'J-294444890', 'J.E Suministros y Mas, C.A.', 'jesuministrosymas', 'info@jesuministrosymas.com.ve', '02423644304', '0416777777', 'San Esteban Urb, avenida principal casa 23', 'Puerto Cabello', 'Carabobo', '', '', '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2025-10-23 04:00:00', '2025-10-23 17:52:50', 1, 'admin', 'f51ac20f477ebab234109d3865ff8ff0', '', 1, 0, 'masculino', '', NULL, '', NULL, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2, '12345678', 'PRUEBA', 'V-12345678', 'herrejose@gmail.com', '02423644304', '04124372322', 'DEBE COMPLETAR', '123', '7', '87', '278', '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2018-09-15 04:49:29', '2026-03-02 14:41:43', 1, 'admin', '$2y$10$kM/1lGzaZGYo/T94hI12d.wEfFl.QVq0Mj61v8PuySCF1KhWxl/jy', 'API_LIMP_67cf30d4ae5de', 1, 1, 'masculino', NULL, NULL, NULL, NULL, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1),
+(3, '15949430', 'JOSE HERRERA', 'V-15949430', 'jose@jesuministrosymas.com.ve', '04141448515', '02436721452', 'Maracay', 'Maracay', 'Aragua', 'MBI', 'Caña de Azucar', '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2018-09-27 03:10:20', '2025-10-01 18:20:39', 1, 'admin', '2ee3c27d9ea2416f9279ec18117311a1', '', 1, 0, NULL, NULL, NULL, NULL, NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(4, '123456789', 'hector', 'hero', 'hectorlamaquina14@gmail.com', '0412555555', '', '', '', '', NULL, NULL, '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2025-06-17 14:47:06', '2025-10-22 15:38:24', 1, 'docente', '$2y$10$cpzUQk3toJ9QIrP30CHBreyr/AbJQP2oC5GBhSpO9fZL7fIUkN2nu', '', 1, 2, 'masculino', NULL, NULL, NULL, NULL, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(5, 'V-30692052', 'Hector', 'heroestudiante', 'heroestudiante@gmail.com', '0412555555', '', 'lol', NULL, 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', 'wayoyo', '03', 'frente al parque', '4', '2', 'Salario', 'Urbana', 'familiar', 'Ninguna', 'Ninguna', 'Bachiller', 'U.E Manuel Gual', '', '2025-06-17 16:07:22', '2026-03-02 14:41:56', 1, 'estudiante', '$2y$10$q3Jrf5ys6uo9CrkYscOfw.L5iydeKL94foqwatyGE96LFJGiLbobG', '', 1, 0, 'Masculino', 'Soltero/a', '2004-04-14', '04124122996', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, NULL),
+(2372, 'V-28596315', 'Manuel Aponte Diaz Romero', 'V-154545454545', 'manuel@gmail.com', '04125555557', '04167777777', 'porai siuuuu', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Juan Jose Flores', '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2025-05-13 04:00:00', '2025-10-01 18:20:39', 1, 'estudiante', '6917fc789d762d53c70bec13497c6921d189e0930ff7d3d99fe7a23d9fbd6884', NULL, 1, 0, 'Masculino', 'Casado/a', '2000-07-22', '04167777777', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2377, 'V-11111111', 'Juan Sambrano', '12345610', 'juansambrano@gmail.com', '0412555555', '0416777777', 'jguyhfyt', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2025-07-03 04:00:00', '2025-10-01 18:20:27', 1, 'estudiante', '1bbd886460827015e5d605ed44252251', NULL, 1, 0, 'Masculino', 'Soltero/a', '2000-07-19', '4568426513', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2378, 'V-29565454', 'Sara Miller', 'sara.miller', 'saramiller@gmail.com', '0412555777', '0416777555', 'hgytdrrt', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2025-06-19 04:00:00', '2025-10-01 18:20:38', 1, 'estudiante', '29b3b2d836fbea2589c7383ae8bba39f', NULL, 1, 0, 'Femenino', 'Soltero/a', '2003-06-19', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2379, 'V-30762211', 'Eliud Miguel Mendoza Perez', 'eliud.miguel.mendoza.perez', 'eliud@gmail.com', '7525254542', '5542643534', 'hgfsvsfr', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', '', '', '0', '0', '', '', '0', '', '', '', '', '', '2025-06-19 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', '478727529f93cfe6013d31fcc9773633', NULL, 1, 0, 'Masculino', 'Soltero/a', '2004-10-06', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2449, '1', 'María González', 'maría.gonzález', 'maria.gonzalez@example.com', '2125551234', '4125551234', 'Calle 1 #23', 'Caracas', 'Distrito Capital', 'Libertador', 'El Recreo', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-01-15 04:00:00', '2025-10-23 15:10:03', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'Femenino', 'Soltera', '1995-05-20', '2125551235', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2450, '2', 'Carlos López', 'carlos.lópez', 'carlos.lopez@example.com', '2125552345', '4125552345', 'Avenida 2 #45', 'Caracas', 'Distrito Capital', 'Libertador', 'San Agustín', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-02-10 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Casado', '1990-08-15', '2125552346', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2451, '3', 'Ana Rodríguez', 'ana.rodríguez', 'ana.rodriguez@example.com', '2125553456', '4125553456', 'Calle 3 #67', 'Valencia', 'Carabobo', 'Valencia', 'Naguanagua', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-03-05 04:00:00', '2025-10-01 18:20:28', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Divorciada', '1988-11-25', '2125553457', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2452, '4', 'Luis Pérez', 'luis.pérez', 'luis.perez@example.com', '2125554567', '4125554567', 'Avenida 4 #89', 'Maracaibo', 'Zulia', 'Maracaibo', 'Coquivacoa', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-04-20 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1993-07-10', '2125554568', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2453, '5', 'Sofía Martínez', 'sofía.martínez', 'sofia.martinez@example.com', '2125555678', '4125555678', 'Calle 5 #12', 'Barcelona', 'Anzoátegui', 'Simón Bolívar', 'El Carmen', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-05-15 04:00:00', '2025-10-01 18:20:38', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Casada', '1992-02-28', '2125555679', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2454, '6', 'Jorge Hernández', 'jorge.hernández', 'jorge.hernandez@example.com', '2125556789', '4125556789', 'Avenida 6 #34', 'Barquisimeto', 'Lara', 'Iribarren', 'Concepción', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-06-10 04:00:00', '2025-10-01 18:20:33', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1994-09-15', '2125556790', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2455, '7', 'Isabel Díaz', 'isabel.díaz', 'isabel.diaz@example.com', '2125557890', '4125557890', 'Calle 7 #56', 'Mérida', 'Mérida', 'Libertador', 'Milla', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-07-05 04:00:00', '2025-10-01 18:20:32', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Soltera', '1991-12-05', '2125557891', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2456, '8', 'Pablo Sánchez', 'pablo.sánchez', 'pablo.sanchez@example.com', '2125558901', '4125558901', 'Avenida 8 #78', 'San Cristóbal', 'Táchira', 'San Cristóbal', 'San Juan Bautista', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-08-20 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Casado', '1989-04-20', '2125558902', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2457, '9', 'Valeria Ramírez', 'valeria.ramírez', 'valeria.ramirez@example.com', '2125559012', '4125559012', 'Calle 9 #90', 'Ciudad Guayana', 'Bolívar', 'Caroní', 'Unare', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-09-15 04:00:00', '2025-10-01 18:20:39', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Soltera', '1996-01-30', '2125559013', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2458, '10', 'Daniel Torres', 'daniel.torres', 'daniel.torres@example.com', '2125550123', '4125550123', 'Avenida 10 #11', 'Puerto La Cruz', 'Anzoátegui', 'Sotillo', 'Guanta', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-10-10 04:00:00', '2025-10-23 15:10:12', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'Masculino', 'Divorciado', '1990-06-25', '2125550124', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2459, '11', 'Adriana Castro', 'adriana.castro', 'adriana.castro@example.com', '2125551122', '4125551122', 'Calle 11 #22', 'Maracay', 'Aragua', 'Girardot', 'Choroní', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-11-05 04:00:00', '2025-10-23 15:10:20', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'Femenino', 'Casada', '1987-03-15', '2125551123', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2460, '12', 'Roberto Núñez', 'roberto.núñez', 'roberto.nunez@example.com', '2125552233', '4125552233', 'Avenida 12 #33', 'Barinas', 'Barinas', 'Barinas', 'Alto Barinas', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2023-12-20 04:00:00', '2025-10-23 15:10:32', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'Masculino', 'Soltero', '1995-10-10', '2125552234', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2461, '13', 'Gabriela Rojas', 'gabriela.rojas', 'gabriela.rojas@example.com', '2125553344', '4125553344', 'Calle 13 #44', 'Los Teques', 'Miranda', 'Guaicaipuro', 'Los Teques', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-01-15 04:00:00', '2025-10-23 15:10:54', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'Femenino', 'Soltera', '1994-07-20', '2125553345', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2462, '14', 'Andrés Mendoza', 'andrés.mendoza', 'andres.mendoza@example.com', '2125554455', '4125554455', 'Avenida 14 #55', 'Punto Fijo', 'Falcón', 'Carirubana', 'Punto Fijo', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-02-10 04:00:00', '2025-10-23 15:10:59', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'Masculino', 'Casado', '1991-04-05', '2125554456', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2463, '15', 'Natalia Guzmán', 'natalia.guzmán', 'natalia.guzman@example.com', '2125555566', '4125555566', 'Calle 15 #66', 'Coro', 'Falcón', 'Colina', 'Coro', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-03-05 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Divorciada', '1989-11-30', '2125555567', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2464, '16', 'Fernando Herrera', 'fernando.herrera', 'fernando.herrera@example.com', '2125556677', '4125556677', 'Avenida 16 #77', 'San Fernando', 'Apure', 'San Fernando', 'San Fernando', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-04-20 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1993-08-15', '2125556678', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2465, '17', 'Carolina Silva', 'carolina.silva', 'carolina.silva@example.com', '2125557788', '4125557788', 'Calle 17 #88', 'La Victoria', 'Aragua', 'José Félix Ribas', 'La Victoria', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-05-15 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Casada', '1992-05-20', '2125557789', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2466, '18', 'Ricardo Peña', 'ricardo.peña', 'ricardo.pena@example.com', '2125558899', '4125558899', 'Avenida 18 #99', 'El Tigre', 'Anzoátegui', 'Simón Rodríguez', 'El Tigre', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-06-10 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1996-02-25', '2125558900', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2467, '19', 'Patricia Flores', 'patricia.flores', 'patricia.flores@example.com', '2125559900', '4125559900', 'Calle 19 #00', 'Acarigua', 'Portuguesa', 'Páez', 'Acarigua', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-07-05 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Soltera', '1990-09-10', '2125559901', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2468, '20', 'José Ruiz', 'josé.ruiz', 'jose.ruiz@example.com', '2125550011', '4125550011', 'Avenida 20 #11', 'Valera', 'Trujillo', 'Valera', 'Valera', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-08-20 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Casado', '1988-12-05', '2125550012', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2469, '21', 'Luisa Vargas', 'luisa.vargas', 'luisa.vargas@example.com', '2125551123', '4125551123', 'Calle 21 #22', 'Cabimas', 'Zulia', 'Cabimas', 'Cabimas', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-09-15 04:00:00', '2025-10-01 18:20:35', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Divorciada', '1994-06-15', '2125551124', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2470, '22', 'Manuel Ortega', 'manuel.ortega', 'manuel.ortega@example.com', '2125552234', '4125552234', 'Avenida 22 #33', 'Carúpano', 'Sucre', 'Bermúdez', 'Carúpano', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-10-10 04:00:00', '2025-10-01 18:20:35', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1995-03-20', '2125552235', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2471, '23', 'Andrea Medina', 'andrea.medina', 'andrea.medina@example.com', '2125553345', '4125553345', 'Calle 23 #44', 'Porlamar', 'Nueva Esparta', 'Mariño', 'Porlamar', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-11-05 04:00:00', '2025-10-01 18:20:28', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Casada', '1991-10-25', '2125553346', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2472, '24', 'Diego Rivas', 'diego.rivas', 'diego.rivas@example.com', '2125554456', '4125554456', 'Avenida 24 #55', 'San Carlos', 'Cojedes', 'San Carlos', 'San Carlos', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2024-12-20 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1993-07-30', '2125554457', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2473, '25', 'Elena Cordero', 'elena.cordero', 'elena.cordero@example.com', '2125555567', '4125555567', 'Calle 25 #66', 'Tucupita', 'Delta Amacuro', 'Tucupita', 'Tucupita', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2025-01-15 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Soltera', '1996-04-05', '2125555568', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2474, '26', 'Oscar Romero', 'oscar.romero', 'oscar.romero@example.com', '2125556678', '4125556678', 'Avenida 26 #77', 'La Grita', 'Táchira', 'Jáuregui', 'La Grita', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2025-02-10 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Casado', '1989-01-10', '2125556679', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2475, '27', 'Vanessa Gil', 'vanessa.gil', 'vanessa.gil@example.com', '2125557789', '4125557789', 'Calle 27 #88', 'San Felipe', 'Yaracuy', 'San Felipe', 'San Felipe', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2025-03-05 04:00:00', '2025-10-01 18:20:39', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Divorciada', '1992-08-15', '2125557790', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2476, '28', 'Arturo Mora', 'arturo.mora', 'arturo.mora@example.com', '2125558890', '4125558890', 'Avenida 28 #99', 'San Juan de los Morros', 'Guárico', 'Roscio', 'San Juan', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2025-04-20 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1995-05-20', '2125558891', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2477, '29', 'Mariana León', 'mariana.león', 'mariana.leon@example.com', '2125559901', '4125559901', 'Calle 29 #00', 'San Antonio de Los Altos', 'Miranda', 'Los Salias', 'San Antonio', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2025-05-15 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 1, 0, 'F', 'Casada', '1990-12-25', '2125559902', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2478, '30', 'Julio Espinoza', 'julio.espinoza', 'julio.espinoza@example.com', '2125550012', '4125550012', 'Avenida 30 #11', 'El Vigía', 'Mérida', 'Alberto Adriani', 'El Vigía', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2025-06-10 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', 'd41d8cd98f00b204e9800998ecf8427e', '', 2, 0, 'M', 'Soltero', '1994-09-30', '2125550013', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2527, 'V-15678901', 'Maríaa Gonzálezz', 'maríaa.gonzálezz', 'mgonzalez@example.com', '2125550101', '4125550101', 'Calle 1 #101', 'Caracas', 'Distrito Capital', 'Libertador', 'El Recreo', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-03-15 04:00:00', '2025-10-01 18:20:35', 1, 'estudiante', 'db0789017e0d5a2484886c25c7bbffd1', '', 1, 0, 'F', 'soltera', '2000-05-20', '2125550102', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2528, 'E-20345678', 'Juan Pérez', 'juan.pérez', 'jperez@example.com', '2125550202', '4125550202', 'Avenida 2 #202', 'Caracas', 'Distrito Capital', 'Libertador', 'San Agustín', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-08-10 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', '6a37eebd4f766baee264c59ee1bbca02', '', 2, 0, 'M', 'casado', '1999-11-15', '2125550203', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2529, 'V-17432109', 'Anaa Rodríguez', 'anaa.rodríguez', 'arodriguez@example.com', '2125550303', '4125550303', 'Calle 3 #303', 'Valencia', 'Carabobo', 'Valencia', 'San Blas', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-01-20 04:00:00', '2025-10-01 18:20:28', 1, 'estudiante', '89451e2737f7a3a6c46d060107dc708b', '', 1, 0, 'F', 'soltera', '2001-02-28', '2125550304', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2530, 'E-18765432', 'Carloss López', 'carloss.lópez', 'clopez@example.com', '2125550404', '4125550404', 'Avenida 4 #404', 'Maracaibo', 'Zulia', 'Maracaibo', 'Juana de Ávila', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-11-05 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', 'b145ec79b1151099b9570d4e3b29aeca', '', 2, 0, 'M', 'soltero', '2000-07-10', '2125550405', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2531, 'V-23456789', 'Laura Martínez', 'laura.martínez', 'lmartinez@example.com', '2125550505', '4125550505', 'Calle 5 #505', 'Barquisimeto', 'Lara', 'Iribarren', 'Concepción', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-05-12 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', '4428c6c474502e61151877825bb41961', '', 1, 0, 'F', 'casada', '1999-09-25', '2125550506', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2532, 'E-19876543', 'Pedro Gómez', 'pedro.gómez', 'pgomez@example.com', '2125550606', '4125550606', 'Avenida 6 #606', 'Maracay', 'Aragua', 'Girardot', 'Choroní', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-09-18 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', 'dd26143c452d55054355fdbd5c92e398', '', 2, 0, 'M', 'soltero', '2001-04-05', '2125550607', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2533, 'V-21567890', 'Sofía Hernández', 'sofía.hernández', 'shernandez@example.com', '2125550707', '4125550707', 'Calle 7 #707', 'San Cristóbal', 'Táchira', 'San Cristóbal', 'La Concordia', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-02-22 04:00:00', '2025-10-01 18:20:38', 1, 'estudiante', 'f5ece76723ac1b6ae3bb9e99bbf26f68', '', 1, 0, 'F', 'soltera', '2000-12-12', '2125550708', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2534, 'E-17654321', 'José Ramírez', 'josé.ramírez', 'jramirez@example.com', '2125550808', '4125550808', 'Avenida 8 #808', 'Barcelona', 'Anzoátegui', 'Simón Bolívar', 'El Carmen', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-10-30 04:00:00', '2025-10-01 18:20:33', 1, 'estudiante', 'e068ff48f0966deade935517d6b4686a', '', 2, 0, 'M', 'casado', '1999-08-17', '2125550809', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2535, 'V-22345678', 'Isabel Torres', 'isabel.torres', 'itorres@example.com', '2125550909', '4125550909', 'Calle 9 #909', 'Mérida', 'Mérida', 'Libertador', 'Milla', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-04-05 04:00:00', '2025-10-01 18:20:32', 1, 'estudiante', '08e0750210f66396eb83957973705aad', '', 1, 0, 'F', 'soltera', '2001-01-30', '2125550910', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2536, 'E-19456789', 'Miguel Díaz', 'miguel.díaz', 'mdiaz@example.com', '2125551010', '4125551010', 'Avenida 10 #1010', 'Ciudad Guayana', 'Bolívar', 'Caroní', 'Unare', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-12-15 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', '7df8c11bddbef2f19bb65c22b1d6c7e6', '', 2, 0, 'M', 'soltero', '2000-06-22', '2125551011', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2537, 'V-20654321', 'Valentina Rojas', 'valentina.rojas', 'vrojas@example.com', '2125551111', '4125551111', 'Calle 11 #1111', 'Barinas', 'Barinas', 'Barinas', 'Alto Barinas', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-06-20 04:00:00', '2025-10-01 18:20:39', 1, 'estudiante', '0295896c168f4a350adf4cdf464198d7', '', 1, 0, 'F', 'soltera', '2001-03-14', '2125551112', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2538, 'E-18543210', 'Daniel Castro', 'daniel.castro', 'dcastro@example.com', '2125551212', '4125551212', 'Avenida 12 #1212', 'Coro', 'Falcón', 'Colina', 'San Antonio', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-07-25 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', '8249bfa20206fc926e206d9fad918ca1', '', 2, 0, 'M', 'casado', '1999-10-08', '2125551213', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2539, 'V-21789012', 'Gabriela Mendoza', 'gabriela.mendoza', 'gmendoza@example.com', '2125551313', '4125551313', 'Calle 13 #1313', 'Puerto La Cruz', 'Anzoátegui', 'Sotillo', 'Los Taques', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-03-10 04:00:00', '2025-10-01 18:20:31', 1, 'estudiante', 'bb1426e76d77f79cc3e5ae1de1e024d6', '', 1, 0, 'F', 'soltera', '2000-09-19', '2125551314', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2540, 'E-19876540', 'Andrés Silva', 'andrés.silva', 'asilva@example.com', '2125551414', '4125551414', 'Avenida 14 #1414', 'San Fernando', 'Apure', 'San Fernando', 'El Recreo', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-09-05 04:00:00', '2025-10-01 18:20:28', 1, 'estudiante', 'd70e78c0ed5accbec273cea8884902ff', '', 2, 0, 'M', 'soltero', '2001-05-25', '2125551415', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2541, 'V-22456789', 'Carolina Herrera', 'carolina.herrera', 'cherrera@example.com', '2125551515', '4125551515', 'Calle 15 #1515', 'Los Teques', 'Miranda', 'Guaicaipuro', 'Paracotos', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-01-12 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', 'a8567e2d80e3d52ac3c81825d3b211fb', '', 1, 0, 'F', 'casada', '1999-12-30', '2125551516', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2542, 'E-20765432', 'Ricardo Núñez', 'ricardo.núñez', 'rnunez@example.com', '2125551616', '4125551616', 'Avenida 16 #1616', 'Punto Fijo', 'Falcón', 'Carirubana', 'Amuay', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-11-20 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', '5bd83db2c82e0eae9f59a479fc1d1bd1', '', 2, 0, 'M', 'soltero', '2000-08-15', '2125551617', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2543, 'V-19345678', 'Patricia Vargas', 'patricia.vargas', 'pvargas@example.com', '2125551717', '4125551717', 'Calle 17 #1717', 'El Tigre', 'Anzoátegui', 'Simón Rodríguez', 'San José de Guanipa', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-05-18 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', '49cfc1380a9ce7380c9cc29813e3b326', '', 1, 0, 'F', 'soltera', '2001-02-10', '2125551718', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2544, 'E-21654321', 'Roberto Medina', 'roberto.medina', 'rmedina@example.com', '2125551818', '4125551818', 'Avenida 18 #1818', 'Cúa', 'Miranda', 'Urdaneta', 'Cúa', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-08-22 04:00:00', '2025-10-01 18:20:38', 1, 'estudiante', 'a52104978231c9a62c4e8a097922ddd9', '', 2, 0, 'M', 'casado', '1999-07-05', '2125551819', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2545, 'V-18456789', 'Adriana Ríos', 'adriana.ríos', 'arios@example.com', '2125551919', '4125551919', 'Calle 19 #1919', 'Ocumare del Tuy', 'Miranda', 'Lander', 'Ocumare', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-02-28 04:00:00', '2025-10-01 18:20:27', 1, 'estudiante', 'fe07e07d7cbbff8b42f6544553763d8a', '', 1, 0, 'F', 'soltera', '2000-11-20', '2125551920', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2546, 'E-22567890', 'Fernando Guzmán', 'fernando.guzmán', 'fguzman@example.com', '2125552020', '4125552020', 'Avenida 20 #2020', 'La Victoria', 'Aragua', 'Jose Felix Ribas', 'La Victoria', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-10-12 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', '9d610e830da7d54e118c00518d7a9b64', '', 2, 0, 'M', 'soltero', '2001-04-15', '2125552021', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2547, 'V-19765432', 'Natalia Blanco', 'natalia.blanco', 'nblanco@example.com', '2125552121', '4125552121', 'Calle 21 #2121', 'San Juan de los Morros', 'Guárico', 'Roscio', 'San Juan', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-04-30 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', '24288ed4283a8c2cc350f035337e84a7', '', 1, 0, 'F', 'soltera', '2000-10-05', '2125552122', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2548, 'E-21456789', 'Eduardo Salas', 'eduardo.salas', 'esalas@example.com', '2125552222', '4125552222', 'Avenida 22 #2222', 'Valera', 'Trujillo', 'Valera', 'La Puerta', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-12-08 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', 'e275c58706ae71adb5bf8942eca845ba', '', 2, 0, 'M', 'casado', '1999-09-12', '2125552223', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2549, 'V-18654321', 'Mariana Cordero', 'mariana.cordero', 'mcordero@example.com', '2125552323', '4125552323', 'Calle 23 #2323', 'Porlamar', 'Nueva Esparta', 'Maneiro', 'Pampatar', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-06-15 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', '11c54f59eb081bcbbcfc65c8bd4772b8', '', 1, 0, 'F', 'soltera', '2001-01-25', '2125552324', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2550, 'E-23567890', 'Jorge Paredes', 'jorge.paredes', 'jparedes@example.com', '2125552424', '4125552424', 'Avenida 24 #2424', 'Carúpano', 'Sucre', 'Bermúdez', 'Carúpano', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-09-30 04:00:00', '2025-10-01 18:20:33', 1, 'estudiante', '9929b8ec6b8b4edfe2ab26c25b1e4a58', '', 2, 0, 'M', 'soltero', '2000-07-18', '2125552425', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2551, 'V-20456789', 'Luisa Fuentes', 'luisa.fuentes', 'lfuentes@example.com', '2125552525', '4125552525', 'Calle 25 #2525', 'La Asunción', 'Nueva Esparta', 'Arismendi', 'La Asunción', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-03-05 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', 'b13e714608fcd3f0fb7f936e1dbd5310', '', 1, 0, 'F', 'casada', '1999-12-08', '2125552526', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2552, 'E-17654320', 'Manuel Alvarado', 'manuel.alvarado', 'malvarado@example.com', '2125552626', '4125552626', 'Avenida 26 #2626', 'Tucupita', 'Delta Amacuro', 'Tucupita', 'Tucupita', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-11-15 04:00:00', '2025-10-01 18:20:35', 1, 'estudiante', '7e6c056718d8497121412444db238f51', '', 2, 0, 'M', 'soltero', '2001-05-30', '2125552627', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2553, 'V-22678901', 'Daniela Mora', 'daniela.mora', 'dmora@example.com', '2125552727', '4125552727', 'Calle 27 #2727', 'Santa Teresa del Tuy', 'Miranda', 'Independencia', 'Santa Teresa', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-01-25 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', 'a0c79045aa1f687714256873c0d9fbde', '', 1, 0, 'F', 'soltera', '2000-09-15', '2125552728', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2554, 'E-19543210', 'Antonio Peña', 'antonio.peña', 'apena@example.com', '2125552828', '4125552828', 'Avenida 28 #2828', 'San Felipe', 'Yaracuy', 'San Felipe', 'San Felipe', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-10-05 04:00:00', '2025-10-01 18:20:28', 1, 'estudiante', '552b566abe41b5f4b7a328382eac6290', '', 2, 0, 'M', 'casado', '1999-08-22', '2125552829', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2555, 'V-23678901', 'Verónica León', 'verónica.león', 'vleon@example.com', '2125552929', '4125552929', 'Calle 29 #2929', 'San Carlos', 'Cojedes', 'San Carlos', 'San Carlos', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-05-10 04:00:00', '2025-10-01 18:20:39', 1, 'estudiante', 'd8b9bf41fc29d33ff8a0d642caf11247', '', 1, 0, 'F', 'soltera', '2001-02-20', '2125552930', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2556, 'E-18765430', 'Oscar Rivas', 'oscar.rivas', 'orivas@example.com', '2125553030', '4125553030', 'Avenida 30 #3030', 'Achaguas', 'Apure', 'Achaguas', 'Achaguas', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-12-20 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', '8c5e3e201833318627b5a3a3d1fb0801', '', 2, 0, 'M', 'soltero', '2000-06-12', '2125553031', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2557, 'V-24567890', 'Gladys Suárez', 'gladys.suárez', 'gsuarez@example.com', '2125553131', '4125553131', 'Calle 31 #3131', 'San Antonio del Táchira', 'Táchira', 'Bolívar', 'San Antonio', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-04-08 04:00:00', '2025-10-01 18:20:32', 1, 'estudiante', 'a7b69682aeedae2e01d506d05cef0933', '', 1, 0, 'F', 'casada', '1999-11-25', '2125553132', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2558, 'E-21654320', 'Raúl Espinoza', 'raúl.espinoza', 'respinoza@example.com', '2125553232', '4125553232', 'Avenida 32 #3232', 'San Carlos de Zulia', 'Zulia', 'Mara', 'San Carlos', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-08-15 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', '66f633b7a86d055da5b9f8b4c5aa172c', '', 2, 0, 'M', 'soltero', '2001-03-10', '2125553233', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2559, 'V-19567890', 'Teresa Acosta', 'teresa.acosta', 'tacosta@example.com', '2125553333', '4125553333', 'Calle 33 #3333', 'Upata', 'Bolívar', 'Piar', 'Upata', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-02-10 04:00:00', '2025-10-01 18:20:39', 1, 'estudiante', 'd6d77546e16bffd6c9768db15103139f', '', 1, 0, 'F', 'soltera', '2000-10-30', '2125553334', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2560, 'E-22789012', 'Alberto Márquez', 'alberto.márquez', 'amarquez@example.com', '2125553434', '4125553434', 'Avenida 34 #3434', 'Guasdualito', 'Apure', 'Páez', 'Guasdualito', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-09-22 04:00:00', '2025-10-01 18:20:27', 1, 'estudiante', 'd84de70c483dc10e4d05955c5e6c864c', '', 2, 0, 'M', 'casado', '1999-07-15', '2125553435', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2561, 'V-20654320', 'Yolanda Cárdenas', 'yolanda.cárdenas', 'ycardenas@example.com', '2125553535', '4125553535', 'Calle 35 #3535', 'Carora', 'Lara', 'Torres', 'Carora', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-06-05 04:00:00', '2025-10-01 18:20:40', 1, 'estudiante', 'd6bde420f4c5b1e80215fb12fbb8a267', '', 1, 0, 'F', 'soltera', '2001-01-10', '2125553536', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL);
+INSERT INTO `users` (`id`, `idusuario`, `nombre`, `username`, `email`, `tlf`, `cel`, `direccion`, `ciudad`, `estado`, `municipio`, `parroquia`, `etnia`, `casaapto`, `punto_referencia`, `grupo_familiar`, `acargo_usted`, `fuente_ingresos`, `tipo_vivienda`, `tenencia_vivienda`, `enfermedad`, `discapacidad`, `titulos`, `institutos`, `potencialidades`, `fecha_ingreso`, `fecha_act`, `status`, `user_type`, `password`, `api_key`, `carrera`, `carrera_di`, `genero`, `edo_civil`, `fecha_nac`, `num_telf_opc`, `foto_perfil`, `usuario`, `estudiante`, `docente`, `admin`, `super_user`, `editar_user`, `editar_nota`, `editar_acceso`, `editar_valores`, `editar_estudiante`, `agregar_estudiante`, `agregar_docente`, `editar_docente`, `agregar_carrera`, `agregar_materia`, `editar_materia`, `pagos`, `auditoria`, `secciones`, `rela_materia_carrera`, `periodos_academicos`, `asig_secciones`, `asig_cursos`, `horarios`, `gestion_director_carrera`, `notas_cargadas`, `consultar_notas`, `consultar_notas_pasadas`, `tipos_pago`, `tipos_horario`, `horario_personal`, `respaldo_bd`, `gestionar_carrera`, `gestion_periodo_academico`, `gestion_asig_cursos`, `gestion_horario`, `titulos_re_materia`, `grado`, `gestion_grado`, `vocero`, `visita`) VALUES
+(2562, 'E-17654329', 'Francisco Parra', 'francisco.parra', 'fparra@example.com', '2125553636', '4125553636', 'Avenida 36 #3636', 'La Grita', 'Táchira', 'Jáuregui', 'La Grita', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-10-30 04:00:00', '2025-10-01 18:20:31', 1, 'estudiante', 'd9d1ca317c8468142d784f3569fff65c', '', 2, 0, 'M', 'soltero', '2000-05-25', '2125553637', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2563, 'V-23789012', 'Leticia Romero', 'leticia.romero', 'lromero@example.com', '2125553737', '4125553737', 'Calle 37 #3737', 'San Cristóbal', 'Táchira', 'San Cristóbal', 'San Juan Bautista', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-03-18 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', '7d6afc7443c6f54340b730698e04688a', '', 1, 0, 'F', 'casada', '1999-12-15', '2125553738', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2564, 'E-19876532', 'Arturoo Mora', 'arturoo.mora', 'amora@example.com', '2125553838', '4125553838', 'Avenida 38 #3838', 'San Joaquín', 'Carabobo', 'San Joaquín', 'San Joaquín', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-11-28 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', '9cb1f9517363737ed3a32082ec88fe93', '', 2, 0, 'M', 'soltero', '2001-04-20', '2125553839', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2565, 'V-24678901', 'Beatriz Rangel', 'beatriz.rangel', 'brangel@example.com', '2125553939', '4125553939', 'Calle 39 #3939', 'San Mateo', 'Aragua', 'Bolívar', 'San Mateo', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-01-10 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', '2da3acf9de8c82b1fd4c40d0f85a59fd', '', 1, 0, 'F', 'soltera', '2000-08-05', '2125553940', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2566, 'E-21567890', 'Héctor Zambrano', 'héctor.zambrano', 'hzambrano@example.com', '2125554040', '4125554040', 'Avenida 40 #4040', 'San José de Guanipa', 'Anzoátegui', 'Simón Rodríguez', 'San José de Guanipa', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-12-05 04:00:00', '2025-10-01 18:20:32', 1, 'estudiante', 'f5ece76723ac1b6ae3bb9e99bbf26f68', '', 2, 0, 'M', 'casado', '1999-09-30', '2125554041', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2567, 'V-18543219', 'Diana Contreras', 'diana.contreras', 'dcontreras@example.com', '2125554141', '4125554141', 'Calle 41 #4141', 'San Antonio de Los Altos', 'Miranda', 'Los Salias', 'San Antonio', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-05-22 04:00:00', '2025-10-01 18:20:30', 1, 'estudiante', '66a65afa7f551b2197845c4ad1754889', '', 1, 0, 'F', 'soltera', '2001-02-15', '2125554142', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2568, 'E-22678901', 'José Gregorio Peñalver', 'josé.gregorio.peñalver', 'jpenalver@example.com', '2125554242', '4125554242', 'Avenida 42 #4242', 'Sanare', 'Lara', 'Jiménez', 'Sanare', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-08-28 04:00:00', '2025-10-01 18:20:33', 1, 'estudiante', 'a0c79045aa1f687714256873c0d9fbde', '', 2, 0, 'M', 'soltero', '2000-07-08', '2125554243', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2569, 'V-19765430', 'Rosaura Velásquez', 'rosaura.velásquez', 'rvelasquez@example.com', '2125554343', '4125554343', 'Calle 43 #4343', 'Quíbor', 'Lara', 'Jiménez', 'Quíbor', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-02-15 04:00:00', '2025-10-01 18:20:38', 1, 'estudiante', '0f05d09833979bbf49c467800c9f7631', '', 1, 0, 'F', 'casada', '1999-11-20', '2125554344', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2570, 'E-24789012', 'Alfredo Delgado', 'alfredo.delgado', 'adelgado@example.com', '2125554444', '4125554444', 'Avenida 44 #4444', 'San Juan de Colón', 'Táchira', 'Ayacucho', 'San Juan de Colón', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-10-12 04:00:00', '2025-10-01 18:20:27', 1, 'estudiante', '0b4954ba6a5e405ad4ed717f14c72764', '', 2, 0, 'M', 'soltero', '2001-03-25', '2125554445', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2571, 'V-21654329', 'Gisela Ferrer', 'gisela.ferrer', 'gferrer@example.com', '2125554545', '4125554545', 'Calle 45 #4545', 'San Luis', 'Falcón', 'Federación', 'San Luis', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-06-10 04:00:00', '2025-10-01 18:20:31', 1, 'estudiante', 'fcd54cbd301c33304cab2820a6e7a553', '', 1, 0, 'F', 'soltera', '2000-09-30', '2125554546', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2572, 'E-18654320', 'René Márquez', 'rené.márquez', 'rmarquez@example.com', '2125554646', '4125554646', 'Avenida 46 #4646', 'San Francisco', 'Zulia', 'San Francisco', 'San Francisco', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-09-05 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', '92f34bbe48e19810ec7e9f232e35e309', '', 2, 0, 'M', 'casado', '1999-08-10', '2125554647', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2573, 'V-25678901', 'Marisol Rivas', 'marisol.rivas', 'mrivas@example.com', '2125554747', '4125554747', 'Calle 47 #4747', 'San Simón', 'Zulia', 'Francisco Javier Pulgar', 'San Simón', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-03-22 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', '16ad8043ae4b9817b7409e6e7fb90dc3', '', 1, 0, 'F', 'soltera', '2001-01-15', '2125554748', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2574, 'E-20765431', 'Wilmer Castillo', 'wilmer.castillo', 'wcastillo@example.com', '2125554848', '4125554848', 'Avenida 48 #4848', 'San Pablo', 'Zulia', 'Almirante Padilla', 'San Pablo', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-11-10 04:00:00', '2025-10-01 18:20:39', 1, 'estudiante', '15314e6f381ff9b044d7eb8595636fbe', '', 2, 0, 'M', 'soltero', '2000-04-28', '2125554849', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2575, 'V-22789013', 'Yusmery Del Moral', 'yusmery.del.moral', 'ydelmoral@example.com', '2125554949', '4125554949', 'Calle 49 #4949', 'San Rafael del Moján', 'Zulia', 'Almirante Padilla', 'San Rafael', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2022-01-18 04:00:00', '2025-10-01 18:20:40', 1, 'estudiante', 'efe9efc9276e537d2f1450885df651b3', '', 1, 0, 'F', 'casada', '1999-10-12', '2125554950', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2576, 'E-23678902', 'Richard Briceño', 'richard.briceño', 'rbriceno@example.com', '2125555050', '4125555050', 'Avenida 50 #5050', 'San Timote', 'Zulia', 'Baralt', 'San Timote', 'Ninguna', NULL, 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', 'No especificado', '', '2021-12-30 04:00:00', '2025-10-01 18:20:38', 1, 'estudiante', 'c146a97d5173f9f25c8fb142cf207ecd', '', 2, 0, 'M', 'soltero', '2001-05-05', '2125555051', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2584, 'V-14123524', 'Manuel Turiso', 'manuel.turiso', 'kol@gmail.com', '0412777777', '0412777777', 'qedwq', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', 'Ninguna', 'No especificado', 'poraiiii', '1', '0', '1', 'Casa', 'Alquilada', '', 'no', '', '', 'lol', '2025-08-03 04:00:00', '2025-10-01 18:20:35', 1, 'docente', '$2y$10$RxKomMmQumrSU9DFowD7mOriXhK6oOW/GYMLm6DvO7NSJQsPh/wiS', '7e140884c26c97f6f6bcce3a20b0a2c3', 0, 0, 'Masculino', '2', '2000-03-09', '', NULL, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2585, 'V-13123524', 'Alberto Lopez', 'alberto.lopez', 'zol@gmail.com', '0412777777', '0412777777', 'mjdncja', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', 'Ninguna', 'No especificado', 'poraiiii', '2', '0', '1', 'Apartamento', 'Alquilada', '', 'no', '', '', 'lol', '2025-08-03 04:00:00', '2025-10-01 18:20:27', 1, 'docente', '$2y$10$hXIRvrslTjCvVisOvsBMl.iNHitesSiFKTolJ5KObfnr6oCk3NwpC', 'af2c2755c1f3498a955651ad7dcc156a', 0, 0, 'Masculino', '2', '1991-07-11', '', NULL, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2586, 'E-12569002', 'Francisco Torrealba', 'francisco.torrealba', 'pol@gmail.com', '0412777777', '0412777777', 'jdNJDSANJ', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', 'Ninguna', 'No especificado', 'poraiiii', '2', '0', '2', 'Casa', 'Alquilada', '', 'no', '', '', 'lol', '2025-08-03 04:00:00', '2025-10-01 18:20:31', 1, 'docente', '$2y$10$JkE3FtgVlymcKJRtI4w6CeecP8Dk93HQO59D6CwgFGeKgBYsDuUKy', '0cc8939b4524580c7589a64aa3e59ae9', 0, 0, 'Masculino', '2', '1991-03-13', '', NULL, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2588, 'V-24765890', 'Sarsamora Vegano', 'sarsamora.vegano', 'rol@gmail.com', '0412777777', '0412777777', 'siuuuuu', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', 'Ninguna', 'No especificado', 'poraiiii', '3', '0', '', 'Apartamento', 'Alquilada', '', 'no', '', '', 'lol', '2025-08-03 04:00:00', '2025-10-01 18:20:38', 1, 'docente', '$2y$10$xgVIJqKbEPm/HJTfyUx5/.xF9YGPlLFioOENtL4gjqfDB13ybb8h2', '226af57221e592d91a033ecc16491a1d', 0, 0, 'Femenino', '2', '1988-07-13', '', NULL, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2589, 'V--21456555', 'Palmera Kazekage', 'palmera.kazekage', 'kazekage@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-08-24 04:00:00', '2025-10-01 18:20:37', 1, 'estudiante', 'b71219d2ea11fb066d298edbadf67b19', '', 1, 0, 'Masculino', 'Soltero', '2000-06-15', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2590, 'V--24648009', 'Francisco Mendoza', 'francisco.mendoza', 'rolllll@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-08-31 04:00:00', '2025-10-01 18:20:31', 1, 'estudiante', '3f718eb49861ad69bd0ddaa7c94974c9', '', 1, 0, 'Masculino', 'Casado', '1989-07-19', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2591, 'V-32567456', 'Claudia Lopez', 'claudia.lopez', 'kollllll@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-08-31 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', '377d6bc1b54ba0f6d729651c9195c205', '', 1, 0, 'Femenino', 'Casado', '2006-07-13', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2592, 'V-54678943', 'Jose Manuel', 'jose.manuel', 'ggol@gmail.com', '04125777777', '', 'lol', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:33', 1, 'estudiante', '92fa6a601065ef1d62cf229a40642da1', '', 1, 0, 'Masculino', 'Soltero', '2002-06-13', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2593, 'V--45324567', 'Jose Manuel Lopez', 'jose.manuel.lopez', 'rrollll@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:33', 1, 'estudiante', '3fe63d34589ba217e4824534c4582578', '', 2, 0, 'Masculino', 'Casado', '1995-07-13', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2594, 'V--21456565', 'Maria Antonieta', 'maria.antonieta', 'mariaantonieta@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:35', 1, 'estudiante', '78f0a70fb42e54b223544eec88e2d052', '', 1, 0, 'Femenino', 'Soltero', '2001-07-19', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2595, 'V--34678324', 'Sofia Fernandez', 'sofia.fernandez', 'sofilol@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:38', 1, 'estudiante', '97f1db41887d87caa54e276ad7b2c312', '', 1, 0, 'Masculino', 'Casado', '1998-06-10', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2596, 'V--20456543', 'Hector Gutierrez', 'hector.gutierrez', 'hectorgu@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:32', 1, 'estudiante', 'd5d6bb5424a9d4f9dc9c1092477fdfc3', '', 1, 0, 'Masculino', 'Casado', '2001-03-08', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2597, 'V--36789546', 'Luis Aguilar', 'luis.aguilar', 'luisaguila@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', '3e6d29ef91fedd06772de7b754316a2a', '', 5, 0, 'Masculino', 'Soltero', '2007-06-28', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2598, 'V--31789321', 'Laura Colores', 'laura.colores', 'lauracolores@gmail.com', '04125777777', '', 'lol', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', '8f467697120171c90181e9a3241fd529', '', 5, 0, 'Masculino', 'Casado', '2003-10-17', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2599, 'V--31789324', 'Laura Coloress', 'laura.coloress', 'lauracolores2@gmail.com', '04125777777', '', 'lol', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:34', 1, 'estudiante', '6b2af18350070cc63a2cf6988b872f38', '', 5, 0, 'Masculino', 'Casado', '2003-10-17', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2600, 'V--12345677', 'Anabelle Carroza', 'anabelle.carroza', 'carroza@gmail.com', '04125777777', '', 'lol', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-02 04:00:00', '2025-10-01 18:20:28', 1, 'estudiante', '02b89b15f7210b47c94e79f08f62704a', '', 5, 0, 'Masculino', 'Casado', '2004-07-15', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2601, 'E--34511211', 'Manuel Turisooo', 'manuel.turisooo', 'turisoo@gmail.com', '04125777777', '', 'porai', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-03 04:00:00', '2025-10-01 18:20:35', 1, 'estudiante', '8059f1d1a0accf2c3aa27dd0c89dfb0f', '', 1, 0, 'Masculino', 'Casado', '2001-12-13', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2602, 'E--34678900', 'Carlos Humberto Morales', 'carlos.humberto.morales', 'calos@gmail.com', '04125777777', '', 'lol', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-03 04:00:00', '2025-10-01 18:20:29', 1, 'estudiante', '777419bcad989fde187a64f51be7b4ea', '', 5, 0, 'Masculino', 'Soltero', '2001-07-18', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2603, 'E--30567435', 'Manteca De Colesterol', 'manteca.de.colesterol', 'manteca@gmail.com', '04125777777', '', 'lol', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-03 04:00:00', '2025-10-01 18:20:35', 1, 'estudiante', '8f908f3eb2d5f7305f17fa9837f591f6', '', 1, 0, 'Masculino', 'Casado', '2004-07-16', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2604, 'V--21456544', 'Jose Manuel Lopezz', 'jose.manuel.lopezz', 'pgol@gmail.com', '04125777777', '', 'lol', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-09-03 04:00:00', '2025-10-01 18:20:33', 1, 'estudiante', '37ce9255f0c8e6dfca1e811959ead689', '', 1, 0, 'Masculino', 'Casado', '2000-07-12', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2607, 'V-12345678', 'Nombre Ejemplo', 'nombre.ejemplo', 'ejemplo@correo.com', '02121234567', '04141234567', 'Dirección Ejemplo', 'Caracas', 'Distrito Capital', 'Libertador', 'La Candelaria', '', 'Casa', 'Frente a la plaza', '4', '2', 'Trabajo formal', 'Casa', 'Propia', 'Ninguna', 'No especificado', 'Bachiller,Licenciatura', 'Liceo XYZ,Universidad ABC', '', '2023-01-15 04:00:00', '2025-10-01 18:20:36', 1, 'estudiante', '25d55ad283aa400af464c76d713c07ad', '', 1, NULL, 'Masculino', 'Soltero', '1990-01-01', '02121234568', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2608, 'E-8549625', 'bhuftyfu', 'bhuftyfu', 'frthft@gmail.com', '0412555777', '', 'guygyh', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Juan Jose Flores', '', 'No especificado', '', '0', '0', '', '', '', '', '', '', '', '', '2025-10-01 04:00:00', '2025-10-23 14:25:07', 1, 'estudiante', '92a0159e815657aeab28ac8a935cf1ca', '', 1, NULL, 'Masculino', 'Soltero', '1979-07-19', '', NULL, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2609, 'V-12345555', 'Perdomo Albañil', 'perdomo.albañil', 'perdomo@gmail.com', '0412555555', '0412555555', 'rdrhv', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', 'Ninguna', 'No especificado', 'frente a una farmacia', '2', '0', '1', 'Apartamento', 'Familiar', '', 'no', '', '', 'esfdfs', '2025-10-02 04:00:00', '2025-10-23 17:26:26', 1, 'docente', '$2y$10$8lPuQS3UuMISfjSY7Cwuc.QToyk85yB/Nz3MfIXd13zi4705M6ivC', '97610812c565e1a74c3478ae6bc6c099', 0, NULL, 'Masculino', '1', '1992-06-11', '', NULL, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL),
+(2610, 'V-30123456', 'alberto guerra', 'alberto.guerra', 'infos@guerra.com', '0416598362', '0416777777', 'prueba', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Juan Jose Flores', 'Ninguna', 'Apartamento', 'frente a un campo', '6', '2', '2', '', 'Alquilada', 'no', 'No', '', '', '', '2025-11-24 04:00:00', '2025-11-25 15:28:10', 1, 'estudiante', '$2y$10$OMS2YHLfEYa3n1Y1RPoj5eDq200OinIjuH9sdPP0G/ryY0C8xK4T.', '', 1, NULL, 'Masculino', 'Casado', '1975-06-12', '04163333333', '69247f8403325_1763999620.png', 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, 0),
+(2615, 'V-30123123', 'O\'Connor', 'o.connor', 'validacion@example.com', '0412555777', '0416777777', 'kvftfvgghjkf', 'Puerto Cabello', 'Carabobo', 'Puerto Cabello', 'Bartolome Salom', 'Ninguna', 'Apartamento', 'frente a una farmacia', '3', '2', '1', '', 'Alquilada', 'no', 'No', '', '', '', '2025-12-03 04:00:00', '2025-12-03 17:03:32', 1, 'estudiante', '$2y$10$sNBUvk9vofry5VPN75ebbeJbLAuhSt61bziRN.ANpmDw3fFHm3Wj.', '854d0aa4bec27560ebb7550a3f9600a4', 1, 1, 'Masculino', 'Divorciado', '2002-06-19', '04163333333', 'foto_69305f0b6200d9.46312539.jpeg', 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, 0),
+(2616, 'E-30123458', 'Luis Miguel', 'luis.miguel', 'luismiguell@gmail.com', '02423644305', '0416777775', 'porai', '87', '7', '87', '275', '', 'Casa', 'frente a un campo', '2', '2', '1', '', 'Propia', 'no', 'No', '', '', '', '2026-02-10 04:00:00', '2026-02-10 18:55:17', 1, 'estudiante', '$2y$10$FWB2IFV68cufx1b50aw0c.DHQVyvJCAVG.E63gWydrFf6c9ku5JX2', 'dfeac3c02b604bcae12167a29e71a819', 5, 5, 'Masculino', 'Soltero', '1995-10-13', '04163333335', '', 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, 0),
+(2617, 'V-54123456', 'una pruba', 'V-54123456', 'pruebasuper@gmail.com', '0412555777', '0416777777', 'porai', '87', '7', '87', '275', '', 'Casa', 'frente a un campo', '2', '1', '1', '', 'Familiar', '', '', 'Bachiller', 'U.E Freancis de Miranda', '', '2026-02-23 04:00:00', '2026-02-23 13:35:36', 1, 'estudiante', '$2y$10$xF2bRQQe5nPh1YYH8hqVaeENeVVFDUmWxbWMqtH6YAbgwe4IVPpIO', '0037221a6e5888dd5951f6c2f64301a6', 5, 5, 'Masculino', 'Casado', '2000-06-17', '', '', 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, 0),
+(2618, 'V-53123456', 'Otra Prueba', 'V-53123456', 'otraprueba@gmail.com', '0412555777', '0416777777', 'lol', '87', '7', '87', '275', '', 'Otro', 'frente a una farmacia', '1', '0', '1', '', 'Otro', '', '', 'Bachiller', 'U.E Freancis de Miranda', '', '2026-02-23 04:00:00', '2026-02-23 13:41:38', 1, 'estudiante', '$2y$10$vkv7JDi8xArzlGWqfXGffOkQS/JbcnpkGpQ0L55Ll4Opr4rWXr93.', '41681b0b80142eed810d89f8c60e2f1b', 5, 5, 'Masculino', 'Casado', '2003-02-07', '04163333333', 'foto_699c59127213f0.57745891.jpg', 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, 0),
+(2619, 'V-98123456', 'Diosito Otra Prueba', 'V-98123456', 'ooomaga@gmail.com', '0412555777', '0416777777', 'lol', '87', '7', '87', '275', '', 'Apartamento', 'yuk', '2', '1', '3', '', 'Alquilada', '', '', 'Bachiller', 'U.E Freancis de Miranda', '', '2026-02-23 04:00:00', '2026-02-23 13:45:21', 1, 'estudiante', '$2y$10$.nHV1hMcXMDJMK8i/YQ46OFQS5diOIRpVv1ou4MCpuYIUj1rsuRNy', 'b221bfdb70f4db19841cc369b2ff94d2', 5, 5, 'Masculino', 'Soltero', '2000-03-17', '', 'foto_699c59f1d0d921.96633581.png', 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, 0),
+(2620, 'V-45123456', 'Papadio Super Prueba', 'V-45123456', 'diosito@gmail.com', '02423644304', '0416777777', 'porai', '87', '7', '87', '275', '', 'Apartamento', 'frente a un campo', '2', '0', '1', '', 'Familiar', '', '', 'Bachiller', 'U.E Freancis de Miranda', '', '2026-02-23 04:00:00', '2026-02-23 13:47:58', 1, 'estudiante', '$2y$10$T1Me3Locj9qc7ZwNSavxheUEIaENCoyD0veQxYOM2y6BTuw4ffdY2', '6ad958f6ff0b729615f6da629362ccc9', 5, 5, 'Masculino', 'Casado', '2004-11-12', '', 'foto_699c5a8e810181.58284137.jpg', 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, 0);
 
 -- --------------------------------------------------------
 
@@ -3853,8 +4398,8 @@ INSERT INTO `users` (`id`, `idusuario`, `nombre`, `username`, `email`, `tlf`, `c
 
 CREATE TABLE `user_types` (
   `id` int NOT NULL,
-  `user_type` varchar(11) COLLATE latin1_spanish_ci NOT NULL,
-  `descripcion` varchar(50) COLLATE latin1_spanish_ci NOT NULL
+  `user_type` varchar(11) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `descripcion` varchar(50) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
 
 --
@@ -3888,13 +4433,36 @@ CREATE TABLE `user_user_types` (
 
 CREATE TABLE `usuarios_cursos` (
   `id` int NOT NULL,
-  `nro_identificacion` varchar(20) COLLATE latin1_spanish_ci NOT NULL,
-  `nombre` varchar(200) COLLATE latin1_spanish_ci NOT NULL,
-  `pais` varchar(100) COLLATE latin1_spanish_ci NOT NULL,
-  `correo` varchar(100) COLLATE latin1_spanish_ci NOT NULL,
-  `whatsapp` varchar(30) COLLATE latin1_spanish_ci NOT NULL,
-  `telegram` varchar(30) COLLATE latin1_spanish_ci NOT NULL
+  `nro_identificacion` varchar(20) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `nombre` varchar(200) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `pais` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `correo` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `whatsapp` varchar(30) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
+  `telegram` varchar(30) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `version_materia`
+--
+
+CREATE TABLE `version_materia` (
+  `id` int NOT NULL,
+  `id_version` int NOT NULL,
+  `id_materia` int NOT NULL,
+  `semestre` int NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
+
+--
+-- Volcado de datos para la tabla `version_materia`
+--
+
+INSERT INTO `version_materia` (`id`, `id_version`, `id_materia`, `semestre`) VALUES
+(2, 2, 29, 1),
+(3, 2, 30, 1),
+(4, 2, 30, 1),
+(5, 3, 31, 1);
 
 -- --------------------------------------------------------
 
@@ -3905,9 +4473,9 @@ CREATE TABLE `usuarios_cursos` (
 CREATE TABLE `visitas` (
   `id` int NOT NULL,
   `id_usuario` int NOT NULL,
-  `ip` varchar(15) COLLATE latin1_spanish_ci NOT NULL,
+  `ip` varchar(15) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL,
   `fecha_visita` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `web` varchar(100) COLLATE latin1_spanish_ci NOT NULL
+  `web` varchar(100) CHARACTER SET latin1 COLLATE latin1_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_spanish_ci;
 
 --
@@ -4502,7 +5070,993 @@ INSERT INTO `visitas` (`id`, `id_usuario`, `ip`, `fecha_visita`, `web`) VALUES
 (585, 2, '::1', '2025-12-04 17:30:17', 'inscripcion_materias.php'),
 (586, 2, '::1', '2025-12-04 17:30:20', 'inscripcion_materias.php'),
 (587, 2, '::1', '2025-12-04 17:30:22', 'inscripcion_materias.php'),
-(588, 2, '::1', '2025-12-04 17:30:32', 'inscripcion_materias.php');
+(588, 2, '::1', '2025-12-04 17:30:32', 'inscripcion_materias.php'),
+(589, 2, '::1', '2026-01-13 14:24:06', 'index.php'),
+(590, 2, '::1', '2026-01-13 14:25:23', 'inscripcion_materias.php'),
+(591, 2, '::1', '2026-01-13 14:25:26', 'inscripcion_materias.php'),
+(592, 2, '::1', '2026-01-13 14:25:52', 'consulta_notas.php'),
+(593, 2, '::1', '2026-01-13 14:25:54', 'consulta_notas.php'),
+(594, 2, '::1', '2026-01-13 14:33:26', 'agregar_carrera.php'),
+(595, 2, '::1', '2026-01-13 14:33:36', 'agregar_carrera.php'),
+(596, 2, '::1', '2026-01-13 14:51:06', 'agregar_carrera.php'),
+(597, 2, '::1', '2026-01-13 15:03:52', 'agregar_carrera.php'),
+(598, 2, '::1', '2026-01-13 15:10:38', 'agregar_carrera.php'),
+(599, 2, '::1', '2026-01-13 15:10:56', 'agregar_carrera.php'),
+(600, 2, '::1', '2026-01-13 15:10:59', 'agregar_carrera.php'),
+(601, 2, '::1', '2026-01-13 15:24:36', 'agregar_carrera.php'),
+(602, 2, '::1', '2026-01-13 15:24:53', 'agregar_carrera.php'),
+(603, 2, '::1', '2026-01-13 15:28:52', 'agregar_carrera.php'),
+(604, 2, '::1', '2026-01-13 15:33:58', 'agregar_carrera.php'),
+(605, 2, '::1', '2026-01-13 15:34:11', 'materia.php'),
+(606, 2, '::1', '2026-01-13 15:44:12', 'materia.php'),
+(607, 2, '::1', '2026-01-13 15:44:15', 'carrera_materias.php'),
+(608, 2, '::1', '2026-01-13 15:44:20', 'materia.php'),
+(609, 2, '::1', '2026-01-13 15:51:14', 'index.php'),
+(610, 2, '::1', '2026-01-13 15:51:47', 'agregar_carrera.php'),
+(611, 2, '::1', '2026-01-13 15:52:24', 'materia.php'),
+(612, 2, '::1', '2026-01-13 16:15:00', 'materia.php'),
+(613, 2, '::1', '2026-01-13 16:15:00', 'materia.php'),
+(614, 2, '::1', '2026-01-13 16:15:11', 'carrera_materias.php'),
+(615, 2, '::1', '2026-01-13 16:15:42', 'carrera_materias.php'),
+(616, 2, '::1', '2026-01-13 16:15:47', 'agregar_carrera.php'),
+(617, 2, '::1', '2026-01-13 16:15:54', 'agregar_carrera.php'),
+(618, 2, '::1', '2026-01-13 16:17:22', 'agregar_carrera.php'),
+(619, 2, '::1', '2026-01-13 16:26:30', 'agregar_carrera.php'),
+(620, 2, '::1', '2026-01-13 16:28:22', 'agregar_carrera.php'),
+(621, 2, '::1', '2026-01-13 16:34:44', 'agregar_carrera.php'),
+(622, 2, '::1', '2026-01-13 16:37:39', 'agregar_carrera.php'),
+(623, 2, '::1', '2026-01-13 16:38:15', 'agregar_carrera.php'),
+(624, 2, '::1', '2026-01-13 16:40:09', 'agregar_carrera.php'),
+(625, 2, '::1', '2026-01-13 16:40:24', 'agregar_carrera.php'),
+(626, 2, '::1', '2026-01-13 16:40:30', 'materia.php'),
+(627, 2, '::1', '2026-01-13 16:40:36', 'carrera_materias.php'),
+(628, 2, '::1', '2026-01-13 16:40:41', 'materia.php'),
+(629, 2, '::1', '2026-01-13 16:41:36', 'materia.php'),
+(630, 2, '::1', '2026-01-13 16:41:36', 'materia.php'),
+(631, 2, '::1', '2026-01-13 16:41:42', 'carrera_materias.php'),
+(632, 2, '::1', '2026-01-13 16:42:57', 'agregar_carrera.php'),
+(633, 2, '::1', '2026-01-13 16:43:16', 'agregar_carrera.php'),
+(634, 2, '::1', '2026-01-13 16:43:20', 'agregar_carrera.php'),
+(635, 2, '::1', '2026-01-13 16:44:22', 'agregar_carrera.php'),
+(636, 2, '::1', '2026-01-13 16:44:31', 'carrera_materias.php'),
+(637, 2, '::1', '2026-01-13 16:45:08', 'agregar_carrera.php'),
+(638, 2, '::1', '2026-01-13 16:46:03', 'agregar_carrera.php'),
+(639, 2, '::1', '2026-01-13 16:46:10', 'agregar_carrera.php'),
+(640, 2, '::1', '2026-01-13 16:46:11', 'materia.php'),
+(641, 2, '::1', '2026-01-13 16:46:25', 'carrera_materias.php'),
+(642, 2, '::1', '2026-01-13 16:46:42', 'carrera_materias.php'),
+(643, 2, '::1', '2026-01-13 16:46:47', 'agregar_carrera.php'),
+(644, 2, '::1', '2026-01-13 16:46:54', 'agregar_carrera.php'),
+(645, 2, '::1', '2026-01-13 16:48:10', 'materia.php'),
+(646, 2, '::1', '2026-01-13 16:48:14', 'carrera_materias.php'),
+(647, 2, '::1', '2026-01-13 16:48:35', 'agregar_estudiante.php'),
+(648, 2, '::1', '2026-01-13 16:48:35', 'agregar_estudiante.php'),
+(649, 2, '::1', '2026-01-13 16:48:38', 'carrera_materias.php'),
+(650, 2, '::1', '2026-01-13 16:51:25', 'carrera_materias.php'),
+(651, 2, '::1', '2026-01-13 16:51:26', 'carrera_materias.php'),
+(652, 2, '::1', '2026-01-13 16:51:26', 'carrera_materias.php'),
+(653, 2, '::1', '2026-01-13 16:53:23', 'carrera_materias.php'),
+(654, 2, '::1', '2026-01-13 16:54:40', 'carrera_materias.php'),
+(655, 2, '::1', '2026-01-13 16:54:42', 'carrera_materias.php'),
+(656, 2, '::1', '2026-01-13 16:54:44', 'carrera_materias.php'),
+(657, 2, '::1', '2026-01-13 16:54:45', 'carrera_materias.php'),
+(658, 2, '::1', '2026-01-13 16:54:46', 'carrera_materias.php'),
+(659, 2, '::1', '2026-01-13 16:55:12', 'carrera_materias.php'),
+(660, 2, '::1', '2026-01-13 16:56:05', 'carrera_materias.php'),
+(661, 2, '::1', '2026-01-13 16:56:06', 'carrera_materias.php'),
+(662, 2, '::1', '2026-01-13 16:56:06', 'carrera_materias.php'),
+(663, 2, '::1', '2026-01-13 16:56:07', 'carrera_materias.php'),
+(664, 2, '::1', '2026-01-13 17:01:45', 'carrera_materias.php'),
+(665, 2, '::1', '2026-01-13 17:03:53', 'carrera_materias.php'),
+(666, 2, '::1', '2026-01-13 17:03:54', 'carrera_materias.php'),
+(667, 2, '::1', '2026-01-13 17:03:55', 'carrera_materias.php'),
+(668, 2, '::1', '2026-01-13 17:03:55', 'carrera_materias.php'),
+(669, 2, '::1', '2026-01-13 17:11:42', 'carrera_materias.php'),
+(670, 2, '::1', '2026-01-13 17:11:43', 'carrera_materias.php'),
+(671, 2, '::1', '2026-01-13 17:11:43', 'carrera_materias.php'),
+(672, 2, '::1', '2026-01-13 17:16:25', 'carrera_materias.php'),
+(673, 2, '::1', '2026-01-13 17:16:26', 'carrera_materias.php'),
+(674, 2, '::1', '2026-01-13 17:16:27', 'carrera_materias.php'),
+(675, 2, '::1', '2026-01-13 17:18:24', 'carrera_materias.php'),
+(676, 2, '::1', '2026-01-13 17:18:40', 'carrera_materias.php'),
+(677, 2, '::1', '2026-01-13 17:19:44', 'carrera_materias.php'),
+(678, 2, '::1', '2026-01-13 17:19:49', 'agregar_carrera.php'),
+(679, 2, '::1', '2026-01-13 17:19:58', 'agregar_carrera.php'),
+(680, 2, '::1', '2026-01-13 17:21:40', 'agregar_carrera.php'),
+(681, 2, '::1', '2026-01-13 17:25:24', 'agregar_carrera.php'),
+(682, 2, '::1', '2026-01-13 17:30:35', 'agregar_carrera.php'),
+(683, 2, '::1', '2026-01-13 17:30:36', 'agregar_carrera.php'),
+(684, 2, '::1', '2026-01-13 17:30:46', 'agregar_carrera.php'),
+(685, 2, '::1', '2026-01-13 17:30:56', 'agregar_carrera.php'),
+(686, 2, '::1', '2026-01-13 17:31:01', 'agregar_carrera.php'),
+(687, 2, '::1', '2026-01-13 17:31:10', 'agregar_carrera.php'),
+(688, 2, '::1', '2026-01-13 17:31:18', 'agregar_carrera.php'),
+(689, 2, '::1', '2026-01-13 17:31:22', 'agregar_carrera.php'),
+(690, 2, '::1', '2026-01-13 17:34:55', 'agregar_carrera.php'),
+(691, 2, '::1', '2026-01-13 17:35:09', 'agregar_carrera.php'),
+(692, 2, '::1', '2026-01-13 17:35:16', 'agregar_carrera.php'),
+(693, 2, '::1', '2026-01-13 17:35:24', 'agregar_carrera.php'),
+(694, 2, '::1', '2026-01-13 17:36:35', 'materia.php'),
+(695, 2, '::1', '2026-01-13 17:37:31', 'materia.php'),
+(696, 2, '::1', '2026-01-13 17:37:32', 'materia.php'),
+(697, 2, '::1', '2026-01-13 17:37:38', 'carrera_materias.php'),
+(698, 2, '::1', '2026-01-13 17:38:09', 'carrera_materias.php'),
+(699, 2, '::1', '2026-01-13 17:38:15', 'agregar_carrera.php'),
+(700, 2, '::1', '2026-01-13 17:38:21', 'agregar_carrera.php'),
+(701, 2, '::1', '2026-01-13 17:38:26', 'agregar_carrera.php'),
+(702, 2, '::1', '2026-01-13 17:38:32', 'agregar_carrera.php'),
+(703, 2, '::1', '2026-01-13 17:42:08', 'agregar_carrera.php'),
+(704, 2, '::1', '2026-01-13 17:42:13', 'carrera_materias.php'),
+(705, 2, '::1', '2026-01-13 17:42:25', 'carrera_materias.php'),
+(706, 2, '::1', '2026-01-13 17:42:26', 'carrera_materias.php'),
+(707, 2, '::1', '2026-01-13 17:44:15', 'carrera_materias.php'),
+(708, 2, '::1', '2026-01-13 17:44:16', 'carrera_materias.php'),
+(709, 2, '::1', '2026-01-13 17:44:32', 'agregar_carrera.php'),
+(710, 2, '::1', '2026-01-13 18:11:29', 'agregar_carrera.php'),
+(711, 2, '::1', '2026-01-13 18:11:42', 'agregar_carrera.php'),
+(712, 2, '::1', '2026-01-13 18:12:33', 'inscripcion_materias.php'),
+(713, 2, '::1', '2026-01-13 18:15:42', 'registro_pagos.php'),
+(714, 2, '::1', '2026-01-13 18:15:44', 'registro_pagos.php'),
+(715, 2, '::1', '2026-01-13 18:15:49', 'mensajeria.php'),
+(716, 2, '::1', '2026-01-13 18:18:29', 'mensajeria.php'),
+(717, 2, '::1', '2026-01-13 18:18:34', 'mensajeria.php'),
+(718, 2, '::1', '2026-01-13 18:24:11', 'mensajeria.php'),
+(719, 2, '::1', '2026-01-13 18:28:38', 'agregar_carrera.php'),
+(720, 2, '::1', '2026-01-13 18:29:10', 'agregar_carrera.php'),
+(721, 2, '::1', '2026-01-13 18:40:56', 'agregar_carrera.php'),
+(722, 2, '::1', '2026-01-14 13:51:21', 'index.php'),
+(723, 2, '::1', '2026-01-14 13:57:09', 'agregar_carrera.php'),
+(724, 2, '::1', '2026-01-14 14:10:27', 'agregar_carrera.php'),
+(725, 2, '::1', '2026-01-14 14:15:29', 'agregar_carrera.php'),
+(726, 2, '::1', '2026-01-14 14:21:33', 'agregar_carrera.php'),
+(727, 2, '::1', '2026-01-14 14:21:33', 'agregar_carrera.php'),
+(728, 2, '::1', '2026-01-14 14:22:07', 'agregar_carrera.php'),
+(729, 2, '::1', '2026-01-14 14:42:42', 'agregar_carrera.php'),
+(730, 2, '::1', '2026-01-14 14:42:43', 'agregar_carrera.php'),
+(731, 2, '::1', '2026-01-14 14:42:57', 'index.php'),
+(732, 2, '::1', '2026-01-14 14:43:00', 'agregar_carrera.php'),
+(733, 2, '::1', '2026-01-14 14:56:38', 'agregar_carrera.php'),
+(734, 2, '::1', '2026-01-14 15:06:04', 'agregar_carrera.php'),
+(735, 2, '::1', '2026-01-14 15:06:10', 'agregar_carrera.php'),
+(736, 2, '::1', '2026-01-14 15:06:26', 'agregar_carrera.php'),
+(737, 2, '::1', '2026-01-14 15:09:01', 'agregar_carrera.php'),
+(738, 2, '::1', '2026-01-14 15:17:45', 'agregar_carrera.php'),
+(739, 2, '::1', '2026-01-14 15:18:03', 'agregar_carrera.php'),
+(740, 2, '::1', '2026-01-14 15:18:12', 'agregar_carrera.php'),
+(741, 2, '::1', '2026-01-14 15:18:30', 'agregar_carrera.php'),
+(742, 2, '::1', '2026-01-14 15:31:03', 'agregar_carrera.php'),
+(743, 2, '::1', '2026-01-14 15:31:12', 'agregar_carrera.php'),
+(744, 2, '::1', '2026-01-14 15:32:00', 'agregar_carrera.php'),
+(745, 2, '::1', '2026-01-14 15:32:05', 'agregar_carrera.php'),
+(746, 2, '::1', '2026-01-14 15:32:19', 'agregar_carrera.php'),
+(747, 2, '::1', '2026-01-14 15:58:59', 'materia.php'),
+(748, 2, '::1', '2026-01-14 16:06:19', 'materia.php'),
+(749, 2, '::1', '2026-01-14 16:07:07', 'materia.php'),
+(750, 2, '::1', '2026-01-14 16:09:36', 'materia.php'),
+(751, 2, '::1', '2026-01-14 16:09:39', 'agregar_carrera.php'),
+(752, 2, '::1', '2026-01-14 16:09:52', 'agregar_carrera.php'),
+(753, 2, '::1', '2026-01-14 16:09:58', 'materia.php'),
+(754, 2, '::1', '2026-01-14 16:11:54', 'materia.php'),
+(755, 2, '::1', '2026-01-14 16:11:55', 'materia.php'),
+(756, 2, '::1', '2026-01-14 16:12:25', 'carrera_materias.php'),
+(757, 2, '::1', '2026-01-14 16:13:15', 'carrera_materias.php'),
+(758, 2, '::1', '2026-01-14 16:13:22', 'agregar_carrera.php'),
+(759, 2, '::1', '2026-01-14 16:15:43', 'carrera_materias.php'),
+(760, 2, '::1', '2026-01-14 16:16:19', 'carrera_materias.php'),
+(761, 2, '::1', '2026-01-14 16:17:04', 'carrera_materias.php'),
+(762, 2, '::1', '2026-01-14 16:17:09', 'agregar_carrera.php'),
+(763, 2, '::1', '2026-01-14 16:18:22', 'materia.php'),
+(764, 2, '::1', '2026-01-14 16:19:02', 'materia.php'),
+(765, 2, '::1', '2026-01-14 16:22:46', 'materia.php'),
+(766, 2, '::1', '2026-01-14 16:22:55', 'materia.php'),
+(767, 2, '::1', '2026-01-14 16:22:55', 'materia.php'),
+(768, 2, '::1', '2026-01-14 16:23:36', 'carrera_materias.php'),
+(769, 2, '::1', '2026-01-14 16:23:42', 'agregar_carrera.php'),
+(770, 2, '::1', '2026-01-14 16:25:38', 'carrera_materias.php'),
+(771, 2, '::1', '2026-01-14 16:25:51', 'carrera_materias.php'),
+(772, 2, '::1', '2026-01-14 16:26:21', 'carrera_materias.php'),
+(773, 2, '::1', '2026-01-14 16:26:45', 'carrera_materias.php'),
+(774, 2, '::1', '2026-01-14 16:26:54', 'agregar_carrera.php'),
+(775, 2, '::1', '2026-01-14 16:30:57', 'index.php'),
+(776, 2, '::1', '2026-01-14 16:32:15', 'agregar_carrera.php'),
+(777, 2, '::1', '2026-01-16 13:48:35', 'index.php'),
+(778, 2, '::1', '2026-01-16 13:48:43', 'inscripcion_materias.php'),
+(779, 2, '::1', '2026-01-16 13:48:47', 'inscripcion_materias.php'),
+(780, 2, '::1', '2026-01-16 13:59:58', 'index.php'),
+(781, 2, '::1', '2026-01-16 14:00:13', 'index.php'),
+(782, 2, '::1', '2026-01-16 14:00:33', 'agregar_carrera.php'),
+(783, 2, '::1', '2026-01-16 14:00:45', 'agregar_carrera.php'),
+(784, 2, '::1', '2026-01-16 14:00:57', 'agregar_carrera.php'),
+(785, 2, '::1', '2026-01-16 14:01:45', 'agregar_carrera.php'),
+(786, 2, '::1', '2026-01-16 14:04:05', 'agregar_carrera.php'),
+(787, 2, '::1', '2026-01-16 14:04:27', 'index.php'),
+(788, 2, '::1', '2026-01-16 14:04:34', 'mi_historial.php'),
+(789, 2, '::1', '2026-01-16 14:04:42', 'mi_horario.php'),
+(790, 2, '::1', '2026-01-16 14:04:44', 'mis_secciones.php'),
+(791, 2, '::1', '2026-01-16 14:04:46', 'mi_pensum.php'),
+(792, 2, '::1', '2026-01-16 14:15:07', 'mis_secciones.php'),
+(793, 2, '::1', '2026-01-16 14:15:11', 'mi_pensum.php'),
+(794, 2, '::1', '2026-01-16 14:15:16', 'mi_pensum.php'),
+(795, 2, '::1', '2026-01-16 14:16:11', 'mi_pensum.php'),
+(796, 2, '::1', '2026-01-16 14:19:02', 'mensajeria_estudiantes.php'),
+(797, 2, '::1', '2026-01-16 14:19:12', 'mi_horario.php'),
+(798, 2, '::1', '2026-01-16 14:19:15', 'mis_secciones.php'),
+(799, 2, '::1', '2026-01-16 14:19:18', 'mi_pensum.php'),
+(800, 5, '::1', '2026-01-16 14:19:28', 'index.php'),
+(801, 5, '::1', '2026-01-16 14:19:34', 'mensajeria_estudiantes.php'),
+(802, 5, '::1', '2026-01-16 14:19:37', 'mi_horario.php'),
+(803, 5, '::1', '2026-01-16 14:20:02', 'mis_secciones.php'),
+(804, 5, '::1', '2026-01-16 14:20:05', 'mi_pensum.php'),
+(805, 5, '::1', '2026-01-16 14:20:11', 'mi_historial.php'),
+(806, 5, '::1', '2026-01-16 14:20:25', 'index.php'),
+(807, 2, '::1', '2026-01-16 14:20:37', 'index.php'),
+(808, 2, '::1', '2026-01-16 14:20:59', 'materia.php'),
+(809, 2, '::1', '2026-01-16 14:21:07', 'agregar_carrera.php'),
+(810, 5, '::1', '2026-01-16 14:40:29', 'index.php'),
+(811, 5, '::1', '2026-01-16 14:40:36', 'mi_pensum.php'),
+(812, 5, '::1', '2026-01-16 14:41:56', 'mi_pensum.php'),
+(813, 5, '::1', '2026-01-16 15:01:48', 'mi_pensum.php'),
+(814, 5, '::1', '2026-01-16 15:02:02', 'mi_pensum.php'),
+(815, 5, '::1', '2026-01-16 15:02:30', 'mi_pensum.php'),
+(816, 2, '::1', '2026-01-16 15:02:38', 'index.php'),
+(817, 2, '::1', '2026-01-16 15:02:41', 'agregar_carrera.php'),
+(818, 5, '::1', '2026-01-16 15:11:12', 'index.php'),
+(819, 5, '::1', '2026-01-16 15:11:16', 'mi_pensum.php'),
+(820, 5, '::1', '2026-01-16 15:11:17', 'mi_pensum.php'),
+(821, 5, '::1', '2026-01-16 15:11:31', 'mi_pensum.php'),
+(822, 5, '::1', '2026-01-16 15:11:37', 'index.php'),
+(823, 5, '::1', '2026-01-16 15:11:53', 'index.php'),
+(824, 5, '::1', '2026-01-16 15:27:18', 'index.php'),
+(825, 5, '::1', '2026-01-16 15:27:21', 'mi_pensum.php'),
+(826, 5, '::1', '2026-01-16 15:27:36', 'mi_pensum.php'),
+(827, 5, '::1', '2026-01-16 15:27:46', 'mi_pensum.php'),
+(828, 2, '::1', '2026-01-16 15:27:54', 'index.php'),
+(829, 2, '::1', '2026-01-16 15:28:00', 'correccion_notas.php'),
+(830, 2, '::1', '2026-01-16 15:28:02', 'correccion_notas.php'),
+(831, 2, '::1', '2026-01-16 15:28:05', 'correccion_notas.php'),
+(832, 2, '::1', '2026-01-16 15:39:17', 'index.php'),
+(833, 2, '::1', '2026-01-16 15:39:20', 'index.php'),
+(834, 2, '::1', '2026-01-16 15:39:46', 'index.php'),
+(835, 2, '::1', '2026-01-16 15:39:50', 'index.php'),
+(836, 2, '::1', '2026-01-16 15:58:58', 'index.php'),
+(837, 2, '::1', '2026-01-16 15:59:00', 'constancias.php'),
+(838, 2, '::1', '2026-01-16 16:07:25', 'constancias.php'),
+(839, 2, '::1', '2026-01-16 16:07:36', 'constancias.php'),
+(840, 2, '::1', '2026-01-16 16:08:18', 'constancias.php'),
+(841, 2, '::1', '2026-01-16 16:10:24', 'constancias.php'),
+(842, 2, '::1', '2026-01-16 16:10:36', 'constancias.php'),
+(843, 2, '::1', '2026-01-16 16:14:42', 'constancias.php'),
+(844, 2, '::1', '2026-01-16 16:15:10', 'constancias.php'),
+(845, 2, '::1', '2026-01-16 16:15:17', 'constancias.php'),
+(846, 2, '::1', '2026-01-16 16:15:21', 'constancias.php'),
+(847, 2, '::1', '2026-01-16 16:15:22', 'constancias.php'),
+(848, 2, '::1', '2026-01-16 16:15:31', 'constancias.php'),
+(849, 2, '::1', '2026-01-16 16:34:39', 'index.php'),
+(850, 2, '::1', '2026-01-16 16:34:41', 'constancias.php'),
+(851, 2, '::1', '2026-01-16 16:34:44', 'constancias.php'),
+(852, 2, '::1', '2026-01-16 16:48:13', 'constancias.php'),
+(853, 2, '::1', '2026-01-16 16:59:36', 'constancias.php'),
+(854, 2, '::1', '2026-01-16 17:00:21', 'gestion_seccion.php'),
+(855, 2, '::1', '2026-01-16 17:00:24', 'gestion_seccion.php');
+INSERT INTO `visitas` (`id`, `id_usuario`, `ip`, `fecha_visita`, `web`) VALUES
+(856, 2, '::1', '2026-01-16 17:00:28', 'gestion_seccion.php'),
+(857, 2, '::1', '2026-01-16 17:00:29', 'gestion_seccion.php'),
+(858, 2, '::1', '2026-01-16 17:00:48', 'periodos_academicos.php'),
+(859, 2, '::1', '2026-01-16 17:01:32', 'periodos_academicos.php'),
+(860, 2, '::1', '2026-01-16 17:01:32', 'periodos_academicos.php'),
+(861, 2, '::1', '2026-01-16 17:01:52', 'gestion_seccion.php'),
+(862, 2, '::1', '2026-01-16 17:02:01', 'gestion_seccion.php'),
+(863, 2, '::1', '2026-01-16 17:04:05', 'gestion_seccion.php'),
+(864, 2, '::1', '2026-01-16 17:04:09', 'gestion_seccion.php'),
+(865, 2, '::1', '2026-01-16 17:04:22', 'gestion_seccion.php'),
+(866, 2, '::1', '2026-01-16 17:05:31', 'gestion_seccion.php'),
+(867, 2, '::1', '2026-01-16 17:05:34', 'gestion_seccion.php'),
+(868, 2, '::1', '2026-01-16 17:05:41', 'tipos_horario.php'),
+(869, 2, '::1', '2026-01-16 17:06:08', 'gestion_horario_personal.php'),
+(870, 2, '::1', '2026-01-16 17:06:21', 'tipos_horario.php'),
+(871, 2, '::1', '2026-01-16 17:07:18', 'gestion_seccion.php'),
+(872, 2, '::1', '2026-01-16 17:07:20', 'gestion_seccion.php'),
+(873, 2, '::1', '2026-01-16 17:13:37', 'constancias.php'),
+(874, 2, '::1', '2026-01-16 17:13:39', 'constancias.php'),
+(875, 2, '::1', '2026-01-16 17:14:52', 'constancias.php'),
+(876, 2, '::1', '2026-01-16 17:17:08', 'index.php'),
+(877, 2, '::1', '2026-01-16 17:17:17', 'constancias.php'),
+(878, 2, '::1', '2026-01-16 17:17:19', 'constancias.php'),
+(879, 2, '::1', '2026-01-16 17:17:43', 'constancias.php'),
+(880, 2, '::1', '2026-01-16 17:19:02', 'constancias.php'),
+(881, 2, '::1', '2026-01-16 17:20:30', 'constancias.php'),
+(882, 2, '::1', '2026-01-16 17:23:38', 'constancias.php'),
+(883, 2, '::1', '2026-01-19 13:19:21', 'index.php'),
+(884, 2, '::1', '2026-01-19 13:20:06', 'admin_notas_pendientes.php'),
+(885, 2, '::1', '2026-01-19 13:20:08', 'consulta_notas.php'),
+(886, 4, '::1', '2026-01-19 13:20:53', 'index.php'),
+(887, 4, '::1', '2026-01-19 13:20:55', 'notas.php'),
+(888, 4, '::1', '2026-01-19 15:36:43', 'notas.php'),
+(889, 2, '::1', '2026-01-20 14:43:44', 'index.php'),
+(890, 2, '::1', '2026-01-20 14:44:40', 'consulta_notas.php'),
+(891, 2, '::1', '2026-01-20 14:44:42', 'consulta_notas.php'),
+(892, 2, '::1', '2026-01-20 14:45:02', 'admin_notas_pendientes.php'),
+(893, 2, '::1', '2026-01-20 14:45:06', 'notas_pasadas.php'),
+(894, 2, '::1', '2026-01-20 15:49:06', 'notas_pasadas.php'),
+(895, 2, '::1', '2026-01-20 16:01:31', 'notas_pasadas.php'),
+(896, 2, '::1', '2026-01-20 16:16:49', 'notas_pasadas.php'),
+(897, 2, '::1', '2026-01-20 16:20:31', 'notas_pasadas.php'),
+(898, 2, '::1', '2026-01-20 16:20:36', 'registro_pagos.php'),
+(899, 2, '::1', '2026-01-20 16:47:44', 'notas_pasadas.php'),
+(900, 2, '::1', '2026-01-20 16:55:33', 'notas_pasadas.php'),
+(901, 2, '::1', '2026-01-20 16:55:34', 'notas_pasadas.php'),
+(902, 2, '::1', '2026-01-20 16:56:49', 'notas_pasadas.php'),
+(903, 2, '::1', '2026-01-20 16:57:03', 'agregar_carrera.php'),
+(904, 2, '::1', '2026-01-20 17:01:27', 'correccion_notas.php'),
+(905, 2, '::1', '2026-01-20 17:01:29', 'notas_pasadas.php'),
+(906, 2, '::1', '2026-01-20 17:09:27', 'notas_pasadas.php'),
+(907, 2, '::1', '2026-01-20 17:09:30', 'notas_pasadas.php'),
+(908, 2, '::1', '2026-01-20 17:12:34', 'notas_pasadas.php'),
+(909, 2, '::1', '2026-01-20 17:12:40', 'consulta_notas.php'),
+(910, 2, '::1', '2026-01-20 17:12:42', 'consulta_notas.php'),
+(911, 2, '::1', '2026-01-20 17:15:43', 'notas_pasadas.php'),
+(912, 2, '::1', '2026-01-20 17:18:40', 'notas_pasadas.php'),
+(913, 2, '::1', '2026-01-20 17:19:05', 'notas_pasadas.php'),
+(914, 2, '::1', '2026-01-20 17:19:43', 'notas_pasadas.php'),
+(915, 2, '::1', '2026-01-20 17:22:11', 'notas_pasadas.php'),
+(916, 2, '::1', '2026-01-20 17:24:34', 'notas_pasadas.php'),
+(917, 2, '::1', '2026-01-20 17:28:03', 'notas_pasadas.php'),
+(918, 2, '::1', '2026-01-20 17:28:06', 'consulta_notas.php'),
+(919, 2, '::1', '2026-01-20 17:28:09', 'consulta_notas.php'),
+(920, 2, '::1', '2026-01-20 17:29:09', 'gestion_seccion.php'),
+(921, 2, '::1', '2026-01-20 17:29:12', 'gestion_seccion.php'),
+(922, 2, '::1', '2026-01-20 17:29:21', 'gestion_seccion.php'),
+(923, 2, '::1', '2026-01-20 17:29:59', 'index.php'),
+(924, 2, '::1', '2026-01-20 17:41:30', 'index.php'),
+(925, 4, '::1', '2026-01-20 17:47:30', 'index.php'),
+(926, 4, '::1', '2026-01-20 17:50:08', 'index.php'),
+(927, 4, '::1', '2026-01-20 17:50:26', 'notas.php'),
+(928, 2, '::1', '2026-01-21 13:33:20', 'index.php'),
+(929, 2, '::1', '2026-01-21 13:47:08', 'visita.php'),
+(930, 2, '::1', '2026-01-21 13:47:12', 'visita.php'),
+(931, 2, '::1', '2026-01-21 13:47:12', 'visita.php'),
+(932, 2, '::1', '2026-01-21 13:47:14', 'visita.php'),
+(933, 2, '::1', '2026-01-21 13:52:49', 'index.php'),
+(934, 4, '::1', '2026-01-21 13:53:25', 'index.php'),
+(935, 4, '::1', '2026-01-21 13:53:27', 'notas.php'),
+(936, 4, '::1', '2026-01-21 14:26:02', 'notas.php'),
+(937, 2, '::1', '2026-01-21 14:26:09', 'index.php'),
+(938, 2, '::1', '2026-01-21 14:26:13', 'actas_calificacion.php'),
+(939, 2, '::1', '2026-01-21 14:27:07', 'actas_calificacion.php'),
+(940, 2, '::1', '2026-01-21 14:28:43', 'carrera_materias.php'),
+(941, 2, '::1', '2026-01-21 14:31:17', 'actas_calificacion.php'),
+(942, 2, '::1', '2026-01-21 14:45:48', 'actas_calificacion.php'),
+(943, 2, '::1', '2026-01-21 14:56:04', 'actas_calificacion.php'),
+(944, 2, '::1', '2026-01-21 14:56:06', 'actas_calificacion.php'),
+(945, 2, '::1', '2026-01-21 14:59:34', 'actas_calificacion.php'),
+(946, 2, '::1', '2026-01-21 14:59:35', 'actas_calificacion.php'),
+(947, 2, '::1', '2026-01-21 15:10:28', 'actas_calificacion.php'),
+(948, 2, '::1', '2026-01-21 15:10:29', 'actas_calificacion.php'),
+(949, 2, '::1', '2026-01-21 15:10:31', 'actas_calificacion.php'),
+(950, 2, '::1', '2026-01-21 15:19:03', 'actas_calificacion.php'),
+(951, 2, '::1', '2026-01-21 15:19:05', 'actas_calificacion.php'),
+(952, 4, '::1', '2026-01-21 15:20:18', 'index.php'),
+(953, 4, '::1', '2026-01-21 15:20:19', 'notas.php'),
+(954, 2, '::1', '2026-01-21 15:20:33', 'index.php'),
+(955, 2, '::1', '2026-01-21 15:20:37', 'actas_calificacion.php'),
+(956, 4, '::1', '2026-01-21 15:21:51', 'index.php'),
+(957, 4, '::1', '2026-01-21 15:21:52', 'notas.php'),
+(958, 2, '::1', '2026-01-21 15:24:08', 'index.php'),
+(959, 2, '::1', '2026-01-21 15:24:11', 'actas_calificacion.php'),
+(960, 2, '::1', '2026-01-21 15:26:44', 'actas_calificacion.php'),
+(961, 2, '::1', '2026-01-22 13:56:14', 'index.php'),
+(962, 4, '::1', '2026-01-22 13:57:08', 'index.php'),
+(963, 4, '::1', '2026-01-22 13:57:09', 'notas.php'),
+(964, 4, '::1', '2026-01-22 15:17:21', 'index.php'),
+(965, 2, '::1', '2026-01-23 13:33:34', 'index.php'),
+(966, 4, '::1', '2026-01-23 13:35:35', 'index.php'),
+(967, 4, '::1', '2026-01-23 13:35:36', 'notas.php'),
+(968, 2, '::1', '2026-01-23 13:35:58', 'index.php'),
+(969, 2, '::1', '2026-01-23 13:36:04', 'notas_pasadas.php'),
+(970, 2, '::1', '2026-01-23 13:37:46', 'notas_pasadas.php'),
+(971, 2, '::1', '2026-01-23 13:55:05', 'notas_pasadas.php'),
+(972, 2, '::1', '2026-01-23 14:20:14', 'notas_pasadas.php'),
+(973, 2, '::1', '2026-01-23 14:20:20', 'correccion_notas.php'),
+(974, 2, '::1', '2026-01-23 14:20:26', 'correccion_notas.php'),
+(975, 2, '::1', '2026-01-23 14:20:29', 'correccion_notas.php'),
+(976, 2, '::1', '2026-01-23 14:21:12', 'correccion_notas.php'),
+(977, 2, '::1', '2026-01-23 14:39:47', 'correccion_notas.php'),
+(978, 2, '::1', '2026-01-23 14:55:55', 'correccion_notas.php'),
+(979, 2, '::1', '2026-01-23 15:03:05', 'correccion_notas.php'),
+(980, 2, '::1', '2026-01-23 15:03:11', 'index.php'),
+(981, 2, '::1', '2026-01-23 15:03:17', 'correccion_notas.php'),
+(982, 2, '::1', '2026-01-23 15:03:20', 'correccion_notas.php'),
+(983, 2, '::1', '2026-01-23 15:03:23', 'correccion_notas.php'),
+(984, 2, '::1', '2026-01-23 15:03:26', 'correccion_notas.php'),
+(985, 2, '::1', '2026-01-23 15:04:26', 'correccion_notas.php'),
+(986, 2, '::1', '2026-01-23 15:04:57', 'correccion_notas.php'),
+(987, 2, '::1', '2026-01-23 15:09:54', 'correccion_notas.php'),
+(988, 2, '::1', '2026-01-23 15:40:41', 'correccion_notas.php'),
+(989, 2, '::1', '2026-01-23 15:40:58', 'correccion_notas.php'),
+(990, 2, '::1', '2026-01-23 15:43:05', 'notas_pasadas.php'),
+(991, 2, '::1', '2026-01-23 15:44:36', 'correccion_notas.php'),
+(992, 2, '::1', '2026-01-23 15:44:38', 'correccion_notas.php'),
+(993, 2, '::1', '2026-01-23 15:44:40', 'correccion_notas.php'),
+(994, 2, '::1', '2026-01-23 15:44:43', 'correccion_notas.php'),
+(995, 2, '::1', '2026-01-23 16:05:03', 'correccion_notas.php'),
+(996, 2, '::1', '2026-01-23 16:14:56', 'consulta_notas.php'),
+(997, 2, '::1', '2026-01-23 16:14:58', 'consulta_notas.php'),
+(998, 2, '::1', '2026-01-23 16:49:03', 'consulta_notas.php'),
+(999, 2, '::1', '2026-01-23 16:50:21', 'consulta_notas.php'),
+(1000, 2, '::1', '2026-01-26 14:59:00', 'index.php'),
+(1001, 2, '::1', '2026-01-26 14:59:12', 'consulta_notas.php'),
+(1002, 2, '::1', '2026-01-26 14:59:14', 'consulta_notas.php'),
+(1003, 2, '::1', '2026-01-26 15:00:33', 'consulta_notas.php'),
+(1004, 2, '::1', '2026-01-26 15:02:45', 'inscripcion_materias.php'),
+(1005, 2, '::1', '2026-01-26 15:02:48', 'inscripcion_materias.php'),
+(1006, 2, '::1', '2026-01-26 15:04:31', 'inscripcion_materias.php'),
+(1007, 2, '::1', '2026-01-26 15:04:51', 'inscripcion_materias.php'),
+(1008, 2, '::1', '2026-01-26 15:07:33', 'gestion_seccion.php'),
+(1009, 2, '::1', '2026-01-26 15:07:38', 'gestion_seccion.php'),
+(1010, 2, '::1', '2026-01-26 15:07:42', 'gestion_seccion.php'),
+(1011, 2, '::1', '2026-01-26 15:07:47', 'gestion_seccion.php'),
+(1012, 2, '::1', '2026-01-26 15:07:47', 'gestion_seccion.php'),
+(1013, 2, '::1', '2026-01-26 15:08:23', 'asignacion_cursos.php'),
+(1014, 2, '::1', '2026-01-26 15:08:50', 'asignacion_cursos.php'),
+(1015, 2, '::1', '2026-01-26 15:09:11', 'asignacion_cursos.php'),
+(1016, 2, '::1', '2026-01-26 15:09:24', 'asignar_secciones.php'),
+(1017, 2, '::1', '2026-01-26 15:09:30', 'asignar_secciones.php'),
+(1018, 2, '::1', '2026-01-26 15:09:43', 'asignar_secciones.php'),
+(1019, 2, '::1', '2026-01-26 16:02:45', 'index.php'),
+(1020, 2, '::1', '2026-01-26 16:02:51', 'gestion_seccion.php'),
+(1021, 2, '::1', '2026-01-26 16:02:57', 'asignar_secciones.php'),
+(1022, 2, '::1', '2026-01-26 16:03:03', 'asignar_secciones.php'),
+(1023, 2, '::1', '2026-01-26 16:03:05', 'asignar_secciones.php'),
+(1024, 2, '::1', '2026-01-26 16:03:24', 'asignar_secciones.php'),
+(1025, 2, '::1', '2026-01-26 16:03:26', 'asignar_secciones.php'),
+(1026, 2, '::1', '2026-01-26 16:03:30', 'asignar_secciones.php'),
+(1027, 2, '::1', '2026-01-26 16:03:41', 'asignar_secciones.php'),
+(1028, 2, '::1', '2026-01-26 16:03:44', 'asignar_secciones.php'),
+(1029, 2, '::1', '2026-01-26 16:04:04', 'index.php'),
+(1030, 2, '::1', '2026-01-26 16:04:10', 'asignar_secciones.php'),
+(1031, 2, '::1', '2026-01-26 16:04:22', 'asignar_secciones.php'),
+(1032, 2, '::1', '2026-01-26 16:04:24', 'asignar_secciones.php'),
+(1033, 2, '::1', '2026-01-26 16:05:45', 'asignar_secciones.php'),
+(1034, 2, '::1', '2026-01-26 16:05:47', 'asignar_secciones.php'),
+(1035, 2, '::1', '2026-01-26 16:28:45', 'asignar_secciones.php'),
+(1036, 2, '::1', '2026-01-26 16:29:35', 'index.php'),
+(1037, 2, '::1', '2026-01-26 16:29:37', 'asignar_secciones.php'),
+(1038, 2, '::1', '2026-01-26 16:29:48', 'asignar_secciones.php'),
+(1039, 2, '::1', '2026-01-26 16:29:51', 'asignar_secciones.php'),
+(1040, 2, '::1', '2026-01-26 16:34:06', 'index.php'),
+(1041, 2, '::1', '2026-01-26 16:34:08', 'asignar_secciones.php'),
+(1042, 2, '::1', '2026-01-26 16:34:18', 'asignar_secciones.php'),
+(1043, 2, '::1', '2026-01-26 16:34:24', 'asignar_secciones.php'),
+(1044, 4, '::1', '2026-01-26 16:36:39', 'index.php'),
+(1045, 4, '::1', '2026-01-26 16:36:42', 'notas.php'),
+(1046, 2, '::1', '2026-01-26 16:37:22', 'index.php'),
+(1047, 2, '::1', '2026-01-26 16:37:29', 'correccion_notas.php'),
+(1048, 2, '::1', '2026-01-26 16:37:33', 'correccion_notas.php'),
+(1049, 2, '::1', '2026-01-26 16:37:38', 'correccion_notas.php'),
+(1050, 4, '::1', '2026-01-26 16:38:30', 'index.php'),
+(1051, 4, '::1', '2026-01-26 16:38:31', 'notas.php'),
+(1052, 4, '::1', '2026-01-26 16:39:37', 'notas.php'),
+(1053, 4, '::1', '2026-01-26 16:40:35', 'notas.php'),
+(1054, 4, '::1', '2026-01-26 16:43:21', 'index.php'),
+(1055, 4, '::1', '2026-01-26 16:43:22', 'notas.php'),
+(1056, 4, '::1', '2026-01-26 17:04:17', 'notas.php'),
+(1057, 4, '::1', '2026-01-26 17:04:28', 'notas.php'),
+(1058, 4, '::1', '2026-01-26 17:05:02', 'notas.php'),
+(1059, 4, '::1', '2026-01-26 17:05:04', 'notas.php'),
+(1060, 4, '::1', '2026-01-26 17:06:25', 'notas.php'),
+(1061, 2, '::1', '2026-01-26 17:13:07', 'index.php'),
+(1062, 2, '::1', '2026-01-26 17:13:12', 'admin_notas_pendientes.php'),
+(1063, 2, '::1', '2026-01-26 17:13:18', 'consulta_notas.php'),
+(1064, 2, '::1', '2026-01-26 17:13:20', 'consulta_notas.php'),
+(1065, 2, '::1', '2026-01-26 17:13:56', 'notas_pasadas.php'),
+(1066, 2, '::1', '2026-01-26 17:14:04', 'notas_pasadas.php'),
+(1067, 4, '::1', '2026-01-26 17:16:59', 'index.php'),
+(1068, 4, '::1', '2026-01-26 17:17:00', 'notas.php'),
+(1069, 4, '::1', '2026-01-26 17:27:26', 'notas.php'),
+(1070, 4, '::1', '2026-01-26 17:27:37', 'notas.php'),
+(1071, 4, '::1', '2026-01-26 17:45:27', 'notas.php'),
+(1072, 4, '::1', '2026-01-26 17:45:29', 'notas.php'),
+(1073, 4, '::1', '2026-01-26 17:48:45', 'notas.php'),
+(1074, 4, '::1', '2026-01-26 17:54:26', 'notas.php'),
+(1075, 4, '::1', '2026-01-26 17:57:19', 'notas.php'),
+(1076, 4, '::1', '2026-01-26 17:57:20', 'notas.php'),
+(1077, 4, '::1', '2026-01-26 18:07:52', 'notas.php'),
+(1078, 4, '::1', '2026-01-26 18:12:16', 'notas.php'),
+(1079, 4, '::1', '2026-01-26 18:12:19', 'notas.php'),
+(1080, 4, '::1', '2026-01-26 18:12:37', 'notas.php'),
+(1081, 4, '::1', '2026-01-26 18:12:54', 'notas.php'),
+(1082, 4, '::1', '2026-01-26 18:24:17', 'notas.php'),
+(1083, 2, '::1', '2026-01-26 18:24:38', 'index.php'),
+(1084, 2, '::1', '2026-01-26 18:24:42', 'consulta_notas.php'),
+(1085, 2, '::1', '2026-01-26 18:24:44', 'consulta_notas.php'),
+(1086, 2, '::1', '2026-01-26 18:33:55', 'consulta_notas.php'),
+(1087, 2, '::1', '2026-01-26 18:42:53', 'consulta_notas.php'),
+(1088, 2, '::1', '2026-01-26 18:44:04', 'consulta_notas.php'),
+(1089, 2, '::1', '2026-01-28 13:35:21', 'index.php'),
+(1090, 2, '::1', '2026-01-28 13:35:27', 'consulta_notas.php'),
+(1091, 2, '::1', '2026-01-28 13:35:30', 'consulta_notas.php'),
+(1092, 2, '::1', '2026-01-28 13:35:49', 'grado.php'),
+(1093, 2, '::1', '2026-01-28 13:35:52', 'grado.php'),
+(1094, 2, '::1', '2026-01-28 13:36:07', 'grado.php'),
+(1095, 2, '::1', '2026-01-28 13:57:30', 'constancias.php'),
+(1096, 2, '::1', '2026-01-28 13:57:33', 'constancias.php'),
+(1097, 5, '::1', '2026-01-28 13:57:55', 'index.php'),
+(1098, 5, '::1', '2026-01-28 13:58:06', 'mis_secciones.php'),
+(1099, 2, '::1', '2026-01-28 13:59:08', 'index.php'),
+(1100, 2, '::1', '2026-01-28 13:59:10', 'grado.php'),
+(1101, 2, '::1', '2026-01-28 13:59:12', 'constancias.php'),
+(1102, 2, '::1', '2026-01-28 13:59:20', 'constancias.php'),
+(1103, 2, '::1', '2026-01-28 13:59:30', 'constancias.php'),
+(1104, 2, '::1', '2026-01-28 13:59:40', 'constancias.php'),
+(1105, 2, '::1', '2026-01-28 13:59:50', 'constancias.php'),
+(1106, 2, '::1', '2026-01-28 14:01:31', 'grado.php'),
+(1107, 2, '::1', '2026-01-28 14:01:41', 'index.php'),
+(1108, 2, '::1', '2026-01-28 14:01:42', 'notas.php'),
+(1109, 2, '::1', '2026-01-28 14:19:25', 'notas.php'),
+(1110, 2, '::1', '2026-01-28 14:22:47', 'index.php'),
+(1111, 2, '::1', '2026-01-28 14:22:48', 'notas.php'),
+(1112, 2, '::1', '2026-01-28 14:23:52', 'notas.php'),
+(1113, 2, '::1', '2026-01-28 14:25:03', 'index.php'),
+(1114, 2, '::1', '2026-01-28 14:25:10', 'index.php'),
+(1115, 2, '::1', '2026-01-28 14:25:15', 'admin_notas_pendientes.php'),
+(1116, 2, '::1', '2026-01-28 14:25:20', 'admin_notas_pendientes.php'),
+(1117, 2, '::1', '2026-01-28 14:25:29', 'grado.php'),
+(1118, 2, '::1', '2026-01-28 14:25:40', 'grado.php'),
+(1119, 2, '::1', '2026-01-28 14:50:49', 'consulta_notas.php'),
+(1120, 2, '::1', '2026-01-28 14:50:51', 'consulta_notas.php'),
+(1121, 2, '::1', '2026-01-28 15:02:59', 'admin_notas_pendientes.php'),
+(1122, 2, '::1', '2026-01-28 15:03:02', 'notas_pasadas.php'),
+(1123, 2, '::1', '2026-01-28 15:03:31', 'notas_pasadas.php'),
+(1124, 2, '::1', '2026-01-28 15:03:38', 'materia.php'),
+(1125, 2, '::1', '2026-01-28 15:03:48', 'agregar_carrera.php'),
+(1126, 2, '::1', '2026-01-28 15:05:54', 'grado.php'),
+(1127, 2, '::1', '2026-01-28 15:05:57', 'grado.php'),
+(1128, 2, '::1', '2026-01-28 15:40:41', 'grado.php'),
+(1129, 2, '::1', '2026-01-28 16:42:57', 'grado.php'),
+(1130, 2, '::1', '2026-01-28 16:43:37', 'grado.php'),
+(1131, 2, '::1', '2026-01-28 16:43:40', 'grado.php'),
+(1132, 2, '::1', '2026-01-28 16:43:45', 'grado.php'),
+(1133, 2, '::1', '2026-01-28 16:43:56', 'grado.php'),
+(1134, 2, '::1', '2026-01-28 16:44:23', 'gestion_seccion.php'),
+(1135, 2, '::1', '2026-01-28 16:44:31', 'agregar_carrera.php'),
+(1136, 2, '::1', '2026-01-28 16:50:21', 'agregar_carrera.php'),
+(1137, 2, '::1', '2026-01-28 16:52:38', 'materia.php'),
+(1138, 2, '::1', '2026-01-28 16:52:43', 'materia.php'),
+(1139, 2, '::1', '2026-01-28 16:52:47', 'index.php'),
+(1140, 2, '::1', '2026-01-28 16:52:49', 'materia.php'),
+(1141, 2, '::1', '2026-01-28 16:55:39', 'materia.php'),
+(1142, 2, '::1', '2026-01-28 16:58:51', 'index.php'),
+(1143, 2, '::1', '2026-01-28 16:59:39', 'grado.php'),
+(1144, 2, '::1', '2026-01-28 16:59:42', 'grado.php'),
+(1145, 2, '::1', '2026-01-28 17:03:03', 'grado.php'),
+(1146, 2, '::1', '2026-01-28 17:18:13', 'grado.php'),
+(1147, 2, '::1', '2026-01-28 17:18:34', 'grado.php'),
+(1148, 2, '::1', '2026-01-28 17:20:03', 'index.php'),
+(1149, 2, '::1', '2026-01-28 17:20:10', 'editar_accesos.php'),
+(1150, 2, '::1', '2026-01-28 17:20:21', 'editar_accesos.php'),
+(1151, 2, '::1', '2026-01-28 17:20:21', 'editar_accesos.php'),
+(1152, 2, '::1', '2026-01-28 17:20:26', 'materia.php'),
+(1153, 2, '::1', '2026-01-28 17:20:31', 'editar_accesos.php'),
+(1154, 2, '::1', '2026-01-28 17:20:33', 'index.php'),
+(1155, 2, '::1', '2026-01-28 17:20:40', 'gestion_seccion.php'),
+(1156, 2, '::1', '2026-01-28 17:20:42', 'grado.php'),
+(1157, 2, '::1', '2026-01-28 17:20:45', 'grado.php'),
+(1158, 2, '::1', '2026-01-28 17:31:52', 'grado.php'),
+(1159, 2, '::1', '2026-01-28 17:33:48', 'grado.php'),
+(1160, 2, '::1', '2026-01-28 17:33:56', 'grado.php'),
+(1161, 2, '::1', '2026-01-28 17:34:06', 'grado.php'),
+(1162, 2, '::1', '2026-01-28 17:39:42', 'grado.php'),
+(1163, 2, '::1', '2026-01-28 17:45:18', 'grado.php'),
+(1164, 2, '::1', '2026-01-28 17:45:39', 'grado.php'),
+(1165, 2, '::1', '2026-01-28 17:47:01', 'grado.php'),
+(1166, 2, '::1', '2026-01-28 17:49:46', 'grado.php'),
+(1167, 2, '::1', '2026-01-28 17:56:47', 'grado.php'),
+(1168, 2, '::1', '2026-01-28 18:21:41', 'grado.php'),
+(1169, 2, '::1', '2026-01-28 18:22:03', 'grado.php'),
+(1170, 2, '::1', '2026-01-28 18:22:04', 'index.php'),
+(1171, 2, '::1', '2026-01-28 18:37:46', 'index.php'),
+(1172, 2, '::1', '2026-01-28 18:40:50', 'index.php'),
+(1173, 2, '::1', '2026-01-28 18:41:15', 'index.php'),
+(1174, 2, '::1', '2026-01-28 18:41:42', 'index.php'),
+(1175, 2, '::1', '2026-01-28 18:43:20', 'index.php'),
+(1176, 2, '::1', '2026-01-28 18:43:21', 'index.php'),
+(1177, 2, '::1', '2026-01-28 18:43:23', 'mensajeria.php'),
+(1178, 2, '::1', '2026-01-28 18:43:35', 'registro_pagos.php'),
+(1179, 2, '::1', '2026-01-28 18:44:08', 'index.php'),
+(1180, 2, '::1', '2026-01-29 13:28:47', 'index.php'),
+(1181, 2, '::1', '2026-01-29 13:29:17', 'materia.php'),
+(1182, 2, '::1', '2026-01-29 13:29:27', 'constancias.php'),
+(1183, 2, '::1', '2026-01-29 13:29:34', 'constancias.php'),
+(1184, 2, '::1', '2026-01-29 13:29:56', 'constancias.php'),
+(1185, 2, '::1', '2026-01-29 13:30:03', 'constancias.php'),
+(1186, 2, '::1', '2026-01-29 14:20:32', 'constancias.php'),
+(1187, 2, '::1', '2026-01-29 14:21:18', 'constancias.php'),
+(1188, 2, '::1', '2026-01-29 14:49:35', 'agregar_carrera.php'),
+(1189, 2, '::1', '2026-01-29 15:11:42', 'constancias.php'),
+(1190, 2, '::1', '2026-01-29 15:11:44', 'constancias.php'),
+(1191, 2, '::1', '2026-01-29 16:09:14', 'constancias.php'),
+(1192, 2, '::1', '2026-01-29 16:27:38', 'constancias.php'),
+(1193, 2, '::1', '2026-01-29 16:27:48', 'constancias.php'),
+(1194, 2, '::1', '2026-01-29 16:29:38', 'constancias.php'),
+(1195, 2, '::1', '2026-01-29 16:32:02', 'constancias.php'),
+(1196, 2, '::1', '2026-01-29 16:50:04', 'constancias.php'),
+(1197, 2, '::1', '2026-01-29 16:50:59', 'index.php'),
+(1198, 2, '::1', '2026-01-29 16:51:03', 'constancias.php'),
+(1199, 2, '::1', '2026-01-29 16:51:06', 'constancias.php'),
+(1200, 2, '::1', '2026-01-29 16:51:22', 'constancias.php'),
+(1201, 2, '::1', '2026-01-29 16:55:27', 'constancias.php'),
+(1202, 2, '::1', '2026-01-29 17:17:40', 'constancias.php'),
+(1203, 2, '::1', '2026-01-29 17:37:28', 'constancias.php'),
+(1204, 2, '::1', '2026-01-29 17:37:29', 'index.php'),
+(1205, 2, '::1', '2026-01-29 17:38:11', 'index.php'),
+(1206, 2, '::1', '2026-01-29 17:39:14', 'index.php'),
+(1207, 2, '::1', '2026-01-30 13:13:19', 'index.php'),
+(1208, 2, '::1', '2026-01-30 13:14:38', 'agregar_carrera.php'),
+(1209, 2, '::1', '2026-01-30 13:14:47', 'agregar_carrera.php'),
+(1210, 2, '::1', '2026-01-30 13:15:28', 'materia.php'),
+(1211, 2, '::1', '2026-01-30 13:17:19', 'materia.php'),
+(1212, 2, '::1', '2026-01-30 13:17:19', 'materia.php'),
+(1213, 2, '::1', '2026-01-30 13:17:25', 'carrera_materias.php'),
+(1214, 2, '::1', '2026-01-30 13:18:13', 'carrera_materias.php'),
+(1215, 2, '::1', '2026-01-30 13:18:18', 'agregar_carrera.php'),
+(1216, 2, '::1', '2026-01-30 13:19:30', 'carrera_materias.php'),
+(1217, 2, '::1', '2026-01-30 13:19:36', 'materia.php'),
+(1218, 2, '::1', '2026-01-30 13:20:20', 'materia.php'),
+(1219, 2, '::1', '2026-01-30 13:20:21', 'materia.php'),
+(1220, 2, '::1', '2026-01-30 13:20:23', 'carrera_materias.php'),
+(1221, 2, '::1', '2026-01-30 13:20:37', 'carrera_materias.php'),
+(1222, 2, '::1', '2026-01-30 13:20:45', 'agregar_carrera.php'),
+(1223, 2, '::1', '2026-01-30 13:21:34', 'agregar_carrera.php'),
+(1224, 2, '::1', '2026-01-30 13:21:51', 'agregar_carrera.php'),
+(1225, 2, '::1', '2026-01-30 13:54:52', 'add_docente.php'),
+(1226, 2, '::1', '2026-01-30 13:55:01', 'asignacion_cursos.php'),
+(1227, 2, '::1', '2026-01-30 13:55:13', 'asignacion_cursos.php'),
+(1228, 2, '::1', '2026-01-30 13:55:36', 'index.php'),
+(1229, 2, '::1', '2026-01-30 13:56:02', 'agregar_carrera.php'),
+(1230, 2, '::1', '2026-01-30 13:56:11', 'agregar_carrera.php'),
+(1231, 2, '::1', '2026-01-30 13:56:23', 'agregar_carrera.php'),
+(1232, 2, '::1', '2026-01-30 13:56:27', 'agregar_carrera.php'),
+(1233, 2, '::1', '2026-01-30 14:09:48', 'materia.php'),
+(1234, 2, '::1', '2026-01-30 14:16:24', 'materia.php'),
+(1235, 2, '::1', '2026-01-30 14:16:28', 'materia.php'),
+(1236, 2, '::1', '2026-01-30 14:16:29', 'materia.php'),
+(1237, 2, '::1', '2026-01-30 14:17:14', 'materia.php'),
+(1238, 2, '::1', '2026-01-30 14:17:14', 'materia.php'),
+(1239, 2, '::1', '2026-01-30 14:17:46', 'carrera_materias.php'),
+(1240, 2, '::1', '2026-01-30 14:18:25', 'carrera_materias.php'),
+(1241, 2, '::1', '2026-01-30 14:18:35', 'agregar_carrera.php'),
+(1242, 2, '::1', '2026-01-30 14:18:45', 'agregar_carrera.php'),
+(1243, 2, '::1', '2026-01-30 14:18:50', 'agregar_carrera.php'),
+(1244, 2, '::1', '2026-01-30 14:19:18', 'materia.php'),
+(1245, 2, '::1', '2026-01-30 14:19:21', 'carrera_materias.php'),
+(1246, 2, '::1', '2026-01-30 14:19:44', 'carrera_materias.php'),
+(1247, 2, '::1', '2026-01-30 14:19:56', 'agregar_carrera.php'),
+(1248, 2, '::1', '2026-01-30 14:23:17', 'materia.php'),
+(1249, 2, '::1', '2026-01-30 14:24:34', 'materia.php'),
+(1250, 2, '::1', '2026-01-30 14:24:39', 'materia.php'),
+(1251, 2, '::1', '2026-01-30 14:24:54', 'materia.php'),
+(1252, 2, '::1', '2026-01-30 14:24:55', 'materia.php'),
+(1253, 2, '::1', '2026-01-30 14:24:58', 'agregar_carrera.php'),
+(1254, 2, '::1', '2026-01-30 14:49:30', 'materia.php'),
+(1255, 2, '::1', '2026-01-30 14:50:18', 'materia.php'),
+(1256, 2, '::1', '2026-01-30 14:50:18', 'materia.php'),
+(1257, 2, '::1', '2026-01-30 14:50:21', 'carrera_materias.php'),
+(1258, 2, '::1', '2026-01-30 14:50:35', 'carrera_materias.php'),
+(1259, 2, '::1', '2026-01-30 14:50:44', 'agregar_carrera.php'),
+(1260, 2, '::1', '2026-01-30 15:07:18', 'materia.php'),
+(1261, 2, '::1', '2026-01-30 15:07:30', 'materia.php'),
+(1262, 2, '::1', '2026-01-30 15:07:30', 'materia.php'),
+(1263, 2, '::1', '2026-01-30 15:07:33', 'agregar_carrera.php'),
+(1264, 2, '::1', '2026-02-02 13:44:23', 'index.php'),
+(1265, 2, '::1', '2026-02-02 13:44:26', 'index.php'),
+(1266, 2, '::1', '2026-02-02 13:51:36', 'index.php'),
+(1267, 2, '::1', '2026-02-02 13:51:53', 'index.php'),
+(1268, 2, '::1', '2026-02-02 14:01:38', 'index.php'),
+(1269, 2, '::1', '2026-02-02 14:07:09', 'index.php'),
+(1270, 2, '::1', '2026-02-02 14:07:40', 'index.php'),
+(1271, 2, '::1', '2026-02-02 14:07:42', 'index.php'),
+(1272, 2, '::1', '2026-02-02 14:07:44', 'index.php'),
+(1273, 2, '::1', '2026-02-02 14:07:46', 'index.php'),
+(1274, 2, '::1', '2026-02-02 14:08:30', 'index.php'),
+(1275, 2, '::1', '2026-02-02 14:08:46', 'index.php'),
+(1276, 2, '::1', '2026-02-02 14:09:06', 'index.php'),
+(1277, 2, '::1', '2026-02-02 14:14:25', 'index.php'),
+(1278, 2, '::1', '2026-02-02 14:16:24', 'index.php'),
+(1279, 2, '::1', '2026-02-02 14:17:12', 'index.php'),
+(1280, 2, '::1', '2026-02-02 14:23:49', 'index.php'),
+(1281, 2, '::1', '2026-02-02 14:23:54', 'respaldo_bd.php'),
+(1282, 2, '::1', '2026-02-02 14:24:06', 'respaldo_bd.php'),
+(1283, 2, '::1', '2026-02-02 14:24:08', 'respaldo_bd.php'),
+(1284, 2, '::1', '2026-02-02 14:24:11', 'respaldo_bd.php'),
+(1285, 2, '::1', '2026-02-02 14:24:14', 'respaldo_bd.php'),
+(1286, 2, '::1', '2026-02-02 14:24:35', 'respaldo_bd.php'),
+(1287, 2, '::1', '2026-02-02 14:25:28', 'index.php'),
+(1288, 2, '::1', '2026-02-02 14:25:29', 'index.php'),
+(1289, 2, '::1', '2026-02-02 14:26:08', 'index.php'),
+(1290, 2, '::1', '2026-02-02 14:28:02', 'index.php'),
+(1291, 2, '::1', '2026-02-05 14:57:43', 'index.php'),
+(1292, 2, '::1', '2026-02-05 14:57:57', 'estudiantes.php'),
+(1293, 2, '::1', '2026-02-05 14:57:58', 'estudiantes.php'),
+(1294, 2, '::1', '2026-02-05 14:58:00', 'agregar_carrera.php'),
+(1295, 2, '::1', '2026-02-05 14:58:08', 'estudiantes.php'),
+(1296, 2, '::1', '2026-02-05 14:58:08', 'estudiantes.php'),
+(1297, 2, '::1', '2026-02-05 14:58:18', 'index.php'),
+(1298, 5, '::1', '2026-02-10 18:48:45', 'index.php'),
+(1299, 2615, '::1', '2026-02-10 18:52:22', 'index.php'),
+(1300, 2, '::1', '2026-02-10 18:52:51', 'index.php'),
+(1301, 2, '::1', '2026-02-10 18:53:15', 'agregar_estudiante.php'),
+(1302, 2, '::1', '2026-02-10 18:53:15', 'agregar_estudiante.php'),
+(1303, 2, '::1', '2026-02-10 18:55:17', 'agregar_estudiante.php'),
+(1304, 2, '::1', '2026-02-10 18:55:17', 'agregar_estudiante.php'),
+(1305, 2, '::1', '2026-02-10 18:55:33', 'index.php'),
+(1306, 2616, '::1', '2026-02-10 18:56:12', 'index.php'),
+(1307, 2616, '::1', '2026-02-10 19:00:40', 'mi_historial.php'),
+(1308, 2616, '::1', '2026-02-10 19:00:59', 'index.php'),
+(1309, 2, '::1', '2026-02-12 13:50:46', 'index.php'),
+(1310, 2, '::1', '2026-02-12 13:50:59', 'mi_pensum.php'),
+(1311, 2, '::1', '2026-02-12 13:51:03', 'mi_pensum.php'),
+(1312, 2, '::1', '2026-02-12 13:51:36', 'mi_pensum.php'),
+(1313, 2, '::1', '2026-02-12 13:51:46', 'index.php'),
+(1314, 2, '::1', '2026-02-12 13:51:55', 'mi_horario.php'),
+(1315, 2, '::1', '2026-02-12 13:51:56', 'index.php'),
+(1316, 4, '::1', '2026-02-12 13:52:17', 'index.php'),
+(1317, 5, '::1', '2026-02-12 13:52:28', 'index.php'),
+(1318, 5, '::1', '2026-02-12 13:52:31', 'mi_horario.php'),
+(1319, 5, '::1', '2026-02-12 13:53:06', 'index.php'),
+(1320, 5, '::1', '2026-02-12 13:53:09', 'mis_secciones.php'),
+(1321, 5, '::1', '2026-02-12 13:53:12', 'index.php'),
+(1322, 5, '::1', '2026-02-12 13:58:16', 'mi_historial.php'),
+(1323, 2, '::1', '2026-02-12 13:58:38', 'index.php'),
+(1324, 2, '::1', '2026-02-12 13:58:59', 'consulta_notas.php'),
+(1325, 2, '::1', '2026-02-12 13:59:01', 'consulta_notas.php'),
+(1326, 2, '::1', '2026-02-12 14:29:22', 'mi_historial.php'),
+(1327, 2, '::1', '2026-02-12 14:29:28', 'index.php'),
+(1328, 2, '::1', '2026-02-12 14:29:32', 'mi_historial.php'),
+(1329, 2, '::1', '2026-02-12 14:29:44', 'mi_historial.php'),
+(1330, 5, '::1', '2026-02-12 14:29:51', 'index.php'),
+(1331, 5, '::1', '2026-02-12 14:29:54', 'mi_pensum.php'),
+(1332, 5, '::1', '2026-02-12 14:29:56', 'index.php'),
+(1333, 5, '::1', '2026-02-12 14:29:59', 'mi_historial.php'),
+(1334, 5, '::1', '2026-02-12 15:06:53', 'mi_historial.php'),
+(1335, 5, '::1', '2026-02-12 15:08:28', 'mi_historial.php'),
+(1336, 5, '::1', '2026-02-12 15:08:58', 'mi_historial.php'),
+(1337, 5, '::1', '2026-02-12 15:26:28', 'mi_historial.php'),
+(1338, 5, '::1', '2026-02-12 15:28:09', 'index.php'),
+(1339, 5, '::1', '2026-02-12 15:28:11', 'mi_pensum.php'),
+(1340, 5, '::1', '2026-02-12 15:28:15', 'mi_pensum.php'),
+(1341, 5, '::1', '2026-02-12 15:28:25', 'mi_pensum.php'),
+(1342, 5, '::1', '2026-02-12 15:28:29', 'index.php'),
+(1343, 5, '::1', '2026-02-12 15:28:33', 'mis_secciones.php'),
+(1344, 5, '::1', '2026-02-12 15:28:38', 'index.php'),
+(1345, 5, '::1', '2026-02-12 15:28:51', 'mi_historial.php'),
+(1346, 5, '::1', '2026-02-12 15:29:00', 'index.php'),
+(1347, 2, '::1', '2026-02-12 15:29:27', 'index.php'),
+(1348, 2, '::1', '2026-02-12 15:29:30', 'constancias.php'),
+(1349, 2, '::1', '2026-02-12 15:29:32', 'constancias.php'),
+(1350, 2, '::1', '2026-02-12 16:06:00', 'constancias.php'),
+(1351, 2, '::1', '2026-02-12 16:06:03', 'index.php'),
+(1352, 2, '::1', '2026-02-12 16:07:05', 'index.php'),
+(1353, 2, '::1', '2026-02-12 16:07:11', 'index.php'),
+(1354, 2, '::1', '2026-02-12 16:55:20', 'index.php'),
+(1355, 2, '::1', '2026-02-12 16:55:22', 'mis_constancias.php'),
+(1356, 2, '::1', '2026-02-12 16:55:41', 'index.php'),
+(1357, 5, '::1', '2026-02-12 16:55:50', 'index.php'),
+(1358, 5, '::1', '2026-02-12 16:55:55', 'mis_constancias.php'),
+(1359, 2, '::1', '2026-02-12 16:57:23', 'index.php'),
+(1360, 2, '::1', '2026-02-12 16:57:26', 'mis_constancias.php'),
+(1361, 2, '::1', '2026-02-12 17:03:11', 'mis_constancias.php'),
+(1362, 2, '::1', '2026-02-12 17:06:05', 'mis_constancias.php'),
+(1363, 2, '::1', '2026-02-12 17:12:50', 'mis_constancias.php'),
+(1364, 2, '::1', '2026-02-12 17:12:51', 'mis_constancias.php'),
+(1365, 2, '::1', '2026-02-12 17:13:33', 'index.php'),
+(1366, 2, '::1', '2026-02-12 17:16:23', 'index.php'),
+(1367, 2, '::1', '2026-02-12 17:18:46', 'index.php'),
+(1368, 2, '::1', '2026-02-12 17:18:47', 'mis_constancias.php'),
+(1369, 2, '::1', '2026-02-12 17:22:43', 'index.php'),
+(1370, 2, '::1', '2026-02-12 17:23:36', 'index.php'),
+(1371, 2, '::1', '2026-02-23 13:18:25', 'index.php'),
+(1372, 2, '::1', '2026-02-23 13:18:28', 'mi_pensum.php'),
+(1373, 2, '::1', '2026-02-23 13:18:32', 'index.php'),
+(1374, 2, '::1', '2026-02-23 13:18:43', 'mis_constancias.php'),
+(1375, 2, '::1', '2026-02-23 13:18:46', 'index.php'),
+(1376, 2, '::1', '2026-02-23 13:22:48', 'mi_horario.php'),
+(1377, 2, '::1', '2026-02-23 13:22:52', 'index.php'),
+(1378, 2, '::1', '2026-02-23 13:22:54', 'mi_historial.php'),
+(1379, 2, '::1', '2026-02-23 13:23:03', 'index.php'),
+(1380, 2, '::1', '2026-02-23 13:23:54', 'index.php'),
+(1381, 2, '::1', '2026-02-23 13:24:16', 'index.php'),
+(1382, 2, '::1', '2026-02-23 13:24:21', 'notas.php'),
+(1383, 2, '::1', '2026-02-23 13:25:09', 'index.php'),
+(1384, 2, '::1', '2026-02-23 13:25:14', 'asignacion_cursos.php'),
+(1385, 2, '::1', '2026-02-23 13:25:35', 'asignacion_cursos.php'),
+(1386, 2, '::1', '2026-02-23 13:25:52', 'asignacion_cursos.php'),
+(1387, 2, '::1', '2026-02-23 13:26:33', 'gestion_seccion.php'),
+(1388, 2, '::1', '2026-02-23 13:26:38', 'gestion_seccion.php'),
+(1389, 2, '::1', '2026-02-23 13:27:41', 'gestion_seccion.php'),
+(1390, 2, '::1', '2026-02-23 13:27:41', 'gestion_seccion.php'),
+(1391, 2, '::1', '2026-02-23 13:27:45', 'gestion_seccion.php'),
+(1392, 2, '::1', '2026-02-23 13:27:47', 'gestion_seccion.php'),
+(1393, 2, '::1', '2026-02-23 13:27:51', 'gestion_seccion.php'),
+(1394, 2, '::1', '2026-02-23 13:28:02', 'gestion_seccion.php'),
+(1395, 2, '::1', '2026-02-23 13:28:02', 'gestion_seccion.php'),
+(1396, 2, '::1', '2026-02-23 13:28:12', 'gestion_seccion.php'),
+(1397, 2, '::1', '2026-02-23 13:28:23', 'gestion_seccion.php'),
+(1398, 2, '::1', '2026-02-23 13:28:27', 'gestion_seccion.php'),
+(1399, 2, '::1', '2026-02-23 13:28:32', 'gestion_seccion.php'),
+(1400, 2, '::1', '2026-02-23 13:28:37', 'gestion_seccion.php'),
+(1401, 2, '::1', '2026-02-23 13:29:14', 'gestion_seccion.php'),
+(1402, 2, '::1', '2026-02-23 13:29:26', 'gestion_seccion.php'),
+(1403, 2, '::1', '2026-02-23 13:29:30', 'asignar_secciones.php'),
+(1404, 2, '::1', '2026-02-23 13:30:01', 'asignar_secciones.php'),
+(1405, 2, '::1', '2026-02-23 13:31:59', 'gestion_seccion.php'),
+(1406, 2, '::1', '2026-02-23 13:32:04', 'agregar_estudiante.php'),
+(1407, 2, '::1', '2026-02-23 13:32:04', 'agregar_estudiante.php'),
+(1408, 2, '::1', '2026-02-23 13:35:36', 'agregar_estudiante.php'),
+(1409, 2, '::1', '2026-02-23 13:35:37', 'agregar_estudiante.php'),
+(1410, 2, '::1', '2026-02-23 13:35:56', 'estudiantes.php'),
+(1411, 2, '::1', '2026-02-23 13:35:57', 'estudiantes.php'),
+(1412, 2, '::1', '2026-02-23 13:39:39', 'agregar_estudiante.php'),
+(1413, 2, '::1', '2026-02-23 13:39:39', 'agregar_estudiante.php'),
+(1414, 2, '::1', '2026-02-23 13:41:38', 'agregar_estudiante.php'),
+(1415, 2, '::1', '2026-02-23 13:41:38', 'agregar_estudiante.php'),
+(1416, 2, '::1', '2026-02-23 13:41:45', 'estudiantes.php'),
+(1417, 2, '::1', '2026-02-23 13:41:45', 'estudiantes.php'),
+(1418, 2, '::1', '2026-02-23 13:42:02', 'gestion_seccion.php'),
+(1419, 2, '::1', '2026-02-23 13:42:05', 'gestion_seccion.php'),
+(1420, 2, '::1', '2026-02-23 13:42:12', 'gestion_seccion.php'),
+(1421, 2, '::1', '2026-02-23 13:42:12', 'gestion_seccion.php'),
+(1422, 2, '::1', '2026-02-23 13:43:17', 'agregar_estudiante.php'),
+(1423, 2, '::1', '2026-02-23 13:43:17', 'agregar_estudiante.php'),
+(1424, 2, '::1', '2026-02-23 13:45:21', 'agregar_estudiante.php'),
+(1425, 2, '::1', '2026-02-23 13:45:22', 'agregar_estudiante.php'),
+(1426, 2, '::1', '2026-02-23 13:47:58', 'agregar_estudiante.php'),
+(1427, 2, '::1', '2026-02-23 13:47:58', 'agregar_estudiante.php'),
+(1428, 2, '::1', '2026-02-23 13:48:03', 'estudiantes.php'),
+(1429, 2, '::1', '2026-02-23 13:48:03', 'estudiantes.php'),
+(1430, 2, '::1', '2026-02-23 13:49:59', 'asignar_secciones.php'),
+(1431, 2, '::1', '2026-02-23 13:50:05', 'gestion_seccion.php'),
+(1432, 2, '::1', '2026-02-23 13:50:11', 'gestion_seccion.php'),
+(1433, 2, '::1', '2026-02-23 13:50:18', 'gestion_seccion.php'),
+(1434, 2, '::1', '2026-02-23 13:50:18', 'gestion_seccion.php'),
+(1435, 2, '::1', '2026-02-23 13:50:21', 'asignar_secciones.php'),
+(1436, 2, '::1', '2026-02-23 13:50:26', 'asignar_secciones.php'),
+(1437, 2, '::1', '2026-02-23 13:50:33', 'asignar_secciones.php'),
+(1438, 2, '::1', '2026-02-23 13:51:22', 'index.php'),
+(1439, 2, '::1', '2026-02-23 13:51:30', 'index.php'),
+(1440, 2, '::1', '2026-02-23 13:52:17', 'notas.php'),
+(1441, 2, '::1', '2026-02-23 14:42:33', 'notas.php'),
+(1442, 2, '::1', '2026-02-23 14:43:38', 'notas.php'),
+(1443, 2, '::1', '2026-02-23 14:52:23', 'notas.php'),
+(1444, 2, '::1', '2026-02-23 15:09:58', 'notas.php'),
+(1445, 2, '::1', '2026-02-23 15:09:59', 'notas.php'),
+(1446, 2, '::1', '2026-02-23 15:45:09', 'notas.php'),
+(1447, 2, '::1', '2026-02-23 15:46:18', 'notas.php'),
+(1448, 2, '::1', '2026-02-23 15:49:17', 'notas.php'),
+(1449, 2, '::1', '2026-02-23 15:52:07', 'notas.php'),
+(1450, 2, '::1', '2026-02-24 13:44:59', 'index.php'),
+(1451, 2, '::1', '2026-02-24 13:46:00', 'index.php'),
+(1452, 2, '::1', '2026-02-24 13:46:02', 'notas.php'),
+(1453, 2, '::1', '2026-02-24 13:48:44', 'notas.php'),
+(1454, 2, '::1', '2026-02-24 13:54:34', 'notas.php'),
+(1455, 2, '::1', '2026-02-24 13:56:03', 'notas.php'),
+(1456, 2, '::1', '2026-02-24 13:56:43', 'notas.php'),
+(1457, 2, '::1', '2026-02-24 15:00:40', 'notas.php'),
+(1458, 2, '::1', '2026-02-24 15:03:58', 'notas.php'),
+(1459, 2, '::1', '2026-02-24 15:03:59', 'notas.php'),
+(1460, 2, '::1', '2026-02-24 15:04:00', 'notas.php'),
+(1461, 2, '::1', '2026-02-24 15:04:11', 'notas.php'),
+(1462, 2, '::1', '2026-02-24 15:04:12', 'notas.php'),
+(1463, 2, '::1', '2026-02-24 15:04:18', 'notas.php'),
+(1464, 2, '::1', '2026-02-24 18:04:37', 'notas.php'),
+(1465, 2, '::1', '2026-03-02 13:12:23', 'index.php'),
+(1466, 2, '::1', '2026-03-02 13:12:58', 'index.php'),
+(1467, 2, '::1', '2026-03-02 13:13:01', 'notas.php'),
+(1468, 2, '::1', '2026-03-02 13:16:42', 'notas.php'),
+(1469, 2, '::1', '2026-03-02 13:17:08', 'notas.php'),
+(1470, 2, '::1', '2026-03-02 13:17:31', 'notas.php'),
+(1471, 2, '::1', '2026-03-02 13:17:52', 'notas.php'),
+(1472, 2, '::1', '2026-03-02 13:17:57', 'notas.php'),
+(1473, 2, '::1', '2026-03-02 13:18:03', 'notas.php'),
+(1474, 2, '::1', '2026-03-02 13:19:27', 'notas.php'),
+(1475, 2, '::1', '2026-03-02 13:20:17', 'notas.php'),
+(1476, 2, '::1', '2026-03-02 13:22:50', 'notas.php'),
+(1477, 2, '::1', '2026-03-02 13:25:15', 'notas.php'),
+(1478, 2, '::1', '2026-03-02 13:27:59', 'index.php'),
+(1479, 2, '::1', '2026-03-02 13:28:00', 'notas.php'),
+(1480, 2, '::1', '2026-03-02 13:38:21', 'index.php'),
+(1481, 2, '::1', '2026-03-02 13:38:22', 'notas.php'),
+(1482, 2, '::1', '2026-03-02 13:38:23', 'notas.php'),
+(1483, 2, '::1', '2026-03-02 13:43:11', 'notas.php'),
+(1484, 2, '::1', '2026-03-02 13:43:11', 'notas.php'),
+(1485, 2, '::1', '2026-03-02 13:44:12', 'index.php'),
+(1486, 2, '::1', '2026-03-02 13:44:20', 'asignacion_cursos.php'),
+(1487, 2, '::1', '2026-03-02 13:44:27', 'index.php'),
+(1488, 2, '::1', '2026-03-02 14:09:47', 'index.php'),
+(1489, 2, '::1', '2026-03-02 14:15:24', 'index.php'),
+(1490, 2, '::1', '2026-03-02 14:27:04', 'index.php'),
+(1491, 2, '::1', '2026-03-02 14:27:05', 'asignacion_voceros.php'),
+(1492, 2, '::1', '2026-03-02 14:27:16', 'asignacion_voceros.php'),
+(1493, 2, '::1', '2026-03-02 14:32:46', 'asignacion_voceros.php'),
+(1494, 2, '::1', '2026-03-02 14:33:00', 'asignacion_voceros.php'),
+(1495, 2, '::1', '2026-03-02 14:33:02', 'asignacion_voceros.php'),
+(1496, 2, '::1', '2026-03-02 14:34:12', 'asignacion_voceros.php'),
+(1497, 2, '::1', '2026-03-02 14:34:21', 'asignacion_voceros.php'),
+(1498, 2, '::1', '2026-03-02 14:34:26', 'asignacion_voceros.php'),
+(1499, 2, '::1', '2026-03-02 14:34:26', 'asignacion_voceros.php'),
+(1500, 2, '::1', '2026-03-02 14:35:06', 'index.php'),
+(1501, 2, '::1', '2026-03-02 14:35:09', 'mis_secciones.php'),
+(1502, 2, '::1', '2026-03-02 14:35:11', 'index.php'),
+(1503, 2, '::1', '2026-03-02 14:35:22', 'index.php'),
+(1504, 2, '::1', '2026-03-02 14:35:26', 'asignacion_cursos.php'),
+(1505, 2, '::1', '2026-03-02 14:35:29', 'index.php'),
+(1506, 2, '::1', '2026-03-02 14:38:07', 'index.php'),
+(1507, 2, '::1', '2026-03-02 14:38:09', 'asignacion_voceros.php'),
+(1508, 2, '::1', '2026-03-02 14:38:12', 'index.php'),
+(1509, 2, '::1', '2026-03-02 14:41:31', 'index.php'),
+(1510, 2, '::1', '2026-03-02 14:41:32', 'asignacion_voceros.php'),
+(1511, 2, '::1', '2026-03-02 14:41:36', 'asignacion_voceros.php'),
+(1512, 2, '::1', '2026-03-02 14:41:37', 'asignacion_voceros.php'),
+(1513, 2, '::1', '2026-03-02 14:41:39', 'asignacion_voceros.php'),
+(1514, 2, '::1', '2026-03-02 14:41:43', 'asignacion_voceros.php'),
+(1515, 2, '::1', '2026-03-02 14:41:44', 'asignacion_voceros.php'),
+(1516, 2, '::1', '2026-03-02 14:41:48', 'asignacion_voceros.php'),
+(1517, 2, '::1', '2026-03-02 14:41:50', 'asignacion_voceros.php'),
+(1518, 2, '::1', '2026-03-02 14:41:56', 'asignacion_voceros.php'),
+(1519, 2, '::1', '2026-03-02 14:41:56', 'asignacion_voceros.php'),
+(1520, 5, '::1', '2026-03-02 14:42:14', 'index.php'),
+(1521, 5, '::1', '2026-03-02 14:44:02', 'mis_secciones.php'),
+(1522, 5, '::1', '2026-03-02 14:44:05', 'index.php'),
+(1523, 5, '::1', '2026-03-02 14:51:46', 'index.php'),
+(1524, 5, '::1', '2026-03-02 14:52:16', 'mis_secciones.php'),
+(1525, 5, '::1', '2026-03-02 14:52:20', 'index.php'),
+(1526, 5, '::1', '2026-03-02 14:52:25', 'mi_horario.php'),
+(1527, 5, '::1', '2026-03-02 14:52:31', 'index.php'),
+(1528, 5, '::1', '2026-03-02 14:52:33', 'mi_pensum.php'),
+(1529, 5, '::1', '2026-03-02 14:52:37', 'index.php'),
+(1530, 5, '::1', '2026-03-02 14:52:40', 'mi_historial.php'),
+(1531, 5, '::1', '2026-03-02 14:53:20', 'index.php'),
+(1532, 5, '::1', '2026-03-02 14:54:20', 'index.php'),
+(1533, 5, '::1', '2026-03-03 13:30:25', 'index.php'),
+(1534, 5, '::1', '2026-03-03 13:32:02', 'mi_horario.php'),
+(1535, 5, '::1', '2026-03-03 13:32:17', 'index.php'),
+(1536, 5, '::1', '2026-03-03 13:32:25', 'mis_constancias.php'),
+(1537, 5, '::1', '2026-03-03 13:32:40', 'index.php'),
+(1538, 5, '::1', '2026-03-03 13:55:13', 'index.php'),
+(1539, 5, '::1', '2026-03-04 13:37:20', 'index.php'),
+(1540, 5, '::1', '2026-03-04 14:11:24', 'mis_constancias.php'),
+(1541, 5, '::1', '2026-03-04 14:11:49', 'index.php'),
+(1542, 2, '::1', '2026-03-12 13:20:34', 'index.php'),
+(1543, 5, '::1', '2026-03-12 13:20:45', 'index.php'),
+(1544, 5, '::1', '2026-03-12 13:20:56', 'index.php'),
+(1545, 5, '::1', '2026-03-12 15:00:46', 'index.php'),
+(1546, 5, '::1', '2026-03-12 15:00:51', 'vocero.php'),
+(1547, 5, '::1', '2026-03-12 15:01:23', 'mensajeria_estudiantes.php'),
+(1548, 5, '::1', '2026-03-12 15:01:28', 'index.php'),
+(1549, 5, '::1', '2026-03-12 15:01:30', 'vocero.php'),
+(1550, 5, '::1', '2026-03-25 15:32:45', 'index.php'),
+(1551, 5, '::1', '2026-03-25 15:33:05', 'vocero.php'),
+(1552, 5, '::1', '2026-03-25 15:34:47', 'mensajeria_estudiantes.php'),
+(1553, 5, '::1', '2026-03-25 15:43:30', 'mensajeria_estudiantes.php'),
+(1554, 5, '::1', '2026-03-25 15:50:51', 'mensajeria_estudiantes.php'),
+(1555, 5, '::1', '2026-03-25 15:55:20', 'mensajeria_estudiantes.php'),
+(1556, 5, '::1', '2026-03-25 15:55:23', 'mensajeria_estudiantes.php'),
+(1557, 5, '::1', '2026-03-25 15:55:39', 'mensajeria_estudiantes.php'),
+(1558, 5, '::1', '2026-03-25 15:55:47', 'mensajeria_estudiantes.php'),
+(1559, 5, '::1', '2026-03-25 15:59:26', 'mensajeria_estudiantes.php'),
+(1560, 5, '::1', '2026-03-25 15:59:46', 'mensajeria_estudiantes.php'),
+(1561, 5, '::1', '2026-03-25 16:10:40', 'mensajeria_estudiantes.php'),
+(1562, 5, '::1', '2026-03-25 16:10:51', 'mensajeria_estudiantes.php'),
+(1563, 5, '::1', '2026-03-25 16:10:57', 'mensajeria_estudiantes.php'),
+(1564, 5, '::1', '2026-03-25 16:11:33', 'mensajeria_estudiantes.php'),
+(1565, 5, '::1', '2026-03-25 16:11:38', 'mensajeria_estudiantes.php'),
+(1566, 5, '::1', '2026-03-25 16:11:49', 'index.php'),
+(1567, 4, '::1', '2026-03-25 16:12:15', 'index.php'),
+(1568, 4, '::1', '2026-03-25 16:12:19', 'mensajeria.php'),
+(1569, 4, '::1', '2026-03-25 16:12:22', 'mensajeria.php'),
+(1570, 4, '::1', '2026-03-25 16:12:37', 'index.php'),
+(1571, 4, '::1', '2026-03-25 16:23:51', 'mensajeria.php'),
+(1572, 4, '::1', '2026-03-25 16:24:02', 'mensajeria.php'),
+(1573, 4, '::1', '2026-03-25 16:24:19', 'mensajeria.php');
 
 --
 -- Índices para tablas volcadas
@@ -4565,6 +6119,13 @@ ALTER TABLE `carrera_materia`
   ADD KEY `id_materia` (`id_materia`);
 
 --
+-- Indices de la tabla `carrera_versiones`
+--
+ALTER TABLE `carrera_versiones`
+  ADD PRIMARY KEY (`id_version`),
+  ADD KEY `id_carrera` (`id_carrera`);
+
+--
 -- Indices de la tabla `ciudades`
 --
 ALTER TABLE `ciudades`
@@ -4600,6 +6161,7 @@ ALTER TABLE `docente_materia`
 ALTER TABLE `docente_seccion`
   ADD PRIMARY KEY (`id_docente_seccion`),
   ADD UNIQUE KEY `id_usuario` (`id_usuario`,`id_seccion`),
+  ADD UNIQUE KEY `idx_unique_seccion_materia` (`id_seccion`,`id_materia`),
   ADD KEY `id_seccion` (`id_seccion`),
   ADD KEY `id_materia` (`id_materia`);
 
@@ -4666,6 +6228,22 @@ ALTER TABLE `horarios`
 --
 ALTER TABLE `ingresos`
   ADD PRIMARY KEY (`id`);
+
+--
+-- Indices de la tabla `mallas`
+--
+ALTER TABLE `mallas`
+  ADD PRIMARY KEY (`id_malla`),
+  ADD UNIQUE KEY `codigo_malla` (`codigo_malla`),
+  ADD KEY `id_carrera` (`id_carrera`);
+
+--
+-- Indices de la tabla `malla_materia`
+--
+ALTER TABLE `malla_materia`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `id_malla` (`id_malla`),
+  ADD KEY `id_materia` (`id_materia`);
 
 --
 -- Indices de la tabla `materias`
@@ -4739,6 +6317,15 @@ ALTER TABLE `periodos_academicos`
   ADD PRIMARY KEY (`id_periodo`);
 
 --
+-- Indices de la tabla `prelaciones`
+--
+ALTER TABLE `prelaciones`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `id_carrera` (`id_carrera`),
+  ADD KEY `id_materia` (`id_materia`),
+  ADD KEY `id_prerequisito` (`id_prerequisito`);
+
+--
 -- Indices de la tabla `relacion_cursos`
 --
 ALTER TABLE `relacion_cursos`
@@ -4760,7 +6347,6 @@ ALTER TABLE `revision_mensajes`
 -- Indices de la tabla `secciones`
 --
 ALTER TABLE `secciones`
-  ADD PRIMARY KEY (`id_seccion`),
   ADD KEY `id_carrera` (`id_carrera`),
   ADD KEY `id_trayecto` (`id_trayecto`),
   ADD KEY `id_periodo` (`id_periodo`);
@@ -4878,6 +6464,14 @@ ALTER TABLE `usuarios_cursos`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indices de la tabla `version_materia`
+--
+ALTER TABLE `version_materia`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `id_version` (`id_version`),
+  ADD KEY `id_materia` (`id_materia`);
+
+--
 -- Indices de la tabla `visitas`
 --
 ALTER TABLE `visitas`
@@ -4903,7 +6497,7 @@ ALTER TABLE `aprobaciones_avance`
 -- AUTO_INCREMENT de la tabla `auditoria`
 --
 ALTER TABLE `auditoria`
-  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=283;
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=593;
 
 --
 -- AUTO_INCREMENT de la tabla `aulas`
@@ -4927,13 +6521,19 @@ ALTER TABLE `bitacora`
 -- AUTO_INCREMENT de la tabla `carreras`
 --
 ALTER TABLE `carreras`
-  MODIFY `id_carrera` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `id_carrera` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT de la tabla `carrera_materia`
 --
 ALTER TABLE `carrera_materia`
-  MODIFY `id_relacion` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
+  MODIFY `id_relacion` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=40;
+
+--
+-- AUTO_INCREMENT de la tabla `carrera_versiones`
+--
+ALTER TABLE `carrera_versiones`
+  MODIFY `id_version` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT de la tabla `ciudades`
@@ -4951,19 +6551,19 @@ ALTER TABLE `contenido`
 -- AUTO_INCREMENT de la tabla `control_avance_trayecto`
 --
 ALTER TABLE `control_avance_trayecto`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT de la tabla `docente_materia`
 --
 ALTER TABLE `docente_materia`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
 -- AUTO_INCREMENT de la tabla `docente_seccion`
 --
 ALTER TABLE `docente_seccion`
-  MODIFY `id_docente_seccion` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `id_docente_seccion` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
 
 --
 -- AUTO_INCREMENT de la tabla `estados`
@@ -4993,7 +6593,7 @@ ALTER TABLE `genero`
 -- AUTO_INCREMENT de la tabla `graduados`
 --
 ALTER TABLE `graduados`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT de la tabla `historial_cambios_notas`
@@ -5014,16 +6614,28 @@ ALTER TABLE `ingresos`
   MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
+-- AUTO_INCREMENT de la tabla `mallas`
+--
+ALTER TABLE `mallas`
+  MODIFY `id_malla` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT de la tabla `malla_materia`
+--
+ALTER TABLE `malla_materia`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
+
+--
 -- AUTO_INCREMENT de la tabla `materias`
 --
 ALTER TABLE `materias`
-  MODIFY `id_materia` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
+  MODIFY `id_materia` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
 
 --
 -- AUTO_INCREMENT de la tabla `mensajeria`
 --
 ALTER TABLE `mensajeria`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
 
 --
 -- AUTO_INCREMENT de la tabla `municipios`
@@ -5041,13 +6653,13 @@ ALTER TABLE `nombre_curso`
 -- AUTO_INCREMENT de la tabla `notas_definitivas`
 --
 ALTER TABLE `notas_definitivas`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=289;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=311;
 
 --
 -- AUTO_INCREMENT de la tabla `notas_pendientes`
 --
 ALTER TABLE `notas_pendientes`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=603;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=647;
 
 --
 -- AUTO_INCREMENT de la tabla `pagos`
@@ -5065,7 +6677,13 @@ ALTER TABLE `parroquias`
 -- AUTO_INCREMENT de la tabla `periodos_academicos`
 --
 ALTER TABLE `periodos_academicos`
-  MODIFY `id_periodo` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id_periodo` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT de la tabla `prelaciones`
+--
+ALTER TABLE `prelaciones`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT de la tabla `relacion_cursos`
@@ -5084,12 +6702,6 @@ ALTER TABLE `respaldos_descargas`
 --
 ALTER TABLE `revision_mensajes`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT de la tabla `secciones`
---
-ALTER TABLE `secciones`
-  MODIFY `id_seccion` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT de la tabla `status`
@@ -5149,7 +6761,7 @@ ALTER TABLE `titulos`
 -- AUTO_INCREMENT de la tabla `titulos_obtenidos`
 --
 ALTER TABLE `titulos_obtenidos`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=39;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=43;
 
 --
 -- AUTO_INCREMENT de la tabla `titulo_materia`
@@ -5167,7 +6779,7 @@ ALTER TABLE `trayectos`
 -- AUTO_INCREMENT de la tabla `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2616;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2621;
 
 --
 -- AUTO_INCREMENT de la tabla `user_types`
@@ -5188,10 +6800,16 @@ ALTER TABLE `usuarios_cursos`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT de la tabla `version_materia`
+--
+ALTER TABLE `version_materia`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
 -- AUTO_INCREMENT de la tabla `visitas`
 --
 ALTER TABLE `visitas`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=589;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1574;
 
 --
 -- Restricciones para tablas volcadas
@@ -5217,6 +6835,12 @@ ALTER TABLE `auditoria`
 ALTER TABLE `carrera_materia`
   ADD CONSTRAINT `carrera_materia_ibfk_1` FOREIGN KEY (`id_carrera`) REFERENCES `carreras` (`id_carrera`) ON DELETE CASCADE,
   ADD CONSTRAINT `carrera_materia_ibfk_2` FOREIGN KEY (`id_materia`) REFERENCES `materias` (`id_materia`) ON DELETE CASCADE;
+
+--
+-- Filtros para la tabla `carrera_versiones`
+--
+ALTER TABLE `carrera_versiones`
+  ADD CONSTRAINT `carrera_versiones_ibfk_1` FOREIGN KEY (`id_carrera`) REFERENCES `carreras` (`id_carrera`) ON DELETE CASCADE;
 
 --
 -- Filtros para la tabla `ciudades`
@@ -5275,6 +6899,19 @@ ALTER TABLE `horarios`
   ADD CONSTRAINT `horarios_ibfk_1` FOREIGN KEY (`id_docente_seccion`) REFERENCES `docente_seccion` (`id_docente_seccion`) ON DELETE CASCADE;
 
 --
+-- Filtros para la tabla `mallas`
+--
+ALTER TABLE `mallas`
+  ADD CONSTRAINT `mallas_ibfk_1` FOREIGN KEY (`id_carrera`) REFERENCES `carreras` (`id_carrera`) ON DELETE CASCADE;
+
+--
+-- Filtros para la tabla `malla_materia`
+--
+ALTER TABLE `malla_materia`
+  ADD CONSTRAINT `malla_materia_ibfk_1` FOREIGN KEY (`id_malla`) REFERENCES `mallas` (`id_malla`) ON DELETE CASCADE,
+  ADD CONSTRAINT `malla_materia_ibfk_2` FOREIGN KEY (`id_materia`) REFERENCES `materias` (`id_materia`) ON DELETE CASCADE;
+
+--
 -- Filtros para la tabla `mensajeria`
 --
 ALTER TABLE `mensajeria`
@@ -5319,6 +6956,14 @@ ALTER TABLE `parroquias`
   ADD CONSTRAINT `parroquias_ibfk_1` FOREIGN KEY (`id_municipio`) REFERENCES `municipios` (`id_municipio`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
+-- Filtros para la tabla `prelaciones`
+--
+ALTER TABLE `prelaciones`
+  ADD CONSTRAINT `prelaciones_ibfk_1` FOREIGN KEY (`id_carrera`) REFERENCES `carreras` (`id_carrera`) ON DELETE CASCADE,
+  ADD CONSTRAINT `prelaciones_ibfk_2` FOREIGN KEY (`id_materia`) REFERENCES `materias` (`id_materia`) ON DELETE CASCADE,
+  ADD CONSTRAINT `prelaciones_ibfk_3` FOREIGN KEY (`id_prerequisito`) REFERENCES `materias` (`id_materia`) ON DELETE CASCADE;
+
+--
 -- Filtros para la tabla `secciones`
 --
 ALTER TABLE `secciones`
@@ -5359,6 +7004,13 @@ ALTER TABLE `users`
 ALTER TABLE `user_user_types`
   ADD CONSTRAINT `user_user_types_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
   ADD CONSTRAINT `user_user_types_ibfk_2` FOREIGN KEY (`user_type_id`) REFERENCES `user_types` (`id`);
+
+--
+-- Filtros para la tabla `version_materia`
+--
+ALTER TABLE `version_materia`
+  ADD CONSTRAINT `version_materia_ibfk_1` FOREIGN KEY (`id_version`) REFERENCES `carrera_versiones` (`id_version`) ON DELETE CASCADE,
+  ADD CONSTRAINT `version_materia_ibfk_2` FOREIGN KEY (`id_materia`) REFERENCES `materias` (`id_materia`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

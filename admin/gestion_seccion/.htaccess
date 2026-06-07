@@ -1,0 +1,3 @@
+# admin/gestion_seccion/.htaccess
+DirectoryIndex index.php
+FallbackResource index.php

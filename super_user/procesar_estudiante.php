@@ -1,84 +1,68 @@
 <?php
-// Iniciar buffer de salida para evitar cualquier salida accidental antes del JSON
-if (ob_get_level() == 0) ob_start();
+// ============================
+// LIMPIAR TODO BUFFER ANTES DE EMPEZAR
+// ============================
+while (ob_get_level() > 0) {
+    ob_end_clean();
+}
+ob_start();
 
-// Manejador global de errores para capturar cualquier warning/fatal error y devolver JSON
-set_error_handler(function($errno, $errstr, $errfile, $errline) {
-    if (!(error_reporting() & $errno)) return;
-    if (ob_get_length()) ob_clean();
-    header('Content-Type: application/json');
-    echo json_encode([
-        'success' => false,
-        'message' => "Error PHP: $errstr en $errfile:$errline",
-        'data' => [],
-        'timestamp' => time()
-    ], JSON_UNESCAPED_UNICODE);
-    exit;
-});
+// Configuración
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
 
+// Solo definir el header después de limpiar buffer
+header('Content-Type: application/json; charset=utf-8');
+
+// Manejador de errores para capturar cualquier salida
 register_shutdown_function(function() {
     $error = error_get_last();
     if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
-        if (ob_get_length()) ob_clean();
-        header('Content-Type: application/json');
+        $output = ob_get_contents();
+        ob_end_clean();
+        
+        http_response_code(500);
         echo json_encode([
             'success' => false,
-            'message' => 'Error fatal: ' . $error['message'] . ' en ' . $error['file'] . ':' . $error['line'],
-            'data' => [],
-            'timestamp' => time()
+            'message' => 'Error crítico del sistema.'
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 });
-// Configuración inicial
-header('Content-Type: application/json');
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
 
-// Función para registrar errores (desactivada para evitar errores de permisos)
-function logError($message) {
-    // No hacer nada, ni intentar escribir a disco
-}
-
-// Función para enviar respuesta JSON consistente
-function sendJsonResponse($success, $message, $data = [], $statusCode = 200) {
-    http_response_code($statusCode);
-    $response = [
-        'success' => $success,
-        'message' => $message,
-        'data' => $data,
-        'timestamp' => time()
-    ];
-    // Limpiar cualquier salida previa antes de enviar JSON
-    if (ob_get_length()) {
-        ob_clean();
-    }
-    echo json_encode($response, JSON_UNESCAPED_UNICODE);
-    exit;
-}
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    error_log("PHP Error [$errno]: $errstr in $errfile:$errline");
+    return true;
+}, E_ALL);
 
 try {
+    // ============================
+    // 1. VERIFICAR MÉTODO
+    // ============================
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        throw new Exception("Método no permitido", 405);
+        throw new Exception('Método no permitido. Se requiere POST.', 405);
     }
 
-    // Incluir funciones
+    // ============================
+    // 2. INCLUIR FUNCIONES
+    // ============================
     $functionsPath = __DIR__.'/../funciones/functions.php';
     if (!file_exists($functionsPath)) {
         throw new Exception("Archivo de funciones no encontrado", 500);
     }
+    
     require_once $functionsPath;
 
-
-    // Permitir tanto JSON como FormData
+    // ============================
+    // 3. OBTENER DATOS
+    // ============================
     $contentType = isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : '';
     $input = [];
+    
     if (stripos($contentType, 'application/json') !== false) {
         $raw = file_get_contents('php://input');
-        $input = json_decode($raw, true);
-        if (!is_array($input)) {
-            $input = [];
-        }
+        $input = json_decode($raw, true) ?: [];
     } else {
         $input = $_POST;
     }
@@ -87,46 +71,155 @@ try {
         throw new Exception("No se recibieron datos", 400);
     }
 
+    // ============================
+    // 4. VALIDAR CAMPOS REQUERIDOS
+    // ============================
+    $camposRequeridos = [
+        'idusuario', 'nombre', 'fecha_nac', 'genero', 'edo_civil',
+        'carrera', 'estado', 'municipio', 'direccion',
+        'tlf', 'email', 'fecha_ingreso', 'status'
+    ];
+    
+    $camposFaltantes = [];
+    foreach ($camposRequeridos as $campo) {
+        if (empty($input[$campo])) {
+            $camposFaltantes[] = $campo;
+        }
+    }
+    
+    if (!empty($camposFaltantes)) {
+        $camposTexto = implode(', ', array_map(function($campo) {
+            return str_replace('_', ' ', $campo);
+        }, $camposFaltantes));
+        
+        throw new Exception("Campos requeridos faltantes: $camposTexto", 400);
+    }
 
-    // Procesar campos dinámicos
-    $titulos = isset($input['titulos']) && is_array($input['titulos']) ? array_filter($input['titulos']) : [];
-    $institutos = isset($input['institutos']) && is_array($input['institutos']) ? array_filter($input['institutos']) : [];
+    // ============================
+    // 5. PROCESAR CAMPOS DINÁMICOS
+    // ============================
+    $titulos = [];
+    $institutos = [];
+    
+    if (isset($input['titulos']) && is_array($input['titulos'])) {
+        $titulos = array_values(array_filter(array_map('trim', $input['titulos'])));
+    }
+    
+    if (isset($input['institutos']) && is_array($input['institutos'])) {
+        $institutos = array_values(array_filter(array_map('trim', $input['institutos'])));
+    }
 
-    // Preparar datos para inserción
+    // ============================
+    // 6. PREPARAR DATOS
+    // ============================
     $datos = $input;
-    $datos['titulos'] = !empty($titulos) ? implode('; ', $titulos) : null;
-    $datos['institutos'] = !empty($institutos) ? implode('; ', $institutos) : null;
-    // Asegurar que potencialidades tenga valor por defecto si no viene
+    $datos['titulos'] = $titulos;
+    $datos['institutos'] = $institutos;
+    
     if (!isset($datos['potencialidades']) || $datos['potencialidades'] === null) {
         $datos['potencialidades'] = '';
     }
-
-    // Validar datos
-    $validacion = function_exists('validarEstudiante') ? validarEstudiante($datos) : true;
-    if ($validacion !== true) {
-        throw new Exception(is_array($validacion) ? implode("\n", $validacion) : $validacion, 400);
+    
+    $camposNumericos = ['grupo_familiar', 'acargo_usted'];
+    foreach ($camposNumericos as $campo) {
+        if (!isset($datos[$campo]) || $datos[$campo] === '') {
+            $datos[$campo] = 0;
+        }
     }
 
-    // Insertar estudiante
+    // ============================
+    // 7. VALIDAR DATOS
+    // ============================
+    if (!function_exists('validarDatosEstudiante')) {
+        throw new Exception("Función de validación no disponible", 500);
+    }
+    
+    $validacion = validarDatosEstudiante($datos);
+    
+    if (!empty($validacion['errors'])) {
+        $errorMessages = [];
+        foreach ($validacion['errors'] as $campo => $mensaje) {
+            $campoTexto = str_replace('_', ' ', $campo);
+            $errorMessages[$campo] = $mensaje;
+        }
+        
+        throw new Exception("Errores de validación:\n" . implode("\n", $errorMessages), 422);
+    }
+
+    // ============================
+    // 8. INSERTAR ESTUDIANTE
+    // ============================
     if (!function_exists('insertarEstudiante')) {
-        throw new Exception("Función insertarEstudiante no disponible", 500);
+        throw new Exception("Función para insertar estudiante no disponible", 500);
     }
-    $resultado = insertarEstudiante($datos);
-    if (!$resultado || !isset($resultado['success'])) {
+    
+    $resultado = insertarEstudiante(array_merge($validacion['data'], $datos));
+    
+    if (!$resultado) {
         throw new Exception("Error al procesar la inserción", 500);
     }
+    
     if (!$resultado['success']) {
-        throw new Exception($resultado['message'] ?? "Error al insertar estudiante", 500);
+        $mensajeError = $resultado['message'] ?? 'Error desconocido';
+        
+        if (strpos($mensajeError, 'Duplicate') !== false || 
+            strpos($mensajeError, 'duplicad') !== false ||
+            strpos($mensajeError, 'ya existe') !== false) {
+            
+            throw new Exception("La cédula ingresada ya está registrada en el sistema.", 409);
+        }
+        
+        throw new Exception($mensajeError, 500);
     }
 
-    sendJsonResponse(true, $resultado['message'] ?? 'Estudiante registrado exitosamente', [
-        'id' => $resultado['id'] ?? null
-    ]);
+    // ============================
+    // 9. ENVIAR RESPUESTA EXITOSA
+    // ============================
+    $response = [
+        'success' => true,
+        'message' => $resultado['message'] ?? '✅ Estudiante registrado exitosamente',
+        'id' => $resultado['id'] ?? null,
+        'foto_perfil' => $resultado['foto_perfil'] ?? null
+    ];
 
 } catch (Exception $e) {
-    logError("Error en procesar_estudiante.php: ".$e->getMessage()." en ".$e->getFile().":".$e->getLine());
-    if (ob_get_length()) {
-        ob_clean();
+    // ============================
+    // 10. MANEJAR ERRORES
+    // ============================
+    $statusCode = ($e->getCode() >= 100 && $e->getCode() < 600) ? $e->getCode() : 500;
+    
+    $response = [
+        'success' => false,
+        'message' => $e->getMessage(),
+        'error_code' => $e->getCode()
+    ];
+    
+    if ($statusCode >= 500) {
+        $response['message'] = "❌ Error interno del sistema. Por favor intente nuevamente.";
     }
-    sendJsonResponse(false, $e->getMessage(), [], ($e->getCode() >= 100 && $e->getCode() < 600) ? $e->getCode() : 500);
 }
+
+// ============================
+// 11. LIMPIAR Y ENVIAR RESPUESTA
+// ============================
+$output = ob_get_contents();
+ob_end_clean();
+
+// Verificar que solo haya JSON
+if (!empty($output) && json_decode($output) === null) {
+    // Hay salida no JSON, forzar JSON de error
+    $response = [
+        'success' => false,
+        'message' => 'Error en la respuesta del servidor',
+        'debug' => 'Salida no JSON detectada'
+    ];
+}
+
+// Asegurar headers
+if (!headers_sent()) {
+    header('Content-Type: application/json; charset=utf-8');
+}
+
+echo json_encode($response, JSON_UNESCAPED_UNICODE);
+exit;
+?>

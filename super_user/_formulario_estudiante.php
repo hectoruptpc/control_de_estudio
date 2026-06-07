@@ -1,5 +1,4 @@
 <?php
-// _formulario_estudiante.php
 // Obtener los datos necesarios para los select (si no se pasaron como parámetros)
 if (!isset($tiposCedula)) {
     $tiposCedula = obtenerTiposCedula($db);
@@ -22,6 +21,9 @@ if (!isset($carreras)) {
 if (!isset($ingresos)) {
     $ingresos = obtenerIngresos($db);
 }
+if (!isset($estados)) {
+    $estados = obtenerEstados($db);
+}
 
 // Determinar si estamos en modo modal
 $esModal = isset($esModal) ? $esModal : false;
@@ -30,25 +32,21 @@ $prefijo = $esModal ? '_modal' : '';
 $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["PHP_SELF"]);
 ?>
 
-<form id="<?php echo $formId; ?>" method="post" action="<?php echo $actionUrl; ?>"<?php echo $esModal ? ' enctype="multipart/form-data"' : ''; ?>>
+<form id="<?php echo $formId; ?>" method="post" action="<?php echo $actionUrl; ?>" enctype="multipart/form-data">
     <!-- Sección 1: Identificación -->
     <h5 class="mb-3"><i class="fas fa-id-card mr-2"></i> Identificación</h5>
     <div class="row g-3 mb-4">
-        <div class="col-md-6">
-            <div class="mb-3">
-                <label for="nombre<?php echo $prefijo; ?>" class="form-label required">Nombre Completo</label>
-                <input type="text" class="form-control" id="nombre<?php echo $prefijo; ?>" name="nombre" required>
-            </div>
-        </div>
-        
         <div class="col-md-6">
             <div class="mb-3">
                 <label for="cedula_completa<?php echo $prefijo; ?>" class="form-label required">Cédula</label>
                 <div class="input-group">
                     <select class="custom-select" id="tipo_cedula<?php echo $prefijo; ?>" name="tipo_cedula" style="max-width: 80px;">
                         <?php foreach ($tiposCedula as $tipo): ?>
-                            <option value="<?php echo htmlspecialchars($tipo['tipo']); ?>">
-                                <?php echo htmlspecialchars($tipo['tipo']); ?>
+                            <?php 
+                            $tipoLetra = substr($tipo['tipo'], 0, 1);
+                            ?>
+                            <option value="<?php echo htmlspecialchars($tipoLetra); ?>">
+                                <?php echo htmlspecialchars($tipoLetra); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -58,12 +56,31 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
                 <small class="text-muted">Formato: V-12345678 o E-12345678</small>
             </div>
         </div>
+        
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="nombre<?php echo $prefijo; ?>" class="form-label required">Nombre Completo</label>
+                <input type="text" class="form-control" id="nombre<?php echo $prefijo; ?>" name="nombre" required>
+            </div>
+        </div>
     </div>
 
     <!-- Sección 2: Datos Personales -->
     <h5 class="mb-3"><i class="fas fa-user-tag mr-2"></i> Datos Personales</h5>
     <div class="row g-3 mb-4">
         <div class="col-md-6">
+            <!-- Foto de Perfil -->
+            <div class="mb-3">
+                <label for="foto_perfil<?php echo $prefijo; ?>" class="form-label">Foto de Perfil</label>
+                <input type="file" class="form-control" id="foto_perfil<?php echo $prefijo; ?>" name="foto_perfil" 
+                       accept=".jpg,.jpeg,.png,.pdf,.webp" 
+                       onchange="previewImage(this, 'preview<?php echo $prefijo; ?>')">
+                <small class="text-muted">Formatos permitidos: JPG, JPEG, PNG, WEBP, PDF (Máx: 5MB)</small>
+                <div id="preview<?php echo $prefijo; ?>" class="mt-2" style="display:none;">
+                    <img id="previewImage<?php echo $prefijo; ?>" src="#" alt="Vista previa" style="max-width: 150px; max-height: 150px; border-radius: 8px;">
+                </div>
+            </div>
+
             <div class="mb-3">
                 <label for="fecha_nac<?php echo $prefijo; ?>" class="form-label required">Fecha de Nacimiento</label>
                 <input type="date" class="form-control" id="fecha_nac<?php echo $prefijo; ?>" name="fecha_nac" required>
@@ -149,24 +166,40 @@ $actionUrl = $esModal ? 'procesar_estudiante.php' : htmlspecialchars($_SERVER["P
         </div>
     </div>
 
-    <!-- Sección 4: Ubicación y Vivienda -->
+    <!-- Sección 4: Ubicación y Vivienda (MODIFICADA) -->
     <h5 class="mb-3"><i class="fas fa-home mr-2"></i> Vivienda</h5>
     <div class="row g-3 mb-4">
         <div class="col-md-6">
             <div class="mb-3">
                 <label for="estado<?php echo $prefijo; ?>" class="form-label required">Estado</label>
-                <input type="text" class="form-control" id="estado<?php echo $prefijo; ?>" name="estado" required>
+                <select class="form-control" id="estado<?php echo $prefijo; ?>" name="estado" required>
+                    <option value="">Seleccione un estado</option>
+                    <?php foreach ($estados as $estado): ?>
+                        <option value="<?php echo htmlspecialchars($estado['id_estado']); ?>">
+                            <?php echo htmlspecialchars($estado['estado']); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             
             <div class="mb-3">
                 <label for="municipio<?php echo $prefijo; ?>" class="form-label required">Municipio</label>
-                <input type="text" class="form-control" id="municipio<?php echo $prefijo; ?>" name="municipio" required>
+                <select class="form-control" id="municipio<?php echo $prefijo; ?>" name="municipio" required disabled>
+                    <option value="">Primero seleccione un estado</option>
+                </select>
             </div>
             
             <div class="mb-3">
                 <label for="parroquia<?php echo $prefijo; ?>" class="form-label">Parroquia</label>
-                <input type="text" class="form-control" id="parroquia<?php echo $prefijo; ?>" name="parroquia">
+                <select class="form-control" id="parroquia<?php echo $prefijo; ?>" name="parroquia" disabled>
+                    <option value="">Primero seleccione un municipio</option>
+                </select>
             </div>
+            
+            <!-- Campos ocultos para los nombres (opcionales, si quieres guardar los nombres también) -->
+            <input type="hidden" id="nombre_estado<?php echo $prefijo; ?>" name="nombre_estado">
+            <input type="hidden" id="nombre_municipio<?php echo $prefijo; ?>" name="nombre_municipio">
+            <input type="hidden" id="nombre_parroquia<?php echo $prefijo; ?>" name="nombre_parroquia">
         </div>
         
         <div class="col-md-6">
@@ -410,12 +443,455 @@ document.addEventListener('DOMContentLoaded', function() {
         function actualizarCedulaCompleta() {
             const numeroLimpio = numeroCedula.value.replace(/[^0-9]/g, '');
             numeroCedula.value = numeroLimpio;
-            idUsuario.value = tipoCedula.value + '-' + numeroLimpio;
+            idUsuario.value = tipoCedula.value + numeroLimpio;
         }
         
         tipoCedula.addEventListener('change', actualizarCedulaCompleta);
         numeroCedula.addEventListener('input', actualizarCedulaCompleta);
         actualizarCedulaCompleta();
     }
+});
+
+// Función para vista previa de imagen
+function previewImage(input, previewId) {
+    const preview = document.getElementById(previewId);
+    const previewImage = document.getElementById('previewImage' + '<?php echo $prefijo; ?>');
+    
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const fileType = file.type;
+        
+        // Validar tipo de archivo
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
+        if (!allowedTypes.includes(fileType)) {
+            alert('Error: Solo se permiten archivos JPG, JPEG, PNG, WEBP y PDF.');
+            input.value = '';
+            preview.style.display = 'none';
+            return;
+        }
+        
+        // Validar tamaño (5MB máximo)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Error: El archivo no debe superar los 5MB.');
+            input.value = '';
+            preview.style.display = 'none';
+            return;
+        }
+        
+        // Mostrar vista previa solo para imágenes
+        if (fileType.startsWith('image/')) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                previewImage.src = e.target.result;
+                preview.style.display = 'block';
+            }
+            
+            reader.readAsDataURL(file);
+        } else {
+            // Para PDF, mostrar mensaje
+            preview.innerHTML = '<div class="alert alert-info p-2">Archivo PDF seleccionado</div>';
+            preview.style.display = 'block';
+        }
+    } else {
+        preview.style.display = 'none';
+    }
+}
+
+// =============================================
+// SCRIPT PARA SELECTS AUTOMÁTICOS DE UBICACIÓN
+// =============================================
+document.addEventListener('DOMContentLoaded', function() {
+    const prefijo = '<?php echo $prefijo; ?>';
+    const estadoSelect = document.getElementById('estado' + prefijo);
+    const municipioSelect = document.getElementById('municipio' + prefijo);
+    const parroquiaSelect = document.getElementById('parroquia' + prefijo);
+    
+    // Campos ocultos para nombres (opcionales)
+    const nombreEstadoInput = document.getElementById('nombre_estado' + prefijo);
+    const nombreMunicipioInput = document.getElementById('nombre_municipio' + prefijo);
+    const nombreParroquiaInput = document.getElementById('nombre_parroquia' + prefijo);
+    
+    if (!estadoSelect || !municipioSelect || !parroquiaSelect) {
+        console.error('No se encontraron los selects de ubicación');
+        return;
+    }
+    
+    // ========== EVENTO: Cambio de Estado ==========
+    estadoSelect.addEventListener('change', function() {
+        const estadoId = this.value;
+        const estadoTexto = this.options[this.selectedIndex].text;
+        
+        // Guardar nombre en campo oculto si existe
+        if (nombreEstadoInput) {
+            nombreEstadoInput.value = estadoTexto;
+        }
+        
+        // Resetear municipio y parroquia
+        resetSelect(municipioSelect, 'Cargando municipios...', true);
+        resetSelect(parroquiaSelect, 'Primero seleccione un municipio', true);
+        
+        if (!estadoId) {
+            resetSelect(municipioSelect, 'Primero seleccione un estado', true);
+            return;
+        }
+        
+        // Cargar municipios del estado seleccionado
+        cargarMunicipios(estadoId);
+    });
+    
+    // ========== EVENTO: Cambio de Municipio ==========
+    municipioSelect.addEventListener('change', function() {
+        const municipioId = this.value;
+        const municipioTexto = this.options[this.selectedIndex].text;
+        
+        // Guardar nombre en campo oculto si existe
+        if (nombreMunicipioInput) {
+            nombreMunicipioInput.value = municipioTexto;
+        }
+        
+        // Resetear parroquia
+        resetSelect(parroquiaSelect, 'Cargando parroquias...', true);
+        
+        if (!municipioId) {
+            resetSelect(parroquiaSelect, 'Primero seleccione un municipio', true);
+            return;
+        }
+        
+        // Cargar parroquias del municipio seleccionado
+        cargarParroquias(municipioId);
+    });
+    
+    // ========== EVENTO: Cambio de Parroquia ==========
+    parroquiaSelect.addEventListener('change', function() {
+        const parroquiaTexto = this.options[this.selectedIndex].text;
+        
+        // Guardar nombre en campo oculto si existe
+        if (nombreParroquiaInput) {
+            nombreParroquiaInput.value = parroquiaTexto;
+        }
+    });
+    
+    // ========== FUNCIÓN: Cargar Municipios ==========
+    function cargarMunicipios(estadoId) {
+        // Crear formulario para enviar datos (alternativa a fetch si no funciona)
+        const formData = new FormData();
+        formData.append('estado_id', estadoId);
+        
+        // Usar fetch con async/await
+        fetch('api/obtener_municipios.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error en la respuesta del servidor');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success && data.municipios) {
+                updateSelect(municipioSelect, data.municipios, 'Seleccione un municipio', false);
+                municipioSelect.disabled = false;
+            } else {
+                resetSelect(municipioSelect, 'No hay municipios disponibles', false);
+                municipioSelect.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error al cargar municipios:', error);
+            resetSelect(municipioSelect, 'Error al cargar municipios', true);
+            
+            // Intentar método alternativo (GET)
+            cargarMunicipiosAlternativo(estadoId);
+        });
+    }
+    
+    // Método alternativo GET (por si el POST no funciona)
+    function cargarMunicipiosAlternativo(estadoId) {
+        fetch('api/obtener_municipios.php?estado_id=' + estadoId)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.municipios) {
+                updateSelect(municipioSelect, data.municipios, 'Seleccione un municipio', false);
+                municipioSelect.disabled = false;
+            } else {
+                resetSelect(municipioSelect, 'No hay municipios disponibles', false);
+                municipioSelect.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error alternativo:', error);
+            resetSelect(municipioSelect, 'Error de conexión', true);
+        });
+    }
+    
+    // ========== FUNCIÓN: Cargar Parroquias ==========
+    function cargarParroquias(municipioId) {
+        const formData = new FormData();
+        formData.append('municipio_id', municipioId);
+        
+        fetch('api/obtener_parroquias.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.parroquias && data.parroquias.length > 0) {
+                updateSelect(parroquiaSelect, data.parroquias, 'Seleccione una parroquia (opcional)', false);
+                parroquiaSelect.disabled = false;
+            } else {
+                resetSelect(parroquiaSelect, 'No hay parroquias disponibles', false);
+                parroquiaSelect.disabled = false;
+                parroquiaSelect.value = '';
+            }
+        })
+        .catch(error => {
+            console.error('Error al cargar parroquias:', error);
+            resetSelect(parroquiaSelect, 'Error de conexión', true);
+            
+            // Intentar método alternativo
+            fetch('api/obtener_parroquias.php?municipio_id=' + municipioId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.parroquias) {
+                    updateSelect(parroquiaSelect, data.parroquias, 'Seleccione una parroquia (opcional)', false);
+                    parroquiaSelect.disabled = false;
+                } else {
+                    resetSelect(parroquiaSelect, 'No hay parroquias disponibles', false);
+                    parroquiaSelect.disabled = false;
+                }
+            })
+            .catch(error2 => {
+                console.error('Error alternativo:', error2);
+                resetSelect(parroquiaSelect, 'Error de conexión', true);
+            });
+        });
+    }
+    
+    // ========== FUNCIÓN: Resetear Select ==========
+    function resetSelect(selectElement, placeholder, disabled) {
+        if (!selectElement) return;
+        
+        selectElement.innerHTML = '';
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = placeholder;
+        selectElement.appendChild(option);
+        
+        selectElement.disabled = disabled;
+        selectElement.value = '';
+    }
+    
+    // ========== FUNCIÓN: Actualizar Opciones del Select ==========
+    function updateSelect(selectElement, options, placeholder, disabled) {
+        if (!selectElement) return;
+        
+        // Limpiar opciones actuales
+        selectElement.innerHTML = '';
+        
+        // Agregar placeholder
+        const optionPlaceholder = document.createElement('option');
+        optionPlaceholder.value = '';
+        optionPlaceholder.textContent = placeholder;
+        selectElement.appendChild(optionPlaceholder);
+        
+        // Agregar opciones
+        options.forEach(option => {
+            const opt = document.createElement('option');
+            opt.value = option.id;
+            opt.textContent = option.nombre;
+            selectElement.appendChild(opt);
+        });
+        
+        selectElement.disabled = disabled;
+    }
+    
+    // ========== FUNCIÓN: Cargar Datos si Estamos Editando ==========
+    function cargarDatosUbicacionSiExisten() {
+        // Esta función se puede usar si el formulario es para editar un estudiante existente
+        // Por ejemplo, si tienes datos en variables PHP como $estudiante_edit
+        <?php if (isset($estudiante_edit) && $estudiante_edit): ?>
+            // Código PHP para cargar datos existentes
+            // Descomenta y adapta según tus necesidades
+            /*
+            const estadoId = '<?php echo $estudiante_edit["estado"] ?? ""; ?>';
+            const municipioId = '<?php echo $estudiante_edit["municipio"] ?? ""; ?>';
+            const parroquiaId = '<?php echo $estudiante_edit["parroquia"] ?? ""; ?>';
+            
+            if (estadoId) {
+                estadoSelect.value = estadoId;
+                estadoSelect.dispatchEvent(new Event('change'));
+                
+                // Esperar a que carguen los municipios y seleccionar
+                setTimeout(() => {
+                    if (municipioId && municipioSelect) {
+                        municipioSelect.value = municipioId;
+                        municipioSelect.dispatchEvent(new Event('change'));
+                        
+                        // Esperar a que carguen las parroquias y seleccionar
+                        setTimeout(() => {
+                            if (parroquiaId && parroquiaSelect) {
+                                parroquiaSelect.value = parroquiaId;
+                            }
+                        }, 500);
+                    }
+                }, 500);
+            }
+            */
+        <?php endif; ?>
+    }
+    
+    // Ejecutar carga inicial si es necesario
+    cargarDatosUbicacionSiExisten();
+});
+
+// Validación del formulario (actualizada para los nuevos selects)
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('<?php echo $formId; ?>');
+    
+    if (!form) return;
+    
+    form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        
+        if (validarFormulario()) {
+            // Si la validación pasa, enviar el formulario
+            form.submit();
+        }
+    });
+    
+    function validarFormulario() {
+        let isValid = true;
+        let mensajesError = [];
+        
+        // Obtener el prefijo
+        const prefijo = '<?php echo $prefijo; ?>';
+        
+        // Validar cédula
+        const numeroCedula = document.getElementById('numero_cedula' + prefijo).value;
+        if (!/^\d{6,9}$/.test(numeroCedula)) {
+            mensajesError.push('La cédula debe contener entre 6 y 9 dígitos numéricos');
+            isValid = false;
+        }
+        
+        // Validar nombre
+        const nombre = document.getElementById('nombre' + prefijo).value;
+        if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s']+$/.test(nombre.trim())) {
+            mensajesError.push('El nombre solo puede contener letras, espacios y apóstrofes');
+            isValid = false;
+        }
+        
+        // Validar estado (ahora es select)
+        const estado = document.getElementById('estado' + prefijo).value;
+        if (!estado) {
+            mensajesError.push('Debe seleccionar un estado');
+            isValid = false;
+        }
+        
+        // Validar municipio (ahora es select)
+        const municipio = document.getElementById('municipio' + prefijo).value;
+        if (!municipio) {
+            mensajesError.push('Debe seleccionar un municipio');
+            isValid = false;
+        }
+        
+        // Validar teléfono
+        const telefono = document.getElementById('tlf' + prefijo).value;
+        if (!/^[0-9]{10,11}$/.test(telefono.replace(/\D/g, ''))) {
+            mensajesError.push('El teléfono debe contener 10 u 11 dígitos');
+            isValid = false;
+        }
+        
+        // Validar email
+        const email = document.getElementById('email' + prefijo).value;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            mensajesError.push('Ingrese un correo electrónico válido');
+            isValid = false;
+        }
+        
+        // Validar que la fecha de nacimiento sea válida
+        const fechaNac = document.getElementById('fecha_nac' + prefijo).value;
+        if (fechaNac) {
+            const fechaNacDate = new Date(fechaNac);
+            const hoy = new Date();
+            if (fechaNacDate > hoy) {
+                mensajesError.push('La fecha de nacimiento no puede ser futura');
+                isValid = false;
+            }
+            
+            // Calcular edad mínima (15 años)
+            const edadMinima = new Date();
+            edadMinima.setFullYear(edadMinima.getFullYear() - 15);
+            if (fechaNacDate > edadMinima) {
+                mensajesError.push('El estudiante debe tener al menos 15 años');
+                isValid = false;
+            }
+        }
+        
+        // Validar fecha de ingreso
+        const fechaIngreso = document.getElementById('fecha_ingreso' + prefijo).value;
+        if (fechaNac && fechaIngreso) {
+            const fechaNacDate = new Date(fechaNac);
+            const fechaIngresoDate = new Date(fechaIngreso);
+            if (fechaIngresoDate < fechaNacDate) {
+                mensajesError.push('La fecha de ingreso no puede ser anterior a la fecha de nacimiento');
+                isValid = false;
+            }
+        }
+        
+        // Mostrar errores si existen
+        if (mensajesError.length > 0) {
+            mostrarErrores(mensajesError);
+        }
+        
+        return isValid;
+    }
+    
+    function mostrarErrores(errores) {
+        // Crear o actualizar contenedor de errores
+        let errorContainer = document.getElementById('errorContainer');
+        if (!errorContainer) {
+            errorContainer = document.createElement('div');
+            errorContainer.id = 'errorContainer';
+            errorContainer.className = 'alert alert-danger';
+            form.prepend(errorContainer);
+        }
+        
+        // Limpiar contenido anterior
+        errorContainer.innerHTML = '';
+        
+        // Agregar título
+        const titulo = document.createElement('strong');
+        titulo.textContent = 'Por favor corrija los siguientes errores:';
+        errorContainer.appendChild(titulo);
+        
+        // Agregar lista de errores
+        const lista = document.createElement('ul');
+        lista.className = 'mb-0 mt-2';
+        
+        errores.forEach(error => {
+            const item = document.createElement('li');
+            item.textContent = error;
+            lista.appendChild(item);
+        });
+        
+        errorContainer.appendChild(lista);
+        
+        // Desplazar al inicio del formulario
+        errorContainer.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    // Limpiar errores al cambiar campos
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        input.addEventListener('change', function() {
+            const errorContainer = document.getElementById('errorContainer');
+            if (errorContainer) {
+                errorContainer.remove();
+            }
+        });
+    });
 });
 </script>

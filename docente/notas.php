@@ -27,13 +27,53 @@ $titulopag = "Registro de Notas";
 include("includes/head.php");
 ?>
 
+<!-- Añadir meta viewport y estilos responsivos adicionales -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=yes">
+<style>
+    @media (max-width: 768px) {
+        .container-fluid { padding-left: 10px; padding-right: 10px; }
+        h2.my-4 { font-size: 1.5rem; margin-top: 1rem !important; margin-bottom: 1rem !important; }
+        .card-header h5 { font-size: 1rem; }
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .btn-sm { padding: 6px 8px; font-size: 0.75rem; margin-bottom: 5px; }
+        td:last-child { min-width: 180px; }
+        .form-group input, .form-group select, .form-group textarea { font-size: 16px !important; }
+        label { font-size: 0.85rem; }
+        .modal-dialog { margin: 10px; max-width: calc(100% - 20px); }
+        .modal-body { padding: 12px; }
+        #preview-table { font-size: 0.75rem; }
+        #preview-table th, #preview-table td { padding: 6px; white-space: nowrap; }
+        #volver-container { position: sticky; top: 0; background: white; z-index: 100; padding: 10px 0; margin-bottom: 15px; border-bottom: 1px solid #ddd; }
+        input[type="number"] { font-size: 16px; width: 80px; }
+        .card { margin-bottom: 15px; }
+        .alert { font-size: 0.85rem; padding: 10px; }
+    }
+    @media (max-width: 480px) {
+        .btn-sm { font-size: 0.7rem; padding: 5px 6px; }
+        td:last-child { min-width: 200px; }
+        .table th, .table td { padding: 6px; font-size: 0.75rem; }
+        h2.my-4 { font-size: 1.3rem; }
+    }
+    .estudiante-row { transition: all 0.3s ease; }
+    .estudiante-row:hover { background-color: #f5f5f5; }
+    .acciones-botones { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+    @media (max-width: 768px) {
+        .acciones-botones { flex-direction: column; align-items: stretch; }
+        .acciones-botones .btn, .acciones-botones label { width: 100%; margin: 2px 0 !important; text-align: center; }
+    }
+</style>
+
 <div class="container-fluid">
-    <h2 class="my-4">Registro de Notas</h2>
+    <h2 class="my-4">
+        <i class="fas fa-chalkboard-teacher"></i> Registro de Notas
+    </h2>
     
     <!-- Secciones del docente -->
-    <div class="card mb-4">
+    <div class="card mb-4 shadow-sm">
         <div class="card-header bg-primary text-white">
-            <h5>Secciones y Materias</h5>
+            <h5 class="mb-0">
+                <i class="fas fa-book"></i> Secciones y Materias
+            </h5>
         </div>
         <div class="card-body">
             <?php if ($result_secciones->num_rows > 0): ?>
@@ -51,32 +91,43 @@ include("includes/head.php");
                         </thead>
                         <tbody>
                             <?php while ($seccion = $result_secciones->fetch_assoc()): ?>
-                                <tr>
+                                <tr class="seccion-row">
                                     <td><?= htmlspecialchars($seccion['codigo_seccion']) ?></td>
                                     <td><?= htmlspecialchars($seccion['nombre_carrera']) ?></td>
                                     <td><?= htmlspecialchars($seccion['nombre_trayecto']) ?></td>
                                     <td><?= htmlspecialchars($seccion['nombre_periodo']) ?></td>
                                     <td><?= htmlspecialchars($seccion['nombre_materia']) ?></td>
                                     <td>
-                                        <button class="btn btn-sm btn-primary btn-cargar" 
-                                                data-seccion="<?= $seccion['id_seccion'] ?>"
-                                                data-materia="<?= $seccion['id_materia'] ?>">
-                                            <i class="fas fa-users"></i> Cargar Estudiantes
-                                        </button>
-                                        <button class="btn btn-sm btn-success btn-descargar-pdf" 
-                                                data-seccion="<?= $seccion['id_seccion'] ?>"
-                                                data-materia="<?= $seccion['id_materia'] ?>">
-                                            <i class="fas fa-download"></i> Planilla PDF
-                                        </button>
-                                    </td>
+                                        <div class="acciones-botones">
+                                            <button class="btn btn-sm btn-primary btn-cargar" 
+                                                    data-seccion="<?= $seccion['id_seccion'] ?>"
+                                                    data-materia="<?= $seccion['id_materia'] ?>">
+                                                <i class="fas fa-users"></i> Cargar
+                                            </button>
+                                            <button class="btn btn-sm btn-success btn-descargar-pdf" 
+                                                    data-seccion="<?= $seccion['id_seccion'] ?>"
+                                                    data-materia="<?= $seccion['id_materia'] ?>">
+                                                <i class="fas fa-download"></i> PDF
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary btn-descargar-csv"
+                                                    data-seccion="<?= $seccion['id_seccion'] ?>"
+                                                    data-materia="<?= $seccion['id_materia'] ?>">
+                                                <i class="fas fa-file-csv"></i> CSV
+                                            </button>
+                                            <label class="btn btn-sm btn-outline-primary mb-0" style="cursor:pointer;">
+                                                <i class="fas fa-file-upload"></i> Importar
+                                                <input type="file" accept=".csv,text/csv,application/vnd.ms-excel" class="d-none input-import-csv" data-seccion="<?= $seccion['id_seccion'] ?>" data-materia="<?= $seccion['id_materia'] ?>">
+                                            </label>
+                                        </div>
+                                    </div>
                                 </tr>
                             <?php endwhile; ?>
                         </tbody>
                     </table>
                 </div>
             <?php else: ?>
-                <div class="alert alert-warning">
-                    No tienes secciones asignadas
+                <div class="alert alert-warning text-center">
+                    <i class="fas fa-exclamation-triangle"></i> No tienes secciones asignadas
                 </div>
             <?php endif; ?>
         </div>
@@ -88,6 +139,60 @@ include("includes/head.php");
             <button class="btn btn-secondary" id="btn-volver">
                 <i class="fas fa-arrow-left"></i> Volver a Secciones
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal resultado -->
+<div class="modal fade" id="modalResultado" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header" id="modalResultadoHeader">
+                <h5 class="modal-title" id="modalResultadoTitle">Resultado</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="modalResultadoBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal preview import CSV -->
+<div class="modal fade" id="modalPreviewCSV" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">Preview de CSV</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="preview-summary" class="mb-3"></div>
+                <div class="table-responsive" style="max-height:400px; overflow:auto;">
+                    <table class="table table-sm table-bordered" id="preview-table">
+                        <thead>
+                            <tr>
+                                <th>Línea</th>
+                                <th>Cédula</th>
+                                <th>Nombres</th>
+                                <th>Notas</th>
+                                <th>Campo</th>
+                                <th>Mensaje</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-primary" id="btn-apply-csv">Aplicar al formulario</button>
+            </div>
         </div>
     </div>
 </div>
@@ -105,25 +210,20 @@ $(document).ready(function() {
                     <i class="fas fa-arrow-left"></i> Volver a Secciones
                 </button>
             </div>
-            <div class="text-center py-4">
-                <div class="spinner-border text-primary"></div>
-                <p>Cargando estudiantes...</p>
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div>
+                <p class="mt-3">Cargando estudiantes...</p>
             </div>
         `);
         
+        $('html, body').animate({ scrollTop: 0 }, 300);
+        
         fetch('cargar_estudiantes.php', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: `seccion_id=${seccionId}&materia_id=${materiaId}`
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Error en la respuesta del servidor');
-            }
-            return response.text();
-        })
+        .then(response => response.text())
         .then(html => {
             $('#resultados').html(`
                 <div class="text-right mb-3" id="volver-container">
@@ -133,6 +233,7 @@ $(document).ready(function() {
                 </div>
                 ${html}
             `);
+            $('input[type="number"]').addClass('form-control');
         })
         .catch(error => {
             $('#resultados').html(`
@@ -141,14 +242,12 @@ $(document).ready(function() {
                         <i class="fas fa-arrow-left"></i> Volver a Secciones
                     </button>
                 </div>
-                <div class="alert alert-danger">
-                    Error: ${error.message}
-                </div>
+                <div class="alert alert-danger">Error: ${error.message}</div>
             `);
         });
     });
     
-    // Función para volver a secciones
+    // Volver a secciones
     $(document).on('click', '#btn-volver', function() {
         $('#resultados').html(`
             <div class="text-right mb-3" id="volver-container" style="display: none;">
@@ -157,32 +256,154 @@ $(document).ready(function() {
                 </button>
             </div>
         `);
+        $('html, body').animate({ scrollTop: $('.card').first().offset().top - 20 }, 400);
     });
     
-    // Descargar planilla PDF
+    // Descargar PDF
     $(document).on('click', '.btn-descargar-pdf', function() {
         const seccionId = $(this).data('seccion');
         const materiaId = $(this).data('materia');
-        
-        // Mostrar loading
-        const btn = $(this);
-        const originalHtml = btn.html();
-        btn.html('<i class="fas fa-spinner fa-spin"></i> Generando...');
-        btn.prop('disabled', true);
-        
-        // Descargar PDF
         window.location.href = `descargar_planilla.php?seccion_id=${seccionId}&materia_id=${materiaId}`;
+    });
+
+    // Descargar CSV
+    $(document).on('click', '.btn-descargar-csv', function() {
+        const seccionId = $(this).data('seccion');
+        const materiaId = $(this).data('materia');
+        window.location.href = `descargar_planilla_csv.php?seccion_id=${seccionId}&materia_id=${materiaId}`;
+    });
+
+    let currentSeccionId = null;
+    let currentMateriaId = null;
+    
+    // Importar CSV
+    $(document).on('change', '.input-import-csv', function(e) {
+        const file = this.files[0];
+        currentSeccionId = $(this).data('seccion');
+        currentMateriaId = $(this).data('materia');
+        if (!file) return;
+
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('seccion_id', currentSeccionId);
+        fd.append('materia_id', currentMateriaId);
+
+        $('#preview-table tbody').html('<tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-info"></div> Procesando...<\/td><\/tr>');
+        $('#preview-summary').html('<span class="text-info">Procesando archivo...</span>');
+        $('#modalPreviewCSV').modal('show');
+
+        fetch('import_preview_notas.php', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    $('#preview-summary').html(`<div class="alert alert-danger">${data.error}</div>`);
+                    return;
+                }
+
+                const rows = data.previewRows || [];
+                const summary = data.summary || {};
+                $('#preview-summary').html(`
+                    <div class="alert alert-info">
+                        <strong>Total:</strong> ${summary.total} | 
+                        <strong>Válidas:</strong> ${summary.validas} | 
+                        <strong>Inválidas:</strong> ${summary.invalidas}
+                    </div>
+                `);
+
+                const tbody = $('#preview-table tbody');
+                tbody.empty();
+                rows.forEach(r => {
+                    const tr = $('<tr>');
+                    tr.append($('<td>').text(r.line));
+                    tr.append($('<td>').text(r.identificador || ''));
+                    tr.append($('<td>').text(r.nombre || ''));
+                    tr.append($('<td>').text(r.notas_texto || '-'));
+                    tr.append($('<td>').text('Trimestres'));
+                    tr.append($('<td>').html(r.mensaje));
+                    tr.data('row', r);
+                    tbody.append(tr);
+                });
+            })
+            .catch(err => {
+                $('#preview-summary').html(`<div class="alert alert-danger">Error: ${err.message}</div>`);
+            });
+    });
+
+    // Aplicar CSV al formulario
+    $('#btn-apply-csv').click(function() {
+        const rows = [];
+        $('#preview-table tbody tr').each(function() {
+            const r = $(this).data('row');
+            if (r && r.valido) rows.push(r);
+        });
+
+        if (rows.length === 0) {
+            alert('No hay filas válidas para aplicar');
+            return;
+        }
+
+        let applied = 0;
+        let missing = 0;
         
-        // Restaurar botón después de 3 segundos
-        setTimeout(() => {
-            btn.html(originalHtml);
-            btn.prop('disabled', false);
-        }, 3000);
+        rows.forEach(r => {
+            const estudianteId = r.estudiante_id;
+            const notas = r.notas || {};
+            
+            if (notas.trimestre_1) {
+                const selector = `input[name="notas[${estudianteId}][trimestre_1]"]`;
+                const input = document.querySelector(selector);
+                if (input) {
+                    input.value = notas.trimestre_1;
+                    $(input).trigger('change');
+                    applied++;
+                } else {
+                    missing++;
+                }
+            }
+            
+            if (notas.trimestre_2) {
+                const selector = `input[name="notas[${estudianteId}][trimestre_2]"]`;
+                const input = document.querySelector(selector);
+                if (input) {
+                    input.value = notas.trimestre_2;
+                    $(input).trigger('change');
+                    applied++;
+                } else {
+                    missing++;
+                }
+            }
+            
+            if (notas.trimestre_3) {
+                const selector = `input[name="notas[${estudianteId}][trimestre_3]"]`;
+                const input = document.querySelector(selector);
+                if (input) {
+                    input.value = notas.trimestre_3;
+                    $(input).trigger('change');
+                    applied++;
+                } else {
+                    missing++;
+                }
+            }
+        });
+
+        $('#modalPreviewCSV').modal('hide');
+        let msg = `✅ Se aplicaron ${applied} notas al formulario.`;
+        if (missing) msg += ` ⚠️ ${missing} campos no se encontraron.`;
+        alert(msg);
     });
     
     // Guardar notas
     $(document).on('submit', '#form-notas', function(e) {
         e.preventDefault();
+        
+        const soporteFile = $('#soporte_grupo')[0].files[0];
+        if (!soporteFile) {
+            alert('❌ Debes adjuntar un archivo de soporte (imagen o PDF) para poder guardar las notas.');
+            $('#soporte_grupo').focus();
+            return;
+        }
+        
+        if (!confirm('¿Estás seguro de guardar las notas?')) return;
         
         $('#resultados').html(`
             <div class="text-right mb-3" id="volver-container">
@@ -190,9 +411,9 @@ $(document).ready(function() {
                     <i class="fas fa-arrow-left"></i> Volver a Secciones
                 </button>
             </div>
-            <div class="text-center py-4">
-                <div class="spinner-border text-success"></div>
-                <p>Guardando notas y soporte...</p>
+            <div class="text-center py-5">
+                <div class="spinner-border text-success" style="width: 3rem; height: 3rem;"></div>
+                <p class="mt-3">Guardando notas y soporte...</p>
             </div>
         `);
         
@@ -202,18 +423,31 @@ $(document).ready(function() {
             method: 'POST',
             body: formData
         })
-        .then(response => response.text())
-        .then(result => {
+        .then(response => response.json())
+        .then(data => {
             $('#resultados').html(`
                 <div class="text-right mb-3" id="volver-container">
                     <button class="btn btn-secondary" id="btn-volver">
                         <i class="fas fa-arrow-left"></i> Volver a Secciones
                     </button>
                 </div>
-                <div class="alert alert-success">
-                    ${result}
-                </div>
             `);
+
+            const header = $('#modalResultadoHeader');
+            const title = $('#modalResultadoTitle');
+            const body = $('#modalResultadoBody');
+
+            if (data.success) {
+                header.removeClass('bg-danger').addClass('bg-success text-white');
+                title.text('Éxito');
+                body.html('<div class="alert alert-success">' + data.message + '</div>');
+            } else {
+                header.removeClass('bg-success').addClass('bg-danger text-white');
+                title.text('Error');
+                body.html('<div class="alert alert-danger">' + data.message + '</div>');
+            }
+
+            $('#modalResultado').modal('show');
         })
         .catch(error => {
             $('#resultados').html(`
@@ -222,14 +456,12 @@ $(document).ready(function() {
                         <i class="fas fa-arrow-left"></i> Volver a Secciones
                     </button>
                 </div>
-                <div class="alert alert-danger">
-                    Error al guardar: ${error.message}
-                </div>
+                <div class="alert alert-danger">Error al guardar: ${error.message}</div>
             `);
         });
     });
     
-    // Preview de imagen antes de subir
+    // Preview de imagen
     $(document).on('change', '.soporte-grupo', function() {
         const file = this.files[0];
         const preview = $('#preview-grupo');
@@ -239,12 +471,12 @@ $(document).ready(function() {
             const reader = new FileReader();
             reader.onload = function(e) {
                 if (file.type.startsWith('image/')) {
-                    preview.html(`<img src="${e.target.result}" class="img-thumbnail" style="max-height: 150px;">`);
+                    preview.html(`<img src="${e.target.result}" class="img-fluid img-thumbnail" style="max-height: 150px;">`);
                 } else {
                     preview.html(`
                         <div class="alert alert-info text-center">
                             <i class="fas fa-file-pdf fa-3x"></i><br>
-                            <strong>Archivo PDF</strong>
+                            <strong>${file.name}</strong>
                         </div>
                     `);
                 }

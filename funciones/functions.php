@@ -1,7 +1,13 @@
 
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Asegura que los includes relativos dentro de este archivo
+// se resuelvan contra la carpeta /funciones en sistemas case-sensitive
+chdir(__DIR__);
 
     include('variables.php');
     include('conexion.php');
@@ -96,7 +102,10 @@ function desactivarPeriodosVencidos($db) {
 }
 
 // Ejecutar la función cada vez que alguien entre al sistema
-desactivarPeriodosVencidos($db);
+// Desactivación automática de periodos vencidos DESHABILITADA por decisión administrativa.
+// Ahora los periodos deben ser desactivados/gestionados manualmente desde la UI.
+// Si en el futuro se requiere reactivar la ejecución automática, descomentar la siguiente línea:
+// desactivarPeriodosVencidos($db);
 
 
 
@@ -120,6 +129,8 @@ function obtenerEstudiantes() {
                 u.tlf AS num_telf,
                 u.email AS correo,
                 u.fecha_ingreso,
+                u.fecha_nac,
+                u.embarazada,
                 u.status
               FROM users u
               LEFT JOIN carreras c ON u.carrera = c.id_carrera
@@ -376,6 +387,18 @@ function validarDatosEstudiante($data) {
             $validados[$campo] = trim($data[$campo]);
         }
     }
+
+    if (!empty($data['genero']) && $data['genero'] === 'Femenino') {
+        if ($data['embarazada'] !== '0' && $data['embarazada'] !== '1') {
+            $errors['embarazada'] = "Debe indicar si la estudiante está embarazada o no";
+        } else {
+            $validados['embarazada'] = (int)$data['embarazada'];
+        }
+    } else {
+        $validados['embarazada'] = isset($data['embarazada']) && ($data['embarazada'] === '0' || $data['embarazada'] === '1')
+            ? (int)$data['embarazada']
+            : 0;
+    }
     
     // Validar campos opcionales que permiten apóstrofes
     $camposConApostrofes = [
@@ -481,21 +504,21 @@ function insertarEstudiante($datos) {
             if (isset($resultadoFoto['success']) && $resultadoFoto['success']) {
                 $nombreFoto = $resultadoFoto['nombre_archivo'];
             }
+        } elseif (!empty($datos['foto_perfil'])) {
+            // Si ya viene una foto desde una preinscripción, conservarla.
+            $nombreFoto = $datos['foto_perfil'];
         }
 
         // ============================
-        // 2. PREPARAR DATOS BÁSICOS
+        // 2. PREPARAR DATOS BÁSICOS - AHORA EL USERNAME ES LA CÉDULA
         // ============================
-        $usernameBase = strtolower(preg_replace('/[^a-zA-Z0-9]/', '.', $datos['nombre']));
-        $username = preg_replace('/\.+/', '.', $usernameBase);
-        $username = trim($username, '.');
+        // El username será exactamente el idusuario (cédula con formato V-12345678 o E-12345678)
+        $username = $datos['idusuario']; // Ahora usa directamente la cédula como username
         
-        if (strlen($username) < 3) {
-            $username = strtolower(str_replace(['-', ' '], '', $datos['idusuario']));
-        }
+        // Verificar si el username ya existe
+        $username = generarUsernameUnico($username); // Esta función verificará si la cédula ya existe
         
-        $username = generarUsernameUnico($username);
-        
+        // La contraseña también será la cédula (se encripta)
         $password = password_hash($datos['idusuario'], PASSWORD_DEFAULT);
         $fecha_act = date('Y-m-d H:i:s');
         $api_key = bin2hex(random_bytes(16));
@@ -525,7 +548,7 @@ function insertarEstudiante($datos) {
             'tipo_vivienda' => $datos['tipo_vivienda'] ?? '',
             'tenencia_vivienda' => $datos['tenencia_vivienda'] ?? '',
             'enfermedad' => $datos['enfermedad'] ?? '',
-            'discapacidad' => $datos['discapacida'] ?? '',
+            'discapacidad' => $datos['discapacidad'] ?? '',
             'titulos' => !empty($datos['titulos']) ? implode('|||', $datos['titulos']) : '',
             'institutos' => !empty($datos['institutos']) ? implode('|||', $datos['institutos']) : '',
             'potencialidades' => $datos['potencialidades'] ?? '',
@@ -544,6 +567,7 @@ function insertarEstudiante($datos) {
             'carrera' => $datos['carrera'] ?? null,
             'carrera_di' => $datos['carrera'] ?? null,
             'genero' => $datos['genero'] ?? null,
+            'embarazada' => isset($datos['embarazada']) ? (int) $datos['embarazada'] : 0,
             'edo_civil' => $datos['edo_civil'] ?? null,
             'fecha_nac' => $datos['fecha_nac'] ?? null,
             'num_telf_opc' => $datos['num_telf_opc'] ?? '',
@@ -670,7 +694,7 @@ function insertarEstudiante($datos) {
         $stmt->close();
 
         // ============================
-        // 6. INSERTAR TÍTULOS OBTENIDOS (CORRECTO)
+        // 6. INSERTAR TÍTULOS OBTENIDOS
         // ============================
         if (!empty($datos['titulos']) && is_array($datos['titulos']) && 
             !empty($datos['institutos']) && is_array($datos['institutos'])) {
@@ -681,7 +705,6 @@ function insertarEstudiante($datos) {
             $count = min(count($titulos), count($institutos));
             
             if ($count > 0) {
-                // CORRECTO: Solo estos 4 campos según tu estructura
                 $sqlTitulos = "INSERT INTO titulos_obtenidos (id_usuario, nombre, titulo_obtenido, instituto) 
                                VALUES (?, ?, ?, ?)";
                 
@@ -717,6 +740,7 @@ function insertarEstudiante($datos) {
             $valores_nuevos = [
                 'idusuario' => $datos['idusuario'],
                 'nombre' => $datos['nombre'],
+                'username' => $username,
                 'carrera' => $datos['carrera'] ?? '',
                 'status' => $datos['status'] ?? 'Activo'
             ];
@@ -728,7 +752,7 @@ function insertarEstudiante($datos) {
                 null, 
                 $valores_nuevos, 
                 "Estudiantes", 
-                "Registro de nuevo estudiante"
+                "Registro de nuevo estudiante. Username: " . $username
             );
         }
 
@@ -743,7 +767,8 @@ function insertarEstudiante($datos) {
         return [
             'success' => true,
             'message' => '✅ Estudiante registrado exitosamente' . 
-                        (!empty($nombreFoto) ? ' con foto de perfil.' : '.'),
+                        (!empty($nombreFoto) ? ' con foto de perfil.' : '.') .
+                        ' Usuario y contraseña: ' . $datos['idusuario'],
             'id' => $userId,
             'username' => $username,
             'foto_perfil' => $nombreFoto,
@@ -798,43 +823,1356 @@ function insertarEstudiante($datos) {
 }
 
 /**
- * Función auxiliar para generar un username único
+ * Verifica si una cédula ya existe en users
+ */
+function estudianteExiste($idusuario) {
+    global $db;
+
+    $query = "SELECT COUNT(*) AS count FROM users WHERE idusuario = ? OR username = ?";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('ss', $idusuario, $idusuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    return isset($row['count']) && (int)$row['count'] > 0;
+}
+
+/**
+ * Verifica si ya existe una preinscripción pendiente para la misma cédula
+ */
+function preinscripcionPendienteExiste($idusuario) {
+    global $db;
+
+    $query = "SELECT COUNT(*) AS count FROM preinscripcion WHERE idusuario = ? AND status = 'Pendiente'";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('s', $idusuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    return isset($row['count']) && (int)$row['count'] > 0;
+}
+
+function obtenerPreinscripcionRechazada($idusuario) {
+    global $db;
+
+    $query = "SELECT * FROM preinscripcion WHERE idusuario = ? AND status = 'Rechazada' ORDER BY id DESC LIMIT 1";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param('s', $idusuario);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    return $row ?: null;
+}
+
+/**
+ * Inserta una preinscripción en la tabla preinscripcion
+ */
+function insertarPreinscripcion($datos) {
+    global $db;
+
+    if (empty($datos['idusuario'])) {
+        return [
+            'success' => false,
+            'message' => 'La cédula es obligatoria para la preinscripción.'
+        ];
+    }
+
+    if (estudianteExiste($datos['idusuario'])) {
+        return [
+            'success' => false,
+            'message' => 'Ya existe un estudiante con esta cédula. Si ya estás inscrito, inicia sesión con tus datos.'
+        ];
+    }
+
+    if (preinscripcionPendienteExiste($datos['idusuario'])) {
+        return [
+            'success' => false,
+            'message' => 'Ya existe una preinscripción pendiente con esta cédula. Por favor espera la revisión administrativa.'
+        ];
+    }
+
+    if (!empty($datos['carrera']) && !empty($datos['turno']) && !hayCupoDisponible($datos['carrera'], $datos['turno'])) {
+        return [
+            'success' => false,
+            'message' => 'No hay cupos disponibles para la carrera seleccionada en el turno ' . htmlspecialchars($datos['turno']) . '. Contacte con Secretaría.'
+        ];
+    }
+
+    $preinscripcionRechazada = obtenerPreinscripcionRechazada($datos['idusuario']);
+    $fotoPerfil = '';
+    $fechaAct = date('Y-m-d H:i:s');
+    $datos['status'] = $datos['status'] ?? 'Pendiente';
+    $datos['fecha_ingreso'] = $datos['fecha_ingreso'] ?? date('Y-m-d');
+    $datos['fecha_act'] = $fechaAct;
+    $datos['username'] = $datos['idusuario'];
+    $datos['user_type'] = 'preinscrito';
+
+    // Normalizar arrays relacionados con títulos para mantener índices alineados
+    $titulos = [];
+    $institutos = [];
+    $paisTitulos = [];
+    $legalizadoTitulos = [];
+    $maxFilasTitulos = max(
+        count($datos['titulos'] ?? []),
+        count($datos['institutos'] ?? []),
+        count($datos['pais_titulo'] ?? []),
+        count($datos['legalizado_titulo'] ?? [])
+    );
+
+    for ($i = 0; $i < $maxFilasTitulos; $i++) {
+        $titulo = trim($datos['titulos'][$i] ?? '');
+        $instituto = trim($datos['institutos'][$i] ?? '');
+        $paisTitulo = trim($datos['pais_titulo'][$i] ?? '');
+        $legalizadoTitulo = trim($datos['legalizado_titulo'][$i] ?? '');
+
+        if ($titulo === '' && $instituto === '' && $paisTitulo === '' && $legalizadoTitulo === '') {
+            continue;
+        }
+
+        $titulos[] = $titulo;
+        $institutos[] = $instituto;
+        $paisTitulos[] = $paisTitulo;
+        $legalizadoTitulos[] = $legalizadoTitulo;
+    }
+
+    try {
+        $db->begin_transaction();
+
+        if (isset($_FILES['foto_perfil']) && $_FILES['foto_perfil']['error'] === UPLOAD_ERR_OK) {
+            $resultadoFoto = subirFotoPerfil($_FILES['foto_perfil']);
+            if (isset($resultadoFoto['success']) && $resultadoFoto['success']) {
+                $fotoPerfil = $resultadoFoto['nombre_archivo'];
+            }
+        }
+
+        $valores = [
+            'idusuario' => $datos['idusuario'],
+            'nombre' => $datos['nombre'] ?? null,
+            'username' => $datos['username'],
+            'email' => !empty($datos['email']) ? $datos['email'] : null,
+            'tlf' => !empty($datos['tlf']) ? $datos['tlf'] : null,
+            'cel' => $datos['cel'] ?? '',
+            'direccion' => $datos['direccion'] ?? null,
+            'ciudad' => $datos['municipio'] ?? '',
+            'estado' => $datos['estado'] ?? null,
+            'municipio' => $datos['municipio'] ?? null,
+            'parroquia' => $datos['parroquia'] ?? null,
+            'etnia' => $datos['etnia'] ?? '',
+            'casaapto' => $datos['casaapto'] ?? 'No especificado',
+            'comuna' => $datos['comuna'] ?? '',
+            'punto_referencia' => $datos['punto_referencia'] ?? '',
+            'grupo_familiar' => isset($datos['grupo_familiar']) ? (int)$datos['grupo_familiar'] : 0,
+            'acargo_usted' => isset($datos['acargo_usted']) ? (int)$datos['acargo_usted'] : 0,
+            'fuente_ingresos' => $datos['fuente_ingresos'] ?? '',
+            'tipo_vivienda' => $datos['tipo_vivienda'] ?? '',
+            'tenencia_vivienda' => $datos['tenencia_vivienda'] ?? '',
+            'enfermedad' => $datos['enfermedad'] ?? '',
+            'discapacidad' => $datos['discapacidad'] ?? '',
+            'titulos' => !empty($titulos) ? implode('|||', $titulos) : '',
+            'institutos' => !empty($institutos) ? implode('|||', $institutos) : '',
+            'pais_titulo' => !empty($paisTitulos) ? implode('|||', $paisTitulos) : '',
+            'legalizado_titulo' => !empty($legalizadoTitulos) ? implode('|||', $legalizadoTitulos) : '',
+            'sede' => $datos['sede'] ?? null,
+            'turno' => $datos['turno'] ?? null,
+            'potencialidades' => $datos['potencialidades'] ?? '',
+            'carrera' => $datos['carrera'] ?? null,
+            'genero' => $datos['genero'] ?? null,
+            'edo_civil' => $datos['edo_civil'] ?? null,
+            'fecha_nac' => $datos['fecha_nac'] ?? null,
+            'embarazada' => isset($datos['embarazada']) ? (int)$datos['embarazada'] : 0,
+            'num_telf_opc' => $datos['num_telf_opc'] ?? '',
+            'fecha_ingreso' => $datos['fecha_ingreso'],
+            'fecha_act' => $fechaAct,
+            'status' => $datos['status'],
+            'user_type' => $datos['user_type'],
+            'foto_perfil' => $fotoPerfil,
+            'aprobado_por' => null,
+            'fecha_aprobado' => null,
+            'rechazado_por' => null,
+            'fecha_rechazo' => null,
+            'motivo_rechazo' => $datos['motivo_rechazo'] ?? null,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+
+        $columnas = array_keys($valores);
+        $placeholders = array_fill(0, count($columnas), '?');
+        $tipos = '';
+        $valoresBind = [];
+
+        foreach ($valores as $valor) {
+            $tipos .= is_int($valor) ? 'i' : 's';
+            $valoresBind[] = $valor;
+        }
+
+        if ($preinscripcionRechazada) {
+            $updateColumns = [];
+            $updateValues = [];
+            $updateTypes = '';
+            foreach ($valores as $key => $valor) {
+                if ($key === 'created_at' || $key === 'updated_at') {
+                    continue;
+                }
+                $updateColumns[] = "`$key` = ?";
+                $updateTypes .= is_int($valor) ? 'i' : 's';
+                $updateValues[] = $valor;
+            }
+
+            $updateValues[] = $preinscripcionRechazada['id'];
+            $updateTypes .= 'i';
+
+            $sql = "UPDATE preinscripcion SET " . implode(', ', $updateColumns) . " WHERE id = ?";
+            $stmt = $db->prepare($sql);
+            if (!$stmt) {
+                throw new Exception('Error al preparar actualización de preinscripción: ' . $db->error);
+            }
+            $stmt->bind_param($updateTypes, ...$updateValues);
+            if (!$stmt->execute()) {
+                throw new Exception('Error al actualizar la preinscripción rechazada: ' . $stmt->error);
+            }
+            $preinscripcionId = $preinscripcionRechazada['id'];
+            $stmt->close();
+        } else {
+            $sql = "INSERT INTO preinscripcion (`" . implode('`, `', $columnas) . "`) VALUES (" . implode(', ', $placeholders) . ")";
+            $stmt = $db->prepare($sql);
+            if (!$stmt) {
+                throw new Exception('Error al preparar consulta de preinscripción: ' . $db->error);
+            }
+            $stmt->bind_param($tipos, ...$valoresBind);
+            if (!$stmt->execute()) {
+                throw new Exception('Error al guardar la preinscripción: ' . $stmt->error);
+            }
+            $preinscripcionId = $stmt->insert_id;
+            $stmt->close();
+        }
+
+        $db->commit();
+
+        return [
+            'success' => true,
+            'message' => '✅ Preinscripción enviada correctamente. Serás contactado cuando el equipo admin la revise.',
+            'id' => $preinscripcionId
+        ];
+    } catch (Exception $e) {
+        if (isset($db) && method_exists($db, 'rollback')) {
+            $db->rollback();
+        }
+        if (!empty($fotoPerfil)) {
+            $rutaFoto = __DIR__ . '/../foto_perfil/' . $fotoPerfil;
+            if (file_exists($rutaFoto)) {
+                @unlink($rutaFoto);
+            }
+        }
+
+        return [
+            'success' => false,
+            'message' => '❌ ' . $e->getMessage()
+        ];
+    }
+}
+
+/**
+ * Obtiene las preinscripciones pendientes
+ */
+function obtenerPreinscripcionesPendientes($busqueda = null) {
+    global $db;
+
+    $preinscripciones = [];
+    $busqueda = trim((string)$busqueda);
+    $query = "SELECT * FROM preinscripcion WHERE status = 'Pendiente'";
+
+    if ($busqueda !== '') {
+        $query .= " AND (idusuario LIKE ? OR nombre LIKE ? OR username LIKE ? OR email LIKE ? OR tlf LIKE ? OR cel LIKE ? OR direccion LIKE ? OR punto_referencia LIKE ? OR potencialidades LIKE ? OR estado LIKE ? OR municipio LIKE ? OR parroquia LIKE ? )";
+    }
+
+    $query .= " ORDER BY fecha_ingreso DESC";
+
+    if ($stmt = $db->prepare($query)) {
+        if ($busqueda !== '') {
+            $like = '%' . $busqueda . '%';
+            $stmt->bind_param('ssssssssssss', $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like);
+        }
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $preinscripciones[] = $row;
+        }
+        $stmt->close();
+    }
+    return $preinscripciones;
+}
+
+/**
+ * Obtiene una preinscripción por ID
+ */
+function obtenerPreinscripcionPorId($id) {
+    global $db;
+
+    $query = "SELECT * FROM preinscripcion WHERE id = ? LIMIT 1";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param('i', $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $preinscripcion = $result->fetch_assoc();
+    $stmt->close();
+    return $preinscripcion ?: null;
+}
+
+/**
+ * Devuelve la configuración de secretaría por clave
+ */
+function obtenerConfiguracionSecretaria($clave, $default = null) {
+    global $db;
+
+    $query = "SELECT valor FROM secretaria_config WHERE clave = ? LIMIT 1";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return $default;
+    }
+    $stmt->bind_param('s', $clave);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    return $row['valor'] ?? $default;
+}
+
+/**
+ * Guarda o actualiza cupos por carrera y turno
+ * Guarda EXACTAMENTE los valores que el usuario ingresa
+ */
+function guardarCupoSecretaria($carreraId, $turno, $cuposTotales, $numeroSecciones = 1) {
+    global $db;
+
+    // Verificar si ya existe el registro
+    $check = $db->prepare("SELECT id FROM secretaria_cupos WHERE carrera_id = ? AND turno = ?");
+    $check->bind_param('is', $carreraId, $turno);
+    $check->execute();
+    $existe = $check->get_result()->fetch_assoc();
+    $check->close();
+
+    if ($existe) {
+        // Si existe, ACTUALIZAR con los valores exactos
+        $query = "UPDATE secretaria_cupos SET cupos_totales = ?, numero_secciones = ? WHERE carrera_id = ? AND turno = ?";
+        $stmt = $db->prepare($query);
+        $stmt->bind_param('iiis', $cuposTotales, $numeroSecciones, $carreraId, $turno);
+    } else {
+        // Si no existe, INSERTAR con los valores exactos
+        $query = "INSERT INTO secretaria_cupos (carrera_id, turno, cupos_totales, numero_secciones) VALUES (?, ?, ?, ?)";
+        $stmt = $db->prepare($query);
+        $stmt->bind_param('isii', $carreraId, $turno, $cuposTotales, $numeroSecciones);
+    }
+
+    if (!$stmt) {
+        error_log("Error prepare guardarCupoSecretaria: " . $db->error);
+        return false;
+    }
+    
+    $result = $stmt->execute();
+    
+    if (!$result) {
+        error_log("Error execute guardarCupoSecretaria: " . $stmt->error);
+    }
+    
+    $stmt->close();
+    return $result;
+}
+
+
+function guardarConfiguracionSecretaria($clave, $valor) {
+    global $db;
+
+    $query = "REPLACE INTO secretaria_config (clave, valor) VALUES (?, ?)";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('ss', $clave, $valor);
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
+}
+
+
+
+/**
+ * Obtiene los cupos configurados por carrera y turno
+ */
+function obtenerCuposSecretaria() {
+    global $db;
+
+    $cupos = [];
+    $query = "SELECT carrera_id, turno, cupos_totales, numero_secciones FROM secretaria_cupos";
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $cupos[$row['carrera_id']][$row['turno']] = [
+                'cupos_totales' => (int)$row['cupos_totales'],
+                'numero_secciones' => (int)$row['numero_secciones']
+            ];
+        }
+        $stmt->close();
+    }
+    return $cupos;
+}
+
+
+
+
+
+/**
+ * Obtiene el límite de secciones autorizadas por secretaria y las ya creadas
+ */
+function obtenerLimiteSeccionesDirector($carrera_id, $turno, $id_periodo) {
+    global $db;
+    
+    // Obtener límite autorizado por secretaria
+    $cuposConfig = obtenerCuposSecretaria();
+    $seccionesAutorizadas = $cuposConfig[$carrera_id][$turno]['numero_secciones'] ?? 0;
+    
+    // Contar secciones ya creadas (pendientes + aprobadas) para este periodo
+    $query = "SELECT COUNT(*) as total FROM secciones 
+              WHERE id_carrera = ? AND turno = ? AND id_periodo = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param('isi', $carrera_id, $turno, $id_periodo);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $seccionesCreadas = $row['total'] ?? 0;
+    $stmt->close();
+    
+    // Contar solo las secciones PENDIENTES (aún no aprobadas)
+    $queryPendientes = "SELECT COUNT(*) as total FROM secciones 
+                        WHERE id_carrera = ? AND turno = ? AND id_periodo = ? AND status = 'pendiente'";
+    $stmtPend = $db->prepare($queryPendientes);
+    $stmtPend->bind_param('isi', $carrera_id, $turno, $id_periodo);
+    $stmtPend->execute();
+    $resultPend = $stmtPend->get_result();
+    $rowPend = $resultPend->fetch_assoc();
+    $seccionesPendientes = $rowPend['total'] ?? 0;
+    $stmtPend->close();
+    
+    // Contar secciones APROBADAS (activas)
+    $seccionesAprobadas = $seccionesCreadas - $seccionesPendientes;
+    
+    return [
+        'autorizadas' => $seccionesAutorizadas,
+        'creadas' => $seccionesCreadas,
+        'pendientes' => $seccionesPendientes,
+        'aprobadas' => $seccionesAprobadas,
+        'disponibles' => max(0, $seccionesAutorizadas - $seccionesCreadas),
+        'tiene_cupo' => ($seccionesCreadas < $seccionesAutorizadas)
+    ];
+}
+
+
+
+
+
+
+
+
+/**
+ * Obtiene lista de números de sección autorizados por Secretaría para una carrera y turno.
+ */
+function obtenerNumerosSeccionDisponibles($carreraId, $turno) {
+    $cupos = obtenerCuposSecretaria();
+    if (empty($cupos[$carreraId][$turno]) || (int)$cupos[$carreraId][$turno]['numero_secciones'] <= 0) {
+        return [];
+    }
+
+    $max = (int)$cupos[$carreraId][$turno]['numero_secciones'];
+    global $db;
+
+    $query = "SELECT numero_seccion FROM secciones WHERE id_carrera = ? AND turno = ? AND status IN ('Pendiente', 'Aprobada')";
+    $stmt = $db->prepare($query);
+    $usedNumbers = [];
+    if ($stmt) {
+        $stmt->bind_param('is', $carreraId, $turno);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $usedNumbers[] = (int)$row['numero_seccion'];
+        }
+        $stmt->close();
+    }
+
+    $result = [];
+    for ($i = 1; $i <= $max; $i++) {
+        $result[] = [
+            'numero' => $i,
+            'disponible' => !in_array($i, $usedNumbers, true)
+        ];
+    }
+    return $result;
+}
+
+/**
+ * Obtiene lista de códigos de sección disponibles según rangos definidos.
+ */
+function obtenerCodigosSeccionDisponibles($carreraId, $turno) {
+    global $db;
+    $rangos = [];
+    $query = "SELECT codigo_inicio, codigo_fin FROM codigos_secciones WHERE id_carrera = ? ORDER BY codigo_inicio";
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        $stmt->bind_param('i', $carreraId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $rangos[] = $row;
+        }
+        $stmt->close();
+    }
+
+    if (empty($rangos)) {
+        return [];
+    }
+
+    $usedCodes = [];
+    $query_usados = "SELECT DISTINCT CAST(codigo_seccion AS UNSIGNED) as codigo_num FROM secciones WHERE id_carrera = ? AND turno = ? AND codigo_seccion REGEXP '^[0-9]+$' AND status IN ('Pendiente', 'Aprobada')";
+    $stmt_usados = $db->prepare($query_usados);
+    if ($stmt_usados) {
+        $stmt_usados->bind_param('is', $carreraId, $turno);
+        $stmt_usados->execute();
+        $result_usados = $stmt_usados->get_result();
+        while ($row = $result_usados->fetch_assoc()) {
+            $usedCodes[] = (int)$row['codigo_num'];
+        }
+        $stmt_usados->close();
+    }
+
+    $available = [];
+    foreach ($rangos as $rango) {
+        for ($codigo = (int)$rango['codigo_inicio']; $codigo <= (int)$rango['codigo_fin']; $codigo++) {
+            if (!in_array($codigo, $usedCodes, true)) {
+                $available[] = $codigo;
+            }
+        }
+    }
+
+    return $available;
+}
+
+
+
+
+/**
+ * Obtiene los cupos disponibles para una carrera y turno específicos
+ */
+function obtenerCuposDisponiblesPorCarreraYTurno($carreraId, $turno) {
+    global $db;
+    
+    if (empty($carreraId) || empty($turno)) {
+        return ['total' => 0, 'ocupados' => 0, 'disponibles' => 0, 'tiene_cupo' => false];
+    }
+    
+    // Obtener cupos totales de secretaria
+    $query = "SELECT cupos_totales FROM secretaria_cupos WHERE carrera_id = ? AND turno = ?";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return ['total' => 0, 'ocupados' => 0, 'disponibles' => 0, 'tiene_cupo' => false];
+    }
+    
+    $stmt->bind_param('is', $carreraId, $turno);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $cupo = $result->fetch_assoc();
+    $total = $cupo ? (int)$cupo['cupos_totales'] : 0;
+    $stmt->close();
+    
+    // Contar preinscripciones (Pendientes + Aprobadas) usando la función existente
+    $ocupados = contarPreinscripcionesPorCupo($carreraId, $turno);
+    $disponibles = max(0, $total - $ocupados);
+    
+    return [
+        'total' => $total,
+        'ocupados' => $ocupados,
+        'disponibles' => $disponibles,
+        'tiene_cupo' => $disponibles > 0
+    ];
+}
+
+/**
+ * Obtiene todos los cupos disponibles para todas las carreras y turnos
+ */
+function obtenerTodosLosCuposDisponibles() {
+    global $db;
+    
+    $carreras = obtenerTodasLasCarreras();
+    $turnos = ['Diurno', 'Nocturno'];
+    $resultados = [];
+    
+    foreach ($carreras as $carrera) {
+        $carreraId = $carrera['id'];
+        foreach ($turnos as $turno) {
+            $resultados[$carreraId][$turno] = obtenerCuposDisponiblesPorCarreraYTurno($carreraId, $turno);
+        }
+    }
+    
+    return $resultados;
+}
+
+
+
+
+
+
+/**
+ * Cuenta cuántas preinscripciones están usando cupos para una carrera+turno
+ */
+function contarPreinscripcionesPorCupo($carreraId, $turno) {
+    global $db;
+
+    $checkTable = $db->query("SHOW TABLES LIKE 'preinscripcion'");
+    if (!$checkTable || $checkTable->num_rows === 0) {
+        return 0;
+    }
+
+    $query = "SELECT COUNT(*) AS total FROM preinscripcion WHERE carrera = ? AND turno = ? AND status IN ('Pendiente', 'Aprobada')";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return 0;
+    }
+    $stmt->bind_param('is', $carreraId, $turno);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    return (int)($row['total'] ?? 0);
+}
+
+/**
+ * Comprueba si hay cupos disponibles para una carrera y turno
+ */
+function hayCupoDisponible($carreraId, $turno) {
+    global $db;
+    
+    // Validar parámetros
+    if (empty($carreraId) || empty($turno)) {
+        error_log("hayCupoDisponible: Parámetros vacíos - carrera: $carreraId, turno: $turno");
+        return false;
+    }
+    
+    // Obtener cupos de la tabla secretaria_cupos
+    $query = "SELECT cupos_totales FROM secretaria_cupos WHERE carrera_id = ? AND turno = ?";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error preparando consulta hayCupoDisponible: " . $db->error);
+        return false;
+    }
+    
+    $stmt->bind_param('is', $carreraId, $turno);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $cupo = $result->fetch_assoc();
+    
+    if (!$cupo) {
+        error_log("hayCupoDisponible: No hay configuración de cupos para carrera_id: $carreraId, turno: $turno");
+        return false;
+    }
+    
+    $total = (int)$cupo['cupos_totales'];
+    if ($total <= 0) {
+        error_log("hayCupoDisponible: Cupos totales es $total para carrera_id: $carreraId, turno: $turno");
+        return false;
+    }
+    
+    $ocupados = contarPreinscripcionesAprobadasPorCarreraYTurno($carreraId, $turno);
+    $disponibles = $total - $ocupados;
+    
+    error_log("hayCupoDisponible: Carrera $carreraId, Turno $turno - Cupos totales: $total, Ocupados: $ocupados, Disponibles: $disponibles");
+    
+    return $ocupados < $total;
+}
+
+/**
+ * Cuenta cuántas preinscripciones APROBADAS existen para una carrera y turno
+ * NOTA: Cambié el nombre para evitar conflicto con la función existente
+ */
+function contarPreinscripcionesAprobadasPorCarreraYTurno($carreraId, $turno) {
+    global $db;
+    
+    // Contar preinscripciones APROBADAS (no pendientes)
+    $query = "SELECT COUNT(*) as total 
+              FROM preinscripcion 
+              WHERE carrera = ? AND turno = ? AND status = 'Aprobada'";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error preparando contarPreinscripcionesAprobadasPorCarreraYTurno: " . $db->error);
+        return 0;
+    }
+    
+    $stmt->bind_param('is', $carreraId, $turno);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    
+    return (int)($row['total'] ?? 0);
+}
+
+/**
+ * Obtiene o crea automáticamente la configuración de cupos para una carrera y turno
+ */
+function obtenerOCrearCupos($carreraId, $turno, $cuposPorDefecto = 30) {
+    global $db;
+    
+    // Verificar si existe
+    $query = "SELECT id, cupos_totales FROM secretaria_cupos WHERE carrera_id = ? AND turno = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param('is', $carreraId, $turno);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $cupo = $result->fetch_assoc();
+    
+    if (!$cupo) {
+        // Crear cupos por defecto
+        $insert = $db->prepare("INSERT INTO secretaria_cupos (carrera_id, turno, cupos_totales, numero_secciones, updated_at) VALUES (?, ?, ?, 1, NOW())");
+        $insert->bind_param('isi', $carreraId, $turno, $cuposPorDefecto);
+        if ($insert->execute()) {
+            error_log("Cupos creados automáticamente para carrera $carreraId, turno $turno con $cuposPorDefecto cupos");
+            return $cuposPorDefecto;
+        }
+        return 0;
+    }
+    
+    return (int)$cupo['cupos_totales'];
+}
+
+/**
+ * Obtiene secciones aprobadas por carrera y turno
+ */
+function obtenerSeccionesTrayecto0($carreraId, $turno = null) {
+    global $db;
+
+    $secciones = [];
+    if ($turno === null) {
+        $query = "SELECT s.id_seccion AS id, s.numero_seccion, s.capacidad_maxima AS capacidad FROM secciones s JOIN trayectos t ON s.id_trayecto = t.id_trayecto WHERE s.id_carrera = ? AND t.numero_trayecto = 0 AND s.estatus = 'activa' ORDER BY s.numero_seccion";
+        $stmt = $db->prepare($query);
+        if ($stmt) {
+            $stmt->bind_param('i', $carreraId);
+        }
+    } else {
+        $query = "SELECT s.id_seccion AS id, s.numero_seccion, s.capacidad_maxima AS capacidad FROM secciones s JOIN trayectos t ON s.id_trayecto = t.id_trayecto WHERE s.id_carrera = ? AND s.turno = ? AND t.numero_trayecto = 0 AND s.estatus = 'activa' ORDER BY s.numero_seccion";
+        $stmt = $db->prepare($query);
+        if ($stmt) {
+            $stmt->bind_param('is', $carreraId, $turno);
+        }
+    }
+
+    if ($stmt) {
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $secciones[] = $row;
+        }
+        $stmt->close();
+    }
+    return $secciones;
+}
+
+/**
+ * Cuenta los estudiantes inscritos en una sección
+ */
+function contarEstudiantesEnSeccion($seccion_id) {
+    global $db;
+    
+    $query = "SELECT COUNT(*) as total FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return 0;
+    }
+    $stmt->bind_param('i', $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $total = $row['total'] ?? 0;
+    $stmt->close();
+    
+    return $total;
+}
+
+
+
+/**
+ * Verifica si una sección tiene cupos disponibles
+ */
+function seccionTieneCuposDisponibles($seccion_id) {
+    global $db;
+    
+    // Obtener capacidad máxima
+    $query = "SELECT capacidad_maxima FROM secciones WHERE id_seccion = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param('i', $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $seccion = $result->fetch_assoc();
+    $stmt->close();
+    
+    if (!$seccion) {
+        return false;
+    }
+    
+    $capacidad_maxima = $seccion['capacidad_maxima'];
+    $inscritos = contarEstudiantesEnSeccion($seccion_id);
+    
+    return $inscritos < $capacidad_maxima;
+}
+
+
+
+
+/**
+ * Asigna sección automáticamente al estudiante
+ * Si userId es null, asigna estudiantes sin sección de la carrera a secciones disponibles
+ */
+function asignarSeccionAutomatica($carreraId, $turno, $userId) {
+    global $db;
+
+    if ($userId !== null) {
+        // Asignar un estudiante específico
+        $secciones = obtenerSeccionesTrayecto0($carreraId, $turno);
+        if (empty($secciones)) {
+            return false; // No hay secciones
+        }
+
+        foreach ($secciones as $seccion) {
+            $ocupados = contarEstudiantesEnSeccion($seccion['id']);
+            if ($ocupados < $seccion['capacidad']) {
+                $query = "UPDATE users SET seccion_id = ? WHERE id = ?";
+                $stmt = $db->prepare($query);
+                if ($stmt) {
+                    $stmt->bind_param('ii', $seccion['id'], $userId);
+                    $result = $stmt->execute();
+                    $stmt->close();
+                    return $result;
+                }
+            }
+        }
+
+        return false; // Todas llenas
+    }
+
+    // Asignar estudiantes sin sección de la carrera y turno a secciones disponibles
+    $secciones = obtenerSeccionesTrayecto0($carreraId, $turno);
+    if (empty($secciones)) {
+        return false;
+    }
+
+    // Obtener estudiantes sin sección asignada de esta carrera y turno
+    $query_estudiantes = "SELECT id FROM users WHERE carrera = ? AND turno = ? AND seccion_id IS NULL AND estudiante = 1 AND status = 'Activo'";
+    $stmt_est = $db->prepare($query_estudiantes);
+    if (!$stmt_est) {
+        return false;
+    }
+    $stmt_est->bind_param('is', $carreraId, $turno);
+    $stmt_est->execute();
+    $result_est = $stmt_est->get_result();
+    $estudiantes_sin_seccion = [];
+    while ($row = $result_est->fetch_assoc()) {
+        $estudiantes_sin_seccion[] = $row['id'];
+    }
+    $stmt_est->close();
+
+    if (empty($estudiantes_sin_seccion)) {
+        return true; // No hay estudiantes esperando, pero no es error
+    }
+
+    $asignados = 0;
+    foreach ($secciones as $seccion) {
+        $ocupados = contarEstudiantesEnSeccion($seccion['id']);
+        $capacidad_disponible = $seccion['capacidad'] - $ocupados;
+
+        if ($capacidad_disponible <= 0) {
+            continue;
+        }
+
+        $estudiantes_a_asignar = array_slice($estudiantes_sin_seccion, $asignados, $capacidad_disponible);
+        if (empty($estudiantes_a_asignar)) {
+            break;
+        }
+
+        $placeholders = str_repeat('?,', count($estudiantes_a_asignar) - 1) . '?';
+        $query_asignar = "UPDATE users SET seccion_id = ? WHERE id IN ($placeholders)";
+        $stmt_asignar = $db->prepare($query_asignar);
+        if ($stmt_asignar) {
+            $params = array_merge([$seccion['id']], $estudiantes_a_asignar);
+            $stmt_asignar->bind_param(str_repeat('i', count($params)), ...$params);
+            $stmt_asignar->execute();
+            $asignados += $stmt_asignar->affected_rows;
+            $stmt_asignar->close();
+        }
+
+        if ($asignados >= count($estudiantes_sin_seccion)) {
+            break;
+        }
+    }
+
+    return $asignados > 0;
+}
+
+function crearSeccionDirector($carreraId, $turno, $numeroSeccion, $capacidad, $horario, $userId, $codigoSeccion, $idTrayecto, $idPeriodo, $fechaInicia) {
+    global $db;
+    
+    $estatus = 'inactiva';
+    $status = 'pendiente';
+    $fechaActual = date('Y-m-d H:i:s');
+    
+    $query = "INSERT INTO secciones (
+        codigo_seccion,
+        id_carrera,
+        turno,
+        numero_seccion,
+        id_trayecto,
+        id_periodo,
+        capacidad_maxima,
+        horario,
+        estatus,
+        status,
+        created_by,
+        created_at,
+        inicia
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error prepare crearSeccionDirector: " . $db->error);
+        return false;
+    }
+    
+    $stmt->bind_param(
+        'sisiiisssssss',
+        $codigoSeccion,
+        $carreraId,
+        $turno,
+        $numeroSeccion,
+        $idTrayecto,
+        $idPeriodo,
+        $capacidad,
+        $horario,
+        $estatus,
+        $status,
+        $userId,
+        $fechaActual,
+        $fechaInicia
+    );
+    
+    if ($stmt->execute()) {
+        $idSeccion = $stmt->insert_id;
+        $stmt->close();
+        error_log("Sección creada - ID: $idSeccion, estatus: $estatus, status: $status");
+        return $idSeccion;
+    } else {
+        error_log("Error execute crearSeccionDirector: " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+}
+
+function aprobarSeccion($seccionId, $approvedBy) {
+    global $db;
+
+    $query_info = "SELECT id_carrera, turno, capacidad_maxima FROM secciones WHERE id_seccion = ?";
+    $stmt_info = $db->prepare($query_info);
+    if (!$stmt_info) {
+        error_log("Error prepare aprobarSeccion info: " . $db->error);
+        return false;
+    }
+    $stmt_info->bind_param('i', $seccionId);
+    $stmt_info->execute();
+    $result_info = $stmt_info->get_result();
+    $seccion_info = $result_info->fetch_assoc();
+    $stmt_info->close();
+
+    if (!$seccion_info) {
+        error_log("Sección no encontrada: $seccionId");
+        return false;
+    }
+
+    $query = "UPDATE secciones SET 
+        status = 'aprobada',
+        estatus = 'activa',
+        approved_by = ?, 
+        approved_at = NOW() 
+        WHERE id_seccion = ? AND status = 'pendiente'";
+    
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error prepare aprobarSeccion update: " . $db->error);
+        return false;
+    }
+    $stmt->bind_param('ii', $approvedBy, $seccionId);
+    $result = $stmt->execute();
+    $stmt->close();
+
+    if ($result) {
+        error_log("Sección $seccionId aprobada y activada exitosamente");
+    } else {
+        error_log("Error al aprobar sección $seccionId");
+    }
+
+    return $result;
+}
+
+
+
+/**
+ * Obtiene las secciones aprobadas (visibles para estudiantes)
+ */
+function obtenerSeccionesAprobadas($carrera_id = null, $turno = null) {
+    global $db;
+    
+    $query = "SELECT 
+        s.*, 
+        c.nombre_carrera AS carrera_nombre
+    FROM secciones s 
+    JOIN carreras c ON s.id_carrera = c.id_carrera 
+    WHERE s.status = 'aprobada' AND s.estatus = 'activa'";
+    
+    $params = [];
+    $types = "";
+    
+    if ($carrera_id) {
+        $query .= " AND s.id_carrera = ?";
+        $params[] = $carrera_id;
+        $types .= "i";
+    }
+    
+    if ($turno) {
+        $query .= " AND s.turno = ?";
+        $params[] = $turno;
+        $types .= "s";
+    }
+    
+    $query .= " ORDER BY s.codigo_seccion ASC";
+    
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error prepare obtenerSeccionesAprobadas: " . $db->error);
+        return [];
+    }
+    
+    if (!empty($params)) {
+        $stmt->bind_param($types, ...$params);
+    }
+    
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $secciones = [];
+    while ($row = $result->fetch_assoc()) {
+        $secciones[] = $row;
+    }
+    
+    $stmt->close();
+    return $secciones;
+}
+
+
+
+
+
+/**
+ * Elimina una sección junto con horarios y asignaciones activas de estudiantes.
+ *
+ * @param int $seccionId ID de la sección
+ * @param int|null $performedBy ID del usuario que ejecuta la eliminación
+ * @return bool True si se eliminó correctamente
+ */
+function eliminarSeccion($seccionId, $performedBy = null) {
+    global $db;
+
+    if (!is_numeric($seccionId) || $seccionId <= 0) {
+        error_log("eliminarSeccion: ID de sección inválido: $seccionId");
+        return false;
+    }
+
+    try {
+        $db->begin_transaction();
+
+        // Deshabilitar restricciones de clave foránea temporalmente
+        $db->query("SET FOREIGN_KEY_CHECKS = 0");
+
+        // Verificar que la sección existe
+        $stmt = $db->prepare("SELECT id_seccion, status FROM secciones WHERE id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error preparando SELECT secciones: " . $db->error);
+        }
+        $stmt->bind_param('i', $seccionId);
+        if (!$stmt->execute()) {
+            throw new Exception("Error ejecutando SELECT secciones: " . $stmt->error);
+        }
+        $result = $stmt->get_result();
+        if ($result->num_rows === 0) {
+            throw new Exception("La sección con ID $seccionId no existe");
+        }
+        $seccion = $result->fetch_assoc();
+        $stmt->close();
+
+        error_log("Intentando eliminar sección $seccionId con status: " . $seccion['status']);
+
+        // Eliminar asignaciones de docente para la sección PRIMERO
+        // Esto automáticamente eliminará los horarios gracias a ON DELETE CASCADE
+        $stmt = $db->prepare("DELETE FROM docente_seccion WHERE id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error preparando DELETE docente_seccion: " . $db->error);
+        }
+        $stmt->bind_param('i', $seccionId);
+        if (!$stmt->execute()) {
+            throw new Exception("Error ejecutando DELETE docente_seccion: " . $stmt->error);
+        }
+        $docentes_eliminados = $stmt->affected_rows;
+        $stmt->close();
+
+        // Eliminar estudiantes de la sección DESPUÉS
+        $stmt = $db->prepare("DELETE FROM estudiante_seccion WHERE id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error preparando DELETE estudiante_seccion: " . $db->error);
+        }
+        $stmt->bind_param('i', $seccionId);
+        if (!$stmt->execute()) {
+            throw new Exception("Error ejecutando DELETE estudiante_seccion: " . $stmt->error);
+        }
+        $estudiantes_eliminados = $stmt->affected_rows;
+        $stmt->close();
+
+        // Finalmente eliminar la sección
+        $stmt = $db->prepare("DELETE FROM secciones WHERE id_seccion = ?");
+        if (!$stmt) {
+            throw new Exception("Error preparando DELETE secciones: " . $db->error);
+        }
+        $stmt->bind_param('i', $seccionId);
+        if (!$stmt->execute()) {
+            throw new Exception("Error ejecutando DELETE secciones: " . $stmt->error);
+        }
+        $stmt->close();
+
+        $db->commit();
+
+        // Log de éxito
+        error_log("Sección $seccionId eliminada exitosamente. Docentes eliminados: $docentes_eliminados, Estudiantes eliminados: $estudiantes_eliminados");
+
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria(
+                    "DELETE",
+                    "secciones",
+                    $seccionId,
+                    null,
+                    [
+                        'performed_by' => $performedBy,
+                        'seccion_id' => $seccionId
+                    ],
+                    "Secciones",
+                    "Eliminación de sección y limpieza de horarios/estudiantes"
+                );
+            } catch (Exception $e) {
+                error_log("Error en auditoría eliminarSeccion: " . $e->getMessage());
+            }
+        }
+
+        return true;
+    } catch (Exception $e) {
+        $db->rollback();
+        error_log("Error en eliminarSeccion: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Rechaza una sección
+ */
+function rechazarSeccion($seccionId, $approvedBy) {
+    return eliminarSeccion($seccionId, $approvedBy);
+}
+
+/**
+ * Obtiene secciones pendientes de aprobación
+ */
+function obtenerSeccionesPendientes() {
+    global $db;
+
+    $secciones = [];
+    $query = "SELECT 
+        s.*, 
+        s.id_seccion AS id, 
+        s.capacidad_maxima AS capacidad, 
+        c.nombre_carrera AS carrera_nombre, 
+        u.nombre AS creador_nombre 
+    FROM secciones s 
+    JOIN carreras c ON s.id_carrera = c.id_carrera 
+    LEFT JOIN users u ON s.created_by = u.id 
+    WHERE s.status = 'pendiente' 
+    ORDER BY s.created_at DESC";
+    
+    $result = $db->query($query);
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $secciones[] = $row;
+        }
+    }
+    return $secciones;
+}
+
+/**
+ * Acepta una preinscripción y crea el usuario en la tabla users
+ */
+function aceptarPreinscripcion($id, $adminId) {
+    global $db;
+
+    $preinscripcion = obtenerPreinscripcionPorId($id);
+    if (!$preinscripcion) {
+        return [
+            'success' => false,
+            'message' => 'Preinscripción no encontrada.'
+        ];
+    }
+
+    if (estudianteExiste($preinscripcion['idusuario'])) {
+        return [
+            'success' => false,
+            'message' => 'Ya existe un estudiante registrado con esta cédula.'
+        ];
+    }
+
+    $datos = [
+        'idusuario' => $preinscripcion['idusuario'],
+        'nombre' => $preinscripcion['nombre'],
+        'email' => $preinscripcion['email'],
+        'tlf' => $preinscripcion['tlf'],
+        'cel' => $preinscripcion['cel'],
+        'direccion' => $preinscripcion['direccion'],
+        'municipio' => $preinscripcion['municipio'],
+        'estado' => $preinscripcion['estado'],
+        'parroquia' => $preinscripcion['parroquia'],
+        'etnia' => $preinscripcion['etnia'],
+        'casaapto' => $preinscripcion['casaapto'],
+        'punto_referencia' => $preinscripcion['punto_referencia'],
+        'grupo_familiar' => $preinscripcion['grupo_familiar'],
+        'acargo_usted' => $preinscripcion['acargo_usted'],
+        'fuente_ingresos' => $preinscripcion['fuente_ingresos'],
+        'tipo_vivienda' => $preinscripcion['tipo_vivienda'],
+        'tenencia_vivienda' => $preinscripcion['tenencia_vivienda'],
+        'enfermedad' => $preinscripcion['enfermedad'],
+        'discapacidad' => $preinscripcion['discapacidad'],
+        'titulos' => !empty($preinscripcion['titulos']) ? explode('|||', $preinscripcion['titulos']) : [],
+        'institutos' => !empty($preinscripcion['institutos']) ? explode('|||', $preinscripcion['institutos']) : [],
+        'potencialidades' => $preinscripcion['potencialidades'],
+        'carrera' => $preinscripcion['carrera'],
+        'genero' => $preinscripcion['genero'],
+        'edo_civil' => $preinscripcion['edo_civil'],
+        'fecha_nac' => $preinscripcion['fecha_nac'],
+        'embarazada' => $preinscripcion['embarazada'],
+        'num_telf_opc' => $preinscripcion['num_telf_opc'],
+        'fecha_ingreso' => $preinscripcion['fecha_ingreso'],
+        'status' => 1, // 🔥 CAMBIADO: 1 = Activo (entero, no string)
+        'foto_perfil' => $preinscripcion['foto_perfil'] ?? ''
+    ];
+
+    $resultado = insertarEstudiante($datos);
+    if (!$resultado['success']) {
+        return $resultado;
+    }
+
+    // Asignar sección automáticamente
+    asignarSeccionAutomatica($preinscripcion['carrera'], $preinscripcion['turno'], $resultado['id']);
+
+    $query = "UPDATE preinscripcion SET status = 'Aprobada', aprobado_por = ?, fecha_aprobado = NOW() WHERE id = ?";
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        $stmt->bind_param('ii', $adminId, $id);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    return [
+        'success' => true,
+        'message' => '✅ Preinscripción aceptada y estudiante creado en el sistema.',
+        'user_id' => $resultado['id']
+    ];
+}
+
+/**
+ * Rechaza una preinscripción
+ */
+function rechazarPreinscripcion($id, $adminId, $motivo = null) {
+    global $db;
+
+    $query = "UPDATE preinscripcion SET status = 'Rechazada', rechazado_por = ?, fecha_rechazo = NOW(), motivo_rechazo = ? WHERE id = ?";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        return [
+            'success' => false,
+            'message' => 'Error al preparar el rechazo de la preinscripción.'
+        ];
+    }
+
+    $stmt->bind_param('isi', $adminId, $motivo, $id);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        return [
+            'success' => false,
+            'message' => 'Error al rechazar la preinscripción: ' . $stmt->error
+        ];
+    }
+
+    $stmt->close();
+    return [
+        'success' => true,
+        'message' => 'Preinscripción rechazada correctamente.'
+    ];
+}
+
+/**
+ * Función auxiliar para verificar si el username (cédula) ya existe
+ * Si ya existe, lanza una excepción porque la cédula debe ser única
  */
 function generarUsernameUnico($usernameBase) {
     global $db;
     
-    $username = $usernameBase;
-    $contador = 1;
-    $maxIntentos = 100;
-    
-    while ($contador <= $maxIntentos) {
-        // Verificar si el username ya existe
-        $sql = "SELECT COUNT(*) as count FROM users WHERE username = ?";
-        $stmt = $db->prepare($sql);
-        if (!$stmt) {
-            // Si hay error en la consulta, retornar el username actual
-            return $username;
-        }
-        
-        $stmt->bind_param('s', $username);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        $stmt->close();
-        
-        if ($row['count'] == 0) {
-            // Username disponible
-            return $username;
-        }
-        
-        // Generar nuevo username con sufijo numérico
-        $username = $usernameBase . $contador;
-        $contador++;
+    // Verificar si el username ya existe
+    $sql = "SELECT COUNT(*) as count FROM users WHERE username = ?";
+    $stmt = $db->prepare($sql);
+    if (!$stmt) {
+        // Si hay error en la consulta, retornar el username actual
+        return $usernameBase;
     }
     
-    // Si no se encuentra username único después de muchos intentos,
-    // usar un hash basado en timestamp
-    return $usernameBase . '_' . substr(md5(time()), 0, 6);
+    $stmt->bind_param('s', $usernameBase);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+    
+    if ($row['count'] > 0) {
+        // Si la cédula ya existe, lanzar excepción
+        throw new Exception("La cédula {$usernameBase} ya está registrada en el sistema.", 409);
+    }
+    
+    // Si no existe, retornar la cédula como username
+    return $usernameBase;
 }
 
 /**
@@ -915,6 +2253,10 @@ function validarEstudiante($datos) {
             $errores[] = "El campo " . str_replace('_', ' ', $campo) . " es requerido";
         }
     }
+
+    if (isset($datos['user_type']) && $datos['user_type'] === 'preinscrito' && empty($datos['turno'])) {
+        $errores[] = 'El campo turno es requerido para la preinscripción';
+    }
     
     // Validación especial para carrera cuando se selecciona "OTRA"
     if (isset($datos['carrera']) && $datos['carrera'] === 'OTRA' && empty($datos['otra_carrera'])) {
@@ -924,6 +2266,15 @@ function validarEstudiante($datos) {
     // Validar email
     if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
         $errores[] = 'Por favor ingrese un correo electrónico válido';
+    }
+
+    // Validar embarazo si el género es femenino
+    if (isset($datos['genero']) && $datos['genero'] === 'Femenino') {
+        if (!isset($datos['embarazada']) || $datos['embarazada'] === '') {
+            $errores[] = 'El campo "embarazada" es obligatorio cuando el género es femenino';
+        } elseif (!in_array($datos['embarazada'], ['0', '1', 'Si', 'No'], true)) {
+            $errores[] = 'El campo "embarazada" debe ser 0, 1, Si o No';
+        }
     }
     
     // Validar teléfono (al menos 10 dígitos)
@@ -1023,7 +2374,6 @@ function actualizarEstudiante(array $datos): array {
     $fotoEliminada = false;
     
     try {
-        // Iniciar transacción
         $db->begin_transaction();
         
         // ============================
@@ -1031,19 +2381,16 @@ function actualizarEstudiante(array $datos): array {
         // ============================
         $errores_validacion = [];
         
-        // Validar ID
         if (empty($datos['id']) || !is_numeric($datos['id'])) {
             $errores_validacion[] = "ID de estudiante no válido";
         }
         
-        // Validar cédula
         if (empty($datos['idusuario'])) {
             $errores_validacion[] = "La cédula es obligatoria";
         } elseif (!preg_match('/^[VE]-\d{6,9}$/', $datos['idusuario'])) {
             $errores_validacion[] = "Formato de cédula inválido. Debe ser V-12345678 o E-12345678";
         }
         
-        // Validar nombre (permite apóstrofes, NO números)
         if (empty($datos['nombre'])) {
             $errores_validacion[] = "El nombre completo es obligatorio";
         } else {
@@ -1064,7 +2411,6 @@ function actualizarEstudiante(array $datos): array {
             }
         }
         
-        // Validar email
         if (!empty($datos['email'])) {
             if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
                 $errores_validacion[] = "Correo electrónico no válido. Ejemplo: estudiante@universidad.edu";
@@ -1074,7 +2420,6 @@ function actualizarEstudiante(array $datos): array {
             }
         }
         
-        // Validar teléfono
         if (!empty($datos['tlf'])) {
             $telefono_limpio = preg_replace('/\D/', '', $datos['tlf']);
             if (!preg_match('/^[0-9]{10,11}$/', $telefono_limpio)) {
@@ -1082,7 +2427,6 @@ function actualizarEstudiante(array $datos): array {
             }
         }
         
-        // Validar celular
         if (!empty($datos['cel'])) {
             $celular_limpio = preg_replace('/\D/', '', $datos['cel']);
             if (!preg_match('/^[0-9]{10,11}$/', $celular_limpio)) {
@@ -1090,7 +2434,6 @@ function actualizarEstudiante(array $datos): array {
             }
         }
         
-        // Validar fecha de nacimiento
         if (!empty($datos['fecha_nac'])) {
             if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $datos['fecha_nac'])) {
                 $errores_validacion[] = "Formato de fecha de nacimiento inválido. Use: AAAA-MM-DD";
@@ -1109,7 +2452,6 @@ function actualizarEstudiante(array $datos): array {
             }
         }
         
-        // Validar fecha de ingreso
         if (!empty($datos['fecha_ingreso'])) {
             if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $datos['fecha_ingreso'])) {
                 $errores_validacion[] = "Formato de fecha de ingreso inválido. Use: AAAA-MM-DD";
@@ -1123,6 +2465,14 @@ function actualizarEstudiante(array $datos): array {
             }
         }
         
+        // Validar sede
+        if (!empty($datos['sede'])) {
+            $sedesPermitidas = ['Puerto Cabello', 'COEF'];
+            if (!in_array($datos['sede'], $sedesPermitidas)) {
+                $errores_validacion[] = "Sede no válida. Las sedes permitidas son: Puerto Cabello, COEF";
+            }
+        }
+        
         // Validar campos de texto con caracteres permitidos
         $camposTexto = [
             'etnia' => 'Etnia',
@@ -1131,7 +2481,10 @@ function actualizarEstudiante(array $datos): array {
             'enfermedad' => 'Enfermedades',
             'discapacidad' => 'Discapacidad',
             'titulos' => 'Títulos obtenidos',
-            'institutos' => 'Instituciones'
+            'institutos' => 'Instituciones',
+            'pais_titulo' => 'País del título',
+            'legalizado_titulo' => 'Legalizado en Venezuela',
+            'potencialidades' => 'Potencialidades'
         ];
         
         foreach ($camposTexto as $campo => $nombre) {
@@ -1146,7 +2499,6 @@ function actualizarEstudiante(array $datos): array {
             }
         }
         
-        // Validar campos numéricos
         if (isset($datos['grupo_familiar']) && $datos['grupo_familiar'] < 0) {
             $errores_validacion[] = "El grupo familiar no puede ser negativo";
         }
@@ -1155,7 +2507,6 @@ function actualizarEstudiante(array $datos): array {
             $errores_validacion[] = "Las personas a cargo no pueden ser negativas";
         }
         
-        // Si hay errores de validación, lanzar excepción
         if (!empty($errores_validacion)) {
             $mensajeError = "❌ ERRORES DE VALIDACIÓN:\n\n• " . implode("\n• ", $errores_validacion);
             throw new Exception($mensajeError, 400);
@@ -1245,8 +2596,13 @@ function actualizarEstudiante(array $datos): array {
             'discapacidad' => 's',
             'titulos' => 's',
             'institutos' => 's',
+            'pais_titulo' => 's',
+            'legalizado_titulo' => 's',
+            'potencialidades' => 's',
             'carrera' => 's',
+            'sede' => 's',
             'genero' => 's',
+            'embarazada' => 'i',
             'edo_civil' => 's',
             'fecha_nac' => 's',
             'fecha_ingreso' => 's',
@@ -1832,7 +3188,8 @@ function registrarNuevaCarrera(
     string $tipo_formacion, 
     int $duracion_anios,
     string $titulo_principal,
-    string $titulo_opcional = ''
+    string $titulo_opcional = '',
+    string $vigencia_fecha = null
 ): array {
     global $db;
     
@@ -1882,10 +3239,10 @@ function registrarNuevaCarrera(
         }
         $checkStmt->close();
         
-        // 2. Insertar nueva carrera
+        // 2. Insertar nueva carrera (permitir guardar la fecha de vigencia en created_at)
         $insertStmt = $db->prepare("INSERT INTO carreras 
-            (nombre_carrera, cod_carrera, tipo_formacion, duracion_semestres, titulo_otorga, otro_titulo, descripcion, activa) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1)");
+            (nombre_carrera, cod_carrera, tipo_formacion, duracion_semestres, titulo_otorga, otro_titulo, descripcion, created_at, activa) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)");
         
         if (!$insertStmt) {
             throw new Exception("Error al preparar inserción: " . $db->error);
@@ -1897,15 +3254,26 @@ function registrarNuevaCarrera(
             $descripcion .= "\nTítulo opcional: $titulo_opcional";
         }
         
+        // Si no se proporcionó una fecha de vigencia, usar la fecha actual
+        if (empty($vigencia_fecha)) {
+            $vigencia_fecha = date('Y-m-d H:i:s');
+        } else {
+            // Normalizar formato a YYYY-MM-DD HH:MM:SS si solo se envió YYYY-MM-DD
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $vigencia_fecha)) {
+                $vigencia_fecha = $vigencia_fecha . ' 00:00:00';
+            }
+        }
+
         $insertStmt->bind_param(
-            "sssisss", 
+            "sssissss", 
             $nombre, 
             $codigo, 
             $tipo_formacion,
             $duracion_semestres,
             $titulo_principal,  // Solo el título principal
             $titulo_opcional,   // Título opcional por separado
-            $descripcion
+            $descripcion,
+            $vigencia_fecha
         );
         
         if (!$insertStmt->execute()) {
@@ -1933,6 +3301,7 @@ function registrarNuevaCarrera(
                         'duracion_anios' => $duracion_anios,
                         'titulo_principal' => $titulo_principal,
                         'titulo_opcional' => $titulo_opcional,
+                        'vigencia_fecha' => $vigencia_fecha,
                         'activa' => 1
                     ], 
                     "Carreras", 
@@ -3378,7 +4747,7 @@ function obtenerCarrerasActivas() {
     $carreras = []; // Array para almacenar resultados
     
     // Consulta SQL con parámetro para estado activo
-    $query = "SELECT id_carrera, nombre_carrera, cod_carrera 
+    $query = "SELECT id_carrera, nombre_carrera, cod_carrera, created_at 
               FROM carreras 
               WHERE activa = ? 
               ORDER BY nombre_carrera";
@@ -3419,6 +4788,305 @@ function obtenerCarrerasActivas() {
     }
     
     return $carreras;
+}
+
+/**
+ * Obtiene todas las carreras (activas e inactivas)
+ */
+function obtenerCarrerasCompleta() {
+    global $db;
+    $carreras = [];
+    $query = "SELECT id_carrera, nombre_carrera, cod_carrera, activa, created_at FROM carreras ORDER BY nombre_carrera";
+    if ($stmt = $db->prepare($query)) {
+        try {
+            if (!$stmt->execute()) throw new Exception('Error al ejecutar consulta: ' . $stmt->error);
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $carreras[] = $row;
+            }
+            $result->free();
+        } catch (Exception $e) {
+            error_log('Error en obtenerTodasLasCarreras: ' . $e->getMessage());
+        } finally {
+            $stmt->close();
+        }
+    } else {
+        error_log('Error preparando obtenerTodasLasCarreras: ' . $db->error);
+    }
+
+    return $carreras;
+}
+
+/**
+ * Obtiene los años (distinct) en los que existe una carrera con el mismo código
+ * útil para mostrar versiones históricas por año
+ */
+function obtenerAniosPorCodigoCarrera($cod_carrera) {
+    global $db;
+
+    $anios = [];
+    // Buscar años en la tabla carreras
+    $query1 = "SELECT DISTINCT YEAR(created_at) AS anio FROM carreras WHERE cod_carrera = ? AND created_at IS NOT NULL";
+    if ($stmt = $db->prepare($query1)) {
+        $stmt->bind_param('s', $cod_carrera);
+        if ($stmt->execute()) {
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                if (!empty($row['anio']) && !in_array($row['anio'], $anios)) $anios[] = $row['anio'];
+            }
+            $result->free();
+        }
+        $stmt->close();
+    }
+
+    // Buscar años en la tabla de versiones si existe
+    $check = $db->query("SHOW TABLES LIKE 'carrera_versiones'");
+    if ($check && $check->num_rows > 0) {
+        $query2 = "SELECT DISTINCT YEAR(fecha_vigencia) AS anio FROM carrera_versiones v JOIN carreras c ON v.id_carrera = c.id_carrera WHERE c.cod_carrera = ? AND v.fecha_vigencia IS NOT NULL";
+        if ($stmt = $db->prepare($query2)) {
+            $stmt->bind_param('s', $cod_carrera);
+            if ($stmt->execute()) {
+                $result = $stmt->get_result();
+                while ($row = $result->fetch_assoc()) {
+                    if (!empty($row['anio']) && !in_array($row['anio'], $anios)) $anios[] = $row['anio'];
+                }
+                $result->free();
+            }
+            $stmt->close();
+        }
+    }
+
+    // Ordenar desc
+    rsort($anios);
+
+    return $anios;
+}
+
+/**
+ * Obtiene versiones (id + fecha) para un código de carrera
+ */
+function obtenerVersionesPorCodigoCarrera($cod_carrera) {
+    global $db;
+    $versions = [];
+
+    // Verificar si la tabla de versiones existe antes de consultar
+    $check = $db->query("SHOW TABLES LIKE 'carrera_versiones'");
+    if ($check && $check->num_rows > 0) {
+        $query = "SELECT v.id_version, v.id_carrera, v.fecha_vigencia FROM carrera_versiones v JOIN carreras c ON v.id_carrera = c.id_carrera WHERE c.cod_carrera = ? ORDER BY v.fecha_vigencia DESC";
+        if ($stmt = $db->prepare($query)) {
+            $stmt->bind_param('s', $cod_carrera);
+            if ($stmt->execute()) {
+                $res = $stmt->get_result();
+                while ($row = $res->fetch_assoc()) {
+                    $row['anio'] = !empty($row['fecha_vigencia']) ? date('Y', strtotime($row['fecha_vigencia'])) : null;
+                    $versions[] = $row;
+                }
+                $res->free();
+            }
+            $stmt->close();
+        }
+    }
+
+    return $versions;
+}
+
+/**
+ * Obtiene versiones por id_carrera (útil cuando cod_carrera está vacío o cambió)
+ */
+function obtenerVersionesPorIdCarrera($id_carrera) {
+    global $db;
+    $versions = [];
+
+    $check = $db->query("SHOW TABLES LIKE 'carrera_versiones'");
+    if ($check && $check->num_rows > 0) {
+        $query = "SELECT id_version, id_carrera, fecha_vigencia FROM carrera_versiones WHERE id_carrera = ? ORDER BY fecha_vigencia DESC";
+        if ($stmt = $db->prepare($query)) {
+            $stmt->bind_param('i', $id_carrera);
+            if ($stmt->execute()) {
+                $res = $stmt->get_result();
+                while ($row = $res->fetch_assoc()) {
+                    $row['anio'] = !empty($row['fecha_vigencia']) ? date('Y', strtotime($row['fecha_vigencia'])) : null;
+                    $versions[] = $row;
+                }
+                $res->free();
+            }
+            $stmt->close();
+        }
+    }
+
+    return $versions;
+}
+
+/**
+ * Asigna una materia a una versión específica de carrera
+ */
+function asignarMateriaAVersion($id_version, $id_materia, $semestre) {
+    global $db;
+    try {
+        $stmt = $db->prepare("INSERT INTO version_materia (id_version, id_materia, semestre) VALUES (?, ?, ?)");
+        if (!$stmt) throw new Exception('Error al preparar insert version_materia: ' . $db->error);
+        $stmt->bind_param('iii', $id_version, $id_materia, $semestre);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar insert version_materia: ' . $stmt->error);
+        $id = $db->insert_id;
+        $stmt->close();
+        return ['success' => true, 'insert_id' => $id];
+    } catch (Exception $e) {
+        error_log('Error en asignarMateriaAVersion: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Obtiene materias asignadas para una versión de carrera
+ */
+function obtenerMateriasAsignadasVersion($id_version) {
+    global $db;
+    $materias = [];
+    $query = "SELECT vm.id, vm.id_version, vm.id_materia, vm.semestre, m.cod_materia, m.nombre_materia FROM version_materia vm JOIN materias m ON vm.id_materia = m.id_materia WHERE vm.id_version = ? ORDER BY vm.semestre";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('i', $id_version);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($row = $res->fetch_assoc()) {
+                $materias[] = $row;
+            }
+            $res->free();
+        }
+        $stmt->close();
+    }
+    return $materias;
+}
+
+/**
+ * Elimina asignación de materia en versión
+ */
+function eliminarAsignacionVersion($id) {
+    global $db;
+    try {
+        $stmt = $db->prepare("DELETE FROM version_materia WHERE id = ?");
+        if (!$stmt) throw new Exception('Error al preparar delete version_materia: ' . $db->error);
+        $stmt->bind_param('i', $id);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar delete version_materia: ' . $stmt->error);
+        $affected = $stmt->affected_rows;
+        $stmt->close();
+        return ['success' => true, 'affected_rows' => $affected];
+    } catch (Exception $e) {
+        error_log('Error en eliminarAsignacionVersion: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Duplica una carrera como nueva versión con una fecha de vigencia distinta.
+ * Opcionalmente copia las asignaciones de materias (carrera_materia).
+ * Devuelve array con success + message + new_id si aplica.
+ */
+function duplicarCarrera(int $id_carrera_original, string $nueva_fecha, bool $copiar_materias = true): array {
+    global $db;
+
+    try {
+        // Obtener carrera original
+        $stmt = $db->prepare("SELECT nombre_carrera, cod_carrera, activa, duracion_semestres, titulo_otorga, otro_titulo, descripcion, tipo_formacion FROM carreras WHERE id_carrera = ? LIMIT 1");
+        if (!$stmt) throw new Exception('Error al preparar consulta de carrera: ' . $db->error);
+        $stmt->bind_param('i', $id_carrera_original);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        if (!$res || $res->num_rows === 0) {
+            $stmt->close();
+            return ['success' => false, 'message' => 'Carrera original no encontrada'];
+        }
+        $orig = $res->fetch_assoc();
+        $stmt->close();
+
+        // Normalizar fecha
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $nueva_fecha)) {
+            $nueva_fecha = $nueva_fecha . ' 00:00:00';
+        }
+
+        // Crear tablas de versiones si no existen
+        $db->query("CREATE TABLE IF NOT EXISTS carrera_versiones (
+            id_version INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            id_carrera INT NOT NULL,
+            fecha_vigencia DATETIME NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (id_carrera),
+            FOREIGN KEY (id_carrera) REFERENCES carreras(id_carrera) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $db->query("CREATE TABLE IF NOT EXISTS version_materia (
+            id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            id_version INT NOT NULL,
+            id_materia INT NOT NULL,
+            semestre INT NOT NULL,
+            INDEX (id_version),
+            FOREIGN KEY (id_version) REFERENCES carrera_versiones(id_version) ON DELETE CASCADE,
+            FOREIGN KEY (id_materia) REFERENCES materias(id_materia) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $db->begin_transaction();
+
+        // Insertar versión
+        $insert = $db->prepare("INSERT INTO carrera_versiones (id_carrera, fecha_vigencia) VALUES (?, ?)");
+        if (!$insert) throw new Exception('Error al preparar inserción version: ' . $db->error);
+        $insert->bind_param('is', $id_carrera_original, $nueva_fecha);
+        if (!$insert->execute()) {
+            $err = $insert->error;
+            $insert->close();
+            $db->rollback();
+            throw new Exception('Error al insertar versión: ' . $err);
+        }
+
+        $new_version_id = $db->insert_id;
+        $insert->close();
+
+        // Copiar asignaciones de materias a version_materia si se solicita
+        if ($copiar_materias) {
+            $sel = $db->prepare("SELECT id_materia, semestre FROM carrera_materia WHERE id_carrera = ?");
+            if (!$sel) throw new Exception('Error al preparar selección de materias: ' . $db->error);
+            $sel->bind_param('i', $id_carrera_original);
+            $sel->execute();
+            $resm = $sel->get_result();
+
+            $ins = $db->prepare("INSERT INTO version_materia (id_version, id_materia, semestre) VALUES (?, ?, ?)");
+            if (!$ins) {
+                $sel->close();
+                throw new Exception('Error al preparar inserción de materia en version: ' . $db->error);
+            }
+
+            while ($row = $resm->fetch_assoc()) {
+                $id_materia = (int)$row['id_materia'];
+                $semestre = (int)$row['semestre'];
+                $ins->bind_param('iii', $new_version_id, $id_materia, $semestre);
+                if (!$ins->execute()) {
+                    $ins->close();
+                    $sel->close();
+                    $db->rollback();
+                    throw new Exception('Error al insertar relación materia-version: ' . $ins->error);
+                }
+            }
+
+            $ins->close();
+            $sel->close();
+        }
+
+        $db->commit();
+
+        // Auditoría si aplica
+        if (function_exists('registrarAuditoria')) {
+            try {
+                registrarAuditoria('INSERT', 'carrera_versiones', $new_version_id, null, ['copiado_de' => $id_carrera_original, 'fecha_vigencia' => $nueva_fecha], 'Carreras', 'Creación de versión de carrera');
+            } catch (Exception $e) {
+                error_log('Error en auditoría duplicarCarrera: ' . $e->getMessage());
+            }
+        }
+
+        return ['success' => true, 'message' => 'Versión creada correctamente', 'new_version_id' => $new_version_id];
+
+    } catch (Exception $e) {
+        if (isset($db) && method_exists($db, 'rollback')) $db->rollback();
+        error_log('Error en duplicarCarrera: ' . $e->getMessage());
+        return ['success' => false, 'message' => 'Error al duplicar carrera: ' . $e->getMessage()];
+    }
 }
 
 /**
@@ -3657,6 +5325,481 @@ function asignarMateriaACarrera($id_carrera, $id_materia, $semestre) {
             'success' => false,
             'message' => 'Error al asignar materia: ' . $e->getMessage()
         ];
+    }
+}
+
+/**
+ * Asegura que la tabla `prelaciones` exista.
+ */
+function asegurarTablaPrelaciones() {
+    global $db;
+    $db->query("CREATE TABLE IF NOT EXISTS prelaciones (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        id_carrera INT NOT NULL,
+        id_materia INT NOT NULL,
+        id_prerequisito INT NOT NULL,
+        tipo VARCHAR(50) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX (id_carrera),
+        INDEX (id_materia),
+        INDEX (id_prerequisito),
+        FOREIGN KEY (id_carrera) REFERENCES carreras(id_carrera) ON DELETE CASCADE,
+        FOREIGN KEY (id_materia) REFERENCES materias(id_materia) ON DELETE CASCADE,
+        FOREIGN KEY (id_prerequisito) REFERENCES materias(id_materia) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+/**
+ * Agrega una prelación (prerequisito) para una materia en una carrera
+ */
+function agregarPrelacion($id_carrera, $id_materia, $id_prerequisito, $tipo = null) {
+    global $db;
+    try {
+        asegurarTablaPrelaciones();
+        // Evitar duplicados
+        $check = $db->prepare("SELECT id FROM prelaciones WHERE id_carrera = ? AND id_materia = ? AND id_prerequisito = ? LIMIT 1");
+        if (!$check) throw new Exception('Error al preparar comprobación de prelación: ' . $db->error);
+        $check->bind_param('iii', $id_carrera, $id_materia, $id_prerequisito);
+        $check->execute();
+        $res = $check->get_result();
+        if ($res && $res->num_rows > 0) {
+            $check->close();
+            return ['success' => false, 'message' => 'La prelación ya existe'];
+        }
+        $check->close();
+
+        $stmt = $db->prepare("INSERT INTO prelaciones (id_carrera, id_materia, id_prerequisito, tipo) VALUES (?, ?, ?, ?)");
+        if (!$stmt) throw new Exception('Error al preparar inserción de prelación: ' . $db->error);
+        $stmt->bind_param('iiis', $id_carrera, $id_materia, $id_prerequisito, $tipo);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar inserción de prelación: ' . $stmt->error);
+        $insert_id = $db->insert_id;
+        $stmt->close();
+        return ['success' => true, 'message' => 'Prelación agregada', 'id' => $insert_id];
+    } catch (Exception $e) {
+        error_log('Error en agregarPrelacion: ' . $e->getMessage());
+        return ['success' => false, 'message' => 'Error al agregar prelación: ' . $e->getMessage()];
+    }
+}
+
+/**
+ * Elimina una prelación por id
+ */
+function eliminarPrelacion($id) {
+    global $db;
+    try {
+        asegurarTablaPrelaciones();
+        $stmt = $db->prepare("DELETE FROM prelaciones WHERE id = ?");
+        if (!$stmt) throw new Exception('Error al preparar delete prelación: ' . $db->error);
+        $stmt->bind_param('i', $id);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar delete prelación: ' . $stmt->error);
+        $affected = $stmt->affected_rows;
+        $stmt->close();
+        return ['success' => true, 'affected_rows' => $affected];
+    } catch (Exception $e) {
+        error_log('Error en eliminarPrelacion: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Obtiene prelaciones para una carrera
+ */
+function obtenerPrelacionesPorCarrera($id_carrera) {
+    global $db;
+    $rows = [];
+    asegurarTablaPrelaciones();
+    $query = "SELECT p.id, p.id_carrera, p.id_materia, p.id_prerequisito, p.tipo,
+                     m1.cod_materia AS cod_materia, m1.nombre_materia AS nombre_materia,
+                     m2.cod_materia AS cod_prereq, m2.nombre_materia AS nombre_prereq
+              FROM prelaciones p
+              JOIN materias m1 ON p.id_materia = m1.id_materia
+              JOIN materias m2 ON p.id_prerequisito = m2.id_materia
+              WHERE p.id_carrera = ?
+              ORDER BY m1.trayecto, m1.nombre_materia";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('i', $id_carrera);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) $rows[] = $r;
+            $res->free();
+        }
+        $stmt->close();
+    }
+    return $rows;
+}
+
+/**
+ * --- Mallas (pensums) ---
+ * Tabla `mallas`: id_malla, id_carrera, codigo_malla, anio, descripcion, created_at
+ * Tabla `malla_materia`: id, id_malla, id_materia, semestre
+ */
+
+function asegurarTablaMallas() {
+    global $db;
+    $db->query("CREATE TABLE IF NOT EXISTS mallas (
+        id_malla INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        id_carrera INT NOT NULL,
+        codigo_malla VARCHAR(100) NOT NULL UNIQUE,
+        anio INT NOT NULL,
+        descripcion TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX (id_carrera),
+        FOREIGN KEY (id_carrera) REFERENCES carreras(id_carrera) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $db->query("CREATE TABLE IF NOT EXISTS malla_materia (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        id_malla INT NOT NULL,
+        id_materia INT NOT NULL,
+        semestre INT NOT NULL,
+        INDEX (id_malla),
+        FOREIGN KEY (id_malla) REFERENCES mallas(id_malla) ON DELETE CASCADE,
+        FOREIGN KEY (id_materia) REFERENCES materias(id_materia) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+/**
+ * Crear una nueva malla para una carrera
+ * codigo_malla se recomienda generar como cod_carrera + anio (numérico)
+ */
+function crearMalla($id_carrera, $anio, $codigo_malla = null, $descripcion = null) {
+    global $db;
+    try {
+        asegurarTablaMallas();
+        if (empty($codigo_malla) || !preg_match('/^[0-9]+$/', $codigo_malla)) {
+            // generar código numérico (solo dígitos) basado en codigo de carrera + año
+            $c = obtenerCarreraPorId($id_carrera);
+            $cod = $c['cod_carrera'] ?? '';
+            $codigo_malla = generarCodigoMallaNumerico($cod, $anio, $id_carrera);
+        }
+
+        // Evitar duplicados por codigo
+        $check = $db->prepare("SELECT id_malla FROM mallas WHERE codigo_malla = ? LIMIT 1");
+        $check->bind_param('s', $codigo_malla);
+        $check->execute();
+        $res = $check->get_result();
+        if ($res && $res->num_rows > 0) {
+            $row = $res->fetch_assoc();
+            $check->close();
+            return ['success' => false, 'message' => 'Código de malla ya existe', 'id_malla' => $row['id_malla']];
+        }
+        $check->close();
+
+        $stmt = $db->prepare("INSERT INTO mallas (id_carrera, codigo_malla, anio, descripcion) VALUES (?, ?, ?, ?)");
+        if (!$stmt) throw new Exception('Error al preparar inserción malla: ' . $db->error);
+        $stmt->bind_param('isis', $id_carrera, $codigo_malla, $anio, $descripcion);
+        if (!$stmt->execute()) throw new Exception('Error al insertar malla: ' . $stmt->error);
+        $id = $db->insert_id;
+        $stmt->close();
+        return ['success' => true, 'message' => 'Malla creada', 'id_malla' => $id];
+    } catch (Exception $e) {
+        error_log('Error en crearMalla: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Genera un código de malla compuesto solo por dígitos.
+ * - extrae dígitos del `cod_carrera` si existe
+ * - si no hay dígitos usa el id_carrera
+ * - concatena el año (4 dígitos)
+ * - garantiza unicidad añadiendo sufijo numérico si es necesario
+ */
+function generarCodigoMallaNumerico($cod_carrera, $anio, $id_carrera = null) {
+    global $db;
+    // extraer solo dígitos
+    $digits = '';
+    if (!empty($cod_carrera)) {
+        // buscar la primera ocurrencia de 5 dígitos
+        if (preg_match('/(\d{5})/', $cod_carrera, $m)) {
+            $digits = $m[1];
+        } else {
+            // si no hay 5 consecutivos, extraer todos los dígitos y tomar los primeros 5
+            preg_match_all('/\d+/', $cod_carrera, $m2);
+            if (!empty($m2[0])) {
+                $all = implode('', $m2[0]);
+                $digits = substr($all, 0, 5);
+            } else {
+                // convertir letras a números (A=01..Z=26) y tomar primeros 5
+                $s = strtoupper($cod_carrera);
+                $mapped = '';
+                for ($i = 0; $i < strlen($s); $i++) {
+                    $ch = $s[$i];
+                    if (ctype_alpha($ch)) {
+                        $val = ord($ch) - ord('A') + 1;
+                        $mapped .= str_pad($val, 2, '0', STR_PAD_LEFT);
+                        if (strlen($mapped) >= 5) break;
+                    }
+                }
+                $digits = substr($mapped, 0, 5);
+            }
+        }
+    }
+    // asegurarse de tener exactamente 5 dígitos: pad o trim
+    $digits = preg_replace('/\D/', '', $digits);
+    if (strlen($digits) < 5) {
+        // si no alcanzamos 5, usar id_carrera padded
+        if (!empty($id_carrera)) {
+            $digits = str_pad(substr(preg_replace('/\D/', '', strval($id_carrera)), 0, 5), 5, '0', STR_PAD_LEFT);
+        } else {
+            $digits = str_pad($digits, 5, '0', STR_PAD_LEFT);
+        }
+    } elseif (strlen($digits) > 5) {
+        $digits = substr($digits, 0, 5);
+    }
+    $anio_str = str_pad(intval($anio), 4, '0', STR_PAD_LEFT);
+    $base = $digits . $anio_str;
+
+    // asegurar solo dígitos
+    $base = preg_replace('/\D/', '', $base);
+
+    $codigo = $base;
+    $sufijo = 0;
+    while (true) {
+        // comprobar existencia
+        $stmt = $db->prepare("SELECT id_malla FROM mallas WHERE codigo_malla = ? LIMIT 1");
+        if (!$stmt) break; // en caso de error, devolver lo que haya
+        $stmt->bind_param('s', $codigo);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $exists = ($res && $res->num_rows > 0);
+        $stmt->close();
+        if (!$exists) break;
+        $sufijo++;
+        $codigo = $base . str_pad($sufijo, 3, '0', STR_PAD_LEFT);
+        // proteger bucle infinito
+        if ($sufijo > 9999) break;
+    }
+
+    return $codigo;
+}
+
+/**
+ * Normaliza códigos de mallas existentes: asegura que sean solo dígitos
+ * Si una malla tiene codigo no numérico intenta regenerarlo y actualizar.
+ */
+function normalizarCodigosMallas() {
+    global $db;
+    asegurarTablaMallas();
+    $updated = 0;
+    $errors = [];
+    $res = $db->query("SELECT id_malla, id_carrera, codigo_malla, anio FROM mallas");
+    if (!$res) return ['updated' => 0, 'errors' => ['Error listando mallas: ' . $db->error]];
+    while ($row = $res->fetch_assoc()) {
+        if (!preg_match('/^[0-9]+$/', $row['codigo_malla'])) {
+            $nuevo = generarCodigoMallaNumerico('', $row['anio'], $row['id_carrera']);
+            $stmt = $db->prepare("UPDATE mallas SET codigo_malla = ? WHERE id_malla = ?");
+            if ($stmt) {
+                $stmt->bind_param('si', $nuevo, $row['id_malla']);
+                if ($stmt->execute()) { $updated++; } else { $errors[] = 'Error update id ' . $row['id_malla'] . ': ' . $stmt->error; }
+                $stmt->close();
+            } else {
+                $errors[] = 'Error preparar update id ' . $row['id_malla'] . ': ' . $db->error;
+            }
+        }
+    }
+    return ['updated' => $updated, 'errors' => $errors];
+}
+
+function obtenerMallasPorCarrera($id_carrera) {
+    global $db;
+    asegurarTablaMallas();
+    $rows = [];
+    $query = "SELECT id_malla, id_carrera, codigo_malla, anio, descripcion, created_at FROM mallas WHERE id_carrera = ? ORDER BY anio DESC";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('i', $id_carrera);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) $rows[] = $r;
+            $res->free();
+        }
+        $stmt->close();
+    }
+    return $rows;
+}
+
+function obtenerMallaPorId($id_malla) {
+    global $db;
+    asegurarTablaMallas();
+    $query = "SELECT id_malla, id_carrera, codigo_malla, anio, descripcion, created_at FROM mallas WHERE id_malla = ? LIMIT 1";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('i', $id_malla);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            $row = $res->fetch_assoc();
+            $res->free();
+            $stmt->close();
+            return $row;
+        }
+        $stmt->close();
+    }
+    return null;
+}
+
+function asignarMateriaAMalla($id_malla, $id_materia, $semestre) {
+    global $db;
+    try {
+        asegurarTablaMallas();
+        // evitar duplicado
+        $check = $db->prepare("SELECT id FROM malla_materia WHERE id_malla = ? AND id_materia = ? LIMIT 1");
+        $check->bind_param('ii', $id_malla, $id_materia);
+        $check->execute();
+        $res = $check->get_result();
+        if ($res && $res->num_rows > 0) { $check->close(); return ['success' => false, 'message' => 'Materia ya asignada a la malla']; }
+        $check->close();
+
+        $stmt = $db->prepare("INSERT INTO malla_materia (id_malla, id_materia, semestre) VALUES (?, ?, ?)");
+        if (!$stmt) throw new Exception('Error al preparar insert malla_materia: ' . $db->error);
+        $stmt->bind_param('iii', $id_malla, $id_materia, $semestre);
+        if (!$stmt->execute()) throw new Exception('Error al insertar malla_materia: ' . $stmt->error);
+        $id = $db->insert_id;
+        $stmt->close();
+        return ['success' => true, 'message' => 'Asignación creada', 'id' => $id];
+    } catch (Exception $e) {
+        error_log('Error en asignarMateriaAMalla: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+function obtenerMateriasDeMalla($id_malla) {
+    global $db;
+    asegurarTablaMallas();
+    $rows = [];
+    $query = "SELECT mm.id, mm.id_malla, mm.id_materia, mm.semestre, m.cod_materia, m.nombre_materia FROM malla_materia mm JOIN materias m ON mm.id_materia = m.id_materia WHERE mm.id_malla = ? ORDER BY mm.semestre, m.nombre_materia";
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param('i', $id_malla);
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) $rows[] = $r;
+            $res->free();
+        }
+        $stmt->close();
+    }
+    return $rows;
+}
+
+function eliminarAsignacionMalla($id) {
+    global $db;
+    try {
+        asegurarTablaMallas();
+        $stmt = $db->prepare("DELETE FROM malla_materia WHERE id = ?");
+        if (!$stmt) throw new Exception('Error al preparar delete malla_materia: ' . $db->error);
+        $stmt->bind_param('i', $id);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar delete malla_materia: ' . $stmt->error);
+        $aff = $stmt->affected_rows;
+        $stmt->close();
+        return ['success' => true, 'affected_rows' => $aff];
+    } catch (Exception $e) {
+        error_log('Error en eliminarAsignacionMalla: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+function eliminarMalla($id_malla) {
+    global $db;
+    try {
+        asegurarTablaMallas();
+        $stmt = $db->prepare("DELETE FROM mallas WHERE id_malla = ?");
+        if (!$stmt) throw new Exception('Error al preparar delete malla: ' . $db->error);
+        $stmt->bind_param('i', $id_malla);
+        if (!$stmt->execute()) throw new Exception('Error al ejecutar delete malla: ' . $stmt->error);
+        $aff = $stmt->affected_rows;
+        $stmt->close();
+        return ['success' => true, 'affected_rows' => $aff];
+    } catch (Exception $e) {
+        error_log('Error en eliminarMalla: ' . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Migrar datos desde `carrera_versiones`/`version_materia` a `mallas`/`malla_materia`.
+ * Devuelve array con resultados y conteos.
+ */
+function migrarVersionesAMallas() {
+    global $db;
+    $result = ['created_mallas' => 0, 'created_asignaciones' => 0, 'skipped_mallas' => 0, 'errors' => []];
+    try {
+        asegurarTablaMallas();
+
+        // comprobar si tablas de versiones existen
+        $res = $db->query("SHOW TABLES LIKE 'carrera_versiones'");
+        if (!$res || $res->num_rows === 0) {
+            return ['message' => 'No existe tabla carrera_versiones', 'created_mallas' => 0];
+        }
+
+        $rv = $db->query("SELECT id_version, id_carrera, fecha_vigencia, created_at FROM carrera_versiones ORDER BY id_version");
+        if (!$rv) throw new Exception('Error leyendo carrera_versiones: ' . $db->error);
+
+        while ($row = $rv->fetch_assoc()) {
+            $anio = null;
+            if (!empty($row['fecha_vigencia'])) {
+                $anio = intval(date('Y', strtotime($row['fecha_vigencia'])));
+            } elseif (!empty($row['created_at'])) {
+                $anio = intval(date('Y', strtotime($row['created_at'])));
+            } else {
+                $anio = intval(date('Y'));
+            }
+
+            // generar codigo_malla: tomar cod_carrera si disponible
+            $c = obtenerCarreraPorId($row['id_carrera']);
+            $cod = $c['cod_carrera'] ?? ('C' . $row['id_carrera']);
+            $codigo_malla = $cod . '_' . $anio;
+
+            // crear malla (si existe, saltar)
+            $check = $db->prepare("SELECT id_malla FROM mallas WHERE codigo_malla = ? LIMIT 1");
+            $check->bind_param('s', $codigo_malla);
+            $check->execute();
+            $rcheck = $check->get_result();
+            if ($rcheck && $rcheck->num_rows > 0) {
+                $existing = $rcheck->fetch_assoc();
+                $id_malla = $existing['id_malla'];
+                $result['skipped_mallas']++;
+                $check->close();
+            } else {
+                $check->close();
+                $ins = $db->prepare("INSERT INTO mallas (id_carrera, codigo_malla, anio, descripcion) VALUES (?, ?, ?, ?)");
+                $desc = 'Migrada desde carrera_versiones id_version=' . $row['id_version'];
+                $ins->bind_param('isis', $row['id_carrera'], $codigo_malla, $anio, $desc);
+                if (!$ins->execute()) { $result['errors'][] = 'Error insert malla: ' . $ins->error; $ins->close(); continue; }
+                $id_malla = $db->insert_id;
+                $ins->close();
+                $result['created_mallas']++;
+            }
+
+            // copiar asignaciones de version_materia (si existe tabla)
+            $rv2 = $db->query("SHOW TABLES LIKE 'version_materia'");
+            if ($rv2 && $rv2->num_rows > 0) {
+                $q = $db->prepare("SELECT id_materia, semestre FROM version_materia WHERE id_version = ?");
+                $q->bind_param('i', $row['id_version']);
+                if ($q->execute()) {
+                    $res2 = $q->get_result();
+                    while ($as = $res2->fetch_assoc()) {
+                        // insertar en malla_materia si no existe
+                        $chk = $db->prepare("SELECT id FROM malla_materia WHERE id_malla = ? AND id_materia = ? LIMIT 1");
+                        $chk->bind_param('ii', $id_malla, $as['id_materia']);
+                        $chk->execute();
+                        $rchk = $chk->get_result();
+                        if ($rchk && $rchk->num_rows > 0) { $chk->close(); continue; }
+                        $chk->close();
+
+                        $ins2 = $db->prepare("INSERT INTO malla_materia (id_malla, id_materia, semestre) VALUES (?, ?, ?)");
+                        $ins2->bind_param('iii', $id_malla, $as['id_materia'], $as['semestre']);
+                        if ($ins2->execute()) { $result['created_asignaciones']++; }
+                        else { $result['errors'][] = 'Error insert malla_materia: ' . $ins2->error; }
+                        $ins2->close();
+                    }
+                    $res2->free();
+                }
+                $q->close();
+            }
+        }
+
+        $rv->free();
+        return $result;
+    } catch (Exception $e) {
+        $result['errors'][] = $e->getMessage();
+        return $result;
     }
 }
 
@@ -4038,9 +6181,11 @@ function crearMateria($db, $data) {
                     creditos, 
                     activa, 
                     horas_teoricas, 
-                    horas_practicas, 
+                    horas_practicas,
+                    horas_laboratorio,
+                    horas_semanales,
                     created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
 
         // Preparamos la sentencia
         $stmt = $db->prepare($query);
@@ -4057,9 +6202,11 @@ function crearMateria($db, $data) {
         $creditos = isset($data['creditos']) ? (int)$data['creditos'] : 0;
         $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
         $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
+        $horas_laboratorio = isset($data['horas_laboratorio']) ? (int)$data['horas_laboratorio'] : 0;
+        $horas_semanales = isset($data['horas_semanales']) ? (int)$data['horas_semanales'] : 0;
 
         // Vinculamos parámetros (tipos: s=string, i=integer)
-        $stmt->bind_param("sssiiiiii", 
+        $stmt->bind_param("sssiiiiiiii", 
             $cod_materia,
             $nombre_materia,
             $pnf_ptf,
@@ -4068,7 +6215,9 @@ function crearMateria($db, $data) {
             $creditos,
             $activa,
             $horas_teoricas,
-            $horas_practicas
+            $horas_practicas,
+            $horas_laboratorio,
+            $horas_semanales
         );
         
         // Ejecutamos la sentencia
@@ -4098,7 +6247,9 @@ function crearMateria($db, $data) {
                         'creditos' => $creditos,
                         'activa' => $activa,
                         'horas_teoricas' => $horas_teoricas,
-                        'horas_practicas' => $horas_practicas
+                        'horas_practicas' => $horas_practicas,
+                        'horas_laboratorio' => $horas_laboratorio,
+                        'horas_semanales' => $horas_semanales
                     ], 
                     "Materias", 
                     "Nueva materia creada"
@@ -4153,16 +6304,18 @@ function actualizarMateria($db, $id, $data) {
 
         // Consulta SQL con sentencia preparada
         $query = "UPDATE materias SET 
-                cod_materia = ?, 
-                nombre_materia = ?, 
-                pnf_ptf = ?,
-                duracion_periodo = ?,
-                creditos = ?, 
-                activa = ?, 
-                horas_teoricas = ?, 
-                horas_practicas = ?,
-                trayecto = ?
-                WHERE id_materia = ?";
+            cod_materia = ?, 
+            nombre_materia = ?, 
+            pnf_ptf = ?,
+            duracion_periodo = ?,
+            creditos = ?, 
+            activa = ?, 
+            horas_teoricas = ?, 
+            horas_practicas = ?,
+            horas_laboratorio = ?,
+            horas_semanales = ?,
+            trayecto = ?
+            WHERE id_materia = ?";
         
         // Preparamos la sentencia
         $stmt = $db->prepare($query);
@@ -4180,10 +6333,12 @@ function actualizarMateria($db, $id, $data) {
         $activa = isset($data['activa']) ? (int)(bool)$data['activa'] : 0;
         $horas_teoricas = isset($data['horas_teoricas']) ? (int)$data['horas_teoricas'] : 0;
         $horas_practicas = isset($data['horas_practicas']) ? (int)$data['horas_practicas'] : 0;
+        $horas_laboratorio = isset($data['horas_laboratorio']) ? (int)$data['horas_laboratorio'] : 0;
+        $horas_semanales = isset($data['horas_semanales']) ? (int)$data['horas_semanales'] : 0;
         $trayecto = isset($data['trayecto']) ? (int)$data['trayecto'] : 0;
 
         // Vinculamos parámetros (tipos: s=string, i=integer)
-        $stmt->bind_param("sssiiiiiii",
+        $stmt->bind_param("sssiiiiiiiii",
             $cod_materia,
             $nombre_materia,
             $pnf_ptf,
@@ -4192,6 +6347,8 @@ function actualizarMateria($db, $id, $data) {
             $activa,
             $horas_teoricas,
             $horas_practicas,
+            $horas_laboratorio,
+            $horas_semanales,
             $trayecto,
             $id
         );
@@ -4214,7 +6371,7 @@ function actualizarMateria($db, $id, $data) {
                 // Comparar campos modificados
                 $campos_auditar = [
                     'cod_materia', 'nombre_materia', 'pnf_ptf', 'duracion_periodo',
-                    'creditos', 'activa', 'horas_teoricas', 'horas_practicas', 'trayecto'
+                    'creditos', 'activa', 'horas_teoricas', 'horas_practicas', 'horas_laboratorio', 'horas_semanales', 'trayecto'
                 ];
                 
                 foreach ($campos_auditar as $campo) {
@@ -4382,10 +6539,10 @@ if (!function_exists('getAllMaterias')) {
         global $db;
         
         // Consulta SQL para obtener todas las materias
-        $query = "SELECT id, cod_materia, nombre_materia, creditos, 
-                         horas_teoricas, horas_practicas, activa 
-                  FROM materias 
-                  ORDER BY nombre_materia ASC";
+         $query = "SELECT id, cod_materia, nombre_materia, creditos, 
+                    horas_teoricas, horas_practicas, horas_laboratorio, horas_semanales, activa 
+                FROM materias 
+                ORDER BY nombre_materia ASC";
         
         // Preparamos la sentencia
         $stmt = $db->prepare($query);
@@ -4443,10 +6600,10 @@ if (!function_exists('getMateriaById')) {
         }
         
         // Consulta SQL para obtener una materia por ID
-        $query = "SELECT id, cod_materia, nombre_materia, creditos, 
-                         horas_teoricas, horas_practicas, activa 
-                  FROM materias 
-                  WHERE id = ?";
+         $query = "SELECT id, cod_materia, nombre_materia, creditos, 
+                    horas_teoricas, horas_practicas, horas_laboratorio, horas_semanales, activa 
+                FROM materias 
+                WHERE id = ?";
         
         // Preparamos la sentencia
         $stmt = $db->prepare($query);
@@ -4651,20 +6808,25 @@ if (!function_exists('guardarMateria')) {
             if ($esNueva) {
                 // INSERT de nueva materia
                 $query = "INSERT INTO materias 
-                         (cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, activa) 
-                         VALUES (?, ?, ?, ?, ?, ?)";
+                         (cod_materia, nombre_materia, creditos, horas_teoricas, horas_practicas, horas_laboratorio, horas_semanales, activa) 
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
                 $stmt = $db->prepare($query);
                 
                 if (!$stmt) {
                     throw new Exception("Error preparando INSERT: ".$db->error);
                 }
                 
-                $stmt->bind_param("ssiiii", 
+                $horas_laboratorio = $datos['horas_laboratorio'] ?? 0;
+                $horas_semanales = $datos['horas_semanales'] ?? 0;
+
+                $stmt->bind_param("ssiiiiii", 
                     $datos['cod_materia'],
                     $datos['nombre_materia'],
                     $datos['creditos'],
                     $datos['horas_teoricas'],
                     $datos['horas_practicas'],
+                    $horas_laboratorio,
+                    $horas_semanales,
                     $datos['activa']);
             } else {
                 // UPDATE de materia existente
@@ -4674,6 +6836,8 @@ if (!function_exists('guardarMateria')) {
                          creditos = ?, 
                          horas_teoricas = ?, 
                          horas_practicas = ?, 
+                         horas_laboratorio = ?,
+                         horas_semanales = ?,
                          activa = ? 
                          WHERE id = ?";
                 $stmt = $db->prepare($query);
@@ -4682,12 +6846,17 @@ if (!function_exists('guardarMateria')) {
                     throw new Exception("Error preparando UPDATE: ".$db->error);
                 }
                 
-                $stmt->bind_param("ssiiiii", 
+                $horas_laboratorio = $datos['horas_laboratorio'] ?? 0;
+                $horas_semanales = $datos['horas_semanales'] ?? 0;
+
+                $stmt->bind_param("ssiiiiiii", 
                     $datos['cod_materia'],
                     $datos['nombre_materia'],
                     $datos['creditos'],
                     $datos['horas_teoricas'],
                     $datos['horas_practicas'],
+                    $horas_laboratorio,
+                    $horas_semanales,
                     $datos['activa'],
                     $datos['id']);
             }
@@ -4728,6 +6897,8 @@ if (!function_exists('guardarMateria')) {
                                 'creditos' => $datos['creditos'],
                                 'horas_teoricas' => $datos['horas_teoricas'],
                                 'horas_practicas' => $datos['horas_practicas'],
+                                'horas_laboratorio' => $datos['horas_laboratorio'] ?? 0,
+                                'horas_semanales' => $datos['horas_semanales'] ?? 0,
                                 'activa' => $datos['activa']
                             ], 
                             "Materias", 
@@ -4738,7 +6909,7 @@ if (!function_exists('guardarMateria')) {
                         $valores_antiguos_audit = [];
                         $valores_nuevos_audit = [];
                         
-                        $campos_auditar = ['cod_materia', 'nombre_materia', 'creditos', 'horas_teoricas', 'horas_practicas', 'activa'];
+                        $campos_auditar = ['cod_materia', 'nombre_materia', 'creditos', 'horas_teoricas', 'horas_practicas', 'horas_laboratorio', 'horas_semanales', 'activa'];
                         
                         foreach ($campos_auditar as $campo) {
                             $valor_antiguo = $datos_actuales[$campo] ?? null;
@@ -5746,29 +7917,65 @@ function verificarIdExistente($tabla, $id) {
 
 
 // Constante para el mínimo de estudiantes requeridos
-define('MINIMO_ESTUDIANTES', 10);
+define('MINIMO_ESTUDIANTES', 0);
 
 /**
  * Crea una nueva sección en la base de datos
  * @param mysqli $db Conexión a la base de datos
- * @param array $datos Datos de la sección (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima)
+ * @param array $datos Datos de la sección (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, turno, inicia)
  * @return array Resultado de la operación (éxito, mensaje)
  */
 function crearSeccion($db, $datos) {
     try {
-        $stmt = $db->prepare("INSERT INTO secciones (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, inicia, estatus) 
-                            VALUES (?, ?, ?, ?, ?, ?, 'inactiva')");
+        // Verificar que los datos necesarios existan
+        if (empty($datos['codigo_seccion'])) {
+            throw new Exception('El código de sección es obligatorio');
+        }
+        if (empty($datos['id_carrera'])) {
+            throw new Exception('La carrera es obligatoria');
+        }
+        if (empty($datos['id_trayecto'])) {
+            throw new Exception('El trayecto es obligatorio');
+        }
+        if (empty($datos['id_periodo'])) {
+            throw new Exception('El período es obligatorio');
+        }
+        if (empty($datos['turno'])) {
+            throw new Exception('El turno es obligatorio');
+        }
+        if (empty($datos['inicia'])) {
+            throw new Exception('La fecha de inicio es obligatoria');
+        }
+        
+        // Capacidad máxima por defecto 30 si no viene
+        $capacidad_maxima = isset($datos['capacidad_maxima']) ? (int)$datos['capacidad_maxima'] : 30;
+        
+        // INSERT con 7 campos (sin status porque se maneja aparte)
+        $stmt = $db->prepare("INSERT INTO secciones (codigo_seccion, id_carrera, id_trayecto, id_periodo, capacidad_maxima, turno, inicia, estatus) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 'inactiva')");
         if (!$stmt) {
             throw new Exception("Error en preparación: " . $db->error);
         }
         
-        $stmt->bind_param("siiiis", 
-            $datos['codigo_seccion'], 
-            $datos['id_carrera'], 
-            $datos['id_trayecto'], 
-            $datos['id_periodo'], 
-            $datos['capacidad_maxima'],
-            $datos['inicia']);
+        // bind_param: 7 variables, 7 tipos (siiii s s? No: s=string, i=integer)
+        // Orden: codigo(s), id_carrera(i), id_trayecto(i), id_periodo(i), capacidad_maxima(i), turno(s), inicia(s)
+        // Tipos: "siiiiss" (7 caracteres)
+        $codigo = $datos['codigo_seccion'];
+        $id_carrera = $datos['id_carrera'];
+        $id_trayecto = $datos['id_trayecto'];
+        $id_periodo = $datos['id_periodo'];
+        $turno = $datos['turno'];
+        $inicia = $datos['inicia'];
+        
+        $stmt->bind_param("siiiiss", 
+            $codigo, 
+            $id_carrera, 
+            $id_trayecto, 
+            $id_periodo, 
+            $capacidad_maxima,
+            $turno,
+            $inicia
+        );
         
         if (!$stmt->execute()) {
             throw new Exception("Error en ejecución: " . $stmt->error);
@@ -5786,13 +7993,14 @@ function crearSeccion($db, $datos) {
                     $seccion_id, 
                     null, 
                     [
-                        'codigo_seccion' => $datos['codigo_seccion'],
-                        'id_carrera' => $datos['id_carrera'],
-                        'id_trayecto' => $datos['id_trayecto'],
-                        'id_periodo' => $datos['id_periodo'],
-                        'capacidad_maxima' => $datos['capacidad_maxima'],
-                        'inicia' => $datos['inicia'],
-                        'estatus' => 'inactiva'
+                        'codigo_seccion' => $codigo,
+                        'id_carrera' => $id_carrera,
+                        'id_trayecto' => $id_trayecto,
+                        'id_periodo' => $id_periodo,
+                        'capacidad_maxima' => $capacidad_maxima,
+                        'turno' => $turno,
+                        'inicia' => $inicia,
+                        'estatus' => 'activa'
                     ], 
                     "Secciones", 
                     "Creación de nueva sección"
@@ -5804,7 +8012,7 @@ function crearSeccion($db, $datos) {
         
         return [
             'success' => true,
-            'message' => "Sección creada exitosamente! La sección estará inactiva hasta tener al menos ".MINIMO_ESTUDIANTES." estudiantes.",
+            'message' => "Sección creada exitosamente!",
             'id_seccion' => $seccion_id
         ];
     } catch (Exception $e) {
@@ -5837,31 +8045,172 @@ function crearSeccion($db, $datos) {
     }
 }
 
+
+
+
+
+
+/**
+ * Obtener una sección por ID
+ * @param int $id_seccion ID de la sección
+ * @return array|null Datos de la sección o null si no existe
+ */
+function obtenerSeccionPorId($id_seccion) {
+    global $db;
+    
+    $query = "SELECT s.*, 
+                     c.nombre_carrera,
+                     t.numero_trayecto,
+                     t.nombre_trayecto,
+                     pa.nombre_periodo
+              FROM secciones s
+              LEFT JOIN carreras c ON s.id_carrera = c.id_carrera
+              LEFT JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+              LEFT JOIN periodos_academicos pa ON s.id_periodo = pa.id_periodo
+              WHERE s.id_seccion = " . intval($id_seccion);
+    
+    $result = $db->query($query);
+    if ($result && $result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    return null;
+}
+
+/**
+ * Obtener todos los trayectos
+ * @return array Lista de trayectos
+ */
+function obtenerTodosLosTrayectos() {
+    global $db;
+    $trayectos = [];
+    
+    $query = "SELECT id_trayecto, numero_trayecto, nombre_trayecto 
+              FROM trayectos 
+              ORDER BY numero_trayecto ASC";
+    
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $trayectos[] = $row;
+        }
+    }
+    return $trayectos;
+}
+
+/**
+ * Obtener todos los períodos académicos
+ * @return array Lista de períodos
+ */
+function obtenerTodosLosPeriodos() {
+    global $db;
+    $periodos = [];
+    
+    $query = "SELECT id_periodo, nombre_periodo 
+              FROM periodos_academicos 
+              ORDER BY id_periodo DESC";
+    
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $periodos[] = $row;
+        }
+    }
+    return $periodos;
+}
+
+/**
+ * Actualizar una sección
+ * @param int $id_seccion ID de la sección
+ * @param string $codigo_seccion Código de la sección
+ * @param int $id_carrera ID de la carrera
+ * @param int $id_trayecto ID del trayecto
+ * @param string $turno Turno (Diurno/Nocturno)
+ * @param int $id_periodo ID del período
+ * @param int $capacidad_maxima Capacidad máxima
+ * @param string $inicia Fecha de inicio
+ * @return array Resultado de la operación
+ */
+function actualizarSeccion($id_seccion, $codigo_seccion, $id_carrera, $id_trayecto, $turno, $id_periodo, $capacidad_maxima, $inicia) {
+    global $db;
+    
+    // Verificar que la sección existe
+    $check = "SELECT id_seccion FROM secciones WHERE id_seccion = $id_seccion";
+    $check_result = $db->query($check);
+    if (!$check_result || $check_result->num_rows == 0) {
+        return ['success' => false, 'message' => 'La sección no existe'];
+    }
+    
+    // Verificar que la carrera existe
+    $check_carrera = "SELECT id_carrera FROM carreras WHERE id_carrera = $id_carrera";
+    $check_carrera_result = $db->query($check_carrera);
+    if (!$check_carrera_result || $check_carrera_result->num_rows == 0) {
+        return ['success' => false, 'message' => 'La carrera seleccionada no existe'];
+    }
+    
+    // Verificar que el trayecto existe
+    $check_trayecto = "SELECT id_trayecto FROM trayectos WHERE id_trayecto = $id_trayecto";
+    $check_trayecto_result = $db->query($check_trayecto);
+    if (!$check_trayecto_result || $check_trayecto_result->num_rows == 0) {
+        return ['success' => false, 'message' => 'El trayecto seleccionado no existe'];
+    }
+    
+    // Verificar que el período existe
+    $check_periodo = "SELECT id_periodo FROM periodos_academicos WHERE id_periodo = $id_periodo";
+    $check_periodo_result = $db->query($check_periodo);
+    if (!$check_periodo_result || $check_periodo_result->num_rows == 0) {
+        return ['success' => false, 'message' => 'El período seleccionado no existe'];
+    }
+    
+    // Actualizar
+    $query = "UPDATE secciones SET 
+                id_carrera = $id_carrera,
+                id_trayecto = $id_trayecto,
+                turno = '$turno',
+                id_periodo = $id_periodo,
+                capacidad_maxima = $capacidad_maxima,
+                inicia = '$inicia'
+              WHERE id_seccion = $id_seccion";
+    
+    if ($db->query($query)) {
+        // Registrar en auditoría
+        if (function_exists('registrarAuditoria')) {
+            registrarAuditoria(
+                "UPDATE",
+                "secciones",
+                $id_seccion,
+                null,
+                [
+                    'id_carrera' => $id_carrera,
+                    'id_trayecto' => $id_trayecto,
+                    'turno' => $turno,
+                    'id_periodo' => $id_periodo,
+                    'capacidad_maxima' => $capacidad_maxima,
+                    'inicia' => $inicia
+                ],
+                "Edición de Sección",
+                "Sección actualizada correctamente"
+            );
+        }
+        
+        return ['success' => true, 'message' => 'Sección actualizada correctamente'];
+    } else {
+        return ['success' => false, 'message' => 'Error al actualizar: ' . $db->error];
+    }
+}
+
+
+
+
+
+
+
+
+
+
 function editarSeccion($db, $datos) {
     try {
         // Obtener datos actuales para auditoría
         $datos_antiguos = obtenerDatosSeccion($db, $datos['id_seccion']);
-        
-        // Verificar si el período está activo
-        $stmt = $db->prepare("SELECT p.activo FROM periodos_academicos p
-                             JOIN secciones s ON s.id_periodo = p.id_periodo
-                             WHERE s.id_seccion = ?");
-        if (!$stmt) {
-            throw new Exception("Error en preparación: " . $db->error);
-        }
-        
-        $stmt->bind_param("i", $datos['id_seccion']);
-        if (!$stmt->execute()) {
-            throw new Exception("Error en ejecución: " . $stmt->error);
-        }
-        
-        $result = $stmt->get_result();
-        $periodo = $result->fetch_assoc();
-        $stmt->close();
-        
-        if ($periodo['activo'] == 0) {
-            throw new Exception("No se puede editar una sección con período inactivo.");
-        }
         
         $stmt = $db->prepare("UPDATE secciones 
                             SET codigo_seccion = ?, 
@@ -5869,20 +8218,33 @@ function editarSeccion($db, $datos) {
                                 id_trayecto = ?, 
                                 id_periodo = ?, 
                                 capacidad_maxima = ?,
+                                turno = ?,
                                 inicia = ?
                             WHERE id_seccion = ?");
         if (!$stmt) {
             throw new Exception("Error en preparación: " . $db->error);
         }
         
-        $stmt->bind_param("siiiisi", 
-            $datos['codigo_seccion'], 
-            $datos['id_carrera'], 
-            $datos['id_trayecto'], 
-            $datos['id_periodo'], 
-            $datos['capacidad_maxima'],
-            $datos['inicia'],
-            $datos['id_seccion']);
+        $codigo = $datos['codigo_seccion'];
+        $id_carrera = $datos['id_carrera'];
+        $id_trayecto = $datos['id_trayecto'];
+        $id_periodo = $datos['id_periodo'];
+        $capacidad_maxima = isset($datos['capacidad_maxima']) ? (int)$datos['capacidad_maxima'] : 30;
+        $turno = $datos['turno'];
+        $inicia = $datos['inicia'];
+        $id_seccion = $datos['id_seccion'];
+        
+        // 8 variables, 8 tipos: s i i i i s s i
+        $stmt->bind_param("siiiissi", 
+            $codigo, 
+            $id_carrera, 
+            $id_trayecto, 
+            $id_periodo, 
+            $capacidad_maxima,
+            $turno,
+            $inicia,
+            $id_seccion
+        );
         
         if (!$stmt->execute()) {
             throw new Exception("Error en ejecución: " . $stmt->error);
@@ -5897,8 +8259,7 @@ function editarSeccion($db, $datos) {
                 $valores_antiguos_audit = [];
                 $valores_nuevos_audit = [];
                 
-                // Comparar campos modificados
-                $campos_auditar = ['codigo_seccion', 'id_carrera', 'id_trayecto', 'id_periodo', 'capacidad_maxima', 'inicia'];
+                $campos_auditar = ['codigo_seccion', 'id_carrera', 'id_trayecto', 'id_periodo', 'capacidad_maxima', 'turno', 'inicia'];
                 
                 foreach ($campos_auditar as $campo) {
                     $valor_antiguo = $datos_antiguos[$campo] ?? null;
@@ -5933,26 +8294,6 @@ function editarSeccion($db, $datos) {
         ];
     } catch (Exception $e) {
         error_log("Error en editarSeccion: " . $e->getMessage());
-        
-        // REGISTRAR EN AUDITORÍA - ERROR AL EDITAR SECCIÓN
-        if (function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "ERROR", 
-                    "secciones", 
-                    $datos['id_seccion'] ?? null, 
-                    null, 
-                    [
-                        'codigo_seccion' => $datos['codigo_seccion'] ?? '',
-                        'error' => $e->getMessage()
-                    ], 
-                    "Secciones", 
-                    "Error al editar sección"
-                );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de error editarSeccion: " . $auditError->getMessage());
-            }
-        }
         
         return [
             'success' => false,
@@ -6436,42 +8777,36 @@ function desactivarSeccionesDePeriodo($db, $periodo_id) {
 }
 
 /**
- * Obtiene el listado de secciones con información relevante
+ * Obtiene el listado de secciones con opción de filtrar por período
  * @param mysqli $db Conexión a la base de datos
+ * @param int $periodo_id ID del período para filtrar (0 = todos)
  * @return array Listado de secciones
  */
-function obtenerListadoSecciones($db) {
-    $stmt = $db->prepare("SELECT 
-                            s.id_seccion, 
-                            s.codigo_seccion, 
-                            c.nombre_carrera, 
-                            t.numero_trayecto, 
-                            p.nombre_periodo, 
-                            p.activo as periodo_activo, 
-                            s.capacidad_maxima,
-                            s.inicia,  
-                            CASE WHEN p.activo = 0 THEN 'inactiva' ELSE s.estatus END as estatus,
-                            COUNT(es.id_usuario) as inscritos
-                          FROM secciones s
-                          JOIN carreras c ON s.id_carrera = c.id_carrera
-                          JOIN trayectos t ON s.id_trayecto = t.id_trayecto
-                          JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
-                          LEFT JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion AND es.estatus = 'activo'
-                          GROUP BY s.id_seccion
-                          ORDER BY p.nombre_periodo DESC, s.codigo_seccion");
-    if (!$stmt) {
-        error_log("Error en preparación obtenerListadoSecciones: " . $db->error);
-        return [];
+function obtenerListadoSecciones($db, $periodo_id = 0) {
+    $sql = "SELECT s.id_seccion, s.codigo_seccion, s.id_carrera, c.nombre_carrera, 
+                   t.numero_trayecto, p.nombre_periodo, p.activo as periodo_activo,
+                   s.capacidad_maxima, s.inicia, s.estatus, s.status,
+                   (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion AND estatus = 'activo') as inscritos
+            FROM secciones s
+            INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+            INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+            INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo";
+    
+    if ($periodo_id > 0) {
+        $sql .= " WHERE s.id_periodo = ?";
     }
     
-    if (!$stmt->execute()) {
-        error_log("Error en ejecución obtenerListadoSecciones: " . $stmt->error);
-        return [];
-    }
+    $sql .= " ORDER BY p.nombre_periodo DESC, t.numero_trayecto, s.codigo_seccion";
     
+    $stmt = $db->prepare($sql);
+    if ($periodo_id > 0) {
+        $stmt->bind_param("i", $periodo_id);
+    }
+    $stmt->execute();
     $result = $stmt->get_result();
     $secciones = $result->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
+    
     return $secciones;
 }
 
@@ -6871,11 +9206,11 @@ function obtenerTotalSeccionesActivas($db) {
  * @return array Secciones de la carrera
  */
 function obtenerSeccionesPorCarrera($db, $carrera_id) {
-    $stmt = $db->prepare("SELECT s.id_seccion, s.codigo_seccion, t.numero_trayecto, p.nombre_periodo, s.estatus
+    $stmt = $db->prepare("SELECT s.id_seccion, s.codigo_seccion, t.numero_trayecto, p.nombre_periodo, s.estatus, s.status
                          FROM secciones s
                          JOIN trayectos t ON s.id_trayecto = t.id_trayecto
                          JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
-                         WHERE s.id_carrera = ? AND s.estatus = 'activa'
+                         WHERE s.id_carrera = ?
                          ORDER BY p.nombre_periodo DESC, t.numero_trayecto, s.codigo_seccion");
     if (!$stmt) {
         error_log("Error en preparación obtenerSeccionesPorCarrera: " . $db->error);
@@ -6893,6 +9228,1136 @@ function obtenerSeccionesPorCarrera($db, $carrera_id) {
     $stmt->close();
     return $secciones;
 }
+
+
+
+
+
+
+
+
+/**
+ * Obtiene las materias de una sección (según el trayecto de la sección y la carrera)
+ * @param int $id_seccion ID de la sección
+ * @return array Lista de materias del trayecto de esa sección
+ */
+function obtenerMateriasPorSeccion($id_seccion) {
+    global $db;
+    
+    // Obtener el id_trayecto y carrera de la sección
+    $sql_seccion = "SELECT id_trayecto, id_carrera FROM secciones WHERE id_seccion = ?";
+    $stmt = $db->prepare($sql_seccion);
+    $stmt->bind_param('i', $id_seccion);
+    $stmt->execute();
+    $seccion = $stmt->get_result()->fetch_assoc();
+    
+    if (!$seccion) {
+        return [];
+    }
+    
+    // IMPORTANTE: En secciones, id_trayecto=1 es Trayecto 0
+    // En materias, trayecto=0 es Trayecto 0
+    // Por eso restamos 1
+    $trayecto_materia = (int)$seccion['id_trayecto'] - 1;
+    
+    // Obtener materias del trayecto de esa carrera
+    $sql = "SELECT m.id_materia, m.cod_materia, m.nombre_materia, m.creditos
+            FROM materias m
+            INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+            WHERE cm.id_carrera = ? AND m.trayecto = ? AND m.activa = 1
+            ORDER BY m.nombre_materia";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param('ii', $seccion['id_carrera'], $trayecto_materia);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_all(MYSQLI_ASSOC);
+}
+
+/**
+ * Obtiene los docentes disponibles para una materia
+ * @param int $id_materia ID de la materia
+ * @return array Lista de docentes
+ */
+function obtenerDocentesPorMateria($id_materia) {
+    global $db;
+    
+    $sql = "SELECT DISTINCT u.id, u.nombre 
+            FROM docente_seccion ds
+            JOIN users u ON ds.id_usuario = u.id
+            WHERE ds.id_materia = ? AND ds.estatus = 1
+            ORDER BY u.nombre";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param('i', $id_materia);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_all(MYSQLI_ASSOC);
+}
+
+/**
+ * Obtiene o crea la relación docente_seccion
+ * @param int $id_seccion ID de la sección
+ * @param int $id_materia ID de la materia
+ * @param int $id_docente ID del docente
+ * @return int|false ID de docente_seccion o false
+ */
+function obtenerDocenteSeccion($id_seccion, $id_materia, $id_docente) {
+    global $db;
+    
+    // Buscar si ya existe
+    $sql = "SELECT id_docente_seccion FROM docente_seccion 
+            WHERE id_seccion = ? AND id_materia = ? AND id_usuario = ?";
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param('iii', $id_seccion, $id_materia, $id_docente);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    
+    if ($row) {
+        return $row['id_docente_seccion'];
+    }
+    
+    // Crear nueva relación
+    $sql = "INSERT INTO docente_seccion (id_usuario, id_seccion, id_materia, fecha_asignacion, estatus) 
+            VALUES (?, ?, ?, NOW(), 1)";
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param('iii', $id_docente, $id_seccion, $id_materia);
+    
+    if ($stmt->execute()) {
+        return $db->insert_id;
+    }
+    
+    return false;
+}
+
+/**
+ * Guarda un horario para una sección
+ * @param int $id_docente_seccion ID de la relación docente_seccion
+ * @param int $dia Día de la semana (0=Lunes a 5=Sábado)
+ * @param string $hora_inicio Hora de inicio (formato HH:MM)
+ * @param string $hora_fin Hora de fin (formato HH:MM)
+ * @param string $aula Aula asignada
+ * @return bool True si se guardó correctamente
+ */
+function guardarHorarioSeccion($id_docente_seccion, $dia, $hora_inicio, $hora_fin, $aula) {
+    global $db;
+    
+    $sql = "INSERT INTO horarios (id_docente_seccion, dia, hora_inicio, hora_fin, aula) 
+            VALUES (?, ?, ?, ?, ?)";
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param('iisss', $id_docente_seccion, $dia, $hora_inicio, $hora_fin, $aula);
+    
+    return $stmt->execute();
+}
+
+/**
+ * Elimina un horario por su ID
+ * @param int $id_horario ID del horario a eliminar
+ * @return bool True si se eliminó correctamente
+ */
+function eliminarHorarioSeccion($id_horario) {
+    global $db;
+    
+    $sql = "DELETE FROM horarios WHERE id_horario = ?";
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param('i', $id_horario);
+    
+    return $stmt->execute();
+}
+
+/**
+ * Verifica conflictos de horario (misma aula, mismo día, horario traslapado)
+ * @param int $dia Día de la semana (0=Lunes a 5=Sábado)
+ * @param string $hora_inicio Hora de inicio
+ * @param string $hora_fin Hora de fin
+ * @param string $aula Aula
+ * @param int|null $id_seccion ID de la sección a omitir (opcional)
+ * @param int|null $id_horario_omitir ID del horario a omitir (opcional)
+ * @return array|false Array con conflictos o false si no hay
+ */
+function verificarConflictoHorario($dia, $hora_inicio, $hora_fin, $aula, $id_seccion = null, $id_horario_omitir = null) {
+    global $db;
+    
+    $sql = "SELECT h.id_horario, u.nombre as docente, m.nombre_materia, s.codigo_seccion
+            FROM horarios h
+            JOIN docente_seccion ds ON h.id_docente_seccion = ds.id_docente_seccion
+            JOIN users u ON ds.id_usuario = u.id
+            JOIN materias m ON ds.id_materia = m.id_materia
+            JOIN secciones s ON ds.id_seccion = s.id_seccion
+            WHERE h.dia = ? AND h.aula = ? 
+            AND ((h.hora_inicio < ? AND h.hora_fin > ?) OR 
+                 (h.hora_inicio >= ? AND h.hora_inicio < ?))";
+    
+    $params = [$dia, $aula, $hora_fin, $hora_inicio, $hora_inicio, $hora_fin];
+    $types = 'isssss';
+    
+    if ($id_horario_omitir) {
+        $sql .= " AND h.id_horario != ?";
+        $params[] = $id_horario_omitir;
+        $types .= 'i';
+    }
+    
+    if ($id_seccion) {
+        $sql .= " AND ds.id_seccion != ?";
+        $params[] = $id_seccion;
+        $types .= 'i';
+    }
+    
+    $stmt = $db->prepare($sql);
+    if (!$stmt) {
+        return false;
+    }
+    
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+    
+    return false;
+}
+
+
+
+
+
+
+
+
+
+/**
+ * Obtener secciones disponibles por carrera, turno y trayecto específico (solo Trayecto 0)
+ * @param int $id_carrera ID de la carrera
+ * @param string $turno Turno (Diurno/Nocturno)
+ * @param int $numero_trayecto Número del trayecto (0,1,2,3,4)
+ * @return array Lista de secciones con cupos disponibles
+ */
+function obtenerSeccionesDisponiblesPorCarreraYTurnoYTrayecto($id_carrera, $turno, $numero_trayecto) {
+    global $db;
+    
+    $secciones = [];
+    
+    // Primero obtener el id_trayecto correspondiente al número
+    $query_trayecto = "SELECT id_trayecto FROM trayectos WHERE numero_trayecto = $numero_trayecto";
+    $result_trayecto = $db->query($query_trayecto);
+    $trayecto = $result_trayecto->fetch_assoc();
+    $id_trayecto = $trayecto ? $trayecto['id_trayecto'] : 0;
+    
+    if (!$id_trayecto) {
+        return $secciones;
+    }
+    
+    $query = "SELECT s.*, 
+                     (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion) as inscritos,
+                     (s.capacidad_maxima - (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion)) as cupos_disponibles
+              FROM secciones s
+              WHERE s.id_carrera = $id_carrera 
+              AND s.turno = '$turno'
+              AND s.id_trayecto = $id_trayecto
+              AND s.estatus = 'activa'
+              AND s.status = 'Aprobada'
+              HAVING cupos_disponibles > 0
+              ORDER BY s.codigo_seccion ASC";
+    
+    $result = $db->query($query);
+    
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $secciones[] = $row;
+        }
+    }
+    
+    return $secciones;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * Obtiene secciones disponibles por carrera y turno (SOLO ACTIVAS Y APROBADAS)
+ */
+function obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno) {
+    global $db;
+    
+    if (empty($carrera_id) || empty($turno)) {
+        return [];
+    }
+    
+    $query = "SELECT 
+        s.id_seccion,
+        s.codigo_seccion,
+        s.capacidad_maxima,
+        s.turno,
+        s.id_carrera,
+        s.id_periodo
+    FROM secciones s
+    WHERE s.id_carrera = ? 
+        AND s.turno = ?
+        AND s.estatus = 'activa'
+        AND s.status = 'aprobada'
+    ORDER BY s.codigo_seccion ASC";
+    
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error prepare secciones: " . $db->error);
+        return [];
+    }
+    
+    $stmt->bind_param('is', $carrera_id, $turno);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $secciones = [];
+    while ($row = $result->fetch_assoc()) {
+        $count_query = "SELECT COUNT(*) as inscritos FROM estudiante_seccion WHERE id_seccion = ? AND estatus = 'activo'";
+        $count_stmt = $db->prepare($count_query);
+        if ($count_stmt) {
+            $count_stmt->bind_param('i', $row['id_seccion']);
+            $count_stmt->execute();
+            $count_result = $count_stmt->get_result();
+            $count_row = $count_result->fetch_assoc();
+            $inscritos = $count_row['inscritos'] ?? 0;
+            $count_stmt->close();
+        } else {
+            $inscritos = 0;
+        }
+        
+        $cupos_disponibles = $row['capacidad_maxima'] - $inscritos;
+        
+        if ($cupos_disponibles > 0) {
+            $row['inscritos'] = $inscritos;
+            $row['cupos_disponibles'] = $cupos_disponibles;
+            $secciones[] = $row;
+        }
+    }
+    
+    $stmt->close();
+    return $secciones;
+}
+
+/**
+ * Obtiene todas las secciones de una carrera (incluyendo llenas o inactivas)
+ */
+function obtenerTodasSeccionesPorCarrera($carrera_id) {
+    global $db;
+    
+    $query = "SELECT 
+        s.id_seccion,
+        s.codigo_seccion,
+        s.capacidad_maxima,
+        s.turno,
+        s.status,
+        p.activo as periodo_activo,
+        (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion AND estatus = 'activo') as inscritos
+    FROM secciones s
+    INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
+    WHERE s.id_carrera = ?
+    ORDER BY s.codigo_seccion ASC";
+    
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error en obtenerTodasSeccionesPorCarrera: " . $db->error);
+        return [];
+    }
+    
+    $stmt->bind_param('i', $carrera_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $secciones = [];
+    while ($row = $result->fetch_assoc()) {
+        $row['inscritos'] = $row['inscritos'] ?? 0;
+        $secciones[] = $row;
+    }
+    
+    return $secciones;
+}
+
+
+
+/**
+ * Asigna un estudiante a una sección específica (selección manual)
+ */
+function asignarEstudianteASeccionEspecifica($usuario_id, $seccion_id) {
+    global $db;
+    
+    // Verificar cupo en la sección
+    $query = "SELECT 
+        s.id_seccion,
+        s.codigo_seccion,
+        s.capacidad_maxima,
+        COUNT(e.id_usuario) as inscritos
+    FROM secciones s
+    LEFT JOIN estudiante_seccion e ON s.id_seccion = e.id_seccion
+    WHERE s.id_seccion = ?
+    GROUP BY s.id_seccion";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param('i', $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $seccion = $result->fetch_assoc();
+    
+    if (!$seccion) {
+        return ['success' => false, 'message' => 'La sección no existe'];
+    }
+    
+    if ($seccion['inscritos'] >= $seccion['capacidad_maxima']) {
+        return ['success' => false, 'message' => 'La sección no tiene cupos disponibles'];
+    }
+    
+    // Verificar si ya está inscrito
+    $check = $db->prepare("SELECT id FROM estudiante_seccion WHERE id_usuario = ? AND id_seccion = ?");
+    $check->bind_param('ii', $usuario_id, $seccion_id);
+    $check->execute();
+    if ($check->get_result()->num_rows > 0) {
+        return ['success' => false, 'message' => 'El estudiante ya está inscrito en esta sección'];
+    }
+    
+    // Inscribir estudiante
+    $fecha = date('Y-m-d H:i:s');
+    $insert = $db->prepare("INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus) VALUES (?, ?, ?, 'activo')");
+    $insert->bind_param('iis', $usuario_id, $seccion_id, $fecha);
+    
+    if ($insert->execute()) {
+        return [
+            'success' => true, 
+            'message' => 'Estudiante asignado a la sección ' . $seccion['codigo_seccion'],
+            'seccion' => $seccion['codigo_seccion']
+        ];
+    }
+    
+    return ['success' => false, 'message' => 'Error al asignar estudiante a la sección'];
+}
+
+/**
+ * Asigna un estudiante a una sección disponible
+ */
+function asignarEstudianteASeccionDisponible($usuario_id, $carrera_id, $turno) {
+    global $db;
+    
+    // Obtener secciones disponibles
+    $secciones = obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno);
+    
+    if (empty($secciones)) {
+        return [
+            'success' => false,
+            'message' => 'No hay secciones disponibles para esta carrera y turno'
+        ];
+    }
+    
+    // Tomar la primera sección disponible
+    $seccion = $secciones[0];
+    $id_seccion = $seccion['id_seccion'];
+    
+    // Verificar si la tabla estudiante_seccion existe
+    $check_table = $db->query("SHOW TABLES LIKE 'estudiante_seccion'");
+    if ($check_table->num_rows == 0) {
+        // Crear la tabla si no existe
+        $db->query("CREATE TABLE IF NOT EXISTS estudiante_seccion (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            id_usuario INT NOT NULL,
+            id_seccion INT NOT NULL,
+            fecha_inscripcion DATETIME,
+            estatus VARCHAR(20) DEFAULT 'activo',
+            INDEX(id_usuario),
+            INDEX(id_seccion)
+        )");
+    }
+    
+    // Insertar en estudiante_seccion con el nombre correcto de la columna
+    $insert = $db->prepare("INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus) VALUES (?, ?, NOW(), 'activo')");
+    $insert->bind_param('ii', $usuario_id, $id_seccion);
+    
+    if (!$insert->execute()) {
+        return [
+            'success' => false,
+            'message' => 'Error al asignar estudiante a la sección: ' . $insert->error
+        ];
+    }
+    
+    return [
+        'success' => true,
+        'message' => 'Asignado a la sección ' . $seccion['codigo_seccion'],
+        'seccion' => $seccion['codigo_seccion'],
+        'id_seccion' => $id_seccion
+    ];
+}
+
+function aceptarPreinscripcionConSeccion($preinscripcion_id, $admin_id) {
+    global $db;
+    
+    error_log("=== aceptarPreinscripcionConSeccion ===");
+    
+    $db->begin_transaction();
+    
+    try {
+        // Obtener datos de la preinscripción
+        $query = "SELECT * FROM preinscripcion WHERE id = ?";
+        $stmt = $db->prepare($query);
+        $stmt->bind_param('i', $preinscripcion_id);
+        $stmt->execute();
+        $preinscripcion = $stmt->get_result()->fetch_assoc();
+        
+        if (!$preinscripcion) {
+            throw new Exception('Preinscripción no encontrada');
+        }
+        
+        if ($preinscripcion['status'] !== 'Pendiente') {
+            throw new Exception('Esta preinscripción ya fue procesada');
+        }
+        
+        // Verificar si el usuario ya existe
+        $check_user = $db->prepare("SELECT id FROM users WHERE idusuario = ?");
+        $check_user->bind_param('s', $preinscripcion['idusuario']);
+        $check_user->execute();
+        $existing_user = $check_user->get_result()->fetch_assoc();
+        
+        if ($existing_user) {
+            $usuario_id = $existing_user['id'];
+            error_log("Usuario ya existe - ID: $usuario_id");
+        } else {
+            // Insertar nuevo usuario
+            $username = $preinscripcion['idusuario'];
+            $password = password_hash($preinscripcion['idusuario'], PASSWORD_DEFAULT);
+            $fecha_act = date('Y-m-d H:i:s');
+            $api_key = bin2hex(random_bytes(16));
+            
+            // Valores por defecto
+            $ciudad = !empty($preinscripcion['ciudad']) ? $preinscripcion['ciudad'] : ($preinscripcion['municipio'] ?? '');
+            $fecha_nac = !empty($preinscripcion['fecha_nac']) ? $preinscripcion['fecha_nac'] : null;
+            $fecha_ingreso = !empty($preinscripcion['fecha_ingreso']) ? $preinscripcion['fecha_ingreso'] : date('Y-m-d');
+            $foto_perfil = $preinscripcion['foto_perfil'] ?? '';
+            $titulos = !empty($preinscripcion['titulos']) ? $preinscripcion['titulos'] : '';
+            $institutos = !empty($preinscripcion['institutos']) ? $preinscripcion['institutos'] : '';
+            $pais_titulo = !empty($preinscripcion['pais_titulo']) ? $preinscripcion['pais_titulo'] : '';
+            $legalizado_titulo = !empty($preinscripcion['legalizado_titulo']) ? $preinscripcion['legalizado_titulo'] : '';
+            $potencialidades = !empty($preinscripcion['potencialidades']) ? $preinscripcion['potencialidades'] : '';
+            
+            // Escapar valores para evitar inyección SQL
+            $idusuario = $db->real_escape_string($preinscripcion['idusuario']);
+            $nombre = $db->real_escape_string($preinscripcion['nombre']);
+            $email = $db->real_escape_string($preinscripcion['email']);
+            $tlf = $db->real_escape_string($preinscripcion['tlf']);
+            $cel = $db->real_escape_string($preinscripcion['cel']);
+            $direccion = $db->real_escape_string($preinscripcion['direccion']);
+            $estado = $db->real_escape_string($preinscripcion['estado']);
+            $municipio = $db->real_escape_string($preinscripcion['municipio']);
+            $parroquia = $db->real_escape_string($preinscripcion['parroquia']);
+            $etnia = $db->real_escape_string($preinscripcion['etnia']);
+            $casaapto = $db->real_escape_string($preinscripcion['casaapto']);
+            $punto_referencia = $db->real_escape_string($preinscripcion['punto_referencia']);
+            $grupo_familiar = $db->real_escape_string($preinscripcion['grupo_familiar']);
+            $acargo_usted = $db->real_escape_string($preinscripcion['acargo_usted']);
+            $fuente_ingresos = $db->real_escape_string($preinscripcion['fuente_ingresos']);
+            $tipo_vivienda = $db->real_escape_string($preinscripcion['tipo_vivienda']);
+            $tenencia_vivienda = $db->real_escape_string($preinscripcion['tenencia_vivienda']);
+            $enfermedad = $db->real_escape_string($preinscripcion['enfermedad']);
+            $discapacidad = $db->real_escape_string($preinscripcion['discapacidad']);
+            $potencialidades = $db->real_escape_string($potencialidades);
+            $carrera = $db->real_escape_string($preinscripcion['carrera']);
+            $genero = $db->real_escape_string($preinscripcion['genero']);
+            $edo_civil = $db->real_escape_string($preinscripcion['edo_civil']);
+            $num_telf_opc = $db->real_escape_string($preinscripcion['num_telf_opc']);
+            $sede = $db->real_escape_string($preinscripcion['sede'] ?? '');
+            
+            $insert_sql = "INSERT INTO users SET 
+                idusuario = '$idusuario',
+                nombre = '$nombre',
+                username = '$username',
+                email = '$email',
+                tlf = '$tlf',
+                cel = '$cel',
+                direccion = '$direccion',
+                ciudad = '$ciudad',
+                estado = '$estado',
+                municipio = '$municipio',
+                parroquia = '$parroquia',
+                etnia = '$etnia',
+                casaapto = '$casaapto',
+                punto_referencia = '$punto_referencia',
+                grupo_familiar = '$grupo_familiar',
+                acargo_usted = '$acargo_usted',
+                fuente_ingresos = '$fuente_ingresos',
+                tipo_vivienda = '$tipo_vivienda',
+                tenencia_vivienda = '$tenencia_vivienda',
+                enfermedad = '$enfermedad',
+                discapacidad = '$discapacidad',
+                titulos = '$titulos',
+                institutos = '$institutos',
+                pais_titulo = '$pais_titulo',
+                legalizado_titulo = '$legalizado_titulo',
+                potencialidades = '$potencialidades',
+                fecha_ingreso = '$fecha_ingreso',
+                fecha_act = '$fecha_act',
+                status = '1',
+                user_type = 'estudiante',
+                password = '$password',
+                api_key = '$api_key',
+                carrera = '$carrera',
+                carrera_di = '$carrera',
+                genero = '$genero',
+                embarazada = '$preinscripcion[embarazada]',
+                edo_civil = '$edo_civil',
+                fecha_nac = '$fecha_nac',
+                num_telf_opc = '$num_telf_opc',
+                foto_perfil = '$foto_perfil',
+                sede = '$sede',
+                estudiante = 1";
+            
+            if (!$db->query($insert_sql)) {
+                throw new Exception('Error al insertar usuario: ' . $db->error);
+            }
+            
+            $usuario_id = $db->insert_id;
+            error_log("Usuario creado - ID: $usuario_id");
+        }
+        
+        // Asignar a sección disponible
+        $turno = $preinscripcion['turno'] ?? 'Diurno';
+        $asignacion = asignarEstudianteASeccionDisponible($usuario_id, $preinscripcion['carrera'], $turno);
+        
+        if (!$asignacion['success']) {
+            throw new Exception($asignacion['message']);
+        }
+        
+        // ========== NUEVO: INSCRIBIR MATERIAS DEL TRAYECTO 0 ==========
+        $periodo_activo = obtenerPeriodoActivo();
+        if (!$periodo_activo) {
+            throw new Exception('No hay un período académico activo. No se pueden inscribir las materias.');
+        }
+        
+        $materias_trayecto0 = obtenerMateriasTrayecto0PorCarrera($preinscripcion['carrera']);
+        $inscripciones_exitosas = 0;
+        $inscripciones_fallidas = 0;
+        
+        if (empty($materias_trayecto0)) {
+            error_log("Advertencia: No se encontraron materias del trayecto 0 para la carrera ID: " . $preinscripcion['carrera']);
+        } else {
+            foreach ($materias_trayecto0 as $id_materia) {
+                $inscrito = inscribirEstudianteEnMateria(
+                    $usuario_id, 
+                    $id_materia, 
+                    $asignacion['id_seccion'], 
+                    $periodo_activo['id_periodo']
+                );
+                
+                if ($inscrito) {
+                    $inscripciones_exitosas++;
+                } else {
+                    $inscripciones_fallidas++;
+                    error_log("Error al inscribir materia $id_materia para usuario $usuario_id");
+                }
+            }
+            
+            error_log("Inscripción de materias trayecto 0 - Exitosas: $inscripciones_exitosas, Fallidas: $inscripciones_fallidas");
+        }
+        // ========== FIN DE LA NUEVA PARTE ==========
+        
+        // Actualizar preinscripción
+        $fecha_actual = date('Y-m-d H:i:s');
+        $update = $db->prepare("UPDATE preinscripcion SET 
+            status = 'Aprobada', 
+            aprobado_por = ?, 
+            fecha_aprobado = ?,
+            updated_at = ?
+            WHERE id = ?");
+        $update->bind_param('issi', $admin_id, $fecha_actual, $fecha_actual, $preinscripcion_id);
+        $update->execute();
+        
+        $db->commit();
+        
+        return [
+            'success' => true,
+            'message' => 'Preinscripción aprobada exitosamente. ' . $asignacion['message'] . ". Materias del trayecto 0 inscritas: $inscripciones_exitosas.",
+            'seccion_asignada' => $asignacion['seccion'],
+            'usuario_id' => $usuario_id,
+            'materias_inscritas' => $inscripciones_exitosas
+        ];
+        
+    } catch (Exception $e) {
+        $db->rollback();
+        error_log("Error en aceptarPreinscripcionConSeccion: " . $e->getMessage());
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+
+
+
+
+
+/**
+ * Verificar si un estudiante cumple los requisitos para avanzar al siguiente trayecto
+ * @param int $id_usuario ID del estudiante
+ * @param int $trayecto_actual Número del trayecto actual (0,1,2,3)
+ * @param int $id_carrera ID de la carrera
+ * @return array ['puede_avanzar' => bool, 'motivo' => string, 'detalles' => array]
+ */
+function verificarRequisitosAvanceEstudiante($id_usuario, $trayecto_actual, $id_carrera) {
+    global $db;
+    
+    $resultado = [
+        'puede_avanzar' => false,
+        'motivo' => '',
+        'detalles' => []
+    ];
+    
+    switch ($trayecto_actual) {
+        case 0: // Trayecto 0 → Trayecto 1: Aprobar el 50% de las materias del trayecto 0
+            // Obtener materias del trayecto 0
+            $materias = obtenerMateriasPorTrayecto($id_carrera, 0);
+            $total_materias = count($materias);
+            $aprobadas = 0;
+            
+            foreach ($materias as $materia) {
+                $nota = obtenerNotaFinalMateria($id_usuario, $materia['id_materia']);
+                if ($nota !== null && $nota >= 12) {
+                    $aprobadas++;
+                }
+            }
+            
+            $porcentaje = $total_materias > 0 ? ($aprobadas / $total_materias) * 100 : 0;
+            $resultado['detalles'] = [
+                'total_materias' => $total_materias,
+                'aprobadas' => $aprobadas,
+                'porcentaje' => round($porcentaje, 1)
+            ];
+            
+            if ($porcentaje >= 50) {
+                $resultado['puede_avanzar'] = true;
+                $resultado['motivo'] = "Aprobó $aprobadas de $total_materias materias ({$resultado['detalles']['porcentaje']}% ≥ 50%)";
+            } else {
+                $resultado['motivo'] = "Solo aprobó $aprobadas de $total_materias materias ({$resultado['detalles']['porcentaje']}% < 50%)";
+            }
+            break;
+            
+        case 1: // Trayecto 1 → Trayecto 2: Aprobar Proyecto Socio Integrador (nota ≥ 16)
+            $proyecto = obtenerProyectoSocioIntegrador($id_carrera, 1);
+            if ($proyecto) {
+                $nota = obtenerNotaFinalMateria($id_usuario, $proyecto['id_materia']);
+                $resultado['detalles'] = [
+                    'materia' => $proyecto['nombre_materia'],
+                    'nota_requerida' => 16,
+                    'nota_obtenida' => $nota
+                ];
+                
+                if ($nota !== null && $nota >= 16) {
+                    $resultado['puede_avanzar'] = true;
+                    $resultado['motivo'] = "Aprobó {$proyecto['nombre_materia']} con $nota (≥ 16)";
+                } else {
+                    $resultado['motivo'] = "No aprobó {$proyecto['nombre_materia']} con nota ≥ 16. Nota actual: " . ($nota ?? 'Sin nota');
+                }
+            } else {
+                $resultado['motivo'] = "No se encontró la materia Proyecto Socio Integrador";
+            }
+            break;
+            
+        case 2: // Trayecto 2 → Trayecto 3: Aprobar todas las materias y obtener primer título (TSU)
+            // Verificar si ya tiene título TSU
+            $tiene_titulo = verificarTituloTSU($id_usuario);
+            
+            if (!$tiene_titulo) {
+                $resultado['motivo'] = "No tiene registrado el título TSU en el sistema de graduación";
+                $resultado['detalles'] = ['pendiente_titulo' => true];
+                break;
+            }
+            
+            // Verificar que aprobó todas las materias hasta trayecto 2
+            $materias = obtenerMateriasPorTrayecto($id_carrera, 0, 1, 2);
+            $total_materias = count($materias);
+            $aprobadas = 0;
+            $materias_pendientes = [];
+            
+            foreach ($materias as $materia) {
+                $nota = obtenerNotaFinalMateria($id_usuario, $materia['id_materia']);
+                if ($nota !== null && $nota >= 12) {
+                    $aprobadas++;
+                } else {
+                    $materias_pendientes[] = $materia['nombre_materia'];
+                }
+            }
+            
+            $resultado['detalles'] = [
+                'total_materias' => $total_materias,
+                'aprobadas' => $aprobadas,
+                'pendientes' => $materias_pendientes,
+                'tiene_titulo' => $tiene_titulo
+            ];
+            
+            if ($aprobadas == $total_materias && $tiene_titulo) {
+                $resultado['puede_avanzar'] = true;
+                $resultado['motivo'] = "Aprobó todas las materias ($aprobadas/$total_materias) y tiene título TSU";
+            } else {
+                $resultado['motivo'] = "Faltan " . ($total_materias - $aprobadas) . " materias por aprobar";
+                if (!$tiene_titulo) $resultado['motivo'] .= " y título TSU pendiente";
+            }
+            break;
+            
+        case 3: // Trayecto 3 → Trayecto 4: Aprobar Proyecto Socio Integrador (nota ≥ 16)
+            $proyecto = obtenerProyectoSocioIntegrador($id_carrera, 3);
+            if ($proyecto) {
+                $nota = obtenerNotaFinalMateria($id_usuario, $proyecto['id_materia']);
+                $resultado['detalles'] = [
+                    'materia' => $proyecto['nombre_materia'],
+                    'nota_requerida' => 16,
+                    'nota_obtenida' => $nota
+                ];
+                
+                if ($nota !== null && $nota >= 16) {
+                    $resultado['puede_avanzar'] = true;
+                    $resultado['motivo'] = "Aprobó {$proyecto['nombre_materia']} con $nota (≥ 16)";
+                } else {
+                    $resultado['motivo'] = "No aprobó {$proyecto['nombre_materia']} con nota ≥ 16. Nota actual: " . ($nota ?? 'Sin nota');
+                }
+            } else {
+                $resultado['motivo'] = "No se encontró la materia Proyecto Socio Integrador para trayecto 3";
+            }
+            break;
+            
+        case 4: // Trayecto 4: Último trayecto, no puede avanzar más
+            $resultado['puede_avanzar'] = false;
+            $resultado['motivo'] = "Es el último trayecto (4), no puede avanzar más";
+            break;
+            
+        default:
+            $resultado['motivo'] = "Trayecto no válido";
+    }
+    
+    return $resultado;
+}
+
+/**
+ * Obtener materias por trayecto(s)
+ * @param int $id_carrera ID de la carrera
+ * @param int ...$trayectos Números de trayectos (0,1,2,3,4)
+ * @return array Lista de materias
+ */
+function obtenerMateriasPorTrayecto($id_carrera, ...$trayectos) {
+    global $db;
+    $materias = [];
+    
+    if (empty($trayectos)) {
+        return $materias;
+    }
+    
+    $trayectos_str = implode(',', array_map('intval', $trayectos));
+    $query = "SELECT m.id_materia, m.nombre_materia, m.trayecto
+              FROM carrera_materia cm
+              INNER JOIN materias m ON cm.id_materia = m.id_materia
+              WHERE cm.id_carrera = $id_carrera 
+              AND m.trayecto IN ($trayectos_str)
+              ORDER BY m.trayecto, m.nombre_materia";
+    
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $materias[] = $row;
+        }
+    }
+    return $materias;
+}
+
+/**
+ * Obtener nota final de una materia para un estudiante desde notas_trimestres
+ * @param int $id_usuario ID del estudiante
+ * @param int $id_materia ID de la materia
+ * @return float|null Nota final (promedio de trimestres aprobados) o null si no hay
+ */
+function obtenerNotaFinalMateria($id_usuario, $id_materia) {
+    global $db;
+    
+    // Obtener las 3 notas trimestrales
+    $query = "SELECT trimestre_num, nota, estado 
+              FROM notas_trimestres 
+              WHERE id_usuario = $id_usuario 
+              AND id_materia = $id_materia
+              AND estado = 'aprobada'
+              ORDER BY trimestre_num";
+    
+    $result = $db->query($query);
+    
+    $suma = 0;
+    $count = 0;
+    
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $suma += $row['nota'];
+            $count++;
+        }
+    }
+    
+    // Calcular promedio si hay al menos una nota
+    if ($count > 0) {
+        return round($suma / $count, 1);
+    }
+    
+    return null;
+}
+
+/**
+ * Obtener el Proyecto Socio Integrador de un trayecto
+ * @param int $id_carrera ID de la carrera
+ * @param int $trayecto Número del trayecto (1 o 3)
+ * @return array|null Información de la materia o null
+ */
+function obtenerProyectoSocioIntegrador($id_carrera, $trayecto) {
+    global $db;
+    
+    $query = "SELECT m.id_materia, m.nombre_materia
+              FROM carrera_materia cm
+              INNER JOIN materias m ON cm.id_materia = m.id_materia
+              WHERE cm.id_carrera = $id_carrera 
+              AND m.trayecto = $trayecto
+              AND m.es_proyecto_socio = 1
+              LIMIT 1";
+    
+    $result = $db->query($query);
+    if ($result && $result->num_rows > 0) {
+        return $result->fetch_assoc();
+    }
+    return null;
+}
+
+/**
+ * Verificar si un estudiante tiene título TSU
+ */
+function verificarTituloTSU($id_usuario) {
+    global $db;
+    
+    $query = "SELECT id FROM graduados 
+              WHERE id_usuario = $id_usuario 
+              AND estado = 'graduado'
+              LIMIT 1";
+    
+    $result = $db->query($query);
+    return $result && $result->num_rows > 0;
+}
+
+/**
+ * Obtener estudiantes de una sección con evaluación de requisitos
+ */
+function obtenerEstudiantesSeccionConRequisitos($id_seccion) {
+    global $db;
+    
+    $seccion = obtenerDetalleSeccion($db, $id_seccion);
+    $estudiantes = obtenerEstudiantesDeSeccion($db, $id_seccion);
+    $resultado = [];
+    
+    foreach ($estudiantes as $estudiante) {
+        $evaluacion = verificarRequisitosAvanceEstudiante(
+            $estudiante['id'], 
+            $seccion['numero_trayecto'], 
+            $seccion['id_carrera']
+        );
+        
+        $resultado[] = [
+            'id' => $estudiante['id'],
+            'nombre' => $estudiante['nombre'],
+            'idusuario' => $estudiante['idusuario'],
+            'fecha_inscripcion' => $estudiante['fecha_inscripcion'],
+            'puede_avanzar' => $evaluacion['puede_avanzar'],
+            'motivo' => $evaluacion['motivo'],
+            'detalles' => $evaluacion['detalles']
+        ];
+    }
+    
+    return $resultado;
+}
+
+/**
+ * Avanzar una sección al siguiente trayecto
+ */
+function avanzarSeccionTrayecto($id_seccion, $id_admin) {
+    global $db;
+    
+    $seccion = obtenerDetalleSeccion($db, $id_seccion);
+    $nuevo_trayecto = $seccion['numero_trayecto'] + 1;
+    
+    if ($nuevo_trayecto > 4) {
+        return ['success' => false, 'message' => 'No se puede avanzar más allá del trayecto 4'];
+    }
+    
+    // Obtener el id_trayecto correspondiente
+    $query_trayecto = "SELECT id_trayecto FROM trayectos WHERE numero_trayecto = $nuevo_trayecto";
+    $result = $db->query($query_trayecto);
+    $nuevo_id_trayecto = $result->fetch_assoc()['id_trayecto'];
+    
+    // Obtener estudiantes que pueden avanzar
+    $estudiantes = obtenerEstudiantesSeccionConRequisitos($id_seccion);
+    $estudiantes_avanzan = array_filter($estudiantes, function($e) {
+        return $e['puede_avanzar'];
+    });
+    
+    if (count($estudiantes_avanzan) == 0) {
+        return ['success' => false, 'message' => 'No hay estudiantes que cumplan los requisitos para avanzar'];
+    }
+    
+    // Crear nueva sección para el siguiente trayecto
+    $nuevo_codigo = $seccion['codigo_seccion'] . '-T' . $nuevo_trayecto;
+    
+    $insert_seccion = "INSERT INTO secciones 
+                       (codigo_seccion, id_carrera, turno, id_trayecto, id_periodo, 
+                        capacidad_maxima, capacidad_minima, inicia, created_by, created_at) 
+                       VALUES 
+                       ('$nuevo_codigo', {$seccion['id_carrera']}, '{$seccion['turno']}', 
+                        $nuevo_id_trayecto, {$seccion['id_periodo']}, 
+                        {$seccion['capacidad_maxima']}, " . MINIMO_ESTUDIANTES . ", 
+                        NOW(), $id_admin, NOW())";
+    
+    if (!$db->query($insert_seccion)) {
+        return ['success' => false, 'message' => 'Error al crear nueva sección: ' . $db->error];
+    }
+    
+    $nueva_seccion_id = $db->insert_id;
+    
+    // Mover estudiantes que cumplen requisitos a la nueva sección
+    $movidos = 0;
+    foreach ($estudiantes_avanzan as $estudiante) {
+        // Actualizar estudiante_seccion
+        $update = "UPDATE estudiante_seccion 
+                   SET id_seccion = $nueva_seccion_id, fecha_inscripcion = NOW() 
+                   WHERE id_usuario = {$estudiante['id']} AND id_seccion = $id_seccion";
+        $db->query($update);
+        
+        // Inscribir materias del nuevo trayecto
+        inscribirMateriasNuevoTrayecto($estudiante['id'], $nueva_seccion_id, $nuevo_trayecto, $seccion['id_carrera']);
+        $movidos++;
+    }
+    
+    return [
+        'success' => true, 
+        'message' => "Sección avanzada correctamente. $movidos estudiantes movidos al trayecto $nuevo_trayecto",
+        'nueva_seccion_id' => $nueva_seccion_id,
+        'movidos' => $movidos
+    ];
+}
+
+/**
+ * Inscribir materias del nuevo trayecto para un estudiante
+ */
+function inscribirMateriasNuevoTrayecto($id_usuario, $id_seccion, $nuevo_trayecto, $id_carrera) {
+    global $db;
+    
+    // Obtener período de la sección
+    $query_periodo = "SELECT id_periodo FROM secciones WHERE id_seccion = $id_seccion";
+    $result = $db->query($query_periodo);
+    $periodo_id = $result->fetch_assoc()['id_periodo'];
+    
+    // Obtener materias del nuevo trayecto
+    $materias = obtenerMateriasPorTrayecto($id_carrera, $nuevo_trayecto);
+    
+    foreach ($materias as $materia) {
+        // Verificar si ya está inscrito
+        $check = "SELECT id_inscripcion FROM estudiante_materias 
+                  WHERE id_usuario = $id_usuario AND id_materia = {$materia['id_materia']} AND id_periodo = $periodo_id";
+        $check_result = $db->query($check);
+        
+        if ($check_result->num_rows == 0) {
+            $insert = "INSERT INTO estudiante_materias 
+                       (id_usuario, id_materia, id_seccion, id_periodo, fecha_inscripcion, estatus) 
+                       VALUES 
+                       ($id_usuario, {$materia['id_materia']}, $id_seccion, $periodo_id, NOW(), 'activo')";
+            $db->query($insert);
+        }
+    }
+}
+
+/**
+ * Obtener secciones disponibles para rezagados
+ */
+function obtenerSeccionesDisponiblesParaRezagados($id_carrera, $id_trayecto, $id_periodo) {
+    global $db;
+    
+    $query = "SELECT s.id_seccion, s.codigo_seccion, s.capacidad_maxima, 
+                     (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion) as inscritos
+              FROM secciones s
+              WHERE s.id_carrera = $id_carrera 
+              AND s.id_trayecto = $id_trayecto
+              AND s.id_periodo = $id_periodo
+              AND s.estatus = 'activa'
+              HAVING inscritos < capacidad_maxima
+              ORDER BY s.codigo_seccion";
+    
+    $result = $db->query($query);
+    $secciones = [];
+    while ($row = $result->fetch_assoc()) {
+        $secciones[] = $row;
+    }
+    return $secciones;
+}
+
+/**
+ * Mover un estudiante a otra sección (para rezagados)
+ */
+function moverEstudianteAOtraSeccion($id_usuario, $id_seccion_origen, $id_seccion_destino, $id_admin) {
+    global $db;
+    
+    // Verificar cupo en sección destino
+    $query_cupo = "SELECT s.capacidad_maxima, 
+                   (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion) as inscritos
+                   FROM secciones s WHERE s.id_seccion = $id_seccion_destino";
+    $result = $db->query($query_cupo);
+    $cupo = $result->fetch_assoc();
+    
+    if ($cupo['inscritos'] >= $cupo['capacidad_maxima']) {
+        return ['success' => false, 'message' => 'La sección destino no tiene cupos disponibles'];
+    }
+    
+    // Mover estudiante
+    $update = "UPDATE estudiante_seccion 
+               SET id_seccion = $id_seccion_destino, fecha_inscripcion = NOW() 
+               WHERE id_usuario = $id_usuario AND id_seccion = $id_seccion_origen";
+    
+    if ($db->query($update)) {
+        // Registrar en log
+        $log = "INSERT INTO logs_administrativos 
+                (id_admin, accion, descripcion, fecha) 
+                VALUES 
+                ($id_admin, 'mover_estudiante', 'Movido estudiante $id_usuario de seccion $id_seccion_origen a $id_seccion_destino', NOW())";
+        $db->query($log);
+        
+        return ['success' => true, 'message' => 'Estudiante movido correctamente'];
+    }
+    
+    return ['success' => false, 'message' => 'Error al mover estudiante: ' . $db->error];
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -7393,8 +10858,8 @@ function obtenerMateriasDisponiblesParaDocente($id_docente, $id_seccion) {
  */
 function obtenerPeriodosAcademicos($db) {
     try {
-        // Primero desactivamos cualquier periodo vencido (por si acaso)
-        desactivarPeriodosVencidos($db);
+        // Nota: desactivación automática removida — los periodos se gestionan manualmente.
+        // La llamada a desactivarPeriodosVencidos fue eliminada para evitar cambios automáticos.
         
         $query = "SELECT * FROM periodos_academicos ORDER BY created_at DESC";
         $stmt = $db->prepare($query);
@@ -8242,7 +11707,7 @@ function generarDescripcionAuditoria($cambios) {
 /**
  * Obtener registros de auditoría con filtros opcionales (versión mejorada)
  */
-function obtenerRegistrosAuditoria($limite = 100, $fecha_inicio = null, $fecha_fin = null, $usuario_id = null, $accion = null, $modulo = null) {
+function obtenerRegistrosAuditoria($limite = 100, $fecha_inicio = null, $fecha_fin = null, $usuario_cedula = null, $accion = null, $modulo = null) {
     global $db;
     
     $query = "SELECT a.*, u.nombre as usuario_nombre, u.idusuario as usuario_cedula
@@ -8265,10 +11730,10 @@ function obtenerRegistrosAuditoria($limite = 100, $fecha_inicio = null, $fecha_f
         $types .= "s";
     }
     
-    if ($usuario_id) {
-        $query .= " AND a.usuario_id = ?";
-        $params[] = $usuario_id;
-        $types .= "i";
+    if ($usuario_cedula) {
+        $query .= " AND u.idusuario = ?";
+        $params[] = $usuario_cedula;
+        $types .= "s";
     }
     
     if ($accion) {
@@ -8430,32 +11895,39 @@ function generarMembreteJS() {
 
 // Función para generar PDF desde HTML
 function generarPDFDesdeHTML($elementoHTML, $nombreArchivo = 'documento.pdf') {
+    // Insertar el código JS del membrete (define agregarMembretePDF)
+    echo generarMembreteJS();
+
+    // Generar el PDF en cliente: primero obtener startY desde agregarMembretePDF (devuelve Promise)
     echo "<script>
-        // Configuración de jsPDF
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('p', 'mm', 'a4');
-        const margin = 10;
-        const pageWidth = doc.internal.pageSize.getWidth();
-        
-        // Agregar membrete
-        const startY = " . generarMembretePDF('doc', 'pageWidth') . ";
-        
-        // Capturar el contenido HTML y agregarlo al PDF
-        html2canvas(document.getElementById('$elementoHTML'), {
-            scale: 2,
-            useCORS: true,
-            logging: false
-        }).then(canvas => {
-            const imgData = canvas.toDataURL('image/jpeg', 1.0);
-            const imgWidth = pageWidth - (margin * 2);
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            
-            // Agregar contenido al PDF
-            doc.addImage(imgData, 'JPEG', margin, startY, imgWidth, imgHeight);
-            
-            // Guardar el PDF
-            doc.save('$nombreArchivo');
-        });
+        (function() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const margin = 10;
+            const pageWidth = doc.internal.pageSize.getWidth();
+
+            // Obtener la posición de inicio del contenido después del membrete
+            agregarMembretePDF(doc, pageWidth, margin).then(function(startY) {
+                // Capturar el contenido HTML y agregarlo al PDF
+                html2canvas(document.getElementById('$elementoHTML'), {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                }).then(function(canvas) {
+                    const imgData = canvas.toDataURL('image/jpeg', 1.0);
+                    const imgWidth = pageWidth - (margin * 2);
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+                    // Agregar contenido al PDF
+                    doc.addImage(imgData, 'JPEG', margin, startY, imgWidth, imgHeight);
+
+                    // Guardar el PDF
+                    doc.save('$nombreArchivo');
+                });
+            }).catch(function(err) {
+                console.error('Error al generar membrete:', err);
+            });
+        })();
     </script>";
 }
 
@@ -8463,6 +11935,481 @@ function generarPDFDesdeHTML($elementoHTML, $nombreArchivo = 'documento.pdf') {
 
 
 //CARGA DE NOTAS ***********************************************************************
+
+
+
+
+/**
+ * Obtener notas del estudiante incluyendo los 3 trimestres
+ * SOLO muestra notas que han sido APROBADAS por el administrador
+ * @param int $estudiante_id ID del estudiante
+ * @return array Array con las notas por materia
+ */
+function obtenerNotasEstudianteConTrimestres($estudiante_id) {
+    global $db;
+    
+    $notas = [];
+    
+    $query = "SELECT 
+        nt.id_materia,
+        nt.trimestre_num,
+        nt.nota,
+        nt.estado,
+        nt.fecha_registro,
+        nt.id_periodo,
+        pa.nombre_periodo
+    FROM notas_trimestres nt
+    LEFT JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
+    WHERE nt.id_usuario = " . intval($estudiante_id) . "
+    AND nt.estado = 'aprobada'
+    ORDER BY nt.id_materia, nt.trimestre_num";
+    
+    $result = $db->query($query);
+    
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $materia_id = $row['id_materia'];
+            $trimestre = $row['trimestre_num'];
+            
+            if (!isset($notas[$materia_id])) {
+                $notas[$materia_id] = [
+                    'trimestre_1' => null,
+                    'trimestre_2' => null,
+                    'trimestre_3' => null,
+                    'nota_final' => null,
+                    'id_periodo' => $row['id_periodo'],
+                    'nombre_periodo' => $row['nombre_periodo'],
+                    'fecha_registro' => $row['fecha_registro'],
+                    'estado' => $row['estado']
+                ];
+            }
+            
+            $notas[$materia_id]["trimestre_$trimestre"] = $row['nota'];
+        }
+    }
+    
+    // Calcular nota final para cada materia
+    foreach ($notas as $materia_id => $nota_data) {
+        $suma = 0;
+        $count = 0;
+        for ($i = 1; $i <= 3; $i++) {
+            if ($nota_data["trimestre_$i"] !== null && $nota_data["trimestre_$i"] > 0) {
+                $suma += $nota_data["trimestre_$i"];
+                $count++;
+            }
+        }
+        if ($count > 0) {
+            $notas[$materia_id]['nota_final'] = round($suma / $count, 1);
+        }
+    }
+    
+    return $notas;
+}
+
+
+
+
+/**
+ * Obtener notas trimestrales por materia y estudiante
+ */
+function obtenerNotasTrimestresPorMateria($estudiante_id, $materia_id) {
+    global $db;
+    
+    $notas = [];
+    
+    $query = "SELECT 
+                nt.id,
+                nt.id_usuario,
+                nt.id_materia,
+                nt.id_periodo,
+                nt.trimestre_num,
+                nt.nota,
+                nt.estado,
+                nt.fecha_registro,
+                pa.nombre_periodo
+              FROM notas_trimestres nt
+              LEFT JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
+              WHERE nt.id_usuario = " . intval($estudiante_id) . "
+              AND nt.id_materia = " . intval($materia_id) . "
+              ORDER BY nt.id_periodo DESC, nt.trimestre_num ASC";
+    
+    $result = $db->query($query);
+    
+    if ($result && $result->num_rows > 0) {
+        $temp = [];
+        while ($row = $result->fetch_assoc()) {
+            $periodo_id = $row['id_periodo'];
+            $trimestre = $row['trimestre_num'];
+            
+            if (!isset($temp[$periodo_id])) {
+                $temp[$periodo_id] = [
+                    'id' => $row['id'],
+                    'id_usuario' => $row['id_usuario'],
+                    'id_materia' => $row['id_materia'],
+                    'id_periodo' => $periodo_id,
+                    'nombre_periodo' => $row['nombre_periodo'],
+                    'trimestre_1' => null,
+                    'trimestre_2' => null,
+                    'trimestre_3' => null,
+                    'estado' => $row['estado'],
+                    'fecha_registro' => $row['fecha_registro'],
+                    'trimestre_actual' => $trimestre
+                ];
+            }
+            
+            $temp[$periodo_id]["trimestre_$trimestre"] = $row['nota'];
+        }
+        $notas = array_values($temp);
+    }
+    
+    return $notas;
+}
+
+function procesarEdicionNotaTrimestral() {
+    global $db;
+    
+    $id_usuario = (int)($_POST['id_usuario'] ?? 0);
+    $id_materia = (int)($_POST['id_materia'] ?? 0);
+    $id_periodo = (int)($_POST['id_periodo'] ?? 0);
+    $justificacion = trim($_POST['justificacion'] ?? '');
+    $admin_id = $_SESSION['user']['id'] ?? 0;
+    $nuevo_estado = $_POST['estado'] ?? 'pendiente';
+    
+    if (!$id_usuario || !$id_materia || !$id_periodo) {
+        return ['success' => false, 'message' => 'Datos incompletos'];
+    }
+    
+    if (empty($justificacion)) {
+        return ['success' => false, 'message' => 'Debe ingresar una justificación'];
+    }
+    
+    // Obtener las notas actuales de los 3 trimestres
+    $notas_actuales = [];
+    $result_actual = $db->query("SELECT trimestre_num, nota FROM notas_trimestres 
+                                  WHERE id_usuario = $id_usuario 
+                                  AND id_materia = $id_materia 
+                                  AND id_periodo = $id_periodo");
+    
+    while ($row = $result_actual->fetch_assoc()) {
+        $notas_actuales[$row['trimestre_num']] = $row['nota'];
+    }
+    
+    // Obtener las nuevas notas del formulario
+    $t1_nueva = isset($_POST['trimestre_1']) && $_POST['trimestre_1'] !== '' ? (float)$_POST['trimestre_1'] : null;
+    $t2_nueva = isset($_POST['trimestre_2']) && $_POST['trimestre_2'] !== '' ? (float)$_POST['trimestre_2'] : null;
+    $t3_nueva = isset($_POST['trimestre_3']) && $_POST['trimestre_3'] !== '' ? (float)$_POST['trimestre_3'] : null;
+    
+    // Validar rangos
+    if ($t1_nueva !== null && ($t1_nueva < 1 || $t1_nueva > 20)) {
+        return ['success' => false, 'message' => 'Trimestre 1 debe estar entre 1 y 20'];
+    }
+    if ($t2_nueva !== null && ($t2_nueva < 1 || $t2_nueva > 20)) {
+        return ['success' => false, 'message' => 'Trimestre 2 debe estar entre 1 y 20'];
+    }
+    if ($t3_nueva !== null && ($t3_nueva < 1 || $t3_nueva > 20)) {
+        return ['success' => false, 'message' => 'Trimestre 3 debe estar entre 1 y 20'];
+    }
+    
+    // Verificar si hubo algún cambio
+    $cambio_t1 = ($t1_nueva !== null && $t1_nueva != ($notas_actuales[1] ?? null));
+    $cambio_t2 = ($t2_nueva !== null && $t2_nueva != ($notas_actuales[2] ?? null));
+    $cambio_t3 = ($t3_nueva !== null && $t3_nueva != ($notas_actuales[3] ?? null));
+    
+    if (!$cambio_t1 && !$cambio_t2 && !$cambio_t3) {
+        return ['success' => false, 'message' => 'No se detectaron cambios en las notas'];
+    }
+    
+    $db->begin_transaction();
+    
+    try {
+        // Actualizar Trimestre 1
+        if ($t1_nueva !== null) {
+            $db->query("UPDATE notas_trimestres SET nota = $t1_nueva, estado = '$nuevo_estado', fecha_registro = NOW() 
+                        WHERE id_usuario = $id_usuario AND id_materia = $id_materia AND id_periodo = $id_periodo AND trimestre_num = 1");
+        }
+        
+        // Actualizar Trimestre 2
+        if ($t2_nueva !== null) {
+            $db->query("UPDATE notas_trimestres SET nota = $t2_nueva, estado = '$nuevo_estado', fecha_registro = NOW() 
+                        WHERE id_usuario = $id_usuario AND id_materia = $id_materia AND id_periodo = $id_periodo AND trimestre_num = 2");
+        }
+        
+        // Actualizar Trimestre 3
+        if ($t3_nueva !== null) {
+            $db->query("UPDATE notas_trimestres SET nota = $t3_nueva, estado = '$nuevo_estado', fecha_registro = NOW() 
+                        WHERE id_usuario = $id_usuario AND id_materia = $id_materia AND id_periodo = $id_periodo AND trimestre_num = 3");
+        }
+        
+        // Guardar en historial (un solo registro con los 3 cambios)
+        $t1_anterior = $notas_actuales[1] ?? null;
+        $t2_anterior = $notas_actuales[2] ?? null;
+        $t3_anterior = $notas_actuales[3] ?? null;
+        
+        $db->query("INSERT INTO historial_cambios_notas 
+                    (id_usuario, id_materia, id_periodo, 
+                     trimestre_1_anterior, trimestre_2_anterior, trimestre_3_anterior,
+                     trimestre_1_nuevo, trimestre_2_nuevo, trimestre_3_nuevo,
+                     justificacion, id_admin, fecha_cambio) 
+                    VALUES ($id_usuario, $id_materia, $id_periodo, 
+                    " . ($t1_anterior !== null ? $t1_anterior : 'NULL') . ", 
+                    " . ($t2_anterior !== null ? $t2_anterior : 'NULL') . ", 
+                    " . ($t3_anterior !== null ? $t3_anterior : 'NULL') . ",
+                    " . ($t1_nueva !== null ? $t1_nueva : 'NULL') . ", 
+                    " . ($t2_nueva !== null ? $t2_nueva : 'NULL') . ", 
+                    " . ($t3_nueva !== null ? $t3_nueva : 'NULL') . ",
+                    '" . $db->real_escape_string($justificacion) . "', $admin_id, NOW())");
+        
+        $db->commit();
+        return ['success' => true, 'message' => 'Notas actualizadas correctamente'];
+        
+    } catch (Exception $e) {
+        $db->rollback();
+        return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+    }
+}
+
+
+
+
+/**
+ * Obtener historial de cambios de notas por estudiante y materia
+ * @param int $estudiante_id ID del estudiante
+ * @param int $materia_id ID de la materia
+ * @return array Array con el historial de cambios
+ */
+function obtenerHistorialCambiosNotasPorMateria($estudiante_id, $materia_id) {
+    global $db;
+    
+    $historial = [];
+    
+    $query = "SELECT 
+                hc.id,
+                hc.trayecto,
+                hc.nota_anterior,
+                hc.nota_nueva,
+                hc.justificacion,
+                hc.fecha_cambio,
+                u.nombre as nombre_admin
+              FROM historial_cambios_notas hc
+              INNER JOIN notas_trimestres nt ON hc.id_nota_trimestre = nt.id
+              LEFT JOIN users u ON hc.id_admin = u.id
+              WHERE nt.id_usuario = " . intval($estudiante_id) . "
+              AND nt.id_materia = " . intval($materia_id) . "
+              ORDER BY hc.fecha_cambio DESC";
+    
+    $result = $db->query($query);
+    
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $historial[] = $row;
+        }
+    }
+    
+    return $historial;
+}
+
+
+
+
+function obtenerHistorialCambiosNotasEstudiante($estudiante_id) {
+    global $db;
+    
+    $historial = [];
+    
+    $query = "SELECT 
+                hc.id,
+                hc.fecha_cambio,
+                hc.justificacion,
+                hc.trimestre_1_anterior,
+                hc.trimestre_2_anterior,
+                hc.trimestre_3_anterior,
+                hc.trimestre_1_nuevo,
+                hc.trimestre_2_nuevo,
+                hc.trimestre_3_nuevo,
+                u.nombre as nombre_admin,
+                m.nombre_materia,
+                pa.nombre_periodo
+              FROM historial_cambios_notas hc
+              INNER JOIN materias m ON hc.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON hc.id_periodo = pa.id_periodo
+              LEFT JOIN users u ON hc.id_admin = u.id
+              WHERE hc.id_usuario = " . intval($estudiante_id) . "
+              ORDER BY hc.fecha_cambio DESC";
+    
+    $result = $db->query($query);
+    
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $historial[] = $row;
+        }
+    }
+    
+    return $historial;
+}
+
+
+
+
+
+
+
+
+/**
+ * Obtener materias inscritas por estudiante
+ */
+function obtenerMateriasInscritasPorEstudiante($estudiante_id, $carrera_id) {
+    global $db;
+    
+    $query = "SELECT DISTINCT 
+                m.id_materia,
+                m.nombre_materia,
+                m.cod_materia,
+                m.trayecto,
+                m.creditos
+              FROM estudiante_materias em
+              INNER JOIN materias m ON em.id_materia = m.id_materia
+              INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+              WHERE em.id_usuario = " . intval($estudiante_id) . "
+              AND cm.id_carrera = " . intval($carrera_id) . "
+              AND em.estatus = 'activo'
+              ORDER BY m.trayecto ASC, m.nombre_materia ASC";
+    
+    return $db->query($query);
+}
+
+
+
+
+
+
+
+
+/**
+ * Obtener información del grupo para notas trimestrales
+ */
+function obtenerInfoGrupoNotasTrimestres($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT 
+                ud.nombre as nombre_docente,
+                m.nombre_materia,
+                pa.nombre_periodo,
+                s.codigo_seccion,
+                c.nombre_carrera
+              FROM notas_trimestres nt
+              INNER JOIN users ud ON nt.id_docente = ud.id
+              INNER JOIN materias m ON nt.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
+              INNER JOIN docente_seccion ds ON nt.id_docente = ds.id_usuario AND nt.id_materia = ds.id_materia
+              INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              WHERE nt.id_docente = $docente_id 
+              AND nt.id_materia = $materia_id 
+              AND nt.id_periodo = $periodo_id
+              LIMIT 1";
+    
+    $result = $db->query($query);
+    return $result->fetch_assoc();
+}
+
+/**
+ * Obtener estudiantes con sus notas trimestrales
+ */
+function obtenerEstudiantesConNotasTrimestres($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $query = "SELECT 
+                u.id as id_usuario,
+                u.idusuario as cedula,
+                u.nombre as nombre_estudiante,
+                MAX(CASE WHEN nt.trimestre_num = 1 THEN nt.nota END) as trimestre_1,
+                MAX(CASE WHEN nt.trimestre_num = 2 THEN nt.nota END) as trimestre_2,
+                MAX(CASE WHEN nt.trimestre_num = 3 THEN nt.nota END) as trimestre_3,
+                nt.estado
+              FROM users u
+              INNER JOIN estudiante_seccion es ON u.id = es.id_usuario
+              INNER JOIN docente_seccion ds ON es.id_seccion = ds.id_seccion
+              LEFT JOIN notas_trimestres nt ON u.id = nt.id_usuario 
+                  AND nt.id_materia = $materia_id 
+                  AND nt.id_periodo = $periodo_id
+              WHERE ds.id_usuario = $docente_id 
+              AND ds.id_materia = $materia_id
+              AND u.estudiante = 1
+              GROUP BY u.id, u.idusuario, u.nombre, nt.estado
+              ORDER BY u.nombre ASC";
+    
+    return $db->query($query);
+}
+
+/**
+ * Obtener estadísticas del grupo para notas trimestrales
+ */
+function obtenerEstadisticasGrupoTrimestres($docente_id, $materia_id, $periodo_id) {
+    global $db;
+    
+    $estadisticas = [
+        'total_estudiantes' => 0,
+        'aprobados' => 0,
+        'reprobados' => 0,
+        'pendientes' => 0,
+        'promedio_general' => 0
+    ];
+    
+    $query = "SELECT 
+                u.id as id_usuario,
+                MAX(CASE WHEN nt.trimestre_num = 1 THEN nt.nota END) as trimestre_1,
+                MAX(CASE WHEN nt.trimestre_num = 2 THEN nt.nota END) as trimestre_2,
+                MAX(CASE WHEN nt.trimestre_num = 3 THEN nt.nota END) as trimestre_3,
+                nt.estado
+              FROM users u
+              INNER JOIN estudiante_seccion es ON u.id = es.id_usuario
+              INNER JOIN docente_seccion ds ON es.id_seccion = ds.id_seccion
+              LEFT JOIN notas_trimestres nt ON u.id = nt.id_usuario 
+                  AND nt.id_materia = $materia_id 
+                  AND nt.id_periodo = $periodo_id
+              WHERE ds.id_usuario = $docente_id 
+              AND ds.id_materia = $materia_id
+              AND u.estudiante = 1
+              GROUP BY u.id, nt.estado";
+    
+    $result = $db->query($query);
+    $suma_notas = 0;
+    $count_notas = 0;
+    
+    while ($row = $result->fetch_assoc()) {
+        $estadisticas['total_estudiantes']++;
+        
+        $t1 = $row['trimestre_1'];
+        $t2 = $row['trimestre_2'];
+        $t3 = $row['trimestre_3'];
+        
+        $suma = 0;
+        $cnt = 0;
+        if ($t1 !== null) { $suma += $t1; $cnt++; }
+        if ($t2 !== null) { $suma += $t2; $cnt++; }
+        if ($t3 !== null) { $suma += $t3; $cnt++; }
+        $nota_final = $cnt > 0 ? round($suma / $cnt, 1) : null;
+        
+        if ($row['estado'] === 'aprobada') {
+            $estadisticas['aprobados']++;
+            if ($nota_final !== null) { $suma_notas += $nota_final; $count_notas++; }
+        } elseif ($row['estado'] === 'rechazada') {
+            $estadisticas['reprobados']++;
+        } else {
+            $estadisticas['pendientes']++;
+        }
+    }
+    
+    $estadisticas['promedio_general'] = $count_notas > 0 ? round($suma_notas / $count_notas, 1) : 0;
+    
+    return $estadisticas;
+}
+
+
+
+
+
+
 
 
 // FUNCIÓN PARA OBTENER NOTAS DEFINITIVAS (SOLO LECTURA - SIN AUDITORÍA)
@@ -8646,6 +12593,122 @@ function determinarTrayectoAMostrar($id_trayecto_seccion) {
         case 4: return 3; // Trayecto 3
         case 5: return 4; // Trayecto 4
         default: return 0;
+    }
+}
+
+// Helper para convertir UTF-8 a ISO-8859-1 para FPDF
+if (!function_exists('to_iso')) {
+    function to_iso($s) {
+        if ($s === null) return '';
+        // Convertir a mayúsculas en UTF-8 y luego convertir a ISO-8859-1 para FPDF
+        $upper = function_exists('mb_strtoupper') ? mb_strtoupper($s, 'UTF-8') : strtoupper($s);
+        return @iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $upper);
+    }
+}
+
+/**
+ * Insertar espacios en palabras largas para evitar que FPDF no las parta.
+ * Divide secuencias largas sin espacios cada $limit caracteres.
+ */
+function insertarEspaciosEnPalabrasLargas($s, $limit = 30) {
+    if ($s === null) return '';
+    if (!function_exists('mb_strlen')) return $s;
+    $parts = preg_split('/(\s+)/u', $s, -1, PREG_SPLIT_DELIM_CAPTURE);
+    foreach ($parts as &$p) {
+        // solo procesar partes que no sean espacios
+        if (trim($p) === '') continue;
+        $len = mb_strlen($p, 'UTF-8');
+        if ($len > $limit) {
+            // insertar espacios cada $limit chars
+            $new = '';
+            for ($i = 0; $i < $len; $i += $limit) {
+                $chunk = mb_substr($p, $i, $limit, 'UTF-8');
+                $new .= $chunk;
+                if ($i + $limit < $len) $new .= ' ';
+            }
+            $p = $new;
+        }
+    }
+    return implode('', $parts);
+}
+
+/**
+ * Calcular cuántas líneas ocupará un texto en FPDF para un ancho dado.
+ */
+function calcularLineasFPDF($pdf, $txt, $w) {
+    if (!$pdf) return 1;
+    // manejar saltos de línea explícitos
+    $lines = 0;
+    $parts = explode("\n", (string)$txt);
+    foreach ($parts as $part) {
+        $part = trim($part);
+        if ($part === '') { $lines++; continue; }
+        $words = preg_split('/(\s+)/u', $part, -1, PREG_SPLIT_NO_EMPTY);
+        $cur = '';
+        foreach ($words as $word) {
+            $test = ($cur === '') ? $word : $cur . ' ' . $word;
+            $wtest = $pdf->GetStringWidth($test);
+            if ($wtest <= $w - 2*$pdf->cMargin) {
+                $cur = $test;
+            } else {
+                // word itself may be longer than width -> split
+                if ($pdf->GetStringWidth($word) > $w - 2*$pdf->cMargin) {
+                    // split by characters
+                    $len = mb_strlen($word, 'UTF-8');
+                    $tmp = '';
+                    for ($i=0;$i<$len;$i++) {
+                        $ch = mb_substr($word,$i,1,'UTF-8');
+                        if ($pdf->GetStringWidth($tmp.$ch) <= $w - 2*$pdf->cMargin) {
+                            $tmp .= $ch;
+                        } else {
+                            $lines++; $tmp = $ch;
+                        }
+                    }
+                    if ($tmp !== '') {
+                        $cur = $tmp;
+                    } else {
+                        $cur = '';
+                    }
+                } else {
+                    // move current to next line
+                    $lines++;
+                    $cur = $word;
+                }
+            }
+        }
+        if ($cur !== '') $lines++;
+    }
+    return max(1, $lines);
+}
+
+// Función global para agregar membrete a un objeto FPDF
+if (!function_exists('agregarMembreteFPDF')) {
+    function agregarMembreteFPDF($pdf, $margin = 10) {
+        $pageWidth = $pdf->GetPageWidth();
+
+        // Logo (si existe)
+        $logoPath = __DIR__ . '/../images/uptpc.png';
+        if (file_exists($logoPath)) {
+            $pdf->Image($logoPath, $margin, 8, 20, 20);
+        }
+
+        // Texto del membrete
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->SetY(15);
+        $pdf->Cell(0, 5, to_iso('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $pdf->SetFont('Arial', 'B', 9);
+        $pdf->Cell(0, 5, to_iso('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $pdf->Cell(0, 5, to_iso('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+
+        // Fecha (a la derecha)
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetXY($pageWidth - $margin - 30, 10);
+        $pdf->Cell(30, 5, date('d/m/Y'), 0, 0, 'R');
+
+        // Línea separadora
+        $pdf->SetY(35);
+        $pdf->Cell(0, 0, '', 'T');
+        $pdf->Ln(5);
     }
 }
 
@@ -9294,16 +13357,23 @@ function marcarMensajeLeido($mensaje_id, $user_id) {
     }
 }
 
-// Enviar mensaje
+// Enviar mensaje - VERSIÓN CORREGIDA PARA TU TABLA
 function enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje) {
     global $db;
     
+    // Validar que los IDs existan
+    if (!$remitente_id || !$destinatario_id) {
+        error_log("Error en enviarMensaje: IDs inválidos - remitente: $remitente_id, destinatario: $destinatario_id");
+        return [
+            'success' => false,
+            'message' => 'IDs de usuario inválidos'
+        ];
+    }
+    
     try {
-        // Iniciar transacción
-        $db->begin_transaction();
-
-        $query = "INSERT INTO mensajeria (id_usuario_remitente, id_usuario_destinatario, titulo, mensaje)
-                  VALUES (?, ?, ?, ?)";
+        // SIN transacción para evitar conflictos
+        $query = "INSERT INTO mensajeria (id_usuario_remitente, id_usuario_destinatario, titulo, mensaje, fecha_envio, leido, archivado_remitente, archivado_destinatario, eliminado_remitente, eliminado_destinatario) 
+                  VALUES (?, ?, ?, ?, NOW(), 0, 0, 0, 0, 0)";
         $stmt = $db->prepare($query);
         if (!$stmt) {
             throw new Exception("Error en preparar consulta: " . $db->error);
@@ -9311,35 +13381,9 @@ function enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje) {
         
         $stmt->bind_param("iiss", $remitente_id, $destinatario_id, $titulo, $mensaje);
         
-        $result = $stmt->execute();
-        
-        if ($result) {
+        if ($stmt->execute()) {
             $mensaje_id = $stmt->insert_id;
-            
-            // Auditoría solo si la función existe
-            if (function_exists('registrarAuditoria')) {
-                try {
-                    registrarAuditoria(
-                        "INSERT", 
-                        "mensajeria", 
-                        $mensaje_id, 
-                        null, 
-                        [
-                            'id_usuario_remitente' => $remitente_id,
-                            'id_usuario_destinatario' => $destinatario_id,
-                            'titulo' => $titulo,
-                            'mensaje_length' => strlen($mensaje)
-                        ], 
-                        "Mensajería", 
-                        "Nuevo mensaje enviado"
-                    );
-                } catch (Exception $e) {
-                    error_log("Error en auditoría enviarMensaje: " . $e->getMessage());
-                }
-            }
-
-            // Confirmar transacción
-            $db->commit();
+            $stmt->close();
             
             return [
                 'success' => true,
@@ -9351,31 +13395,6 @@ function enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje) {
         }
         
     } catch(Exception $e) {
-        // Revertir transacción en caso de error
-        $db->rollback();
-        
-        // Auditoría de error solo si la función existe
-        if (function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "ERROR", 
-                    "mensajeria", 
-                    null, 
-                    null, 
-                    [
-                        'remitente_id' => $remitente_id,
-                        'destinatario_id' => $destinatario_id,
-                        'titulo' => $titulo,
-                        'error' => $e->getMessage()
-                    ], 
-                    "Mensajería", 
-                    "Error al enviar mensaje"
-                );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de error enviarMensaje: " . $auditError->getMessage());
-            }
-        }
-        
         error_log("Error en enviarMensaje: " . $e->getMessage());
         return [
             'success' => false,
@@ -9391,31 +13410,22 @@ function enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje) {
 
 function obtenerSeccionEstudiante($db, $estudiante_id) {
     // Consulta SQL para obtener información completa de la sección del estudiante
-    $sql = "SELECT s.id_seccion, s.codigo_seccion, s.id_carrera, c.nombre_carrera, 
+    $sql = "SELECT s.id_seccion, s.codigo_seccion, s.turno, s.id_carrera, c.nombre_carrera, 
                    t.numero_trayecto, p.nombre_periodo, s.capacidad_maxima, s.inicia,
                    s.estatus, COUNT(es.id_usuario) as inscritos, p.activo as periodo_activo
             FROM estudiante_seccion es
             INNER JOIN secciones s ON es.id_seccion = s.id_seccion
             INNER JOIN carreras c ON s.id_carrera = c.id_carrera
             INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
-            INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo  -- Usa periodos_academicos
+            INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
             WHERE es.id_usuario = ? AND es.estatus = 'activo'
             GROUP BY s.id_seccion";
     
-    // Preparar la sentencia SQL para prevenir inyecciones
     $stmt = $db->prepare($sql);
-    
-    // Vincular el parámetro: 'i' indica que es un integer
     $stmt->bind_param("i", $estudiante_id);
-    
-    // Ejecutar la consulta
     $stmt->execute();
-    
-    // Obtener el resultado de la consulta
     $result = $stmt->get_result();
     
-    // Retornar la primera fila como array asociativo
-    // Si no hay resultados, retorna null
     return $result->fetch_assoc();
 }
 
@@ -11398,10 +15408,38 @@ function generar_botones_accion($estudiante) {
     $id_graduado = isset($estudiante['id_graduado']) ? $estudiante['id_graduado'] : null;
     
     if (empty($estado) || $estado == 'cumple_requisitos') {
-        // Si cumple requisitos pero no está graduado
+        // Botón principal - Marcar Graduado
+        $botones .= '<div class="mb-2">';
         $botones .= '<button class="btn btn-success btn-sm" onclick="confirmarGraduacion('.$id_usuario.')">
                         <i class="fas fa-graduation-cap"></i> Marcar Graduado
                      </button>';
+        $botones .= '</div>';
+        
+        // Botones de documentos en un grupo organizado
+        $botones .= '<div class="btn-group-vertical d-flex flex-column gap-1" style="min-width: 200px;">';
+        
+        // Fila 1: Documentos principales
+        $botones .= '<div class="d-flex gap-1">';
+        $botones .= '<a target="_blank" class="btn btn-outline-primary btn-sm flex-fill" href="constancias/pdf_notas_certificadas.php?id='.$id_usuario.'">
+                        <i class="fas fa-file-alt"></i> Notas Certificadas
+                    </a>';
+        $botones .= '<a target="_blank" class="btn btn-outline-secondary btn-sm flex-fill" href="constancias/pdf_servicio_comunitario.php?id='.$id_usuario.'">
+                        <i class="fas fa-hands-helping"></i> Servicio Com.
+                    </a>';
+        $botones .= '</div>';
+        
+        // Fila 2: Nuevos documentos
+        $botones .= '<div class="d-flex gap-1">';
+        $botones .= '<a target="_blank" class="btn btn-outline-success btn-sm flex-fill" href="constancias/pdf_carta_culminacion.php?id='.$id_usuario.'">
+                        <i class="fas fa-file-contract"></i> Carta Culminación
+                    </a>';
+        $botones .= '<a target="_blank" class="btn btn-outline-info btn-sm flex-fill" href="constancias/pdf_constancia.php?id='.$id_usuario.'">
+                        <i class="fas fa-file-certificate"></i> Constancia
+                    </a>';
+        $botones .= '</div>';
+        
+        $botones .= '</div>'; // Cierre del grupo
+        
     } elseif ($estado == 'graduado' && empty($estudiante['titulo_entregado'])) {
         // Si está graduado pero no se le ha entregado título
         $botones .= '<form method="POST" style="display:inline;">
@@ -11685,78 +15723,89 @@ function cumple_requisitos_graduacion($id_usuario) {
 //IMAGENES SOPORTE *********************************************************************
 
 
-// Función para subir imagen de soporte
+/**
+ * Función para subir imagen o PDF de soporte
+ * Se ajusta la ruta para que sea absoluta y no rompa el JSON
+ */
 function subirSoporte($archivo) {
-    // Directorio relativo a la raíz del proyecto
-    $directorio = '../soportes/';
+    // Definimos la ruta absoluta basada en la ubicación de este archivo (functions.php)
+    // Asumiendo que functions.php está en /funciones/ y la carpeta soportes en la raíz /soportes/
+    $directorio = dirname(__DIR__) . '/soportes/';
     
-    // Verificar y crear directorio si no existe
+    // Verificar y crear directorio si no existe (silenciamos con @ para evitar salida de texto)
     if (!file_exists($directorio)) {
-        if (!mkdir($directorio, 0755, true)) {
-            return ['success' => false, 'error' => 'No se pudo crear el directorio de soportes'];
+        if (!@mkdir($directorio, 0755, true)) {
+            return ['success' => false, 'error' => 'El servidor no tiene permisos para crear la carpeta de soportes en: ' . $directorio];
         }
     }
     
-    // Validar que se haya subido un archivo
+    // Validar que se haya enviado un archivo
     if (!isset($archivo['name']) || empty($archivo['name'])) {
         return ['success' => false, 'error' => 'No se ha seleccionado ningún archivo'];
     }
     
-    // Validar errores de subida
+    // Validar errores internos de PHP al subir
     if ($archivo['error'] !== UPLOAD_ERR_OK) {
         $errores = [
-            UPLOAD_ERR_INI_SIZE => 'El archivo excede el tamaño máximo permitido',
-            UPLOAD_ERR_FORM_SIZE => 'El archivo excede el tamaño máximo del formulario',
-            UPLOAD_ERR_PARTIAL => 'El archivo fue solo parcialmente subido',
-            UPLOAD_ERR_NO_FILE => 'No se subió ningún archivo',
-            UPLOAD_ERR_NO_TMP_DIR => 'Falta la carpeta temporal',
-            UPLOAD_ERR_CANT_WRITE => 'No se pudo escribir el archivo en el disco',
-            UPLOAD_ERR_EXTENSION => 'Una extensión de PHP detuvo la subida del archivo'
+            UPLOAD_ERR_INI_SIZE   => 'El archivo excede el límite (upload_max_filesize)',
+            UPLOAD_ERR_FORM_SIZE  => 'El archivo excede el límite del formulario',
+            UPLOAD_ERR_PARTIAL    => 'Subida incompleta',
+            UPLOAD_ERR_NO_FILE    => 'No se subió archivo',
+            UPLOAD_ERR_NO_TMP_DIR => 'Falta carpeta temporal en el servidor',
+            UPLOAD_ERR_CANT_WRITE => 'Error al escribir en disco',
+            UPLOAD_ERR_EXTENSION  => 'Una extensión de PHP bloqueó la subida'
         ];
-        return ['success' => false, 'error' => $errores[$archivo['error']] ?? 'Error desconocido al subir archivo'];
+        return ['success' => false, 'error' => $errores[$archivo['error']] ?? 'Error desconocido en el servidor'];
     }
     
-    // Validar tipo de archivo
+    // Validar extensión
     $tiposPermitidos = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
     $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
     
     if (!in_array($extension, $tiposPermitidos)) {
-        return ['success' => false, 'error' => 'Tipo de archivo no permitido. Use: ' . implode(', ', $tiposPermitidos)];
+        return ['success' => false, 'error' => 'Formato no permitido. Use: ' . implode(', ', $tiposPermitidos)];
     }
     
-    // Validar tamaño (máximo 5MB)
-    $tamañoMaximo = 5 * 1024 * 1024; // 5MB en bytes
-    if ($archivo['size'] > $tamañoMaximo) {
-        return ['success' => false, 'error' => 'El archivo es demasiado grande. Máximo 5MB'];
+    // Validar tamaño (5MB)
+    $max_size = 5 * 1024 * 1024;
+    if ($archivo['size'] > $max_size) {
+        return ['success' => false, 'error' => 'Archivo demasiado pesado. Máximo 5MB'];
     }
     
-    // Generar nombre único
-    $nombreUnico = uniqid() . '_' . time() . '.' . $extension;
-    $rutaDestino = $directorio . $nombreUnico;
+    // Generar nombre único para evitar sobreescribir otros soportes
+    $nombreUnico = uniqid('soporte_', true) . '_' . time() . '.' . $extension;
+    $rutaFinal = $directorio . $nombreUnico;
     
-    // Mover archivo
-    if (move_uploaded_file($archivo['tmp_name'], $rutaDestino)) {
+    // Intentar mover el archivo
+    if (@move_uploaded_file($archivo['tmp_name'], $rutaFinal)) {
         return [
             'success' => true,
-            'ruta' => $nombreUnico,
-            'tipo' => $extension,
-            'tamaño' => $archivo['size']
+            'ruta'    => $nombreUnico,
+            'tipo'    => $extension,
+            'tamaño'  => $archivo['size']
         ];
     } else {
-        return ['success' => false, 'error' => 'Error al mover el archivo subido. Verifique permisos del directorio.'];
+        return ['success' => false, 'error' => 'No se pudo guardar el archivo. Verifique permisos de escritura en /soportes/'];
     }
 }
 
-// Función para eliminar soporte anterior si existe
+/**
+ * Función para eliminar un archivo de soporte anterior
+ */
 function eliminarSoporteAnterior($nombreArchivo) {
-    $directorio = '../soportes/';
-    if (!empty($nombreArchivo) && file_exists($directorio . $nombreArchivo)) {
-        return unlink($directorio . $nombreArchivo);
+    if (empty($nombreArchivo)) return false;
+    
+    $rutaCompleta = dirname(__DIR__) . '/soportes/' . $nombreArchivo;
+    
+    if (file_exists($rutaCompleta)) {
+        return @unlink($rutaCompleta);
     }
     return false;
 }
 
-// Función para obtener soporte actual de un estudiante
+/**
+ * Función para obtener los datos de soporte actuales de la BD
+ */
 function obtenerSoporteActual($id_estudiante, $id_materia, $id_periodo) {
     global $db;
     
@@ -11766,13 +15815,15 @@ function obtenerSoporteActual($id_estudiante, $id_materia, $id_periodo) {
               AND id_periodo = ? 
               LIMIT 1";
     
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("iii", $id_estudiante, $id_materia, $id_periodo);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        return $result->fetch_assoc();
+    // Usamos sentencias preparadas para mayor seguridad
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param("iii", $id_estudiante, $id_materia, $id_periodo);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result && $result->num_rows > 0) {
+            return $result->fetch_assoc();
+        }
     }
     
     return null;
@@ -11793,9 +15844,9 @@ class PDF_PlanillaNotas {
     private $estudiantes;
     
     function __construct() {
-        // Incluir FPDF solo cuando se instancie la clase
+        // Asegúrate de que la ruta a FPDF sea la correcta en tu proyecto
         require_once('../fpdf/fpdf.php');
-        $this->pdf = new FPDF();
+        $this->pdf = new FPDF('P', 'mm', 'A4'); // Orientación Vertical, milímetros, A4
     }
     
     function generarPlanilla($info, $estudiantes) {
@@ -11881,7 +15932,7 @@ class PDF_PlanillaNotas {
         $this->pdf->Cell(50, 4, $this->codificarTexto($this->info['nombre_periodo']), 0, 1);
         
         $this->pdf->SetX($x);
-        $this->pdf->Ln(2);
+        $this->pdf->Ln(5); // Un poco más de espacio antes de la tabla
     }
     
     function Firma() {
@@ -11904,8 +15955,17 @@ class PDF_PlanillaNotas {
         // Llamar Header
         $this->Header();
         
+        // --- CONFIGURACIÓN DE ANCHOS PARA 12 COLUMNAS ---
+        // Ajustamos los anchos para que quepan en una hoja A4 (aprox 190mm ancho útil)
+        $w_num = 8;
+        $w_ced = 20;
+        $w_nom = 60;  // Espacio suficiente para nombre
+        $w_nota = 7;  // Ancho de cada casillero de nota (7mm x 12 = 84mm)
+        $w_fin = 10;  // Nota final
+        $cant_notas = 12;
+
         // Calcular el ancho total de la tabla
-        $ancho_total_tabla = 8 + 18 + 45 + (7 * 8) + 8; // Suma de todas las columnas
+        $ancho_total_tabla = $w_num + $w_ced + $w_nom + ($cant_notas * $w_nota) + $w_fin;
         
         // Calcular la posición X para centrar la tabla
         $margen_izquierdo = ($this->pdf->GetPageWidth() - $ancho_total_tabla) / 2;
@@ -11913,8 +15973,8 @@ class PDF_PlanillaNotas {
         // Establecer la posición X para centrar
         $this->pdf->SetX($margen_izquierdo);
         
-        // Encabezado de la tabla centrado
-        $this->agregarEncabezadoTabla($margen_izquierdo);
+        // Encabezado de la tabla centrado con los parámetros de ancho
+        $this->agregarEncabezadoTabla($margen_izquierdo, $w_num, $w_ced, $w_nom, $w_nota, $w_fin, $cant_notas);
         
         // Estudiantes - tabla centrada
         $contador = 0;
@@ -11925,48 +15985,60 @@ class PDF_PlanillaNotas {
             $this->pdf->SetX($margen_izquierdo);
             
             $this->pdf->SetFont('Arial', '', 7);
-            $this->pdf->Cell(8, 5, $contador, 1, 0, 'C');
-            $this->pdf->Cell(18, 5, $estudiante['cedula'], 1, 0, 'C');
+            
+            // Altura de la fila
+            $h_fila = 5;
+            
+            $this->pdf->Cell($w_num, $h_fila, $contador, 1, 0, 'C');
+            $this->pdf->Cell($w_ced, $h_fila, $estudiante['cedula'], 1, 0, 'C');
             
             $nombreCompleto = $this->codificarTexto($estudiante['nombre']);
-            if (strlen($nombreCompleto) > 25) {
-                $nombreCompleto = substr($nombreCompleto, 0, 25) . '...';
+            if (strlen($nombreCompleto) > 30) {
+                $nombreCompleto = substr($nombreCompleto, 0, 30) . '...';
             }
-            $this->pdf->Cell(45, 5, $nombreCompleto, 1, 0);
+            // Alineación L (Left) para el nombre se ve mejor
+            $this->pdf->Cell($w_nom, $h_fila, ' ' . $nombreCompleto, 1, 0, 'L');
             
-            // 8 casillas para notas
-            for ($i = 1; $i <= 8; $i++) {
-                $this->pdf->Cell(7, 5, '', 1, 0, 'C');
+            // 12 casillas para notas
+            for ($i = 1; $i <= $cant_notas; $i++) {
+                $this->pdf->Cell($w_nota, $h_fila, '', 1, 0, 'C');
             }
             
             // Casilla para nota final
-            $this->pdf->Cell(8, 5, '', 1, 1, 'C');
+            $this->pdf->Cell($w_fin, $h_fila, '', 1, 1, 'C');
         }
         
-        // AGREGAR FIRMA INMEDIATAMENTE DESPUÉS DE LA TABLA
-        $this->pdf->Ln(20); // Un pequeño espacio
+        // AGREGAR FIRMA DESPUÉS DE LA TABLA
+        $this->pdf->Ln(15); // Espacio antes de la firma
         $this->Firma();
     }
     
-    function agregarEncabezadoTabla($margen_izquierdo = 10) {
+    function agregarEncabezadoTabla($margen_izquierdo, $w_num, $w_ced, $w_nom, $w_nota, $w_fin, $cant_notas) {
         // Establecer posición X para el encabezado
         $this->pdf->SetX($margen_izquierdo);
         
-        // Encabezado de la tabla
+        // Configuración de fuente y color para que se parezca a la imagen
         $this->pdf->SetFont('Arial', 'B', 7);
-        $this->pdf->SetFillColor(200, 200, 200);
+        $this->pdf->SetFillColor(230, 230, 230); // Gris claro tipo formulario
+        $this->pdf->SetLineWidth(0.2); // Líneas finas y nítidas
         
-        $this->pdf->Cell(8, 6, 'N°', 1, 0, 'C', true);
-        $this->pdf->Cell(18, 6, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
-        $this->pdf->Cell(45, 6, $this->codificarTexto('Nombre'), 1, 0, 'C', true);
+        $h_header = 8; // Altura del encabezado
         
-        // 8 casillas para notas
-        for ($i = 1; $i <= 8; $i++) {
-            $this->pdf->Cell(7, 6, "N$i", 1, 0, 'C', true);
+        $this->pdf->Cell($w_num, $h_header, 'N', 1, 0, 'C', true);
+        $this->pdf->Cell($w_ced, $h_header, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
+        $this->pdf->Cell($w_nom, $h_header, $this->codificarTexto('Apellidos y Nombres'), 1, 0, 'C', true);
+        
+        // 12 casillas para notas numeradas
+        for ($i = 1; $i <= $cant_notas; $i++) {
+            // Aquí encuadramos bien el número
+            $this->pdf->Cell($w_nota, $h_header, $i, 1, 0, 'C', true);
         }
         
-        $this->pdf->Cell(8, 6, 'Final', 1, 1, 'C', true);
+        $this->pdf->Cell($w_fin, $h_header, 'DEF', 1, 1, 'C', true);
+        
+        // Resetear colores
         $this->pdf->SetFillColor(255, 255, 255);
+        $this->pdf->SetFont('Arial', '', 7);
     }
     
     /**
@@ -11974,7 +16046,7 @@ class PDF_PlanillaNotas {
      */
     function codificarTexto($texto) {
         if (mb_detect_encoding($texto, 'UTF-8', true)) {
-            return utf8_decode($texto);
+            return mb_convert_encoding($texto, 'ISO-8859-1', 'UTF-8');
         }
         return $texto;
     }
@@ -11986,7 +16058,10 @@ class PDF_PlanillaNotas {
     }
 }
 
-// El resto de las funciones permanecen igual...
+// --------------------------------------------------------------------------
+// FUNCIONES AUXILIARES (INCLUIDAS TAL CUAL SE SOLICITÓ)
+// --------------------------------------------------------------------------
+
 /**
  * Generar planilla PDF para lista de estudiantes con casillas de notas
  */
@@ -12086,446 +16161,448 @@ function obtenerEstudiantesSeccion($seccion_id) {
 }
 
 
+/**
+ * Verifica si un usuario tiene marcado el rol de vocero
+ */
+function esVoceroUsuario($user_id) {
+    global $db;
+    $query = "SELECT vocero FROM users WHERE id = ? LIMIT 1";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($res && $res->num_rows > 0) {
+        return intval($res->fetch_assoc()['vocero']) === 1;
+    }
+    return false;
+}
+
+/**
+ * Obtener lista de estudiantes de una sección junto con sus notas definitivas
+ * devuelve un array donde cada elemento tiene keys: id, cedula, nombre, notas (array)
+ */
+function obtenerEstudiantesConNotasSeccion($seccion_id) {
+    global $db;
+    
+    $query = "SELECT u.id, u.idusuario AS cedula, u.nombre
+              FROM users u
+              INNER JOIN estudiante_seccion es ON u.id = es.id_usuario
+              WHERE es.id_seccion = ? AND es.estatus = 'activo'
+              ORDER BY u.nombre";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $seccion_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $estudiantes = [];
+    while ($row = $result->fetch_assoc()) {
+        // agregar notas definitivas para cada estudiante
+        $row['notas'] = obtenerNotasEstudianteConsulta($row['id']);
+        $estudiantes[] = $row;
+    }
+    
+    return $estudiantes;
+}
+
+
+
 
 
 // REPORTE DE NOTAS DEFINITIVAS ***********************************************************************
 
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-class PDF_NotasDefinitivas {
-    private $pdf;
-    private $datos;
-    private $trayecto;
-    private $columnas_trayectos;
-    
-    function __construct() {
-        require_once('../fpdf/fpdf.php');
-        $this->pdf = new FPDF();
-    }
-    
-    function generarReporte($datos) {
-        $this->datos = $datos;
-        $this->trayecto = $datos['info_general']['numero_trayecto'];
-        $this->definirColumnasTrayecto();
-        
-        $this->pdf->AddPage();
-        $this->Membrete(); // Agregar membrete primero
-        $this->Header();
-        $this->Cuerpo();
-        $this->pdf->Output('D', $this->getNombreArchivo());
-        exit;
-    }
-    
-    function Membrete() {
-        // Configurar márgenes
-        $margin = 10;
-        $pageWidth = $this->pdf->GetPageWidth();
-        
-        // Logo (si existe)
-        $logoPath = '../images/uptpc.png';
-        if (file_exists($logoPath)) {
-            $this->pdf->Image($logoPath, $margin, 10, 20, 20);
+require_once __DIR__ . '/../fpdf/fpdf.php';
+
+
+// 1. OBTENER EL NOMBRE DEL USUARIO ACTUAL (Basado en tu lógica de BD)
+$nombre_usuario_reporte = "ADMINISTRADOR"; 
+
+// Intentar resolver el nombre real sólo si las variables necesarias existen
+if (isset($pool) && isset($usua)) {
+    try {
+        $db_user = $pool->getConnection();
+        $query_user = "SELECT nombre FROM users WHERE username = ? LIMIT 1";
+        $stmt_u = $db_user->prepare($query_user);
+        $stmt_u->bind_param("s", $usua);
+        $stmt_u->execute();
+        $res_u = $stmt_u->get_result();
+        if ($res_u && $res_u->num_rows > 0) {
+            $user_data = $res_u->fetch_assoc();
+            $nombre_usuario_reporte = $user_data['nombre'];
         }
-        
-        // Texto del membrete
-        $this->pdf->SetFont('Arial', 'B', 10);
-        $this->pdf->SetY(15);
-        $this->pdf->Cell(0, 5, $this->codificarTexto('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
-        $this->pdf->SetFont('Arial', 'B', 9);
-        $this->pdf->Cell(0, 5, $this->codificarTexto('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
-        $this->pdf->Cell(0, 5, $this->codificarTexto('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
-        
-        // Fecha
-        $this->pdf->SetFont('Arial', '', 8);
-        $this->pdf->SetXY($pageWidth - $margin - 30, 10);
-        $this->pdf->Cell(30, 5, date('d/m/Y'), 0, 0, 'R');
-        
-        // Línea separadora
-        $this->pdf->SetY(35);
-        $this->pdf->Cell(0, 0, '', 'T');
-        $this->pdf->Ln(10);
-    }
-    
-    function definirColumnasTrayecto() {
-        switch ($this->trayecto) {
-            case 0:
-                $this->columnas_trayectos = [0]; // Solo trayecto 0
-                break;
-            case 1:
-            case 2:
-                $this->columnas_trayectos = [0, 1, 2]; // Trayectos 0, 1, 2
-                break;
-            case 3:
-            case 4:
-                $this->columnas_trayectos = [0, 1, 2, 3, 4]; // Todos los trayectos
-                break;
-            default:
-                $this->columnas_trayectos = [0, 1, 2, 3, 4]; // Por defecto todos
-        }
-    }
-    
-    function Header() {
-        // Título principal (después del membrete)
-        $this->pdf->SetY(45); // Posición después del membrete
-        
-        $this->pdf->SetFont('Arial', 'B', 14);
-        $this->pdf->Cell(0, 8, $this->codificarTexto('REPORTE DE NOTAS DEFINITIVAS'), 0, 1, 'C');
-        $this->pdf->SetFont('Arial', 'B', 10);
-        $this->pdf->Cell(0, 6, $this->codificarTexto('SISTEMA DE CONTROL DE NOTAS'), 0, 1, 'C');
-        $this->pdf->Ln(5);
-        
-        // Información general
-        $this->pdf->SetFont('Arial', '', 9);
-        
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Docente:'), 0, 0);
-        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_docente']), 0, 1);
-        
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Cédula:'), 0, 0);
-        $this->pdf->Cell(80, 5, $this->datos['info_general']['cedula_docente'], 0, 1);
-        
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Materia:'), 0, 0);
-        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_materia']), 0, 1);
-        
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Periodo:'), 0, 0);
-        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_periodo']), 0, 1);
-        
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Sección:'), 0, 0);
-        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['codigo_seccion']), 0, 1);
-        
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Carrera:'), 0, 0);
-        $this->pdf->Cell(80, 5, $this->codificarTexto($this->datos['info_general']['nombre_carrera']), 0, 1);
-        
-        $this->pdf->Cell(25, 5, $this->codificarTexto('Trayecto:'), 0, 0);
-        $this->pdf->Cell(80, 5, $this->trayecto, 0, 1);
-        
-        $this->pdf->Ln(8);
-    }
-    
-    function Footer() {
-        // Posición a 1.5 cm del final
-        $this->pdf->SetY(-25);
-        
-        // Firma del docente
-        $this->pdf->SetFont('Arial', '', 9);
-        $this->pdf->Cell(0, 5, $this->codificarTexto('Firma del Docente:'), 0, 1);
-        $this->pdf->Ln(3);
-        $this->pdf->Cell(60, 5, '_________________________________', 0, 1);
-        $this->pdf->Cell(60, 5, $this->codificarTexto('Nombre: ') . $this->codificarTexto($this->datos['info_general']['nombre_docente']), 0, 1);
-        $this->pdf->Cell(60, 5, $this->codificarTexto('Cédula: ') . $this->datos['info_general']['cedula_docente'], 0, 1);
-        
-        // Número de página
-        $this->pdf->SetY(-10);
-        $this->pdf->SetFont('Arial', 'I', 8);
-        $this->pdf->Cell(0, 5, $this->codificarTexto('Página ') . $this->pdf->PageNo() . ' de {nb}', 0, 0, 'C');
-    }
-    
-    function Cuerpo() {
-        // Configurar número total de páginas
-        $this->pdf->AliasNbPages();
-        
-        // Calcular ancho de columnas dinámicamente
-        $ancho_nombre = 50; // Ancho base para nombre
-        $ancho_trayecto = 12; // Ancho por cada columna de trayecto
-        $total_columnas_trayecto = count($this->columnas_trayectos);
-        
-        // Ajustar ancho del nombre según cantidad de columnas de trayecto
-        if ($total_columnas_trayecto < 3) {
-            $ancho_nombre = 60;
-        }
-        
-        // Encabezado de la tabla
-        $this->pdf->SetFillColor(200, 200, 200);
-        $this->pdf->SetFont('Arial', 'B', 8);
-        
-        $this->pdf->Cell(8, 8, 'N°', 1, 0, 'C', true);
-        $this->pdf->Cell(22, 8, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
-        $this->pdf->Cell($ancho_nombre, 8, $this->codificarTexto('Nombre del Estudiante'), 1, 0, 'C', true);
-        
-        // Columnas para trayectos (dinámicas)
-        foreach ($this->columnas_trayectos as $trayecto_num) {
-            $this->pdf->Cell($ancho_trayecto, 8, "T$trayecto_num", 1, 0, 'C', true);
-        }
-        
-        $this->pdf->Cell(12, 8, $this->codificarTexto('Final'), 1, 0, 'C', true);
-        $this->pdf->Cell(30, 8, $this->codificarTexto('En Letras'), 1, 0, 'C', true);
-        $this->pdf->Cell(25, 8, $this->codificarTexto('Fecha'), 1, 1, 'C', true);
-        
-        $this->pdf->SetFont('Arial', '', 8);
-        
-        $contador = 0;
-        foreach ($this->datos['notas'] as $nota) {
-            $contador++;
-            
-            // Verificar si necesita nueva página (cada 25 estudiantes)
-            if ($contador > 25 && ($contador - 1) % 25 == 0) {
-                $this->pdf->AddPage();
-                $this->Membrete(); // Agregar membrete en cada página nueva
-                $this->Header();
-                
-                // Volver a dibujar el encabezado de la tabla
-                $this->pdf->SetFillColor(200, 200, 200);
-                $this->pdf->SetFont('Arial', 'B', 8);
-                $this->pdf->Cell(8, 8, 'N°', 1, 0, 'C', true);
-                $this->pdf->Cell(22, 8, $this->codificarTexto('Cédula'), 1, 0, 'C', true);
-                $this->pdf->Cell($ancho_nombre, 8, $this->codificarTexto('Nombre del Estudiante'), 1, 0, 'C', true);
-                
-                foreach ($this->columnas_trayectos as $trayecto_num) {
-                    $this->pdf->Cell($ancho_trayecto, 8, "T$trayecto_num", 1, 0, 'C', true);
-                }
-                
-                $this->pdf->Cell(12, 8, $this->codificarTexto('Final'), 1, 0, 'C', true);
-                $this->pdf->Cell(30, 8, $this->codificarTexto('En Letras'), 1, 0, 'C', true);
-                $this->pdf->Cell(25, 8, $this->codificarTexto('Fecha'), 1, 1, 'C', true);
-                $this->pdf->SetFont('Arial', '', 8);
-            }
-            
-            $this->pdf->Cell(8, 6, $contador, 1, 0, 'C');
-            $this->pdf->Cell(22, 6, $nota['cedula_estudiante'], 1, 0, 'C');
-            
-            $nombreCompleto = $this->codificarTexto($nota['nombre_estudiante']);
-            $max_caracteres = $ancho_nombre == 60 ? 40 : 35;
-            if (strlen($nombreCompleto) > $max_caracteres) {
-                $nombreCompleto = substr($nombreCompleto, 0, $max_caracteres) . '...';
-            }
-            $this->pdf->Cell($ancho_nombre, 6, $nombreCompleto, 1, 0);
-            
-            // Mostrar solo los trayectos correspondientes
-            foreach ($this->columnas_trayectos as $trayecto_num) {
-                $trayecto = $nota["trayecto_$trayecto_num"];
-                $valor = ($trayecto !== null && $trayecto != '') ? intval($trayecto) : '-';
-                $this->pdf->Cell($ancho_trayecto, 6, $valor, 1, 0, 'C');
-            }
-            
-            // Nota final (número entero)
-            $nota_final_entero = intval($nota['nota_final']);
-            $this->pdf->Cell(12, 6, $nota_final_entero, 1, 0, 'C');
-            
-            // Nota en letras
-            $nota_letras = $this->convertirNumeroALetras($nota_final_entero);
-            $this->pdf->Cell(30, 6, $this->codificarTexto($nota_letras), 1, 0, 'C');
-            
-            // Fecha de registro
-            $fecha = date('d/m/Y', strtotime($nota['fecha_registro']));
-            $this->pdf->Cell(25, 6, $fecha, 1, 1, 'C');
-        }
-        
-        // Estadísticas al final
-        $this->pdf->Ln(10);
-        $this->pdf->SetFont('Arial', 'B', 10);
-        $this->pdf->Cell(0, 8, $this->codificarTexto('RESUMEN ESTADÍSTICO'), 0, 1, 'C');
-        
-        $this->pdf->SetFont('Arial', '', 9);
-        $this->pdf->Cell(0, 6, $this->codificarTexto('Total de Estudiantes: ') . $contador, 0, 1);
-        $this->pdf->Cell(0, 6, $this->codificarTexto('Aprobados: ') . $this->datos['estadisticas']['aprobados'], 0, 1);
-        $this->pdf->Cell(0, 6, $this->codificarTexto('Reprobados: ') . $this->datos['estadisticas']['reprobados'], 0, 1);
-        $this->pdf->Cell(0, 6, $this->codificarTexto('Promedio del Grupo: ') . intval($this->datos['estadisticas']['promedio_grupo']), 0, 1);
-    }
-    
-    /**
-     * Función para convertir números a letras
-     */
-    function convertirNumeroALetras($numero) {
-        $unidades = array(
-            '', 'UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE',
-            'DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'
-        );
-        
-        $decenas = array(
-            '', '', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'
-        );
-        
-        if ($numero == 0) {
-            return 'CERO';
-        }
-        
-        if ($numero < 20) {
-            return $unidades[$numero];
-        }
-        
-        if ($numero < 100) {
-            $decena = intval($numero / 10);
-            $unidad = $numero % 10;
-            
-            if ($decena == 2 && $unidad > 0) {
-                return 'VEINTI' . $unidades[$unidad];
-            }
-            
-            if ($unidad == 0) {
-                return $decenas[$decena];
-            } else {
-                return $decenas[$decena] . ' Y ' . $unidades[$unidad];
-            }
-        }
-        
-        if ($numero == 100) {
-            return 'CIEN';
-        }
-        
-        // Para números mayores a 100, devolvemos el número
-        return "($numero)";
-    }
-    
-    /**
-     * Función para codificar texto correctamente
-     */
-    function codificarTexto($texto) {
-        if (mb_detect_encoding($texto, 'UTF-8', true)) {
-            return utf8_decode($texto);
-        }
-        return $texto;
-    }
-    
-    function getNombreArchivo() {
-        $docente = preg_replace('/[^a-zA-Z0-9]/', '_', $this->datos['info_general']['nombre_docente']);
-        $materia = preg_replace('/[^a-zA-Z0-9]/', '_', $this->datos['info_general']['nombre_materia']);
-        $periodo = preg_replace('/[^a-zA-Z0-9]/', '_', $this->datos['info_general']['nombre_periodo']);
-        return "Notas_Definitivas_{$docente}_{$materia}_{$periodo}.pdf";
+        $stmt_u->close();
+        $pool->releaseConnection($db_user);
+    } catch (Exception $e) {
+        // Mantener valor por defecto si falla
     }
 }
 
+class PDF_ActaCarga extends FPDF {
+    private $datos;
+    private $usuario;
+
+    function generarReporte($datos, $usuario) {
+        $this->datos = $datos;
+        $this->usuario = $usuario;
+        $this->SetMargins(10, 10, 10);
+        $this->AliasNbPages();
+        $this->AddPage();
+        $this->Cuerpo();
+        $this->Output('I', "Reporte_Carga_" . $this->datos['info_general']['codigo_seccion'] . ".pdf");
+        exit;
+    }
+
+    function Header() {
+        // Membrete Institucional
+        if (function_exists('agregarMembreteFPDF')) {
+            agregarMembreteFPDF($this);
+            $this->SetY(40); 
+        }
+
+        $info = $this->datos['info_general'];
+        // Usamos el nombre del periodo tal cual viene de la BD (ej. 2025-2)
+        $periodo_texto = $info['nombre_periodo'];
+
+        // Título: LISTADO DE CARGA DE NOTAS con el periodo dinámico
+        $this->SetFont('Arial', 'B', 11);
+        $this->Cell(0, 8, $this->utf8('LISTADO DE CARGA DE NOTAS - PERIODO ' . $periodo_texto), 1, 1, 'C');
+        $this->Ln(4);
+
+        $this->SetFont('Arial', '', 8);
+        
+        // Fila 1: Asignatura y Sección
+        $this->Cell(20, 5, 'ASIGNATURA:', 0, 0);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(120, 5, $this->utf8($info['nombre_materia']), 'B', 0);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(15, 5, $this->utf8('SECCIÓN:'), 0, 0);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(0, 5, $info['codigo_seccion'], 'B', 1);
+
+        // Fila 2: Docente, Cédula y Carrera (Dpt)
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(15, 5, 'DOCENTE:', 0, 0);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(80, 5, $this->utf8($info['nombre_docente']), 'B', 0);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(15, 5, $this->utf8('CÉDULA:'), 0, 0);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(30, 5, $info['cedula_docente'], 'B', 0);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(12, 5, 'DEPT.:', 0, 0);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(0, 5, $this->utf8($info['nombre_carrera']), 'B', 1);
+        $this->Ln(5);
+    }
+
+    function Cuerpo() {
+        // Encabezado de la tabla de alumnos
+        $this->SetFont('Arial', 'B', 7);
+        $this->SetFillColor(245, 245, 245);
+        $this->Cell(10, 6, 'NUM.', 1, 0, 'C', true);
+        $this->Cell(25, 6, $this->utf8('CÉDULA'), 1, 0, 'C', true);
+        $this->Cell(75, 6, 'NOMBRE DEL ALUMNO', 1, 0, 'C', true);
+        $this->Cell(15, 6, 'ACUM.', 1, 0, 'C', true);
+        $this->Cell(15, 6, 'NOTA', 1, 0, 'C', true);
+        $this->Cell(25, 6, 'LETRA', 1, 0, 'C', true);
+        $this->Cell(25, 6, 'OBSERVACION', 1, 1, 'C', true);
+
+        $this->SetFont('Arial', '', 7);
+        $i = 1;
+        foreach ($this->datos['notas'] as $n) {
+            $this->Cell(10, 5, $i++, 1, 0, 'C');
+            $this->Cell(25, 5, $n['cedula_estudiante'], 1, 0, 'C');
+            $this->Cell(75, 5, $this->utf8($n['nombre_estudiante']), 1, 0, 'L');
+            $this->Cell(15, 5, '---', 1, 0, 'C'); // Espacio para acumulado si aplica
+            $this->Cell(15, 5, str_pad($n['nota_final'], 2, '0', STR_PAD_LEFT), 1, 0, 'C');
+            $this->Cell(25, 5, $this->utf8($this->numLetras($n['nota_final'])), 1, 0, 'C');
+            $this->Cell(25, 5, ($n['nota_final'] >= 10 ? 'Aprobado' : 'Reprobado'), 1, 1, 'C');
+
+            if($this->GetY() > 250) $this->AddPage();
+        }
+
+        $this->Ln(2);
+        $this->Cell(0, 5, $this->utf8('--- FIN DEL REPORTE DE CARGA ---'), 0, 1, 'C');
+        $this->DibujarPie();
+    }
+
+    function DibujarPie() {
+        if ($this->GetY() > 220) $this->AddPage();
+        
+        $y_base = $this->GetY() + 5;
+        $info = $this->datos['info_general'];
+        $st = $this->datos['estadisticas'];
+
+        // Bloque de Firmas
+        $this->SetXY(10, $y_base);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(55, 5, $this->utf8('Revisión Docente'), 1, 1, 'L');
+        $this->SetFont('Arial', '', 7);
+        $this->Cell(55, 6, $this->utf8('Firma Profesor: ________________'), 'LR', 1);
+        $this->Cell(55, 6, $this->utf8('C.I.: __________________________'), 'LR', 1);
+        $this->Cell(55, 6, $this->utf8('Sello Departamento: ____________'), 'LRB', 1);
+
+        // Bloque de Observaciones
+        $this->SetXY(65, $y_base);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(90, 5, 'Detalles del Reporte', 1, 1, 'L');
+        $this->SetXY(65, $y_base + 5);
+        $this->SetFont('Arial', '', 7);
+        $this->MultiCell(90, 6, $this->utf8("CARRERA: " . $info['nombre_carrera'] . "\nPERIODO ACADÉMICO: " . $info['nombre_periodo'] . "\nSECCION: " . $info['codigo_seccion']), 1, 'L');
+
+        // Bloque de Estadísticas
+        $this->SetXY(155, $y_base);
+        $this->SetFont('Arial', '', 7);
+        $this->Cell(25, 5, 'Fecha Impresion:', 1, 0); $this->Cell(20, 5, date('d-m-Y'), 1, 1);
+        $this->SetX(155);
+        $this->Cell(25, 5, 'Inasistentes:', 1, 0); $this->Cell(20, 5, '0', 1, 1);
+        $this->SetX(155);
+        $this->Cell(25, 5, 'Aprobados:', 1, 0); $this->Cell(20, 5, $st['aprobados'], 1, 1);
+        $this->SetX(155);
+        $this->Cell(25, 5, 'Reprobados:', 1, 0); $this->Cell(20, 5, $st['reprobados'], 1, 1);
+
+        // Nombre del Usuario Administrativo que genera el reporte
+        $this->Ln(6);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(0, 5, 'GENERADO POR: ' . strtoupper($this->utf8($this->usuario)), 0, 1, 'R');
+    }
+
+    function numLetras($n) {
+        $l = [0=>'CERO', 1=>'UNO', 2=>'DOS', 3=>'TRES', 4=>'CUATRO', 5=>'CINCO', 6=>'SEIS', 7=>'SIETE', 8=>'OCHO', 9=>'NUEVE', 10=>'DIEZ', 11=>'ONCE', 12=>'DOCE', 13=>'TRECE', 14=>'CATORCE', 15=>'QUINCE', 16=>'DIECISEIS', 17=>'DIECISIETE', 18=>'DIECIOCHO', 19=>'DIECINUEVE', 20=>'VEINTE'];
+        return ($n < 10) ? "CERO " . $l[$n] : $l[$n];
+    }
+
+    function utf8($t) { return mb_convert_encoding($t, "ISO-8859-1", "UTF-8"); }
+}
+
+// --- PROCESAMIENTO ---
+// Ejecutar únicamente si se proporcionan todos los parámetros esperados
+if (isset($_GET['materia_id']) && isset($_GET['docente_id']) && isset($_GET['periodo_id'])) {
+    $docente_id_get = $_GET['docente_id'];
+    $materia_id_get = $_GET['materia_id'];
+    $periodo_id_get = $_GET['periodo_id'];
+
+    $info = obtenerInfoNotasDefinitivas($docente_id_get, $materia_id_get, $periodo_id_get);
+    $lista_notas = obtenerNotasDefinitivasGrupo($docente_id_get, $materia_id_get, $periodo_id_get);
+    $stats = calcularEstadisticasNotas($lista_notas);
+
+    $datos_pdf = [
+        'info_general' => $info,
+        'notas' => $lista_notas,
+        'estadisticas' => $stats
+    ];
+
+    $pdf = new PDF_ActaCarga();
+    $pdf->generarReporte($datos_pdf, $nombre_usuario_reporte);
+}
+
+
+
+
+
+
+
 /**
- * Generar PDF de notas definitivas
+ * Obtener grupos de notas aprobadas con filtros
  */
+function obtenerGruposNotasAprobadas($profesor_id = '', $materia_id = '', $periodo_id = '', $seccion_id = '', $fecha_desde = '', $fecha_hasta = '') {
+    global $db;
+    
+    $where = array();
+    $where[] = "nt.estado = 'aprobada'";
+    
+    if (!empty($profesor_id)) {
+        $where[] = "nt.id_docente = " . intval($profesor_id);
+    }
+    
+    if (!empty($materia_id)) {
+        $where[] = "nt.id_materia = " . intval($materia_id);
+    }
+    
+    if (!empty($periodo_id)) {
+        $where[] = "nt.id_periodo = " . intval($periodo_id);
+    }
+    
+    if (!empty($seccion_id)) {
+        $where[] = "ds.id_seccion = " . intval($seccion_id);
+    }
+    
+    if (!empty($fecha_desde)) {
+        $where[] = "nt.fecha_registro >= '" . $db->real_escape_string($fecha_desde) . "'";
+    }
+    
+    if (!empty($fecha_hasta)) {
+        $where[] = "nt.fecha_registro <= '" . $db->real_escape_string($fecha_hasta) . " 23:59:59'";
+    }
+    
+    $where_clause = implode(" AND ", $where);
+    
+    $query = "SELECT 
+                nt.id_docente,
+                nt.id_materia,
+                nt.id_periodo,
+                MAX(ud.nombre) as nombre_docente,
+                MAX(ud.idusuario) as cedula_docente,
+                MAX(m.nombre_materia) as nombre_materia,
+                MAX(pa.nombre_periodo) as nombre_periodo,
+                MAX(s.codigo_seccion) as codigo_seccion,
+                MAX(c.nombre_carrera) as nombre_carrera,
+                COUNT(DISTINCT nt.id_usuario) as total_estudiantes,
+                MAX(nt.fecha_registro) as ultima_fecha
+              FROM notas_trimestres nt
+              INNER JOIN users ud ON nt.id_docente = ud.id
+              INNER JOIN materias m ON nt.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
+              INNER JOIN docente_seccion ds ON nt.id_docente = ds.id_usuario AND nt.id_materia = ds.id_materia
+              INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+              INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+              WHERE $where_clause
+              GROUP BY nt.id_docente, nt.id_materia, nt.id_periodo
+              ORDER BY ultima_fecha DESC";
+    
+    $result = $db->query($query);
+    
+    if (!$result) {
+        error_log("Error en obtenerGruposNotasAprobadas: " . $db->error);
+        // Retornar un resultado vacío pero válido
+        return new mysqli_result();
+    }
+    
+    return $result;
+}
+
+/**
+ * Obtener todas las materias para filtros
+ */
+function obtenerTodasLasMaterias() {
+    global $db;
+    $materias = [];
+    $query = "SELECT id_materia as id, nombre_materia as nombre FROM materias ORDER BY nombre_materia ASC";
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $materias[] = $row;
+        }
+    }
+    return $materias;
+}
+
+/**
+ * Obtener todas las secciones para filtros
+ */
+function obtenerTodasLasSecciones() {
+    global $db;
+    $secciones = [];
+    $query = "SELECT id_seccion, codigo_seccion FROM secciones ORDER BY codigo_seccion ASC";
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $secciones[] = $row;
+        }
+    }
+    return $secciones;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * LOGICA DE PROCESAMIENTO
+ */
+
 function generarPDFNotasDefinitivas($docente_id, $materia_id, $periodo_id) {
     global $db;
     
-    // Obtener información general
     $info_general = obtenerInfoNotasDefinitivas($docente_id, $materia_id, $periodo_id);
-    if (!$info_general) {
-        return false;
-    }
+    if (!$info_general) return false;
     
-    // Obtener notas definitivas
     $notas = obtenerNotasDefinitivasGrupo($docente_id, $materia_id, $periodo_id);
-    if (empty($notas)) {
-        return false;
-    }
+    if (empty($notas)) return false;
     
-    // Calcular estadísticas
     $estadisticas = calcularEstadisticasNotas($notas);
     
-    // Preparar datos para el PDF
     $datos = [
         'info_general' => $info_general,
         'notas' => $notas,
         'estadisticas' => $estadisticas
     ];
     
-    // Crear PDF
-    $pdf = new PDF_NotasDefinitivas();
-    $pdf->generarReporte($datos);
-    
+    // Usar la clase existente `PDF_ActaCarga` para generar el reporte
+    $pdf = new PDF_ActaCarga();
+    // Obtener nombre de usuario para el reporte si está disponible
+    $usuario = isset($nombre_usuario_reporte) ? $nombre_usuario_reporte : '';
+    $pdf->generarReporte($datos, $usuario);
     return true;
 }
 
-/**
- * Obtener información general para el reporte incluyendo el trayecto
- */
 function obtenerInfoNotasDefinitivas($docente_id, $materia_id, $periodo_id) {
     global $db;
-    
     $query = "SELECT ud.nombre as nombre_docente, ud.idusuario as cedula_docente,
                      m.nombre_materia, pa.nombre_periodo, 
                      s.codigo_seccion, c.nombre_carrera, t.numero_trayecto
-              FROM notas_definitivas nd
-              INNER JOIN users ud ON nd.id_docente = ud.id
-              INNER JOIN materias m ON nd.id_materia = m.id_materia
-              INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
-              INNER JOIN docente_seccion ds ON nd.id_docente = ds.id_usuario 
-                                           AND nd.id_materia = ds.id_materia
+              FROM docente_seccion ds
+              INNER JOIN users ud ON ds.id_usuario = ud.id
+              INNER JOIN materias m ON ds.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON pa.id_periodo = $periodo_id
               INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
               INNER JOIN carreras c ON s.id_carrera = c.id_carrera
               INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
-              WHERE nd.id_docente = ? AND nd.id_materia = ? AND nd.id_periodo = ?
-              LIMIT 1";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    return $result->fetch_assoc();
+              WHERE ds.id_usuario = $docente_id AND ds.id_materia = $materia_id LIMIT 1";
+    $result = $db->query($query);
+    return ($result) ? $result->fetch_assoc() : false;
 }
 
-/**
- * Obtener notas definitivas del grupo y calcular nota final
- */
 function obtenerNotasDefinitivasGrupo($docente_id, $materia_id, $periodo_id) {
     global $db;
-    
-    $query = "SELECT nd.id_usuario as id_estudiante,
-                     nd.trayecto_0, nd.trayecto_1, nd.trayecto_2, nd.trayecto_3, nd.trayecto_4,
-                     nd.fecha_registro,
-                     ue.idusuario as cedula_estudiante, ue.nombre as nombre_estudiante
+    $query = "SELECT nd.*, ue.idusuario as cedula_estudiante, ue.nombre as nombre_estudiante
               FROM notas_definitivas nd
               INNER JOIN users ue ON nd.id_usuario = ue.id
-              WHERE nd.id_docente = ? AND nd.id_materia = ? AND nd.id_periodo = ?
-              ORDER BY ue.nombre";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("iii", $docente_id, $materia_id, $periodo_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
+              WHERE nd.id_docente = $docente_id AND nd.id_materia = $materia_id AND nd.id_periodo = $periodo_id
+              ORDER BY ue.nombre ASC";
+    $result = $db->query($query);
     $notas = [];
-    while ($row = $result->fetch_assoc()) {
-        // Calcular la nota final basada en los trayectos
-        $nota_final = calcularNotaFinal($row);
-        $row['nota_final'] = $nota_final;
-        $notas[] = $row;
+    if($result){
+        while ($row = $result->fetch_assoc()) {
+            $row['nota_final'] = calcularNotaFinal($row);
+            $notas[] = $row;
+        }
     }
-    
     return $notas;
 }
 
-/**
- * Calcular nota final a partir de los trayectos (números enteros)
- */
 function calcularNotaFinal($datos_nota) {
-    $trayectos = [];
-    $suma = 0;
-    $contador = 0;
-    
-    // Recolectar trayectos que tengan valor
+    $suma = 0; $cont = 0;
     for ($i = 0; $i <= 4; $i++) {
-        $campo_trayecto = "trayecto_$i";
-        if (isset($datos_nota[$campo_trayecto]) && $datos_nota[$campo_trayecto] !== null && $datos_nota[$campo_trayecto] != '') {
-            $trayectos[] = intval($datos_nota[$campo_trayecto]); // Convertir a entero
-            $suma += intval($datos_nota[$campo_trayecto]);
-            $contador++;
+        $campo = "trayecto_$i";
+        if (isset($datos_nota[$campo]) && $datos_nota[$campo] !== '' && $datos_nota[$campo] !== null) {
+            $suma += (int)$datos_nota[$campo];
+            $cont++;
         }
     }
-    
-    // Calcular promedio si hay trayectos válidos
-    if ($contador > 0) {
-        return round($suma / $contador); // Redondear al entero más cercano
-    }
-    
-    return 0; // Si no hay trayectos con notas
+    return ($cont > 0) ? round($suma / $cont) : 0;
 }
 
-/**
- * Calcular estadísticas de las notas
- */
 function calcularEstadisticasNotas($notas) {
     $total = count($notas);
     $aprobados = 0;
-    $suma_notas = 0;
-    
-    foreach ($notas as $nota) {
-        $suma_notas += $nota['nota_final'];
-        if ($nota['nota_final'] >= 10.0) {
-            $aprobados++;
-        }
+    foreach ($notas as $n) { 
+        if ($n['nota_final'] >= 10) $aprobados++; 
     }
-    
-    $promedio = $total > 0 ? $suma_notas / $total : 0;
-    $reprobados = $total - $aprobados;
-    
     return [
         'total' => $total,
         'aprobados' => $aprobados,
-        'reprobados' => $reprobados,
-        'promedio_grupo' => $promedio
+        'reprobados' => $total - $aprobados
     ];
 }
 
@@ -12995,7 +17072,7 @@ function buscarEstudiantePorCedulaConsulta($cedula) {
                     $estudiante ? $estudiante['id'] : null, 
                     null, 
                     array_merge([
-                        'cedula_buscada' => $cedura,
+                        'cedula_buscada' => $cedula,
                         'resultado_busqueda' => $resultado_busqueda,
                         'tipo_consulta' => 'busqueda_estudiante'
                     ], $detalles_estudiante), 
@@ -13037,11 +17114,12 @@ function buscarEstudiantePorCedulaConsulta($cedula) {
     }
 }
 
+
 // Función para obtener la carrera del estudiante - SOLO LECTURA, SIN AUDITORÍA
 function obtenerCarreraEstudiante($estudiante_id) {
     global $db;
     
-    $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera 
+    $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera, c.tipo_formacion 
               FROM users u
               INNER JOIN carreras c ON u.carrera = c.id_carrera
               WHERE u.id = ?";
@@ -13053,11 +17131,12 @@ function obtenerCarreraEstudiante($estudiante_id) {
     return $result->num_rows > 0 ? $result->fetch_assoc() : null;
 }
 
+
 // Función para obtener todas las materias de la carrera - SOLO LECTURA, SIN AUDITORÍA
 function obtenerMateriasCarrera($carrera_id) {
     global $db;
     
-    $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto
+    $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto, m.creditos
               FROM carrera_materia cm
               INNER JOIN materias m ON cm.id_materia = m.id_materia
               WHERE cm.id_carrera = ?
@@ -13101,6 +17180,38 @@ function obtenerInfoTrayecto($numero_trayecto) {
     ];
 }
 
+/**
+ * Obtiene el trayecto actual estimado de un estudiante consultando
+ * las materias en las que tiene notas definitivas o pendientes.
+ * Retorna un entero (0 = Trayecto Inicial si no hay registros).
+ */
+function obtenerTrayectoActualEstudiante($estudiante_id) {
+    global $db;
+
+    // Buscamos el máximo trayecto entre las materias asociadas a las notas
+    $query = "SELECT COALESCE(MAX(m.trayecto), 0) as max_trayecto
+              FROM (
+                SELECT id_materia FROM notas_definitivas WHERE id_usuario = ?
+                UNION
+                SELECT id_materia FROM notas_pendientes WHERE id_usuario = ?
+              ) as t
+              INNER JOIN materias m ON t.id_materia = m.id_materia";
+
+    if ($stmt = $db->prepare($query)) {
+        $stmt->bind_param("ii", $estudiante_id, $estudiante_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($row = $result->fetch_assoc()) {
+            return (int)$row['max_trayecto'];
+        }
+        $stmt->close();
+    } else {
+        error_log("Error al preparar obtenerTrayectoActualEstudiante: " . $db->error);
+    }
+
+    return 0;
+}
+
 // Función para obtener las notas definitivas del estudiante - SOLO LECTURA, SIN AUDITORÍA
 function obtenerNotasEstudianteConsulta($estudiante_id) {
     global $db;
@@ -13132,7 +17243,7 @@ function obtenerNotasEstudianteConsulta($estudiante_id) {
     return $notas;
 }
 
-// Función para determinar si el estudiante es apto para grado (CON AUDITORÍA PARA CASOS ESPECIALES)
+// Función para determinar si el estudiante es apto para grado (SOLO MATERIAS INSCRITAS)
 function esAptoParaGradoConsulta($estudiante_id, $carrera_id) {
     global $db;
     
@@ -13142,22 +17253,9 @@ function esAptoParaGradoConsulta($estudiante_id, $carrera_id) {
         $carrera_info = obtenerCarreraPorId($carrera_id);
         
         if (!$estudiante_info) {
-            // REGISTRAR EN AUDITORÍA - ESTUDIANTE NO ENCONTRADO
             if (function_exists('registrarAuditoria')) {
                 try {
-                    registrarAuditoria(
-                        "ERROR", 
-                        "users", 
-                        $estudiante_id, 
-                        null, 
-                        [
-                            'id_estudiante' => $estudiante_id,
-                            'id_carrera' => $carrera_id,
-                            'error' => 'Estudiante no encontrado'
-                        ], 
-                        "Consulta de Grado", 
-                        "Error en consulta de aptitud para grado - Estudiante no existe"
-                    );
+                    registrarAuditoria("ERROR", "users", $estudiante_id, null, ['id_estudiante' => $estudiante_id, 'id_carrera' => $carrera_id, 'error' => 'Estudiante no encontrado'], "Consulta de Grado", "Error en consulta de aptitud para grado - Estudiante no existe");
                 } catch (Exception $auditError) {
                     error_log("Error en auditoría esAptoParaGradoConsulta: " . $auditError->getMessage());
                 }
@@ -13176,44 +17274,51 @@ function esAptoParaGradoConsulta($estudiante_id, $carrera_id) {
             ];
         }
 
-        // Obtener todas las materias de la carrera
-        $materias_carrera = obtenerMateriasCarrera($carrera_id);
-        $total_materias_carrera = $materias_carrera->num_rows;
+        // Obtener SOLO las materias que el estudiante tiene INSCRITAS
+        $materias_inscritas = obtenerMateriasInscritasPorEstudiante($estudiante_id, $carrera_id);
         
-        // Obtener notas del estudiante
-        $notas_estudiante = obtenerNotasEstudianteConsulta($estudiante_id);
+        if (!$materias_inscritas) {
+            return [
+                'apto_tsu' => false,
+                'apto_grado_completo' => false,
+                'materias_aprobadas_tsu' => 0,
+                'total_materias_tsu' => 0,
+                'porcentaje_tsu' => 0,
+                'materias_aprobadas_completo' => 0,
+                'total_materias_carrera' => 0,
+                'porcentaje_completo' => 0
+            ];
+        }
         
-        // Contadores para TSU (trayectos 0, 1, 2)
+        // Obtener notas del estudiante (solo aprobadas)
+        $notas_estudiante = obtenerNotasEstudianteConTrimestres($estudiante_id);
+        
+        // Contadores
         $materias_aprobadas_tsu = 0;
         $total_materias_tsu = 0;
-        
-        // Contadores para carrera completa
         $materias_aprobadas_completo = 0;
+        $total_materias_carrera = 0;
         
-        // Recorrer todas las materias de la carrera
-        while ($materia = $materias_carrera->fetch_assoc()) {
+        // Recorrer SOLO las materias inscritas
+        while ($materia = $materias_inscritas->fetch_assoc()) {
             $trayecto = (int)$materia['trayecto'];
             $materia_id = $materia['id_materia'];
+            $total_materias_carrera++;
             
             // Verificar si es materia de TSU (trayectos 0, 1, 2)
             if ($trayecto <= 2) {
                 $total_materias_tsu++;
             }
             
-            // Verificar si el estudiante aprobó esta materia
+            // Verificar si el estudiante aprobó esta materia (nota final >= 12)
             if (isset($notas_estudiante[$materia_id])) {
-                $nota = $notas_estudiante[$materia_id];
-                $campo_trayecto = 'trayecto_' . $trayecto;
+                $nota_data = $notas_estudiante[$materia_id];
+                $nota_final = $nota_data['nota_final'] ?? null;
                 
-                if (isset($nota[$campo_trayecto]) && $nota[$campo_trayecto] !== null) {
-                    $nota_valor = (float)$nota[$campo_trayecto];
-                    if ($nota_valor >= 12) {
-                        $materias_aprobadas_completo++;
-                        
-                        // Si es materia de TSU, contar para TSU también
-                        if ($trayecto <= 2) {
-                            $materias_aprobadas_tsu++;
-                        }
+                if ($nota_final !== null && $nota_final >= 12) {
+                    $materias_aprobadas_completo++;
+                    if ($trayecto <= 2) {
+                        $materias_aprobadas_tsu++;
                     }
                 }
             }
@@ -13224,8 +17329,8 @@ function esAptoParaGradoConsulta($estudiante_id, $carrera_id) {
         $porcentaje_completo = $total_materias_carrera > 0 ? round(($materias_aprobadas_completo / $total_materias_carrera) * 100, 1) : 0;
         
         // Determinar si es apto
-        $apto_tsu = ($porcentaje_tsu >= 90); // 90% o más para TSU
-        $apto_grado_completo = ($porcentaje_completo >= 100); // 100% para grado completo
+        $apto_tsu = ($porcentaje_tsu >= 90);
+        $apto_grado_completo = ($porcentaje_completo >= 100);
         
         $resultado = [
             'apto_tsu' => $apto_tsu,
@@ -13238,31 +17343,22 @@ function esAptoParaGradoConsulta($estudiante_id, $carrera_id) {
             'porcentaje_completo' => $porcentaje_completo
         ];
         
-        // REGISTRAR EN AUDITORÍA - CONSULTA DE APTITUD PARA GRADO (SOLO SI ES APTO)
+        // REGISTRAR EN AUDITORÍA
         if (function_exists('registrarAuditoria') && ($apto_tsu || $apto_grado_completo)) {
             try {
                 $tipo_aptitud = $apto_grado_completo ? 'GRADO_COMPLETO' : ($apto_tsu ? 'TSU' : 'NO_APTO');
-                
-                registrarAuditoria(
-                    "CONSULTA", 
-                    "notas_definitivas", 
-                    $estudiante_id, 
-                    null, 
-                    [
-                        'id_estudiante' => $estudiante_id,
-                        'cedula_estudiante' => $estudiante_info['idusuario'] ?? '',
-                        'nombre_estudiante' => $estudiante_info['nombre'] ?? '',
-                        'id_carrera' => $carrera_id,
-                        'carrera_nombre' => $carrera_info['nombre_carrera'] ?? '',
-                        'apto_tsu' => $apto_tsu,
-                        'apto_grado_completo' => $apto_grado_completo,
-                        'porcentaje_tsu' => $porcentaje_tsu,
-                        'porcentaje_completo' => $porcentaje_completo,
-                        'tipo_aptitud' => $tipo_aptitud
-                    ], 
-                    "Consulta de Grado", 
-                    "Consulta de aptitud para grado - " . $tipo_aptitud
-                );
+                registrarAuditoria("CONSULTA", "notas_trimestres", $estudiante_id, null, [
+                    'id_estudiante' => $estudiante_id,
+                    'cedula_estudiante' => $estudiante_info['idusuario'] ?? '',
+                    'nombre_estudiante' => $estudiante_info['nombre'] ?? '',
+                    'id_carrera' => $carrera_id,
+                    'carrera_nombre' => $carrera_info['nombre_carrera'] ?? '',
+                    'apto_tsu' => $apto_tsu,
+                    'apto_grado_completo' => $apto_grado_completo,
+                    'porcentaje_tsu' => $porcentaje_tsu,
+                    'porcentaje_completo' => $porcentaje_completo,
+                    'tipo_aptitud' => $tipo_aptitud
+                ], "Consulta de Grado", "Consulta de aptitud para grado - " . $tipo_aptitud);
             } catch (Exception $e) {
                 error_log("Error en auditoría esAptoParaGradoConsulta: " . $e->getMessage());
             }
@@ -13272,27 +17368,6 @@ function esAptoParaGradoConsulta($estudiante_id, $carrera_id) {
         
     } catch (Exception $e) {
         error_log("Error en esAptoParaGradoConsulta: " . $e->getMessage());
-        
-        // REGISTRAR EN AUDITORÍA - ERROR EN CONSULTA DE GRADO
-        if (function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "ERROR", 
-                    "notas_definitivas", 
-                    $estudiante_id, 
-                    null, 
-                    [
-                        'id_estudiante' => $estudiante_id,
-                        'id_carrera' => $carrera_id,
-                        'error' => $e->getMessage()
-                    ], 
-                    "Consulta de Grado", 
-                    "Error en consulta de aptitud para grado"
-                );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de error esAptoParaGradoConsulta: " . $auditError->getMessage());
-            }
-        }
         
         return [
             'apto_tsu' => false,
@@ -15202,9 +19277,11 @@ function procesarNotasEstudiantes() {
 }
 
 /**
- * Verificar estados de notas de estudiantes
+ * Verificar estados de notas de estudiantes (TRIMESTRES)
  */
 function verificarEstadosNotas($estudiantes, $materia_id, $periodo_id, $docente_id, $trayecto_a_mostrar) {
+    global $db;
+    
     $notas_aprobadas = false;
     $notas_rechazadas = false;
     $notas_en_revision = false;
@@ -15217,62 +19294,86 @@ function verificarEstadosNotas($estudiantes, $materia_id, $periodo_id, $docente_
 
     $estudiantes_info = [];
     
+    // Obtener todas las notas de notas_trimestres para esta materia y periodo
+    $notas_trimestres_data = [];
+    $query = "SELECT id_usuario, trimestre_num, nota, estado 
+              FROM notas_trimestres 
+              WHERE id_materia = $materia_id 
+              AND id_periodo = $periodo_id";
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $notas_trimestres_data[$row['id_usuario']][$row['trimestre_num']] = [
+                'nota' => $row['nota'],
+                'estado' => $row['estado']
+            ];
+        }
+    }
+    
+    // Reiniciar el puntero del resultado de estudiantes
+    $estudiantes->data_seek(0);
+    
     while ($estudiante = $estudiantes->fetch_assoc()) {
-        $notas_definitivas = obtenerNotasDefinitivas($estudiante['id'], $materia_id);
-        $notas_pendientes_data = obtenerNotasPendientes($estudiante['id'], $materia_id, $periodo_id, $docente_id);
+        $estudiante_id = $estudiante['id'];
         
-        // JERARQUÍA CORRECTA DE ESTADOS:
-        // 1. Aprobada (máxima prioridad) - tabla de notas_definitivas
-        // 2. Rechazada - si está en notas_pendientes con estado 'rechazada'
-        // 3. En Revisión - si está en tabla notas_pendientes con cualquier otro estado
-        // 4. Pendiente - no está en ninguna tabla
+        // Inicializar valores para los 3 trimestres
+        $trimestre_1_nota = '';
+        $trimestre_1_estado = 'pendiente';
+        $trimestre_2_nota = '';
+        $trimestre_2_estado = 'pendiente';
+        $trimestre_3_nota = '';
+        $trimestre_3_estado = 'pendiente';
         
-        $estado = 'pendiente'; // Por defecto
-        $valor_nota = 1; // Valor por defecto
-        $campo_trayecto = 'trayecto_' . $trayecto_a_mostrar;
+        // Buscar notas existentes para este estudiante
+        if (isset($notas_trimestres_data[$estudiante_id])) {
+            $notas_est = $notas_trimestres_data[$estudiante_id];
+            
+            // Trimestre 1
+            if (isset($notas_est[1])) {
+                $trimestre_1_nota = $notas_est[1]['nota'];
+                $trimestre_1_estado = $notas_est[1]['estado'];
+            }
+            
+            // Trimestre 2
+            if (isset($notas_est[2])) {
+                $trimestre_2_nota = $notas_est[2]['nota'];
+                $trimestre_2_estado = $notas_est[2]['estado'];
+            }
+            
+            // Trimestre 3
+            if (isset($notas_est[3])) {
+                $trimestre_3_nota = $notas_est[3]['nota'];
+                $trimestre_3_estado = $notas_est[3]['estado'];
+            }
+        }
         
-        // PRIMERO: Verificar si existe en la tabla de notas_definitivas (APROBADA - MÁXIMA PRIORIDAD)
-        if ($notas_definitivas) {
-            $estado = 'aprobada';
+        // Determinar estados globales para los mensajes
+        if ($trimestre_1_estado === 'aprobada' || $trimestre_2_estado === 'aprobada' || $trimestre_3_estado === 'aprobada') {
             $notas_aprobadas = true;
             $estudiantes_con_notas_aprobadas[] = $estudiante['nombre'];
-            // Obtener la nota de la tabla definitiva
-            if (isset($notas_definitivas[$campo_trayecto]) && $notas_definitivas[$campo_trayecto] !== null) {
-                $valor_nota = (int)$notas_definitivas[$campo_trayecto];
-            }
-        } 
-        // SEGUNDO: Si no está aprobada, verificar si está en notas_pendientes y su estado
-        elseif ($notas_pendientes_data) {
-            // Verificar el estado en notas_pendientes
-            $estado_pendiente = isset($notas_pendientes_data['estado_pendiente']) ? $notas_pendientes_data['estado_pendiente'] : 'en_revision';
-            
-            if ($estado_pendiente === 'rechazada') {
-                $estado = 'rechazada';
-                $notas_rechazadas = true;
-                $estudiantes_con_notas_rechazadas[] = $estudiante['nombre'];
-            } else {
-                $estado = 'en_revision';
-                $notas_en_revision = true;
-                $estudiantes_con_notas_en_revision[] = $estudiante['nombre'];
-            }
-            
-            // Obtener la nota de la tabla notas_pendientes
-            if (isset($notas_pendientes_data[$campo_trayecto]) && $notas_pendientes_data[$campo_trayecto] !== null) {
-                $valor_nota = (int)$notas_pendientes_data[$campo_trayecto];
-            }
-        } 
-        // TERCERO: Si no está en ninguna tabla, es pendiente
-        else {
-            $estado = 'pendiente';
+        }
+        if ($trimestre_1_estado === 'rechazada' || $trimestre_2_estado === 'rechazada' || $trimestre_3_estado === 'rechazada') {
+            $notas_rechazadas = true;
+            $estudiantes_con_notas_rechazadas[] = $estudiante['nombre'];
+        }
+        if ($trimestre_1_estado === 'en_revision' || $trimestre_2_estado === 'en_revision' || $trimestre_3_estado === 'en_revision') {
+            $notas_en_revision = true;
+            $estudiantes_con_notas_en_revision[] = $estudiante['nombre'];
+        }
+        if ($trimestre_1_estado === 'pendiente' && $trimestre_2_estado === 'pendiente' && $trimestre_3_estado === 'pendiente' && 
+            $trimestre_1_nota === '' && $trimestre_2_nota === '' && $trimestre_3_nota === '') {
             $notas_pendientes = true;
             $estudiantes_con_notas_pendientes[] = $estudiante['nombre'];
-            // Mantener el valor por defecto de 1
         }
         
         $estudiantes_info[] = [
             'datos' => $estudiante,
-            'estado' => $estado,
-            'valor_nota' => $valor_nota
+            'trimestre_1_nota' => $trimestre_1_nota,
+            'trimestre_1_estado' => $trimestre_1_estado,
+            'trimestre_2_nota' => $trimestre_2_nota,
+            'trimestre_2_estado' => $trimestre_2_estado,
+            'trimestre_3_nota' => $trimestre_3_nota,
+            'trimestre_3_estado' => $trimestre_3_estado
         ];
     }
     
@@ -15450,64 +19551,26 @@ function obtenerEstudiantePorId($id) {
 }
 
 /**
- * Obtener carreras del estudiante - VERSIÓN CORREGIDA CON RELACIÓN
+ * Obtener carreras de un estudiante
  */
-function obtenerCarrerasEstudiante($id_estudiante) {
+function obtenerCarrerasEstudiante($estudiante_id) {
     global $db;
     
-    try {
-        // Primero obtenemos el ID de la carrera del estudiante
-        $query_user = "SELECT carrera FROM users WHERE id = ? LIMIT 1";
-        $stmt_user = $db->prepare($query_user);
-        if (!$stmt_user) {
-            throw new Exception("Error en preparación user: " . $db->error);
-        }
-
-        $stmt_user->bind_param("i", $id_estudiante);
-        if (!$stmt_user->execute()) {
-            throw new Exception("Error en ejecución user: " . $stmt_user->error);
-        }
-
-        $result_user = $stmt_user->get_result();
-        $user = $result_user->fetch_assoc();
-        $stmt_user->close();
-
-        if (!$user || empty($user['carrera'])) {
-            return [];
-        }
-
-        $carrera_id = $user['carrera'];
-        
-        // Buscamos la carrera por ID
-        $query_carreras = "SELECT id_carrera, nombre_carrera 
-                          FROM carreras 
-                          WHERE id_carrera = ? 
-                          AND activa = 1";
-        
-        $stmt_carreras = $db->prepare($query_carreras);
-        if (!$stmt_carreras) {
-            throw new Exception("Error en preparación carreras: " . $db->error);
-        }
-
-        $stmt_carreras->bind_param("i", $carrera_id);
-        if (!$stmt_carreras->execute()) {
-            throw new Exception("Error en ejecución carreras: " . $stmt_carreras->error);
-        }
-
-        $result_carreras = $stmt_carreras->get_result();
-        $carreras = [];
-        while ($row = $result_carreras->fetch_assoc()) {
+    $carreras = [];
+    $query = "SELECT DISTINCT c.id_carrera, c.nombre_carrera
+              FROM estudiante_materias em
+              INNER JOIN carrera_materia cm ON em.id_materia = cm.id_materia
+              INNER JOIN carreras c ON cm.id_carrera = c.id_carrera
+              WHERE em.id_usuario = " . intval($estudiante_id) . "
+              AND em.estatus = 'activo'";
+    
+    $result = $db->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
             $carreras[] = $row;
         }
-
-        $stmt_carreras->close();
-        
-        return $carreras;
-        
-    } catch (Exception $e) {
-        error_log("Error al obtener carreras: " . $e->getMessage());
-        return [];
     }
+    return $carreras;
 }
 
 /**
@@ -15764,6 +19827,94 @@ function procesarEdicionNota() {
 
 
 //INSCRIPCION DE MATERIAS ***********************************************************************
+
+
+
+
+
+/**
+ * Obtiene todas las materias del trayecto 0 para una carrera específica
+ */
+function obtenerMateriasTrayecto0PorCarrera($carrera_id) {
+    global $db;
+    
+    $query = "SELECT m.id_materia 
+              FROM materias m
+              INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
+              WHERE cm.id_carrera = ? 
+              AND m.trayecto = 0 
+              AND m.activa = 1";
+    
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error prepare obtenerMateriasTrayecto0PorCarrera: " . $db->error);
+        return [];
+    }
+    
+    $stmt->bind_param('i', $carrera_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $materias = [];
+    while ($row = $result->fetch_assoc()) {
+        $materias[] = $row['id_materia'];
+    }
+    
+    $stmt->close();
+    return $materias;
+}
+
+/**
+ * Inscribe un estudiante en una materia
+ */
+function inscribirEstudianteEnMateria($usuario_id, $id_materia, $id_seccion, $id_periodo) {
+    global $db;
+    
+    // Verificar si ya está inscrito para evitar duplicados
+    $check_query = "SELECT id_inscripcion FROM estudiante_materias 
+                    WHERE id_usuario = ? AND id_materia = ? AND id_periodo = ?";
+    $check_stmt = $db->prepare($check_query);
+    $check_stmt->bind_param('iii', $usuario_id, $id_materia, $id_periodo);
+    $check_stmt->execute();
+    $check_result = $check_stmt->get_result();
+    
+    if ($check_result->num_rows > 0) {
+        // Ya está inscrito, no hacer nada
+        $check_stmt->close();
+        return true;
+    }
+    $check_stmt->close();
+    
+    // Insertar nueva inscripción
+    $query = "INSERT INTO estudiante_materias 
+              (id_usuario, id_materia, id_seccion, id_periodo, fecha_inscripcion, estatus, nota_final) 
+              VALUES (?, ?, ?, ?, NOW(), 'activo', NULL)";
+    
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error prepare inscribirEstudianteEnMateria: " . $db->error);
+        return false;
+    }
+    
+    $stmt->bind_param('iiii', $usuario_id, $id_materia, $id_seccion, $id_periodo);
+    $result = $stmt->execute();
+    $stmt->close();
+    
+    return $result;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -17275,6 +21426,8 @@ function obtenerNombresUbicacion($id_estado, $id_municipio, $id_parroquia) {
             $stmt->fetch();
             $stmt->close();
         }
+    } elseif (!empty($id_estado)) {
+        $ubicacion['estado_nombre'] = $id_estado;
     }
     
     // Obtener nombre del municipio
@@ -17288,6 +21441,8 @@ function obtenerNombresUbicacion($id_estado, $id_municipio, $id_parroquia) {
             $stmt->fetch();
             $stmt->close();
         }
+    } elseif (!empty($id_municipio)) {
+        $ubicacion['municipio_nombre'] = $id_municipio;
     }
     
     // Obtener nombre de la parroquia
@@ -17301,6 +21456,8 @@ function obtenerNombresUbicacion($id_estado, $id_municipio, $id_parroquia) {
             $stmt->fetch();
             $stmt->close();
         }
+    } elseif (!empty($id_parroquia)) {
+        $ubicacion['parroquia_nombre'] = $id_parroquia;
     }
     
     return $ubicacion;
@@ -17375,15 +21532,232 @@ $nombresUbicacion = obtenerNombresUbicacionDirecto(
 
 
 
+//PNF PTF *********************************************************************
+
+
+
+// Función para formatear el nombre de la carrera según su tipo de formación
+function formatearNombreCarrera($nombre_carrera, $tipo_formacion = '') {
+    if (empty($tipo_formacion)) {
+        return $nombre_carrera;
+    }
+    
+    $tipo = strtoupper(trim($tipo_formacion));
+    $nombre = trim($nombre_carrera);
+    
+    // Quitar prefijos si existen
+    $nombre = preg_replace('/^PNF\s+/i', '', $nombre);
+    $nombre = preg_replace('/^PTF\s+/i', '', $nombre);
+    $nombre = preg_replace('/^PROGRAMA\s+NACIONAL\s+DE\s+FORMACIÓN\s+/i', '', $nombre);
+    $nombre = preg_replace('/^PROGRAMA\s+TÉCNICO\s+DE\s+FORMACIÓN\s+/i', '', $nombre);
+    
+    if ($tipo == 'PNF' || $tipo == 'PROGRAMA NACIONAL DE FORMACION' || $tipo == 'PROGRAMA NACIONAL DE FORMACIÓN') {
+        return "PNF " . ucwords(strtolower($nombre));
+    } elseif ($tipo == 'PTF' || $tipo == 'PROGRAMA TECNICO DE FORMACION' || $tipo == 'PROGRAMA TÉCNICO DE FORMACIÓN') {
+        return "PTF " . ucwords(strtolower($nombre));
+    }
+    
+    return $nombre_carrera;
+}
+
+/**
+ * Función auxiliar para obtener el tipo de formación de la base de datos
+ */
+if (!function_exists('obtenerTipoFormacionCarrera')) {
+function obtenerTipoFormacionCarrera($id_carrera) {
+    global $db;
+    
+    try {
+        $query = "SELECT tipo_formacion FROM carreras WHERE id_carrera = ?";
+        $stmt = $db->prepare($query);
+        $stmt->bind_param("i", $id_carrera);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows > 0) {
+            $row = $result->fetch_assoc();
+            return $row['tipo_formacion'] ?? '';
+        }
+        
+        return '';
+        
+    } catch (Exception $e) {
+        error_log("Error al obtener tipo de formación: " . $e->getMessage());
+        return '';
+    }
+}
+}
+
+/**
+ * Función mejorada para obtener carrera del estudiante incluyendo tipo de formación
+ */
+if (!function_exists('obtenerCarreraEstudianteCompleta')) {
+function obtenerCarreraEstudianteCompleta($estudiante_id) {
+    global $db;
+    
+    $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera, c.tipo_formacion 
+              FROM users u
+              INNER JOIN carreras c ON u.carrera = c.id_carrera
+              WHERE u.id = ?";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $estudiante_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
+}
+}
+
+
+//HISTORIAL DESGLOZADO ***********************************************************************
+
+
+
+/**
+ * Función para obtener historial desglozado de notas
+ */
+function obtenerHistorialNotasDesglozado($estudiante_id) {
+    global $db;
+    
+    $query = "SELECT 
+                nd.id,
+                nd.id_materia,
+                m.nombre_materia,
+                m.cod_materia,
+                m.trayecto,
+                m.creditos,
+                pa.nombre_periodo,
+                nd.fecha_registro,
+                nd.trayecto_0,
+                nd.trayecto_1,
+                nd.trayecto_2,
+                nd.trayecto_3,
+                nd.trayecto_4,
+                ua.nombre as nombre_admin,
+                nd.id_admin_aprobador
+              FROM notas_definitivas nd
+              INNER JOIN materias m ON nd.id_materia = m.id_materia
+              INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+              LEFT JOIN users ua ON nd.id_admin_aprobador = ua.id
+              WHERE nd.id_usuario = ?
+              ORDER BY m.trayecto, m.nombre_materia, nd.fecha_registro DESC";
+    
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $estudiante_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $historial = [];
+    while ($row = $result->fetch_assoc()) {
+        $historial[] = $row;
+    }
+    
+    return $historial;
+}
 
 
 
 
 
 
+//SECRETARIA**********************************************************************
 
 
 
+/**
+ * Obtener la configuración de fechas para un trimestre específico
+ * @param int $trimestre_num Número del trimestre (1, 2, 3)
+ * @return array|null Configuración del trimestre o null si no existe
+ */
+function obtenerConfiguracionCargaTrimestre($trimestre_num) {
+    global $db;
+    
+    $query = "SELECT * FROM secretaria_configuracion_carga WHERE trimestre_num = ? AND activo = 1";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $trimestre_num);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * Obtener todas las configuraciones de carga de notas
+ * @return array Lista de configuraciones por trimestre
+ */
+function obtenerTodasConfiguracionesCarga() {
+    global $db;
+    
+    $configuraciones = [];
+    $query = "SELECT * FROM secretaria_configuracion_carga ORDER BY trimestre_num ASC";
+    $result = $db->query($query);
+    
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $configuraciones[$row['trimestre_num']] = $row;
+        }
+    }
+    
+    return $configuraciones;
+}
+
+/**
+ * Guardar configuración de fechas para un trimestre
+ * @param int $trimestre_num Número del trimestre
+ * @param string $fecha_inicio Fecha de inicio (Y-m-d)
+ * @param string $fecha_fin Fecha de fin (Y-m-d)
+ * @return bool True si se guardó correctamente
+ */
+function guardarConfiguracionCargaTrimestre($trimestre_num, $fecha_inicio, $fecha_fin) {
+    global $db;
+    
+    $query = "INSERT INTO secretaria_configuracion_carga (trimestre_num, fecha_inicio, fecha_fin, activo) 
+              VALUES (?, ?, ?, 1) 
+              ON DUPLICATE KEY UPDATE fecha_inicio = ?, fecha_fin = ?, activo = 1";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("issss", $trimestre_num, $fecha_inicio, $fecha_fin, $fecha_inicio, $fecha_fin);
+    
+    return $stmt->execute();
+}
+
+/**
+ * Verificar si un trimestre está disponible para carga
+ * @param int $trimestre_num Número del trimestre
+ * @return array ['disponible' => bool, 'mensaje' => string]
+ */
+function verificarDisponibilidadTrimestre($trimestre_num) {
+    $config = obtenerConfiguracionCargaTrimestre($trimestre_num);
+    
+    if (!$config) {
+        return [
+            'disponible' => false,
+            'mensaje' => "El Trimestre $trimestre_num no está configurado. Contacte con secretaría."
+        ];
+    }
+    
+    $hoy = date('Y-m-d');
+    $fecha_inicio = $config['fecha_inicio'];
+    $fecha_fin = $config['fecha_fin'];
+    
+    if ($hoy < $fecha_inicio) {
+        return [
+            'disponible' => false,
+            'mensaje' => "El Trimestre $trimestre_num estará disponible para carga a partir del " . date('d/m/Y', strtotime($fecha_inicio))
+        ];
+    }
+    
+    if ($hoy > $fecha_fin) {
+        return [
+            'disponible' => false,
+            'mensaje' => "El período de carga del Trimestre $trimestre_num finalizó el " . date('d/m/Y', strtotime($fecha_fin))
+        ];
+    }
+    
+    return [
+        'disponible' => true,
+        'mensaje' => "Trimestre $trimestre_num disponible para carga (hasta " . date('d/m/Y', strtotime($fecha_fin)) . ")"
+    ];
+}
 
 
 
@@ -18003,49 +22377,7 @@ function contar_en_espera(){
     }
 
 
-	function contar_pedidos(){
-        global $db, $username, $usua, $contar_pedido,
-        $pendiente_pedido, $mes_de_pago_actual, $ganancia_bantecom, $id_usua;
-        if (minisAd())
-        {
-
-
-
-if ($porentregar>0) {
-  $pendiente_pedido = $porentregar;
-} else {
-$pendiente_pedido = 0;
-}
-
-$pendiente_pedido = $pendiente_pedido;
-
-	// } else {
-  //   $contar_pedido .= $entregado .' Ya Entregados <br>';
-  //   $pendiente_pedido = "";
-	// }
-        } else {
-//echo 'USUARIO';
-
-$sql = "SELECT
-SUM(monto) AS total_ventas,
-SUM(IF(MONTH(fecha) = MONTH(CURDATE()) AND YEAR(fecha) = YEAR(CURDATE()), monto, 0)) AS total_ventas_mes,
-COUNT(DISTINCT id) AS cantidad_transacciones,
-SUM(IF(MONTH(fecha) = MONTH(CURDATE()) AND YEAR(fecha) = YEAR(CURDATE()), 1, 0)) AS cantidad_transacciones_mes,
-COUNT(DISTINCT id_cliente) AS cantidad_clientes
-FROM ventas
-WHERE id_usuario = '$id_usua'";
-
-$resultsql = mysqli_query($db, $sql);
-$rowsql = mysqli_fetch_assoc($resultsql);
-
-echo "Total ventas: $" . $rowsql['total_ventas'] . "<br>";
-echo "Total ventas en el mes: $" . $rowsql['total_ventas_mes'] . "<br>";
-echo "Transacciones en el mes: " . $rowsql['cantidad_transacciones_mes'] . "<br>";
-echo "Total transacciones: " . $rowsql['cantidad_transacciones'] . "<br>";
-echo "Total clientes: " . $rowsql['cantidad_clientes'] . "<br>";
-}
-
-}
+	
 
 
 
@@ -23637,4 +27969,185 @@ WHERE pre.id_producto IS NULL AND p.id IN (
 }
 }
 
-	?>
+/**
+ * Obtiene todos los códigos de secciones
+ * @return array Lista de códigos de secciones
+ */
+function obtenerCodigosSecciones() {
+    global $db;
+    
+    $sql = "SELECT cs.*, c.nombre_carrera 
+            FROM codigos_secciones cs 
+            INNER JOIN carreras c ON cs.id_carrera = c.id_carrera 
+            ORDER BY c.nombre_carrera, cs.codigo_inicio";
+    
+    $result = $db->query($sql);
+    $codigos = [];
+    
+    while ($row = $result->fetch_assoc()) {
+        $codigos[] = $row;
+    }
+    
+    return $codigos;
+}
+
+/**
+ * Inserta un nuevo código de sección
+ * @param int $id_carrera ID de la carrera
+ * @param int $codigo_inicio Código inicial del rango
+ * @param int $codigo_fin Código final del rango
+ * @param string $descripcion Descripción opcional
+ * @return array Resultado con success y message
+ */
+function insertarCodigoSeccion($id_carrera, $codigo_inicio, $codigo_fin, $descripcion) {
+    global $db;
+    
+    // Validar que no se solape con rangos existentes para la misma carrera
+    $sql_check = "SELECT COUNT(*) as total FROM codigos_secciones 
+                  WHERE id_carrera = ? AND 
+                  ((? BETWEEN codigo_inicio AND codigo_fin) OR 
+                   (? BETWEEN codigo_inicio AND codigo_fin) OR 
+                   (codigo_inicio BETWEEN ? AND ?) OR 
+                   (codigo_fin BETWEEN ? AND ?))";
+    
+    $stmt_check = $db->prepare($sql_check);
+    $stmt_check->bind_param("iiiiiii", $id_carrera, $codigo_inicio, $codigo_fin, $codigo_inicio, $codigo_fin, $codigo_inicio, $codigo_fin);
+    $stmt_check->execute();
+    $result_check = $stmt_check->get_result();
+    $row_check = $result_check->fetch_assoc();
+    
+    if ($row_check['total'] > 0) {
+        return ['success' => false, 'message' => 'El rango de códigos se solapa con uno existente para esta carrera.'];
+    }
+    
+    $sql = "INSERT INTO codigos_secciones (id_carrera, codigo_inicio, codigo_fin, descripcion) 
+            VALUES (?, ?, ?, ?)";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iiis", $id_carrera, $codigo_inicio, $codigo_fin, $descripcion);
+    
+    if ($stmt->execute()) {
+        return ['success' => true, 'message' => 'Código de sección creado correctamente.'];
+    } else {
+        return ['success' => false, 'message' => 'Error al crear el código de sección: ' . $stmt->error];
+    }
+}
+
+/**
+ * Actualiza un código de sección
+ * @param int $id ID del registro
+ * @param int $id_carrera ID de la carrera
+ * @param int $codigo_inicio Código inicial
+ * @param int $codigo_fin Código final
+ * @param string $descripcion Descripción
+ * @return array Resultado
+ */
+function actualizarCodigoSeccion($id, $id_carrera, $codigo_inicio, $codigo_fin, $descripcion) {
+    global $db;
+    
+    // Validar que no se solape con otros rangos (excluyendo el actual)
+    $sql_check = "SELECT COUNT(*) as total FROM codigos_secciones 
+                  WHERE id != ? AND id_carrera = ? AND 
+                  ((? BETWEEN codigo_inicio AND codigo_fin) OR 
+                   (? BETWEEN codigo_inicio AND codigo_fin) OR 
+                   (codigo_inicio BETWEEN ? AND ?) OR 
+                   (codigo_fin BETWEEN ? AND ?))";
+    
+    $stmt_check = $db->prepare($sql_check);
+    $stmt_check->bind_param("iiiiiiii", $id, $id_carrera, $codigo_inicio, $codigo_fin, $codigo_inicio, $codigo_fin, $codigo_inicio, $codigo_fin);
+    $stmt_check->execute();
+    $result_check = $stmt_check->get_result();
+    $row_check = $result_check->fetch_assoc();
+    
+    if ($row_check['total'] > 0) {
+        return ['success' => false, 'message' => 'El rango de códigos se solapa con uno existente para esta carrera.'];
+    }
+    
+    $sql = "UPDATE codigos_secciones SET id_carrera = ?, codigo_inicio = ?, codigo_fin = ?, descripcion = ? 
+            WHERE id = ?";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("iiisi", $id_carrera, $codigo_inicio, $codigo_fin, $descripcion, $id);
+    
+    if ($stmt->execute()) {
+        return ['success' => true, 'message' => 'Código de sección actualizado correctamente.'];
+    } else {
+        return ['success' => false, 'message' => 'Error al actualizar el código de sección: ' . $stmt->error];
+    }
+}
+
+/**
+ * Elimina un código de sección
+ * @param int $id ID del registro
+ * @return array Resultado
+ */
+function eliminarCodigoSeccion($id) {
+    global $db;
+    
+    $sql = "DELETE FROM codigos_secciones WHERE id = ?";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id);
+    
+    if ($stmt->execute()) {
+        return ['success' => true, 'message' => 'Código de sección eliminado correctamente.'];
+    } else {
+        return ['success' => false, 'message' => 'Error al eliminar el código de sección: ' . $stmt->error];
+    }
+}
+
+/**
+ * Genera un código de sección automáticamente basado en los rangos definidos
+ * @param int $id_carrera ID de la carrera
+ * @return string Código generado o null si no hay rango disponible
+ */
+function generarCodigoSeccion($id_carrera, $turno) {
+    global $db;
+    
+    // Obtener el rango para la carrera
+    $sql = "SELECT codigo_inicio, codigo_fin FROM codigos_secciones 
+            WHERE id_carrera = ? 
+            ORDER BY codigo_inicio";
+    
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param("i", $id_carrera);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows == 0) {
+        return null; // No hay rango definido
+    }
+    
+    $rangos = [];
+    while ($row = $result->fetch_assoc()) {
+        $rangos[] = $row;
+    }
+    
+    // Obtener códigos ya usados en secciones para esta carrera y turno
+    $sql_usados = "SELECT DISTINCT CAST(codigo_seccion AS UNSIGNED) as codigo_num 
+                   FROM secciones 
+                   WHERE id_carrera = ? AND turno = ? AND codigo_seccion REGEXP '^[0-9]+$'";
+    
+    $stmt_usados = $db->prepare($sql_usados);
+    $stmt_usados->bind_param("is", $id_carrera, $turno);
+    $stmt_usados->execute();
+    $result_usados = $stmt_usados->get_result();
+    
+    $usados = [];
+    while ($row = $result_usados->fetch_assoc()) {
+        $usados[] = (int)$row['codigo_num'];
+    }
+    
+    // Encontrar el primer código disponible en los rangos
+    foreach ($rangos as $rango) {
+        for ($codigo = $rango['codigo_inicio']; $codigo <= $rango['codigo_fin']; $codigo++) {
+            if (!in_array($codigo, $usados)) {
+                return (string)$codigo;
+            }
+        }
+    }
+    
+    return null; // No hay códigos disponibles
+}
+
+?>

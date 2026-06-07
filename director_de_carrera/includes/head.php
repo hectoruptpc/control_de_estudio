@@ -65,6 +65,7 @@ if (!isLoggedIn() || !isUser()) {
     
     /* NAVBAR FIJO */
     .navbar {
+        z-index: 1060;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
 
@@ -111,6 +112,8 @@ if (!isLoggedIn() || !isUser()) {
         .navbar-toggler {
             padding: 0.4rem 0.75rem;
             font-size: 1.25rem;
+            position: relative;
+            z-index: 1065;
         }
         
         /* Mejorar contraste en móviles */
@@ -121,6 +124,32 @@ if (!isLoggedIn() || !isUser()) {
         
         .dropdown-toggle::after {
             border-top-color: white;
+        }
+
+        /* Overlay móvil para cerrar el navbar colapsado al tocar fuera */
+        .mobile-navbar-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.35);
+            z-index: 1020;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+
+        .mobile-navbar-backdrop.show {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .navbar-collapse {
+            position: relative;
+            z-index: 1060;
         }
     }
 
@@ -168,6 +197,13 @@ if (!isLoggedIn() || !isUser()) {
               </a>
             </li>
 
+            <!-- NUEVO: Menú de Asignación de Voceros -->
+            <li class="nav-item">
+              <a title="Asignar Voceros Estudiantiles" class="nav-link" href="asignacion_voceros.php">
+                <i class="fas fa-users fa-fw"></i> Asignar Voceros
+              </a>
+            </li>
+
             <!-- Menú de Ajustes - ID ÚNICO CORREGIDO -->
             <li id="dropdown-ajustes-director" class="nav-item dropdown">
                 <a title="Ir a Ajustes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownAjustesDirector" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -189,6 +225,7 @@ if (!isLoggedIn() || !isUser()) {
         </div>
       </div>
     </nav>
+    <div id="mobileNavbarBackdrop" class="mobile-navbar-backdrop"></div>
     <div class="container">
     <div class="row">
         <div class="col-sm-6">
@@ -331,6 +368,24 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Actualizar también al cargar la página
     actualizarNotificaciones();
+
+    // Overlay móvil para cerrar el navbar con un clic fuera
+    var $navbarCollapse = $('#navbarResponsive');
+    var $mobileBackdrop = $('#mobileNavbarBackdrop');
+
+    if ($navbarCollapse.length && $mobileBackdrop.length) {
+        $navbarCollapse.on('show.bs.collapse', function() {
+            $mobileBackdrop.addClass('show');
+        });
+
+        $navbarCollapse.on('hidden.bs.collapse', function() {
+            $mobileBackdrop.removeClass('show');
+        });
+
+        $mobileBackdrop.on('click', function() {
+            $navbarCollapse.collapse('hide');
+        });
+    }
 });
 </script>
 

@@ -27,6 +27,18 @@ if (!isLoggedIn() || !isEstudiante()) {
     header('location: ../login.php');
     exit();
 }
+
+// Verificar si el estudiante es vocero para mostrar la opción en el menú
+$es_vocero = false;
+if (isset($_SESSION['user']['id'])) {
+    $query_vocero = "SELECT vocero FROM users WHERE id = ?";
+    $stmt_vocero = $db->prepare($query_vocero);
+    $stmt_vocero->bind_param("i", $_SESSION['user']['id']);
+    $stmt_vocero->execute();
+    $result_vocero = $stmt_vocero->get_result();
+    $usuario_vocero = $result_vocero->fetch_assoc();
+    $es_vocero = ($usuario_vocero && $usuario_vocero['vocero'] == 1);
+}
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html lang="es-Es" xmlns="http://www.w3.org/1999/xhtml">
@@ -64,6 +76,7 @@ if (!isLoggedIn() || !isEstudiante()) {
 
     /* NAVBAR FIJO */
     .navbar {
+        z-index: 1060;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
 
@@ -105,6 +118,8 @@ if (!isLoggedIn() || !isEstudiante()) {
         .navbar-toggler {
             padding: 0.4rem 0.75rem;
             font-size: 1.25rem;
+            position: relative;
+            z-index: 1065;
         }
         
         /* Mejorar contraste en móviles */
@@ -115,6 +130,32 @@ if (!isLoggedIn() || !isEstudiante()) {
         
         .dropdown-toggle::after {
             border-top-color: white;
+        }
+
+        /* Overlay móvil para cerrar el navbar colapsado al tocar fuera */
+        .mobile-navbar-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.35);
+            z-index: 1020;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+
+        .mobile-navbar-backdrop.show {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .navbar-collapse {
+            position: relative;
+            z-index: 1060;
         }
     }
 
@@ -145,6 +186,22 @@ if (!isLoggedIn() || !isEstudiante()) {
                 <span class="sr-only">(current)</span>
               </a>
             </li>
+
+            <!-- NUEVA OPCIÓN: SOLICITUDES Y CONSTANCIAS - CON MISMO ESTILO -->
+            <li class="nav-item">
+              <a title="Constancias y Solicitudes" class="nav-link" href="mis_constancias.php">
+                <i class="fas fa-file-alt fa-fw"></i> Solicitudes
+              </a>
+            </li>
+
+            <!-- OPCIÓN PARA VOCEROS: PANEL DE VOCERO (SOLO VISIBLE SI ES VOCERO) -->
+            <?php if ($es_vocero): ?>
+            <li class="nav-item">
+              <a title="Panel del Vocero" class="nav-link" href="vocero.php">
+                <i class="fas fa-microphone-alt fa-fw"></i> Panel Vocero
+              </a>
+            </li>
+            <?php endif; ?>
 
             <!-- Icono de Mensajería con Notificación para Estudiantes -->
             <li class="nav-item nav-item-mensajes">
@@ -207,6 +264,7 @@ if (!isLoggedIn() || !isEstudiante()) {
         </div>
       </div>
     </nav>
+    <div id="mobileNavbarBackdrop" class="mobile-navbar-backdrop"></div>
     <div class="container">
     <div class="row">
         <div class="col-sm-6">
@@ -268,12 +326,12 @@ function actualizarNotificaciones() {
         .then(response => response.json())
         .then(data => {
             const link = document.querySelector('.nav-link[href="mensajeria_estudiantes.php"]');
-            const badge = link.querySelector('.badge-notificacion');
+            const badge = link?.querySelector('.badge-notificacion');
             
             if (data.mensajes_no_leidos > 0) {
                 if (badge) {
                     badge.textContent = data.mensajes_no_leidos;
-                } else {
+                } else if (link) {
                     // Crear el badge si no existe
                     const newBadge = document.createElement('span');
                     newBadge.className = 'badge badge-danger badge-notificacion';
@@ -296,23 +354,29 @@ setInterval(actualizarNotificaciones, 30000);
 // Script para manejar el modal de logout y mejoras móviles
 document.addEventListener('DOMContentLoaded', function() {
     // Manejar el clic en el enlace de logout
-    document.getElementById('logoutLink').addEventListener('click', function(e) {
-        e.preventDefault(); // Prevenir el comportamiento por defecto
-        $('#logoutModal').modal('show'); // Mostrar el modal
-    });
+    const logoutLink = document.getElementById('logoutLink');
+    if (logoutLink) {
+        logoutLink.addEventListener('click', function(e) {
+            e.preventDefault(); // Prevenir el comportamiento por defecto
+            $('#logoutModal').modal('show'); // Mostrar el modal
+        });
+    }
     
     // Manejar la confirmación de logout
-    document.getElementById('confirmLogout').addEventListener('click', function(e) {
-        e.preventDefault(); // Prevenir cualquier acción por defecto
-        
-        // Cerrar el modal
-        $('#logoutModal').modal('hide');
-        
-        // Redirigir después de que el modal se haya ocultado
-        setTimeout(function() {
-            window.location.href = '../logout.php';
-        }, 500);
-    });
+    const confirmLogout = document.getElementById('confirmLogout');
+    if (confirmLogout) {
+        confirmLogout.addEventListener('click', function(e) {
+            e.preventDefault(); // Prevenir cualquier acción por defecto
+            
+            // Cerrar el modal
+            $('#logoutModal').modal('hide');
+            
+            // Redirigir después de que el modal se haya ocultado
+            setTimeout(function() {
+                window.location.href = '../logout.php';
+            }, 500);
+        });
+    }
     
     // MEJORA PARA DROPDOWNS EN MÓVILES
     if (window.innerWidth <= 991) {
@@ -349,6 +413,24 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Actualizar también al cargar la página
     actualizarNotificaciones();
+
+    // Overlay móvil para cerrar el navbar con un clic fuera
+    var $navbarCollapse = $('#navbarResponsive');
+    var $mobileBackdrop = $('#mobileNavbarBackdrop');
+
+    if ($navbarCollapse.length && $mobileBackdrop.length) {
+        $navbarCollapse.on('show.bs.collapse', function() {
+            $mobileBackdrop.addClass('show');
+        });
+
+        $navbarCollapse.on('hidden.bs.collapse', function() {
+            $mobileBackdrop.removeClass('show');
+        });
+
+        $mobileBackdrop.on('click', function() {
+            $navbarCollapse.collapse('hide');
+        });
+    }
 });
 </script>
 

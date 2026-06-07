@@ -29,162 +29,679 @@ $estudiante = $result->fetch_assoc();
 // Obtener listados necesarios
 $carreras = obtenerTodasLasCarreras();
 $generos = obtenerGeneros($db);
+$estadosCiviles = obtenerEstadosCiviless($db);
+$tiposVivienda = obtenerTiposVivienda($db);
+$tenenciasVivienda = obtenerTenenciaViviendas($db);
+$ingresos = obtenerIngresos($db);
+$tiposCedula = obtenerTiposCedula($db);
+
+// Manejo de foto de perfil
+$fotoPerfil = '';
+if (!empty($estudiante['foto_perfil'])) {
+    $rutaFoto = '../foto_perfil/' . $estudiante['foto_perfil'];
+    if (file_exists($rutaFoto) && is_file($rutaFoto)) {
+        $fotoPerfil = $rutaFoto;
+    }
+}
+
+if (empty($fotoPerfil)) {
+    $fotoPerfil = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='40' r='20' fill='%236c757d'/%3E%3Ccircle cx='50' cy='100' r='40' fill='%236c757d'/%3E%3Ctext x='50' y='45' text-anchor='middle' fill='white' font-family='Arial' font-size='14'%3EUSER%3C/text%3E%3C/svg%3E";
+}
 ?>
 
-<div class="modal-header">
-    <h5 class="modal-title">Editar Estudiante</h5>
-    
-</div>
+<div class="modal-body p-0">
+    <!-- Header con foto -->
+    <div class="bg-light py-3 px-4 border-bottom">
+        <div class="row align-items-center">
+            <div class="col-auto">
+                <div class="avatar-container position-relative">
+                    <img src="<?= $fotoPerfil ?>" 
+                         alt="Foto de perfil" 
+                         class="avatar-img rounded-circle border"
+                         id="fotoPreview">
+                    <div class="status-indicator <?= ($estudiante['status'] ?? 0) == 1 ? 'bg-success' : 'bg-secondary' ?>"></div>
+                </div>
+            </div>
+            <div class="col">
+                <h6 class="mb-1 text-dark"><?= htmlspecialchars($estudiante['nombre'] ?? '') ?></h6>
+                <p class="text-muted mb-1 small">
+                    <i class="fas fa-id-card mr-1"></i>
+                    <?= htmlspecialchars($estudiante['idusuario'] ?? '') ?> 
+                    | ID: <?= htmlspecialchars($estudiante['id'] ?? '') ?>
+                </p>
+                <div class="mb-2">
+                    <input type="file" class="form-control form-control-sm" id="foto_perfil" name="foto_perfil" 
+                           accept=".jpg,.jpeg,.png,.webp" style="max-width: 200px;">
+                    <small class="text-muted">Formatos: JPG, JPEG, PNG, WEBP (Máx: 5MB)</small>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<div class="modal-body">
-    <form id="formEditarEstudiante" method="post">
-        <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
-        
-        <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="nombre" class="form-label">Nombre Completo</label>
-                    <input type="text" class="form-control" id="nombre" name="nombre" 
-                           value="<?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?>" required>
-                </div>
-            </div>
+    <div class="container-fluid py-3">
+        <form id="formEditarEstudiante" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="id" value="<?= $estudiante['id'] ?>">
             
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="cedula" class="form-label">Usuario</label>
-                    <input type="text" class="form-control" id="cedula" name="cedula" 
-                           value="<?php echo htmlspecialchars($estudiante['username'] ?? ''); ?>" required>
+            <!-- Pestañas para organizar la información - Bootstrap 4.5 -->
+            <ul class="nav nav-tabs mb-4" id="editTabs" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="personal-tab" data-toggle="tab" href="#personal" role="tab">
+                        <i class="fas fa-user mr-1"></i>Personal
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="academico-tab" data-toggle="tab" href="#academico" role="tab">
+                        <i class="fas fa-graduation-cap mr-1"></i>Académico
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="contacto-tab" data-toggle="tab" href="#contacto" role="tab">
+                        <i class="fas fa-address-book mr-1"></i>Contacto
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="vivienda-tab" data-toggle="tab" href="#vivienda" role="tab">
+                        <i class="fas fa-home mr-1"></i>Vivienda
+                    </a>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="editTabsContent">
+                <!-- Pestaña Información Personal -->
+                <div class="tab-pane fade show active" id="personal" role="tabpanel">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="nombre" class="form-label">Nombre Completo</label>
+                                <input type="text" class="form-control" id="nombre" name="nombre" 
+                                       value="<?= htmlspecialchars($estudiante['nombre'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <!-- CAMPO CÉDULA SIMPLIFICADO -->
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="idusuario" class="form-label">Cédula</label>
+                                <input type="text" class="form-control" id="idusuario" name="idusuario" 
+                                       value="<?= htmlspecialchars($estudiante['idusuario'] ?? '') ?>" 
+                                       placeholder="Ej: V-12345678">
+                                <small class="text-muted">Formato: V-12345678 o E-12345678</small>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="username" class="form-label">Usuario</label>
+                                <input type="text" class="form-control" id="username" name="username" 
+                                       value="<?= htmlspecialchars($estudiante['username'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="genero" class="form-label">Género</label>
+                                <select class="custom-select" id="genero" name="genero">
+                                    <option value="">Seleccionar género</option>
+                                    <?php foreach ($generos as $nombre_genero): ?>
+                                        <option value="<?= htmlspecialchars($nombre_genero) ?>"
+                                            <?= ($estudiante['genero'] == $nombre_genero) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($nombre_genero) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edo_civil" class="form-label">Estado Civil</label>
+                                <select class="custom-select" id="edo_civil" name="edo_civil">
+                                    <option value="">Seleccionar estado civil</option>
+                                    <?php foreach ($estadosCiviles as $id => $estadoCivil): ?>
+                                        <option value="<?= htmlspecialchars($estadoCivil) ?>"
+                                            <?= ($estudiante['edo_civil'] == $estadoCivil) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($estadoCivil) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="fecha_nac" class="form-label">Fecha de Nacimiento</label>
+                                <input type="date" class="form-control" id="fecha_nac" name="fecha_nac" 
+                                       value="<?= htmlspecialchars($estudiante['fecha_nac_format'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="etnia" class="form-label">Etnia</label>
+                                <input type="text" class="form-control" id="etnia" name="etnia" 
+                                       value="<?= htmlspecialchars($estudiante['etnia'] ?? '') ?>">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pestaña Información Académica -->
+                <div class="tab-pane fade" id="academico" role="tabpanel">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="carrera" class="form-label">Programa</label>
+                                <select name="carrera" id="carrera" class="custom-select">
+                                    <option value="">-- Seleccione una carrera --</option>
+                                    <?php foreach ($carreras as $carrera): ?>
+                                        <option value="<?= htmlspecialchars($carrera['id']) ?>" 
+                                            <?= ($estudiante['carrera'] ?? '') == $carrera['id'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($carrera['nombre']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="fecha_ingreso" class="form-label">Fecha de Ingreso</label>
+                                <input type="date" class="form-control" id="fecha_ingreso" name="fecha_ingreso" 
+                                       value="<?= htmlspecialchars($estudiante['fecha_ingreso_format'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="status" class="form-label">Estado</label>
+                                <select class="custom-select" id="status" name="status">
+                                    <option value="1" <?= ($estudiante['status'] ?? 1) == 1 ? 'selected' : '' ?>>Activo</option>
+                                    <option value="0" <?= ($estudiante['status'] ?? 1) == 0 ? 'selected' : '' ?>>Inactivo</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label class="form-label">Títulos Obtenidos</label>
+                                <input type="text" class="form-control" id="titulos" name="titulos" 
+                                       value="<?= htmlspecialchars($estudiante['titulos'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label class="form-label">Instituciones Anteriores</label>
+                                <input type="text" class="form-control" id="institutos" name="institutos" 
+                                       value="<?= htmlspecialchars($estudiante['institutos'] ?? '') ?>">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pestaña Información de Contacto -->
+                <div class="tab-pane fade" id="contacto" role="tabpanel">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="email" class="form-label">Correo Electrónico</label>
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       value="<?= htmlspecialchars($estudiante['email'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="tlf" class="form-label">Teléfono Principal</label>
+                                <input type="tel" class="form-control" id="tlf" name="tlf" 
+                                       value="<?= htmlspecialchars($estudiante['tlf'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="cel" class="form-label">Teléfono Celular</label>
+                                <input type="tel" class="form-control" id="cel" name="cel" 
+                                       value="<?= htmlspecialchars($estudiante['cel'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="num_telf_opc" class="form-label">Teléfono Opcional</label>
+                                <input type="tel" class="form-control" id="num_telf_opc" name="num_telf_opc" 
+                                       value="<?= htmlspecialchars($estudiante['num_telf_opc'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label for="enfermedad" class="form-label">Enfermedades</label>
+                                <input type="text" class="form-control" id="enfermedad" name="enfermedad" 
+                                       value="<?= htmlspecialchars($estudiante['enfermedad'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label for="discapacidad" class="form-label">Discapacidad</label>
+                                <input type="text" class="form-control" id="discapacidad" name="discapacidad" 
+                                       value="<?= htmlspecialchars($estudiante['discapacidad'] ?? '') ?>">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pestaña Información de Vivienda -->
+                <div class="tab-pane fade" id="vivienda" role="tabpanel">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label for="direccion" class="form-label">Dirección Completa</label>
+                                <textarea class="form-control" id="direccion" name="direccion" rows="2"><?= htmlspecialchars($estudiante['direccion'] ?? '') ?></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="estado" class="form-label">Estado</label>
+                                <input type="text" class="form-control" id="estado" name="estado" 
+                                       value="<?= htmlspecialchars($estudiante['estado'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="municipio" class="form-label">Municipio</label>
+                                <input type="text" class="form-control" id="municipio" name="municipio" 
+                                       value="<?= htmlspecialchars($estudiante['municipio'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="parroquia" class="form-label">Parroquia</label>
+                                <input type="text" class="form-control" id="parroquia" name="parroquia" 
+                                       value="<?= htmlspecialchars($estudiante['parroquia'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="ciudad" class="form-label">Ciudad</label>
+                                <input type="text" class="form-control" id="ciudad" name="ciudad" 
+                                       value="<?= htmlspecialchars($estudiante['ciudad'] ?? '') ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="casaapto" class="form-label">Tipo de Vivienda</label>
+                                <select class="custom-select" id="casaapto" name="casaapto">
+                                    <option value="">Seleccionar tipo</option>
+                                    <?php foreach ($tiposVivienda as $id => $vivienda): ?>
+                                        <option value="<?= htmlspecialchars($vivienda) ?>"
+                                            <?= ($estudiante['casaapto'] == $vivienda) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($vivienda) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="tenencia_vivienda" class="form-label">Tenencia de Vivienda</label>
+                                <select class="custom-select" id="tenencia_vivienda" name="tenencia_vivienda">
+                                    <option value="">Seleccionar tenencia</option>
+                                    <?php foreach ($tenenciasVivienda as $id => $tenencia): ?>
+                                        <option value="<?= htmlspecialchars($tenencia) ?>"
+                                            <?= ($estudiante['tenencia_vivienda'] == $tenencia) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($tenencia) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="grupo_familiar" class="form-label">Grupo Familiar</label>
+                                <input type="number" class="form-control" id="grupo_familiar" name="grupo_familiar" 
+                                       value="<?= htmlspecialchars($estudiante['grupo_familiar'] ?? '') ?>" min="0">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="acargo_usted" class="form-label">Personas a Cargo</label>
+                                <input type="number" class="form-control" id="acargo_usted" name="acargo_usted" 
+                                       value="<?= htmlspecialchars($estudiante['acargo_usted'] ?? '') ?>" min="0">
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label for="fuente_ingresos" class="form-label">Fuente de Ingresos</label>
+                                <select class="custom-select" id="fuente_ingresos" name="fuente_ingresos">
+                                    <option value="">Seleccionar fuente</option>
+                                    <?php foreach ($ingresos as $id => $ingreso): ?>
+                                        <option value="<?= $id ?>"
+                                            <?= ($estudiante['fuente_ingresos'] == $id) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($ingreso) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label for="punto_referencia" class="form-label">Punto de Referencia</label>
+                                <input type="text" class="form-control" id="punto_referencia" name="punto_referencia" 
+                                       value="<?= htmlspecialchars($estudiante['punto_referencia'] ?? '') ?>">
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="num_telf" class="form-label">Teléfono Principal</label>
-                    <input type="tel" class="form-control" id="num_telf" name="num_telf" 
-                           value="<?php echo htmlspecialchars($estudiante['tlf'] ?? ''); ?>">
+
+            <!-- Botones dentro del formulario -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="d-flex justify-content-end gap-2 border-top pt-3">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                            <i class="fas fa-times mr-1"></i>Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="btnGuardar">
+                            <i class="fas fa-save mr-1"></i>Guardar Cambios
+                        </button>
+                    </div>
                 </div>
             </div>
-            
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="num_telf_opc" class="form-label">Teléfono Opcional</label>
-                    <input type="tel" class="form-control" id="num_telf_opc" name="num_telf_opc" 
-                           value="<?php echo htmlspecialchars($estudiante['num_telf_opc'] ?? ''); ?>">
-                </div>
-            </div>
-        </div>
-        
-        <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="email" class="form-label">Correo Electrónico</label>
-                    <input type="email" class="form-control" id="email" name="email" 
-                           value="<?php echo htmlspecialchars($estudiante['email'] ?? ''); ?>">
-                </div>
-                
-                <div class="mb-3">
-                    <label for="fecha_nac" class="form-label">Fecha de Nacimiento</label>
-                    <input type="date" class="form-control" id="fecha_nac" name="fecha_nac" 
-                           value="<?php echo htmlspecialchars($estudiante['fecha_nac_format'] ?? ''); ?>">
-                </div>
-                
-                <div class="mb-3">
-                    <label for="genero" class="form-label">Género</label>
-                    <select class="custom-select d-block w-100" id="genero" name="genero" required>
-                        <option value="">Seleccionar género</option>
-                        <?php foreach ($generos as $id_genero => $nombre_genero): ?>
-                            <option value="<?php echo $id_genero; ?>"
-                                <?php echo ($estudiante['genero'] == $id_genero) ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($nombre_genero); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="carrera" class="form-label required">Programa</label>
-                    <select name="carrera" id="carrera" class="form-control" required>
-                        <option value="">-- Seleccione una carrera --</option>
-                        <?php foreach ($carreras as $carrera): ?>
-                            <option value="<?php echo htmlspecialchars($carrera['id']); ?>" 
-                                <?php echo ($estudiante['carrera'] ?? '') == $carrera['id'] ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($carrera['nombre']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                
-                <div class="mb-3">
-                    <label for="fecha_ingreso" class="form-label">Fecha de Ingreso</label>
-                    <input type="date" class="form-control" id="fecha_ingreso" name="fecha_ingreso" 
-                           value="<?php echo htmlspecialchars($estudiante['fecha_ingreso_format'] ?? ''); ?>">
-                </div>
-                
-                <div class="mb-3">
-                    <label for="status" class="form-label">Estado</label>
-                    <select class="custom-select d-block w-100" id="status" name="status" required>
-                        <option value="1" <?php echo ($estudiante['status'] ?? 1) == 1 ? 'selected' : ''; ?>>Activo</option>
-                        <option value="0" <?php echo ($estudiante['status'] ?? 1) == 0 ? 'selected' : ''; ?>>Inactivo</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-        
-        <div class="row mt-3">
-            <div class="col-12">
-                <div class="d-flex justify-content-end gap-2">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
-                </div>
-            </div>
-        </div>
-    </form>
+        </form>
+    </div>
 </div>
 
 <script>
 $(document).ready(function() {
-    $('#formEditarEstudiante').on('submit', function(e) {
+    // Inicializar pestañas de Bootstrap 4
+    $('#editTabs a').on('click', function (e) {
         e.preventDefault();
-        
-        // Validaciones básicas
-        const email = $('#email').val();
-        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            alert('Por favor ingrese un correo electrónico válido');
-            return;
-        }
-        
-        const telefono = $('#num_telf').val();
-        if (telefono && telefono.length < 10) {
-            alert('El teléfono debe tener al menos 10 dígitos');
-            return;
-        }
-        
-        // Enviar formulario via AJAX
-        const formData = new FormData(this);
-        
-        $.ajax({
-            url: 'actualizar_estudiante.php',
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(data) {
-                if (data.success) {
-                    alert(data.message);
-                    $('#editarEstudianteModal').modal('hide');
-                    location.reload();
-                } else {
-                    alert(data.message || 'Error al actualizar el estudiante');
-                }
-            },
-            error: function() {
-                alert('Ocurrió un error al procesar la solicitud');
+        $(this).tab('show');
+    });
+
+    // Vista previa de foto de perfil
+    $('#foto_perfil').on('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                $('#fotoPreview').attr('src', e.target.result);
             }
-        });
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // VALIDACIÓN EN TIEMPO REAL
+    $('#nombre').on('blur', function() {
+        const nombre = $(this).val().trim();
+        const $feedback = $(this).siblings('.invalid-feedback');
+        
+        if (nombre) {
+            if (/[0-9]/.test(nombre)) {
+                $(this).addClass('is-invalid');
+                if ($feedback.length === 0) {
+                    $(this).after('<div class="invalid-feedback">El nombre no puede contener números</div>');
+                }
+            } else if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s']+$/.test(nombre)) {
+                $(this).addClass('is-invalid');
+                if ($feedback.length === 0) {
+                    $(this).after('<div class="invalid-feedback">El nombre contiene caracteres no permitidos</div>');
+                }
+            } else {
+                $(this).removeClass('is-invalid');
+                $feedback.remove();
+            }
+        }
+    });
+
+    // Validar cédula en tiempo real
+    $('#idusuario').on('blur', function() {
+        const cedula = $(this).val().trim();
+        const $feedback = $(this).siblings('.invalid-feedback');
+        
+        if (cedula) {
+            if (!/^[VE]-\d{6,9}$/.test(cedula)) {
+                $(this).addClass('is-invalid');
+                if ($feedback.length === 0) {
+                    $(this).after('<div class="invalid-feedback">Formato: V-12345678 o E-12345678</div>');
+                }
+            } else {
+                $(this).removeClass('is-invalid');
+                $feedback.remove();
+            }
+        }
+    });
+
+    // Validar email en tiempo real
+    $('#email').on('blur', function() {
+        const email = $(this).val().trim();
+        const $feedback = $(this).siblings('.invalid-feedback');
+        
+        if (email) {
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                $(this).addClass('is-invalid');
+                if ($feedback.length === 0) {
+                    $(this).after('<div class="invalid-feedback">Correo electrónico no válido</div>');
+                }
+            } else {
+                $(this).removeClass('is-invalid');
+                $feedback.remove();
+            }
+        }
+    });
+
+    // VALIDACIÓN DEL FORMULARIO AL ENVIAR
+   // En el evento submit del formulario, actualiza el AJAX:
+$('#formEstudiante').on('submit', function(e) {
+    e.preventDefault();
+    
+    // Limpiar errores previos
+    $('.is-invalid').removeClass('is-invalid');
+    $('.invalid-feedback').remove();
+    
+    let errores = [];
+    
+    // Validar cédula
+    const cedula = $('#idusuario').val().trim();
+    if (!cedula) {
+        errores.push('La cédula es obligatoria');
+        $('#idusuario').addClass('is-invalid').after('<div class="invalid-feedback">La cédula es obligatoria</div>');
+    } else if (!/^[VE]-\d{6,9}$/.test(cedula)) {
+        errores.push('Formato de cédula inválido. Debe ser V-12345678 o E-12345678');
+        $('#idusuario').addClass('is-invalid').after('<div class="invalid-feedback">Formato: V-12345678 o E-12345678</div>');
+    }
+    
+    // Validar nombre
+    const nombre = $('#nombre').val().trim();
+    if (!nombre) {
+        errores.push('El nombre es obligatorio');
+        $('#nombre').addClass('is-invalid').after('<div class="invalid-feedback">El nombre es obligatorio</div>');
+    } else if (/[0-9]/.test(nombre)) {
+        errores.push('El nombre no puede contener números. Solo letras, espacios y apóstrofes (\')');
+        $('#nombre').addClass('is-invalid').after('<div class="invalid-feedback">El nombre no puede contener números</div>');
+    }
+    
+    // Mostrar errores si existen
+    if (errores.length > 0) {
+        alert('❌ Errores de validación:\n\n• ' + errores.join('\n• '));
+        $('.is-invalid').first().focus();
+        return;
+    }
+    
+    // Mostrar loading
+    const submitBtn = $('button[type="submit"]', this);
+    const originalText = submitBtn.html();
+    submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i>Guardando...');
+    
+    // Enviar formulario via AJAX
+    const formData = new FormData(this);
+    
+    $.ajax({
+        url: $(this).attr('action'),
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        dataType: 'json',
+        success: function(response) {
+            // Verificar si response es string (necesita parse)
+            if (typeof response === 'string') {
+                try {
+                    response = JSON.parse(response);
+                } catch (e) {
+                    console.error('Error al parsear JSON:', e);
+                    alert('❌ Error: Respuesta del servidor no es JSON válido.');
+                    return;
+                }
+            }
+            
+            if (response && response.success) {
+                alert(response.message || '✅ Estudiante registrado exitosamente');
+                
+                // Si es modal, cerrarlo
+                if ($('#formEstudiante').closest('.modal').length > 0) {
+                    $('#formEstudiante').closest('.modal').modal('hide');
+                }
+                
+                // Recargar o redirigir
+                setTimeout(function() {
+                    if (response.redirect_url) {
+                        window.location.href = response.redirect_url;
+                    } else {
+                        location.reload();
+                    }
+                }, 1000);
+            } else {
+                const errorMsg = response && response.message 
+                    ? response.message 
+                    : 'Error desconocido al registrar estudiante';
+                
+                // Mostrar errores específicos
+                if (errorMsg.includes('Errores de validación')) {
+                    alert(errorMsg);
+                } else {
+                    alert('❌ Error: ' + errorMsg);
+                }
+            }
+        },
+        error: function(xhr, status, error) {
+            let mensajeError = '❌ Error de conexión\n\n';
+            
+            if (xhr.status === 0) {
+                mensajeError += 'No hay conexión con el servidor.';
+            } else if (xhr.status === 500) {
+                mensajeError += 'Error interno del servidor.';
+            } else {
+                mensajeError += 'Detalles: ' + error;
+                
+                // Intentar mostrar respuesta del servidor
+                if (xhr.responseText) {
+                    try {
+                        const serverResponse = JSON.parse(xhr.responseText);
+                        if (serverResponse.message) {
+                            mensajeError += '\n\nMensaje: ' + serverResponse.message;
+                        }
+                    } catch (e) {
+                        mensajeError += '\n\nRespuesta: ' + xhr.responseText.substring(0, 200);
+                    }
+                }
+            }
+            
+            alert(mensajeError);
+        },
+        complete: function() {
+            submitBtn.prop('disabled', false).html(originalText);
+        }
     });
 });
 </script>
+
+<style>
+.avatar-container {
+    position: relative;
+    display: inline-block;
+}
+
+.avatar-img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.status-indicator {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+}
+
+.nav-tabs .nav-link {
+    font-weight: 500;
+    border: none;
+    padding: 0.75rem 1rem;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: #f8f9fa;
+    border-bottom: 3px solid #007bff;
+}
+
+.form-label.required::after {
+    content: " *";
+    color: #dc3545;
+}
+
+.tab-content {
+    min-height: 400px;
+}
+
+/* Asegurar que las pestañas se vean bien en Bootstrap 4 */
+.nav-tabs {
+    border-bottom: 1px solid #dee2e6;
+}
+
+.nav-tabs .nav-item {
+    margin-bottom: -1px;
+}
+
+.nav-tabs .nav-link {
+    border: 1px solid transparent;
+    border-top-left-radius: 0.25rem;
+    border-top-right-radius: 0.25rem;
+}
+
+.nav-tabs .nav-link:hover {
+    border-color: #e9ecef #e9ecef #dee2e6;
+}
+
+.nav-tabs .nav-link.active {
+    color: #495057;
+    background-color: #fff;
+    border-color: #dee2e6 #dee2e6 #fff;
+}
+
+/* Mejorar espaciado de los botones */
+.gap-2 > * {
+    margin-left: 0.5rem;
+}
+.gap-2 > *:first-child {
+    margin-left: 0;
+}
+</style>

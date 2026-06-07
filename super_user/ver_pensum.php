@@ -10,146 +10,214 @@ if (!$db) {
     die("Error de conexión: " . mysqli_connect_error());
 }
 
-// Validar parámetro
-if (!isset($_GET['id_carrera']) || !is_numeric($_GET['id_carrera'])) {
-    header("Location: lista_carreras.php");
-    exit();
+$id_carrera = null;
+$carrera = null;
+$version_year = null;
+$codigo_malla = null;
+$id_malla = null;
+
+// --- LÓGICA DE BÚSQUEDA ---
+if (isset($_GET['id_malla'])) {
+    $malla_id = intval($_GET['id_malla']);
+    $stmt = $db->prepare("SELECT m.id_malla, m.id_carrera, m.codigo_malla, m.anio, c.nombre_carrera, c.tipo_formacion FROM mallas m JOIN carreras c ON m.id_carrera = c.id_carrera WHERE m.id_malla = ? LIMIT 1");
+    if ($stmt) {
+        $stmt->bind_param('i', $malla_id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        if ($res && $res->num_rows > 0) {
+            $row = $res->fetch_assoc();
+            $carrera = ['nombre_carrera' => $row['nombre_carrera'], 'tipo_formacion' => $row['tipo_formacion']];
+            $id_carrera = (int)$row['id_carrera'];
+            $codigo_malla = $row['codigo_malla'];
+            $id_malla = $malla_id;
+        }
+        $stmt->close();
+    }
+} elseif (isset($_GET['id_carrera'])) {
+    $id_carrera = (int)$_GET['id_carrera'];
+    $stmt = $db->prepare("SELECT nombre_carrera, tipo_formacion FROM carreras WHERE id_carrera = ? LIMIT 1");
+    if ($stmt) {
+        $stmt->bind_param('i', $id_carrera);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        if ($res && $res->num_rows > 0) { $carrera = $res->fetch_assoc(); }
+        $stmt->close();
+    }
 }
 
-$id_carrera = (int)$_GET['id_carrera'];
+if (!$carrera) { header("Location: lista_carreras.php"); exit(); }
 
-// Obtener información básica de la carrera
-$query_carrera = "SELECT nombre_carrera, tipo_formacion FROM carreras WHERE id_carrera = $id_carrera";
-$result_carrera = mysqli_query($db, $query_carrera);
-
-if (!$result_carrera || mysqli_num_rows($result_carrera) === 0) {
-    header("Location: lista_carreras.php");
-    exit();
+if (empty($id_malla) && !empty($id_carrera)) {
+    $mallas_disponibles = obtenerMallasPorCarrera($id_carrera);
+    if (!empty($mallas_disponibles)) {
+        $id_malla = intval($mallas_disponibles[0]['id_malla']);
+        $codigo_malla = $mallas_disponibles[0]['codigo_malla'];
+    }
 }
 
-$carrera = mysqli_fetch_assoc($result_carrera);
-$es_pnf = ($carrera['tipo_formacion'] == 'PNF');
-
-// Obtener el tipo de período según la carrera (trimestre o semestre)
 $tipo_periodo = obtenerTipoPeriodoPorCarrera($id_carrera);
-
-// Debug: ver qué está retornando la función
-error_log("Tipo de periodo para carrera ID $id_carrera: " . $tipo_periodo);
-
-// Corregir la formación del plural
 $texto_duracion = ($tipo_periodo == 'trimestre') ? 'trimestres' : 'semestres';
 
-// Obtener materias agrupadas por trayecto y ordenadas por duración
-$query_materias = "SELECT 
-                    m.*, 
-                    cm.semestre,
-                    m.trayecto
-                  FROM materias m
-                  JOIN carrera_materia cm ON m.id_materia = cm.id_materia
-                  WHERE cm.id_carrera = $id_carrera
-                  ORDER BY m.trayecto, m.duracion_periodo, m.nombre_materia";
-$result_materias = mysqli_query($db, $query_materias);
-
-if (!$result_materias) {
-    die("Error en consulta: " . mysqli_error($db));
+// --- CONSULTA CON LOS NUEVOS CAMPOS ---
+if (!empty($id_malla)) {
+    $query_materias = "SELECT m.*, mm.semestre, m.trayecto FROM materias m JOIN malla_materia mm ON m.id_materia = mm.id_materia WHERE mm.id_malla = " . intval($id_malla) . " ORDER BY m.trayecto, m.duracion_periodo, m.nombre_materia";
+} else {
+    $query_materias = "SELECT m.*, cm.semestre, m.trayecto FROM materias m JOIN carrera_materia cm ON m.id_materia = cm.id_materia WHERE cm.id_carrera = " . intval($id_carrera) . " ORDER BY m.trayecto, m.duracion_periodo, m.nombre_materia";
 }
 
-// Agrupar materias solo por trayecto
+$result_materias = mysqli_query($db, $query_materias);
 $materias_agrupadas = [];
+
+// Determinar el texto a usar basado en el tipo de formación
+$es_ptf = (isset($carrera['tipo_formacion']) && strtoupper($carrera['tipo_formacion']) == 'PTF');
+$texto_trayecto = $es_ptf ? 'Semestre' : 'Trayecto';
+
 while ($materia = mysqli_fetch_assoc($result_materias)) {
     $trayecto = $materia['trayecto'];
+    $nombre_grupo = '';
     
-    // Formatear el texto del trayecto
-    $texto_trayecto = ($trayecto == 0) ? 'Trayecto Inicial' : 'Trayecto ' . $trayecto;
-    
-    if (!isset($materias_agrupadas[$texto_trayecto])) {
-        $materias_agrupadas[$texto_trayecto] = [];
+    if ($es_ptf) {
+        // Para PTF: "Semestre 1", "Semestre 2", etc.
+        $nombre_grupo = ($trayecto == 0) ? 'Semestre Inicial' : 'Semestre ' . $trayecto;
+    } else {
+        // Para otros tipos: "Trayecto 1", "Trayecto 2", etc.
+        $nombre_grupo = ($trayecto == 0) ? 'Trayecto Inicial' : 'Trayecto ' . $trayecto;
     }
     
-    $materias_agrupadas[$texto_trayecto][] = $materia;
+    $materias_agrupadas[$nombre_grupo][] = $materia;
+}
+
+// ==========================================
+// GENERACIÓN DE PDF (VERTICAL OPTIMIZADO)
+// ==========================================
+if (isset($_GET['pdf']) && $_GET['pdf'] == '1') {
+    ini_set('display_errors', '0');
+    require_once __DIR__ . '/../fpdf/fpdf.php';
+
+    $pdf = new FPDF('P', 'mm', 'A4');
+    $pdf->SetAutoPageBreak(true, 20);
+    $pdf->AddPage();
+
+    if (function_exists('agregarMembreteFPDF')) {
+        agregarMembreteFPDF($pdf);
+        $pdf->SetY(45);
+    }
+
+    $pdf->SetFont('Arial', 'B', 12);
+    $pdf->Cell(0, 7, to_iso('PENSUM DE ESTUDIOS: ' . mb_strtoupper($carrera['nombre_carrera'])), 0, 1, 'C');
+    
+    // Solo el código, sin la frase "Código de malla"
+    if(!empty($codigo_malla)) {
+        $pdf->SetFont('Arial', '', 11);
+        $pdf->Cell(0, 6, to_iso($codigo_malla), 0, 1, 'C');
+    }
+    $pdf->Ln(5);
+
+    foreach ($materias_agrupadas as $grupo_nombre => $materias) {
+        // Verificar espacio restante antes de imprimir el encabezado del grupo
+        if ($pdf->GetY() > 250) $pdf->AddPage();
+
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->SetFillColor(230, 230, 230);
+        $pdf->Cell(0, 7, to_iso($grupo_nombre), 1, 1, 'L', true);
+
+        // Anchos de columna redistribuidos (Total 190mm)
+        $w = [22, 70, 14, 16, 16, 16, 16, 20]; // Total: 190mm
+        $pdf->SetFont('Arial', 'B', 8);
+        $headers = ['CÓDIGO', 'ASIGNATURA', 'UC', 'H.T.', 'H.P.', 'H.L.', 'H.S.', 'ESTADO'];
+        foreach($headers as $i => $h_text) $pdf->Cell($w[$i], 7, to_iso($h_text), 1, 0, 'C', true);
+        $pdf->Ln();
+
+        $pdf->SetFont('Arial', '', 8);
+        foreach ($materias as $m) {
+            // Calcular altura de la fila basándose en el nombre de la materia
+            $nb_lines = $pdf->GetStringWidth(to_iso($m['nombre_materia'])) > $w[1] ? 2 : 1;
+            $h_fila = 6 * $nb_lines;
+
+            // Salto de página preventivo si la fila no cabe
+            if ($pdf->GetY() + $h_fila > 270) $pdf->AddPage();
+
+            $x = $pdf->GetX();
+            $y = $pdf->GetY();
+
+            $pdf->Cell($w[0], $h_fila, to_iso($m['cod_materia']), 1, 0, 'C');
+            
+            // Celda multi-línea para el nombre
+            $pdf->MultiCell($w[1], ($h_fila/$nb_lines), to_iso($m['nombre_materia']), 1, 'L');
+            
+            $pdf->SetXY($x + $w[0] + $w[1], $y);
+            $pdf->Cell($w[2], $h_fila, $m['creditos'], 1, 0, 'C');
+            $pdf->Cell($w[3], $h_fila, $m['horas_teoricas'], 1, 0, 'C');
+            $pdf->Cell($w[4], $h_fila, $m['horas_practicas'], 1, 0, 'C');
+            $pdf->Cell($w[5], $h_fila, $m['horas_laboratorio'], 1, 0, 'C');
+            $pdf->Cell($w[6], $h_fila, $m['horas_semanales'], 1, 0, 'C');
+            $pdf->Cell($w[7], $h_fila, ($m['activa'] ? 'Activa' : 'Inactiva'), 1, 1, 'C');
+        }
+        $pdf->Ln(4);
+    }
+    $pdf->Output('I', 'Pensum_Academico.pdf');
+    exit();
 }
 
 include("includes/head.php");
 ?>
 
-<!-- Resto del código HTML/PHP permanece igual -->
 <div class="container-fluid">
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">Pensum: <?php echo htmlspecialchars($carrera['nombre_carrera']); ?> 
-            <small class="text-muted">(<?php echo strtoupper($tipo_periodo); ?>s)</small>
-        </h1>
+        <h1 class="h3 mb-0 text-gray-800">Pensum: <?php echo htmlspecialchars($carrera['nombre_carrera']); ?></h1>
         <div>
-            <a href="lista_carreras.php" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm no-print">
-                <i class="fas fa-arrow-left fa-sm text-white-50"></i> Volver a Carreras
+            <a href="lista_carreras.php" class="btn btn-sm btn-primary shadow-sm no-print"><i class="fas fa-arrow-left"></i> Volver</a>
+            <a href="?<?= $_SERVER['QUERY_STRING'] ?>&pdf=1" class="btn btn-sm btn-success shadow-sm no-print ml-2">
+                <i class="fas fa-print"></i> Generar PDF
             </a>
-            <button onclick="generarPDF()" class="d-none d-sm-inline-block btn btn-sm btn-success shadow-sm no-print ml-2">
-                <i class="fas fa-print fa-sm text-white-50"></i> Generar PDF
-            </button>
         </div>
     </div>
 
-    <div class="card shadow mb-4" id="printable-area">
-        <div class="card-header py-3 bg-secondary text-white d-flex justify-content-between align-items-center">
-            <h5 class="m-0 font-weight-bold">Plan de Estudios - Duración en <?php echo $texto_duracion; ?></h5>
-            <span class="no-print"><?php echo date('d/m/Y'); ?></span>
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-secondary text-white">
+            <h6 class="m-0 font-weight-bold">Plan de Estudios Completo</h6>
         </div>
         <div class="card-body">
             <?php if (empty($materias_agrupadas)): ?>
-                <div class="alert alert-warning">No hay materias asignadas a esta carrera.</div>
+                <div class="alert alert-warning">No hay materias registradas.</div>
             <?php else: ?>
-                <div class="accordion" id="pensumAccordion">
-                    <?php foreach ($materias_agrupadas as $texto_trayecto => $materias): ?>
-                        <div class="card mb-3">
-                            <div class="card-header" id="heading<?= md5($texto_trayecto) ?>">
-                                <h5 class="mb-0">
-                                    <button class="btn btn-link" type="button" data-toggle="collapse" 
-                                            data-target="#collapse<?= md5($texto_trayecto) ?>" 
-                                            aria-expanded="true" aria-controls="collapse<?= md5($texto_trayecto) ?>">
-                                        <?= $texto_trayecto ?>
-                                    </button>
-                                </h5>
-                            </div>
-
-                            <div id="collapse<?= md5($texto_trayecto) ?>" class="collapse show" 
-                                 aria-labelledby="heading<?= md5($texto_trayecto) ?>" data-parent="#pensumAccordion">
-                                <div class="card-body">
-                                    <div class="table-responsive">
-                                        <table class="table table-bordered table-hover table-sm">
-                                            <thead class="thead-light">
-                                                <tr>
-                                                    <th width="10%">Código</th>
-                                                    <th width="35%">Nombre</th>
-                                                    <th width="8%">Créditos</th>
-                                                    <th width="12%">Horas T</th>
-                                                    <th width="12%">Horas P</th>
-                                                    <th width="13%">Duración (<?php echo $texto_duracion; ?>)</th>
-                                                    <th width="10%">Estado</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ($materias as $materia): ?>
-                                                    <tr>
-                                                        <td><?php echo htmlspecialchars($materia['cod_materia']); ?></td>
-                                                        <td><?php echo htmlspecialchars($materia['nombre_materia']); ?></td>
-                                                        <td class="text-center"><?php echo htmlspecialchars($materia['creditos']); ?></td>
-                                                        <td class="text-center"><?php echo htmlspecialchars($materia['horas_teoricas']); ?></td>
-                                                        <td class="text-center"><?php echo htmlspecialchars($materia['horas_practicas']); ?></td>
-                                                        <td class="text-center"><?php echo htmlspecialchars($materia['duracion_periodo']); ?></td>
-                                                        <td class="text-center">
-                                                            <span class="badge badge-<?php echo $materia['activa'] ? 'success' : 'secondary'; ?>">
-                                                                <?php echo $materia['activa'] ? 'Activa' : 'Inactiva'; ?>
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
+                <?php foreach ($materias_agrupadas as $grupo => $materias): ?>
+                    <h5 class="font-weight-bold text-primary mt-4 mb-3"><?= htmlspecialchars($grupo) ?></h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover" style="table-layout: fixed; width: 100%;">
+                            <thead class="thead-light text-center">
+                                <tr>
+                                    <th style="width: 12%">Código</th>
+                                    <th style="width: 38%">Nombre de la Asignatura</th>
+                                    <th style="width: 8%">Unidades Crédito</th>
+                                    <th style="width: 8%">Horas Teóricas</th>
+                                    <th style="width: 8%">Horas Prácticas</th>
+                                    <th style="width: 8%">Horas Laboratorio</th>
+                                    <th style="width: 8%">Horas Semanales</th>
+                                    <th style="width: 10%">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($materias as $m): ?>
+                                    <tr>
+                                        <td class="text-center"><?= htmlspecialchars($m['cod_materia']) ?></td>
+                                        <td><?= htmlspecialchars($m['nombre_materia']) ?></td>
+                                        <td class="text-center"><?= $m['creditos'] ?></td>
+                                        <td class="text-center"><?= $m['horas_teoricas'] ?></td>
+                                        <td class="text-center"><?= $m['horas_practicas'] ?></td>
+                                        <td class="text-center"><?= $m['horas_laboratorio'] ?></td>
+                                        <td class="text-center"><?= $m['horas_semanales'] ?></td>
+                                        <td class="text-center">
+                                            <span class="badge badge-<?= $m['activa'] ? 'success' : 'secondary' ?>">
+                                                <?= $m['activa'] ? 'Activa' : 'Inactiva' ?>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endforeach; ?>
             <?php endif; ?>
         </div>
     </div>

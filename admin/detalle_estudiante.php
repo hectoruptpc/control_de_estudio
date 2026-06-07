@@ -24,6 +24,13 @@ if(isset($estudiante['carrera']) && !empty($estudiante['carrera'])) {
     }
 }
 
+// Obtener el nombre de la fuente de ingresos
+$fuenteIngresoNombre = 'No especificado';
+if (isset($estudiante['fuente_ingresos']) && !empty($estudiante['fuente_ingresos'])) {
+    $ingresos = obtenerIngresos($db);
+    $fuenteIngresoNombre = $ingresos[$estudiante['fuente_ingresos']] ?? $estudiante['fuente_ingresos'];
+}
+
 // =============================================
 // OBTENER NOMBRES DE UBICACIÓN
 // =============================================
@@ -34,10 +41,7 @@ $nombresUbicacion = [
     'ciudad_nombre' => 'No especificado'
 ];
 
-// Verificar si tenemos IDs de ubicación
 if (isset($estudiante['estado']) && !empty($estudiante['estado'])) {
-    
-    // Obtener nombre del estado
     if (is_numeric($estudiante['estado'])) {
         $sql_estado = "SELECT estado FROM estados WHERE id_estado = ?";
         $stmt_estado = $db->prepare($sql_estado);
@@ -51,14 +55,11 @@ if (isset($estudiante['estado']) && !empty($estudiante['estado'])) {
             $stmt_estado->close();
         }
     } else {
-        // Si no es numérico, usar el valor directamente
         $nombresUbicacion['estado_nombre'] = $estudiante['estado'];
     }
 }
 
 if (isset($estudiante['municipio']) && !empty($estudiante['municipio'])) {
-    
-    // Obtener nombre del municipio
     if (is_numeric($estudiante['municipio'])) {
         $sql_municipio = "SELECT municipio FROM municipios WHERE id_municipio = ?";
         $stmt_municipio = $db->prepare($sql_municipio);
@@ -72,14 +73,11 @@ if (isset($estudiante['municipio']) && !empty($estudiante['municipio'])) {
             $stmt_municipio->close();
         }
     } else {
-        // Si no es numérico, usar el valor directamente
         $nombresUbicacion['municipio_nombre'] = $estudiante['municipio'];
     }
 }
 
 if (isset($estudiante['parroquia']) && !empty($estudiante['parroquia'])) {
-    
-    // Obtener nombre de la parroquia
     if (is_numeric($estudiante['parroquia'])) {
         $sql_parroquia = "SELECT parroquia FROM parroquias WHERE id_parroquia = ?";
         $stmt_parroquia = $db->prepare($sql_parroquia);
@@ -93,14 +91,11 @@ if (isset($estudiante['parroquia']) && !empty($estudiante['parroquia'])) {
             $stmt_parroquia->close();
         }
     } else {
-        // Si no es numérico, usar el valor directamente
         $nombresUbicacion['parroquia_nombre'] = $estudiante['parroquia'];
     }
 }
 
 if (isset($estudiante['ciudad']) && !empty($estudiante['ciudad'])) {
-    
-    // Obtener nombre de la ciudad
     if (is_numeric($estudiante['ciudad'])) {
         $sql_ciudad = "SELECT ciudad FROM ciudades WHERE id_ciudad = ?";
         $stmt_ciudad = $db->prepare($sql_ciudad);
@@ -114,25 +109,22 @@ if (isset($estudiante['ciudad']) && !empty($estudiante['ciudad'])) {
             $stmt_ciudad->close();
         }
     } else {
-        // Si no es numérico, usar el valor directamente
         $nombresUbicacion['ciudad_nombre'] = $estudiante['ciudad'];
     }
 }
 
-// Manejo robusto de la foto de perfil
+// Manejo de foto de perfil
 $fotoPerfil = '';
 $tieneFoto = false;
 
 if (!empty($estudiante['foto_perfil'])) {
     $rutaFoto = '../foto_perfil/' . $estudiante['foto_perfil'];
-    // Verificar si el archivo existe físicamente
     if (file_exists($rutaFoto) && is_file($rutaFoto)) {
         $fotoPerfil = $rutaFoto;
         $tieneFoto = true;
     }
 }
 
-// Si no hay foto válida, usar una predeterminada
 if (!$tieneFoto) {
     $fotoPerfil = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='40' r='20' fill='%236c757d'/%3E%3Ccircle cx='50' cy='100' r='40' fill='%236c757d'/%3E%3Ctext x='50' y='45' text-anchor='middle' fill='white' font-family='Arial' font-size='14'%3EUSER%3C/text%3E%3C/svg%3E";
 }
@@ -153,26 +145,38 @@ if (!$tieneFoto) {
                 </div>
             </div>
             <div class="col">
-                <h4 class="mb-1 text-dark"><?= htmlspecialchars($estudiante['nombre'] ?? '') ?></h4>
-                <p class="text-muted mb-1">
-                    <i class="fas fa-id-card me-1"></i>
-                    <?= htmlspecialchars($estudiante['idusuario'] ?? '') ?> 
-                    | ID: <?= htmlspecialchars($estudiante['id'] ?? '') ?>
-                </p>
-                <p class="mb-1">
-                    <span class="badge bg-primary">
-                        <i class="fas fa-graduation-cap me-1"></i>
-                        <?= htmlspecialchars($nombreCarrera) ?>
-                    </span>
-                    <span class="badge <?= ($estudiante['status'] ?? 0) == 1 ? 'bg-success' : 'bg-secondary' ?> ms-2">
-                        <?= ($estudiante['status'] ?? 0) == 1 ? 'Activo' : 'Inactivo' ?>
-                    </span>
-                    <?php if (!$tieneFoto): ?>
-                        <span class="badge bg-warning ms-2">
-                            <i class="fas fa-camera me-1"></i>Sin foto
-                        </span>
-                    <?php endif; ?>
-                </p>
+                <div class="d-flex justify-content-between align-items-start flex-wrap">
+                    <div>
+                        <h4 class="mb-1 text-dark"><?= htmlspecialchars($estudiante['nombre'] ?? '') ?></h4>
+                        <p class="text-muted mb-1">
+                            <i class="fas fa-id-card me-1"></i>
+                            <?= htmlspecialchars($estudiante['idusuario'] ?? '') ?> 
+                            | ID: <?= htmlspecialchars($estudiante['id'] ?? '') ?>
+                        </p>
+                        <p class="mb-1">
+                            <span class="badge bg-primary">
+                                <i class="fas fa-graduation-cap me-1"></i>
+                                <?= htmlspecialchars($nombreCarrera) ?>
+                            </span>
+                            <span class="badge <?= ($estudiante['status'] ?? 0) == 1 ? 'bg-success' : 'bg-secondary' ?> ms-2">
+                                <?= ($estudiante['status'] ?? 0) == 1 ? 'Activo' : 'Inactivo' ?>
+                            </span>
+                            <?php if (!$tieneFoto): ?>
+                                <span class="badge bg-warning ms-2">
+                                    <i class="fas fa-camera me-1"></i>Sin foto
+                                </span>
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                    <div>
+                        <a href="consulta_notas.php?cedula=<?= urlencode($estudiante['idusuario'] ?? '') ?>" 
+                           class="btn btn-info btn-sm" 
+                           target="_blank"
+                           title="Ver historial académico">
+                            <i class="fas fa-book-open me-1"></i> Historial Académico
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -224,6 +228,10 @@ if (!$tieneFoto) {
                             <div class="col-12">
                                 <label class="form-label small text-muted mb-1">Programa</label>
                                 <p class="mb-0 fw-semibold"><?= htmlspecialchars($nombreCarrera) ?></p>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label small text-muted mb-1">Sede</label>
+                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($estudiante['sede'] ?? 'No especificada') ?></p>
                             </div>
                             <div class="col-sm-6">
                                 <label class="form-label small text-muted mb-1">Fecha Ingreso</label>
@@ -305,7 +313,7 @@ if (!$tieneFoto) {
             </div>
         </div>
 
-        <!-- Tercera fila: Dirección y Ubicación (CORREGIDA) -->
+        <!-- Tercera fila: Dirección y Ubicación -->
         <div class="row g-4 mb-4">
             <!-- Dirección Residencial -->
             <div class="col-lg-6">
@@ -334,7 +342,7 @@ if (!$tieneFoto) {
                 </div>
             </div>
 
-            <!-- Ubicación Geográfica (CORREGIDA - solo nombres, sin IDs) -->
+            <!-- Ubicación Geográfica -->
             <div class="col-lg-6">
                 <div class="card h-100 shadow-sm">
                     <div class="card-header bg-light-cyan text-dark">
@@ -400,7 +408,7 @@ if (!$tieneFoto) {
                             </div>
                             <div class="col-12">
                                 <label class="form-label small text-muted mb-1">Fuente de Ingresos</label>
-                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($estudiante['fuente_ingresos'] ?? 'No especificado') ?></p>
+                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($fuenteIngresoNombre) ?></p>
                             </div>
                         </div>
                     </div>
@@ -418,12 +426,12 @@ if (!$tieneFoto) {
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-sm-6">
-                                <label class="form-label small text-muted mb-1">Tipo de Vivienda</label>
-                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($estudiante['tipo_vivienda'] ?? 'No especificado') ?></p>
+                                <label class="form-label small text-muted mb-1">Tenencia de Vivienda</label>
+                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($estudiante['tenencia_vivienda'] ?? 'No especificado') ?></p>
                             </div>
                             <div class="col-sm-6">
-                                <label class="form-label small text-muted mb-1">Tenencia</label>
-                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($estudiante['tenencia_vivienda'] ?? 'No especificado') ?></p>
+                                <label class="form-label small text-muted mb-1">Potencialidades</label>
+                                <p class="mb-0 fw-semibold"><?= htmlspecialchars($estudiante['potencialidades'] ?? 'No especificado') ?></p>
                             </div>
                         </div>
                     </div>
@@ -431,7 +439,7 @@ if (!$tieneFoto) {
             </div>
         </div>
 
-        <!-- Quinta fila: Títulos Obtenidos (OPCIONAL) -->
+        <!-- Quinta fila: Títulos Obtenidos -->
         <?php if (!empty($estudiante['titulos']) && $estudiante['titulos'] !== '|||'): ?>
         <div class="row g-4 mt-4">
             <div class="col-12">
@@ -445,6 +453,8 @@ if (!$tieneFoto) {
                         <?php 
                         $titulos = explode('|||', $estudiante['titulos'] ?? '');
                         $institutos = explode('|||', $estudiante['institutos'] ?? '');
+                        $pais_titulo = explode('|||', $estudiante['pais_titulo'] ?? '');
+                        $legalizado_titulo = explode('|||', $estudiante['legalizado_titulo'] ?? '');
                         ?>
                         <div class="table-responsive">
                             <table class="table table-sm table-hover">
@@ -452,6 +462,8 @@ if (!$tieneFoto) {
                                     <tr>
                                         <th>Título</th>
                                         <th>Institución</th>
+                                        <th>País</th>
+                                        <th>Legalizado</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -460,6 +472,8 @@ if (!$tieneFoto) {
                                             <tr>
                                                 <td><?= htmlspecialchars(trim($titulos[$i])) ?></td>
                                                 <td><?= isset($institutos[$i]) ? htmlspecialchars(trim($institutos[$i])) : 'No especificado' ?></td>
+                                                <td><?= isset($pais_titulo[$i]) ? htmlspecialchars(trim($pais_titulo[$i])) : 'No especificado' ?></td>
+                                                <td><?= isset($legalizado_titulo[$i]) && trim($legalizado_titulo[$i]) == 'Sí' ? 'Sí' : 'No' ?></td>
                                             </tr>
                                         <?php endif; ?>
                                     <?php endfor; ?>
@@ -475,13 +489,11 @@ if (!$tieneFoto) {
 </div>
 
 <script>
-// JavaScript adicional para manejar errores de imagen
 document.addEventListener('DOMContentLoaded', function() {
     const fotoEstudiante = document.getElementById('fotoEstudiante');
     
     if (fotoEstudiante) {
         fotoEstudiante.addEventListener('error', function() {
-            // Si falla la imagen, usar SVG por defecto
             this.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='40' r='20' fill='%236c757d'/%3E%3Ccircle cx='50' cy='100' r='40' fill='%236c757d'/%3E%3Ctext x='50' y='45' text-anchor='middle' fill='white' font-family='Arial' font-size='14'%3EUSER%3C/text%3E%3C/svg%3E";
         });
     }
@@ -500,7 +512,7 @@ document.addEventListener('DOMContentLoaded', function() {
     object-fit: cover;
     border: 4px solid #fff;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    background-color: #f8f9fa; /* Fondo por si falla la imagen */
+    background-color: #f8f9fa;
 }
 
 .status-indicator {
@@ -513,7 +525,6 @@ document.addEventListener('DOMContentLoaded', function() {
     border: 3px solid #fff;
 }
 
-/* Colores de header para las tarjetas */
 .bg-light-blue { background-color: #e3f2fd !important; }
 .bg-light-green { background-color: #e8f5e9 !important; }
 .bg-light-purple { background-color: #f3e5f5 !important; }
@@ -542,7 +553,6 @@ document.addEventListener('DOMContentLoaded', function() {
     font-weight: 600;
 }
 
-/* Estilos para la tabla de títulos */
 .table-responsive {
     max-height: 200px;
     overflow-y: auto;

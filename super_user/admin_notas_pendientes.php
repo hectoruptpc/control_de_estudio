@@ -12,6 +12,9 @@ if (!isLoggedIn() || !isAdmin()) {
     exit();
 }
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 $titulopag = "Administrar Notas Pendientes";
 include("includes/head.php");
 
@@ -39,44 +42,13 @@ function obtenerGruposNotasPendientes() {
     return $result;
 }
 
-// Procesar aprobación/rechazo
+// Procesar aprobación/rechazo - versión simplificada que redirige a procesar_acciones.php
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['accion']) && isset($_POST['notas_ids'])) {
-        $accion = $_POST['accion'];
-        $notas_ids = $_POST['notas_ids'];
-        $admin_id = $_SESSION['user']['id'];
-        
-        if ($accion === 'aprobar' || $accion === 'rechazar') {
-            $nuevo_estado = $accion === 'aprobar' ? 'aprobada' : 'rechazada';
-            
-            if (!empty($notas_ids)) {
-                $ids_str = implode(',', array_map('intval', $notas_ids));
-                
-                // Actualizar estado en notas_pendientes
-                $update_query = "UPDATE notas_pendientes SET estado = '$nuevo_estado' 
-                                WHERE id IN ($ids_str)";
-                $db->query($update_query);
-                
-                // Si se aprueban, copiar a notas_definitivas
-                if ($accion === 'aprobar') {
-                    $insert_query = "INSERT INTO notas_definitivas 
-                                    (id_usuario, id_materia, id_periodo, id_docente, 
-                                     trayecto_0, trayecto_1, trayecto_2, trayecto_3, trayecto_4, 
-                                     fecha_registro, id_admin_aprobador)
-                                    SELECT id_usuario, id_materia, id_periodo, id_docente,
-                                           trayecto_0, trayecto_1, trayecto_2, trayecto_3, trayecto_4,
-                                           NOW(), $admin_id
-                                    FROM notas_pendientes 
-                                    WHERE id IN ($ids_str)";
-                    $db->query($insert_query);
-                }
-                
-                $_SESSION['msg'] = count($notas_ids) . " nota(s) $nuevo_estado correctamente";
-            }
-            
-            header('location: admin_notas_pendientes.php');
-            exit();
-        }
+        // Esta lógica ahora se maneja en procesar_acciones.php
+        // Solo redirigimos si es una acción directa del formulario principal
+        $_SESSION['msg'] = "Procesando acción...";
+        // La lógica detallada está en procesar_acciones.php
     }
 }
 
@@ -170,9 +142,10 @@ $grupos_notas = obtenerGruposNotasPendientes();
                             <a href="#resumen" class="list-group-item list-group-item-action" data-toggle="tab">
                                 <i class="fas fa-chart-bar"></i> Resumen
                             </a>
-                            <a href="#acciones-grupo" class="list-group-item list-group-item-action" data-toggle="tab">
-                                <i class="fas fa-cogs"></i> Acciones Grupales
+                            <a href="#soporte" class="list-group-item list-group-item-action" data-toggle="tab">
+                                <i class="fas fa-paperclip"></i> Soporte
                             </a>
+                            
                         </div>
                     </div>
                     
@@ -191,6 +164,12 @@ $grupos_notas = obtenerGruposNotasPendientes();
                                     <p>Cargando resumen...</p>
                                 </div>
                             </div>
+                            <div class="tab-pane fade" id="soporte">
+                                <div class="text-center">
+                                    <div class="spinner-border text-primary"></div>
+                                    <p>Cargando soporte...</p>
+                                </div>
+                            </div>
                             <div class="tab-pane fade" id="acciones-grupo">
                                 <div class="text-center">
                                     <div class="spinner-border text-primary"></div>
@@ -200,7 +179,7 @@ $grupos_notas = obtenerGruposNotasPendientes();
                         </div>
                     </div>
                 </div>
-</div>
+            </div>
         </div>
     </div>
 </div>
@@ -248,6 +227,21 @@ $(document).ready(function() {
             },
             success: function(data) {
                 $('#resumen').html(data);
+            }
+        });
+        
+        // Cargar soporte
+        $.ajax({
+            url: 'ajax_detalles_notas.php',
+            type: 'POST',
+            data: { 
+                docente_id: docenteId, 
+                materia_id: materiaId, 
+                periodo_id: periodoId,
+                seccion: 'soporte'
+            },
+            success: function(data) {
+                $('#soporte').html(data);
             }
         });
         

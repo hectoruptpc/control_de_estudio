@@ -9,6 +9,9 @@ include('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('periodos_academicos');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 
 // Procesar formularios
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -35,26 +38,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     
     if (isset($_POST['cambiar_estado'])) {
-        $cambiado = cambiarEstadoPeriodo($db, $_POST['id_periodo'], $_POST['nuevo_estado']);
-        
-        if ($cambiado) {
-            $mensaje = 'Estado del periodo cambiado correctamente';
-            
-            if ($_POST['nuevo_estado'] == 0) {
-                // Desactivar período y sus secciones
-                desactivarSeccionesDePeriodo($db, $_POST['id_periodo']);
-                $mensaje .= '. Todas las secciones asociadas han sido desactivadas.';
+        $resultado = cambiarEstadoPeriodo($db, $_POST['id_periodo'], $_POST['nuevo_estado']);
+
+        // La función devuelve un array con 'success' y 'message'
+        if (is_array($resultado)) {
+            if (!empty($resultado['success'])) {
+                $_SESSION['mensaje'] = ['tipo' => 'success', 'texto' => $resultado['message'] ?? 'Estado del periodo cambiado correctamente.'];
             } else {
-                // Activar período y actualizar estado de secciones
-                actualizarEstadoSeccionesDePeriodo($db, $_POST['id_periodo']);
-                $mensaje .= '. Las secciones asociadas se reactivarán si cumplen con los requisitos.';
+                $_SESSION['mensaje'] = ['tipo' => 'danger', 'texto' => $resultado['message'] ?? 'Error al cambiar el estado del periodo'];
             }
-            
-            $_SESSION['mensaje'] = ['tipo' => 'success', 'texto' => $mensaje];
         } else {
-            $_SESSION['mensaje'] = ['tipo' => 'danger', 'texto' => 'Error al cambiar el estado del periodo'];
+            // Compatibilidad por si la función retornara booleano
+            if ($resultado) {
+                $_SESSION['mensaje'] = ['tipo' => 'success', 'texto' => 'Estado del periodo cambiado correctamente.'];
+            } else {
+                $_SESSION['mensaje'] = ['tipo' => 'danger', 'texto' => 'Error al cambiar el estado del periodo'];
+            }
         }
-        header("Location: ".$_SERVER['PHP_SELF']);
+
+        header("Location: " . $_SERVER['PHP_SELF']);
         exit();
     }
 }
@@ -111,7 +113,7 @@ include("includes/head.php");
                                 </span>
                             </td>
                             <td>
-                                <?php if (tienePermiso('gestionar_periodo_academico')): ?>
+                                <?php if (tienePermiso('gestion_periodo_academico')): ?>
                                 <button class="btn btn-sm btn-primary editar-periodo" 
                                         data-id="<?= $periodo['id_periodo'] ?>"
                                         data-nombre="<?= htmlspecialchars($periodo['nombre_periodo']) ?>"
@@ -260,7 +262,7 @@ $(document).ready(function() {
         var id = $(this).data('id');
         $('#id_periodo_estado').val(id);
         $('#nuevo_estado').val(0);
-        $('#mensaje_estado').html('¿Está seguro que desea DESACTIVAR este periodo académico?<br><br><strong>Todas las secciones asociadas también serán desactivadas.</strong>');
+        $('#mensaje_estado').html('¿Está seguro que desea DESACTIVAR este periodo académico?');
         $('#cambiarEstadoModal').modal('show');
     });
     
@@ -269,7 +271,7 @@ $(document).ready(function() {
         var id = $(this).data('id');
         $('#id_periodo_estado').val(id);
         $('#nuevo_estado').val(1);
-        $('#mensaje_estado').html('¿Está seguro que desea ACTIVAR este periodo académico?<br><br><strong>Las secciones asociadas se reactivarán automáticamente si cumplen con los requisitos (mínimo de estudiantes).</strong>');
+        $('#mensaje_estado').html('¿Está seguro que desea ACTIVAR este periodo académico?');
         $('#cambiarEstadoModal').modal('show');
     });
 });

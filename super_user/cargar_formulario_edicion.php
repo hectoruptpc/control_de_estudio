@@ -41,6 +41,11 @@ function generarInput($label, $name, $value, $type = 'text', $required = true) {
                     <option value="otro" <?= isset($docente['genero']) && $docente['genero'] == 'otro' ? 'selected' : '' ?>>Otro</option>
                 </select>
             </div>
+
+            <!-- Campos adicionales requeridos por actualizarDocente() -->
+            <?= generarInput('Municipio', 'municipio', $docente['municipio'] ?? '', 'text', false) ?>
+            <?= generarInput('Parroquia', 'parroquia', $docente['parroquia'] ?? '', 'text', false) ?>
+            <?= generarInput('Carrera', 'carrera', $docente['carrera'] ?? '', 'text', false) ?>
         </div>
         
         <div class="col-md-6">
@@ -54,26 +59,44 @@ function generarInput($label, $name, $value, $type = 'text', $required = true) {
                 <input type="date" class="form-control" id="fecha_nac" name="fecha_nac" 
                        value="<?= htmlspecialchars($docente['fecha_nac'] ?? '') ?>">
             </div>
+
+            <!-- Más campos adicionales -->
+            <div class="mb-3">
+                <label for="edo_civil" class="form-label">Estado Civil</label>
+                <select class="custom-select d-block w-100" id="edo_civil" name="edo_civil">
+                    <option value="">Seleccione...</option>
+                    <option value="soltero" <?= isset($docente['edo_civil']) && $docente['edo_civil'] == 'soltero' ? 'selected' : '' ?>>Soltero</option>
+                    <option value="casado" <?= isset($docente['edo_civil']) && $docente['edo_civil'] == 'casado' ? 'selected' : '' ?>>Casado</option>
+                    <option value="divorciado" <?= isset($docente['edo_civil']) && $docente['edo_civil'] == 'divorciado' ? 'selected' : '' ?>>Divorciado</option>
+                    <option value="viudo" <?= isset($docente['edo_civil']) && $docente['edo_civil'] == 'viudo' ? 'selected' : '' ?>>Viudo</option>
+                </select>
+            </div>
+
+            <?= generarInput('Teléfono Opcional', 'num_telf_opc', $docente['num_telf_opc'] ?? '', 'tel', false) ?>
+            <?= generarInput('Títulos', 'titulos', $docente['titulos'] ?? '', 'text', false) ?>
+            <?= generarInput('Institutos', 'institutos', $docente['institutos'] ?? '', 'text', false) ?>
             
-         
+            <div class="mb-3">
+                <label for="fecha_ingreso" class="form-label">Fecha de Ingreso</label>
+                <input type="date" class="form-control" id="fecha_ingreso" name="fecha_ingreso" 
+                       value="<?= htmlspecialchars($docente['fecha_ingreso'] ?? '') ?>">
+            </div>
         </div>
     </div>
     
     <div class="d-flex justify-content-end mt-4">
-    <button type="button" class="btn btn-secondary me-2" id="btnCancelarDocente">Cancelar</button>
+        <button type="button" class="btn btn-secondary me-2" id="btnCancelarDocente">Cancelar</button>
         <button type="submit" class="btn btn-primary">Guardar Cambios</button>
     </div>
 </form>
 
-<script>
 
+<script>
 $(document).ready(function() {
     // Forzar cierre de modal al hacer clic en Cancelar
     $('#btnCancelarDocente').on('click', function() {
-        // Buscar el modal padre y cerrarlo
         $(this).closest('.modal').modal('hide');
     });
-
 
     $('#formEditarDocente').on('submit', function(e) {
         e.preventDefault();
@@ -96,10 +119,16 @@ $(document).ready(function() {
             jsonData[field.name] = field.value;
         });
 
-        // Validar fecha_nac si está vacía
-        if (!jsonData.fecha_nac) {
-            jsonData.fecha_nac = null;
-        }
+        // Validar campos que pueden estar vacíos
+        if (!jsonData.fecha_nac) jsonData.fecha_nac = null;
+        if (!jsonData.fecha_ingreso) jsonData.fecha_ingreso = null;
+        if (!jsonData.municipio) jsonData.municipio = '';
+        if (!jsonData.parroquia) jsonData.parroquia = '';
+        if (!jsonData.carrera) jsonData.carrera = '';
+        if (!jsonData.edo_civil) jsonData.edo_civil = '';
+        if (!jsonData.num_telf_opc) jsonData.num_telf_opc = '';
+        if (!jsonData.titulos) jsonData.titulos = '';
+        if (!jsonData.institutos) jsonData.institutos = '';
 
         $.ajax({
             url: 'actualizar_docente.php',
@@ -117,7 +146,7 @@ $(document).ready(function() {
                         text: response.message,
                         confirmButtonText: 'Aceptar'
                     }).then(() => {
-                        $('#modalEditarDocente').modal('hide');
+                        $('#modalEditar').modal('hide');
                         // Refrescar la tabla o lista de docentes
                         if (typeof refreshDocentesTable === 'function') {
                             refreshDocentesTable();
@@ -158,3 +187,5 @@ $(document).ready(function() {
     });
 });
 </script>
+
+<?php

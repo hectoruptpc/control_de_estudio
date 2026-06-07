@@ -5,28 +5,24 @@ ini_set('display_errors', '1');
 $titulopag = "Asignación de Secciones a Docentes";
 include('../funciones/functions.php');
 
-//CARGAR PERMISOS
+// CARGAR PERMISOS
 cargarPermisosUsuario();
 verificarPermiso('asig_secciones');
 
-// Manejar petición AJAX para obtener materias del docente
-if(isset($_GET['ajax']) && $_GET['ajax'] == 'materias_docente' && isset($_GET['id_docente'])) {
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
+// Variables para mensajes
+$tipo_mensaje = ''; // 'success' o 'error'
+$texto_mensaje = '';
+
+// Manejar petición AJAX para obtener materias del docente POR CARRERA
+if(isset($_GET['ajax']) && $_GET['ajax'] == 'materias_docente_carrera' && isset($_GET['id_docente']) && isset($_GET['id_carrera'])) {
     header('Content-Type: application/json');
     $id_docente = $db->real_escape_string($_GET['id_docente']);
+    $id_carrera = $db->real_escape_string($_GET['id_carrera']);
     
-    $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia 
-              FROM docente_materia dm
-              JOIN materias m ON dm.id_materia = m.id_materia
-              WHERE dm.id_usuario = '$id_docente'
-              ORDER BY m.nombre_materia";
-    
-    $result = $db->query($query);
-    $materias = array();
-    
-    while($row = $result->fetch_assoc()) {
-        $materias[] = $row;
-    }
-    
+    $materias = obtenerMateriasDocentePorCarrera($id_docente, $id_carrera);
     echo json_encode($materias);
     exit();
 }
@@ -37,35 +33,28 @@ if(isset($_POST['asignar'])) {
     $id_seccion = $db->real_escape_string($_POST['id_seccion']);
     $id_materia = $db->real_escape_string($_POST['id_materia']);
     
-    // Verificar si ya existe la asignación
-    $query = "SELECT * FROM docente_seccion 
-              WHERE id_usuario = '$id_usuario' 
-              AND id_seccion = '$id_seccion'
-              AND id_materia = '$id_materia'";
-    $result = $db->query($query);
+    $resultado = procesarAsignacionSeccion($id_usuario, $id_seccion, $id_materia);
     
-    if($result->num_rows > 0) {
-        $mensaje = "<div class='alert alert-warning'>Este docente ya tiene asignada esta sección con esta materia.</div>";
+    if($resultado['success']) {
+        $tipo_mensaje = 'success';
+        $texto_mensaje = $resultado['message'];
     } else {
-        // Insertar nueva asignación
-        $query = "INSERT INTO docente_seccion (id_usuario, id_seccion, id_materia) 
-                  VALUES ('$id_usuario', '$id_seccion', '$id_materia')";
-        if($db->query($query)) {
-            $mensaje = "<div class='alert alert-success'>Asignación realizada correctamente.</div>";
-        } else {
-            $mensaje = "<div class='alert alert-danger'>Error al asignar: ".$db->error."</div>";
-        }
+        $tipo_mensaje = 'error';
+        $texto_mensaje = $resultado['message'];
     }
 }
 
 // Eliminar asignación
 if(isset($_GET['eliminar'])) {
     $id = $db->real_escape_string($_GET['eliminar']);
-    $query = "DELETE FROM docente_seccion WHERE id_docente_seccion = '$id'";
-    if($db->query($query)) {
-        $mensaje = "<div class='alert alert-success'>Asignación eliminada correctamente.</div>";
+    $resultado = eliminarAsignacionSeccion($id);
+    
+    if($resultado['success']) {
+        $tipo_mensaje = 'success';
+        $texto_mensaje = $resultado['message'];
     } else {
-        $mensaje = "<div class='alert alert-danger'>Error al eliminar: ".$db->error."</div>";
+        $tipo_mensaje = 'error';
+        $texto_mensaje = $resultado['message'];
     }
 }
 
@@ -77,8 +66,52 @@ include("includes/head.php");
         <div class="col-md-12">
             <h1 class="mt-4"><?php echo $titulopag; ?></h1>
             
-            <?php if(isset($mensaje)) echo $mensaje; ?>
-            
+            <!-- Modal de Éxito -->
+            <div class="modal fade" id="successModal" tabindex="-1" role="dialog" aria-labelledby="successModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header bg-success text-white">
+                            <h5 class="modal-title" id="successModalLabel">¡Operación Exitosa!</h5>
+                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-check-circle fa-3x text-success"></i>
+                            </div>
+                            <p id="successMessage" class="lead"></p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-success" data-dismiss="modal">Aceptar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal de Error -->
+            <div class="modal fade" id="errorModal" tabindex="-1" role="dialog" aria-labelledby="errorModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title" id="errorModalLabel">Error en la Operación</h5>
+                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-exclamation-circle fa-3x text-danger"></i>
+                            </div>
+                            <p id="errorMessage" class="lead"></p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-danger" data-dismiss="modal">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Modal de Confirmación para Eliminar -->
             <div class="modal fade" id="confirmDeleteModal" tabindex="-1" role="dialog" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
                 <div class="modal-dialog" role="document">
@@ -90,53 +123,58 @@ include("includes/head.php");
                             </button>
                         </div>
                         <div class="modal-body">
-                            <p>¿Está seguro de eliminar esta asignación?</p>
+                            <div class="text-center mb-3">
+                                <i class="fas fa-trash-alt fa-2x text-danger"></i>
+                            </div>
+                            <p class="text-center">¿Está seguro de eliminar esta asignación?</p>
+                            <p class="text-center text-muted"><small>Esta acción no se puede deshacer.</small></p>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                            <a id="confirmDeleteButton" href="#" class="btn btn-danger">Eliminar</a>
+                            <a id="confirmDeleteButton" href="#" class="btn btn-danger">
+                                <i class="fas fa-trash-alt mr-1"></i> Eliminar
+                            </a>
                         </div>
                     </div>
                 </div>
             </div>
 
+            <!-- Mostrar mensaje en toast -->
+            <?php if($tipo_mensaje): ?>
+            <div id="toastMessage" data-type="<?php echo $tipo_mensaje; ?>" data-message="<?php echo htmlspecialchars($texto_mensaje); ?>"></div>
+            <?php endif; ?>
+
             <div class="card mb-4">
                 <div class="card-header">
-                    <i class="fas fa-table mr-1"></i>
+                    <i class="fas fa-user-plus mr-1"></i>
                     Asignar Nueva Sección a Docente
                 </div>
                 <div class="card-body">
-                    <form method="post" action="">
+                    <form method="post" action="" id="asignarForm">
                         <div class="form-row">
                             <div class="form-group col-md-4">
                                 <label for="id_usuario">Docente:</label>
-                                <select class="form-control" id="id_usuario" name="id_usuario" required onchange="cargarMateriasDocente()">
+                                <select class="form-control" id="id_usuario" name="id_usuario" required onchange="cargarMateriasPorCarrera()">
                                     <option value="">Seleccione un docente</option>
                                     <?php
-                                    $query = "SELECT id, idusuario, nombre FROM users WHERE docente = 1 ORDER BY nombre";
-                                    $result = $db->query($query);
-                                    while($row = $result->fetch_assoc()) {
-                                        echo "<option value='".$row['id']."'>".$row['nombre']." (".$row['idusuario'].")</option>";
+                                    $docentes = obtenerDocentesActivos();
+                                    foreach($docentes as $docente) {
+                                        echo "<option value='".$docente['id']."'>".$docente['nombre']." (".$docente['idusuario'].")</option>";
                                     }
                                     ?>
                                 </select>
                             </div>
                             <div class="form-group col-md-4">
                                 <label for="id_seccion">Sección:</label>
-                                <select class="form-control" id="id_seccion" name="id_seccion" required>
+                                <select class="form-control" id="id_seccion" name="id_seccion" required onchange="cargarMateriasPorCarrera()">
                                     <option value="">Seleccione una sección</option>
                                     <?php
-                                    $query = "SELECT s.id_seccion, s.codigo_seccion, c.nombre_carrera 
-                                              FROM secciones s
-                                              LEFT JOIN carreras c ON s.id_carrera = c.id_carrera
-                                              WHERE s.estatus = 'activa' AND (c.activa = 1 OR c.activa IS NULL)
-                                              ORDER BY c.nombre_carrera, s.codigo_seccion";
-                                    $result = $db->query($query);
-                                    
-                                    if($result->num_rows > 0) {
-                                        while($row = $result->fetch_assoc()) {
-                                            $nombre_carrera = $row['nombre_carrera'] ?? 'Sin carrera asignada';
-                                            echo "<option value='".$row['id_seccion']."'>".$row['codigo_seccion']." - ".$nombre_carrera."</option>";
+                                    $secciones = obtenerSeccionesActivas();
+                                    if(count($secciones) > 0) {
+                                        foreach($secciones as $seccion) {
+                                            $id_carrera = $seccion['id_carrera'] ?? '0';
+                                            $nombre_carrera = $seccion['nombre_carrera'] ?? 'Sin carrera asignada';
+                                            echo "<option value='".$seccion['id_seccion']."' data-carrera='".$id_carrera."'>".$seccion['codigo_seccion']." - ".$nombre_carrera."</option>";
                                         }
                                     } else {
                                         echo "<option value=''>No hay secciones activas disponibles</option>";
@@ -147,11 +185,16 @@ include("includes/head.php");
                             <div class="form-group col-md-4">
                                 <label for="id_materia">Materia:</label>
                                 <select class="form-control" id="id_materia" name="id_materia" required disabled>
-                                    <option value="">Primero seleccione un docente</option>
+                                    <option value="">Primero seleccione docente y sección</option>
                                 </select>
                             </div>
                         </div>
-                        <button type="submit" name="asignar" class="btn btn-primary">Asignar Sección</button>
+                        <button type="submit" name="asignar" class="btn btn-primary">
+                            <i class="fas fa-save mr-1"></i> Asignar Sección
+                        </button>
+                        <button type="reset" class="btn btn-secondary">
+                            <i class="fas fa-undo mr-1"></i> Limpiar
+                        </button>
                     </form>
                 </div>
             </div>
@@ -163,8 +206,8 @@ include("includes/head.php");
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
-                            <thead>
+                        <table class="table table-bordered table-hover" id="dataTable" width="100%" cellspacing="0">
+                            <thead class="thead-dark">
                                 <tr>
                                     <th>Docente</th>
                                     <th>Sección</th>
@@ -176,39 +219,40 @@ include("includes/head.php");
                             </thead>
                             <tbody>
                                 <?php
-                                $query = "SELECT ds.id_docente_seccion, u.nombre AS docente, 
-                                                 s.codigo_seccion, c.nombre_carrera, ds.fecha_asignacion,
-                                                 m.nombre_materia, m.cod_materia
-                                          FROM docente_seccion ds
-                                          JOIN users u ON ds.id_usuario = u.id
-                                          JOIN secciones s ON ds.id_seccion = s.id_seccion
-                                          LEFT JOIN carreras c ON s.id_carrera = c.id_carrera
-                                          JOIN materias m ON ds.id_materia = m.id_materia
-                                          WHERE s.estatus = 'activa' AND (c.activa = 1 OR c.activa IS NULL)
-                                          ORDER BY ds.fecha_asignacion DESC";
-                                $result = $db->query($query);
-                                
-                                if($result->num_rows > 0) {
-                                    while($row = $result->fetch_assoc()) {
+                                $asignaciones = obtenerAsignacionesSecciones();
+                                if(count($asignaciones) > 0) {
+                                    foreach($asignaciones as $row) {
                                         $nombre_carrera = $row['nombre_carrera'] ?? 'Sin carrera asignada';
                                         echo "<tr>
                                                 <td>".$row['docente']."</td>
-                                                <td>".$row['codigo_seccion']."</td>
+                                                <td><span class='badge badge-primary'>".$row['codigo_seccion']."</span></td>
                                                 <td>".$nombre_carrera."</td>
-                                                <td>".$row['nombre_materia']." (".$row['cod_materia'].")</td>
+                                                <td>
+                                                    <strong>".$row['nombre_materia']."</strong><br>
+                                                    <small class='text-muted'>Código: ".$row['cod_materia']."</small>
+                                                </td>
                                                 <td>".$row['fecha_asignacion']."</td>
                                                 <td>
                                                     <button class='btn btn-sm btn-danger eliminar-asignacion' 
                                                             data-toggle='modal' 
                                                             data-target='#confirmDeleteModal'
-                                                            data-id='".$row['id_docente_seccion']."'>
-                                                        Eliminar
+                                                            data-id='".$row['id_docente_seccion']."'
+                                                            data-docente='".htmlspecialchars($row['docente'])."'
+                                                            data-seccion='".$row['codigo_seccion']."'>
+                                                        <i class='fas fa-trash-alt mr-1'></i> Eliminar
                                                     </button>
                                                 </td>
                                               </tr>";
                                     }
                                 } else {
-                                    echo "<tr><td colspan='6' class='text-center'>No hay asignaciones registradas</td></tr>";
+                                    echo "<tr>
+                                            <td colspan='6' class='text-center'>
+                                                <div class='alert alert-info'>
+                                                    <i class='fas fa-info-circle mr-2'></i>
+                                                    No hay asignaciones registradas
+                                                </div>
+                                            </td>
+                                          </tr>";
                                 }
                                 ?>
                             </tbody>
@@ -221,19 +265,27 @@ include("includes/head.php");
 </div>
 
 <script>
-function cargarMateriasDocente() {
+function cargarMateriasPorCarrera() {
     var idDocente = document.getElementById('id_usuario').value;
+    var selectSeccion = document.getElementById('id_seccion');
     var selectMaterias = document.getElementById('id_materia');
     
-    if(idDocente === '') {
-        selectMaterias.innerHTML = '<option value="">Primero seleccione un docente</option>';
+    // Obtener la carrera de la sección seleccionada
+    var idCarrera = selectSeccion.options[selectSeccion.selectedIndex]?.getAttribute('data-carrera') || '0';
+    
+    if(idDocente === '' || selectSeccion.value === '') {
+        selectMaterias.innerHTML = '<option value="">Primero seleccione docente y sección</option>';
         selectMaterias.disabled = true;
         return;
     }
     
-    // Realizar petición AJAX para obtener las materias del docente
+    // Mostrar indicador de carga
+    selectMaterias.innerHTML = '<option value="">Cargando materias...</option>';
+    selectMaterias.disabled = true;
+    
+    // Realizar petición AJAX para obtener las materias del docente por carrera
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', '?ajax=materias_docente&id_docente=' + idDocente, true);
+    xhr.open('GET', '?ajax=materias_docente_carrera&id_docente=' + idDocente + '&id_carrera=' + idCarrera, true);
     
     xhr.onload = function() {
         if(this.status == 200) {
@@ -249,33 +301,118 @@ function cargarMateriasDocente() {
                         selectMaterias.appendChild(option);
                     });
                     selectMaterias.disabled = false;
+                    
+                    // Mostrar toast de éxito si hay materias
+                    if(materias.length === 1) {
+                        showToast('success', 'Se encontró 1 materia disponible');
+                    } else {
+                        showToast('success', 'Se encontraron ' + materias.length + ' materias disponibles');
+                    }
                 } else {
-                    selectMaterias.innerHTML = '<option value="">Este docente no tiene materias asignadas</option>';
+                    selectMaterias.innerHTML = '<option value="">Este docente no tiene materias para esta carrera</option>';
                     selectMaterias.disabled = true;
+                    showToast('warning', 'El docente no tiene materias asignadas para esta carrera');
                 }
             } catch(e) {
                 selectMaterias.innerHTML = '<option value="">Error al procesar materias</option>';
                 selectMaterias.disabled = true;
+                showToast('error', 'Error al cargar las materias');
             }
         } else {
             selectMaterias.innerHTML = '<option value="">Error al cargar materias</option>';
             selectMaterias.disabled = true;
+            showToast('error', 'Error de conexión al servidor');
         }
     };
     
     xhr.onerror = function() {
         selectMaterias.innerHTML = '<option value="">Error de conexión</option>';
         selectMaterias.disabled = true;
+        showToast('error', 'Error de conexión con el servidor');
     };
     
     xhr.send();
 }
 
-// Configurar modal de eliminación
+// Función para mostrar toast
+function showToast(type, message) {
+    // Puedes implementar un toast más elegante aquí si lo prefieres
+    // Por ahora usaremos alertas de Bootstrap
+    var alertClass = type === 'success' ? 'alert-success' : 
+                     type === 'error' ? 'alert-danger' : 
+                     type === 'warning' ? 'alert-warning' : 'alert-info';
+    
+    var toast = document.createElement('div');
+    toast.className = 'alert ' + alertClass + ' alert-dismissible fade show';
+    toast.style.position = 'fixed';
+    toast.style.top = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.style.minWidth = '300px';
+    toast.innerHTML = `
+        <button type="button" class="close" data-dismiss="alert">&times;</button>
+        <strong>${type === 'success' ? 'Éxito!' : type === 'error' ? 'Error!' : 'Advertencia!'}</strong> ${message}
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Auto-eliminar después de 5 segundos
+    setTimeout(function() {
+        $(toast).alert('close');
+    }, 5000);
+}
+
+// Configurar modales
 $(document).ready(function() {
+    // Configurar modal de eliminación
     $(document).on('click', '.eliminar-asignacion', function() {
         var id = $(this).data('id');
+        var docente = $(this).data('docente');
+        var seccion = $(this).data('seccion');
+        
         $('#confirmDeleteButton').attr('href', '?eliminar=' + id);
+        
+        // Actualizar mensaje del modal con información específica
+        $('#confirmDeleteModal .modal-body p:first').html(
+            '¿Está seguro de eliminar la asignación de <strong>' + docente + '</strong> a la sección <strong>' + seccion + '</strong>?'
+        );
+    });
+    
+    // Mostrar modal de éxito/error si hay mensaje
+    var toastMessage = $('#toastMessage');
+    if(toastMessage.length) {
+        var type = toastMessage.data('type');
+        var message = toastMessage.data('message');
+        
+        if(type === 'success') {
+            $('#successMessage').text(message);
+            $('#successModal').modal('show');
+        } else if(type === 'error') {
+            $('#errorMessage').text(message);
+            $('#errorModal').modal('show');
+        }
+        
+        // Limpiar el elemento después de mostrar
+        setTimeout(function() {
+            toastMessage.remove();
+        }, 100);
+    }
+    
+    // Validación del formulario
+    $('#asignarForm').on('submit', function(e) {
+        var idMateria = $('#id_materia');
+        if(idMateria.is(':disabled') || idMateria.val() === '') {
+            e.preventDefault();
+            showToast('error', 'Por favor seleccione una materia válida');
+            return false;
+        }
+        return true;
+    });
+    
+    // Resetear formulario
+    $('#asignarForm button[type="reset"]').on('click', function() {
+        $('#id_materia').html('<option value="">Primero seleccione docente y sección</option>').prop('disabled', true);
+        showToast('info', 'Formulario limpiado');
     });
 });
 </script>

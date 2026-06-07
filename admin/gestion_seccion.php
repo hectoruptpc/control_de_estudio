@@ -21,12 +21,27 @@ $periodo_id = $_POST['periodo'] ?? 0;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['crear_seccion'])) {
         // Procesar creación de sección
+        $id_carrera = (int)$_POST['id_carrera'];
+        $codigo_seccion = trim($_POST['codigo_seccion']);
+        
+        // Generar código automáticamente si no se proporciona
+        if (empty($codigo_seccion)) {
+            $turno_seccion = trim($_POST['turno']);
+            $codigo_seccion = generarCodigoSeccion($id_carrera, $turno_seccion);
+            if (!$codigo_seccion) {
+                $_SESSION['error'] = 'No hay códigos disponibles para esta carrera y turno. Configure los rangos de códigos primero.';
+                header("Location: cod_secciones.php");
+                exit();
+            }
+        }
+        
         $datos = [
-            'codigo_seccion' => trim($_POST['codigo_seccion']),
-            'id_carrera' => (int)$_POST['id_carrera'],
+            'codigo_seccion' => $codigo_seccion,
+            'id_carrera' => $id_carrera,
             'id_trayecto' => (int)$_POST['id_trayecto'],
             'id_periodo' => (int)$_POST['id_periodo'],
             'capacidad_maxima' => (int)$_POST['capacidad_maxima'],
+            'turno' => trim($_POST['turno']),
             'inicia' => $_POST['inicia']
         ];
         
@@ -49,6 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'id_trayecto' => (int)$_POST['id_trayecto'],
             'id_periodo' => (int)$_POST['id_periodo'],
             'capacidad_maxima' => (int)$_POST['capacidad_maxima'],
+            'turno' => trim($_POST['turno']),
             'inicia' => $_POST['inicia']
         ];
         
@@ -99,6 +115,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 include("includes/head.php");
 ?>
 
+<style>
+    .table-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .35rem;
+        align-items: center;
+    }
+    .table-actions form {
+        display: inline-flex;
+        margin: 0;
+    }
+    .table-actions .btn {
+        min-width: 2.5rem;
+    }
+    .table-responsive {
+        overflow-x: auto;
+    }
+    .horario-cell {
+        min-height: 60px;
+        padding: .5rem;
+    }
+    @media (max-width: 991.98px) {
+        .card-header.d-flex {
+            flex-direction: column;
+            align-items: stretch;
+            gap: .5rem;
+        }
+        .card-header.d-flex .badge {
+            width: auto;
+        }
+        .table-actions {
+            width: 100%;
+        }
+        .table-actions form {
+            flex: 1 1 auto;
+        }
+    }
+    @media (max-width: 767.98px) {
+        .form-row {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-row .form-group {
+            width: 100% !important;
+        }
+        .table thead th,
+        .table tbody td {
+            padding: .55rem .65rem;
+            font-size: .9rem;
+        }
+        .btn-block {
+            width: 100%;
+        }
+        #horario-clases .table-responsive {
+            margin-bottom: .75rem;
+        }
+        #horario-clases table {
+            min-width: 720px;
+        }
+        .horario-cell {
+            min-height: 50px;
+        }
+    }
+</style>
+
 <!-- Modal de Confirmación -->
 <div class="modal fade" id="confirmarRetiroModal" tabindex="-1" role="dialog" aria-labelledby="confirmarRetiroModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
@@ -146,7 +227,14 @@ include("includes/head.php");
         
         <div class="card shadow mb-4">
             <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                <h6 class="m-0 font-weight-bold text-primary">Listado de Secciones</h6>
+                <div>
+                    <h6 class="m-0 font-weight-bold text-primary">Listado de Secciones</h6>
+                    <?php if (tienePermiso('admin')): ?>
+                        <a href="aprobar_secciones.php" class="btn btn-info btn-sm mt-2">
+                            <i class="fas fa-check-circle"></i> Secciones Pendientes
+                        </a>
+                    <?php endif; ?>
+                </div>
                 <form method="post" style="display:inline">
                     <input type="hidden" name="action" value="new">
                     <button type="submit" class="btn btn-success btn-sm">
@@ -167,6 +255,7 @@ include("includes/head.php");
                                 <th>Trayecto</th>
                                 <th>Período</th>
                                 <th>Inicio</th>
+                                <th>Aprobación</th>
                                 <th>Estudiantes</th>
                                 <th>Capacidad</th>
                                 <th>Estado</th>
@@ -212,6 +301,22 @@ include("includes/head.php");
                                         }
                                     }
                                 }
+
+                                $status_text = isset($seccion['status']) ? ucfirst($seccion['status']) : 'Desconocido';
+                                switch ($seccion['status'] ?? '') {
+                                    case 'Aprobada':
+                                        $status_class = 'success';
+                                        break;
+                                    case 'Pendiente':
+                                        $status_class = 'warning';
+                                        break;
+                                    case 'Rechazada':
+                                        $status_class = 'danger';
+                                        break;
+                                    default:
+                                        $status_class = 'secondary';
+                                        break;
+                                }
                             ?>
                             <tr>
                                 <td><?= htmlspecialchars($seccion['codigo_seccion']) ?></td>
@@ -219,6 +324,11 @@ include("includes/head.php");
                                 <td>Trayecto <?= $seccion['numero_trayecto'] ?></td>
                                 <td><?= htmlspecialchars($seccion['nombre_periodo']) ?></td>
                                 <td><?= isset($seccion['inicia']) ? date('d/m/Y H:i', strtotime($seccion['inicia'])) : '--' ?></td>
+                                <td>
+                                    <span class="badge badge-<?= $status_class ?>">
+                                        <?= htmlspecialchars($status_text) ?>
+                                    </span>
+                                </td>
                                 <td>
                                     <div class="progress">
                                         <div class="progress-bar <?= $porcentaje >= 80 ? 'bg-success' : 'bg-info' ?>" 
@@ -238,23 +348,23 @@ include("includes/head.php");
                                         <?php endif; ?>
                                     </span>
                                 </td>
-                                <td>
-                                    <form method="post" style="display:inline">
+                                <td class="table-actions">
+                                    <form method="post">
                                         <input type="hidden" name="action" value="view">
                                         <input type="hidden" name="id" value="<?= $seccion['id_seccion'] ?>">
                                         <button type="submit" class="btn btn-sm btn-info" title="Ver">
                                             <i class="fas fa-eye"></i>
                                         </button>
                                     </form>
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="edit">
+                                        <input type="hidden" name="id" value="<?= $seccion['id_seccion'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-primary" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </form>
                                     <?php if ($seccion['periodo_activo'] == 1): ?>
-                                        <form method="post" style="display:inline">
-                                            <input type="hidden" name="action" value="edit">
-                                            <input type="hidden" name="id" value="<?= $seccion['id_seccion'] ?>">
-                                            <button type="submit" class="btn btn-sm btn-primary" title="Editar">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                        </form>
-                                        <form method="post" style="display:inline">
+                                        <form method="post">
                                             <input type="hidden" name="action" value="assign">
                                             <input type="hidden" name="id" value="<?= $seccion['id_seccion'] ?>">
                                             <button type="submit" class="btn btn-sm btn-warning" title="Asignar Estudiantes">
@@ -303,13 +413,13 @@ include("includes/head.php");
                     <?php endif; ?>
                     
                     <div class="form-row">
-                        <div class="form-group col-md-3">
+                        <div class="form-group col-md-2">
                             <label for="codigo_seccion">Código de Sección *</label>
                             <input type="text" class="form-control" id="codigo_seccion" name="codigo_seccion" 
-                                   value="<?= $seccion['codigo_seccion'] ?? '' ?>" required>
+                                   value="<?= $seccion['codigo_seccion'] ?? '' ?>" required readonly>
                         </div>
                         
-                        <div class="form-group col-md-4">
+                        <div class="form-group col-md-3">
                             <label for="id_carrera">Carrera *</label>
                             <select class="form-control" id="id_carrera" name="id_carrera" required>
                                 <option value="">Seleccione...</option>
@@ -334,6 +444,29 @@ include("includes/head.php");
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        
+                        <div class="form-group col-md-2">
+                            <label for="turno">Turno *</label>
+                            <select class="form-control" id="turno" name="turno" required>
+                                <option value="">Seleccione...</option>
+                                <option value="Diurno" <?= isset($seccion['turno']) && $seccion['turno'] == 'Diurno' ? 'selected' : '' ?>>Diurno</option>
+                                <option value="Nocturno" <?= isset($seccion['turno']) && $seccion['turno'] == 'Nocturno' ? 'selected' : '' ?>>Nocturno</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group col-md-3">
+                            <label for="id_periodo">Período *</label>
+                            <select class="form-control" id="id_periodo" name="id_periodo" required>
+                                <option value="">Seleccione...</option>
+                                <?php foreach ($periodos as $periodo): ?>
+                                    <option value="<?= $periodo['id_periodo'] ?>" 
+                                        <?= isset($seccion['id_periodo']) && $seccion['id_periodo'] == $periodo['id_periodo'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($periodo['nombre_periodo']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
                         
                         <div class="form-group col-md-3">
                             <label for="id_periodo">Período *</label>
@@ -372,6 +505,46 @@ include("includes/head.php");
                         <i class="fas fa-times"></i> Cancelar
                     </a>
                 </form>
+                
+                <script>
+                $(document).ready(function() {
+                    function generarCodigo() {
+                        var id_carrera = $('#id_carrera').val();
+                        
+                        if (id_carrera) {
+                            var turno = $('#turno').val();
+                            $.ajax({
+                                url: 'ajax_generar_codigo.php',
+                                type: 'POST',
+                                data: {
+                                    id_carrera: id_carrera,
+                                    turno: turno
+                                },
+                                success: function(response) {
+                                    var data = JSON.parse(response);
+                                    if (data.success) {
+                                        $('#codigo_seccion').val(data.codigo);
+                                    } else {
+                                        $('#codigo_seccion').val('');
+                                        alert(data.message);
+                                    }
+                                },
+                                error: function() {
+                                    $('#codigo_seccion').val('');
+                                    alert('Error al generar código');
+                                }
+                            });
+                        } else {
+                            $('#codigo_seccion').val('');
+                        }
+                    }
+                    
+                    $('#id_carrera, #turno').change(generarCodigo);
+                    if ($('#id_carrera').val() && $('#turno').val()) {
+                        generarCodigo();
+                    }
+                });
+                </script>
             </div>
         </div>
 
@@ -514,7 +687,9 @@ include("includes/head.php");
             var table = $('#tablaEstudiantes').DataTable({
                 "language": {
                     "url": "//cdn.datatables.net/plug-ins/1.10.20/i18n/Spanish.json"
-                }
+                },
+                "autoWidth": false,
+                "responsive": true
             });
             
             // Función para actualizar el contador y deshabilitar checkboxes si es necesario
@@ -616,9 +791,9 @@ include("includes/head.php");
         <a href="gestion_seccion.php?action=view&id=<?= $seccion_id ?>" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Volver a la sección
         </a>
-        <button class="btn btn-success float-right ml-2" onclick="generarPDF()">
+        <a class="btn btn-success float-right ml-2" href="pdf_horario_seccion.php?seccion_id=<?= $seccion_id ?>" target="_blank">
             <i class="fas fa-file-pdf"></i> Descargar PDF
-        </button>
+        </a>
         
     </div>
     
@@ -645,34 +820,22 @@ include("includes/head.php");
                 </div>
                 
                 <?php
-                // 1. Definir las horas de la tabla (de 7:00 a 16:00)
-                $horas_tabla = [];
-                for ($h = 7; $h <= 16; $h++) {
-                    $horas_tabla[] = sprintf("%02d:00", $h);
-                }
-                
-                // 2. Organizar los horarios por día
+                // Construir tabla similar a la vista de docente: horas x dias con rowspan para bloques
                 $dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                $horas_disponibles = [];
+                for ($h = 7; $h <= 16; $h++) $horas_disponibles[] = sprintf('%02d:00', $h);
+
+                // Agrupar horarios por día
                 $horarios_por_dia = array_fill(0, 6, []);
-                
                 foreach ($horarios as $horario) {
                     $dia = (int)$horario['dia'];
                     $hora_inicio = date('H:i', strtotime($horario['hora_inicio']));
                     $hora_fin = date('H:i', strtotime($horario['hora_fin']));
-                    
-                    $horarios_por_dia[$dia][] = [
-                        'materia' => $horario['nombre_materia'],
-                        'docente' => $horario['nombre_docente'],
-                        'aula' => $horario['aula'],
-                        'hora_inicio' => $hora_inicio,
-                        'hora_fin' => $hora_fin,
-                        'cod_materia' => $horario['cod_materia'] ?? ''
-                    ];
-                    
-                    // Preparar datos para la leyenda
-                    $clave_leyenda = $horario['nombre_materia'].$horario['nombre_docente'].$horario['aula'];
-                    if (!isset($leyenda_materias[$clave_leyenda])) {
-                        $leyenda_materias[$clave_leyenda] = [
+                    $horarios_por_dia[$dia][] = array_merge($horario, ['hora_inicio' => $hora_inicio, 'hora_fin' => $hora_fin]);
+
+                    $clave = $horario['nombre_materia'].$horario['nombre_docente'].$horario['aula'];
+                    if (!isset($leyenda_materias[$clave])) {
+                        $leyenda_materias[$clave] = [
                             'materia' => $horario['nombre_materia'],
                             'docente' => $horario['nombre_docente'],
                             'aula' => $horario['aula'],
@@ -680,8 +843,36 @@ include("includes/head.php");
                         ];
                     }
                 }
+
+                $celdas_ocupadas = array_fill(0, count($dias_semana), array_fill(0, count($horas_disponibles), false));
                 ?>
-                
+
+                <style>
+                    .horario-cell {
+                        min-height: 80px;
+                        border: 1px solid #ddd;
+                        padding: 5px;
+                        cursor: default;
+                        position: relative;
+                        text-align: center;
+                        vertical-align: middle;
+                        box-sizing: border-box;
+                        overflow: hidden;
+                        word-break: break-word;
+                        white-space: normal;
+                        min-height: 60px;
+                    }
+                    .horario-cell:hover { background-color: #f5f5f5; }
+                    .bg-asignada { background-color: #d4edda; font-weight: bold; }
+                    .bg-asignada:hover { background-color: #c3e6cb !important; }
+                    .bg-conflicto { background-color: #f8d7da !important; }
+                    .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(0,0,0,.1); border-radius: 50%; border-top-color: #007bff; animation: spin 1s ease-in-out infinite; margin-right: 10px; }
+                    @keyframes spin { to { transform: rotate(360deg); } }
+                    small { font-size: 0.8em; color: #666; }
+                    table.table { table-layout: fixed; width: 100%; }
+                    td[title] { max-width: 1px; }
+                </style>
+
                 <div class="table-responsive mb-4">
                     <table class="table table-bordered table-hover">
                         <thead class="thead-dark">
@@ -693,42 +884,55 @@ include("includes/head.php");
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($horas_tabla as $index => $hora): ?>
-                                <tr>
-                                    <th><?= $hora ?></th>
-                                    <?php for ($dia = 0; $dia <= 5; $dia++): ?>
-                                        <?php
-                                        $contenido_celda = '';
-                                        $clase_css = 'celda-horario';
-                                        $es_continuacion = false;
-                                        
-                                        // Buscar si hay una clase en esta hora y día
-                                        foreach ($horarios_por_dia[$dia] as $clase) {
-                                            if ($hora >= $clase['hora_inicio'] && $hora < $clase['hora_fin']) {
-                                                $contenido_celda = htmlspecialchars($clase['materia']);
-                                                $clase_css = 'horario-block';
-                                                
-                                                // Verificar si es continuación
-                                                if ($hora != $clase['hora_inicio']) {
-                                                    $clase_css .= ' continuacion';
-                                                    $es_continuacion = true;
+                        <?php foreach ($horas_disponibles as $hora_index => $hora): ?>
+                            <tr>
+                                <td><?= $hora ?></td>
+                                <?php foreach ($dias_semana as $dia_index => $dia_nombre): ?>
+                                    <?php
+                                    if (isset($celdas_ocupadas[$dia_index][$hora_index]) && $celdas_ocupadas[$dia_index][$hora_index]) {
+                                        // celda cubierta por rowspan anterior
+                                        echo '';
+                                        continue;
+                                    }
+
+                                    $celdaContent = '';
+                                    $clasesCelda = 'horario-cell';
+                                    $rowspan = 1;
+
+                                    // Buscar horario que empiece exactamente en esta hora
+                                    foreach ($horarios_por_dia[$dia_index] as $asig) {
+                                        if ($asig['hora_inicio'] == $hora) {
+                                            $celdaContent = '<strong>' . htmlspecialchars($asig['nombre_materia']) . '</strong><br><small>' . htmlspecialchars($asig['nombre_docente']) . ' | ' . htmlspecialchars($asig['aula']) . '</small>';
+
+                                            $hora_fin = $asig['hora_fin'];
+                                            $start_ts = strtotime($hora);
+                                            $end_ts = strtotime($hora_fin);
+                                            if ($end_ts <= $start_ts) {
+                                                $rowspan = 1;
+                                            } else {
+                                                $hours = ($end_ts - $start_ts) / 3600;
+                                                $rowspan = max(1, (int) ceil($hours));
+                                                $max_index = count($horas_disponibles);
+                                                for ($i = $hora_index; $i < min($max_index, $hora_index + $rowspan); $i++) {
+                                                    $celdas_ocupadas[$dia_index][$i] = true;
                                                 }
-                                                break;
                                             }
+
+                                            $clasesCelda .= ' bg-asignada';
+                                            break;
                                         }
-                                        ?>
-                                        <td class="<?= $clase_css ?>">
-                                            <?php if ($es_continuacion): ?>
-                                                <span class="continuacion-simbolo">↳</span>
-                                            <?php endif; ?>
-                                            <?= $contenido_celda ?>
-                                        </td>
-                                    <?php endfor; ?>
-                                </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                                    }
+
+                                    echo '<td class="' . $clasesCelda . '"';
+                                    if ($rowspan > 1) echo ' rowspan="' . $rowspan . '"';
+                                    echo '>' . $celdaContent . '</td>';
+                                    ?>
+                                <?php endforeach; ?>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
                     
                     <!-- Leyenda de materias -->
                     <div class="card border-left-primary shadow py-2 mb-4">
@@ -985,6 +1189,13 @@ include("includes/head.php");
                         </p>
                         
                         <div class="mt-4">
+                            <form method="post" style="display:block; margin-bottom:10px;">
+                                <input type="hidden" name="action" value="edit">
+                                <input type="hidden" name="id" value="<?= $seccion_id ?>">
+                                <button type="submit" class="btn btn-primary btn-block">
+                                    <i class="fas fa-edit"></i> Editar Sección
+                                </button>
+                            </form>
                             <?php if (!$periodo_inactivo): ?>
                                 <form method="post" style="display:block; margin-bottom:10px;">
                                     <input type="hidden" name="action" value="assign">
@@ -993,21 +1204,14 @@ include("includes/head.php");
                                         <i class="fas fa-users"></i> Asignar Estudiantes
                                     </button>
                                 </form>
-                                <form method="post" style="display:block; margin-bottom:10px;">
-                                    <input type="hidden" name="action" value="edit">
-                                    <input type="hidden" name="id" value="<?= $seccion_id ?>">
-                                    <button type="submit" class="btn btn-primary btn-block">
-                                        <i class="fas fa-edit"></i> Editar Sección
-                                    </button>
-                                </form>
-                                <form method="post" style="display:block; margin-bottom:10px;">
-                                    <input type="hidden" name="action" value="view_schedule">
-                                    <input type="hidden" name="id" value="<?= $seccion_id ?>">
-                                    <button type="submit" class="btn btn-info btn-block">
-                                        <i class="fas fa-calendar-alt"></i> Ver Horario Semanal
-                                    </button>
-                                </form>
                             <?php endif; ?>
+                            <form method="post" style="display:block; margin-bottom:10px;">
+                                <input type="hidden" name="action" value="view_schedule">
+                                <input type="hidden" name="id" value="<?= $seccion_id ?>">
+                                <button type="submit" class="btn btn-info btn-block">
+                                    <i class="fas fa-calendar-alt"></i> Ver Horario Semanal
+                                </button>
+                            </form>
                             <a href="gestion_seccion.php" class="btn btn-secondary btn-block">
                                 <i class="fas fa-arrow-left"></i> Volver al listado
                             </a>

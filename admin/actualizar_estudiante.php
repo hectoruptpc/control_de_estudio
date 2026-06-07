@@ -44,9 +44,8 @@ register_shutdown_function('shutdown_handler');
 
 // Manejador de errores personalizado
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
-    // No mostrar errores, solo log
     error_log("PHP Error [$errno]: $errstr in $errfile:$errline");
-    return true; // No ejecutar el manejador interno de PHP
+    return true;
 }, E_ALL);
 
 try {
@@ -80,7 +79,7 @@ try {
     }
 
     // ============================
-    // 4. PREPARAR DATOS
+    // 4. PREPARAR DATOS CON TODOS LOS CAMPOS
     // ============================
     $datos = [
         'id' => $id,
@@ -108,8 +107,13 @@ try {
         'discapacidad' => isset($_POST['discapacidad']) ? trim($_POST['discapacidad']) : '',
         'titulos' => isset($_POST['titulos']) ? trim($_POST['titulos']) : '',
         'institutos' => isset($_POST['institutos']) ? trim($_POST['institutos']) : '',
+        'pais_titulo' => isset($_POST['pais_titulo']) ? trim($_POST['pais_titulo']) : '',
+        'legalizado_titulo' => isset($_POST['legalizado_titulo']) ? trim($_POST['legalizado_titulo']) : '',
+        'potencialidades' => isset($_POST['potencialidades']) ? trim($_POST['potencialidades']) : '',
         'carrera' => isset($_POST['carrera']) ? trim($_POST['carrera']) : '',
+        'sede' => isset($_POST['sede']) ? trim($_POST['sede']) : '',
         'genero' => isset($_POST['genero']) ? trim($_POST['genero']) : '',
+        'embarazada' => isset($_POST['embarazada']) ? (int)$_POST['embarazada'] : 0,
         'edo_civil' => isset($_POST['edo_civil']) ? trim($_POST['edo_civil']) : '',
         'fecha_nac' => isset($_POST['fecha_nac']) ? trim($_POST['fecha_nac']) : '',
         'fecha_ingreso' => isset($_POST['fecha_ingreso']) ? trim($_POST['fecha_ingreso']) : '',
@@ -127,8 +131,25 @@ try {
         throw new Exception('Formato de cédula inválido. Debe ser V-12345678 o E-12345678', 400);
     }
 
+    if (empty($datos['nombre'])) {
+        throw new Exception('El nombre completo es obligatorio', 400);
+    }
+
+    // Validar formato de email si no está vacío
+    if (!empty($datos['email']) && !filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
+        throw new Exception('Correo electrónico no válido', 400);
+    }
+
+    // Validar sede si está presente
+    if (!empty($datos['sede'])) {
+        $sedesPermitidas = ['Puerto Cabello', 'COEF'];
+        if (!in_array($datos['sede'], $sedesPermitidas)) {
+            throw new Exception('Sede no válida. Las sedes permitidas son: Puerto Cabello, COEF', 400);
+        }
+    }
+
     // ============================
-    // 6. LLAMAR A LA FUNCIÓN
+    // 6. LLAMAR A LA FUNCIÓN DE ACTUALIZACIÓN
     // ============================
     $resultado = actualizarEstudiante($datos);
 
@@ -169,16 +190,13 @@ try {
 // ============================
 // 9. FINALIZAR - ASEGURAR QUE NO HAY NADA MÁS
 // ============================
-// Capturar cualquier salida restante
 $output = ob_get_contents();
 ob_end_clean();
 
 // Si hay algo que no sea JSON, loguearlo
 if ($output) {
-    // Verificar si ya es JSON válido
     json_decode($output);
     if (json_last_error() !== JSON_ERROR_NONE) {
-        // No es JSON válido, crear JSON de error
         $errorResponse = [
             'success' => false,
             'message' => 'Error en la respuesta del servidor',
@@ -186,7 +204,6 @@ if ($output) {
         ];
         echo json_encode($errorResponse, JSON_UNESCAPED_UNICODE);
     } else {
-        // Es JSON válido, enviarlo
         echo $output;
     }
 }

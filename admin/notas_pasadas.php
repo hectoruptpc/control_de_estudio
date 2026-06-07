@@ -2,7 +2,7 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
-$titulopag = "Consultar Notas Definitivas por Profesor";
+$titulopag = "Consultar Notas Aprobadas por Profesor";
 include('../funciones/functions.php');
 
 // CARGAR PERMISOS
@@ -21,23 +21,45 @@ visita();
 
 // Obtener parámetros de filtro
 $filtro_profesor = $_GET['profesor'] ?? '';
+$filtro_materia = $_GET['materia'] ?? '';
+$filtro_periodo = $_GET['periodo'] ?? '';
+$filtro_seccion = $_GET['seccion'] ?? '';
 $filtro_fecha_desde = $_GET['fecha_desde'] ?? '';
 $filtro_fecha_hasta = $_GET['fecha_hasta'] ?? '';
 
-// Obtener información del profesor seleccionado para mostrar
+// Obtener información del profesor seleccionado
 $profesor_seleccionado = null;
 if (!empty($filtro_profesor)) {
     $profesor_seleccionado = obtenerProfesorPorId($filtro_profesor);
 }
 
+// Obtener listas para filtros
 $profesores = obtenerProfesores();
-$grupos_notas = obtenerGruposNotasDefinitivas($filtro_profesor, $filtro_fecha_desde, $filtro_fecha_hasta);
+$materias = obtenerTodasLasMaterias();
+$periodos = obtenerPeriodosAcademicos($db);
+$secciones = obtenerTodasLasSecciones();
+
+// Obtener grupos de notas aprobadas
+$grupos_notas = obtenerGruposNotasAprobadas($filtro_profesor, $filtro_materia, $filtro_periodo, $filtro_seccion, $filtro_fecha_desde, $filtro_fecha_hasta);
 
 include("includes/head.php");
 ?>
 
+<style>
+.badge-aprobada {
+    background-color: #28a745 !important;
+    color: white !important;
+}
+.filter-badge {
+    background-color: #e9ecef;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+}
+</style>
+
 <div class="container-fluid">
-    <h2 class="my-4">Consultar Notas Definitivas por Profesor</h2>
+    <h2 class="my-4">Consultar Notas Aprobadas por Profesor</h2>
     
     <?php if (isset($_SESSION['msg'])): ?>
         <div class="alert alert-success alert-dismissible fade show">
@@ -56,23 +78,23 @@ include("includes/head.php");
         </div>
         <div class="card-body">
             <form method="GET" action="">
-                <div class="form-row align-items-end">
+                <div class="row">
                     <div class="col-md-4 mb-3">
-                        <label for="buscar_profesor" class="form-label">Buscar Profesor:</label>
+                        <label for="buscar_profesor" class="form-label">Profesor:</label>
                         <input type="text" 
                                class="form-control" 
                                id="buscar_profesor" 
                                placeholder="Escriba nombre o cédula..."
-                               autocomplete="off">
+                               autocomplete="off"
+                               value="<?= $profesor_seleccionado ? htmlspecialchars($profesor_seleccionado['nombre']) : '' ?>">
                         <input type="hidden" name="profesor" id="profesor_id" value="<?= htmlspecialchars($filtro_profesor) ?>">
-                        <div id="sugerencias_profesores" class="list-group mt-1" style="display: none; max-height: 200px; overflow-y: auto; position: absolute; z-index: 1000; width: 100%;"></div>
+                        <div id="sugerencias_profesores" class="list-group mt-1" style="display: none; max-height: 200px; overflow-y: auto; position: absolute; z-index: 1000; width: calc(100% - 30px); background: white; border: 1px solid #ccc; border-radius: 4px;"></div>
                         
-                        <!-- Mostrar profesor seleccionado -->
                         <?php if ($profesor_seleccionado): ?>
                             <div class="mt-2">
                                 <small class="text-success">
                                     <i class="fas fa-check"></i> 
-                                    Profesor seleccionado: <strong><?= htmlspecialchars($profesor_seleccionado['nombre']) ?> (<?= htmlspecialchars($profesor_seleccionado['idusuario']) ?>)</strong>
+                                    Profesor: <strong><?= htmlspecialchars($profesor_seleccionado['nombre']) ?> (<?= htmlspecialchars($profesor_seleccionado['idusuario']) ?>)</strong>
                                     <button type="button" class="btn btn-sm btn-outline-danger ml-2" onclick="limpiarProfesor()">
                                         <i class="fas fa-times"></i>
                                     </button>
@@ -81,6 +103,44 @@ include("includes/head.php");
                         <?php endif; ?>
                     </div>
                     
+                    <div class="col-md-3 mb-3">
+                        <label for="materia" class="form-label">Materia:</label>
+                        <select name="materia" id="materia" class="form-control">
+                            <option value="">Todas las materias</option>
+                            <?php foreach ($materias as $materia): ?>
+                            <option value="<?= $materia['id'] ?>" <?= ($filtro_materia == $materia['id']) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($materia['nombre']) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="periodo" class="form-label">Periodo Académico:</label>
+                        <select name="periodo" id="periodo" class="form-control">
+                            <option value="">Todos los periodos</option>
+                            <?php foreach ($periodos as $periodo): ?>
+                            <option value="<?= $periodo['id_periodo'] ?>" <?= ($filtro_periodo == $periodo['id_periodo']) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($periodo['nombre_periodo']) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-2 mb-3">
+                        <label for="seccion" class="form-label">Sección:</label>
+                        <select name="seccion" id="seccion" class="form-control">
+                            <option value="">Todas las secciones</option>
+                            <?php foreach ($secciones as $seccion): ?>
+                            <option value="<?= $seccion['id_seccion'] ?>" <?= ($filtro_seccion == $seccion['id_seccion']) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($seccion['codigo_seccion']) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="row">
                     <div class="col-md-3 mb-3">
                         <label for="fecha_desde" class="form-label">Fecha Desde:</label>
                         <input type="date" name="fecha_desde" id="fecha_desde" class="form-control" 
@@ -93,10 +153,10 @@ include("includes/head.php");
                                value="<?= htmlspecialchars($filtro_fecha_hasta) ?>">
                     </div>
                     
-                    <div class="col-md-2 mb-3">
-                        <div class="btn-group w-100" role="group">
+                    <div class="col-md-6 mb-3 d-flex align-items-end">
+                        <div class="btn-group" role="group">
                             <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-search"></i> Aplicar
+                                <i class="fas fa-search"></i> Aplicar Filtros
                             </button>
                             <a href="notas_pasadas.php" class="btn btn-outline-secondary">
                                 <i class="fas fa-times"></i> Limpiar
@@ -107,28 +167,41 @@ include("includes/head.php");
             </form>
             
             <!-- Mostrar filtros activos -->
-            <?php if (!empty($filtro_profesor) || !empty($filtro_fecha_desde) || !empty($filtro_fecha_hasta)): ?>
+            <?php if (!empty($filtro_profesor) || !empty($filtro_materia) || !empty($filtro_periodo) || !empty($filtro_seccion) || !empty($filtro_fecha_desde) || !empty($filtro_fecha_hasta)): ?>
                 <div class="mt-3">
-                    <small class="text-muted">
-                        <strong>Filtros aplicados:</strong>
-                        <?php 
-                        $filtros_activos = array();
-                        
-                        if (!empty($filtro_profesor) && $profesor_seleccionado) {
-                            $filtros_activos[] = "Profesor: " . htmlspecialchars($profesor_seleccionado['nombre']) . " (" . htmlspecialchars($profesor_seleccionado['idusuario']) . ")";
+                    <strong>Filtros aplicados:</strong>
+                    <?php 
+                    if (!empty($filtro_profesor) && $profesor_seleccionado) {
+                        echo '<span class="filter-badge ml-1"><i class="fas fa-chalkboard-teacher"></i> ' . htmlspecialchars($profesor_seleccionado['nombre']) . '</span>';
+                    }
+                    if (!empty($filtro_materia)) {
+                        $materia_nombre = '';
+                        foreach ($materias as $m) {
+                            if ($m['id'] == $filtro_materia) { $materia_nombre = $m['nombre']; break; }
                         }
-                        
-                        if (!empty($filtro_fecha_desde)) {
-                            $filtros_activos[] = "Desde: " . date('d/m/Y', strtotime($filtro_fecha_desde));
+                        echo '<span class="filter-badge ml-1"><i class="fas fa-book"></i> ' . htmlspecialchars($materia_nombre) . '</span>';
+                    }
+                    if (!empty($filtro_periodo)) {
+                        $periodo_nombre = '';
+                        foreach ($periodos as $p) {
+                            if ($p['id_periodo'] == $filtro_periodo) { $periodo_nombre = $p['nombre_periodo']; break; }
                         }
-                        
-                        if (!empty($filtro_fecha_hasta)) {
-                            $filtros_activos[] = "Hasta: " . date('d/m/Y', strtotime($filtro_fecha_hasta));
+                        echo '<span class="filter-badge ml-1"><i class="fas fa-calendar"></i> ' . htmlspecialchars($periodo_nombre) . '</span>';
+                    }
+                    if (!empty($filtro_seccion)) {
+                        $seccion_codigo = '';
+                        foreach ($secciones as $s) {
+                            if ($s['id_seccion'] == $filtro_seccion) { $seccion_codigo = $s['codigo_seccion']; break; }
                         }
-                        
-                        echo implode(' | ', $filtros_activos);
-                        ?>
-                    </small>
+                        echo '<span class="filter-badge ml-1"><i class="fas fa-users"></i> Sección ' . htmlspecialchars($seccion_codigo) . '</span>';
+                    }
+                    if (!empty($filtro_fecha_desde)) {
+                        echo '<span class="filter-badge ml-1"><i class="fas fa-calendar-alt"></i> Desde: ' . date('d/m/Y', strtotime($filtro_fecha_desde)) . '</span>';
+                    }
+                    if (!empty($filtro_fecha_hasta)) {
+                        echo '<span class="filter-badge ml-1"><i class="fas fa-calendar-alt"></i> Hasta: ' . date('d/m/Y', strtotime($filtro_fecha_hasta)) . '</span>';
+                    }
+                    ?>
                 </div>
             <?php endif; ?>
         </div>
@@ -136,7 +209,7 @@ include("includes/head.php");
     
     <div class="card">
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Notas Definitivas por Docente</h5>
+            <h5 class="mb-0">Notas Aprobadas por Docente</h5>
             <span class="badge badge-light badge-pill">
                 Total: <?= $grupos_notas->num_rows ?> grupo(s)
             </span>
@@ -153,7 +226,7 @@ include("includes/head.php");
                                 <th>Periodo</th>
                                 <th>Sección</th>
                                 <th>Carrera</th>
-                                <th># Notas</th>
+                                <th># Estudiantes</th>
                                 <th>Última Actualización</th>
                                 <th>Acciones</th>
                             </tr>
@@ -169,37 +242,38 @@ include("includes/head.php");
                                     <td><?= htmlspecialchars($grupo['nombre_carrera']) ?></td>
                                     <td>
                                         <span class="badge badge-info badge-pill">
-                                            <?= $grupo['total_notas'] ?>
+                                            <?= $grupo['total_estudiantes'] ?>
                                         </span>
-                                    </td>
-                                    <td><?= date('d/m/Y H:i', strtotime($grupo['ultima_fecha'])) ?></td>
+                                    </div>
+                                    <td><?= date('d/m/Y H:i', strtotime($grupo['ultima_fecha'])) ?></div>
                                     <td>
-                                        <button type="button" class="btn btn-sm btn-info btn-detalles" 
-                                                data-toggle="modal" data-target="#modalDetalles"
-                                                data-docente-id="<?= $grupo['id_docente'] ?>"
-                                                data-materia-id="<?= $grupo['id_materia'] ?>"
-                                                data-periodo-id="<?= $grupo['id_periodo'] ?>"
-                                                data-docente="<?= htmlspecialchars($grupo['nombre_docente']) ?>"
-                                                data-materia="<?= htmlspecialchars($grupo['nombre_materia']) ?>"
-                                                data-periodo="<?= htmlspecialchars($grupo['nombre_periodo']) ?>"
-                                                data-seccion="<?= htmlspecialchars($grupo['codigo_seccion']) ?>"
-                                                data-carrera="<?= htmlspecialchars($grupo['nombre_carrera']) ?>">
-                                            <i class="fas fa-eye"></i> Ver Detalles
-                                        </button>
-                                        
-                                        <!-- Botón para generar PDF -->
-                                        <button type="button" class="btn btn-sm btn-danger btn-pdf" 
-                                                data-docente-id="<?= $grupo['id_docente'] ?>"
-                                                data-materia-id="<?= $grupo['id_materia'] ?>"
-                                                data-periodo-id="<?= $grupo['id_periodo'] ?>"
-                                                data-docente="<?= htmlspecialchars($grupo['nombre_docente']) ?>"
-                                                data-materia="<?= htmlspecialchars($grupo['nombre_materia']) ?>"
-                                                data-periodo="<?= htmlspecialchars($grupo['nombre_periodo']) ?>"
-                                                data-seccion="<?= htmlspecialchars($grupo['codigo_seccion']) ?>"
-                                                data-carrera="<?= htmlspecialchars($grupo['nombre_carrera']) ?>">
-                                            <i class="fas fa-file-pdf"></i> PDF
-                                        </button>
-                                    </td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button type="button" class="btn btn-info btn-detalles" 
+                                                    data-toggle="modal" data-target="#modalDetalles"
+                                                    data-docente-id="<?= $grupo['id_docente'] ?>"
+                                                    data-materia-id="<?= $grupo['id_materia'] ?>"
+                                                    data-periodo-id="<?= $grupo['id_periodo'] ?>"
+                                                    data-docente="<?= htmlspecialchars($grupo['nombre_docente']) ?>"
+                                                    data-materia="<?= htmlspecialchars($grupo['nombre_materia']) ?>"
+                                                    data-periodo="<?= htmlspecialchars($grupo['nombre_periodo']) ?>"
+                                                    data-seccion="<?= htmlspecialchars($grupo['codigo_seccion']) ?>"
+                                                    data-carrera="<?= htmlspecialchars($grupo['nombre_carrera']) ?>">
+                                                <i class="fas fa-eye"></i> Ver
+                                            </button>
+                                            
+                                            <button type="button" class="btn btn-danger btn-pdf" 
+                                                    data-docente-id="<?= $grupo['id_docente'] ?>"
+                                                    data-materia-id="<?= $grupo['id_materia'] ?>"
+                                                    data-periodo-id="<?= $grupo['id_periodo'] ?>"
+                                                    data-docente="<?= htmlspecialchars($grupo['nombre_docente']) ?>"
+                                                    data-materia="<?= htmlspecialchars($grupo['nombre_materia']) ?>"
+                                                    data-periodo="<?= htmlspecialchars($grupo['nombre_periodo']) ?>"
+                                                    data-seccion="<?= htmlspecialchars($grupo['codigo_seccion']) ?>"
+                                                    data-carrera="<?= htmlspecialchars($grupo['nombre_carrera']) ?>">
+                                                <i class="fas fa-file-pdf"></i> PDF
+                                            </button>
+                                        </div>
+                                    </div>
                                 </tr>
                             <?php endwhile; ?>
                         </tbody>
@@ -209,13 +283,13 @@ include("includes/head.php");
                 <div class="alert alert-info text-center py-4">
                     <i class="fas fa-info-circle fa-2x mb-3"></i>
                     <h5>
-                        <?php if (!empty($filtro_profesor) || !empty($filtro_fecha_desde) || !empty($filtro_fecha_hasta)): ?>
+                        <?php if (!empty($filtro_profesor) || !empty($filtro_materia) || !empty($filtro_periodo) || !empty($filtro_seccion) || !empty($filtro_fecha_desde) || !empty($filtro_fecha_hasta)): ?>
                             No se encontraron resultados con los filtros aplicados.
                         <?php else: ?>
-                            No hay notas definitivas registradas en el sistema.
+                            No hay notas aprobadas registradas en el sistema.
                         <?php endif; ?>
                     </h5>
-                    <?php if (!empty($filtro_profesor) || !empty($filtro_fecha_desde) || !empty($filtro_fecha_hasta)): ?>
+                    <?php if (!empty($filtro_profesor) || !empty($filtro_materia) || !empty($filtro_periodo) || !empty($filtro_seccion) || !empty($filtro_fecha_desde) || !empty($filtro_fecha_hasta)): ?>
                         <a href="notas_pasadas.php" class="btn btn-primary mt-2">
                             <i class="fas fa-times"></i> Limpiar Filtros
                         </a>
@@ -232,7 +306,7 @@ include("includes/head.php");
         <div class="modal-content">
             <div class="modal-header bg-info text-white">
                 <h5 class="modal-title" id="modalDetallesTitle">
-                    Notas Definitivas - <span id="tituloGrupo"></span>
+                    Notas Aprobadas - <span id="tituloGrupo"></span>
                 </h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
@@ -282,6 +356,9 @@ include("includes/head.php");
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-danger btn-modal-pdf" id="btnModalPDF">
+                    <i class="fas fa-file-pdf"></i> Generar PDF
+                </button>
             </div>
         </div>
     </div>
@@ -289,6 +366,16 @@ include("includes/head.php");
 
 <script>
 $(document).ready(function() {
+    // Variables globales para el PDF
+    let currentDocenteId = null;
+    let currentMateriaId = null;
+    let currentPeriodoId = null;
+    let currentDocente = '';
+    let currentMateria = '';
+    let currentPeriodo = '';
+    let currentSeccion = '';
+    let currentCarrera = '';
+
     // Búsqueda de profesores con autocompletado
     $('#buscar_profesor').on('input', function() {
         const termino = $(this).val().trim();
@@ -302,6 +389,7 @@ $(document).ready(function() {
             url: 'ajax_buscar_profesores.php',
             type: 'GET',
             data: { termino: termino },
+            dataType: 'json',
             success: function(data) {
                 const sugerencias = $('#sugerencias_profesores');
                 sugerencias.empty();
@@ -321,16 +409,22 @@ $(document).ready(function() {
                             $('#profesor_id').val(profesor.id);
                             sugerencias.hide();
                             
+                            // Eliminar selector anterior si existe
+                            $('.profesor-seleccionado').remove();
+                            
                             // Mostrar información del profesor seleccionado
-                            $('<div class="mt-2">' +
-                                '<small class="text-success">' +
-                                '<i class="fas fa-check"></i> ' +
-                                'Profesor seleccionado: <strong>' + profesor.nombre + ' (' + profesor.idusuario + ')</strong>' +
-                                '<button type="button" class="btn btn-sm btn-outline-danger ml-2" onclick="limpiarProfesor()">' +
-                                '<i class="fas fa-times"></i>' +
-                                '</button>' +
-                                '</small>' +
-                                '</div>').insertAfter('#buscar_profesor');
+                            const selectorHtml = `
+                                <div class="mt-2 profesor-seleccionado">
+                                    <small class="text-success">
+                                        <i class="fas fa-check"></i> 
+                                        Profesor: <strong>${profesor.nombre} (${profesor.idusuario})</strong>
+                                        <button type="button" class="btn btn-sm btn-outline-danger ml-2" onclick="limpiarProfesor()">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </small>
+                                </div>
+                            `;
+                            $('#buscar_profesor').after(selectorHtml);
                         });
                         sugerencias.append(item);
                     });
@@ -351,120 +445,106 @@ $(document).ready(function() {
             $('#sugerencias_profesores').hide();
         }
     });
-    
-    // Limpiar campo de búsqueda si está vacío
-    $('#buscar_profesor').on('blur', function() {
-        if ($(this).val().trim() === '' && $('#profesor_id').val() === '') {
-            $(this).val('');
-        }
-    });
 
     // Cargar detalles del grupo via AJAX
     $('.btn-detalles').click(function() {
-        const docenteId = $(this).data('docente-id');
-        const materiaId = $(this).data('materia-id');
-        const periodoId = $(this).data('periodo-id');
-        const docente = $(this).data('docente');
-        const materia = $(this).data('materia');
-        const periodo = $(this).data('periodo');
-        const seccion = $(this).data('seccion');
-        const carrera = $(this).data('carrera');
+        currentDocenteId = $(this).data('docente-id');
+        currentMateriaId = $(this).data('materia-id');
+        currentPeriodoId = $(this).data('periodo-id');
+        currentDocente = $(this).data('docente');
+        currentMateria = $(this).data('materia');
+        currentPeriodo = $(this).data('periodo');
+        currentSeccion = $(this).data('seccion');
+        currentCarrera = $(this).data('carrera');
         
         // Actualizar título del modal
-        $('#tituloGrupo').text(`${docente} - ${materia} - ${periodo}`);
+        $('#tituloGrupo').text(`${currentDocente} - ${currentMateria} - ${currentPeriodo}`);
         
         // Cargar lista de estudiantes
         $.ajax({
-            url: 'ajax_detalles_notas_definitivas.php',
+            url: 'ajax_detalles_notas_aprobadas.php',
             type: 'POST',
             data: { 
-                docente_id: docenteId, 
-                materia_id: materiaId, 
-                periodo_id: periodoId,
+                docente_id: currentDocenteId, 
+                materia_id: currentMateriaId, 
+                periodo_id: currentPeriodoId,
                 seccion: 'lista-estudiantes'
             },
             success: function(data) {
                 $('#lista-estudiantes').html(data);
+            },
+            error: function(xhr) {
+                $('#lista-estudiantes').html('<div class="alert alert-danger">Error al cargar estudiantes: ' + xhr.status + '</div>');
             }
         });
         
         // Cargar resumen
         $.ajax({
-            url: 'ajax_detalles_notas_definitivas.php',
+            url: 'ajax_detalles_notas_aprobadas.php',
             type: 'POST',
             data: { 
-                docente_id: docenteId, 
-                materia_id: materiaId, 
-                periodo_id: periodoId,
+                docente_id: currentDocenteId, 
+                materia_id: currentMateriaId, 
+                periodo_id: currentPeriodoId,
                 seccion: 'resumen'
             },
             success: function(data) {
                 $('#resumen').html(data);
+            },
+            error: function(xhr) {
+                $('#resumen').html('<div class="alert alert-danger">Error al cargar resumen: ' + xhr.status + '</div>');
             }
         });
         
         // Cargar soporte
         $.ajax({
-            url: 'ajax_detalles_notas_definitivas.php',
+            url: 'ajax_detalles_notas_aprobadas.php',
             type: 'POST',
             data: { 
-                docente_id: docenteId, 
-                materia_id: materiaId, 
-                periodo_id: periodoId,
+                docente_id: currentDocenteId, 
+                materia_id: currentMateriaId, 
+                periodo_id: currentPeriodoId,
                 seccion: 'soporte'
             },
             success: function(data) {
                 $('#soporte').html(data);
+            },
+            error: function(xhr) {
+                $('#soporte').html('<div class="alert alert-danger">Error al cargar soporte: ' + xhr.status + '</div>');
             }
         });
     });
     
-    // Manejar clic en botón PDF
+    // Botón PDF del modal
+    $('#btnModalPDF').click(function() {
+        if (currentDocenteId && currentMateriaId && currentPeriodoId) {
+            window.location.href = `generar_pdf_notas_aprobadas.php?docente_id=${currentDocenteId}&materia_id=${currentMateriaId}&periodo_id=${currentPeriodoId}`;
+        } else {
+            alert('No se pudo generar el PDF. Faltan datos.');
+        }
+    });
+    
+    // Botones PDF en la tabla
     $('.btn-pdf').click(function() {
         const docenteId = $(this).data('docente-id');
         const materiaId = $(this).data('materia-id');
         const periodoId = $(this).data('periodo-id');
-        const docente = $(this).data('docente');
-        const materia = $(this).data('materia');
-        const periodo = $(this).data('periodo');
-        const seccion = $(this).data('seccion');
-        const carrera = $(this).data('carrera');
         
         // Mostrar loading
         const $btn = $(this);
         const originalHtml = $btn.html();
-        $btn.html('<i class="fas fa-spinner fa-spin"></i> Generando...');
+        $btn.html('<i class="fas fa-spinner fa-spin"></i>');
         $btn.prop('disabled', true);
         
-        // Cargar datos para el PDF
-        $.ajax({
-            url: 'ajax_detalles_notas_definitivas.php',
-            type: 'POST',
-            data: { 
-                docente_id: docenteId, 
-                materia_id: materiaId, 
-                periodo_id: periodoId,
-                accion: 'pdf'
-            },
-            success: function(data) {
-                // Restaurar botón
-                $btn.html(originalHtml);
-                $btn.prop('disabled', false);
-                
-                // Generar PDF
-                generarPDF(data, docente, materia, periodo, seccion, carrera);
-            },
-            error: function(xhr, status, error) {
-                // Restaurar botón
-                $btn.html(originalHtml);
-                $btn.prop('disabled', false);
-                console.error('Error:', error);
-                alert('Error al generar el PDF: ' + error);
-            }
-        });
+        window.location.href = `generar_pdf_notas_aprobadas.php?docente_id=${docenteId}&materia_id=${materiaId}&periodo_id=${periodoId}`;
+        
+        setTimeout(() => {
+            $btn.html(originalHtml);
+            $btn.prop('disabled', false);
+        }, 2000);
     });
 
-    // Validación de fechas: fecha_hasta no puede ser menor que fecha_desde
+    // Validación de fechas
     $('#fecha_desde, #fecha_hasta').change(function() {
         const fechaDesde = $('#fecha_desde').val();
         const fechaHasta = $('#fecha_hasta').val();
@@ -476,35 +556,11 @@ $(document).ready(function() {
     });
 });
 
-// Manejar clic en botón PDF
-$('.btn-pdf').click(function() {
-    const docenteId = $(this).data('docente-id');
-    const materiaId = $(this).data('materia-id');
-    const periodoId = $(this).data('periodo-id');
-    
-    // Mostrar loading
-    const $btn = $(this);
-    const originalHtml = $btn.html();
-    $btn.html('<i class="fas fa-spinner fa-spin"></i> Generando...');
-    $btn.prop('disabled', true);
-    
-    // Redirigir directamente al generador de PDF
-    window.location.href = `generar_pdf_notas_definitivas.php?docente_id=${docenteId}&materia_id=${materiaId}&periodo_id=${periodoId}`;
-    
-    // Restaurar botón después de 3 segundos
-    setTimeout(() => {
-        $btn.html(originalHtml);
-        $btn.prop('disabled', false);
-    }, 3000);
-});
-
 // Función para limpiar la selección del profesor
 function limpiarProfesor() {
     $('#buscar_profesor').val('');
     $('#profesor_id').val('');
-    $('.mt-2').filter(function() {
-        return $(this).find('.text-success').length > 0;
-    }).remove();
+    $('.profesor-seleccionado').remove();
 }
 </script>
 

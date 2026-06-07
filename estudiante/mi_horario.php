@@ -12,381 +12,407 @@ if (!isLoggedIn() || !isEstudiante()) {
     exit();
 }
 
-// LLAMAR A LA FUNCIÓN DE VISITA
 visita();
 
-// Obtener la sección del estudiante - CORREGIDO: usar $_SESSION['user']['id']
 $estudiante_id = (int)$_SESSION['user']['id'];
 $seccion_estudiante = obtenerSeccionEstudiante($db, $estudiante_id);
 
 include("includes/head.php");
 ?>
 
-<div class="container-fluid">
-    <?php 
-    if (isset($_SESSION['error'])) {
-        mostrarError($_SESSION['error']);
-        unset($_SESSION['error']);
+<style>
+    :root {
+        --color-clase: #e8f5e9;
+        --color-texto-clase: #2e7d32;
+        --border-clase: #388e3c;
     }
-    if (isset($_SESSION['success'])) {
-        mostrarExito($_SESSION['success']);
-        unset($_SESSION['success']);
+
+    /* Estilos de la Tabla */
+    #tablaHorario {
+        table-layout: fixed;
+        border-collapse: collapse;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #6c757d;
+        width: 100%;
     }
-    ?>
-    
-    <?php if ($seccion_estudiante): ?>
-        <!-- EL ESTUDIANTE TIENE UNA SECCIÓN ASIGNADA -->
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1 class="h3 text-gray-800">Mi Horario - <?= htmlspecialchars($seccion_estudiante['codigo_seccion']) ?></h1>
-            <div>
-                <button class="btn btn-sm btn-success" onclick="generarPDF()">
-                    <i class="fas fa-file-pdf"></i> Descargar PDF
+
+    #tablaHorario thead th {
+        background-color: #2c3e50;
+        color: white;
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        letter-spacing: 0.5px;
+        border: 1px solid #495057;
+        padding: 6px 4px;
+    }
+
+    #tablaHorario tbody td {
+        border: 1px solid #6c757d;
+    }
+
+    .hora-col {
+        background-color: #f8f9fa;
+        font-weight: bold;
+        color: #495057;
+        width: 65px;
+        text-align: center;
+        padding: 6px 4px;
+        font-size: 0.7rem;
+        border: 1px solid #6c757d;
+    }
+
+    .materia-container {
+        padding: 4px !important;
+        vertical-align: middle !important;
+        border: 1px solid #6c757d;
+    }
+
+    .bloque-clase {
+        background-color: var(--color-clase);
+        color: var(--color-texto-clase);
+        border: 1px solid var(--border-clase);
+        border-radius: 4px;
+        padding: 4px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .materia-nombre {
+        font-weight: 800;
+        font-size: 0.65rem;
+        line-height: 1.1;
+        margin-bottom: 2px;
+        text-transform: uppercase;
+    }
+
+    .docente-nombre {
+        font-size: 0.6rem;
+        opacity: 0.9;
+    }
+
+    .aula-tag {
+        font-size: 0.55rem;
+        font-weight: bold;
+        margin-top: 2px;
+        display: inline-block;
+        background: rgba(255,255,255,0.5);
+        padding: 1px 4px;
+        border-radius: 3px;
+    }
+
+    /* Badges con colores claros */
+    .badge-seccion {
+        background-color: #e3f2fd;
+        color: #1565c0;
+        font-size: 0.65rem;
+        padding: 4px 8px;
+        margin-right: 5px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+
+    .badge-carrera {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+        font-size: 0.65rem;
+        padding: 4px 8px;
+        margin-right: 5px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+
+    .badge-turno {
+        background-color: #fff3e0;
+        color: #e65100;
+        font-size: 0.65rem;
+        padding: 4px 8px;
+        margin-right: 5px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+
+    .badge-trayecto {
+        background-color: #f3e5f5;
+        color: #6a1b9a;
+        font-size: 0.65rem;
+        padding: 4px 8px;
+        margin-right: 5px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+
+    .badge-periodo {
+        background-color: #e0f7fa;
+        color: #006064;
+        font-size: 0.65rem;
+        padding: 4px 8px;
+        margin-right: 5px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+
+    /* CONFIGURACIÓN DE IMPRESIÓN - UNA SOLA HOJA */
+    @media print {
+        @page {
+            size: landscape;
+            margin: 0.3cm;
+        }
+        body * {
+            visibility: hidden;
+        }
+        #seccionImprimir, #seccionImprimir * {
+            visibility: visible;
+        }
+        #seccionImprimir {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        .no-print {
+            display: none !important;
+        }
+        .bloque-clase {
+            border: 1px solid #2e7d32 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .card {
+            box-shadow: none !important;
+            border: 1px solid #6c757d !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .card-body {
+            padding: 0 !important;
+        }
+        #tablaHorario td, #tablaHorario th {
+            border: 1px solid #6c757d !important;
+            padding: 4px !important;
+            font-size: 0.6rem !important;
+        }
+        #tablaHorario thead th {
+            padding: 4px !important;
+            font-size: 0.6rem !important;
+            border: 1px solid #495057 !important;
+        }
+        .hora-col {
+            padding: 4px !important;
+            font-size: 0.6rem !important;
+            width: 55px !important;
+            border: 1px solid #6c757d !important;
+        }
+        .materia-container {
+            border: 1px solid #6c757d !important;
+        }
+        .materia-nombre {
+            font-size: 0.55rem !important;
+        }
+        .docente-nombre {
+            font-size: 0.5rem !important;
+        }
+        .aula-tag {
+            font-size: 0.45rem !important;
+        }
+        h2 {
+            font-size: 1rem !important;
+            margin: 0 !important;
+        }
+        .mt-2 {
+            margin-top: 2px !important;
+        }
+        .mb-4 {
+            margin-bottom: 5px !important;
+        }
+        .py-4 {
+            padding-top: 2px !important;
+            padding-bottom: 2px !important;
+        }
+        .badge-seccion, .badge-carrera, .badge-turno, .badge-trayecto, .badge-periodo {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+    }
+</style>
+
+<div class="container-fluid py-4" id="seccionImprimir">
+    <?php if ($seccion_estudiante && !empty($seccion_estudiante)): ?>
+        <div class="row mb-3 align-items-center">
+            <div class="col-md-8">
+                <h2 class="mb-0 fw-bold" style="font-size: 1.2rem;"><i class="fas fa-calendar-check text-primary me-2"></i> HORARIO ACADÉMICO</h2>
+                <div class="mt-1">
+                    <span class="badge-seccion"><i class="fas fa-code-branch me-1"></i> SECCIÓN: <?= htmlspecialchars($seccion_estudiante['codigo_seccion'] ?? 'N/A') ?></span>
+                    <span class="badge-carrera"><i class="fas fa-graduation-cap me-1"></i> CARRERA: <?= htmlspecialchars($seccion_estudiante['nombre_carrera'] ?? 'N/A') ?></span>
+                    <span class="badge-turno"><i class="fas fa-clock me-1"></i> TURNO: <?= htmlspecialchars($seccion_estudiante['turno'] ?? 'N/A') ?></span>
+                    <span class="badge-trayecto"><i class="fas fa-layer-group me-1"></i> TRAYECTO: <?= htmlspecialchars($seccion_estudiante['numero_trayecto'] ?? 'N/A') ?></span>
+                    <span class="badge-periodo"><i class="fas fa-calendar-alt me-1"></i> PERÍODO: <?= htmlspecialchars($seccion_estudiante['nombre_periodo'] ?? 'N/A') ?></span>
+                </div>
+            </div>
+            <div class="col-md-4 text-md-end no-print">
+                <button onclick="window.print();" class="btn btn-primary btn-sm shadow-sm">
+                    <i class="fas fa-print me-2"></i> Imprimir / Guardar PDF
                 </button>
             </div>
         </div>
-        
-        <!-- Información básica de la sección (solo para web) -->
-        <div class="row mb-4 web-only">
-            <div class="col-md-12">
-                <div class="card border-left-primary shadow h-100 py-2">
-                    <div class="card-body">
-                        <div class="row no-gutters align-items-center">
-                            <div class="col mr-2">
-                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                    Información de mi Sección
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <strong>Carrera:</strong> <?= htmlspecialchars($seccion_estudiante['nombre_carrera']) ?>
-                                    </div>
-                                    <div class="col-md-2">
-                                        <strong>Trayecto:</strong> <?= $seccion_estudiante['numero_trayecto'] ?>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <strong>Período:</strong> <?= htmlspecialchars($seccion_estudiante['nombre_periodo']) ?>
-                                    </div>
-                                    <div class="col-md-2">
-                                        <strong>Estado:</strong> 
-                                        <span class="badge badge-<?= $seccion_estudiante['estatus'] == 'activa' ? 'success' : 'danger' ?>">
-                                            <?= ucfirst($seccion_estudiante['estatus']) ?>
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+
+        <div class="card border-0 shadow">
+            <div class="card-body p-0">
+                <?php
+                $id_seccion = $seccion_estudiante['id_seccion'];
+                $turno_seccion = $seccion_estudiante['turno'] ?? 'Diurno';
+                $horarios = obtenerHorariosSeccion($db, $id_seccion);
+                $horarios = is_array($horarios) ? $horarios : [];
+                
+                if (empty($horarios)):
+                ?>
+                    <div class="p-5 text-center">
+                        <i class="fas fa-calendar-times fa-4x text-muted mb-3"></i>
+                        <p class="mt-3 text-muted">No hay horarios cargados para esta sección.</p>
                     </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- HORARIO SEMANAL -->
-        <?php
-        $horarios = obtenerHorariosSeccion($db, $seccion_estudiante['id_seccion']);
-        $horarios = is_array($horarios) ? $horarios : [];
-        ?>
-        
-        <div class="card shadow mb-4" id="horario-clases">
-            <div class="card-header py-3 d-flex justify-content-between align-items-center web-only">
-                <h6 class="m-0 font-weight-bold text-primary">Horario de Clases Semanal</h6>
-                <div>
-                    <span class="badge badge-info"><?= count($horarios) ?> bloques horarios</span>
-                </div>
-            </div>
-            <div class="card-body">
-                <?php if (empty($horarios)): ?>
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> No se han definido horarios para esta sección.
-                    </div>
-                <?php else: ?>
-                    <!-- Información para PDF (oculta en web) -->
-                    <div id="pdf-info" class="pdf-only text-center mb-3" style="display: none;">
-                        <h4>Universidad Politécnica Territorial de Puerto Cabello</h4>
-                        <h5>Horario de Clases - <?= htmlspecialchars($seccion_estudiante['codigo_seccion']) ?></h5>
-                        <p>
-                            <strong>Carrera:</strong> <?= htmlspecialchars($seccion_estudiante['nombre_carrera']) ?> | 
-                            <strong>Trayecto:</strong> <?= $seccion_estudiante['numero_trayecto'] ?> | 
-                            <strong>Período:</strong> <?= htmlspecialchars($seccion_estudiante['nombre_periodo']) ?>
-                        </p>
-                    </div>
-                    
-                    <?php
-                    // Definir las horas de la tabla (de 7:00 a 16:00)
-                    $horas_tabla = [];
-                    for ($h = 7; $h <= 16; $h++) {
-                        $horas_tabla[] = sprintf("%02d:00", $h);
-                    }
-                    
-                    // Organizar los horarios por día
+                <?php else: 
                     $dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-                    $horarios_por_dia = array_fill(0, 6, []);
                     
-                    foreach ($horarios as $horario) {
-                        $dia = (int)$horario['dia'];
-                        $hora_inicio = date('H:i', strtotime($horario['hora_inicio']));
-                        $hora_fin = date('H:i', strtotime($horario['hora_fin']));
-                        
-                        $horarios_por_dia[$dia][] = [
-                            'materia' => $horario['nombre_materia'],
-                            'docente' => $horario['nombre_docente'],
-                            'aula' => $horario['aula'],
-                            'hora_inicio' => $hora_inicio,
-                            'hora_fin' => $hora_fin,
-                            'cod_materia' => $horario['cod_materia'] ?? ''
-                        ];
+                    function horaToNumPrint($hora) {
+                        return (int)substr($hora, 0, 2) + (int)substr($hora, 3, 2) / 60;
                     }
-                    ?>
                     
-                    <div class="table-responsive mb-4">
-                        <table class="table table-bordered table-hover">
-                            <thead class="thead-dark">
+                    $hora_min = 24;
+                    $hora_max = 0;
+                    foreach ($horarios as $horario) {
+                        $hora_inicio_num = horaToNumPrint($horario['hora_inicio']);
+                        $hora_fin_num = horaToNumPrint($horario['hora_fin']);
+                        if ($hora_inicio_num < $hora_min) $hora_min = $hora_inicio_num;
+                        if ($hora_fin_num > $hora_max) $hora_max = $hora_fin_num;
+                    }
+                    
+                    if ($turno_seccion == 'Diurno') {
+                        $hay_clases_fuera = false;
+                        foreach ($horarios as $horario) {
+                            $hora_inicio_num = horaToNumPrint($horario['hora_inicio']);
+                            $hora_fin_num = horaToNumPrint($horario['hora_fin']);
+                            if ($hora_inicio_num < 7 || $hora_fin_num > 17.5) {
+                                $hay_clases_fuera = true;
+                                break;
+                            }
+                        }
+                        if ($hay_clases_fuera) {
+                            $inicio = max(7, floor($hora_min));
+                            $fin = min(20, ceil($hora_max));
+                        } else {
+                            $inicio = 7;
+                            $fin = 17;
+                        }
+                    } else {
+                        $hay_clases_fuera = false;
+                        foreach ($horarios as $horario) {
+                            $hora_inicio_num = horaToNumPrint($horario['hora_inicio']);
+                            if ($hora_inicio_num < 17.5) {
+                                $hay_clases_fuera = true;
+                                break;
+                            }
+                        }
+                        if ($hay_clases_fuera) {
+                            $inicio = max(7, floor($hora_min));
+                            $fin = min(20, ceil($hora_max));
+                        } else {
+                            $inicio = 17;
+                            $fin = 20;
+                        }
+                    }
+                    
+                    $horas_tabla = [];
+                    for ($h = $inicio; $h <= $fin; $h++) {
+                        $horas_tabla[] = sprintf("%02d:00", $h);
+                        if ($h < $fin) {
+                            $horas_tabla[] = sprintf("%02d:30", $h);
+                        }
+                    }
+
+                    $horarios_por_dia = array_fill(0, 6, []);
+                    foreach ($horarios as $h) {
+                        $horarios_por_dia[(int)$h['dia']][] = $h;
+                    }
+                ?>
+                    <div class="table-responsive">
+                        <table class="table table-bordered m-0 text-center" id="tablaHorario">
+                            <thead>
                                 <tr>
-                                    <th width="100">Hora</th>
+                                    <th class="hora-col">HORA</th>
                                     <?php foreach ($dias_semana as $dia): ?>
                                         <th><?= $dia ?></th>
                                     <?php endforeach; ?>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($horas_tabla as $index => $hora): ?>
+                                <?php 
+                                $skip_cells = [];
+                                foreach ($horas_tabla as $hora): 
+                                ?>
                                     <tr>
-                                        <th class="bg-light"><?= $hora ?></th>
+                                        <td class="hora-col"><?= $hora ?></td>
                                         <?php for ($dia = 0; $dia <= 5; $dia++): ?>
                                             <?php
-                                            $contenido_celda = '';
-                                            $clase_css = 'celda-horario';
-                                            $es_continuacion = false;
-                                            $tooltip_content = '';
-                                            
-                                            // Buscar si hay una clase en esta hora y día
+                                            if (isset($skip_cells[$dia][$hora])) continue;
+
+                                            $clase_encontrada = null;
                                             foreach ($horarios_por_dia[$dia] as $clase) {
                                                 if ($hora >= $clase['hora_inicio'] && $hora < $clase['hora_fin']) {
-                                                    $contenido_celda = htmlspecialchars($clase['materia']);
-                                                    $clase_css = 'horario-block';
-                                                    $tooltip_content = htmlspecialchars($clase['materia']) . 
-                                                                      '\\nProf: ' . htmlspecialchars($clase['docente']) . 
-                                                                      '\\nAula: ' . htmlspecialchars($clase['aula']) . 
-                                                                      '\\nHora: ' . $clase['hora_inicio'] . ' - ' . $clase['hora_fin'];
-                                                    
-                                                    // Verificar si es continuación
-                                                    if ($hora != $clase['hora_inicio']) {
-                                                        $clase_css .= ' continuacion';
-                                                        $es_continuacion = true;
-                                                    }
+                                                    $clase_encontrada = $clase;
                                                     break;
                                                 }
                                             }
+
+                                            if ($clase_encontrada): 
+                                                $h_ini = strtotime($hora);
+                                                $h_fin_clase = strtotime($clase_encontrada['hora_fin']);
+                                                $rowspan = ($h_fin_clase - $h_ini) / 1800;
+
+                                                $temp_hora = $h_ini;
+                                                for ($i = 1; $i < $rowspan; $i++) {
+                                                    $temp_hora += 1800;
+                                                    $skip_cells[$dia][date('H:i', $temp_hora)] = true;
+                                                }
                                             ?>
-                                            <td class="<?= $clase_css ?>" data-toggle="tooltip" title="<?= $tooltip_content ?>">
-                                                <?php if ($es_continuacion): ?>
-                                                    <span class="continuacion-simbolo">↳</span>
-                                                <?php endif; ?>
-                                                <?= $contenido_celda ?>
-                                            </td>
+                                                <td rowspan="<?= $rowspan ?>" class="materia-container">
+                                                    <div class="bloque-clase">
+                                                        <span class="materia-nombre"><?= htmlspecialchars($clase_encontrada['nombre_materia']) ?></span>
+                                                        <span class="docente-nombre"><?= htmlspecialchars($clase_encontrada['nombre_docente']) ?></span>
+                                                        <div><span class="aula-tag"><i class="fas fa-door-open me-1"></i> <?= htmlspecialchars($clase_encontrada['aula']) ?></span></div>
+                                                    </div>
+                                                 </td>
+                                            <?php else: ?>
+                                                <td class="bg-light"></td>
+                                            <?php endif; ?>
                                         <?php endfor; ?>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
-                    
-                    <!-- Leyenda de materias (solo para web) -->
-                    <div class="card border-left-primary shadow py-2 web-only">
-                        <div class="card-body">
-                            <h5 class="font-weight-bold text-primary mb-3">
-                                <i class="fas fa-info-circle"></i> Detalle de Materias
-                            </h5>
-                            <div class="row">
-                                <?php foreach ($horarios as $item): ?>
-                                    <div class="col-md-6 mb-3">
-                                        <div class="d-flex align-items-start">
-                                            <div class="mr-3 mt-1">
-                                                <i class="fas fa-book text-primary"></i>
-                                            </div>
-                                            <div>
-                                                <strong class="text-primary"><?= htmlspecialchars($item['nombre_materia']) ?></strong>
-                                                <br>
-                                                <small class="text-muted">
-                                                    <strong>Día:</strong> <?= $dias_semana[$item['dia']] ?><br>
-                                                    <strong>Horario:</strong> <?= date('H:i', strtotime($item['hora_inicio'])) ?> - <?= date('H:i', strtotime($item['hora_fin'])) ?><br>
-                                                    <strong>Profesor:</strong> <?= htmlspecialchars($item['nombre_docente']) ?><br>
-                                                    <strong>Aula:</strong> <?= htmlspecialchars($item['aula']) ?>
-                                                </small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    </div>
                 <?php endif; ?>
             </div>
         </div>
+        
+        <div class="mt-2 no-print">
+            <div class="alert alert-light border shadow-sm py-2" style="font-size: 0.8rem;">
+                <i class="fas fa-info-circle text-primary me-2"></i>
+                <strong>Consejo:</strong> Para descargar este horario, haz clic en el botón azul y selecciona <strong>"Guardar como PDF"</strong>.
+            </div>
+        </div>
 
-        <style>
-        .horario-block {
-            background-color: #e3f2fd;
-            border-left: 4px solid #2196F3;
-            text-align: center;
-            font-weight: bold;
-            vertical-align: middle;
-            position: relative;
-            cursor: help;
-        }
-        
-        .horario-block.continuacion {
-            background-color: #bbdefb;
-            border-left: 4px solid #64b5f6;
-            font-weight: normal;
-        }
-        
-        .continuacion-simbolo {
-            color: #1976d2;
-            margin-right: 5px;
-        }
-        
-        .celda-horario {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-        }
-        
-        .table {
-            table-layout: fixed;
-            border-collapse: collapse;
-        }
-        
-        .table th, .table td {
-            padding: 12px;
-            height: 60px;
-            vertical-align: middle;
-            border: 1px solid #dee2e6;
-        }
-        
-        /* Estilos para impresión */
-        @media print {
-            body * {
-                visibility: hidden;
-            }
-            #horario-clases, #horario-clases * {
-                visibility: visible;
-            }
-            #horario-clases {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-            }
-            .btn, .web-only {
-                display: none !important;
-            }
-            .pdf-only {
-                display: block !important;
-            }
-        }
-        
-        /* Estilos para PDF */
-        .pdf-only {
-            display: none;
-        }
-        </style>
-        
-        <script>
-        $(document).ready(function() {
-            // Inicializar tooltips
-            $('[data-toggle="tooltip"]').tooltip();
-        });
-        
-        // Función para generar el PDF con membrete
-        function generarPDF() {
-            // Mostrar información para PDF
-            document.getElementById('pdf-info').style.display = 'block';
-            
-            // Configuración de jsPDF
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
-            const margin = 10;
-            const pageWidth = doc.internal.pageSize.getWidth();
-            
-            // Función para agregar membrete al PDF
-            function agregarMembretePDF(doc, pageWidth, margin) {
-                // Cargar imagen del logo
-                const logoImg = new Image();
-                logoImg.crossOrigin = 'Anonymous';
-                logoImg.src = '../images/uptpc.png';
-                
-                return new Promise((resolve) => {
-                    logoImg.onload = function() {
-                        // Agregar logo (arriba a la izquierda)
-                        doc.addImage(logoImg, 'PNG', margin, 10, 20, 20);
-                        
-                        // Agregar texto del membrete
-                        doc.setFontSize(12);
-                        doc.setFont(undefined, 'bold');
-                        doc.text('República Bolivariana de Venezuela', pageWidth / 2, 15, { align: 'center' });
-                        doc.text('Ministerio del Poder Popular para la Educación Universitaria', pageWidth / 2, 20, { align: 'center' });
-                        doc.text('Universidad Politécnica Territorial de Puerto Cabello', pageWidth / 2, 25, { align: 'center' });
-                        
-                        // Agregar fecha
-                        const hoy = new Date();
-                        const fecha = hoy.toLocaleDateString('es-ES');
-                        doc.setFont(undefined, 'normal');
-                        doc.text(fecha, pageWidth - margin, 15, { align: 'right' });
-                        
-                        resolve(35); // Retornar posición Y después del membrete
-                    };
-                    
-                    logoImg.onerror = function() {
-                        // Fallback sin imagen
-                        doc.setFontSize(12);
-                        doc.setFont(undefined, 'bold');
-                        doc.text('República Bolivariana de Venezuela', pageWidth / 2, 15, { align: 'center' });
-                        doc.text('Ministerio del Poder Popular para la Educación Universitaria', pageWidth / 2, 20, { align: 'center' });
-                        doc.text('Universidad Politécnica Territorial de Puerto Cabello', pageWidth / 2, 25, { align: 'center' });
-                        
-                        // Agregar fecha
-                        const hoy = new Date();
-                        const fecha = hoy.toLocaleDateString('es-ES');
-                        doc.setFont(undefined, 'normal');
-                        doc.text(fecha, pageWidth / 2, 32, { align: 'center' });
-                        
-                        resolve(40); // Retornar posición Y después del membrete
-                    };
-                });
-            }
-            
-            // Llamar a la función para agregar el membrete
-            agregarMembretePDF(doc, pageWidth, margin).then(startY => {
-                // Capturar el contenido HTML y agregarlo al PDF
-                html2canvas(document.getElementById('horario-clases'), {
-                    scale: 2,
-                    useCORS: true,
-                    logging: false
-                }).then(canvas => {
-                    const imgData = canvas.toDataURL('image/jpeg', 1.0);
-                    const imgWidth = pageWidth - (margin * 2);
-                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                    
-                    // Agregar contenido al PDF
-                    doc.addImage(imgData, 'JPEG', margin, startY, imgWidth, imgHeight);
-                    
-                    // Guardar el PDF
-                    doc.save('Horario_<?= $seccion_estudiante['codigo_seccion'] ?>.pdf');
-                    
-                    // Ocultar información para PDF después de generarlo
-                    document.getElementById('pdf-info').style.display = 'none';
-                });
-            });
-        }
-        </script>
-        
     <?php else: ?>
-        <!-- EL ESTUDIANTE NO TIENE SECCIÓN ASIGNADA -->
         <div class="text-center py-5">
             <div class="card shadow">
                 <div class="card-body py-5">
-                    <i class="fas fa-calendar-times fa-4x text-gray-300 mb-4"></i>
-                    <h3 class="text-gray-800">No tienes una sección asignada</h3>
+                    <i class="fas fa-calendar-times fa-4x text-muted mb-4"></i>
+                    <h3>No tienes una sección asignada</h3>
                     <p class="text-muted">Actualmente no estás asignado a ninguna sección.</p>
-                    <p class="text-muted">Por favor, contacta con la administración para resolver esta situación.</p>
+                    <p class="text-muted">Por favor, contacta con la administración.</p>
                     <a href="index.php" class="btn btn-primary mt-3">
                         <i class="fas fa-home"></i> Volver al Inicio
                     </a>

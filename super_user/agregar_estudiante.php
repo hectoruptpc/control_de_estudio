@@ -9,6 +9,9 @@ require_once('../funciones/functions.php');
 cargarPermisosUsuario();
 verificarPermiso('agregar_estudiante');
 
+// LLAMAR A LA FUNCIÓN DE VISITA
+visita();
+
 // Obtener los datos necesarios usando las nuevas funciones
 $tiposCedula = obtenerTiposCedula($db);
 $estadosCiviles = obtenerEstadosCiviless($db);

@@ -7,7 +7,7 @@
 
 <div class="row">
     <div class="col-sm-6 col-xs-12">
-    <p class="navbar-text pull-left">&copy <?php echo date('Y');?> - JH
+    <p class="navbar-text pull-left">&copy <?php echo date('Y');?> - CE
 </p>
     </div>
     <div class="col-sm-6 col-xs-12">
