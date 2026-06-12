@@ -1,132 +1,210 @@
 <?php
+// recuperar_password.php - Sistema de Control de Estudios UPTPC
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
-$titulo ="Olvido Password";
+$titulo = "Recuperar Contraseña - UPTPC";
 include('funciones/functions.php');
 
-$email =   $_REQUEST['email'] = isset($_REQUEST['email']) ? $_REQUEST['email'] : "";
+$email = isset($_REQUEST['email']) ? $_REQUEST['email'] : "";
 
-
-if (empty($email)) {
-    //echo "LO SENTIMOS";
-   // array_push($errors, "Debe indicar un correo electronico registrado en el sistema.");
-    $_SESSION['msg_recuperar']  = 'Si posees Usuario y Clave puede acceder e iniciar sesion <a href="login.php" class="link">AQUI</a><br>';
-    //header("location: login.php");
-
-}
-else {
-    global $db, $email;
-
-$sql = "SELECT * FROM users
-WHERE email = '$email' ";
-   $result = mysqli_query($db, $sql);
-   $rows = mysqli_num_rows($result);
-   $row = mysqli_fetch_assoc($result);
-
-   if (!$rows)   {
-
-    array_push($errors, "El correo<b> $email </b>indicado por usted no existe en nuestra base de datos.");
-    //$_SESSION['msg_recuperar']  = 'El correo indicado por usted no existe en nuestra base de datos<br>';
-
-   } else {
-
-    //array_push($errors, "El correo si existe.");
-
-    $rowid = $row['id'];
-    $rowControl = $row['control'];
-    $nombre_usuario = $row['nombre'];
-    $username = $row['username'];
-    $email_usuario = $row['email'];
-    $status = $row['status'];
-    $motivo = $row['motivo_bloqueo'];
-
-    if ($status == 0) {
-      $_SESSION['msg']  ='<i class="fa fa-ban"></i> No puedes recuperar contraseña porque tu usuario esta bloqueado por el siguiente motivo: '.$motivo.'<br>';
+if (!empty($email)) {
+    global $db;
+    
+    // Usar prepared statement para seguridad
+    $sql = "SELECT id, nombre, email, status, username FROM users WHERE email = ?";
+    $stmt = mysqli_prepare($db, $sql);
+    mysqli_stmt_bind_param($stmt, "s", $email);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    $rows = mysqli_num_rows($result);
+    
+    if ($rows == 0) {
+        array_push($errors, "El correo <b>$email</b> no existe en nuestra base de datos.");
+        $_SESSION['msg_recuperar'] = display_error();
+        header("location: recuperar_password.php");
+        exit;
     } else {
-
-$email = $email_usuario;
-$nombre = $nombre_usuario;
-$asunto = "Configure su Contraseña de acceso al Sistema Gestion de Recargas Telefonicas";
-$cuerpo = "Hola $nombre: <br/><br/>
-Usted ha sido registrado en la Plataforma Sistema Gestion de Recargas Telefonicas donde podra recargar servicios prepagados de las operadoras Movilnet, Movistar y Digitel. De abrir nuevas relaciones comerciales con otros operadores sera notificado desde la plataforma.<br><br>Ahora debes crear tu contraseña<br>";
-  $cuerpo .= '<span style="background-color: #FFFD01; color: #fff; display: inline-block; padding: 10px 20px; font-weight: bold; border-radius: 10px;"><strong><a href="https://virtual.jesuministrosymas.com.ve/u/crear_password.php?id='.$rowid.'&control='.$rowControl.'" target="_BLANK"><i class="fa fa-key"></i> CREAR CONTRASEÑA AQUI</a></strong></span><br><br>';
-
-$cuerpo .= "Ya en breve podras acceder al sistema y empezar a disfrutar de este servicio.";
-enviarEmail($email, $nombre, $asunto, $cuerpo);
-
-//$_SESSION['msg_recuperar']  =' Hemos enviado un Correo con Instrucciones para que cree su contraseña.<br>puede acceder e iniciar sesion <a href="login.php" class="link">AQUI</a><br>';
-$_SESSION['msg']  ='<i class="fa fa-envelope"></i> Hemos enviado un Email a '.$email.' con Instrucciones para que cree su contraseña.<br>';
-
+        $row = mysqli_fetch_assoc($result);
+        $rowid = $row['id'];
+        $nombre_usuario = $row['nombre'];
+        $username = $row['username'];
+        $email_usuario = $row['email'];
+        $status = $row['status'];
+        
+        if ($status == 0) {
+            $_SESSION['msg'] = '<i class="fa fa-ban"></i> No puedes recuperar contraseña porque tu usuario está bloqueado. Contacta al administrador del sistema.';
+            header('location: login.php');
+            exit;
+        } else {
+            // Crear tabla password_resets si no existe
+            $crear_tabla = "
+            CREATE TABLE IF NOT EXISTS `password_resets` (
+                `id` int(11) NOT NULL AUTO_INCREMENT,
+                `user_id` int(11) NOT NULL,
+                `email` varchar(100) NOT NULL,
+                `token` varchar(255) NOT NULL,
+                `expira` datetime NOT NULL,
+                `usado` tinyint(1) DEFAULT 0,
+                `creado_en` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                KEY `token` (`token`),
+                KEY `user_id` (`user_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            ";
+            mysqli_query($db, $crear_tabla);
+            
+            // Generar token único
+            $token = bin2hex(random_bytes(32));
+            $expira = date('Y-m-d H:i:s', strtotime('+1 hour'));
+            
+            // Insertar token
+            $insert = "INSERT INTO password_resets (user_id, email, token, expira) VALUES (?, ?, ?, ?)";
+            $stmt_insert = mysqli_prepare($db, $insert);
+            mysqli_stmt_bind_param($stmt_insert, "isss", $rowid, $email_usuario, $token, $expira);
+            mysqli_stmt_execute($stmt_insert);
+            
+            // ==============================================
+            // CONSTRUIR ENLACE CON TU IP (para acceso desde celular)
+            // ==============================================
+            $url_base = "http://172.16.0.242";  // ← TU IP FIJA
+            $ruta_base = "/control_de_estudio";  // ← CARPETA DEL PROYECTO
+            $enlace = $url_base . $ruta_base . "/nueva_password.php?token=" . $token;
+            
+            // ==============================================
+            // CORREO PARA SISTEMA DE CONTROL DE ESTUDIOS UPTPC
+            // ==============================================
+            $asunto = "🔐 Recupera tu contraseña - Sistema de Control de Estudios UPTPC";
+            $cuerpo = "
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset='UTF-8'>
+                <title>Recuperar Contraseña UPTPC</title>
+            </head>
+            <body style='font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px;'>
+                <div style='max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.1);'>
+                    
+                    <!-- Encabezado institucional -->
+                    <div style='background: linear-gradient(135deg, #003366 0%, #00509e 100%); padding: 30px 20px; text-align: center;'>
+                        <h1 style='color: #ffffff; margin: 0; font-size: 28px;'>🏛️ UPTPC</h1>
+                        <p style='color: #ffd700; margin: 5px 0 0; font-size: 14px;'>Universidad Politécnica Territorial de Puerto Cabello</p>
+                        <p style='color: #cce5ff; margin: 5px 0 0; font-size: 12px;'>Sistema de Control de Estudios</p>
+                    </div>
+                    
+                    <!-- Contenido principal -->
+                    <div style='padding: 30px 25px;'>
+                        <h2 style='color: #003366; margin-top: 0;'>Estimado(a), $nombre_usuario</h2>
+                        
+                        <p style='color: #333; font-size: 16px; line-height: 1.5;'>Recibimos una solicitud para restablecer la contraseña de tu cuenta en el <strong>Sistema de Control de Estudios de la Universidad Politécnica Territorial de Puerto Cabello (UPTPC)</strong>.</p>
+                        
+                        <p style='color: #333; font-size: 16px; line-height: 1.5;'>Para continuar y crear una nueva contraseña, haz clic en el siguiente botón:</p>
+                        
+                        <div style='text-align: center; margin: 35px 0;'>
+                            <a href='{$enlace}' style='display: inline-block; background-color: #00509e; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 50px; font-weight: bold; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);'>
+                                🔑 Restablecer mi contraseña
+                            </a>
+                        </div>
+                        
+                        <div style='background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;'>
+                            <p style='color: #555; font-size: 13px; margin: 0 0 5px;'>📎 <strong>¿El botón no funciona?</strong> Copia y pega este enlace en tu navegador:</p>
+                            <p style='background-color: #e9ecef; padding: 10px; border-radius: 5px; word-break: break-all; font-size: 12px; color: #00509e; margin: 0;'>{$enlace}</p>
+                        </div>
+                        
+                        <div style='border-left: 4px solid #ffc107; background-color: #fff3cd; padding: 12px 15px; margin: 20px 0; border-radius: 5px;'>
+                            <p style='color: #856404; font-size: 13px; margin: 0;'>
+                                <strong>⏰ Importante:</strong> Este enlace expirará en <strong>1 hora</strong> por razones de seguridad.
+                            </p>
+                            <p style='color: #856404; font-size: 13px; margin: 5px 0 0;'>
+                                <strong>🛡️ ¿No solicitaste este cambio?</strong> Ignora este mensaje, tu contraseña seguirá siendo la misma.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Pie de página institucional -->
+                    <div style='background-color: #f0f0f0; padding: 20px; text-align: center; border-top: 1px solid #ddd;'>
+                        <p style='color: #666; font-size: 12px; margin: 0;'>Universidad Politécnica Territorial de Puerto Cabello (UPTPC)</p>
+                        <p style='color: #666; font-size: 12px; margin: 5px 0 0;'>Sistema de Control de Estudios</p>
+                        <p style='color: #999; font-size: 11px; margin: 10px 0 0;'>Este es un mensaje automático, por favor no responder a este correo.</p>
+                        <p style='color: #999; font-size: 11px; margin: 5px 0 0;'>© " . date('Y') . " - Todos los derechos reservados</p>
+                    </div>
+                </div>
+            </body>
+            </html>";
+            
+            enviarEmail($email_usuario, $nombre_usuario, $asunto, $cuerpo);
+            
+            $_SESSION['msg'] = '<i class="fa fa-envelope"></i> ✅ Hemos enviado un correo a <strong>' . $email_usuario . '</strong> con las instrucciones para recuperar tu contraseña. Por favor, revisa tu bandeja de entrada o la carpeta de SPAM.';
+            header('location: login.php');
+            exit;
+        }
+    }
 }
-  header('location: login.php');
-}
-
-}
-
 ?>
 <!DOCTYPE html>
 <html>
 <head>
-  <?php echo $bootstrap_head; ?>
-  <!-- FAVICON EN LOGIN -->
-
-
-  <link rel="apple-touch-icon" href="images/favicon/apple-touch-icon.png" sizes="180x180">
-  <link rel="icon" href="images/favicon/favicon-32x32.png" sizes="32x32" type="image/png">
-  <link rel="icon" href="images/favicon/favicon-16x16.png" sizes="16x16" type="image/png">
-
-  	<link rel="icon" href="images/favicon/favicon.ico">
+    <?php echo $bootstrap_head; ?>
+    <link rel="apple-touch-icon" href="images/favicon/apple-touch-icon.png" sizes="180x180">
+    <link rel="icon" href="images/favicon/favicon-32x32.png" sizes="32x32" type="image/png">
+    <link rel="icon" href="images/favicon/favicon-16x16.png" sizes="16x16" type="image/png">
+    <link rel="icon" href="images/favicon/favicon.ico">
+    <title>Recuperar Contraseña - UPTPC</title>
 </head>
 <body>
 <div class="container text-center">
-
-        <?php echo $logopertenenciag; ?>
-       
+    <?php echo $logopertenenciag; ?>
 </div>
 <hr>
 <div class="container-fluid">
-  <div class="row">
-    <div class="d-none d-sm-block col-md-6">
-
-      <?php
-      echo $image_responsive;
-      ?>
+    <div class="row">
+        <div class="d-none d-sm-block col-md-6">
+            <?php echo $image_responsive; ?>
+        </div>
+        <div class="col-sm-12 col-md-6">
+            <h3 class="text-center text-uppercase" style="color: #003366;">🏛️ Recuperar Contraseña</h3>
+            <h5 class="text-center text-muted">Universidad Politécnica Territorial de Puerto Cabello</h5>
+            <h6 class="text-center text-muted mb-4">Sistema de Control de Estudios</h6>
+            
+            <form class="was-validated" method="post" action="recuperar_password.php" autocomplete="off">
+                
+                <?php if (isset($_SESSION['msg_recuperar'])) : ?>
+                    <div class="alert alert-danger" role="alert">
+                        <?php
+                            echo $_SESSION['msg_recuperar'];
+                            unset($_SESSION['msg_recuperar']);
+                        ?>
+                    </div>
+                <?php endif ?>
+                
+                <?php echo display_error(); ?>
+                
+                <div class="form-group">
+                    <label for="email">📧 Correo electrónico institucional</label>
+                    <input type="email" class="form-control" id="email" placeholder="tucorreo@uptpc.edu.ve" name="email" required>
+                    <div class="invalid-feedback">Indica tu correo electrónico registrado en el sistema</div>
+                    <small class="form-text text-muted">
+                        <i class="fa fa-info-circle"></i> Te enviaremos un enlace seguro para restablecer tu contraseña
+                    </small>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block" style="background-color: #00509e; border-color: #003366;">
+                    <i class="fa fa-key"></i> Enviar enlace de recuperación
+                </button>
+                
+                <a href="login.php" class="btn btn-secondary btn-block mt-2">
+                    <i class="fa fa-arrow-left"></i> Volver al inicio de sesión
+                </a>
+            </form>
+            
+            <hr>
+            <div class="text-center">
+                <small class="text-muted">
+                    <i class="fa fa-university"></i> UPTPC - Sistema de Control de Estudios<br>
+                    Universidad Politécnica Territorial de Puerto Cabello
+                </small>
+            </div>
+        </div>
     </div>
-    <div class="col-sm-12 col-md-6">
-    <h3 class="text-center text-uppercase">Olvido su Contraseña</h3>
-
-    <form class="was-validated" method="post" action="recuperar_password.php" autocomplete="off">
-<!-- notification message -->
-<?php if (isset($_SESSION['msg_recuperar'])) : ?>
-			<div class="alert alert-danger" role="alert" >
-				<h3>
-					<?php
-						echo $_SESSION['msg_recuperar'];
-						unset($_SESSION['msg_recuperar']);
-					?>
-				</h3>
-			</div>
-<?php endif ?>
-
-<?php echo display_error();
-echo "<br>";
- ?>
-
-
-  <div class="form-group">
-    <label for="email">Su Email</label>
-    <input pattern="[a-zA-Z0-9]{0,}([.]?[_.a-zA-Z0-9]{1,})[@](gmail.com|hotmail.com|yahoo.com|yahoo.es|outlook.es|outlook.com|hotmail.es|cantv.com|cantv.net)" title="Debe utilizar solo correos gmail, outlook, yahoo, hotmail o cantv" type="email" class="form-control" id="email" placeholder="Indique su Email" name="email" required>
-    <div class="invalid-feedback">Indique su Email registrado en el sistema </div>
-  </div>
-
-  <button type="submit" class="btn btn-danger" ><span  class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>
-  <i class="fa fa-key"></i> Recuperar Password <span  class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span></button>
-
-</form>
-
-    </div>
-  </div>
-
-
-  <hr>
-
+</div>
+</body>
+</html>
