@@ -10288,14 +10288,19 @@ function inscribirMateriasNuevoTrayecto($id_usuario, $id_seccion, $nuevo_trayect
 function obtenerSeccionesDisponiblesParaRezagados($id_carrera, $id_trayecto, $id_periodo) {
     global $db;
     
-    $query = "SELECT s.id_seccion, s.codigo_seccion, s.capacidad_maxima, 
+    $query = "SELECT s.id_seccion, s.codigo_seccion, s.capacidad_maxima, s.id_periodo, p.nombre_periodo,
                      (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion) as inscritos
               FROM secciones s
+              JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
               WHERE s.id_carrera = $id_carrera 
               AND s.id_trayecto = $id_trayecto
-              AND s.id_periodo = $id_periodo
-              AND s.estatus = 'activa'
-              HAVING inscritos < capacidad_maxima
+              AND s.estatus = 'activa'";
+    
+    if ($id_periodo !== null) {
+        $query .= " AND s.id_periodo = $id_periodo";
+    }
+    
+    $query .= " HAVING inscritos < capacidad_maxima
               ORDER BY s.codigo_seccion";
     
     $result = $db->query($query);

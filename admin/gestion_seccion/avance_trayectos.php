@@ -24,7 +24,7 @@ include(__DIR__ . '/../includes/head.php');
 <div class="container-fluid py-2">
     <div class="row mb-2">
         <div class="col-12 d-flex justify-content-between">
-            <h2 class="h4 mb-0">Avance de Trayectos - <?= $seccion['codigo_seccion'] ?></h2>
+            <h2 class="h4 mb-0">Avance de Trayectos - <?= htmlspecialchars($seccion['codigo_seccion']) ?></h2>
             <div>
                 <a href="ver_seccion.php?id=<?= $id_seccion ?>" class="btn btn-secondary btn-sm">← Volver</a>
             </div>
@@ -38,8 +38,8 @@ include(__DIR__ . '/../includes/head.php');
         </div>
         <div class="card-body py-2">
             <div class="row">
-                <div class="col-md-3"><strong>Código:</strong> <?= $seccion['codigo_seccion'] ?></div>
-                <div class="col-md-3"><strong>Carrera:</strong> <?= $seccion['nombre_carrera'] ?></div>
+                <div class="col-md-3"><strong>Código:</strong> <?= htmlspecialchars($seccion['codigo_seccion']) ?></div>
+                <div class="col-md-3"><strong>Carrera:</strong> <?= htmlspecialchars($seccion['nombre_carrera']) ?></div>
                 <div class="col-md-3"><strong>Trayecto Actual:</strong> <?= $seccion['numero_trayecto'] ?></div>
                 <div class="col-md-3"><strong>Siguiente Trayecto:</strong> <?= $seccion['numero_trayecto'] + 1 ?></div>
             </div>
@@ -120,9 +120,9 @@ include(__DIR__ . '/../includes/head.php');
                     <tbody>
                         <?php foreach ($pueden_avanzar as $e): ?>
                         <tr>
-                            <td><?= $e['idusuario'] ?></td>
-                            <td><?= $e['nombre'] ?></td>
-                            <td><span class="badge badge-success"><?= $e['motivo'] ?></span></td>
+                            <td><?= htmlspecialchars($e['idusuario']) ?></td>
+                            <td><?= htmlspecialchars($e['nombre']) ?></td>
+                            <td><span class="badge badge-success"><?= htmlspecialchars($e['motivo']) ?></span></td>
                             <td>
                                 <?php if (!empty($e['detalles'])): ?>
                                     <small class="text-muted">
@@ -139,7 +139,7 @@ include(__DIR__ . '/../includes/head.php');
                         </tr>
                         <?php endforeach; ?>
                         <?php if (empty($pueden_avanzar)): ?>
-                            <tr><td colspan="4" class="text-center text-muted">No hay estudiantes que cumplan los requisitos</td></tr>
+                            <tr><td colspan="4" class="text-center text-muted">No hay estudiantes que cumplan los requisitos</div></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -161,16 +161,18 @@ include(__DIR__ . '/../includes/head.php');
                     <tbody>
                         <?php foreach ($no_pueden_avanzar as $e): ?>
                         <tr>
-                            <td><?= $e['idusuario'] ?></td>
-                            <td><?= $e['nombre'] ?></td>
-                            <td><span class="badge badge-warning"><?= $e['motivo'] ?></span></td>
+                            <td><?= htmlspecialchars($e['idusuario']) ?></td>
+                            <td><?= htmlspecialchars($e['nombre']) ?></td>
+                            <td><span class="badge badge-warning"><?= htmlspecialchars($e['motivo']) ?></span></td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-primary btn-mover-rezagado"
                                         data-id-usuario="<?= $e['id'] ?>"
-                                        data-nombre="<?= $e['nombre'] ?>"
-                                        data-cedula="<?= $e['idusuario'] ?>"
-                                        data-seccion-origen="<?= $id_seccion ?>"
+                                        data-nombre="<?= htmlspecialchars($e['nombre']) ?>"
+                                        data-cedula="<?= htmlspecialchars($e['idusuario']) ?>"
+                                        data-seccion-origen-id="<?= $id_seccion ?>"
+                                        data-seccion-origen-codigo="<?= htmlspecialchars($seccion['codigo_seccion']) ?>"
                                         data-trayecto-actual="<?= $seccion['numero_trayecto'] ?>"
+                                        data-id-trayecto="<?= $seccion['id_trayecto'] ?>"
                                         data-carrera="<?= $seccion['id_carrera'] ?>">
                                     <i class="fas fa-exchange-alt"></i> Mover a otra sección
                                 </button>
@@ -178,7 +180,7 @@ include(__DIR__ . '/../includes/head.php');
                         </tr>
                         <?php endforeach; ?>
                         <?php if (empty($no_pueden_avanzar)): ?>
-                            <tr><td colspan="4" class="text-center text-muted">Todos los estudiantes cumplen los requisitos</td></tr>
+                            <tr><td colspan="4" class="text-center text-muted">Todos los estudiantes cumplen los requisitos</div></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -223,29 +225,41 @@ $(document).ready(function() {
             id: $(this).data('id-usuario'),
             nombre: $(this).data('nombre'),
             cedula: $(this).data('cedula'),
-            seccion_origen: $(this).data('seccion-origen'),
-            trayecto: $(this).data('trayecto-actual'),
+            seccion_origen_id: $(this).data('seccion-origen-id'),
+            seccion_origen_codigo: $(this).data('seccion-origen-codigo') || '',
+            trayecto: $(this).data('id-trayecto'),
             carrera: $(this).data('carrera')
         };
-        
+
         $('#estudianteNombre').text(currentEstudiante.nombre);
         $('#estudianteCedula').text(currentEstudiante.cedula);
-        $('#seccionOrigen').text($('#seccionOrigen').data('codigo') || currentEstudiante.seccion_origen);
-        $('#trayectoActual').text(currentEstudiante.trayecto);
+        $('#seccionOrigen').text(currentEstudiante.seccion_origen_codigo);
+        $('#trayectoActual').text('Trayecto ' + currentEstudiante.trayecto);
         
-        // Cargar secciones disponibles
-        $.ajax({
-            url: 'ajax_obtener_secciones_disponibles.php',
-            type: 'POST',
-            data: {
-                id_carrera: currentEstudiante.carrera,
-                id_trayecto: currentEstudiante.trayecto,
-                id_periodo: <?= $seccion['id_periodo'] ?>
-            },
-            success: function(data) {
-                $('#seccionDestino').html(data);
-            }
-        });
+        // Cargar secciones disponibles para mover al estudiante
+        function cargarSeccionesDisponibles() {
+            $.ajax({
+                url: 'ajax_obtener_secciones_disponibles.php',
+                type: 'POST',
+                data: {
+                    id_carrera: currentEstudiante.carrera,
+                    id_trayecto: currentEstudiante.trayecto
+                },
+                success: function(data) {
+                    // Detectar si el servidor redirigió a login (respuesta HTML de inicio de sesión)
+                    if (typeof data === 'string' && (data.indexOf('login.php') !== -1 || data.indexOf('<form') !== -1)) {
+                        $('#seccionDestino').html('<option value="">Sesión expirada o no autorizado. Vuelva a iniciar sesión.</option>');
+                        return;
+                    }
+                    $('#seccionDestino').html(data);
+                },
+                error: function() {
+                    $('#seccionDestino').html('<option value="">Error al cargar secciones</option>');
+                }
+            });
+        }
+
+        cargarSeccionesDisponibles();
         
         $('#modalMoverRezagado').modal('show');
     });
@@ -262,17 +276,24 @@ $(document).ready(function() {
             type: 'POST',
             data: {
                 id_usuario: currentEstudiante.id,
-                id_seccion_origen: currentEstudiante.seccion_origen,
+                id_seccion_origen: currentEstudiante.seccion_origen_id,
                 id_seccion_destino: seccionDestino
             },
             success: function(response) {
-                const data = JSON.parse(response);
-                if (data.success) {
-                    alert(data.message);
-                    location.reload();
-                } else {
-                    alert('Error: ' + data.message);
+                try {
+                    const data = JSON.parse(response);
+                    if (data.success) {
+                        alert(data.message);
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                } catch(e) {
+                    alert('Error al procesar la respuesta');
                 }
+            },
+            error: function() {
+                alert('Error al mover el estudiante');
             }
         });
     });
@@ -292,21 +313,28 @@ $(document).ready(function() {
                 type: 'POST',
                 data: { id_seccion: seccionId },
                 success: function(response) {
-                    const data = JSON.parse(response);
-                    if (data.success) {
-                        alert(data.message);
-                        if (data.nueva_seccion_id) {
-                            if (confirm('¿Desea ver la nueva sección creada?')) {
-                                window.location.href = 'ver_seccion.php?id=' + data.nueva_seccion_id;
+                    try {
+                        const data = JSON.parse(response);
+                        if (data.success) {
+                            alert(data.message);
+                            if (data.nueva_seccion_id) {
+                                if (confirm('¿Desea ver la nueva sección creada?')) {
+                                    window.location.href = 'ver_seccion.php?id=' + data.nueva_seccion_id;
+                                } else {
+                                    location.reload();
+                                }
                             } else {
                                 location.reload();
                             }
                         } else {
-                            location.reload();
+                            alert('Error: ' + data.message);
                         }
-                    } else {
-                        alert('Error: ' + data.message);
+                    } catch(e) {
+                        alert('Error al procesar la respuesta');
                     }
+                },
+                error: function() {
+                    alert('Error al avanzar la sección');
                 }
             });
         }
