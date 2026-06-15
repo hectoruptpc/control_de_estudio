@@ -2,6 +2,9 @@
 // funciones/seguridad.php - Módulo de ciberseguridad (CORREGIDO)
 // NO iniciar sesión aquí, ya se inicia en el archivo que lo llama
 
+// Evitar redeclaración si el archivo fue incluido más de una vez
+if (!class_exists('Seguridad')) {
+
 class Seguridad {
     private $db;
     private $ip;
@@ -325,82 +328,53 @@ class Seguridad {
     public function verificarSistemaAbierto() {
         if (!$this->sistemaCompletoActivo()) {
             $razon = $this->obtenerConfiguracion('razon_cierre', 'Mantenimiento del sistema');
-            $mensaje = "
+            $mensaje = <<<HTML
             <!DOCTYPE html>
             <html>
             <head>
-                <meta charset='UTF-8'>
+                <meta charset="UTF-8">
                 <title>Sistema Temporalmente Cerrado</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
                 <style>
-                    body {
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        height: 100vh;
-                        margin: 0;
-                        padding: 20px;
-                    }
-                    .closed-container {
-                        background: white;
-                        border-radius: 20px;
-                        padding: 40px;
-                        max-width: 500px;
-                        text-align: center;
-                        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-                    }
-                    .closed-container h1 {
-                        color: #dc3545;
-                        font-size: 60px;
-                        margin-bottom: 20px;
-                    }
-                    .closed-container h2 {
-                        color: #333;
-                        margin-bottom: 20px;
-                    }
-                    .closed-container p {
-                        color: #666;
-                        margin-bottom: 20px;
-                        line-height: 1.6;
-                    }
-                    .closed-container .reason {
-                        background: #f8f9fa;
-                        padding: 15px;
-                        border-radius: 10px;
-                        margin: 20px 0;
-                        border-left: 4px solid #dc3545;
-                        text-align: left;
-                    }
-                    .btn {
-                        display: inline-block;
-                        padding: 12px 30px;
-                        background: #007bff;
-                        color: white;
-                        text-decoration: none;
-                        border-radius: 8px;
-                        transition: all 0.3s;
-                    }
-                    .btn:hover {
-                        background: #0056b3;
-                        transform: translateY(-2px);
-                    }
+                    body { background: #eaf4ff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; padding:20px; }
+                    .uptpc-closed-wrap { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+                    .uptpc-card { background:#ffffff; border-radius:14px; max-width:760px; width:100%; padding:24px; box-shadow:0 12px 30px rgba(0,0,0,0.06); border:1px solid #dfeeff; }
+                    .uptpc-logo { text-align:center; margin-bottom:12px; }
+                    .uptpc-bar { background:#003d82; color:#ffffff; padding:12px 16px; border-radius:8px; margin-bottom:12px; }
+                    .uptpc-bar h1 { margin:0; font-size:20px; }
+                    .uptpc-desc { color:#27507a; background:#f2f9ff; border:1px solid #d7e9ff; padding:12px; border-radius:8px; }
+                    .uptpc-reason { margin-top:12px; background:#f8fbff; border-left:4px solid #004b9e; padding:12px; border-radius:6px; color:#042a5b; }
+                    .uptpc-actions { margin-top:16px; display:flex; justify-content:flex-end; gap:10px; }
+                    .btn { padding:10px 16px; border-radius:8px; text-decoration:none; font-weight:600; }
+                    .btn-primary { background:#003d82; color:#fff; }
+                    .btn-secondary { background:#f0f4fb; color:#003d82; border:1px solid #dfeeff; }
                 </style>
             </head>
             <body>
-                <div class='closed-container'>
-                    <h1>🔒</h1>
-                    <h2>Sistema Temporalmente Cerrado</h2>
-                    <p>El sistema de Control de Estudios se encuentra actualmente cerrado por mantenimiento o razones administrativas.</p>
-                    <div class='reason'>
-                        <strong>📌 Motivo:</strong><br>
-                        " . htmlspecialchars($razon) . "
+                <div class="uptpc-closed-wrap">
+                    <div class="uptpc-card">
+                        <div class="uptpc-logo">{{LOGO}}</div>
+                        <div class="uptpc-bar"><h1>🔒 Sistema Temporalmente Cerrado</h1></div>
+                        <div class="uptpc-desc">El Sistema de Control de Estudios se encuentra temporalmente cerrado por mantenimiento o razones administrativas. No se permitirá el acceso en este momento.</div>
+                        <div class="uptpc-reason"><strong>📌 Motivo:</strong><div style="margin-top:6px">{{RAZON}}</div></div>
+                        <div class="uptpc-actions"><a class="btn btn-secondary" href="login.php">Volver a Login</a><a class="btn btn-primary" href="javascript:location.reload()">Intentar más tarde</a></div>
                     </div>
-                    <p><small>Por favor, intenta más tarde. Disculpa las molestias.</small></p>
-                    <a href='javascript:history.back()' class='btn'>← Intentar más tarde</a>
                 </div>
             </body>
-            </html>";
+            </html>
+            HTML;
+            // Inyectar logo y motivo de forma segura
+            global $logo_uptpc, $logo_uptpcp, $logopertenencia;
+            $logo_html = '';
+            if (isset($logo_uptpc) && !empty($logo_uptpc)) {
+                $logo_html = $logo_uptpc; // uptpc.png variable (ideal)
+            } elseif (isset($logopertenencia) && !empty($logopertenencia)) {
+                $logo_html = $logopertenencia; // fallback existing logo
+            } else {
+                $logo_html = '<img src="/images/uptpc.png" alt="UPTPC" style="max-width:320px;height:auto;">';
+            }
+            $mensaje = str_replace('{{LOGO}}', $logo_html, $mensaje);
+            $mensaje = str_replace('{{RAZON}}', htmlspecialchars($razon), $mensaje);
             die($mensaje);
         }
         return true;
@@ -410,6 +384,7 @@ class Seguridad {
 
 
 
+}
 }
 
 

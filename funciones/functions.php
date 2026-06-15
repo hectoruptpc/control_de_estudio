@@ -45,6 +45,9 @@ chdir(__DIR__);
 
         if (isset($db) && mysqli_ping($db)) {
             $seguridad_global = new Seguridad($db);
+            global $seguridad;
+            $seguridad = $seguridad_global;
+
             if (!$seguridad_global->sistemaCompletoActivo()) {
                 $sistema_cerrado = true;
                 $sistema_cerrado_razon = $seguridad_global->obtenerConfiguracion('razon_cierre', 'Mantenimiento del sistema');
