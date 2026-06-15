@@ -5,7 +5,8 @@ ini_set('display_errors', '1');
 
 $titulopag = "👑 PANEL DIOS - Control Total UPTPC";
 
-// Incluir funciones
+// Incluir configuración DIOS y funciones
+require_once 'config.php';
 require_once '../funciones/functions.php';
 require_once '../funciones/seguridad.php';
 
@@ -20,7 +21,7 @@ $seguridad = new Seguridad($db);
 // ==============================================
 // VARIABLES DE PAGINACIÓN Y BÚSQUEDA
 // ==============================================
-$pagina = isset($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
+$pagina = isset($_GET['pagina']) ? max(1, (int)$_GET['pagina']) : 1;
 $buscar = isset($_GET['buscar']) ? trim($_GET['buscar']) : '';
 $por_pagina = 15;
 $offset = ($pagina - 1) * $por_pagina;
@@ -125,11 +126,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $_SESSION['msg_dios'] = "👑 Modo mantenimiento " . ($nuevo_estado == '1' ? 'ACTIVADO' : 'DESACTIVADO');
             break;
         case 'actualizar_limites':
-            $seguridad->actualizarConfiguracion('limite_recuperar_por_hora', $_POST['limite_recuperar']);
-            $seguridad->actualizarConfiguracion('limite_bloqueo_horas', $_POST['bloqueo_horas']);
-            $seguridad->actualizarConfiguracion('limite_bloqueo_incremento', $_POST['bloqueo_incremento']);
-            $seguridad->actualizarConfiguracion('limite_rps_10seg', $_POST['rps_limite']);
-            $seguridad->actualizarConfiguracion('limite_rps_global_porcentaje', $_POST['rps_global_porcentaje']);
+            $limite_recuperar = max(1, min(100, intval($_POST['limite_recuperar'] ?? 3)));
+            $bloqueo_horas = max(1, min(24, intval($_POST['bloqueo_horas'] ?? 1)));
+            $bloqueo_incremento = max(1, min(168, intval($_POST['bloqueo_incremento'] ?? 24)));
+            $rps_limite = max(1, min(1000, intval($_POST['rps_limite'] ?? 10)));
+            $rps_global_porcentaje = max(1, min(100, intval($_POST['rps_global_porcentaje'] ?? 10)));
+            $seguridad->actualizarConfiguracion('limite_recuperar_por_hora', (string)$limite_recuperar);
+            $seguridad->actualizarConfiguracion('limite_bloqueo_horas', (string)$bloqueo_horas);
+            $seguridad->actualizarConfiguracion('limite_bloqueo_incremento', (string)$bloqueo_incremento);
+            $seguridad->actualizarConfiguracion('limite_rps_10seg', (string)$rps_limite);
+            $seguridad->actualizarConfiguracion('limite_rps_global_porcentaje', (string)$rps_global_porcentaje);
             $_SESSION['msg_dios'] = "👑 Límites actualizados";
             break;
         case 'desbloquear_ip':
@@ -155,7 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $_SESSION['msg_dios'] = "👑 Todos los tokens invalidados";
             break;
         case 'limpiar_logs':
-            $periodo = $_POST['periodo'] ?? 7;
+            $periodo = max(1, min(365, intval($_POST['periodo'] ?? 7)));
             mysqli_query($db, "DELETE FROM seguridad_intentos WHERE fecha < DATE_SUB(NOW(), INTERVAL $periodo DAY)");
             mysqli_query($db, "DELETE FROM seguridad_rps WHERE fecha < DATE_SUB(NOW(), INTERVAL 1 HOUR)");
             mysqli_query($db, "DELETE FROM seguridad_tokens_invalidos WHERE fecha < DATE_SUB(NOW(), INTERVAL $periodo DAY)");
@@ -168,12 +174,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $_SESSION['msg_dios'] = "👑 TODOS los logs eliminados";
             break;
         case 'cambiar_password':
-            $nueva_pass = password_hash($_POST['nueva_password'], PASSWORD_DEFAULT);
-            $sql = "UPDATE users SET password = ? WHERE id = ?";
-            $stmt = mysqli_prepare($db, $sql);
-            mysqli_stmt_bind_param($stmt, "si", $nueva_pass, $_POST['user_id']);
-            mysqli_stmt_execute($stmt);
-            $_SESSION['msg_dios'] = "👑 Contraseña cambiada";
+            $nueva_password = trim($_POST['nueva_password'] ?? '');
+            if ($nueva_password === '') {
+                $_SESSION['msg_dios'] = "⚠️ La contraseña no puede estar vacía.";
+            } else {
+                $nueva_pass = password_hash($nueva_password, PASSWORD_DEFAULT);
+                $sql = "UPDATE users SET password = ? WHERE id = ?";
+                $stmt = mysqli_prepare($db, $sql);
+                mysqli_stmt_bind_param($stmt, "si", $nueva_pass, $_POST['user_id']);
+                mysqli_stmt_execute($stmt);
+                $_SESSION['msg_dios'] = "👑 Contraseña cambiada";
+            }
             break;
         case 'bloquear_usuario':
             $sql = "UPDATE users SET status = 0, motivo_bloqueo = 'Bloqueado por administrador DIOS' WHERE id = ?";
@@ -447,11 +458,11 @@ include("head_dios.php");
                         <input type="hidden" name="sistema_completo" value="<?php echo $sistema_completo ? '1' : '0'; ?>">
                         <button type="submit" class="btn <?php echo $sistema_completo ? 'btn-dios-danger' : 'btn-dios-success'; ?> btn-lg btn-block" 
                                 style="padding: 12px; font-size: 16px;"
-                                onclick="return confirm('<?php echo $sistema_completo ? '¿Estás seguro de REABRIR el sistema completo?' : '¿Estás seguro de CERRAR el sistema completo? Nadie podrá acceder.'; ?>')">
+                                onclick="return confirm('<?php echo $sistema_completo ? '¿Estás seguro de CERRAR el sistema completo? Nadie podrá acceder.' : '¿Estás seguro de REABRIR el sistema completo?'; ?>')">
                             <?php if($sistema_completo): ?>
-                                <i class="fas fa-unlock-alt"></i> ABRIR SISTEMA COMPLETO
-                            <?php else: ?>
                                 <i class="fas fa-lock"></i> CERRAR SISTEMA COMPLETO
+                            <?php else: ?>
+                                <i class="fas fa-unlock-alt"></i> ABRIR SISTEMA COMPLETO
                             <?php endif; ?>
                         </button>
                     </form>
@@ -740,7 +751,7 @@ include("head_dios.php");
                                                 <input type="hidden" name="ip" value="<?php echo $row['ip']; ?>">
                                                 <button type="submit" class="btn btn-sm btn-dios-success"><i class="fas fa-unlock-alt"></i></button>
                                             </form>
-                                         </nav>
+                                    </td>
                                     </tr>
                                 <?php endwhile; ?>
                                 </tbody>

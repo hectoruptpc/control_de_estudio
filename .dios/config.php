@@ -9,7 +9,7 @@ define('DIOS_USER', 'Dios');
 define('DIOS_PASS_HASH', '$2y$10$CxayOoSjMJLomCdQIA4r7eTJPjMdM/FyG5lNe/iWEZTH6eeH8o01.');
 
 // Token secreto para acceder directamente (opcional)
-define('DIOS_TOKEN', 'uptpc_dios_master_2024_');
+define('DIOS_TOKEN', 'uptpc_dios_master_');
 
 // Carpeta donde está el panel (para redirecciones)
 define('DIOS_FOLDER', '/control_de_estudio/.dios/');

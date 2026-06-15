@@ -19,6 +19,42 @@ chdir(__DIR__);
     include('registrar.php');
     include('enviar_email.php');
 
+    if (file_exists(__DIR__ . '/seguridad.php')) {
+        require_once __DIR__ . '/seguridad.php';
+        $uri = $_SERVER['REQUEST_URI'] ?? '';
+        $skip_system_close = false;
+
+        global $sistema_cerrado, $sistema_cerrado_razon;
+        $sistema_cerrado = false;
+        $sistema_cerrado_razon = '';
+
+        $current_script = basename($_SERVER['SCRIPT_NAME'] ?? '');
+        $publicPagesWhenClosed = ['login.php', 'recuperar_password.php', 'nueva_password.php'];
+
+        if (strpos($uri, '/.dios/') !== false) {
+            $skip_system_close = true;
+        }
+
+        if (isset($_SESSION['dios_autenticado']) && $_SESSION['dios_autenticado'] === true) {
+            $skip_system_close = true;
+        }
+
+        if (in_array($current_script, $publicPagesWhenClosed, true)) {
+            $skip_system_close = true;
+        }
+
+        if (isset($db) && mysqli_ping($db)) {
+            $seguridad_global = new Seguridad($db);
+            if (!$seguridad_global->sistemaCompletoActivo()) {
+                $sistema_cerrado = true;
+                $sistema_cerrado_razon = $seguridad_global->obtenerConfiguracion('razon_cierre', 'Mantenimiento del sistema');
+            }
+
+            if (!$skip_system_close) {
+                $seguridad_global->verificarSistemaAbierto();
+            }
+        }
+    }
 
 // Función para decodificar y devolver la URL
 function g($v) {
@@ -27128,7 +27164,13 @@ function crear_password(){
 
 // LOGIN USER
 function login(){
-    global $db, $username, $errors;
+    global $db, $username, $errors, $sistema_cerrado, $sistema_cerrado_razon;
+
+    if (!empty($sistema_cerrado)) {
+        array_push($errors, "El sistema está temporalmente cerrado y no es posible iniciar sesión en este momento. Por favor inténtelo más tarde.");
+        return;
+    }
+
     $username = e($_POST['username']);
     $password = e($_POST['password']);
     

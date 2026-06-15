@@ -5,11 +5,9 @@ ini_set('display_errors', '1');
 
 $titulopag = "Panel DIOS - Acceso Restringido";
 
-// Incluir funciones y configuraciones del sistema
-require_once '../funciones/functions.php';
-
-// Incluir config DIOS
+// Incluir config DIOS y funciones del sistema
 require_once 'config.php';
+require_once '../funciones/functions.php';
 
 // Si ya está logueado, ir al panel
 if (isset($_SESSION['dios_autenticado']) && $_SESSION['dios_autenticado'] === true) {
@@ -54,14 +52,88 @@ include("head_dios.php");
 
 <!-- Estilos adicionales para el login DIOS -->
 <style>
-    .login-dios-card {
+    body {
+        background: #f0f5fb;
+    }
+    .login-dios-card,
+    .login-upc-card {
         max-width: 450px;
         margin: 80px auto;
-        border-top: 4px solid #ffd700;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-        background: rgba(10,14,39,0.95);
         border-radius: 12px;
         overflow: hidden;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.12);
+    }
+    .login-dios-card {
+        background: rgba(10,14,39,0.95);
+        border-top: 4px solid #ffd700;
+    }
+    .login-upc-card {
+        background: #ffffff;
+        border: 1px solid #cfe0f6;
+    }
+    .login-brand-header {
+        background: #004a8f;
+        color: #ffffff;
+        padding: 30px 20px;
+        text-align: center;
+    }
+    .login-brand-logo {
+        max-width: 120px;
+        margin-bottom: 15px;
+    }
+    .login-brand-title {
+        margin-bottom: 8px;
+        font-size: 20px;
+        font-weight: 700;
+    }
+    .login-brand-subtitle {
+        color: #d9e8ff;
+        margin: 0;
+        font-size: 14px;
+    }
+    .login-brand-body {
+        padding: 30px;
+    }
+    .login-brand-footer {
+        background: #f4f8ff;
+        padding: 18px 20px;
+        text-align: center;
+        color: #3a5f8d;
+        border-top: 1px solid #d8e5f8;
+    }
+    .btn-dios-login {
+        background: linear-gradient(135deg, #004a8f, #2463c0);
+        color: #fff;
+        font-weight: bold;
+        border: none;
+        padding: 12px;
+        font-size: 16px;
+    }
+    .btn-dios-login:hover {
+        background: linear-gradient(135deg, #003366, #1f4f8c);
+        color: #fff;
+    }
+    .login-upc-card .form-control-dios-login {
+        background: #ffffff;
+        border: 1px solid #a8c4f0;
+        color: #0d264d;
+    }
+    .login-upc-card .form-control-dios-login:focus {
+        border-color: #004a8f;
+        box-shadow: 0 0 6px rgba(0,74,143,0.25);
+        background: #ffffff;
+        color: #0d264d;
+    }
+    .login-upc-card .btn-dios-login {
+        background: #004a8f;
+    }
+    .login-upc-card .btn-dios-login:hover {
+        background: #003366;
+    }
+    .login-upc-card .alert {
+        background: #e1efff;
+        color: #0f3173;
+        border: 1px solid #9dc6ff;
     }
     .dios-crown-icon {
         font-size: 60px;
@@ -72,18 +144,6 @@ include("head_dios.php");
     .bg-dios-dark {
         background: linear-gradient(135deg, #1a1a2e, #16213e);
         padding: 25px;
-    }
-    .btn-dios-login {
-        background: linear-gradient(135deg, #ffd700, #ff8c00);
-        color: #000;
-        font-weight: bold;
-        border: none;
-        padding: 12px;
-        font-size: 16px;
-    }
-    .btn-dios-login:hover {
-        background: linear-gradient(135deg, #ff8c00, #ff6600);
-        color: #fff;
     }
     .form-control-dios-login {
         background: #1a1f3a;
@@ -100,16 +160,16 @@ include("head_dios.php");
     }
 </style>
 
-<div class="login-dios-card">
-    <div class="bg-dios-dark text-center">
-        <div class="dios-crown-icon">👑</div>
-        <h3 style="color: #ffd700; margin-bottom: 5px;">PANEL DE CONTROL DIOS</h3>
-        <small style="color: #888;">Sistema de Control de Estudios - UPTPC</small>
+<div class="login-upc-card">
+    <div class="login-brand-header">
+        <img src="../images/uptpc.png" alt="UPTPC Logo" class="login-brand-logo">
+        <div class="login-brand-title">UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO</div>
+        <p class="login-brand-subtitle">Sistema de Control de Estudios</p>
     </div>
-    <div class="card-body" style="padding: 30px;">
+    <div class="login-brand-body">
         <?php if($error): ?>
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <i class="fas fa-exclamation-triangle"></i> <?php echo $error; ?>
+                <strong>Acceso denegado.</strong> Credenciales incorrectas.
                 <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
@@ -130,8 +190,8 @@ include("head_dios.php");
             </button>
         </form>
     </div>
-    <div class="card-footer text-center" style="background: #1a1a2e; border-top: 1px solid #2a2f4a;">
-        <small style="color: #666;"><i class="fas fa-shield-alt"></i> Acceso autorizado exclusivo para el Administrador del Sistema</small>
+    <div class="login-brand-footer">
+        <small>© <?php echo date('Y'); ?> Universidad Politécnica Territorial de Puerto Cabello</small>
     </div>
 </div>
 
