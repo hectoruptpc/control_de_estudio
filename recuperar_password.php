@@ -4,13 +4,52 @@ error_reporting(E_ALL);
 ini_set('display_errors', '1');
 $titulo = "Recuperar Contraseña - UPTPC";
 include('funciones/functions.php');
+include('funciones/seguridad.php');
 
-$email = isset($_REQUEST['email']) ? $_REQUEST['email'] : "";
+// VERIFICAR SI EL SISTEMA ESTÁ ACTIVO
+if (!$seguridad->sistemaEstaActivo()) {
+    die("
+    <div style='text-align: center; font-family: Arial; padding: 50px;'>
+        <h2 style='color: #dc3545;'>🔒 Sistema Temporalmente Cerrado</h2>
+        <p>El sistema de recuperación de contraseña está deshabilitado por razones de seguridad.</p>
+        <p>Contacta al administrador si necesitas recuperar tu cuenta.</p>
+        <a href='login.php' class='btn btn-primary'>Volver al login</a>
+    </div>
+    ");
+}
+
+// VERIFICAR SI HAY MANTENIMIENTO
+if ($seguridad->sistemaEnMantenimiento()) {
+    die("
+    <div style='text-align: center; font-family: Arial; padding: 50px;'>
+        <h2 style='color: #ffc107;'>🛠️ Sistema en Mantenimiento</h2>
+        <p>El sistema está siendo actualizado. Por favor, intenta más tarde.</p>
+        <a href='login.php' class='btn btn-primary'>Volver al login</a>
+    </div>
+    ");
+}
+
+$email = isset($_REQUEST['email']) ? trim($_REQUEST['email']) : "";
 
 if (!empty($email)) {
+    // VERIFICAR RPS
+    $rps = $seguridad->verificarRPS('recuperar_password');
+    if (!$rps['permitido']) {
+        $_SESSION['msg'] = '<i class="fa fa-shield-alt"></i> ' . $rps['mensaje'];
+        header('location: login.php');
+        exit;
+    }
+    
+    // VERIFICAR INTENTOS PREVIOS
+    $verificar = $seguridad->verificarIntentos($email, 'recuperar');
+    if (!$verificar['permitido']) {
+        $_SESSION['msg'] = '<i class="fa fa-lock"></i> ' . $verificar['mensaje'];
+        header('location: login.php');
+        exit;
+    }
+    
     global $db;
     
-    // Usar prepared statement para seguridad
     $sql = "SELECT id, nombre, email, status, username FROM users WHERE email = ?";
     $stmt = mysqli_prepare($db, $sql);
     mysqli_stmt_bind_param($stmt, "s", $email);
@@ -19,6 +58,7 @@ if (!empty($email)) {
     $rows = mysqli_num_rows($result);
     
     if ($rows == 0) {
+        $seguridad->registrarIntentoFallido($email, 'recuperar');
         array_push($errors, "El correo <b>$email</b> no existe en nuestra base de datos.");
         $_SESSION['msg_recuperar'] = display_error();
         header("location: recuperar_password.php");
@@ -27,12 +67,11 @@ if (!empty($email)) {
         $row = mysqli_fetch_assoc($result);
         $rowid = $row['id'];
         $nombre_usuario = $row['nombre'];
-        $username = $row['username'];
         $email_usuario = $row['email'];
         $status = $row['status'];
         
         if ($status == 0) {
-            $_SESSION['msg'] = '<i class="fa fa-ban"></i> No puedes recuperar contraseña porque tu usuario está bloqueado. Contacta al administrador del sistema.';
+            $_SESSION['msg'] = '<i class="fa fa-ban"></i> Usuario bloqueado. Contacta al administrador.';
             header('location: login.php');
             exit;
         } else {
@@ -63,16 +102,12 @@ if (!empty($email)) {
             mysqli_stmt_bind_param($stmt_insert, "isss", $rowid, $email_usuario, $token, $expira);
             mysqli_stmt_execute($stmt_insert);
             
-            // ==============================================
-            // CONSTRUIR ENLACE CON TU IP (para acceso desde celular)
-            // ==============================================
-            $url_base = "http://172.16.0.242";  // ← TU IP FIJA
-            $ruta_base = "/control_de_estudio";  // ← CARPETA DEL PROYECTO
+            // Construir enlace con localhost
+            $url_base = "http://localhost";
+            $ruta_base = "/control_de_estudio";
             $enlace = $url_base . $ruta_base . "/nueva_password.php?token=" . $token;
             
-            // ==============================================
-            // CORREO PARA SISTEMA DE CONTROL DE ESTUDIOS UPTPC
-            // ==============================================
+            // Enviar correo
             $asunto = "🔐 Recupera tu contraseña - Sistema de Control de Estudios UPTPC";
             $cuerpo = "
             <!DOCTYPE html>
@@ -84,14 +119,12 @@ if (!empty($email)) {
             <body style='font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px;'>
                 <div style='max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.1);'>
                     
-                    <!-- Encabezado institucional -->
                     <div style='background: linear-gradient(135deg, #003366 0%, #00509e 100%); padding: 30px 20px; text-align: center;'>
                         <h1 style='color: #ffffff; margin: 0; font-size: 28px;'>🏛️ UPTPC</h1>
                         <p style='color: #ffd700; margin: 5px 0 0; font-size: 14px;'>Universidad Politécnica Territorial de Puerto Cabello</p>
                         <p style='color: #cce5ff; margin: 5px 0 0; font-size: 12px;'>Sistema de Control de Estudios</p>
                     </div>
                     
-                    <!-- Contenido principal -->
                     <div style='padding: 30px 25px;'>
                         <h2 style='color: #003366; margin-top: 0;'>Estimado(a), $nombre_usuario</h2>
                         
@@ -120,7 +153,6 @@ if (!empty($email)) {
                         </div>
                     </div>
                     
-                    <!-- Pie de página institucional -->
                     <div style='background-color: #f0f0f0; padding: 20px; text-align: center; border-top: 1px solid #ddd;'>
                         <p style='color: #666; font-size: 12px; margin: 0;'>Universidad Politécnica Territorial de Puerto Cabello (UPTPC)</p>
                         <p style='color: #666; font-size: 12px; margin: 5px 0 0;'>Sistema de Control de Estudios</p>
@@ -133,7 +165,7 @@ if (!empty($email)) {
             
             enviarEmail($email_usuario, $nombre_usuario, $asunto, $cuerpo);
             
-            $_SESSION['msg'] = '<i class="fa fa-envelope"></i> ✅ Hemos enviado un correo a <strong>' . $email_usuario . '</strong> con las instrucciones para recuperar tu contraseña. Por favor, revisa tu bandeja de entrada o la carpeta de SPAM.';
+            $_SESSION['msg'] = '<i class="fa fa-envelope"></i> ✅ Hemos enviado un correo a <strong>' . $email_usuario . '</strong> con las instrucciones para recuperar tu contraseña. Revisa tu bandeja de entrada o SPAM.';
             header('location: login.php');
             exit;
         }

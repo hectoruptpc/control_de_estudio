@@ -1,0 +1,6 @@
+# .dios/.htaccess - Protección adicional
+Options -Indexes
+<FilesMatch "\.(log|txt|ini)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
