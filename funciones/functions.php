@@ -230,6 +230,28 @@ function obtenerDetalleEstudiante($id) {
     }
 }
 
+
+
+
+
+function obtenerNombreCarrera($carrera_id) {
+    global $db;
+    $sql = "SELECT nombre_carrera FROM carreras WHERE id_carrera = ? AND activa = 1";
+    $stmt = mysqli_prepare($db, $sql);
+    mysqli_stmt_bind_param($stmt, "i", $carrera_id);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    if ($row = mysqli_fetch_assoc($result)) {
+        return $row['nombre_carrera'];
+    }
+    return 'No especificada';
+}
+
+
+
+
+
+
 /**
  * Funciones para el manejo de estudiantes (users)
  */
@@ -1104,7 +1126,7 @@ function insertarPreinscripcion($datos) {
 
         return [
             'success' => true,
-            'message' => '✅ Preinscripción enviada correctamente. Serás contactado cuando el equipo admin la revise.',
+            'message' => '✅ Preinscripción enviada correctamente. Se a enviado un mensaje a su correo electrónico.',
             'id' => $preinscripcionId
         ];
     } catch (Exception $e) {
