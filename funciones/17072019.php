@@ -22,7 +22,7 @@ session_start();
 
     $logo = '<img src="https://local.jesuministrosymas.com.ve/image/LOGO.png" width="180" height="30"><br><br>';
 
-    $footer_correo = '<br><br><br>Este es un producto ofrecido por: J.E Suministros y Mas, C.A.<br><br>Gracias por Confiar en J.E Suministros y Mas, C.A.<br>Rif: J-29444489-0<br>Nuestra Web Principal: <a href="http://www.jesuministrosymas.com.ve">http://www.jesuministrosymas.com.ve</a><br>La Plataforma de Gestion de Recargas: <a href="https://virtual.jesuministrosymas.com.ve">https://virtual.jesuministrosymas.com.ve</a>';
+    
 
     $db = new mysqli('localhost', 'root', '060906', 'multi_login');
     mysqli_set_charset($db, "utf8");

@@ -174,12 +174,7 @@ if (!empty($email)) {
                 </div>
             </div>
             
-            <div style='background-color: #f0f0f0; padding: 20px; text-align: center; border-top: 1px solid #ddd;'>
-                <p style='color: #666; font-size: 12px; margin: 0;'>Universidad Politécnica Territorial de Puerto Cabello (UPTPC)</p>
-                <p style='color: #666; font-size: 12px; margin: 5px 0 0;'>Sistema de Control de Estudios</p>
-                <p style='color: #999; font-size: 11px; margin: 10px 0 0;'>Este es un mensaje automático, por favor no responder a este correo.</p>
-                <p style='color: #999; font-size: 11px; margin: 5px 0 0;'>© " . date('Y') . " - Todos los derechos reservados</p>
-            </div>
+            
         </div>
     </body>
     </html>";
