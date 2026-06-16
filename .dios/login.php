@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Verificar token secreto (acceso rápido)
     if (isset($_GET['token']) && $_GET['token'] === DIOS_TOKEN) {
+        session_regenerate_id(true);
         $_SESSION['dios_autenticado'] = true;
         $_SESSION['dios_usuario'] = 'token_master';
         $_SESSION['dios_acceso'] = date('Y-m-d H:i:s');
@@ -33,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Verificar usuario y contraseña
     if ($username === DIOS_USER && password_verify($password, DIOS_PASS_HASH)) {
+        session_regenerate_id(true);
         $_SESSION['dios_autenticado'] = true;
         $_SESSION['dios_usuario'] = $username;
         $_SESSION['dios_acceso'] = date('Y-m-d H:i:s');

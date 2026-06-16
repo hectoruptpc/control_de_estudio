@@ -1,5 +1,5 @@
 <?php
-// .dios/index.php - Panel MODO DIOS (VERSIÓN DEFINITIVA)
+// .dios/index.php - Panel MODO DIOS (CON BUSCADOR EN TIEMPO REAL)
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
@@ -17,6 +17,30 @@ if (!isset($_SESSION['dios_autenticado']) || $_SESSION['dios_autenticado'] !== t
 }
 
 $seguridad = new Seguridad($db);
+
+// ==============================================
+// TOKEN CSRF Y SEGURIDAD DEL PANEL DIOS
+// ==============================================
+if (session_status() === PHP_SESSION_NONE) session_start();
+
+// Generar token CSRF para el panel DIOS
+if (empty($_SESSION['dios_csrf_token'])) {
+    try {
+        $_SESSION['dios_csrf_token'] = bin2hex(random_bytes(32));
+    } catch (Exception $e) {
+        $_SESSION['dios_csrf_token'] = md5(uniqid('', true));
+    }
+}
+$csrf_token = $_SESSION['dios_csrf_token'];
+$csrf_field = '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrf_token) . '">';
+
+if (empty($_SESSION['dios_ajax_token'])) {
+    try {
+        $_SESSION['dios_ajax_token'] = bin2hex(random_bytes(16));
+    } catch (Exception $e) {
+        $_SESSION['dios_ajax_token'] = md5(uniqid('', true));
+    }
+}
 
 // ==============================================
 // VARIABLES DE PAGINACIÓN Y BÚSQUEDA
@@ -87,7 +111,13 @@ $limite_global_calculado = ceil($total_usuarios_db * ($rps_global / 100));
 // Procesar acciones POST
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $accion = $_POST['accion'] ?? '';
-    
+    $csrf_submitted = $_POST['csrf_token'] ?? '';
+    if (empty($csrf_token) || !hash_equals($csrf_token, $csrf_submitted)) {
+        $_SESSION['msg_dios'] = '⚠️ Token CSRF inválido o expirado. Acción denegada.';
+        header('Location: index.php' . (!empty($buscar) ? "?buscar=" . urlencode($buscar) : ''));
+        exit;
+    }
+
     switch ($accion) {
         case 'toggle_sistema_completo':
             if ($_POST['sistema_completo'] == '1') {
@@ -190,19 +220,43 @@ include("head_dios.php");
         border-radius: 50px;
         padding: 5px 15px;
         border: 1px solid #e9ecef;
-        display: inline-flex;
+        display: flex;
+        align-items: center;
+        gap: 10px;
     }
     .search-box input {
         border: none;
         padding: 10px;
-        width: 250px;
+        width: 300px;
         outline: none;
+        flex: 1;
     }
     .search-box button {
         background: none;
         border: none;
         color: #ffc107;
         cursor: pointer;
+    }
+    .clear-btn {
+        color: #dc3545;
+        font-size: 14px;
+        text-decoration: none;
+        cursor: pointer;
+    }
+    .clear-btn:hover {
+        color: #a71d2a;
+    }
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ffc107;
+        border-radius: 50%;
+        border-top-color: transparent;
+        animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
     }
     .pagination .page-item.active .page-link {
         background: #ffc107;
@@ -348,6 +402,19 @@ include("head_dios.php");
         gap: 5px;
         flex-wrap: wrap;
     }
+    .resultados-info {
+        font-size: 14px;
+        color: #6c757d;
+    }
+    .tabla-contenedor {
+        min-height: 400px;
+    }
+    .input-group .btn {
+        border-radius: 8px;
+    }
+    .input-group {
+        border-radius: 8px;
+    }
 </style>
 
 <div class="dios-container">
@@ -398,6 +465,7 @@ include("head_dios.php");
                 </div>
                 <div class="col-md-5">
                     <form method="POST">
+                        <?php echo $csrf_field; ?>
                         <input type="hidden" name="accion" value="toggle_sistema_completo">
                         <input type="hidden" name="sistema_completo" value="<?php echo $sistema_completo ? '1' : '0'; ?>">
                         <button type="submit" class="btn <?php echo $sistema_completo ? 'btn-dios-danger' : 'btn-dios-success'; ?> btn-lg btn-block">
@@ -424,6 +492,7 @@ include("head_dios.php");
                         <?php echo $sistema_activo == '1' ? '🟢 ACTIVO' : '🔴 CERRADO'; ?>
                     </strong></p>
                     <form method="POST">
+                        <?php echo $csrf_field; ?>
                         <input type="hidden" name="accion" value="toggle_sistema">
                         <input type="hidden" name="sistema_activo" value="<?php echo $sistema_activo; ?>">
                         <button type="submit" class="btn btn-sm <?php echo $sistema_activo == '1' ? 'btn-dios-danger' : 'btn-dios-success'; ?>">
@@ -441,6 +510,7 @@ include("head_dios.php");
                         <?php echo $modo_mantenimiento == '1' ? '🛠️ ACTIVO' : '✅ NORMAL'; ?>
                     </strong></p>
                     <form method="POST">
+                        <?php echo $csrf_field; ?>
                         <input type="hidden" name="accion" value="toggle_mantenimiento">
                         <input type="hidden" name="modo_mantenimiento" value="<?php echo $modo_mantenimiento; ?>">
                         <button type="submit" class="btn btn-sm btn-warning">
@@ -465,6 +535,7 @@ include("head_dios.php");
         <div class="card-header-dios"><i class="fas fa-sliders-h"></i> Configuración de Límites</div>
         <div class="card-body">
             <form method="POST" class="row">
+                <?php echo $csrf_field; ?>
                 <input type="hidden" name="accion" value="actualizar_limites">
                 <div class="col-md-2"><label>Intentos/hora</label><input type="number" name="limite_recuperar" class="form-control" value="<?php echo $limite_recuperar; ?>"></div>
                 <div class="col-md-2"><label>Bloqueo inicial (h)</label><input type="number" name="bloqueo_horas" class="form-control" value="<?php echo $bloqueo_horas; ?>"></div>
@@ -476,81 +547,109 @@ include("head_dios.php");
         </div>
     </div>
 
-    <!-- GESTIÓN DE USUARIOS -->
+    <!-- GESTIÓN DE USUARIOS CON BUSCADOR EN TIEMPO REAL -->
     <div class="card card-dios mt-3">
         <div class="card-header-dios"><i class="fas fa-users"></i> Gestión de Usuarios</div>
         <div class="card-body">
             <div class="row mb-3">
                 <div class="col-md-8">
-                    <form method="GET" class="search-box">
-                        <input type="text" name="buscar" placeholder="🔍 Buscar por nombre, email, username o ID..." value="<?php echo htmlspecialchars($buscar); ?>">
-                        <button type="submit"><i class="fas fa-search"></i></button>
-                        <?php if(!empty($buscar)): ?>
-                            <a href="index.php" class="btn btn-sm btn-secondary ml-2">Limpiar</a>
-                        <?php endif; ?>
-                    </form>
+                    <div class="input-group">
+                        <input type="text" id="searchInput" class="form-control" placeholder="🔍 Buscar en tiempo real (nombre, email, username o ID)..." autocomplete="off" data-token="<?php echo htmlspecialchars($_SESSION['dios_ajax_token']); ?>">
+                        <div class="input-group-append">
+                            <button class="btn btn-dios" type="button" id="searchBtn">
+                                <i class="fas fa-search"></i> Buscar
+                            </button>
+                            <button class="btn btn-secondary" type="button" id="clearSearch" style="display: none;">
+                                <i class="fas fa-times"></i> Limpiar
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-4 text-right"><span class="text-muted">Total: <?php echo $total_usuarios; ?> usuarios</span></div>
+                <div class="col-md-4 text-right">
+                    <span class="resultados-info" id="resultadosInfo">
+                        Total: <?php echo $total_usuarios; ?> usuarios
+                    </span>
+                </div>
             </div>
             
-            <div class="table-responsive">
-                <table class="table table-dios table-bordered">
-                    <thead>
-                        <tr><th>ID</th><th>Nombre</th><th>Email</th><th>Username</th><th>Estado</th><th>Acciones</th></tr>
-                    </thead>
-                    <tbody>
-                        <?php 
-                        $usuarios_array = [];
-                        while($u = mysqli_fetch_assoc($usuarios)) {
-                            $usuarios_array[] = $u;
-                        }
-                        foreach($usuarios_array as $u): 
-                        ?>
-                        <tr>
-                            <td><?php echo $u['id']; ?></td>
-                            <td><?php echo htmlspecialchars($u['nombre']); ?></td>
-                            <td><?php echo htmlspecialchars($u['email']); ?></td>
-                            <td><?php echo htmlspecialchars($u['username']); ?></td>
-                            <td><?php echo $u['status'] == 1 ? '<span class="badge-dios-active">ACTIVO</span>' : '<span class="badge-dios-blocked">BLOQUEADO</span>'; ?></td>
-                            <td>
-                                <div class="acciones-btns">
-                                    <button class="btn btn-sm btn-dios" onclick="abrirModal(<?php echo $u['id']; ?>, '<?php echo addslashes($u['nombre']); ?>', '<?php echo addslashes($u['email']); ?>')">
-                                        <i class="fas fa-key"></i> Clave
-                                    </button>
-                                    <?php if($u['status'] == 1): ?>
-                                        <form method="POST" class="d-inline">
-                                            <input type="hidden" name="accion" value="bloquear_usuario">
-                                            <input type="hidden" name="user_id" value="<?php echo $u['id']; ?>">
-                                            <button class="btn btn-sm btn-dios-danger"><i class="fas fa-lock"></i> Bloq</button>
-                                        </form>
-                                    <?php else: ?>
-                                        <form method="POST" class="d-inline">
-                                            <input type="hidden" name="accion" value="desbloquear_usuario">
-                                            <input type="hidden" name="user_id" value="<?php echo $u['id']; ?>">
-                                            <button class="btn btn-sm btn-dios-success"><i class="fas fa-unlock-alt"></i> Desbloq</button>
-                                        </form>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+            <div id="tablaUsuarios">
+                <div class="table-responsive">
+                    <table class="table table-dios table-bordered">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Email</th>
+                                <th>Username</th>
+                                <th>Estado</th>
+                                <th width="180">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if(mysqli_num_rows($usuarios) > 0): ?>
+                                <?php while($u = mysqli_fetch_assoc($usuarios)): ?>
+                                <tr>
+                                    <td><?php echo $u['id']; ?></td>
+                                    <td><?php echo htmlspecialchars($u['nombre']); ?></td>
+                                    <td><?php echo htmlspecialchars($u['email']); ?></td>
+                                    <td><?php echo htmlspecialchars($u['username']); ?></td>
+                                    <td><?php echo $u['status'] == 1 ? '<span class="badge badge-success"><i class="fas fa-check-circle"></i> ACTIVO</span>' : '<span class="badge badge-danger"><i class="fas fa-ban"></i> BLOQUEADO</span>'; ?></td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-sm btn-warning" onclick="abrirModal(<?php echo $u['id']; ?>, '<?php echo addslashes($u['nombre']); ?>', '<?php echo addslashes($u['email']); ?>')">
+                                                <i class="fas fa-key"></i> Clave
+                                            </button>
+                                            <?php if($u['status'] == 1): ?>
+                                                <form method="POST" class="d-inline" onsubmit="return confirm('¿Bloquear a <?php echo addslashes($u['nombre']); ?>?')">
+                                                    <?php echo $csrf_field; ?>
+                                                    <input type="hidden" name="accion" value="bloquear_usuario">
+                                                    <input type="hidden" name="user_id" value="<?php echo $u['id']; ?>">
+                                                    <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-lock"></i> Bloq</button>
+                                                </form>
+                                            <?php else: ?>
+                                                <form method="POST" class="d-inline" onsubmit="return confirm('¿Desbloquear a <?php echo addslashes($u['nombre']); ?>?')">
+                                                    <?php echo $csrf_field; ?>
+                                                    <input type="hidden" name="accion" value="desbloquear_usuario">
+                                                    <input type="hidden" name="user_id" value="<?php echo $u['id']; ?>">
+                                                    <button type="submit" class="btn btn-sm btn-success"><i class="fas fa-unlock-alt"></i> Desbloq</button>
+                                                </form>
+                                            <?php endif; ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endwhile; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="6" class="text-center">No hay usuarios registrados</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            
-            <?php if($total_paginas > 1): ?>
-            <nav><ul class="pagination justify-content-center">
-                <li class="page-item <?php echo $pagina <= 1 ? 'disabled' : ''; ?>"><a class="page-link" href="?pagina=<?php echo $pagina-1; ?>&buscar=<?php echo urlencode($buscar); ?>">«</a></li>
-                <?php for($i = 1; $i <= $total_paginas; $i++): ?>
-                    <li class="page-item <?php echo $i == $pagina ? 'active' : ''; ?>"><a class="page-link" href="?pagina=<?php echo $i; ?>&buscar=<?php echo urlencode($buscar); ?>"><?php echo $i; ?></a></li>
-                <?php endfor; ?>
-                <li class="page-item <?php echo $pagina >= $total_paginas ? 'disabled' : ''; ?>"><a class="page-link" href="?pagina=<?php echo $pagina+1; ?>&buscar=<?php echo urlencode($buscar); ?>">»</a></li>
-            </ul></nav>
-            <?php endif; ?>
+            <div id="paginacionUsuarios">
+                <?php if($total_paginas > 1): ?>
+                <nav>
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item <?php echo $pagina <= 1 ? 'disabled' : ''; ?>">
+                            <a class="page-link" href="?pagina=<?php echo $pagina-1; ?>&buscar=<?php echo urlencode($buscar); ?>">« Anterior</a>
+                        </li>
+                        <?php for($i = 1; $i <= $total_paginas; $i++): ?>
+                            <li class="page-item <?php echo $i == $pagina ? 'active' : ''; ?>">
+                                <a class="page-link" href="?pagina=<?php echo $i; ?>&buscar=<?php echo urlencode($buscar); ?>"><?php echo $i; ?></a>
+                            </li>
+                        <?php endfor; ?>
+                        <li class="page-item <?php echo $pagina >= $total_paginas ? 'disabled' : ''; ?>">
+                            <a class="page-link" href="?pagina=<?php echo $pagina+1; ?>&buscar=<?php echo urlencode($buscar); ?>">Siguiente »</a>
+                        </li>
+                    </ul>
+                </nav>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 
-    <!-- IPs BLOQUEADAS -->
+    <!-- IPs BLOQUEADAS (CORREGIDO CON CSRF) -->
     <div class="row mt-3">
         <div class="col-md-6">
             <div class="card card-dios">
@@ -563,14 +662,17 @@ include("head_dios.php");
                                 <tbody>
                                 <?php while($row = mysqli_fetch_assoc($bloqueos)): ?>
                                     <tr>
-                                        <td><?php echo $row['ip']; ?></td>
-                                        <td><?php echo $row['email'] ?: 'N/A'; ?></td>
-                                        <td><?php echo $row['desbloqueo_en']; ?></td>
+                                        <td><?php echo htmlspecialchars($row['ip']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['email'] ?: 'N/A'); ?></td>
+                                        <td><?php echo htmlspecialchars($row['desbloqueo_en']); ?></td>
                                         <td>
-                                            <form method="POST">
+                                            <form method="POST" onsubmit="return confirm('¿Desbloquear IP <?php echo htmlspecialchars($row['ip']); ?>?')">
+                                                <?php echo $csrf_field; ?>
                                                 <input type="hidden" name="accion" value="desbloquear_ip">
-                                                <input type="hidden" name="ip" value="<?php echo $row['ip']; ?>">
-                                                <button class="btn btn-sm btn-dios-success">Desbloquear</button>
+                                                <input type="hidden" name="ip" value="<?php echo htmlspecialchars($row['ip']); ?>">
+                                                <button type="submit" class="btn btn-sm btn-dios-success">
+                                                    <i class="fas fa-unlock-alt"></i> Desbloquear
+                                                </button>
                                             </form>
                                         </td>
                                     </tr>
@@ -578,9 +680,12 @@ include("head_dios.php");
                                 </tbody>
                             </table>
                         </div>
-                        <form method="POST">
+                        <form method="POST" onsubmit="return confirm('¿Desbloquear TODAS las IPs?')">
+                            <?php echo $csrf_field; ?>
                             <input type="hidden" name="accion" value="desbloquear_todo">
-                            <button class="btn btn-warning btn-sm">Desbloquear Todos</button>
+                            <button type="submit" class="btn btn-warning btn-sm">
+                                <i class="fas fa-unlock-alt"></i> Desbloquear Todos
+                            </button>
                         </form>
                     <?php else: ?>
                         <p class="text-success">✅ No hay bloqueos activos</p>
@@ -597,7 +702,7 @@ include("head_dios.php");
                             <thead><tr><th>IP</th><th>Intentos</th></tr></thead>
                             <tbody>
                             <?php while($row = mysqli_fetch_assoc($top_ips)): ?>
-                                <tr><td><?php echo $row['ip']; ?></td><td class="text-danger"><?php echo $row['total']; ?></td></tr>
+                                <tr><td><?php echo htmlspecialchars($row['ip']); ?></td><td class="text-danger"><?php echo htmlspecialchars($row['total']); ?></td></tr>
                             <?php endwhile; ?>
                             </tbody>
                         </table>
@@ -607,13 +712,32 @@ include("head_dios.php");
         </div>
     </div>
 
-    <!-- ACCIONES RÁPIDAS -->
+    <!-- ACCIONES RÁPIDAS (CORREGIDO CON CSRF) -->
     <div class="card card-dios mt-3">
         <div class="card-header-dios"><i class="fas fa-bolt"></i> Acciones Rápidas</div>
         <div class="card-body">
-            <form method="POST" class="d-inline"><input type="hidden" name="accion" value="resetear_tokens"><button class="btn btn-dios-danger">Invalidar Tokens</button></form>
-            <form method="POST" class="d-inline"><input type="hidden" name="accion" value="limpiar_logs"><input type="hidden" name="periodo" value="7"><button class="btn btn-warning">Limpiar Logs (7d)</button></form>
-            <form method="POST" class="d-inline"><input type="hidden" name="accion" value="limpiar_todo"><button class="btn btn-secondary" onclick="return confirm('¿Eliminar TODOS los logs?')">Limpiar Todo</button></form>
+            <form method="POST" class="d-inline">
+                <?php echo $csrf_field; ?>
+                <input type="hidden" name="accion" value="resetear_tokens">
+                <button type="submit" class="btn btn-dios-danger" onclick="return confirm('¿Invalidar TODOS los tokens?')">
+                    <i class="fas fa-times-circle"></i> Invalidar Tokens
+                </button>
+            </form>
+            <form method="POST" class="d-inline">
+                <?php echo $csrf_field; ?>
+                <input type="hidden" name="accion" value="limpiar_logs">
+                <input type="hidden" name="periodo" value="7">
+                <button type="submit" class="btn btn-warning">
+                    <i class="fas fa-broom"></i> Limpiar Logs (7d)
+                </button>
+            </form>
+            <form method="POST" class="d-inline">
+                <?php echo $csrf_field; ?>
+                <input type="hidden" name="accion" value="limpiar_todo">
+                <button type="submit" class="btn btn-secondary" onclick="return confirm('¿Eliminar TODOS los logs? Esta acción NO se puede deshacer')">
+                    <i class="fas fa-trash-alt"></i> Limpiar Todo
+                </button>
+            </form>
         </div>
     </div>
 
@@ -629,7 +753,7 @@ include("head_dios.php");
                         <td><small><?php echo $row['fecha']; ?></small></td>
                         <td><?php echo $row['ip']; ?></td>
                         <td><?php echo $row['email'] ?: 'N/A'; ?></td>
-                        <td><span class="badge-dios-warning"><?php echo $row['tipo']; ?></span></td>
+                        <td><span class="badge badge-warning"><?php echo $row['tipo']; ?></span></td>
                         <td><small><?php echo substr($row['user_agent'], 0, 40); ?>...</small></td>
                     </tr>
                 <?php endwhile; ?>
@@ -639,11 +763,12 @@ include("head_dios.php");
     </div>
 </div>
 
-<!-- MODAL ÚNICO FUERA DEL BUCLE (JavaScript) -->
+<!-- MODAL ÚNICO -->
 <div class="modal fade" id="modalPasswordUnico" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <form method="POST" id="formCambiarPassword">
+                <?php echo $csrf_field; ?>
                 <input type="hidden" name="accion" value="cambiar_password">
                 <input type="hidden" name="user_id" id="modal_user_id">
                 <div class="modal-header">
@@ -669,7 +794,7 @@ include("head_dios.php");
 </div>
 
 <script>
-// Función para abrir el modal con los datos del usuario
+// Función para abrir el modal
 function abrirModal(id, nombre, email) {
     document.getElementById('modal_user_id').value = id;
     document.getElementById('modal_nombre').innerText = nombre;
