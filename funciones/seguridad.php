@@ -203,51 +203,100 @@ class Seguridad {
     // 4. CONTROL RPS (Requests Per Second)
     // ==============================================
     public function verificarRPS($endpoint) {
-        // Limpiar registros antiguos
-        $sql = "DELETE FROM seguridad_rps WHERE fecha < DATE_SUB(NOW(), INTERVAL 10 SECOND)";
+    global $db;
+    
+    // ==============================================
+    // 1. ASEGURAR QUE LA TABLA EXISTA
+    // ==============================================
+    $sql = "SHOW TABLES LIKE 'seguridad_rps'";
+    $result = mysqli_query($this->db, $sql);
+    if (mysqli_num_rows($result) == 0) {
+        $sql = "CREATE TABLE IF NOT EXISTS `seguridad_rps` (
+            `id` int(11) NOT NULL AUTO_INCREMENT,
+            `ip` varchar(45) NOT NULL,
+            `endpoint` varchar(100) NOT NULL,
+            `fecha` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_ip_fecha` (`ip`, `fecha`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
         mysqli_query($this->db, $sql);
-        
-        // Contar peticiones de esta IP en los últimos 10 segundos
-        $sql = "SELECT COUNT(*) as total FROM seguridad_rps WHERE ip = ? AND endpoint = ? AND fecha > DATE_SUB(NOW(), INTERVAL 10 SECOND)";
-        $stmt = mysqli_prepare($this->db, $sql);
-        mysqli_stmt_bind_param($stmt, "ss", $this->ip, $endpoint);
-        mysqli_stmt_execute($stmt);
-        $result = mysqli_stmt_get_result($stmt);
-        $row = mysqli_fetch_assoc($result);
-        
-        $limite_individual = $this->obtenerConfiguracion('limite_rps_10seg', 10);
-        
-        if ($row['total'] >= $limite_individual) {
-            return ['permitido' => false, 'mensaje' => "Demasiadas peticiones. Espera unos segundos."];
-        }
-        
-        // ==============================================
-        // VERIFICACIÓN GLOBAL (10% de la tabla users)
-        // ==============================================
-        $total_usuarios = $this->obtenerConfiguracion('total_usuarios', 100);
-        $porcentaje = $this->obtenerConfiguracion('limite_rps_global_porcentaje', 10);
-        $limite_global = ceil($total_usuarios * ($porcentaje / 100));
-        
-        // Contar peticiones GLOBALES en los últimos 10 segundos
-        $sql = "SELECT COUNT(*) as total FROM seguridad_rps WHERE endpoint = ? AND fecha > DATE_SUB(NOW(), INTERVAL 10 SECOND)";
-        $stmt = mysqli_prepare($this->db, $sql);
-        mysqli_stmt_bind_param($stmt, "s", $endpoint);
-        mysqli_stmt_execute($stmt);
-        $result = mysqli_stmt_get_result($stmt);
-        $row_global = mysqli_fetch_assoc($result);
-        
-        if ($row_global['total'] >= $limite_global) {
-            return ['permitido' => false, 'mensaje' => "El sistema está congestionado. Intenta más tarde."];
-        }
-        
-        // Registrar esta petición
-        $sql = "INSERT INTO seguridad_rps (ip, endpoint) VALUES (?, ?)";
-        $stmt = mysqli_prepare($this->db, $sql);
-        mysqli_stmt_bind_param($stmt, "ss", $this->ip, $endpoint);
-        mysqli_stmt_execute($stmt);
-        
+    }
+    
+    // ==============================================
+    // 2. LIMPIAR REGISTROS ANTIGUOS (más de 10 segundos)
+    // ==============================================
+    $sql = "DELETE FROM seguridad_rps WHERE fecha < DATE_SUB(NOW(), INTERVAL 10 SECOND)";
+    mysqli_query($this->db, $sql);
+    
+    // ==============================================
+    // 3. INSERTAR SIEMPRE LA PETICIÓN ACTUAL
+    // ==============================================
+    $sql = "INSERT INTO seguridad_rps (ip, endpoint) VALUES (?, ?)";
+    $stmt = mysqli_prepare($this->db, $sql);
+    mysqli_stmt_bind_param($stmt, "ss", $this->ip, $endpoint);
+    $insertado = mysqli_stmt_execute($stmt);
+    
+    // Si falla la inserción, registrar error y permitir (para no bloquear)
+    if (!$insertado) {
+        error_log("Error al insertar en seguridad_rps: " . mysqli_error($this->db));
         return ['permitido' => true];
     }
+    
+    // ==============================================
+    // 4. CONTAR PETICIONES DE ESTA IP (últimos 10 segundos)
+    // ==============================================
+    $sql = "SELECT COUNT(*) as total FROM seguridad_rps 
+            WHERE ip = ? AND endpoint = ? 
+            AND fecha > DATE_SUB(NOW(), INTERVAL 10 SECOND)";
+    $stmt = mysqli_prepare($this->db, $sql);
+    mysqli_stmt_bind_param($stmt, "ss", $this->ip, $endpoint);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    $row = mysqli_fetch_assoc($result);
+    $total_ip = $row['total'] ?? 0;
+    
+    // Límite: 15 peticiones por IP en 10 segundos (más permisivo para pruebas)
+    $limite_individual = 15;
+    
+    if ($total_ip >= $limite_individual) {
+        return ['permitido' => false, 'mensaje' => "Demasiadas peticiones desde tu IP. Espera unos segundos."];
+    }
+    
+    // ==============================================
+    // 5. VERIFICACIÓN GLOBAL (10% de usuarios)
+    // ==============================================
+    $total_usuarios = $this->obtenerConfiguracion('total_usuarios', 0);
+    
+    // Si no hay usuarios, usar 128 como base
+    if ($total_usuarios == 0 || $total_usuarios < 10) {
+        $total_usuarios = 128;
+    }
+    
+    $porcentaje = 10;
+    $limite_global = ceil($total_usuarios * ($porcentaje / 100));
+    
+    // Mínimo 20 peticiones globales
+    if ($limite_global < 20) {
+        $limite_global = 20;
+    }
+    
+    // Contar peticiones GLOBALES en los últimos 10 segundos
+    $sql = "SELECT COUNT(*) as total FROM seguridad_rps 
+            WHERE endpoint = ? 
+            AND fecha > DATE_SUB(NOW(), INTERVAL 10 SECOND)";
+    $stmt = mysqli_prepare($this->db, $sql);
+    mysqli_stmt_bind_param($stmt, "s", $endpoint);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    $row_global = mysqli_fetch_assoc($result);
+    $total_global = $row_global['total'] ?? 0;
+    
+    if ($total_global >= $limite_global) {
+        return ['permitido' => false, 'mensaje' => "El sistema está congestionado. Intenta más tarde."];
+    }
+    
+    return ['permitido' => true];
+}
     
     // ==============================================
     // 5. FUNCIONES DE CONFIGURACIÓN (PÚBLICAS)
