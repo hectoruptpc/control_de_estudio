@@ -1,5 +1,5 @@
 <?php
-// .dios/index.php - Panel MODO DIOS (CON BUSCADOR EN TIEMPO REAL)
+// .dios/index.php - Panel MODO DIOS (CON BUSCADOR EN TIEMPO REAL Y RPS DINÁMICO)
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
@@ -284,6 +284,11 @@ include("head_dios.php");
         text-align: center;
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         margin-bottom: 20px;
+        transition: all 0.3s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }
     .stat-card .icon {
         font-size: 35px;
@@ -307,10 +312,12 @@ include("head_dios.php");
         padding: 8px 20px;
         border-radius: 8px;
         cursor: pointer;
+        transition: all 0.3s ease;
     }
     .btn-dios:hover {
         background: #e0a800;
         color: #fff;
+        transform: translateY(-2px);
     }
     .btn-dios-danger {
         background: #dc3545;
@@ -415,6 +422,10 @@ include("head_dios.php");
     .input-group {
         border-radius: 8px;
     }
+    /* Indicador RPS */
+    .rps-bajo { color: #00ff00; }
+    .rps-medio { color: #ffaa00; }
+    .rps-alto { color: #ff4444; }
 </style>
 
 <div class="dios-container">
@@ -522,12 +533,36 @@ include("head_dios.php");
         </div>
     </div>
 
-    <!-- ESTADÍSTICAS -->
+    <!-- ESTADÍSTICAS CON ACTUALIZACIÓN EN TIEMPO REAL -->
     <div class="row mt-3">
-        <div class="col-md-3"><div class="stat-card"><div class="icon"><i class="fas fa-hand-paper"></i></div><div class="value"><?php echo $stats['intentos_hoy']; ?></div><div class="label">Intentos Hoy</div></div></div>
-        <div class="col-md-3"><div class="stat-card"><div class="icon"><i class="fas fa-ban"></i></div><div class="value"><?php echo $stats['bloqueos_activos']; ?></div><div class="label">Bloqueos Activos</div></div></div>
-        <div class="col-md-3"><div class="stat-card"><div class="icon"><i class="fas fa-key"></i></div><div class="value"><?php echo $stats['tokens_invalidos_hoy']; ?></div><div class="label">Tokens Inválidos</div></div></div>
-        <div class="col-md-3"><div class="stat-card"><div class="icon"><i class="fas fa-tachometer-alt"></i></div><div class="value"><?php echo $stats['rps_actual']; ?></div><div class="label">RPS Actual</div></div></div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="icon"><i class="fas fa-hand-paper"></i></div>
+                <div class="value" id="intentosHoy"><?php echo $stats['intentos_hoy']; ?></div>
+                <div class="label">Intentos Hoy</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="icon"><i class="fas fa-ban"></i></div>
+                <div class="value" id="bloqueosActivos"><?php echo $stats['bloqueos_activos']; ?></div>
+                <div class="label">Bloqueos Activos</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="icon"><i class="fas fa-key"></i></div>
+                <div class="value" id="tokensInvalidos"><?php echo $stats['tokens_invalidos_hoy']; ?></div>
+                <div class="label">Tokens Inválidos</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="icon"><i class="fas fa-tachometer-alt"></i></div>
+                <div class="value" id="rpsActual"><?php echo $stats['rps_actual']; ?></div>
+                <div class="label">RPS Actual <span id="rpsIndicator" style="font-size:12px;"></span></div>
+            </div>
+        </div>
     </div>
 
     <!-- CONFIGURACIÓN -->
@@ -649,7 +684,7 @@ include("head_dios.php");
         </div>
     </div>
 
-    <!-- IPs BLOQUEADAS (CORREGIDO CON CSRF) -->
+    <!-- IPs BLOQUEADAS -->
     <div class="row mt-3">
         <div class="col-md-6">
             <div class="card card-dios">
@@ -700,7 +735,7 @@ include("head_dios.php");
                     <div class="table-responsive">
                         <table class="table table-sm">
                             <thead><tr><th>IP</th><th>Intentos</th></tr></thead>
-                            <tbody>
+                            <tbody id="topIpsBody">
                             <?php while($row = mysqli_fetch_assoc($top_ips)): ?>
                                 <tr><td><?php echo htmlspecialchars($row['ip']); ?></td><td class="text-danger"><?php echo htmlspecialchars($row['total']); ?></td></tr>
                             <?php endwhile; ?>
@@ -712,7 +747,7 @@ include("head_dios.php");
         </div>
     </div>
 
-    <!-- ACCIONES RÁPIDAS (CORREGIDO CON CSRF) -->
+    <!-- ACCIONES RÁPIDAS -->
     <div class="card card-dios mt-3">
         <div class="card-header-dios"><i class="fas fa-bolt"></i> Acciones Rápidas</div>
         <div class="card-body">
@@ -801,6 +836,143 @@ function abrirModal(id, nombre, email) {
     document.getElementById('modal_email').innerText = email;
     $('#modalPasswordUnico').modal('show');
 }
+
+// ==============================================
+// ACTUALIZACIÓN AUTOMÁTICA DE ESTADÍSTICAS
+// ==============================================
+function actualizarEstadisticas() {
+    $.ajax({
+        url: 'ajax_rps.php',
+        type: 'GET',
+        dataType: 'json',
+        cache: false,
+        success: function(data) {
+            if (data.error) {
+                console.log('Error:', data.error);
+                return;
+            }
+            
+            // Actualizar RPS Actual
+            $('#rpsActual').text(data.rps_actual);
+            
+            // Cambiar color según el nivel de RPS
+            var indicator = $('#rpsIndicator');
+            if (data.rps_actual > 15) {
+                indicator.html(' 🔴 Alto');
+                indicator.css('color', '#ff4444');
+            } else if (data.rps_actual > 8) {
+                indicator.html(' 🟡 Medio');
+                indicator.css('color', '#ffaa00');
+            } else {
+                indicator.html(' 🟢 Bajo');
+                indicator.css('color', '#00ff00');
+            }
+            
+            // Actualizar Intentos Hoy
+            $('#intentosHoy').text(data.intentos_hoy);
+            
+            // Actualizar Bloqueos Activos
+            $('#bloqueosActivos').text(data.bloqueos_activos);
+            
+            // Actualizar Tokens Inválidos
+            $('#tokensInvalidos').text(data.tokens_invalidos);
+            
+            // Actualizar Top IPs Sospechosas
+            if (data.top_ips && data.top_ips.length > 0) {
+                var html = '';
+                data.top_ips.forEach(function(ip) {
+                    html += '<tr><td>' + ip.ip + '</td><td class="text-danger">' + ip.total + ' intentos</td></tr>';
+                });
+                if ($('#topIpsBody').length) {
+                    $('#topIpsBody').html(html);
+                }
+            }
+        },
+        error: function(xhr, status, error) {
+            console.log('Error al actualizar estadísticas:', error);
+        }
+    });
+}
+
+// Actualizar cada 3 segundos
+$(document).ready(function() {
+    actualizarEstadisticas();
+    setInterval(actualizarEstadisticas, 3000);
+});
+
+// BUSCADOR EN TIEMPO REAL
+$(document).ready(function() {
+    var timeoutId;
+    
+    function cargarUsuarios(searchTerm, page) {
+        if (page === undefined) page = 1;
+        
+        $('#tablaUsuarios').html('<div class="text-center p-5"><i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando...</div>');
+        
+        $.ajax({
+            url: 'ajax_usuarios.php',
+            type: 'GET',
+            data: { buscar: searchTerm, pagina: page },
+            dataType: 'json',
+            success: function(response) {
+                if (response.html) {
+                    $('#tablaUsuarios').html(response.html);
+                    $('#paginacionUsuarios').html(response.paginacion);
+                    $('#resultadosInfo').html('<i class="fas fa-users"></i> Total: ' + response.total + ' usuarios | Mostrando ' + response.mostrando);
+                }
+            },
+            error: function(xhr, status, error) {
+                $('#tablaUsuarios').html('<div class="alert alert-danger">Error al cargar los datos: ' + error + '</div>');
+            }
+        });
+    }
+    
+    // Búsqueda al escribir (con delay de 500ms)
+    $('#searchInput').on('keyup', function() {
+        var searchTerm = $(this).val();
+        clearTimeout(timeoutId);
+        
+        if (searchTerm.length >= 2 || searchTerm.length === 0) {
+            timeoutId = setTimeout(function() {
+                cargarUsuarios(searchTerm, 1);
+                if (searchTerm.length > 0) {
+                    $('#clearSearch').show();
+                } else {
+                    $('#clearSearch').hide();
+                }
+            }, 500);
+        }
+    });
+    
+    // Botón de búsqueda manual
+    $('#searchBtn').on('click', function() {
+        var searchTerm = $('#searchInput').val();
+        cargarUsuarios(searchTerm, 1);
+        if (searchTerm.length > 0) {
+            $('#clearSearch').show();
+        } else {
+            $('#clearSearch').hide();
+        }
+    });
+    
+    // Limpiar búsqueda
+    $('#clearSearch').on('click', function() {
+        $('#searchInput').val('');
+        cargarUsuarios('', 1);
+        $(this).hide();
+    });
+    
+    // Paginación dinámica
+    $(document).on('click', '#paginacionUsuarios .page-link', function(e) {
+        e.preventDefault();
+        var page = $(this).data('page');
+        var searchTerm = $('#searchInput').val();
+        if (page && !$(this).parent().hasClass('disabled')) {
+            cargarUsuarios(searchTerm, page);
+            $('html, body').animate({ scrollTop: $('#tablaUsuarios').offset().top - 100 }, 300);
+        }
+    });
+});
 </script>
 
 <?php include("footer_dios.php"); ?>
