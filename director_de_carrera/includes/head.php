@@ -197,10 +197,17 @@ if (!isLoggedIn() || !isUser()) {
               </a>
             </li>
 
-            <!-- NUEVO: Menú de Asignación de Voceros -->
+            <!-- Menú de Asignación de Voceros -->
             <li class="nav-item">
               <a title="Asignar Voceros Estudiantiles" class="nav-link" href="asignacion_voceros.php">
                 <i class="fas fa-users fa-fw"></i> Asignar Voceros
+              </a>
+            </li>
+
+            <!-- NUEVO: Menú de Asignación de Secciones a Docentes -->
+            <li class="nav-item">
+              <a title="Asignar Secciones a Docentes" class="nav-link" href="director_asignar_secciones.php">
+                <i class="fas fa-door-open fa-fw"></i> Asignar Secciones
               </a>
             </li>
 
