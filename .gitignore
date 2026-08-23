@@ -1,1 +1,6 @@
+# Archivos SQL locales y temporales
+*.sql
+**/*.sql
+
+# Configuración local con credenciales
 funciones/conexion.php
