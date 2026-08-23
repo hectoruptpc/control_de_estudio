@@ -238,7 +238,8 @@ $logo_empresag = '<img class="img-fluid" src="'.$pag_web.'/images/logoempresa.pn
 $logo_web_login = '<img class="img-fluid" src="'.$pag_web.'/images/logo.png" width="450" height="80">';
 $logo_uptpc = '<img class="img-fluid" src="'.$pag_web.'/images/uptpc.png" width="150" height="150">';
 $logo_uptpcp = '<img class="img-fluid" src="'.$pag_web.'/images/uptpc.png" width="25" height="25">';
-$logopertenencia = '<img class="img-fluid" src="'.$pag_web.'/images/educacion_universitaria.jpg" width="300" height="30">';
+$logopertenencia = '<img class="img-fluid logo-header" src="'.$pag_web.'/images/LOGO.png" style="height: 46px; max-height: 50px; width: auto; display: inline-block; vertical-align: middle;" alt="Logo">';
+$logo_footer = '<img class="img-fluid" src="'.$pag_web.'/images/educacion_universitaria.jpg" style="max-height: 35px; width: auto;" alt="Logo Footer">';
 $logopertenenciag = '<img class="img-fluid" src="'.$pag_web.'/images/logopertenenciag.png" width="700" height="100">';
  
  

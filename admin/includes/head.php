@@ -200,25 +200,6 @@ $admin_url = $base_url . '/admin';
         <div class="collapse navbar-collapse" id="navbarResponsive">
             <ul class="navbar-nav ml-auto">
                 
-                <!-- Inicio -->
-                <li class="nav-item">
-                    <a title="Cargar Inicio" class="nav-link" href="<?= $admin_url ?>/index.php">
-                        <i class="fas fa-home fa-fw"></i> Inicio
-                    </a>
-                </li>
-
-                <!-- Mensajería con notificación -->
-                <li class="nav-item nav-item-mensajes">
-                    <a title="Sistema de Mensajería" class="nav-link position-relative" href="<?= $admin_url ?>/mensajeria.php">
-                        <i class="fas fa-envelope fa-fw"></i> Mensajes
-                        <?php if ($mensajes_no_leidos > 0): ?>
-                            <span class="badge badge-danger badge-notificacion">
-                                <?= $mensajes_no_leidos ?>
-                            </span>
-                        <?php endif; ?>
-                    </a>
-                </li>
-
                 <!-- Pagos (individual) -->
                 <?php if (tienePermiso('pagos')): ?>
                 <li class="nav-item">
@@ -392,6 +373,18 @@ $admin_url = $base_url . '/admin';
                     </a>
                     <div class="dropdown-menu" aria-labelledby="navbarDropdownAjustes">
                         
+                        <!-- Mensajería -->
+                        <a title="Sistema de Mensajería" class="dropdown-item position-relative" href="<?= $admin_url ?>/mensajeria.php">
+                            <i class="fas fa-envelope fa-fw"></i> Mensajes
+                            <?php if ($mensajes_no_leidos > 0): ?>
+                                <span class="badge badge-danger badge-notificacion ml-2">
+                                    <?= $mensajes_no_leidos ?>
+                                </span>
+                            <?php endif; ?>
+                        </a>
+
+                        <div class="dropdown-divider"></div>
+
                         <!-- Cambiar Perfil -->
                         <a title="Cambiar Perfil de Usuario" class="dropdown-item" href="<?= $base_url ?>/profile_selector.php">
                             <i class="fas fa-user-edit fa-fw"></i> Cambiar Perfil

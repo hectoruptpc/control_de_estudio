@@ -716,11 +716,15 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('institutos').value = '';
     });
 
-    // Delegación de eventos para los botones de eliminar
-    document.getElementById('titulosInstitutosContainer').addEventListener('click', function(e) {
-        if(e.target.classList.contains('remove-field') || e.target.closest('.remove-field')) {
-            const button = e.target.classList.contains('remove-field') ? e.target : e.target.closest('.remove-field');
-            button.closest('.row').remove();
+    // Delegación universal de eventos para eliminar cualquier campo dinámico (títulos, especialidades, potencialidades)
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.remove-field');
+        if (btn) {
+            e.preventDefault();
+            const targetRow = btn.closest('.row, .form-group, .input-group');
+            if (targetRow) {
+                targetRow.remove();
+            }
         }
     });
 
@@ -845,10 +849,11 @@ document.addEventListener('DOMContentLoaded', function() {
             $('#institutosEdit').val('');
         });
         
-        // Eliminar campos en el modal
-        $(document).on('click', '.remove-field', function() {
-            $(this).closest('.row, .form-group').remove();
-        });
+    // Delegación global para eliminar campos dinámicos (funciona en formulario principal y modales)
+    $(document).on('click', '.remove-field', function(e) {
+        e.preventDefault();
+        $(this).closest('.row, .form-group').remove();
+    });
     }
     
     // Guardar cambios en el modal de edición: bind al submit del formulario cargado por AJAX

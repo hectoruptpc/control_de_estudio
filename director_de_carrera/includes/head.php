@@ -172,43 +172,26 @@ if (!isLoggedIn() || !isUser()) {
         </button>
         <div class="collapse navbar-collapse" id="navbarResponsive">
           <ul class="navbar-nav ml-auto">
-            <li class="nav-item">
-              <a title="Cargar Inicio" class="nav-link" href="index.php"><i class="fas fa-home fa-fw"></i> Inicio
-                <span class="sr-only">(current)</span>
-              </a>
-            </li>
+            
 
-            <!-- Icono de Mensajería con Notificación -->
-            <li class="nav-item nav-item-mensajes">
-              <a title="Sistema de Mensajería" class="nav-link position-relative" href="mensajeria.php">
-                <i class="fas fa-envelope fa-fw"></i> Mensajes
-                <?php if ($mensajes_no_leidos > 0): ?>
-                  <span class="badge badge-danger badge-notificacion">
-                    <?= $mensajes_no_leidos ?>
-                  </span>
-                <?php endif; ?>
-              </a>
-            </li>
+            
 
-            <!-- Menú de Asignación de Docentes -->
-            <li class="nav-item">
-              <a title="Asignar Docente al Programa" class="nav-link" href="asignacion_cursos.php">
-                <i class="fas fa-chalkboard-teacher fa-fw"></i> Asignar Docente
+            <!-- DROPDOWN: Asignar -->
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownAsignarDirector" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <i class="fas fa-tasks fa-fw"></i> Asignar
               </a>
-            </li>
-
-            <!-- Menú de Asignación de Voceros -->
-            <li class="nav-item">
-              <a title="Asignar Voceros Estudiantiles" class="nav-link" href="asignacion_voceros.php">
-                <i class="fas fa-users fa-fw"></i> Asignar Voceros
-              </a>
-            </li>
-
-            <!-- Menú de Asignación de Secciones a Docentes -->
-            <li class="nav-item">
-              <a title="Asignar Secciones a Docentes" class="nav-link" href="director_asignar_secciones.php">
-                <i class="fas fa-door-open fa-fw"></i> Asignar Secciones
-              </a>
+              <div class="dropdown-menu" aria-labelledby="navbarDropdownAsignarDirector">
+                <a class="dropdown-item" href="asignacion_cursos.php" title="Asignar Docente al Programa">
+                  <i class="fas fa-chalkboard-teacher fa-fw"></i> Asignar Docente
+                </a>
+                <a class="dropdown-item" href="asignacion_voceros.php" title="Asignar Voceros Estudiantiles">
+                  <i class="fas fa-users fa-fw"></i> Asignar Voceros
+                </a>
+                <a class="dropdown-item" href="director_asignar_secciones.php" title="Asignar Secciones a Docentes">
+                  <i class="fas fa-door-open fa-fw"></i> Asignar Secciones
+                </a>
+              </div>
             </li>
 
             <!-- ============================================ -->
@@ -235,6 +218,16 @@ if (!isLoggedIn() || !isUser()) {
                     <i class="fa fa-cogs fa-fw"></i> Ajustes
                 </a>
                 <div id="dropdown-ajustes-director-menu" class="dropdown-menu" aria-labelledby="navbarDropdownAjustesDirector">
+                    <!-- Mensajería -->
+                    <a title="Sistema de Mensajería" class="dropdown-item position-relative" href="mensajeria.php">
+                        <i class="fas fa-envelope fa-fw"></i> Mensajes
+                        <?php if ($mensajes_no_leidos > 0): ?>
+                            <span class="badge badge-danger badge-notificacion ml-2">
+                                <?= $mensajes_no_leidos ?>
+                            </span>
+                        <?php endif; ?>
+                    </a>
+                    <div class="dropdown-divider"></div>
                     <a title="Cambiar Perfil de Usuario" class="dropdown-item" href="../profile_selector.php">
                         <i class="fas fa-user-edit fa-fw"></i> Cambiar Perfil
                     </a>

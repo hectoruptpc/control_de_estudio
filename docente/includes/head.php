@@ -169,23 +169,10 @@ if (!isLoggedIn() || !isDocente()) {
 
         <div class="collapse navbar-collapse" id="navbarResponsive">
           <ul class="navbar-nav ml-auto">
-            <li class="nav-item">
-              <a title="Cargar Inicio" class="nav-link" href="index.php"><i class="fas fa-home fa-fw"></i> Inicio
-                <span class="sr-only">(current)</span>
-              </a>
-            </li>
+            
 
             <!-- Icono de Mensajería con Notificación para Docentes -->
-            <li class="nav-item nav-item-mensajes">
-              <a title="Sistema de Mensajería" class="nav-link position-relative" href="mensajeria.php">
-                <i class="fas fa-envelope fa-fw"></i> Mensajes
-                <?php if ($mensajes_no_leidos > 0): ?>
-                  <span class="badge badge-danger badge-notificacion">
-                    <?= $mensajes_no_leidos ?>
-                  </span>
-                <?php endif; ?>
-              </a>
-            </li>
+            
 
             <li id="dropdown-evaluaciones" class="nav-item dropdown">
               <a title="Gestión de Evaluaciones" class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">

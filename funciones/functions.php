@@ -7606,7 +7606,7 @@ function obtenerTiposVivienda($db) {
     }
 
     $viviendas = [];
-    $query = "SELECT id, vivienda FROM tipo_vivienda ORDER BY vivienda ASC";
+    $query = "SELECT id, vivienda FROM tipo_vivienda ORDER BY CASE WHEN LOWER(vivienda) LIKE '%otro%' THEN 1 ELSE 0 END ASC, id ASC";
     
     try {
         if (!$stmt = $db->prepare($query)) {
@@ -7641,7 +7641,7 @@ function obtenerTenenciaViviendas($db) {
     }
 
     $tenencias = [];
-    $query = "SELECT id, tenencia FROM tenencia_vivienda ORDER BY tenencia ASC";
+    $query = "SELECT id, tenencia FROM tenencia_vivienda ORDER BY CASE WHEN LOWER(tenencia) LIKE '%otro%' THEN 1 ELSE 0 END ASC, id ASC";
     
     try {
         if (!$stmt = $db->prepare($query)) {
@@ -7695,7 +7695,7 @@ function obtenerOpcionesStatus($db) {
 
 function obtenerIngresos($db) {
     $ingresos = [];
-    $query = "SELECT id, ingreso FROM ingresos ORDER BY id";
+    $query = "SELECT id, ingreso FROM ingresos ORDER BY CASE WHEN LOWER(ingreso) LIKE '%otro%' THEN 1 ELSE 0 END ASC, id ASC";
     $result = $db->query($query);
     
     while ($row = $result->fetch_assoc()) {
@@ -27812,43 +27812,48 @@ function login(){
 }
 
 function visita() {
-  global $pool, $nombrepag, $usua, $stmt_visita;
+  global $db, $pool, $nombrepag, $usua, $stmt_visita;
   try {
-      // Obtener una conexión del pool
-      $db = $pool->getConnection();
-      // Preparar la consulta para seleccionar el usuario
-      $query = "SELECT * FROM users WHERE username = ? LIMIT 1";
-      $stmt = $db->prepare($query);
-      $stmt->bind_param("s", $usua);
+      $conn = null;
+      if (isset($db) && $db instanceof mysqli) {
+          $conn = $db;
+      } elseif (isset($pool) && is_object($pool) && method_exists($pool, 'getConnection')) {
+          $conn = $pool->getConnection();
+      }
+      if (!$conn) return;
+
+      $usuario_buscar = !empty($usua) ? $usua : ($_SESSION['user']['username'] ?? '');
+      if (empty($usuario_buscar)) return;
+
+      $query = "SELECT id FROM users WHERE username = ? LIMIT 1";
+      $stmt = $conn->prepare($query);
+      if (!$stmt) return;
+      
+      $stmt->bind_param("s", $usuario_buscar);
       $stmt->execute();
       $results = $stmt->get_result();
-      if ($results !== null && $results->num_rows > 0) {
+      
+      if ($results && $results->num_rows > 0) {
           $logged_in_user = $results->fetch_assoc();
           $id_usuario = $logged_in_user['id'];
-          $ip = get_client_ip();
-          // Preparar la consulta para insertar la visita
+          $ip = function_exists('get_client_ip') ? get_client_ip() : ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
+          $web = !empty($nombrepag) ? $nombrepag : ($_SERVER['PHP_SELF'] ?? 'sitio');
+
           $query_visita = "INSERT INTO visitas (id, id_usuario, ip, fecha_visita, web) VALUES (null, ?, ?, NOW(), ?)";
-          $stmt_visita = $db->prepare($query_visita);
-          $stmt_visita->bind_param("iss", $id_usuario, $ip, $nombrepag);
-          $stmt_visita->execute();
-          if ($stmt_visita->error) {
-              // Manejo del error
-              echo 'Error al insertar la visita: ' . $stmt_visita->error;
+          $stmt_visita = $conn->prepare($query_visita);
+          if ($stmt_visita) {
+              $stmt_visita->bind_param("iss", $id_usuario, $ip, $web);
+              $stmt_visita->execute();
+              $stmt_visita->close();
           }
-      } else {
-          // Manejo del error
-          echo 'Error: no se encontró ningún usuario registrado con el nombre de usuario actual.';
       }
-      // Cerrar los statement y liberar la conexión
-      if ($stmt !== null) {
-          $stmt->close();
+      $stmt->close();
+
+      if (isset($pool) && is_object($pool) && method_exists($pool, 'releaseConnection') && $conn !== $db) {
+          $pool->releaseConnection($conn);
       }
-      if ($stmt_visita !== null) {
-          $stmt_visita->close();
-      }
-      $pool->releaseConnection($db);
-  } catch (Exception $e) {
-      echo "Error: " . $e->getMessage();
+  } catch (Throwable $e) {
+      error_log("Error en visita(): " . $e->getMessage());
   }
 }
 

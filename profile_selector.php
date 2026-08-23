@@ -140,6 +140,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['logout'])) {
             flex-wrap: wrap;
             gap: 10px;
         }
+        .btn-profile-card {
+            min-height: 170px !important;
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+        }
         @media (max-width: 768px) {
             .btn-back-container {
                 margin-left: 0;
@@ -185,12 +193,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['logout'])) {
         </div>
 
         <div class="row justify-content-center py-4">
-            <div class="col-md-8 col-lg-6">
-                <div class="card shadow">
+            <div class="col-md-10 col-lg-9">
+                <div class="card shadow border-0">
                     <div class="card-header bg-primary text-white">
                         <h4 class="mb-0 text-center">Selecciona tu perfil</h4>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body p-4">
                         <p class="text-center mb-4">Hola, <strong><?php echo sanitizeValue($username); ?></strong>. Tienes acceso a los siguientes perfiles:</p>
                         
                         <?php if (isset($error)): ?>
@@ -198,7 +206,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['logout'])) {
                         <?php endif; ?>
                         
                         <form method="POST" action="profile_selector.php">
-                            <div class="row">
+                            <div class="row g-3">
                                 <?php 
                                 if (!empty($availableProfiles)):
                                     foreach ($availableProfiles as $profile): 
@@ -207,7 +215,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['logout'])) {
                                         $profileSanitized = sanitizeValue($profileStr);
                                 ?>
                                     <div class="col-md-6 mb-3">
-                                        <button type="submit" name="profile" value="<?php echo $profileSanitized; ?>" class="btn btn-outline-primary w-100 py-4">
+                                        <button type="submit" name="profile" value="<?php echo $profileSanitized; ?>" class="btn btn-outline-primary w-100 py-3 btn-profile-card">
                                             <div class="profile-icon">
                                                 <?php 
                                                     switch($profileStr) {
