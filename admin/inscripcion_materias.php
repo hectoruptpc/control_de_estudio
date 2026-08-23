@@ -2,7 +2,7 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
-$titulopag = "Inscripción de Materias por Trayecto";
+$titulopag = "Inscripción de Materias por Trayecto - Individual";
 include('../funciones/functions.php');
 
 // CARGAR PERMISOS
@@ -49,21 +49,14 @@ $trayecto_actual = 0;
 $trayecto_inscripcion = 0;
 $estudiantes_encontrados = [];
 $es_estudiante_nuevo = false;
+$info_seccion_actual = null;
+$verificacion_avance = null;
+$puede_avanzar = false;
+$trayecto_siguiente = 0;
 
-// Variables para control de avance
-$cumple_requisitos = false;
-$detalles_requisitos = '';
-$total_materias = 0;
-$total_aprobadas = 0;
-$minimo_requerido = 0;
-$aprobacion_existente = false;
-$info_aprobacion = null;
-$historial_aprobaciones = [];
-
-// Procesar búsqueda por cédula (POST para seguridad)
+// Procesar búsqueda por cédula
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['buscar_cedula'])) {
-        // Validar CSRF token
         if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
             $mensaje = "Error de seguridad. Token inválido.";
             $tipo_mensaje = 'danger';
@@ -79,15 +72,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     if (is_array($resultados) && !empty($resultados)) {
                         if (isset($resultados['id'])) {
-                            // Un solo resultado
                             $estudiantes_encontrados = [$resultados];
                         } else {
-                            // Múltiples resultados
                             $estudiantes_encontrados = $resultados;
                         }
                         
                         if (count($estudiantes_encontrados) == 1) {
-                            // Seleccionar automáticamente si solo hay uno
                             $info_estudiante = obtenerInfoEstudiantePorId($estudiantes_encontrados[0]['id']);
                             $_SESSION['estudiante_seleccionado'] = $info_estudiante['id'];
                         }
@@ -105,7 +95,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Procesar selección de estudiante
     if (isset($_POST['seleccionar_estudiante'])) {
-        // Validar CSRF token
         if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
             $mensaje = "Error de seguridad. Token inválido.";
             $tipo_mensaje = 'danger';
@@ -114,7 +103,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($id_estudiante > 0) {
                 $info_estudiante = obtenerInfoEstudiantePorId($id_estudiante);
-
                 if ($info_estudiante) {
                     $_SESSION['estudiante_seleccionado'] = $info_estudiante['id'];
                 } else {
@@ -122,17 +110,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $tipo_mensaje = 'danger';
                 }
             } else {
-                // Limpiar selección: eliminar variable de sesión y limpiar variables relacionadas
                 unset($_SESSION['estudiante_seleccionado']);
                 $info_estudiante = null;
-                $materias_disponibles = [];
-                $secciones_disponibles = [];
-                $materias_aprobadas = [];
-                $materias_inscritas = [];
-                $historial_secciones = [];
-                $trayecto_actual = 0;
-                $trayecto_inscripcion = 0;
-                $es_estudiante_nuevo = false;
                 $mensaje = "Selección de estudiante limpiada.";
                 $tipo_mensaje = 'info';
             }
@@ -141,7 +120,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Procesar inscripción de materias
     if (isset($_POST['inscribir_materias'])) {
-        // Validar CSRF token
         if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
             $mensaje = "Error de seguridad. Token inválido.";
             $tipo_mensaje = 'danger';
@@ -150,239 +128,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id_seccion = intval($_POST['id_seccion'] ?? 0);
             $materias_ids = isset($_POST['materias']) ? array_map('intval', $_POST['materias']) : [];
             
-            // Debug logging
-            error_log("=== PROCESANDO INSCRIPCIÓN ===");
-            error_log("Estudiante ID: $id_estudiante");
-            error_log("Sección ID: $id_seccion");
-            error_log("Materias IDs: " . implode(', ', $materias_ids));
-            
             if ($id_estudiante > 0 && !empty($materias_ids)) {
-                // Obtener información del estudiante para debug
-                $info_temp = obtenerInfoEstudiantePorId($id_estudiante);
-                error_log("Info estudiante: " . json_encode($info_temp));
-                
-                // Llamar a la función de inscripción
                 $resultado = inscribirMateriasEstudiante($id_estudiante, $id_seccion, $materias_ids);
                 
                 if ($resultado) {
                     $mensaje = "✅ Materias inscritas correctamente para el estudiante.";
                     $tipo_mensaje = 'success';
-                    
-                    // Actualizar información del estudiante
                     $info_estudiante = obtenerInfoEstudiantePorId($id_estudiante);
-                    
-                    // Actualizar listas
-                    $materias_inscritas = obtenerMateriasInscritasActuales($id_estudiante);
-                    
-                    // Volver a obtener datos actualizados
-                    if ($info_estudiante) {
-                        $id_carrera = $info_estudiante['carrera'] ?? $info_estudiante['id_carrera'] ?? 0;
-                        $es_estudiante_nuevo = esEstudianteNuevo($info_estudiante['id']);
-                        $trayecto_actual = obtenerTrayectoActual($info_estudiante['id'], $id_carrera);
-                        
-                        // Obtener datos actualizados
-                        if ($id_carrera > 0) {
-                            $resultado_requisitos = verificarRequisitosTrayecto($info_estudiante['id'], $trayecto_actual, $id_carrera);
-                            $cumple_requisitos = $resultado_requisitos['cumple_requisitos'];
-                            $detalles_requisitos = $resultado_requisitos['detalles'];
-                            $total_materias = $resultado_requisitos['total_materias'];
-                            $total_aprobadas = $resultado_requisitos['total_aprobadas'];
-                            $minimo_requerido = $resultado_requisitos['minimo_requerido'] ?? 0;
-                            
-                            $aprobacion_existente = verificarAprobacionExistente($info_estudiante['id'], $id_carrera, $trayecto_actual);
-                            $info_aprobacion = $aprobacion_existente ? $aprobacion_existente : null;
-                            $historial_aprobaciones = obtenerHistorialAprobaciones($info_estudiante['id'], $id_carrera);
-                        }
-                        
-                        $materias_aprobadas = obtenerMateriasAprobadas($info_estudiante['id'], $trayecto_actual);
-                        $trayecto_inscripcion = $trayecto_actual;
-                        
-                        if ($periodo_activo && $id_carrera > 0) {
-                            $secciones_disponibles = obtenerSeccionesTrayecto($id_carrera, $trayecto_inscripcion, $periodo_activo['id_periodo']);
-                        }
-                        
-                        if ($id_carrera > 0) {
-                            $materias_disponibles = obtenerMateriasParaInscripcion(
-                                $info_estudiante['id'], 
-                                $trayecto_actual, 
-                                $id_carrera, 
-                                $es_estudiante_nuevo
-                            );
-                        }
-                        
-                        $historial_secciones = obtenerHistorialSecciones($info_estudiante['id']);
-                    }
-                    
-                    error_log("✅ Inscripción completada exitosamente");
                 } else {
                     $mensaje = "❌ Error al inscribir las materias. Por favor intente nuevamente.";
                     $tipo_mensaje = 'danger';
-                    error_log("❌ Inscripción fallida");
                 }
             } else {
                 $mensaje = "⚠️ Debe seleccionar al menos una materia para inscribir.";
                 $tipo_mensaje = 'warning';
-                
-                // Debug de qué falta
-                if ($id_estudiante <= 0) error_log("⚠️ Falta estudiante ID");
-                if (empty($materias_ids)) error_log("⚠️ Falta materias");
             }
         }
     }
     
-    // Procesar aprobación de avance de trayecto
-    if (isset($_POST['aprobar_avance'])) {
-        // Validar CSRF token
+    // Procesar avance de estudiante individual
+    if (isset($_POST['avanzar_estudiante_trayecto'])) {
         if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
             $mensaje = "Error de seguridad. Token inválido.";
             $tipo_mensaje = 'danger';
         } else {
             $id_estudiante = intval($_POST['id_estudiante'] ?? 0);
-            $trayecto_actual_post = intval($_POST['trayecto_actual'] ?? 0);
-            $motivo = trim($_POST['motivo_aprobacion'] ?? '');
             
-            if ($id_estudiante > 0 && $trayecto_actual_post >= 0) {
-                // Obtener información actualizada del estudiante
-                $info_estudiante_temp = obtenerInfoEstudiantePorId($id_estudiante);
-                $id_carrera = $info_estudiante_temp['carrera'] ?? $info_estudiante_temp['id_carrera'] ?? 0;
+            if ($id_estudiante > 0) {
+                $id_admin = $_SESSION['user_id'] ?? 0;
+                $resultado = avanzarEstudianteTrayecto($id_estudiante, $id_admin);
                 
-                if ($id_carrera > 0) {
-                    $resultado = aprobarAvanceTrayecto($id_estudiante, $id_carrera, $trayecto_actual_post, $motivo);
-                    
-                    if ($resultado['success']) {
-                        $mensaje = "✅ " . $resultado['message'];
-                        $tipo_mensaje = 'success';
-                        
-                        // Actualizar información del estudiante
-                        $info_estudiante = $info_estudiante_temp;
-                        
-                        // Recargar datos actualizados
-                        if ($info_estudiante) {
-                            $id_carrera = $info_estudiante['carrera'] ?? $info_estudiante['id_carrera'] ?? 0;
-                            $es_estudiante_nuevo = esEstudianteNuevo($info_estudiante['id']);
-                            $trayecto_actual = obtenerTrayectoActual($info_estudiante['id'], $id_carrera);
-                            
-                            // Obtener datos actualizados
-                            if ($id_carrera > 0) {
-                                $resultado_requisitos = verificarRequisitosTrayecto($info_estudiante['id'], $trayecto_actual, $id_carrera);
-                                $cumple_requisitos = $resultado_requisitos['cumple_requisitos'];
-                                $detalles_requisitos = $resultado_requisitos['detalles'];
-                                $total_materias = $resultado_requisitos['total_materias'];
-                                $total_aprobadas = $resultado_requisitos['total_aprobadas'];
-                                $minimo_requerido = $resultado_requisitos['minimo_requerido'] ?? 0;
-                                
-                                $aprobacion_existente = verificarAprobacionExistente($info_estudiante['id'], $id_carrera, $trayecto_actual);
-                                $info_aprobacion = $aprobacion_existente ? $aprobacion_existente : null;
-                                $historial_aprobaciones = obtenerHistorialAprobaciones($info_estudiante['id'], $id_carrera);
-                            }
-                            
-                            $materias_aprobadas = obtenerMateriasAprobadas($info_estudiante['id'], $trayecto_actual);
-                            $trayecto_inscripcion = $trayecto_actual;
-                            
-                            if ($periodo_activo && $id_carrera > 0) {
-                                $secciones_disponibles = obtenerSeccionesTrayecto($id_carrera, $trayecto_inscripcion, $periodo_activo['id_periodo']);
-                            }
-                            
-                            if ($id_carrera > 0) {
-                                $materias_disponibles = obtenerMateriasParaInscripcion(
-                                    $info_estudiante['id'], 
-                                    $trayecto_actual, 
-                                    $id_carrera, 
-                                    $es_estudiante_nuevo
-                                );
-                            }
-                            
-                            $materias_inscritas = obtenerMateriasInscritasActuales($info_estudiante['id']);
-                            $historial_secciones = obtenerHistorialSecciones($info_estudiante['id']);
-                        }
-                    } else {
-                        $mensaje = "❌ " . $resultado['message'];
-                        $tipo_mensaje = 'danger';
-                    }
+                if ($resultado['success']) {
+                    $mensaje = "✅ " . $resultado['message'];
+                    $tipo_mensaje = 'success';
+                    $info_estudiante = obtenerInfoEstudiantePorId($id_estudiante);
                 } else {
-                    $mensaje = "❌ Error: El estudiante no tiene una carrera asignada.";
+                    $mensaje = "❌ " . $resultado['message'];
                     $tipo_mensaje = 'danger';
                 }
-            } else {
-                $mensaje = "⚠️ Datos incompletos para aprobar avance.";
-                $tipo_mensaje = 'warning';
-            }
-        }
-    }
-    
-    // Procesar rechazo de avance de trayecto
-    if (isset($_POST['rechazar_avance'])) {
-        // Validar CSRF token
-        if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-            $mensaje = "Error de seguridad. Token inválido.";
-            $tipo_mensaje = 'danger';
-        } else {
-            $id_estudiante = intval($_POST['id_estudiante'] ?? 0);
-            $trayecto_actual_post = intval($_POST['trayecto_actual'] ?? 0);
-            
-            if ($id_estudiante > 0 && $trayecto_actual_post >= 0) {
-                // Obtener información actualizada del estudiante
-                $info_estudiante_temp = obtenerInfoEstudiantePorId($id_estudiante);
-                $id_carrera = $info_estudiante_temp['carrera'] ?? $info_estudiante_temp['id_carrera'] ?? 0;
-                
-                if ($id_carrera > 0) {
-                    if (rechazarAvanceTrayecto($id_estudiante, $id_carrera, $trayecto_actual_post)) {
-                        $mensaje = "✅ Aprobación de avance eliminada correctamente.";
-                        $tipo_mensaje = 'success';
-                        
-                        // Actualizar información del estudiante
-                        $info_estudiante = $info_estudiante_temp;
-                        
-                        // Recargar datos actualizados
-                        if ($info_estudiante) {
-                            $id_carrera = $info_estudiante['carrera'] ?? $info_estudiante['id_carrera'] ?? 0;
-                            $es_estudiante_nuevo = esEstudianteNuevo($info_estudiante['id']);
-                            $trayecto_actual = obtenerTrayectoActual($info_estudiante['id'], $id_carrera);
-                            
-                            // Obtener datos actualizados
-                            if ($id_carrera > 0) {
-                                $resultado_requisitos = verificarRequisitosTrayecto($info_estudiante['id'], $trayecto_actual, $id_carrera);
-                                $cumple_requisitos = $resultado_requisitos['cumple_requisitos'];
-                                $detalles_requisitos = $resultado_requisitos['detalles'];
-                                $total_materias = $resultado_requisitos['total_materias'];
-                                $total_aprobadas = $resultado_requisitos['total_aprobadas'];
-                                $minimo_requerido = $resultado_requisitos['minimo_requerido'] ?? 0;
-                                
-                                $aprobacion_existente = verificarAprobacionExistente($info_estudiante['id'], $id_carrera, $trayecto_actual);
-                                $info_aprobacion = $aprobacion_existente ? $aprobacion_existente : null;
-                                $historial_aprobaciones = obtenerHistorialAprobaciones($info_estudiante['id'], $id_carrera);
-                            }
-                            
-                            $materias_aprobadas = obtenerMateriasAprobadas($info_estudiante['id'], $trayecto_actual);
-                            $trayecto_inscripcion = $trayecto_actual;
-                            
-                            if ($periodo_activo && $id_carrera > 0) {
-                                $secciones_disponibles = obtenerSeccionesTrayecto($id_carrera, $trayecto_inscripcion, $periodo_activo['id_periodo']);
-                            }
-                            
-                            if ($id_carrera > 0) {
-                                $materias_disponibles = obtenerMateriasParaInscripcion(
-                                    $info_estudiante['id'], 
-                                    $trayecto_actual, 
-                                    $id_carrera, 
-                                    $es_estudiante_nuevo
-                                );
-                            }
-                            
-                            $materias_inscritas = obtenerMateriasInscritasActuales($info_estudiante['id']);
-                            $historial_secciones = obtenerHistorialSecciones($info_estudiante['id']);
-                        }
-                    } else {
-                        $mensaje = "❌ Error al eliminar la aprobación de avance.";
-                        $tipo_mensaje = 'danger';
-                    }
-                } else {
-                    $mensaje = "❌ Error: No se pudo obtener información de carrera.";
-                    $tipo_mensaje = 'danger';
-                }
-            } else {
-                $mensaje = "⚠️ Datos incompletos para rechazar avance.";
-                $tipo_mensaje = 'warning';
             }
         }
     }
@@ -393,59 +176,68 @@ if (isset($_SESSION['estudiante_seleccionado']) && empty($info_estudiante)) {
     $info_estudiante = obtenerInfoEstudiantePorId($_SESSION['estudiante_seleccionado']);
 }
 
-// Si hay información del estudiante, cargar datos académicos
-if ($info_estudiante) {
+// Función para cargar todos los datos del estudiante
+function cargarDatosEstudiante($info_estudiante) {
+    global $db, $periodo_activo, $materias_disponibles, $secciones_disponibles, 
+           $materias_aprobadas, $materias_inscritas, $historial_secciones, 
+           $trayecto_actual, $trayecto_inscripcion, $es_estudiante_nuevo, 
+           $info_seccion_actual, $verificacion_avance, $puede_avanzar, $trayecto_siguiente;
+    
+    if (!$info_estudiante) return;
+    
     $id_carrera = $info_estudiante['carrera'] ?? $info_estudiante['id_carrera'] ?? 0;
+    $id_usuario = $info_estudiante['id'];
     
-    // Verificar si es estudiante nuevo (sin notas ni inscripciones)
-    $es_estudiante_nuevo = esEstudianteNuevo($info_estudiante['id']);
+    // OBTENER SECCIÓN ACTUAL
+    $info_seccion_actual = obtenerSeccionActualEstudiante($id_usuario);
     
-    // Obtener trayecto actual (siempre empieza en 0, luego según aprobaciones)
-    $trayecto_actual = obtenerTrayectoActual($info_estudiante['id'], $id_carrera);
+    // OBTENER TRAYECTO DESDE LA SECCIÓN
+    $info_trayecto = obtenerTrayectoDesdeSeccion($id_usuario);
+    $trayecto_actual = $info_trayecto['trayecto'];
     
-    // Verificar requisitos para avanzar
-    if ($id_carrera > 0) {
-        $resultado_requisitos = verificarRequisitosTrayecto($info_estudiante['id'], $trayecto_actual, $id_carrera);
-        $cumple_requisitos = $resultado_requisitos['cumple_requisitos'];
-        $detalles_requisitos = $resultado_requisitos['detalles'];
-        $total_materias = $resultado_requisitos['total_materias'];
-        $total_aprobadas = $resultado_requisitos['total_aprobadas'];
-        $minimo_requerido = $resultado_requisitos['minimo_requerido'] ?? 0;
-        
-        // Verificar si ya existe aprobación para este trayecto
-        $aprobacion_existente = verificarAprobacionExistente($info_estudiante['id'], $id_carrera, $trayecto_actual);
-        $info_aprobacion = $aprobacion_existente ? $aprobacion_existente : null;
-        
-        // Obtener historial de aprobaciones
-        $historial_aprobaciones = obtenerHistorialAprobaciones($info_estudiante['id'], $id_carrera);
+    // Si no tiene sección, usar sistema de aprobaciones
+    if ($trayecto_actual == 0 && !$info_seccion_actual) {
+        $trayecto_actual = obtenerTrayectoActual($id_usuario, $id_carrera);
     }
     
-    // Obtener materias aprobadas en el trayecto actual
-    $materias_aprobadas = obtenerMateriasAprobadas($info_estudiante['id'], $trayecto_actual);
+    // Verificar si es estudiante nuevo
+    $es_estudiante_nuevo = esEstudianteNuevo($id_usuario);
     
-    // Determinar trayecto para inscripción
-    $trayecto_inscripcion = $trayecto_actual;
+    // VERIFICAR SI PUEDE AVANZAR (IGUAL QUE EN SECCIONES)
+    $verificacion_avance = verificarAvancePorSeccion($id_usuario);
+    $puede_avanzar = $verificacion_avance['puede_avanzar'];
+    $trayecto_siguiente = $trayecto_actual + 1;
     
-    // Obtener secciones disponibles
+    // DETERMINAR TRAYECTO PARA INSCRIPCIÓN
+    if ($puede_avanzar && $trayecto_actual < 4) {
+        $trayecto_inscripcion = $trayecto_actual + 1;
+    } else {
+        $trayecto_inscripcion = $trayecto_actual;
+    }
+    
+    // OBTENER MATERIAS APROBADAS
+    $materias_aprobadas = obtenerMateriasAprobadasPorTrayecto($id_usuario, $trayecto_actual);
+    
+    // OBTENER SECCIONES DISPONIBLES
     if ($periodo_activo && $id_carrera > 0) {
         $secciones_disponibles = obtenerSeccionesTrayecto($id_carrera, $trayecto_inscripcion, $periodo_activo['id_periodo']);
     }
     
-    // Obtener materias para inscripción (solo las NO inscritas actualmente)
+    // OBTENER MATERIAS PARA INSCRIPCIÓN
     if ($id_carrera > 0) {
-        $materias_disponibles = obtenerMateriasParaInscripcion(
-            $info_estudiante['id'], 
-            $trayecto_actual, 
-            $id_carrera, 
-            $es_estudiante_nuevo
-        );
+        $materias_disponibles = obtenerMateriasDisponiblesIndividual($id_usuario, $trayecto_inscripcion, $id_carrera);
     }
     
-    // Obtener materias inscritas actualmente en el período activo
-    $materias_inscritas = obtenerMateriasInscritasActuales($info_estudiante['id']);
+    // OBTENER MATERIAS INSCRITAS
+    $materias_inscritas = obtenerMateriasInscritasActuales($id_usuario);
     
-    // Obtener historial de secciones
-    $historial_secciones = obtenerHistorialSecciones($info_estudiante['id']);
+    // OBTENER HISTORIAL
+    $historial_secciones = obtenerHistorialSecciones($id_usuario);
+}
+
+// Cargar datos del estudiante si existe
+if ($info_estudiante) {
+    cargarDatosEstudiante($info_estudiante);
 }
 
 // Mostrar mensajes
@@ -530,7 +322,6 @@ if (!empty($mensaje)) {
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle"></i> Se encontraron <?php echo count($estudiantes_encontrados); ?> estudiantes. Seleccione uno:
                     </div>
-                    
                     <div class="table-responsive">
                         <table class="table table-bordered table-hover">
                             <thead class="thead-light">
@@ -605,9 +396,6 @@ if (!empty($mensaje)) {
                         <div class="col-md-3">
                             <p><strong>Trayecto Actual:</strong> 
                                 <span class="badge badge-info"><?php echo $trayecto_actual; ?></span>
-                                <?php if ($es_estudiante_nuevo): ?>
-                                    <span class="badge badge-success">NUEVO</span>
-                                <?php endif; ?>
                             </p>
                         </div>
                     </div>
@@ -632,67 +420,137 @@ if (!empty($mensaje)) {
                             </p>
                         </div>
                     </div>
-                    
-                    <!-- Historial de aprobaciones -->
-                    <?php if (!empty($historial_aprobaciones)): ?>
-                    <div class="mt-3">
-                        <h6><i class="fas fa-history mr-1"></i> Historial de Aprobaciones de Trayecto:</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-bordered">
-                                <thead>
-                                    <tr>
-                                        <th>Trayecto Aprobado</th>
-                                        <th>Aprobado por</th>
-                                        <th>Fecha Aprobación</th>
-                                        <th>Motivo</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($historial_aprobaciones as $aprobacion): ?>
-                                    <tr>
-                                        <td>Trayecto <?php echo $aprobacion['trayecto_actual']; ?></td>
-                                        <td><?php echo htmlspecialchars($aprobacion['nombre_aprobador'] ?? 'Administrador'); ?></td>
-                                        <td><?php echo isset($aprobacion['fecha_aprobacion']) ? date('d/m/Y H:i', strtotime($aprobacion['fecha_aprobacion'])) : 'N/A'; ?></td>
-                                        <td><?php echo !empty($aprobacion['motivo']) ? htmlspecialchars($aprobacion['motivo']) : 'Sin motivo especificado'; ?></td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información de Sección Actual -->
+    <?php if ($info_seccion_actual): ?>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4 border-primary">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-users mr-1"></i>
+                    Sección Actual del Estudiante
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <p><strong>Código Sección:</strong> <?php echo htmlspecialchars($info_seccion_actual['codigo_seccion']); ?></p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>Trayecto:</strong> <span class="badge badge-info"><?php echo $info_seccion_actual['numero_trayecto']; ?></span></p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>Período:</strong> <?php echo htmlspecialchars($info_seccion_actual['nombre_periodo'] ?? 'No definido'); ?></p>
+                        </div>
+                        <div class="col-md-3">
+                            <p><strong>Estado:</strong> <span class="badge badge-success">ACTIVA</span></p>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- ESTADO ACADÉMICO (IGUAL QUE EN SECCIONES) -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <i class="fas fa-chart-line mr-1"></i>
+                    Estado Académico - Trayecto <?php echo $trayecto_actual; ?>
+                    <?php if ($es_estudiante_nuevo): ?>
+                        <span class="badge badge-light float-right">ESTUDIANTE NUEVO</span>
+                    <?php endif; ?>
+                </div>
+                <div class="card-body">
+                    <?php if ($trayecto_actual == 0 && $es_estudiante_nuevo): ?>
+                        <div class="alert alert-primary">
+                            <h5 class="alert-heading"><i class="fas fa-user-plus"></i> Estudiante Nuevo</h5>
+                            <p>Este estudiante no tiene historial académico. Se inscribirá en el <strong>Trayecto 0</strong> por primera vez.</p>
+                            <p class="mb-0"><strong>Condición para avanzar al Trayecto 1:</strong> Aprobar al menos el 50% de las materias del trayecto 0.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="alert <?php echo ($puede_avanzar && $trayecto_actual < 4) ? 'alert-success' : 'alert-warning'; ?>">
+                            <h5 class="alert-heading">
+                                <i class="fas fa-<?php echo ($puede_avanzar && $trayecto_actual < 4) ? 'check-circle' : 'exclamation-circle'; ?>"></i>
+                                <?php if ($puede_avanzar && $trayecto_actual < 4): ?>
+                                    ¡Cumple requisitos para avanzar al Trayecto <?php echo $trayecto_siguiente; ?>!
+                                <?php elseif ($trayecto_actual >= 4): ?>
+                                    ¡El estudiante ha completado todos los trayectos!
+                                <?php else: ?>
+                                    No cumple requisitos para avanzar al siguiente trayecto
+                                <?php endif; ?>
+                            </h5>
+                            <p class="mb-0">
+                                <strong>Condición para avanzar:</strong><br>
+                                <?php echo $verificacion_avance['detalles'] ?? 'Verificando requisitos...'; ?>
+                            </p>
+                            
+                            <!-- BOTÓN DE AVANZAR (IGUAL QUE EN SECCIONES) -->
+                            <?php if ($puede_avanzar && $trayecto_actual < 4): ?>
+                                <hr>
+                                <form method="POST" action="" class="mt-3">
+                                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                    <input type="hidden" name="id_estudiante" value="<?php echo $info_estudiante['id']; ?>">
+                                    
+                                    <div class="form-group">
+                                        <label for="motivo_aprobacion"><small>Motivo de aprobación (opcional):</small></label>
+                                        <textarea class="form-control form-control-sm" 
+                                                  id="motivo_aprobacion" 
+                                                  name="motivo_aprobacion" 
+                                                  rows="2" 
+                                                  placeholder="Ej: Cumple todos los requisitos académicos"></textarea>
+                                    </div>
+                                    
+                                    <button type="submit" name="avanzar_estudiante_trayecto" class="btn btn-success btn-lg">
+                                        <i class="fas fa-arrow-right mr-1"></i> AVANZAR AL TRAYECTO <?php echo $trayecto_siguiente; ?>
+                                    </button>
+                                    
+                                    <small class="d-block text-muted mt-1">
+                                        <i class="fas fa-info-circle"></i> Esta acción creará una nueva sección e inscribirá automáticamente las materias del Trayecto <?php echo $trayecto_siguiente; ?>.
+                                    </small>
+                                </form>
+                            <?php elseif ($trayecto_actual >= 4): ?>
+                                <hr>
+                                <div class="alert alert-success">
+                                    <i class="fas fa-graduation-cap"></i> 
+                                    <strong>¡Felicidades!</strong> El estudiante ha completado todos los trayectos de la carrera.
+                                </div>
+                            <?php endif; ?>
+                        </div>
                     <?php endif; ?>
                     
-                    <!-- Historial de secciones -->
-                    <?php if (!empty($historial_secciones)): ?>
+                    <!-- Mostrar progreso -->
+                    <?php if (isset($verificacion_avance['total_materias']) && $verificacion_avance['total_materias'] > 0): ?>
                     <div class="mt-3">
-                        <h6><i class="fas fa-book mr-1"></i> Historial de Inscripciones en Secciones:</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-bordered">
-                                <thead>
-                                    <tr>
-                                        <th>Período</th>
-                                        <th>Sección</th>
-                                        <th>Trayecto</th>
-                                        <th>Fecha Inscripción</th>
-                                        <th>Estado</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($historial_secciones as $historial): ?>
-                                    <tr>
-                                        <td><?php echo htmlspecialchars($historial['nombre_periodo'] ?? 'Desconocido'); ?></td>
-                                        <td><?php echo htmlspecialchars($historial['codigo_seccion'] ?? 'Sin sección'); ?></td>
-                                        <td><?php echo $historial['id_trayecto'] ?? '0'; ?></td>
-                                        <td><?php echo isset($historial['fecha_inscripcion']) ? date('d/m/Y', strtotime($historial['fecha_inscripcion'])) : 'Sin fecha'; ?></td>
-                                        <td>
-                                            <span class="badge badge-<?php echo ($historial['estatus'] ?? '') == 'Activo' ? 'success' : 'secondary'; ?>">
-                                                <?php echo $historial['estatus'] ?? 'Desconocido'; ?>
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
+                        <strong>Progreso del Trayecto <?php echo $trayecto_actual; ?>:</strong>
+                        <?php 
+                        $total = $verificacion_avance['total_materias'];
+                        $aprobadas = $verificacion_avance['total_aprobadas'];
+                        $porcentaje = ($total > 0) ? ($aprobadas / $total) * 100 : 0;
+                        ?>
+                        <div class="progress mt-2" style="height: 25px;">
+                            <div class="progress-bar bg-success" role="progressbar" 
+                                 style="width: <?php echo $porcentaje; ?>%" 
+                                 aria-valuenow="<?php echo $porcentaje; ?>" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                                <?php echo number_format($porcentaje, 1); ?>%
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between mt-1">
+                            <small class="text-muted">
+                                <?php echo $aprobadas; ?> de <?php echo $total; ?> materias aprobadas
+                            </small>
+                            <?php if (isset($verificacion_avance['minimo_requerido']) && $verificacion_avance['minimo_requerido'] > 0): ?>
+                            <small class="text-muted">
+                                Mínimo requerido: <?php echo $verificacion_avance['minimo_requerido']; ?> materias
+                            </small>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <?php endif; ?>
@@ -700,6 +558,52 @@ if (!empty($mensaje)) {
             </div>
         </div>
     </div>
+
+    <!-- Materias aprobadas -->
+    <?php if (!empty($materias_aprobadas)): ?>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-check-circle mr-1"></i>
+                    Materias Aprobadas - Trayecto <?php echo $trayecto_actual; ?>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Materia</th>
+                                    <th>Créditos</th>
+                                    <th>Período</th>
+                                    <th>Tipo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($materias_aprobadas as $materia): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($materia['cod_materia']); ?></td>
+                                    <td><?php echo htmlspecialchars($materia['nombre_materia']); ?></td>
+                                    <td><?php echo $materia['creditos']; ?></td>
+                                    <td><?php echo htmlspecialchars($materia['nombre_periodo'] ?? 'N/A'); ?></td>
+                                    <td>
+                                        <?php if ($materia['es_proyecto']): ?>
+                                            <span class="badge badge-warning">PROYECTO</span>
+                                        <?php else: ?>
+                                            <span class="badge badge-info">NORMAL</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- Materias inscritas actualmente -->
     <?php if (!empty($materias_inscritas) && $periodo_activo): ?>
@@ -727,10 +631,8 @@ if (!empty($mensaje)) {
                             <tbody>
                                 <?php foreach ($materias_inscritas as $materia): 
                                     $nota_minima = obtenerNotaMinimaMateria($materia['id_materia']);
-                                    $es_proyecto = esProyectoSocio($materia['id_materia']);
-                                    
-                                    // Obtener información de la nota actual si existe
-                                    $nota_actual = obtenerNotaMateriaActual($info_estudiante['id'], $materia['id_materia']);
+                                    $es_proyecto = $materia['es_proyecto'] ?? false;
+                                    $nota_actual = obtenerNotaMateriaActualPeriodo($info_estudiante['id'], $materia['id_materia']);
                                     $estado_nota = ($nota_actual === null) ? 'Sin calificar' : 
                                         ((($es_proyecto && $nota_actual >= 16) || (!$es_proyecto && $nota_actual >= 12)) 
                                             ? 'Aprobada' 
@@ -775,170 +677,60 @@ if (!empty($mensaje)) {
     </div>
     <?php endif; ?>
 
-    <!-- Paneles de estado e inscripción -->
+    <!-- Historial de secciones -->
+    <?php if (!empty($historial_secciones)): ?>
     <div class="row">
-        <div class="col-md-6">
+        <div class="col-md-12">
             <div class="card mb-4">
-                <div class="card-header bg-info text-white">
-                    <i class="fas fa-chart-line mr-1"></i>
-                    Estado Académico - Trayecto <?php echo $trayecto_actual; ?>
-                    <?php if ($es_estudiante_nuevo): ?>
-                        <span class="badge badge-light float-right">ESTUDIANTE NUEVO</span>
-                    <?php endif; ?>
+                <div class="card-header bg-secondary text-white">
+                    <i class="fas fa-history mr-1"></i>
+                    Historial de Secciones del Estudiante
                 </div>
                 <div class="card-body">
-                    <?php if ($es_estudiante_nuevo): ?>
-                        <div class="alert alert-primary">
-                            <h5 class="alert-heading"><i class="fas fa-user-plus"></i> Estudiante Nuevo</h5>
-                            <p>Este estudiante no tiene historial académico. Se inscribirá en el <strong>Trayecto 0</strong> por primera vez.</p>
-                            <p class="mb-0"><strong>Condición para avanzar al Trayecto 1:</strong> Aprobar al menos el 50% de las materias del trayecto 0.</p>
-                        </div>
-                    <?php else: ?>
-                        <div class="alert <?php echo $cumple_requisitos ? 'alert-success' : 'alert-warning'; ?>">
-                            <h5 class="alert-heading">
-                                <i class="fas fa-<?php echo $cumple_requisitos ? 'check-circle' : 'exclamation-circle'; ?>"></i>
-                                <?php 
-                                if ($aprobacion_existente) {
-                                    echo "¡Avance APROBADO al Trayecto " . ($trayecto_actual + 1) . "!";
-                                } elseif ($cumple_requisitos) {
-                                    echo "¡Cumple requisitos para avanzar al Trayecto " . ($trayecto_actual + 1) . "!";
-                                } else {
-                                    echo "No cumple requisitos para avanzar al siguiente trayecto";
-                                }
-                                ?>
-                            </h5>
-                            <p class="mb-0">
-                                <strong>Condición para avanzar:</strong><br>
-                                <?php echo $detalles_requisitos; ?>
-                            </p>
-                            
-                            <?php if ($aprobacion_existente): ?>
-                                <hr>
-                                <div class="alert alert-info">
-                                    <i class="fas fa-user-check"></i> 
-                                    <strong>Avance ya aprobado:</strong>
-                                    <ul class="mb-0 pl-3">
-                                        <li>Aprobado por: <?php echo htmlspecialchars($info_aprobacion['nombre_aprobador']); ?></li>
-                                        <li>Fecha: <?php echo date('d/m/Y H:i', strtotime($info_aprobacion['fecha_aprobacion'])); ?></li>
-                                        <?php if (!empty($info_aprobacion['motivo'])): ?>
-                                            <li>Motivo: <?php echo htmlspecialchars($info_aprobacion['motivo']); ?></li>
-                                        <?php endif; ?>
-                                    </ul>
-                                    
-                                    <!-- Botón para revocar aprobación -->
-                                    <?php if ($trayecto_actual < 4): ?>
-                                    <form method="POST" action="" class="mt-2">
-                                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-                                        <input type="hidden" name="id_estudiante" value="<?php echo $info_estudiante['id']; ?>">
-                                        <input type="hidden" name="trayecto_actual" value="<?php echo $trayecto_actual; ?>">
-                                        
-                                        <button type="submit" name="rechazar_avance" class="btn btn-warning btn-sm" 
-                                                >
-                                            <i class="fas fa-times-circle mr-1"></i> REVOCAR APROBACIÓN
-                                        </button>
-                                        <small class="d-block text-muted mt-1">
-                                            <i class="fas fa-exclamation-triangle"></i> Revocar esta aprobación devolverá al estudiante al Trayecto <?php echo $trayecto_actual; ?>.
-                                        </small>
-                                    </form>
-                                    <?php endif; ?>
-                                </div>
-                            <?php elseif ($cumple_requisitos && $trayecto_actual < 4): ?>
-                                <hr>
-                                <!-- Formulario para aprobar avance -->
-                                <form method="POST" action="" class="mt-3">
-                                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-                                    <input type="hidden" name="id_estudiante" value="<?php echo $info_estudiante['id']; ?>">
-                                    <input type="hidden" name="trayecto_actual" value="<?php echo $trayecto_actual; ?>">
-                                    
-                                    <div class="form-group">
-                                        <label for="motivo_aprobacion"><small>Motivo de aprobación (opcional):</small></label>
-                                        <textarea class="form-control form-control-sm" 
-                                                  id="motivo_aprobacion" 
-                                                  name="motivo_aprobacion" 
-                                                  rows="2" 
-                                                  placeholder="Ej: Cumple todos los requisitos académicos"></textarea>
-                                    </div>
-                                    
-                                    <button type="submit" name="aprobar_avance" class="btn btn-success btn-lg">
-                                        <i class="fas fa-check-circle mr-1"></i> APROBAR AVANCE AL TRAYECTO <?php echo ($trayecto_actual + 1); ?>
-                                    </button>
-                                    
-                                    <small class="d-block text-muted mt-1">
-                                        <i class="fas fa-info-circle"></i> Esta acción permitirá al estudiante inscribirse en el Trayecto <?php echo ($trayecto_actual + 1); ?>.
-                                    </small>
-                                </form>
-                            <?php elseif ($trayecto_actual == 4): ?>
-                                <hr>
-                                <div class="alert alert-success">
-                                    <i class="fas fa-graduation-cap"></i> 
-                                    <strong>¡Felicidades!</strong> El estudiante ha completado todos los trayectos de la carrera.
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                        
-                        <!-- Materias aprobadas en el trayecto actual -->
-                        <h6><i class="fas fa-check-circle text-success mr-1"></i> Materias Aprobadas en Trayecto <?php echo $trayecto_actual; ?>:</h6>
-                        <?php if (!empty($materias_aprobadas)): ?>
-                            <ul class="list-group mb-3">
-                                <?php foreach ($materias_aprobadas as $materia): ?>
-                                <li class="list-group-item list-group-item-success d-flex justify-content-between align-items-center">
-                                    <?php echo htmlspecialchars($materia['nombre_materia']); ?>
-                                    <?php if (esProyectoSocio($materia['id_materia'])): ?>
-                                        <span class="badge badge-warning">PROYECTO</span>
-                                    <?php endif; ?>
-                                </li>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Período</th>
+                                    <th>Sección</th>
+                                    <th>Trayecto</th>
+                                    <th>Fecha Inscripción</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($historial_secciones as $historial): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($historial['nombre_periodo'] ?? 'Desconocido'); ?></td>
+                                    <td><?php echo htmlspecialchars($historial['codigo_seccion'] ?? 'Sin sección'); ?></td>
+                                    <td><?php echo $historial['numero_trayecto'] ?? '0'; ?></td>
+                                    <td><?php echo isset($historial['fecha_inscripcion']) ? date('d/m/Y', strtotime($historial['fecha_inscripcion'])) : 'Sin fecha'; ?></td>
+                                    <td>
+                                        <span class="badge badge-<?php echo ($historial['estatus'] ?? '') == 'activo' ? 'success' : 'secondary'; ?>">
+                                            <?php echo ucfirst($historial['estatus'] ?? 'Desconocido'); ?>
+                                        </span>
+                                    </td>
+                                </tr>
                                 <?php endforeach; ?>
-                            </ul>
-                        <?php else: ?>
-                            <div class="alert alert-secondary">
-                                <i class="fas fa-info-circle"></i> No tiene materias aprobadas en este trayecto.
-                            </div>
-                        <?php endif; ?>
-                        
-                        <!-- Progreso del trayecto -->
-                        <?php if ($trayecto_actual == 0 && $total_materias > 0): ?>
-                        <div class="mt-3">
-                            <strong>Progreso del Trayecto 0:</strong>
-                            <?php 
-                            $porcentaje = ($total_aprobadas / $total_materias) * 100;
-                            ?>
-                            <div class="progress mt-2" style="height: 25px;">
-                                <div class="progress-bar bg-success" role="progressbar" 
-                                     style="width: <?php echo $porcentaje; ?>%" 
-                                     aria-valuenow="<?php echo $porcentaje; ?>" aria-valuemin="0" aria-valuemax="100">
-                                    <?php echo number_format($porcentaje, 1); ?>%
-                                </div>
-                            </div>
-                            <div class="d-flex justify-content-between mt-1">
-                                <small class="text-muted">
-                                    <?php echo $total_aprobadas; ?> de <?php echo $total_materias; ?> materias aprobadas
-                                </small>
-                                <small class="text-muted">
-                                    Mínimo requerido: <?php echo $minimo_requerido; ?> materias (50%)
-                                </small>
-                            </div>
-                            <?php if ($total_aprobadas >= $minimo_requerido && !$aprobacion_existente): ?>
-                                <div class="alert alert-success mt-2">
-                                    <i class="fas fa-check-circle"></i> 
-                                    <strong>¡Cumple con el mínimo requerido!</strong> 
-                                    Puede aprobar el avance al Trayecto 1.
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
+    </div>
+    <?php endif; ?>
 
-        <div class="col-md-6">
+    <!-- Formulario de Inscripción -->
+    <div class="row">
+        <div class="col-md-12">
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white">
                     <i class="fas fa-clipboard-list mr-1"></i>
                     Inscripción de Materias - Trayecto <?php echo $trayecto_inscripcion; ?>
                     <?php if ($trayecto_inscripcion == 0 && $es_estudiante_nuevo): ?>
                         <span class="badge badge-warning float-right">INICIO</span>
-                    <?php elseif ($aprobacion_existente): ?>
+                    <?php elseif ($puede_avanzar && $trayecto_actual < 4): ?>
                         <span class="badge badge-success float-right">AVANCE APROBADO</span>
                     <?php else: ?>
                         <span class="badge badge-info float-right">REINSCRIPCIÓN</span>
@@ -954,11 +746,11 @@ if (!empty($mensaje)) {
                             <i class="fas fa-exclamation-triangle"></i> El estudiante no tiene una carrera asignada.
                         </div>
                     <?php else: ?>
-                        <?php if ($aprobacion_existente): ?>
+                        <?php if ($puede_avanzar && $trayecto_actual < 4): ?>
                             <div class="alert alert-success">
                                 <i class="fas fa-check-circle"></i> 
-                                <strong>¡El estudiante puede inscribirse en el Trayecto <?php echo ($trayecto_actual + 1); ?>!</strong>
-                                <p class="mb-0">Ya fue aprobado para avanzar. Ahora puede inscribir materias del siguiente trayecto.</p>
+                                <strong>¡El estudiante puede inscribirse en el Trayecto <?php echo $trayecto_siguiente; ?>!</strong>
+                                <p class="mb-0">Cumple con los requisitos para avanzar. Ahora puede inscribir materias del siguiente trayecto.</p>
                             </div>
                         <?php endif; ?>
                         
@@ -969,15 +761,12 @@ if (!empty($mensaje)) {
                             <div class="form-group">
                                 <label for="id_seccion">Seleccionar Sección (Trayecto <?php echo $trayecto_inscripcion; ?>) <small class="text-muted">(Opcional)</small></label>
                                 <select class="form-control" id="id_seccion" name="id_seccion">
-                                    <option value="">Sin sección (inscripción general)</option>
+                                    <option value="0">Sin sección (inscripción general)</option>
                                     <?php foreach ($secciones_disponibles as $seccion): ?>
                                     <option value="<?php echo $seccion['id_seccion']; ?>">
                                         <?php echo htmlspecialchars($seccion['codigo_seccion']); ?> - 
-                                        Horario: <?php echo htmlspecialchars($seccion['horario']); ?> - 
-                                        Aula: <?php echo htmlspecialchars($seccion['aula_asignada']); ?>
-                                        <?php if ($seccion['capacidad_maxima']): ?>
-                                            (Cupo: <?php echo $seccion['capacidad_maxima']; ?>)
-                                        <?php endif; ?>
+                                        Trayecto <?php echo $seccion['numero_trayecto']; ?>
+                                        (Cupo: <?php echo $seccion['inscritos']; ?>/<?php echo $seccion['capacidad_maxima']; ?>)
                                     </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -988,7 +777,7 @@ if (!empty($mensaje)) {
                             
                             <div class="form-group">
                                 <label>Materias para Inscripción (Trayecto <?php echo $trayecto_inscripcion; ?>)</label>
-                                <div class="border p-3" style="max-height: 300px; overflow-y: auto;">
+                                <div class="border p-3" style="max-height: 400px; overflow-y: auto;">
                                     <?php if (empty($materias_disponibles)): ?>
                                         <div class="alert alert-info">
                                             <i class="fas fa-info-circle"></i>
@@ -1012,17 +801,12 @@ if (!empty($mensaje)) {
                                         <hr>
                                         <?php foreach ($materias_disponibles as $materia): 
                                             $nota_minima = obtenerNotaMinimaMateria($materia['id_materia']);
-                                            $es_proyecto = esProyectoSocio($materia['id_materia']);
-                                            
-                                            // Verificar si ya está inscrita
-                                            $ya_inscrita = materiaYaInscrita($info_estudiante['id'], $materia['id_materia']);
-                                            
-                                            // Verificar si ya fue cursada pero reprobada
-                                            $nota_actual = obtenerNotaMateriaActual($info_estudiante['id'], $materia['id_materia']);
+                                            $es_proyecto = $materia['es_proyecto'] ?? false;
+                                            $ya_inscrita = materiaYaInscritaPeriodo($info_estudiante['id'], $materia['id_materia']);
+                                            $nota_actual = obtenerNotaMateriaActualPeriodo($info_estudiante['id'], $materia['id_materia']);
                                             $reprobada = ($nota_actual !== null && 
                                                          (($es_proyecto && $nota_actual < 16) || 
                                                           (!$es_proyecto && $nota_actual < 12)));
-                                            $nueva = ($nota_actual === null);
                                         ?>
                                         <div class="form-check mb-2">
                                             <input class="form-check-input materia-checkbox" type="checkbox" 
@@ -1040,7 +824,7 @@ if (!empty($mensaje)) {
                                                     <span class="badge badge-secondary">YA INSCRITA</span>
                                                 <?php elseif ($reprobada): ?>
                                                     <span class="badge badge-danger">REPROBADA</span>
-                                                <?php elseif ($nueva): ?>
+                                                <?php else: ?>
                                                     <span class="badge badge-primary">NUEVA</span>
                                                 <?php endif; ?>
                                                 <small class="text-muted d-block">
@@ -1099,13 +883,12 @@ if (!empty($mensaje)) {
                         <div class="col-md-6">
                             <h6><i class="fas fa-clipboard-check text-success"></i> Reglas de Inscripción:</h6>
                             <ul class="list-unstyled">
-                                <li class="mb-2"><strong>Todos empiezan:</strong> En Trayecto 0</li>
-                                <li class="mb-2"><strong>Avance manual:</strong> Requiere aprobación explícita del administrador</li>
                                 <li class="mb-2"><strong>Nota mínima aprobatoria:</strong> 12 puntos</li>
                                 <li class="mb-2"><strong>Nota mínima para proyectos:</strong> 16 puntos</li>
                                 <li class="mb-2"><strong>Reinscripción:</strong> Solo se inscriben materias NO inscritas actualmente</li>
                                 <li class="mb-2"><strong>Ya inscritas:</strong> No se pueden volver a inscribir en mismo período</li>
                                 <li class="mb-2"><strong>Nuevos estudiantes:</strong> Pueden inscribir todas las materias del Trayecto 0</li>
+                                <li class="mb-2"><strong>Sección:</strong> El trayecto se determina por la sección activa del estudiante</li>
                             </ul>
                         </div>
                     </div>
@@ -1140,13 +923,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         function actualizarEstadoBoton() {
             const inscribirBtn = document.querySelector('button[name="inscribir_materias"]');
-            
             if (inscribirBtn) {
                 const algunaSeleccionada = Array.from(materiaCheckboxes).some(cb => cb.checked);
                 inscribirBtn.disabled = !algunaSeleccionada;
             }
         }
-        
         actualizarEstadoBoton();
     }
     
@@ -1157,162 +938,106 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
-</script>
 
-<!-- Modal de confirmación genérico -->
-<div class="modal fade" id="confirmActionModal" tabindex="-1" role="dialog" aria-labelledby="confirmActionModalLabel" aria-hidden="true">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="confirmActionModalLabel">Confirmar acción</h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <div class="modal-body" id="confirmActionModalBody">
-        ¿Desea continuar?
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal" id="confirmActionCancel">Cancelar</button>
-        <button type="button" class="btn btn-primary" id="confirmActionConfirm">Confirmar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Función genérica para mostrar modal de confirmación
-    function showConfirm(options) {
-        const title = options.title || 'Confirmar acción';
-        const message = options.message || '¿Está seguro?';
-        const confirmText = options.confirmText || 'Confirmar';
-        const cancelText = options.cancelText || 'Cancelar';
-        const showCancel = (typeof options.showCancel === 'undefined') ? true : options.showCancel;
-
-        document.getElementById('confirmActionModalLabel').textContent = title;
-        document.getElementById('confirmActionModalBody').innerHTML = message;
-        const btnConfirm = document.getElementById('confirmActionConfirm');
-        const btnCancel = document.getElementById('confirmActionCancel');
-
-        btnConfirm.textContent = confirmText;
-        btnCancel.textContent = cancelText;
-
-        if (!showCancel) {
-            btnCancel.style.display = 'none';
-        } else {
-            btnCancel.style.display = '';
-        }
-
-        // Limpiar eventos previos
-        btnConfirm.onclick = null;
-
-        if (options.onConfirm && typeof options.onConfirm === 'function') {
-            btnConfirm.onclick = function() {
-                options.onConfirm();
-                if (window.jQuery && $('#confirmActionModal').modal) {
-                    $('#confirmActionModal').modal('hide');
-                }
-            };
-        }
-
-        if (window.jQuery && $('#confirmActionModal').modal) {
-            $('#confirmActionModal').modal('show');
-        }
+// Función para confirmar acciones
+function showConfirm(options) {
+    const title = options.title || 'Confirmar acción';
+    const message = options.message || '¿Está seguro?';
+    const confirmText = options.confirmText || 'Confirmar';
+    
+    const modalHtml = `
+        <div class="modal fade" id="confirmModal" tabindex="-1" role="dialog">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">${title}</h5>
+                        <button type="button" class="close" data-dismiss="modal">
+                            <span>&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">${message}</div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="confirmBtn">${confirmText}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const existingModal = document.getElementById('confirmModal');
+    if (existingModal) {
+        existingModal.remove();
     }
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    const modal = document.getElementById('confirmModal');
+    const confirmBtn = document.getElementById('confirmBtn');
+    
+    $(modal).modal('show');
+    
+    return new Promise((resolve) => {
+        confirmBtn.onclick = function() {
+            $(modal).modal('hide');
+            resolve(true);
+        };
+        
+        $(modal).on('hidden.bs.modal', function() {
+            setTimeout(() => {
+                modal.remove();
+                resolve(false);
+            }, 300);
+        });
+    });
+}
 
-    // Manejar inscripción de materias
-    const btnInscribir = document.querySelector('button[name="inscribir_materias"]');
-    if (btnInscribir) {
-        btnInscribir.addEventListener('click', function(e) {
-            e.preventDefault();
-            const form = this.closest('form');
-            const clickedBtn = this;
-            const checkboxesMaterias = document.querySelectorAll('input[name="materias[]"]:checked:not(:disabled)');
-
-            if (checkboxesMaterias.length === 0) {
-                showConfirm({
-                    title: 'Atención',
-                    message: '⚠️ Por favor seleccione al menos una materia.',
-                    confirmText: 'OK',
-                    showCancel: false
-                });
-                return;
+// Manejar botón de avanzar
+document.querySelectorAll('button[name="avanzar_estudiante_trayecto"]').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const form = this.closest('form');
+        const trayectoActual = <?php echo $trayecto_actual; ?>;
+        const siguiente = trayectoActual + 1;
+        
+        showConfirm({
+            title: 'Confirmar Avance',
+            message: `¿Está seguro de avanzar al estudiante al Trayecto ${siguiente}?<br><br>Esta acción creará una nueva sección para el estudiante en el Trayecto ${siguiente} e inscribirá automáticamente sus materias.`,
+            confirmText: 'Avanzar'
+        }).then(confirmed => {
+            if (confirmed) {
+                form.submit();
             }
-
-            showConfirm({
-                title: 'Confirmar Inscripción',
-                message: `¿Está seguro de inscribir ${checkboxesMaterias.length} materia(s)?`,
-                confirmText: 'Inscribir',
-                onConfirm: function() {
-                    if (clickedBtn && clickedBtn.name) {
-                        const hidden = document.createElement('input');
-                        hidden.type = 'hidden';
-                        hidden.name = clickedBtn.name;
-                        hidden.value = clickedBtn.value || '1';
-                        form.appendChild(hidden);
-                    }
-                    form.submit();
-                }
-            });
         });
-    }
+    });
+});
 
-    // Manejar aprobación de avance
-    const btnAprobar = document.querySelector('button[name="aprobar_avance"]');
-    if (btnAprobar) {
-        btnAprobar.addEventListener('click', function(e) {
-            e.preventDefault();
-            const form = this.closest('form');
-            const clickedBtn = this;
-            const trayectoActual = form.querySelector('input[name="trayecto_actual"]') ? parseInt(form.querySelector('input[name="trayecto_actual"]').value, 10) : null;
-            const siguiente = (trayectoActual !== null) ? (trayectoActual + 1) : '';
-
+// Manejar botón de inscripción
+document.querySelectorAll('button[name="inscribir_materias"]').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const form = this.closest('form');
+        const checkboxes = document.querySelectorAll('input[name="materias[]"]:checked:not(:disabled)');
+        
+        if (checkboxes.length === 0) {
             showConfirm({
-                title: 'Aprobar Avance',
-                message: `¿Confirma aprobar el avance del estudiante al Trayecto ${siguiente}?`,
-                confirmText: 'Aprobar',
-                onConfirm: function() {
-                    if (clickedBtn && clickedBtn.name) {
-                        const hidden = document.createElement('input');
-                        hidden.type = 'hidden';
-                        hidden.name = clickedBtn.name;
-                        hidden.value = clickedBtn.value || '1';
-                        form.appendChild(hidden);
-                    }
-                    form.submit();
-                }
+                title: 'Atención',
+                message: '⚠️ Por favor seleccione al menos una materia.',
+                confirmText: 'OK'
             });
+            return;
+        }
+        
+        showConfirm({
+            title: 'Confirmar Inscripción',
+            message: `¿Está seguro de inscribir ${checkboxes.length} materia(s)?`,
+            confirmText: 'Inscribir'
+        }).then(confirmed => {
+            if (confirmed) {
+                form.submit();
+            }
         });
-    }
-
-    // Manejar revocación/rechazo de avance
-    const btnRechazar = document.querySelector('button[name="rechazar_avance"]');
-    if (btnRechazar) {
-        btnRechazar.addEventListener('click', function(e) {
-            e.preventDefault();
-            const form = this.closest('form');
-            const clickedBtn = this;
-            const trayectoActual = form.querySelector('input[name="trayecto_actual"]') ? parseInt(form.querySelector('input[name="trayecto_actual"]').value, 10) : null;
-            const siguiente = (trayectoActual !== null) ? (trayectoActual + 1) : '';
-
-            showConfirm({
-                title: 'Revocar Aprobación',
-                message: `¿Está seguro de revocar la aprobación de avance al Trayecto ${siguiente}?`,
-                confirmText: 'Revocar',
-                onConfirm: function() {
-                    if (clickedBtn && clickedBtn.name) {
-                        const hidden = document.createElement('input');
-                        hidden.type = 'hidden';
-                        hidden.name = clickedBtn.name;
-                        hidden.value = clickedBtn.value || '1';
-                        form.appendChild(hidden);
-                    }
-                    form.submit();
-                }
-            });
-        });
-    }
+    });
 });
 </script>
 

@@ -197,20 +197,44 @@ if (!isLoggedIn() || !isUser()) {
               </a>
             </li>
 
-            <!-- NUEVO: Menú de Asignación de Voceros -->
+            <!-- Menú de Asignación de Voceros -->
             <li class="nav-item">
               <a title="Asignar Voceros Estudiantiles" class="nav-link" href="asignacion_voceros.php">
                 <i class="fas fa-users fa-fw"></i> Asignar Voceros
               </a>
             </li>
 
-            <!-- Menú de Ajustes - ID ÚNICO CORREGIDO -->
+            <!-- Menú de Asignación de Secciones a Docentes -->
+            <li class="nav-item">
+              <a title="Asignar Secciones a Docentes" class="nav-link" href="director_asignar_secciones.php">
+                <i class="fas fa-door-open fa-fw"></i> Asignar Secciones
+              </a>
+            </li>
+
+            <!-- ============================================ -->
+            <!-- NUEVO: Menú desplegable de Secciones y Horarios -->
+            <!-- ============================================ -->
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownSecciones" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <i class="fas fa-cogs fa-fw"></i> Secciones
+              </a>
+              <div class="dropdown-menu" aria-labelledby="navbarDropdownSecciones">
+                <a class="dropdown-item" href="crear_seccion.php">
+                  <i class="fas fa-plus-circle fa-fw"></i> Crear Sección
+                </a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item" href="gestion_horario_seccion.php">
+                  <i class="fas fa-calendar-alt fa-fw"></i> Gestionar Horarios
+                </a>
+              </div>
+            </li>
+
+            <!-- Menú de Ajustes -->
             <li id="dropdown-ajustes-director" class="nav-item dropdown">
                 <a title="Ir a Ajustes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownAjustesDirector" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="fa fa-cogs fa-fw"></i> Ajustes
                 </a>
                 <div id="dropdown-ajustes-director-menu" class="dropdown-menu" aria-labelledby="navbarDropdownAjustesDirector">
-                    <!-- Nueva opción: Cambiar Perfil -->
                     <a title="Cambiar Perfil de Usuario" class="dropdown-item" href="../profile_selector.php">
                         <i class="fas fa-user-edit fa-fw"></i> Cambiar Perfil
                     </a>

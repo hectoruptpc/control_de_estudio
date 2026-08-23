@@ -50,10 +50,12 @@ $maxConnections = 50;
 $pool = new ConnectionPool($maxConnections, 'localhost', 'root', '12345678', 'proyecto_tsu');
 $db = new mysqli('localhost', 'root', '12345678', 'proyecto_tsu');
 
-
-
-//query("SET NAMES 'utf8';");
-$db->set_charset("utf8");
+// Asegurar charset compatible con utf8mb4 para evitar conflictos de colación
+if ($db->connect_errno) {
+    die('Error de conexión MySQL: ' . $db->connect_error);
+}
+$db->set_charset('utf8mb4');
+$db->query("SET NAMES 'utf8mb4'");
 
 $casa = 'Marcador';
  ?>

@@ -1,0 +1,978 @@
+<?php
+// .dios/index.php - Panel MODO DIOS (CON BUSCADOR EN TIEMPO REAL Y RPS DINÁMICO)
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+
+$titulopag = "👑 PANEL DIOS - Control Total UPTPC";
+
+// Incluir configuración DIOS y funciones
+require_once 'config.php';
+require_once '../funciones/functions.php';
+require_once '../funciones/seguridad.php';
+
+// Verificar autenticación DIOS
+if (!isset($_SESSION['dios_autenticado']) || $_SESSION['dios_autenticado'] !== true) {
+    header('Location: login.php');
+    exit;
+}
+
+$seguridad = new Seguridad($db);
+
+// ==============================================
+// TOKEN CSRF Y SEGURIDAD DEL PANEL DIOS
+// ==============================================
+if (session_status() === PHP_SESSION_NONE) session_start();
+
+// Generar token CSRF para el panel DIOS
+if (empty($_SESSION['dios_csrf_token'])) {
+    try {
+        $_SESSION['dios_csrf_token'] = bin2hex(random_bytes(32));
+    } catch (Exception $e) {
+        $_SESSION['dios_csrf_token'] = md5(uniqid('', true));
+    }
+}
+$csrf_token = $_SESSION['dios_csrf_token'];
+$csrf_field = '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrf_token) . '">';
+
+if (empty($_SESSION['dios_ajax_token'])) {
+    try {
+        $_SESSION['dios_ajax_token'] = bin2hex(random_bytes(16));
+    } catch (Exception $e) {
+        $_SESSION['dios_ajax_token'] = md5(uniqid('', true));
+    }
+}
+
+// ==============================================
+// VARIABLES DE PAGINACIÓN Y BÚSQUEDA
+// ==============================================
+$pagina = isset($_GET['pagina']) ? max(1, (int)$_GET['pagina']) : 1;
+$buscar = isset($_GET['buscar']) ? trim($_GET['buscar']) : '';
+$por_pagina = 15;
+$offset = ($pagina - 1) * $por_pagina;
+
+// Construir query con búsqueda
+$where = "";
+$params = [];
+$types = "";
+
+if (!empty($buscar)) {
+    $where = "WHERE nombre LIKE ? OR email LIKE ? OR username LIKE ? OR id LIKE ?";
+    $buscar_param = "%$buscar%";
+    $params = [$buscar_param, $buscar_param, $buscar_param, $buscar_param];
+    $types = "ssss";
+}
+
+// Contar total de usuarios
+$count_sql = "SELECT COUNT(*) as total FROM users $where";
+$stmt = mysqli_prepare($db, $count_sql);
+if (!empty($params)) {
+    mysqli_stmt_bind_param($stmt, $types, ...$params);
+}
+mysqli_stmt_execute($stmt);
+$count_result = mysqli_stmt_get_result($stmt);
+$total_usuarios = mysqli_fetch_assoc($count_result)['total'];
+$total_paginas = ceil($total_usuarios / $por_pagina);
+
+// Obtener usuarios con paginación
+$sql = "SELECT id, nombre, email, username, status FROM users $where ORDER BY id LIMIT ? OFFSET ?";
+$stmt = mysqli_prepare($db, $sql);
+if (!empty($params)) {
+    $params[] = $por_pagina;
+    $params[] = $offset;
+    $types .= "ii";
+    mysqli_stmt_bind_param($stmt, $types, ...$params);
+} else {
+    mysqli_stmt_bind_param($stmt, "ii", $por_pagina, $offset);
+}
+mysqli_stmt_execute($stmt);
+$usuarios = mysqli_stmt_get_result($stmt);
+
+// Otras consultas
+$bloqueos = mysqli_query($db, "SELECT * FROM seguridad_bloqueos WHERE activo = 1 AND desbloqueo_en > NOW() ORDER BY desbloqueo_en DESC LIMIT 20");
+$top_ips = mysqli_query($db, "SELECT ip, COUNT(*) as total FROM seguridad_intentos WHERE fecha > DATE_SUB(NOW(), INTERVAL 1 HOUR) GROUP BY ip ORDER BY total DESC LIMIT 10");
+$logs_recientes = mysqli_query($db, "SELECT * FROM seguridad_intentos ORDER BY fecha DESC LIMIT 30");
+
+// Estadísticas
+$stats = $seguridad->obtenerEstadisticas();
+$sistema_activo = $seguridad->obtenerConfiguracion('sistema_activo', '1');
+$modo_mantenimiento = $seguridad->obtenerConfiguracion('modo_mantenimiento', '0');
+$sistema_completo = $seguridad->obtenerConfiguracion('sistema_completo_activo', '1') == '1';
+$razon_cierre = $seguridad->obtenerConfiguracion('razon_cierre', '');
+$ultimo_cierre_por = $seguridad->obtenerConfiguracion('ultimo_cierre_por', '');
+$fecha_cierre = $seguridad->obtenerConfiguracion('fecha_cierre', '');
+$limite_recuperar = $seguridad->obtenerConfiguracion('limite_recuperar_por_hora', 3);
+$bloqueo_horas = $seguridad->obtenerConfiguracion('limite_bloqueo_horas', 1);
+$bloqueo_incremento = $seguridad->obtenerConfiguracion('limite_bloqueo_incremento', 24);
+$rps_limite = $seguridad->obtenerConfiguracion('limite_rps_10seg', 10);
+$rps_global = $seguridad->obtenerConfiguracion('limite_rps_global_porcentaje', 10);
+$total_usuarios_db = $seguridad->obtenerConfiguracion('total_usuarios', 100);
+$limite_global_calculado = ceil($total_usuarios_db * ($rps_global / 100));
+
+// Procesar acciones POST
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $accion = $_POST['accion'] ?? '';
+    $csrf_submitted = $_POST['csrf_token'] ?? '';
+    if (empty($csrf_token) || !hash_equals($csrf_token, $csrf_submitted)) {
+        $_SESSION['msg_dios'] = '⚠️ Token CSRF inválido o expirado. Acción denegada.';
+        header('Location: index.php' . (!empty($buscar) ? "?buscar=" . urlencode($buscar) : ''));
+        exit;
+    }
+
+    switch ($accion) {
+        case 'toggle_sistema_completo':
+            if ($_POST['sistema_completo'] == '1') {
+                $motivos = [
+                    '🔧 Mantenimiento programado del sistema',
+                    '⚙️ Actualización de la plataforma',
+                    '🛠️ Mejoras en el sistema de control de estudios',
+                    '🔒 Seguridad del sistema - Revisión programada',
+                    '📊 Optimización de base de datos',
+                    '🔄 Respaldo completo del sistema',
+                    '🚨 Sistema en mantenimiento por seguridad',
+                    '📈 Actualización de módulos académicos'
+                ];
+                $razon = $motivos[array_rand($motivos)];
+                $seguridad->actualizarConfiguracion('sistema_completo_activo', '0');
+                $seguridad->actualizarConfiguracion('razon_cierre', $razon);
+                $seguridad->actualizarConfiguracion('ultimo_cierre_por', $_SESSION['dios_usuario']);
+                $seguridad->actualizarConfiguracion('fecha_cierre', date('Y-m-d H:i:s'));
+                $_SESSION['msg_dios'] = "🔒 SISTEMA COMPLETO CERRADO. Motivo: $razon";
+            } else {
+                $seguridad->actualizarConfiguracion('sistema_completo_activo', '1');
+                $seguridad->actualizarConfiguracion('razon_cierre', '');
+                $_SESSION['msg_dios'] = "🔓 SISTEMA COMPLETO ABIERTO";
+            }
+            break;
+        case 'toggle_sistema':
+            $nuevo_estado = $_POST['sistema_activo'] == '1' ? '0' : '1';
+            $seguridad->actualizarConfiguracion('sistema_activo', $nuevo_estado);
+            $_SESSION['msg_dios'] = "👑 Recuperación " . ($nuevo_estado == '1' ? 'ACTIVADA' : 'DESACTIVADA');
+            break;
+        case 'toggle_mantenimiento':
+            $nuevo_estado = $_POST['modo_mantenimiento'] == '1' ? '0' : '1';
+            $seguridad->actualizarConfiguracion('modo_mantenimiento', $nuevo_estado);
+            $_SESSION['msg_dios'] = "👑 Mantenimiento " . ($nuevo_estado == '1' ? 'ACTIVADO' : 'DESACTIVADO');
+            break;
+        case 'actualizar_limites':
+            $seguridad->actualizarConfiguracion('limite_recuperar_por_hora', $_POST['limite_recuperar']);
+            $seguridad->actualizarConfiguracion('limite_bloqueo_horas', $_POST['bloqueo_horas']);
+            $seguridad->actualizarConfiguracion('limite_bloqueo_incremento', $_POST['bloqueo_incremento']);
+            $seguridad->actualizarConfiguracion('limite_rps_10seg', $_POST['rps_limite']);
+            $seguridad->actualizarConfiguracion('limite_rps_global_porcentaje', $_POST['rps_global_porcentaje']);
+            $_SESSION['msg_dios'] = "👑 Límites actualizados";
+            break;
+        case 'desbloquear_ip':
+            $stmt = mysqli_prepare($db, "UPDATE seguridad_bloqueos SET activo = 0 WHERE ip = ?");
+            mysqli_stmt_bind_param($stmt, "s", $_POST['ip']);
+            mysqli_stmt_execute($stmt);
+            $_SESSION['msg_dios'] = "👑 IP desbloqueada";
+            break;
+        case 'desbloquear_todo':
+            mysqli_query($db, "UPDATE seguridad_bloqueos SET activo = 0 WHERE activo = 1");
+            $_SESSION['msg_dios'] = "👑 TODOS los bloqueos eliminados";
+            break;
+        case 'resetear_tokens':
+            mysqli_query($db, "UPDATE password_resets SET usado = 1 WHERE usado = 0");
+            $_SESSION['msg_dios'] = "👑 Todos los tokens invalidados";
+            break;
+        case 'limpiar_logs':
+            $periodo = $_POST['periodo'] ?? 7;
+            mysqli_query($db, "DELETE FROM seguridad_intentos WHERE fecha < DATE_SUB(NOW(), INTERVAL $periodo DAY)");
+            mysqli_query($db, "DELETE FROM seguridad_rps WHERE fecha < DATE_SUB(NOW(), INTERVAL 1 HOUR)");
+            $_SESSION['msg_dios'] = "👑 Logs eliminados ($periodo días)";
+            break;
+        case 'limpiar_todo':
+            mysqli_query($db, "TRUNCATE TABLE seguridad_intentos");
+            mysqli_query($db, "TRUNCATE TABLE seguridad_rps");
+            mysqli_query($db, "TRUNCATE TABLE seguridad_tokens_invalidos");
+            $_SESSION['msg_dios'] = "👑 TODOS los logs eliminados";
+            break;
+        case 'cambiar_password':
+            $nueva_pass = password_hash($_POST['nueva_password'], PASSWORD_DEFAULT);
+            $stmt = mysqli_prepare($db, "UPDATE users SET password = ? WHERE id = ?");
+            mysqli_stmt_bind_param($stmt, "si", $nueva_pass, $_POST['user_id']);
+            mysqli_stmt_execute($stmt);
+            $_SESSION['msg_dios'] = "👑 Contraseña cambiada";
+            break;
+        case 'bloquear_usuario':
+            $stmt = mysqli_prepare($db, "UPDATE users SET status = 0, motivo_bloqueo = 'Bloqueado por administrador DIOS' WHERE id = ?");
+            mysqli_stmt_bind_param($stmt, "i", $_POST['user_id']);
+            mysqli_stmt_execute($stmt);
+            $_SESSION['msg_dios'] = "👑 Usuario BLOQUEADO";
+            break;
+        case 'desbloquear_usuario':
+            $stmt = mysqli_prepare($db, "UPDATE users SET status = 1, motivo_bloqueo = NULL WHERE id = ?");
+            mysqli_stmt_bind_param($stmt, "i", $_POST['user_id']);
+            mysqli_stmt_execute($stmt);
+            $_SESSION['msg_dios'] = "👑 Usuario DESBLOQUEADO";
+            break;
+    }
+    header('Location: index.php' . (!empty($buscar) ? "?buscar=" . urlencode($buscar) : ""));
+    exit;
+}
+
+include("head_dios.php");
+?>
+
+<style>
+    .search-box {
+        background: #fff;
+        border-radius: 50px;
+        padding: 5px 15px;
+        border: 1px solid #e9ecef;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .search-box input {
+        border: none;
+        padding: 10px;
+        width: 300px;
+        outline: none;
+        flex: 1;
+    }
+    .search-box button {
+        background: none;
+        border: none;
+        color: #ffc107;
+        cursor: pointer;
+    }
+    .clear-btn {
+        color: #dc3545;
+        font-size: 14px;
+        text-decoration: none;
+        cursor: pointer;
+    }
+    .clear-btn:hover {
+        color: #a71d2a;
+    }
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ffc107;
+        border-radius: 50%;
+        border-top-color: transparent;
+        animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    .pagination .page-item.active .page-link {
+        background: #ffc107;
+        border-color: #ffc107;
+        color: #2c3e50;
+    }
+    .badge-sistema-cerrado {
+        background: #dc3545;
+        color: white;
+        padding: 5px 15px;
+        border-radius: 30px;
+        font-size: 12px;
+    }
+    .badge-sistema-abierto {
+        background: #28a745;
+        color: white;
+        padding: 5px 15px;
+        border-radius: 30px;
+        font-size: 12px;
+    }
+    .stat-card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .stat-card .icon {
+        font-size: 35px;
+        color: #ffc107;
+        margin-bottom: 10px;
+    }
+    .stat-card .value {
+        font-size: 28px;
+        font-weight: bold;
+        color: #2c3e50;
+    }
+    .stat-card .label {
+        font-size: 14px;
+        color: #6c757d;
+    }
+    .btn-dios {
+        background: #ffc107;
+        color: #2c3e50;
+        font-weight: 600;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .btn-dios:hover {
+        background: #e0a800;
+        color: #fff;
+        transform: translateY(-2px);
+    }
+    .btn-dios-danger {
+        background: #dc3545;
+        color: #fff;
+        border: none;
+        cursor: pointer;
+    }
+    .btn-dios-danger:hover {
+        background: #c82333;
+    }
+    .btn-dios-success {
+        background: #28a745;
+        color: #fff;
+        border: none;
+        cursor: pointer;
+    }
+    .btn-dios-success:hover {
+        background: #218838;
+    }
+    .badge-dios-active {
+        background: #d4edda;
+        color: #155724;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+    }
+    .badge-dios-blocked {
+        background: #f8d7da;
+        color: #721c24;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+    }
+    .badge-dios-warning {
+        background: #fff3cd;
+        color: #856404;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+    }
+    .table-dios {
+        background: #fff;
+    }
+    .table-dios thead th {
+        background: #f8f9fa;
+        border-bottom: 2px solid #ffc107;
+    }
+    .card-dios {
+        background: #fff;
+        border-radius: 12px;
+        border: none;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .card-header-dios {
+        background: #f8f9fa;
+        border-bottom: 3px solid #ffc107;
+        padding: 15px 20px;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+    .dios-header {
+        background: #fff;
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 30px;
+        text-align: center;
+        border: 1px solid #e9ecef;
+    }
+    .crown-icon {
+        font-size: 45px;
+        color: #ffc107;
+    }
+    .modal-header {
+        background: #ffc107;
+        color: #2c3e50;
+        border-bottom: none;
+    }
+    .modal-header .close {
+        color: #2c3e50;
+        opacity: 1;
+    }
+    .btn-secondary {
+        background: #6c757d;
+        border: none;
+    }
+    .acciones-btns {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+    }
+    .resultados-info {
+        font-size: 14px;
+        color: #6c757d;
+    }
+    .tabla-contenedor {
+        min-height: 400px;
+    }
+    .input-group .btn {
+        border-radius: 8px;
+    }
+    .input-group {
+        border-radius: 8px;
+    }
+    /* Indicador RPS */
+    .rps-bajo { color: #00ff00; }
+    .rps-medio { color: #ffaa00; }
+    .rps-alto { color: #ff4444; }
+</style>
+
+<div class="dios-container">
+    <!-- CABECERA -->
+    <div class="dios-header">
+        <div class="crown-icon">👑</div>
+        <h1>PANEL DE CONTROL DIOS</h1>
+        <p>
+            <i class="fas fa-user-secret"></i> <strong><?php echo $_SESSION['dios_usuario']; ?></strong> | 
+            <i class="fas fa-network-wired"></i> IP: <?php echo $_SESSION['dios_ip']; ?>
+        </p>
+        <div class="mt-2">
+            <?php if($sistema_completo): ?>
+                <span class="badge-sistema-abierto"><i class="fas fa-check-circle"></i> SISTEMA COMPLETO: ABIERTO</span>
+            <?php else: ?>
+                <span class="badge-sistema-cerrado"><i class="fas fa-ban"></i> SISTEMA COMPLETO: CERRADO</span>
+            <?php endif; ?>
+        </div>
+        <a href="logout.php" class="btn btn-danger btn-sm mt-3">Cerrar Sesión DIOS</a>
+    </div>
+
+    <!-- MENSAJES -->
+    <?php if(isset($_SESSION['msg_dios'])): ?>
+        <div class="alert alert-warning alert-dismissible fade show">
+            <?php echo $_SESSION['msg_dios']; unset($_SESSION['msg_dios']); ?>
+            <button type="button" class="close" data-dismiss="alert">&times;</button>
+        </div>
+    <?php endif; ?>
+
+    <!-- CONTROL DE SISTEMA COMPLETO -->
+    <div class="card card-dios mb-4">
+        <div class="card-header-dios">
+            <i class="fas fa-globe-americas"></i> CONTROL DE SISTEMA COMPLETO
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-7">
+                    <?php if($sistema_completo): ?>
+                        <div class="alert alert-success">✅ El sistema está <strong>ABIERTO</strong></div>
+                    <?php else: ?>
+                        <div class="alert alert-danger">
+                            ❌ El sistema está <strong>CERRADO</strong><br>
+                            📌 Motivo: <?php echo htmlspecialchars($razon_cierre); ?><br>
+                            👤 Cerrado por: <?php echo htmlspecialchars($ultimo_cierre_por); ?><br>
+                            📅 Fecha: <?php echo htmlspecialchars($fecha_cierre); ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                <div class="col-md-5">
+                    <form method="POST">
+                        <?php echo $csrf_field; ?>
+                        <input type="hidden" name="accion" value="toggle_sistema_completo">
+                        <input type="hidden" name="sistema_completo" value="<?php echo $sistema_completo ? '1' : '0'; ?>">
+                        <button type="submit" class="btn <?php echo $sistema_completo ? 'btn-dios-danger' : 'btn-dios-success'; ?> btn-lg btn-block">
+                            <?php if($sistema_completo): ?>
+                                <i class="fas fa-lock"></i> CERRAR SISTEMA
+                            <?php else: ?>
+                                <i class="fas fa-unlock-alt"></i> ABRIR SISTEMA
+                            <?php endif; ?>
+                        </button>
+                    </form>
+                    <small class="text-muted">⚠️ Al cerrar, NADIE podrá acceder. Solo tú puedes reabrirlo.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTROLES RÁPIDOS -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card card-dios">
+                <div class="card-header-dios"><i class="fas fa-power-off"></i> Recuperación de Contraseña</div>
+                <div class="card-body">
+                    <p>Estado: <strong class="<?php echo $sistema_activo == '1' ? 'text-success' : 'text-danger'; ?>">
+                        <?php echo $sistema_activo == '1' ? '🟢 ACTIVO' : '🔴 CERRADO'; ?>
+                    </strong></p>
+                    <form method="POST">
+                        <?php echo $csrf_field; ?>
+                        <input type="hidden" name="accion" value="toggle_sistema">
+                        <input type="hidden" name="sistema_activo" value="<?php echo $sistema_activo; ?>">
+                        <button type="submit" class="btn btn-sm <?php echo $sistema_activo == '1' ? 'btn-dios-danger' : 'btn-dios-success'; ?>">
+                            <?php echo $sistema_activo == '1' ? '🔒 Cerrar' : '🔓 Abrir'; ?>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card card-dios">
+                <div class="card-header-dios"><i class="fas fa-tools"></i> Modo Mantenimiento</div>
+                <div class="card-body">
+                    <p>Estado: <strong class="<?php echo $modo_mantenimiento == '1' ? 'text-warning' : 'text-success'; ?>">
+                        <?php echo $modo_mantenimiento == '1' ? '🛠️ ACTIVO' : '✅ NORMAL'; ?>
+                    </strong></p>
+                    <form method="POST">
+                        <?php echo $csrf_field; ?>
+                        <input type="hidden" name="accion" value="toggle_mantenimiento">
+                        <input type="hidden" name="modo_mantenimiento" value="<?php echo $modo_mantenimiento; ?>">
+                        <button type="submit" class="btn btn-sm btn-warning">
+                            <?php echo $modo_mantenimiento == '1' ? 'Desactivar' : 'Activar'; ?>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ESTADÍSTICAS CON ACTUALIZACIÓN EN TIEMPO REAL -->
+    <div class="row mt-3">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="icon"><i class="fas fa-hand-paper"></i></div>
+                <div class="value" id="intentosHoy"><?php echo $stats['intentos_hoy']; ?></div>
+                <div class="label">Intentos Hoy</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="icon"><i class="fas fa-ban"></i></div>
+                <div class="value" id="bloqueosActivos"><?php echo $stats['bloqueos_activos']; ?></div>
+                <div class="label">Bloqueos Activos</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="icon"><i class="fas fa-key"></i></div>
+                <div class="value" id="tokensInvalidos"><?php echo $stats['tokens_invalidos_hoy']; ?></div>
+                <div class="label">Tokens Inválidos</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="icon"><i class="fas fa-tachometer-alt"></i></div>
+                <div class="value" id="rpsActual"><?php echo $stats['rps_actual']; ?></div>
+                <div class="label">RPS Actual <span id="rpsIndicator" style="font-size:12px;"></span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONFIGURACIÓN -->
+    <div class="card card-dios mt-3">
+        <div class="card-header-dios"><i class="fas fa-sliders-h"></i> Configuración de Límites</div>
+        <div class="card-body">
+            <form method="POST" class="row">
+                <?php echo $csrf_field; ?>
+                <input type="hidden" name="accion" value="actualizar_limites">
+                <div class="col-md-2"><label>Intentos/hora</label><input type="number" name="limite_recuperar" class="form-control" value="<?php echo $limite_recuperar; ?>"></div>
+                <div class="col-md-2"><label>Bloqueo inicial (h)</label><input type="number" name="bloqueo_horas" class="form-control" value="<?php echo $bloqueo_horas; ?>"></div>
+                <div class="col-md-2"><label>Bloqueo avanzado (h)</label><input type="number" name="bloqueo_incremento" class="form-control" value="<?php echo $bloqueo_incremento; ?>"></div>
+                <div class="col-md-2"><label>RPS por IP</label><input type="number" name="rps_limite" class="form-control" value="<?php echo $rps_limite; ?>"></div>
+                <div class="col-md-2"><label>RPS Global (%)</label><input type="number" name="rps_global_porcentaje" class="form-control" value="<?php echo $rps_global; ?>"></div>
+                <div class="col-md-2"><button type="submit" class="btn btn-dios w-100 mt-4">Guardar</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- GESTIÓN DE USUARIOS CON BUSCADOR EN TIEMPO REAL -->
+    <div class="card card-dios mt-3">
+        <div class="card-header-dios"><i class="fas fa-users"></i> Gestión de Usuarios</div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-8">
+                    <div class="input-group">
+                        <input type="text" id="searchInput" class="form-control" placeholder="🔍 Buscar en tiempo real (nombre, email, username o ID)..." autocomplete="off" data-token="<?php echo htmlspecialchars($_SESSION['dios_ajax_token']); ?>">
+                        <div class="input-group-append">
+                            <button class="btn btn-dios" type="button" id="searchBtn">
+                                <i class="fas fa-search"></i> Buscar
+                            </button>
+                            <button class="btn btn-secondary" type="button" id="clearSearch" style="display: none;">
+                                <i class="fas fa-times"></i> Limpiar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 text-right">
+                    <span class="resultados-info" id="resultadosInfo">
+                        Total: <?php echo $total_usuarios; ?> usuarios
+                    </span>
+                </div>
+            </div>
+            
+            <div id="tablaUsuarios">
+                <div class="table-responsive">
+                    <table class="table table-dios table-bordered">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Email</th>
+                                <th>Username</th>
+                                <th>Estado</th>
+                                <th width="180">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if(mysqli_num_rows($usuarios) > 0): ?>
+                                <?php while($u = mysqli_fetch_assoc($usuarios)): ?>
+                                <tr>
+                                    <td><?php echo $u['id']; ?></td>
+                                    <td><?php echo htmlspecialchars($u['nombre']); ?></td>
+                                    <td><?php echo htmlspecialchars($u['email']); ?></td>
+                                    <td><?php echo htmlspecialchars($u['username']); ?></td>
+                                    <td><?php echo $u['status'] == 1 ? '<span class="badge badge-success"><i class="fas fa-check-circle"></i> ACTIVO</span>' : '<span class="badge badge-danger"><i class="fas fa-ban"></i> BLOQUEADO</span>'; ?></td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-sm btn-warning" onclick="abrirModal(<?php echo $u['id']; ?>, '<?php echo addslashes($u['nombre']); ?>', '<?php echo addslashes($u['email']); ?>')">
+                                                <i class="fas fa-key"></i> Clave
+                                            </button>
+                                            <?php if($u['status'] == 1): ?>
+                                                <form method="POST" class="d-inline" onsubmit="return confirm('¿Bloquear a <?php echo addslashes($u['nombre']); ?>?')">
+                                                    <?php echo $csrf_field; ?>
+                                                    <input type="hidden" name="accion" value="bloquear_usuario">
+                                                    <input type="hidden" name="user_id" value="<?php echo $u['id']; ?>">
+                                                    <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-lock"></i> Bloq</button>
+                                                </form>
+                                            <?php else: ?>
+                                                <form method="POST" class="d-inline" onsubmit="return confirm('¿Desbloquear a <?php echo addslashes($u['nombre']); ?>?')">
+                                                    <?php echo $csrf_field; ?>
+                                                    <input type="hidden" name="accion" value="desbloquear_usuario">
+                                                    <input type="hidden" name="user_id" value="<?php echo $u['id']; ?>">
+                                                    <button type="submit" class="btn btn-sm btn-success"><i class="fas fa-unlock-alt"></i> Desbloq</button>
+                                                </form>
+                                            <?php endif; ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endwhile; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="6" class="text-center">No hay usuarios registrados</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="paginacionUsuarios">
+                <?php if($total_paginas > 1): ?>
+                <nav>
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item <?php echo $pagina <= 1 ? 'disabled' : ''; ?>">
+                            <a class="page-link" href="?pagina=<?php echo $pagina-1; ?>&buscar=<?php echo urlencode($buscar); ?>">« Anterior</a>
+                        </li>
+                        <?php for($i = 1; $i <= $total_paginas; $i++): ?>
+                            <li class="page-item <?php echo $i == $pagina ? 'active' : ''; ?>">
+                                <a class="page-link" href="?pagina=<?php echo $i; ?>&buscar=<?php echo urlencode($buscar); ?>"><?php echo $i; ?></a>
+                            </li>
+                        <?php endfor; ?>
+                        <li class="page-item <?php echo $pagina >= $total_paginas ? 'disabled' : ''; ?>">
+                            <a class="page-link" href="?pagina=<?php echo $pagina+1; ?>&buscar=<?php echo urlencode($buscar); ?>">Siguiente »</a>
+                        </li>
+                    </ul>
+                </nav>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- IPs BLOQUEADAS -->
+    <div class="row mt-3">
+        <div class="col-md-6">
+            <div class="card card-dios">
+                <div class="card-header-dios"><i class="fas fa-ban"></i> IPs Bloqueadas</div>
+                <div class="card-body">
+                    <?php if(mysqli_num_rows($bloqueos) > 0): ?>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead><tr><th>IP</th><th>Email</th><th>Desbloqueo</th><th></th></tr></thead>
+                                <tbody>
+                                <?php while($row = mysqli_fetch_assoc($bloqueos)): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($row['ip']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['email'] ?: 'N/A'); ?></td>
+                                        <td><?php echo htmlspecialchars($row['desbloqueo_en']); ?></td>
+                                        <td>
+                                            <form method="POST" onsubmit="return confirm('¿Desbloquear IP <?php echo htmlspecialchars($row['ip']); ?>?')">
+                                                <?php echo $csrf_field; ?>
+                                                <input type="hidden" name="accion" value="desbloquear_ip">
+                                                <input type="hidden" name="ip" value="<?php echo htmlspecialchars($row['ip']); ?>">
+                                                <button type="submit" class="btn btn-sm btn-dios-success">
+                                                    <i class="fas fa-unlock-alt"></i> Desbloquear
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <?php endwhile; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <form method="POST" onsubmit="return confirm('¿Desbloquear TODAS las IPs?')">
+                            <?php echo $csrf_field; ?>
+                            <input type="hidden" name="accion" value="desbloquear_todo">
+                            <button type="submit" class="btn btn-warning btn-sm">
+                                <i class="fas fa-unlock-alt"></i> Desbloquear Todos
+                            </button>
+                        </form>
+                    <?php else: ?>
+                        <p class="text-success">✅ No hay bloqueos activos</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card card-dios">
+                <div class="card-header-dios"><i class="fas fa-exclamation-triangle"></i> Top IPs Sospechosas</div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead><tr><th>IP</th><th>Intentos</th></tr></thead>
+                            <tbody id="topIpsBody">
+                            <?php while($row = mysqli_fetch_assoc($top_ips)): ?>
+                                <tr><td><?php echo htmlspecialchars($row['ip']); ?></td><td class="text-danger"><?php echo htmlspecialchars($row['total']); ?></td></tr>
+                            <?php endwhile; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACCIONES RÁPIDAS -->
+    <div class="card card-dios mt-3">
+        <div class="card-header-dios"><i class="fas fa-bolt"></i> Acciones Rápidas</div>
+        <div class="card-body">
+            <form method="POST" class="d-inline">
+                <?php echo $csrf_field; ?>
+                <input type="hidden" name="accion" value="resetear_tokens">
+                <button type="submit" class="btn btn-dios-danger" onclick="return confirm('¿Invalidar TODOS los tokens?')">
+                    <i class="fas fa-times-circle"></i> Invalidar Tokens
+                </button>
+            </form>
+            <form method="POST" class="d-inline">
+                <?php echo $csrf_field; ?>
+                <input type="hidden" name="accion" value="limpiar_logs">
+                <input type="hidden" name="periodo" value="7">
+                <button type="submit" class="btn btn-warning">
+                    <i class="fas fa-broom"></i> Limpiar Logs (7d)
+                </button>
+            </form>
+            <form method="POST" class="d-inline">
+                <?php echo $csrf_field; ?>
+                <input type="hidden" name="accion" value="limpiar_todo">
+                <button type="submit" class="btn btn-secondary" onclick="return confirm('¿Eliminar TODOS los logs? Esta acción NO se puede deshacer')">
+                    <i class="fas fa-trash-alt"></i> Limpiar Todo
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- LOG DE INTENTOS -->
+    <div class="card card-dios mt-3 mb-4">
+        <div class="card-header-dios"><i class="fas fa-history"></i> Log de Intentos</div>
+        <div class="card-body table-responsive">
+            <table class="table table-sm">
+                <thead><tr><th>Fecha</th><th>IP</th><th>Email</th><th>Tipo</th><th>User Agent</th></tr></thead>
+                <tbody>
+                <?php while($row = mysqli_fetch_assoc($logs_recientes)): ?>
+                    <tr>
+                        <td><small><?php echo $row['fecha']; ?></small></td>
+                        <td><?php echo $row['ip']; ?></td>
+                        <td><?php echo $row['email'] ?: 'N/A'; ?></td>
+                        <td><span class="badge badge-warning"><?php echo $row['tipo']; ?></span></td>
+                        <td><small><?php echo substr($row['user_agent'], 0, 40); ?>...</small></td>
+                    </tr>
+                <?php endwhile; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL ÚNICO -->
+<div class="modal fade" id="modalPasswordUnico" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form method="POST" id="formCambiarPassword">
+                <?php echo $csrf_field; ?>
+                <input type="hidden" name="accion" value="cambiar_password">
+                <input type="hidden" name="user_id" id="modal_user_id">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-key"></i> Cambiar contraseña</h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Usuario:</strong> <span id="modal_nombre"></span></p>
+                    <p><strong>Email:</strong> <span id="modal_email"></span></p>
+                    <div class="form-group">
+                        <label>Nueva contraseña:</label>
+                        <input type="text" name="nueva_password" class="form-control" required autocomplete="off">
+                        <small class="text-muted">La contraseña se guardará de forma segura</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-dios">Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Función para abrir el modal
+function abrirModal(id, nombre, email) {
+    document.getElementById('modal_user_id').value = id;
+    document.getElementById('modal_nombre').innerText = nombre;
+    document.getElementById('modal_email').innerText = email;
+    $('#modalPasswordUnico').modal('show');
+}
+
+// ==============================================
+// ACTUALIZACIÓN AUTOMÁTICA DE ESTADÍSTICAS
+// ==============================================
+function actualizarEstadisticas() {
+    $.ajax({
+        url: 'ajax_rps.php',
+        type: 'GET',
+        dataType: 'json',
+        cache: false,
+        success: function(data) {
+            if (data.error) {
+                console.log('Error:', data.error);
+                return;
+            }
+            
+            // Actualizar RPS Actual
+            $('#rpsActual').text(data.rps_actual);
+            
+            // Cambiar color según el nivel de RPS
+            var indicator = $('#rpsIndicator');
+            if (data.rps_actual > 15) {
+                indicator.html(' 🔴 Alto');
+                indicator.css('color', '#ff4444');
+            } else if (data.rps_actual > 8) {
+                indicator.html(' 🟡 Medio');
+                indicator.css('color', '#ffaa00');
+            } else {
+                indicator.html(' 🟢 Bajo');
+                indicator.css('color', '#00ff00');
+            }
+            
+            // Actualizar Intentos Hoy
+            $('#intentosHoy').text(data.intentos_hoy);
+            
+            // Actualizar Bloqueos Activos
+            $('#bloqueosActivos').text(data.bloqueos_activos);
+            
+            // Actualizar Tokens Inválidos
+            $('#tokensInvalidos').text(data.tokens_invalidos);
+            
+            // Actualizar Top IPs Sospechosas
+            if (data.top_ips && data.top_ips.length > 0) {
+                var html = '';
+                data.top_ips.forEach(function(ip) {
+                    html += '<tr><td>' + ip.ip + '</td><td class="text-danger">' + ip.total + ' intentos</td></tr>';
+                });
+                if ($('#topIpsBody').length) {
+                    $('#topIpsBody').html(html);
+                }
+            }
+        },
+        error: function(xhr, status, error) {
+            console.log('Error al actualizar estadísticas:', error);
+        }
+    });
+}
+
+// Actualizar cada 3 segundos
+$(document).ready(function() {
+    actualizarEstadisticas();
+    setInterval(actualizarEstadisticas, 3000);
+});
+
+// BUSCADOR EN TIEMPO REAL
+$(document).ready(function() {
+    var timeoutId;
+    
+    function cargarUsuarios(searchTerm, page) {
+        if (page === undefined) page = 1;
+        
+        $('#tablaUsuarios').html('<div class="text-center p-5"><i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando...</div>');
+        
+        $.ajax({
+            url: 'ajax_usuarios.php',
+            type: 'GET',
+            data: { buscar: searchTerm, pagina: page },
+            dataType: 'json',
+            success: function(response) {
+                if (response.html) {
+                    $('#tablaUsuarios').html(response.html);
+                    $('#paginacionUsuarios').html(response.paginacion);
+                    $('#resultadosInfo').html('<i class="fas fa-users"></i> Total: ' + response.total + ' usuarios | Mostrando ' + response.mostrando);
+                }
+            },
+            error: function(xhr, status, error) {
+                $('#tablaUsuarios').html('<div class="alert alert-danger">Error al cargar los datos: ' + error + '</div>');
+            }
+        });
+    }
+    
+    // Búsqueda al escribir (con delay de 500ms)
+    $('#searchInput').on('keyup', function() {
+        var searchTerm = $(this).val();
+        clearTimeout(timeoutId);
+        
+        if (searchTerm.length >= 2 || searchTerm.length === 0) {
+            timeoutId = setTimeout(function() {
+                cargarUsuarios(searchTerm, 1);
+                if (searchTerm.length > 0) {
+                    $('#clearSearch').show();
+                } else {
+                    $('#clearSearch').hide();
+                }
+            }, 500);
+        }
+    });
+    
+    // Botón de búsqueda manual
+    $('#searchBtn').on('click', function() {
+        var searchTerm = $('#searchInput').val();
+        cargarUsuarios(searchTerm, 1);
+        if (searchTerm.length > 0) {
+            $('#clearSearch').show();
+        } else {
+            $('#clearSearch').hide();
+        }
+    });
+    
+    // Limpiar búsqueda
+    $('#clearSearch').on('click', function() {
+        $('#searchInput').val('');
+        cargarUsuarios('', 1);
+        $(this).hide();
+    });
+    
+    // Paginación dinámica
+    $(document).on('click', '#paginacionUsuarios .page-link', function(e) {
+        e.preventDefault();
+        var page = $(this).data('page');
+        var searchTerm = $('#searchInput').val();
+        if (page && !$(this).parent().hasClass('disabled')) {
+            cargarUsuarios(searchTerm, page);
+            $('html, body').animate({ scrollTop: $('#tablaUsuarios').offset().top - 100 }, 300);
+        }
+    });
+});
+</script>
+
+<?php include("footer_dios.php"); ?>

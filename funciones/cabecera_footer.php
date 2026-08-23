@@ -152,7 +152,12 @@ $bootstrap_head ='
 ';
 
 
-$footer_correo = '<p>Siempre podra acceder aqui a su <a href="'.$pag_web.'/usuario/billetera.php" target="_blank">Billetera Virtual</a> <br><br>--<br><strong>Este es un producto ofrecido con el respaldo de J.E Suministros y Mas, C.A.</strong><br><em>Nuestra Web Principal: <a href="http://www.jesuministrosymas.com.ve" target="_blank" rel="noopener">http://www.jesuministrosymas.com.ve</a><br>La Plataforma de Gestion de Recargas: <a href="https://virtual.jesuministrosymas.com.ve" target="_blank" rel="noopener">https://virtual.jesuministrosymas.com.ve</a><br>Puedes solicitar atencion personalizada via <a href="https://wa.me/584141448515?text=Me%20gustar&iacute;a%20contactar%20con%20ustedes%20exponiendo%20el%20caso%20a%20continuacion:%20" target="_blank" rel="noopener">WHATSAPP</a><br>Unete a nuestro canal de Telegram <a href="https://t.me/jesuministrosymas" target="_blank" rel="noopener">Telegram JESUMINISTROSYMAS</a><br><br>Para dejar de recibir este tipo de correos favor, env&iacute;a un correo electr&oacute;nico a: <a href="mailto:gestionderecargas+unsubscribe@googlegroups.com" target="_blank" rel="noopener"> gestionderecargas+unsubscribe@googlegroups.com</a> y de manera automatica dejaras de recibir correos automatizados de nuestro sistema.</em><br><strong>J.E Suministros y Mas, C.A.<br>Rif: J-29444489-0</strong></p>';
-
+$footer_correo = '
+<div style="background-color: #f0f0f0; padding: 20px; text-align: center; border-top: 3px solid #003366; font-family: Arial, sans-serif; margin-top: 30px;">
+    <p style="color: #003366; font-size: 16px; margin: 0; font-weight: bold;">🏛️ Universidad Politécnica Territorial de Puerto Cabello (UPTPC)</p>
+    <p style="color: #666; font-size: 13px; margin: 5px 0 0;">Sistema de Control de Estudios</p>
+    <p style="color: #999; font-size: 12px; margin: 10px 0 0;">Este es un mensaje automático, por favor no responder a este correo.</p>
+    <p style="color: #999; font-size: 11px; margin: 5px 0 0;">© ' . date('Y') . ' - Todos los derechos reservados</p>
+</div>';
 
  ?>
