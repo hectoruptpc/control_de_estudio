@@ -338,7 +338,7 @@ if (!empty($mensaje)) {
                                 <tr>
                                     <td><?php echo htmlspecialchars($est['cedula']); ?></td>
                                     <td><?php echo htmlspecialchars($est['nombre']); ?></td>
-                                    <td><?php echo htmlspecialchars($est['carrera']); ?></td>
+                                    <td><?php echo htmlspecialchars($est['nombre_carrera'] ?? $est['carrera']); ?></td>
                                     <td>
                                         <?php echo htmlspecialchars($est['contacto']); ?><br>
                                         <small><?php echo htmlspecialchars($est['email']); ?></small>

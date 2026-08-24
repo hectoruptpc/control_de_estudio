@@ -1309,84 +1309,10 @@ function obtenerLimiteSeccionesDirector($carrera_id, $turno, $id_periodo) {
 /**
  * Obtiene lista de números de sección autorizados por Secretaría para una carrera y turno.
  */
-function obtenerNumerosSeccionDisponibles($carreraId, $turno) {
-    $cupos = obtenerCuposSecretaria();
-    if (empty($cupos[$carreraId][$turno]) || (int)$cupos[$carreraId][$turno]['numero_secciones'] <= 0) {
-        return [];
-    }
-
-    $max = (int)$cupos[$carreraId][$turno]['numero_secciones'];
-    global $db;
-
-    $query = "SELECT numero_seccion FROM secciones WHERE id_carrera = ? AND turno = ? AND status IN ('Pendiente', 'Aprobada')";
-    $stmt = $db->prepare($query);
-    $usedNumbers = [];
-    if ($stmt) {
-        $stmt->bind_param('is', $carreraId, $turno);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $usedNumbers[] = (int)$row['numero_seccion'];
-        }
-        $stmt->close();
-    }
-
-    $result = [];
-    for ($i = 1; $i <= $max; $i++) {
-        $result[] = [
-            'numero' => $i,
-            'disponible' => !in_array($i, $usedNumbers, true)
-        ];
-    }
-    return $result;
-}
 
 /**
  * Obtiene lista de códigos de sección disponibles según rangos definidos.
  */
-function obtenerCodigosSeccionDisponibles($carreraId, $turno) {
-    global $db;
-    $rangos = [];
-    $query = "SELECT codigo_inicio, codigo_fin FROM codigos_secciones WHERE id_carrera = ? ORDER BY codigo_inicio";
-    $stmt = $db->prepare($query);
-    if ($stmt) {
-        $stmt->bind_param('i', $carreraId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $rangos[] = $row;
-        }
-        $stmt->close();
-    }
-
-    if (empty($rangos)) {
-        return [];
-    }
-
-    $usedCodes = [];
-    $query_usados = "SELECT DISTINCT CAST(codigo_seccion AS UNSIGNED) as codigo_num FROM secciones WHERE id_carrera = ? AND turno = ? AND codigo_seccion REGEXP '^[0-9]+$' AND status IN ('Pendiente', 'Aprobada')";
-    $stmt_usados = $db->prepare($query_usados);
-    if ($stmt_usados) {
-        $stmt_usados->bind_param('is', $carreraId, $turno);
-        $stmt_usados->execute();
-        $result_usados = $stmt_usados->get_result();
-        while ($row = $result_usados->fetch_assoc()) {
-            $usedCodes[] = (int)$row['codigo_num'];
-        }
-        $stmt_usados->close();
-    }
-
-    $available = [];
-    foreach ($rangos as $rango) {
-        for ($codigo = (int)$rango['codigo_inicio']; $codigo <= (int)$rango['codigo_fin']; $codigo++) {
-            if (!in_array($codigo, $usedCodes, true)) {
-                $available[] = $codigo;
-            }
-        }
-    }
-
-    return $available;
-}
 
 
 
@@ -1430,22 +1356,6 @@ function obtenerCuposDisponiblesPorCarreraYTurno($carreraId, $turno) {
 /**
  * Obtiene todos los cupos disponibles para todas las carreras y turnos
  */
-function obtenerTodosLosCuposDisponibles() {
-    global $db;
-    
-    $carreras = obtenerTodasLasCarreras();
-    $turnos = ['Diurno', 'Nocturno'];
-    $resultados = [];
-    
-    foreach ($carreras as $carrera) {
-        $carreraId = $carrera['id'];
-        foreach ($turnos as $turno) {
-            $resultados[$carreraId][$turno] = obtenerCuposDisponiblesPorCarreraYTurno($carreraId, $turno);
-        }
-    }
-    
-    return $resultados;
-}
 
 
 
@@ -1549,30 +1459,6 @@ function contarPreinscripcionesAprobadasPorCarreraYTurno($carreraId, $turno) {
 /**
  * Obtiene o crea automáticamente la configuración de cupos para una carrera y turno
  */
-function obtenerOCrearCupos($carreraId, $turno, $cuposPorDefecto = 30) {
-    global $db;
-    
-    // Verificar si existe
-    $query = "SELECT id, cupos_totales FROM secretaria_cupos WHERE carrera_id = ? AND turno = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param('is', $carreraId, $turno);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $cupo = $result->fetch_assoc();
-    
-    if (!$cupo) {
-        // Crear cupos por defecto
-        $insert = $db->prepare("INSERT INTO secretaria_cupos (carrera_id, turno, cupos_totales, numero_secciones, updated_at) VALUES (?, ?, ?, 1, NOW())");
-        $insert->bind_param('isi', $carreraId, $turno, $cuposPorDefecto);
-        if ($insert->execute()) {
-            error_log("Cupos creados automáticamente para carrera $carreraId, turno $turno con $cuposPorDefecto cupos");
-            return $cuposPorDefecto;
-        }
-        return 0;
-    }
-    
-    return (int)$cupo['cupos_totales'];
-}
 
 /**
  * Obtiene secciones aprobadas por carrera y turno
@@ -1632,27 +1518,6 @@ function contarEstudiantesEnSeccion($seccion_id) {
 /**
  * Verifica si una sección tiene cupos disponibles
  */
-function seccionTieneCuposDisponibles($seccion_id) {
-    global $db;
-    
-    // Obtener capacidad máxima
-    $query = "SELECT capacidad_maxima FROM secciones WHERE id_seccion = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param('i', $seccion_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $seccion = $result->fetch_assoc();
-    $stmt->close();
-    
-    if (!$seccion) {
-        return false;
-    }
-    
-    $capacidad_maxima = $seccion['capacidad_maxima'];
-    $inscritos = contarEstudiantesEnSeccion($seccion_id);
-    
-    return $inscritos < $capacidad_maxima;
-}
 
 
 
@@ -1854,54 +1719,6 @@ function aprobarSeccion($seccionId, $approvedBy) {
 /**
  * Obtiene las secciones aprobadas (visibles para estudiantes)
  */
-function obtenerSeccionesAprobadas($carrera_id = null, $turno = null) {
-    global $db;
-    
-    $query = "SELECT 
-        s.*, 
-        c.nombre_carrera AS carrera_nombre
-    FROM secciones s 
-    JOIN carreras c ON s.id_carrera = c.id_carrera 
-    WHERE s.status = 'aprobada' AND s.estatus = 'activa'";
-    
-    $params = [];
-    $types = "";
-    
-    if ($carrera_id) {
-        $query .= " AND s.id_carrera = ?";
-        $params[] = $carrera_id;
-        $types .= "i";
-    }
-    
-    if ($turno) {
-        $query .= " AND s.turno = ?";
-        $params[] = $turno;
-        $types .= "s";
-    }
-    
-    $query .= " ORDER BY s.codigo_seccion ASC";
-    
-    $stmt = $db->prepare($query);
-    if (!$stmt) {
-        error_log("Error prepare obtenerSeccionesAprobadas: " . $db->error);
-        return [];
-    }
-    
-    if (!empty($params)) {
-        $stmt->bind_param($types, ...$params);
-    }
-    
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $secciones = [];
-    while ($row = $result->fetch_assoc()) {
-        $secciones[] = $row;
-    }
-    
-    $stmt->close();
-    return $secciones;
-}
 
 
 
@@ -3594,114 +3411,6 @@ function actualizarCarrera(
 /**
  * Función para eliminar carrera (eliminación lógica)
  */
-function eliminarCarrera($id_carrera): array {
-    global $db;
-    
-    try {
-        // Obtener información de la carrera antes de eliminar
-        $carrera_info = obtenerCarreraPorId($id_carrera);
-        if (!$carrera_info) {
-            return [
-                'success' => false,
-                'message' => 'Carrera no encontrada'
-            ];
-        }
-        
-        // Verificar si hay estudiantes asociados a esta carrera
-        $check_estudiantes = $db->prepare("SELECT COUNT(*) as total FROM users WHERE carrera = ? AND estudiante = 1 AND status = 1");
-        if ($check_estudiantes) {
-            $check_estudiantes->bind_param("i", $id_carrera);
-            $check_estudiantes->execute();
-            $result = $check_estudiantes->get_result();
-            $estudiantes_count = $result->fetch_assoc()['total'];
-            $check_estudiantes->close();
-            
-            if ($estudiantes_count > 0) {
-                return [
-                    'success' => false,
-                    'message' => "No se puede eliminar la carrera porque tiene $estudiantes_count estudiante(s) asociado(s)"
-                ];
-            }
-        }
-        
-        // Realizar eliminación lógica (desactivar)
-        $query = "UPDATE carreras SET activa = 0 WHERE id_carrera = ?";
-        $stmt = $db->prepare($query);
-        if (!$stmt) {
-            throw new Exception("Error en preparación: " . $db->error);
-        }
-        
-        $stmt->bind_param("i", $id_carrera);
-        $resultado = $stmt->execute();
-        $affected_rows = $stmt->affected_rows;
-        $stmt->close();
-        
-        if ($resultado && $affected_rows > 0) {
-            // REGISTRAR EN AUDITORÍA - ELIMINACIÓN DE CARRERA
-            if (function_exists('registrarAuditoria')) {
-                try {
-                    registrarAuditoria(
-                        "UPDATE", 
-                        "carreras", 
-                        $id_carrera, 
-                        [
-                            'activa' => $carrera_info['activa'],
-                            'nombre_carrera' => $carrera_info['nombre_carrera'],
-                            'cod_carrera' => $carrera_info['cod_carrera']
-                        ], 
-                        [
-                            'activa' => 0,
-                            'estado' => 'Eliminada (desactivada)'
-                        ], 
-                        "Carreras", 
-                        "Eliminación lógica de carrera"
-                    );
-                } catch (Exception $e) {
-                    error_log("Error en auditoría eliminarCarrera: " . $e->getMessage());
-                }
-            }
-            
-            return [
-                'success' => true,
-                'message' => 'Carrera eliminada exitosamente',
-                'affected_rows' => $affected_rows
-            ];
-        } else {
-            return [
-                'success' => false,
-                'message' => 'No se realizaron cambios en la carrera'
-            ];
-        }
-        
-    } catch (Exception $e) {
-        error_log("Error en eliminarCarrera: " . $e->getMessage());
-        
-        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR CARRERA
-        if (function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "ERROR", 
-                    "carreras", 
-                    $id_carrera, 
-                    null, 
-                    [
-                        'id_carrera' => $id_carrera,
-                        'error' => $e->getMessage()
-                    ], 
-                    "Carreras", 
-                    "Error al eliminar carrera"
-                );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de error eliminarCarrera: " . $auditError->getMessage());
-            }
-        }
-        
-        return [
-            'success' => false,
-            'message' => 'Error al eliminar carrera: ' . $e->getMessage()
-        ];
-    }
-}
 
 
 
@@ -4363,53 +4072,6 @@ function obtenerDocentes() {
  * 
  * @return array Array asociativo con todos los docentes encontrados, ordenados por nombre
  */
-function getDocentes() {
-    // Accede a la conexión de la base de datos definida globalmente
-    global $db;
-    
-    try {
-        // Inicializa el array que contendrá los resultados
-        $docentes = array();
-        
-        // Consulta SQL con parámetro para docente (aunque sea fijo, lo preparamos igual)
-        $sql = "SELECT * FROM users WHERE docente = ? ORDER BY nombre ASC";
-        
-        // Prepara la sentencia SQL
-        if ($stmt = $db->prepare($sql)) {
-            // Valor fijo para docente (1 = true)
-            $docente = 1;
-            
-            // Vincula el parámetro (aunque sea fijo, se trata como parámetro)
-            $stmt->bind_param("i", $docente);
-            
-            // Ejecuta la consulta
-            $stmt->execute();
-            
-            // Obtiene el resultado
-            $result = $stmt->get_result();
-            
-            // Recorre los resultados y los agrega al array
-            while ($row = $result->fetch_assoc()) {
-                $docentes[] = $row;
-            }
-            
-            // Cierra el statement y libera memoria
-            $stmt->close();
-            
-            // Libera el resultado (no es estrictamente necesario ya que close() lo hace)
-            if (isset($result)) {
-                $result->free();
-            }
-        }
-        
-        // Retorna el array de docentes (vacío si no hay resultados)
-        return $docentes;
-        
-    } catch (Exception $e) {
-        error_log("Error en getDocentes: " . $e->getMessage());
-        return [];
-    }
-}
 
 /**
  * Cambia el estado de un docente (activo/inactivo)
@@ -4418,97 +4080,6 @@ function getDocentes() {
  * @param int $nuevo_estado Nuevo estado (1 para activo, 0 para inactivo)
  * @return array Resultado de la operación
  */
-function cambiarEstadoDocente($docente_id, $nuevo_estado) {
-    global $db;
-    
-    try {
-        // Obtener información actual del docente para auditoría
-        $docente_actual = obtenerDocentePorId($docente_id);
-        if (!$docente_actual) {
-            return [
-                'success' => false,
-                'message' => 'Docente no encontrado'
-            ];
-        }
-
-        $stmt = $db->prepare("UPDATE users SET status = ? WHERE id = ? AND docente = 1");
-        
-        if (!$stmt) {
-            throw new Exception("Error en preparación: " . $db->error);
-        }
-        
-        $stmt->bind_param("ii", $nuevo_estado, $docente_id);
-        
-        if (!$stmt->execute()) {
-            throw new Exception("Error en ejecución: " . $stmt->error);
-        }
-        
-        $affected_rows = $stmt->affected_rows;
-        $stmt->close();
-        
-        // REGISTRAR EN AUDITORÍA - CAMBIO DE ESTADO DE DOCENTE
-        if ($affected_rows > 0 && function_exists('registrarAuditoria')) {
-            try {
-                $estado_texto_anterior = $docente_actual['status'] ? 'Activo' : 'Inactivo';
-                $estado_texto_nuevo = $nuevo_estado ? 'Activo' : 'Inactivo';
-                
-                registrarAuditoria(
-                    "UPDATE", 
-                    "users", 
-                    $docente_id, 
-                    [
-                        'status' => $docente_actual['status'],
-                        'estado_anterior' => $estado_texto_anterior
-                    ], 
-                    [
-                        'status' => $nuevo_estado,
-                        'estado_nuevo' => $estado_texto_nuevo,
-                        'nombre_docente' => $docente_actual['nombre'],
-                        'idusuario' => $docente_actual['idusuario']
-                    ], 
-                    "Docentes", 
-                    "Cambio de estado de docente"
-                );
-            } catch (Exception $e) {
-                error_log("Error en auditoría cambiarEstadoDocente: " . $e->getMessage());
-            }
-        }
-        
-        return [
-            'success' => true,
-            'message' => 'Estado del docente actualizado exitosamente',
-            'affected_rows' => $affected_rows
-        ];
-        
-    } catch (Exception $e) {
-        error_log("Error en cambiarEstadoDocente: " . $e->getMessage());
-        
-        // REGISTRAR EN AUDITORÍA - ERROR AL CAMBIAR ESTADO
-        if (function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "ERROR", 
-                    "users", 
-                    $docente_id, 
-                    null, 
-                    [
-                        'nuevo_estado' => $nuevo_estado,
-                        'error' => $e->getMessage()
-                    ], 
-                    "Docentes", 
-                    "Error al cambiar estado de docente"
-                );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de error cambiarEstadoDocente: " . $auditError->getMessage());
-            }
-        }
-        
-        return [
-            'success' => false,
-            'message' => 'Error al cambiar estado del docente: ' . $e->getMessage()
-        ];
-    }
-}
 
 /**
  * Elimina un docente (eliminación lógica)
@@ -4516,116 +4087,6 @@ function cambiarEstadoDocente($docente_id, $nuevo_estado) {
  * @param int $docente_id ID del docente a eliminar
  * @return array Resultado de la operación
  */
-function eliminarDocente($docente_id) {
-    global $db;
-    
-    try {
-        // Obtener información del docente antes de eliminar
-        $docente_info = obtenerDocentePorId($docente_id);
-        if (!$docente_info) {
-            return [
-                'success' => false,
-                'message' => 'Docente no encontrado'
-            ];
-        }
-
-        // Verificar si el docente tiene asignaciones activas
-        $check_asignaciones = $db->prepare("SELECT COUNT(*) as total FROM docente_seccion WHERE id_usuario = ? AND estatus = 1");
-        if ($check_asignaciones) {
-            $check_asignaciones->bind_param("i", $docente_id);
-            $check_asignaciones->execute();
-            $result = $check_asignaciones->get_result();
-            $asignaciones_count = $result->fetch_assoc()['total'];
-            $check_asignaciones->close();
-            
-            if ($asignaciones_count > 0) {
-                return [
-                    'success' => false,
-                    'message' => "No se puede eliminar el docente porque tiene $asignaciones_count asignación(es) activa(s)"
-                ];
-            }
-        }
-
-        // Realizar eliminación lógica (desactivar)
-        $query = "UPDATE users SET status = 0, docente = 0 WHERE id = ?";
-        $stmt = $db->prepare($query);
-        if (!$stmt) {
-            throw new Exception("Error en preparación: " . $db->error);
-        }
-        
-        $stmt->bind_param("i", $docente_id);
-        $resultado = $stmt->execute();
-        $affected_rows = $stmt->affected_rows;
-        $stmt->close();
-        
-        if ($resultado && $affected_rows > 0) {
-            // REGISTRAR EN AUDITORÍA - ELIMINACIÓN DE DOCENTE
-            if (function_exists('registrarAuditoria')) {
-                try {
-                    registrarAuditoria(
-                        "UPDATE", 
-                        "users", 
-                        $docente_id, 
-                        [
-                            'status' => $docente_info['status'],
-                            'docente' => $docente_info['docente'],
-                            'nombre_docente' => $docente_info['nombre'],
-                            'idusuario' => $docente_info['idusuario']
-                        ], 
-                        [
-                            'status' => 0,
-                            'docente' => 0,
-                            'estado' => 'Eliminado (desactivado)'
-                        ], 
-                        "Docentes", 
-                        "Eliminación lógica de docente"
-                    );
-                } catch (Exception $e) {
-                    error_log("Error en auditoría eliminarDocente: " . $e->getMessage());
-                }
-            }
-            
-            return [
-                'success' => true,
-                'message' => 'Docente eliminado exitosamente',
-                'affected_rows' => $affected_rows
-            ];
-        } else {
-            return [
-                'success' => false,
-                'message' => 'No se realizaron cambios en el docente'
-            ];
-        }
-        
-    } catch (Exception $e) {
-        error_log("Error en eliminarDocente: " . $e->getMessage());
-        
-        // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR DOCENTE
-        if (function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "ERROR", 
-                    "users", 
-                    $docente_id, 
-                    null, 
-                    [
-                        'docente_id' => $docente_id,
-                        'error' => $e->getMessage()
-                    ], 
-                    "Docentes", 
-                    "Error al eliminar docente"
-                );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de error eliminarDocente: " . $auditError->getMessage());
-            }
-        }
-        
-        return [
-            'success' => false,
-            'message' => 'Error al eliminar docente: ' . $e->getMessage()
-        ];
-    }
-}
 
 
 
@@ -4834,46 +4295,6 @@ function obtenerCarrerasCompleta() {
  * Obtiene los años (distinct) en los que existe una carrera con el mismo código
  * útil para mostrar versiones históricas por año
  */
-function obtenerAniosPorCodigoCarrera($cod_carrera) {
-    global $db;
-
-    $anios = [];
-    // Buscar años en la tabla carreras
-    $query1 = "SELECT DISTINCT YEAR(created_at) AS anio FROM carreras WHERE cod_carrera = ? AND created_at IS NOT NULL";
-    if ($stmt = $db->prepare($query1)) {
-        $stmt->bind_param('s', $cod_carrera);
-        if ($stmt->execute()) {
-            $result = $stmt->get_result();
-            while ($row = $result->fetch_assoc()) {
-                if (!empty($row['anio']) && !in_array($row['anio'], $anios)) $anios[] = $row['anio'];
-            }
-            $result->free();
-        }
-        $stmt->close();
-    }
-
-    // Buscar años en la tabla de versiones si existe
-    $check = $db->query("SHOW TABLES LIKE 'carrera_versiones'");
-    if ($check && $check->num_rows > 0) {
-        $query2 = "SELECT DISTINCT YEAR(fecha_vigencia) AS anio FROM carrera_versiones v JOIN carreras c ON v.id_carrera = c.id_carrera WHERE c.cod_carrera = ? AND v.fecha_vigencia IS NOT NULL";
-        if ($stmt = $db->prepare($query2)) {
-            $stmt->bind_param('s', $cod_carrera);
-            if ($stmt->execute()) {
-                $result = $stmt->get_result();
-                while ($row = $result->fetch_assoc()) {
-                    if (!empty($row['anio']) && !in_array($row['anio'], $anios)) $anios[] = $row['anio'];
-                }
-                $result->free();
-            }
-            $stmt->close();
-        }
-    }
-
-    // Ordenar desc
-    rsort($anios);
-
-    return $anios;
-}
 
 /**
  * Obtiene versiones (id + fecha) para un código de carrera
@@ -4933,61 +4354,14 @@ function obtenerVersionesPorIdCarrera($id_carrera) {
 /**
  * Asigna una materia a una versión específica de carrera
  */
-function asignarMateriaAVersion($id_version, $id_materia, $semestre) {
-    global $db;
-    try {
-        $stmt = $db->prepare("INSERT INTO version_materia (id_version, id_materia, semestre) VALUES (?, ?, ?)");
-        if (!$stmt) throw new Exception('Error al preparar insert version_materia: ' . $db->error);
-        $stmt->bind_param('iii', $id_version, $id_materia, $semestre);
-        if (!$stmt->execute()) throw new Exception('Error al ejecutar insert version_materia: ' . $stmt->error);
-        $id = $db->insert_id;
-        $stmt->close();
-        return ['success' => true, 'insert_id' => $id];
-    } catch (Exception $e) {
-        error_log('Error en asignarMateriaAVersion: ' . $e->getMessage());
-        return ['success' => false, 'message' => $e->getMessage()];
-    }
-}
 
 /**
  * Obtiene materias asignadas para una versión de carrera
  */
-function obtenerMateriasAsignadasVersion($id_version) {
-    global $db;
-    $materias = [];
-    $query = "SELECT vm.id, vm.id_version, vm.id_materia, vm.semestre, m.cod_materia, m.nombre_materia FROM version_materia vm JOIN materias m ON vm.id_materia = m.id_materia WHERE vm.id_version = ? ORDER BY vm.semestre";
-    if ($stmt = $db->prepare($query)) {
-        $stmt->bind_param('i', $id_version);
-        if ($stmt->execute()) {
-            $res = $stmt->get_result();
-            while ($row = $res->fetch_assoc()) {
-                $materias[] = $row;
-            }
-            $res->free();
-        }
-        $stmt->close();
-    }
-    return $materias;
-}
 
 /**
  * Elimina asignación de materia en versión
  */
-function eliminarAsignacionVersion($id) {
-    global $db;
-    try {
-        $stmt = $db->prepare("DELETE FROM version_materia WHERE id = ?");
-        if (!$stmt) throw new Exception('Error al preparar delete version_materia: ' . $db->error);
-        $stmt->bind_param('i', $id);
-        if (!$stmt->execute()) throw new Exception('Error al ejecutar delete version_materia: ' . $stmt->error);
-        $affected = $stmt->affected_rows;
-        $stmt->close();
-        return ['success' => true, 'affected_rows' => $affected];
-    } catch (Exception $e) {
-        error_log('Error en eliminarAsignacionVersion: ' . $e->getMessage());
-        return ['success' => false, 'message' => $e->getMessage()];
-    }
-}
 
 /**
  * Duplica una carrera como nueva versión con una fecha de vigencia distinta.
@@ -5591,28 +4965,6 @@ function generarCodigoMallaNumerico($cod_carrera, $anio, $id_carrera = null) {
  * Normaliza códigos de mallas existentes: asegura que sean solo dígitos
  * Si una malla tiene codigo no numérico intenta regenerarlo y actualizar.
  */
-function normalizarCodigosMallas() {
-    global $db;
-    asegurarTablaMallas();
-    $updated = 0;
-    $errors = [];
-    $res = $db->query("SELECT id_malla, id_carrera, codigo_malla, anio FROM mallas");
-    if (!$res) return ['updated' => 0, 'errors' => ['Error listando mallas: ' . $db->error]];
-    while ($row = $res->fetch_assoc()) {
-        if (!preg_match('/^[0-9]+$/', $row['codigo_malla'])) {
-            $nuevo = generarCodigoMallaNumerico('', $row['anio'], $row['id_carrera']);
-            $stmt = $db->prepare("UPDATE mallas SET codigo_malla = ? WHERE id_malla = ?");
-            if ($stmt) {
-                $stmt->bind_param('si', $nuevo, $row['id_malla']);
-                if ($stmt->execute()) { $updated++; } else { $errors[] = 'Error update id ' . $row['id_malla'] . ': ' . $stmt->error; }
-                $stmt->close();
-            } else {
-                $errors[] = 'Error preparar update id ' . $row['id_malla'] . ': ' . $db->error;
-            }
-        }
-    }
-    return ['updated' => $updated, 'errors' => $errors];
-}
 
 function obtenerMallasPorCarrera($id_carrera) {
     global $db;
@@ -5631,23 +4983,6 @@ function obtenerMallasPorCarrera($id_carrera) {
     return $rows;
 }
 
-function obtenerMallaPorId($id_malla) {
-    global $db;
-    asegurarTablaMallas();
-    $query = "SELECT id_malla, id_carrera, codigo_malla, anio, descripcion, created_at FROM mallas WHERE id_malla = ? LIMIT 1";
-    if ($stmt = $db->prepare($query)) {
-        $stmt->bind_param('i', $id_malla);
-        if ($stmt->execute()) {
-            $res = $stmt->get_result();
-            $row = $res->fetch_assoc();
-            $res->free();
-            $stmt->close();
-            return $row;
-        }
-        $stmt->close();
-    }
-    return null;
-}
 
 function asignarMateriaAMalla($id_malla, $id_materia, $semestre) {
     global $db;
@@ -5708,22 +5043,6 @@ function eliminarAsignacionMalla($id) {
     }
 }
 
-function eliminarMalla($id_malla) {
-    global $db;
-    try {
-        asegurarTablaMallas();
-        $stmt = $db->prepare("DELETE FROM mallas WHERE id_malla = ?");
-        if (!$stmt) throw new Exception('Error al preparar delete malla: ' . $db->error);
-        $stmt->bind_param('i', $id_malla);
-        if (!$stmt->execute()) throw new Exception('Error al ejecutar delete malla: ' . $stmt->error);
-        $aff = $stmt->affected_rows;
-        $stmt->close();
-        return ['success' => true, 'affected_rows' => $aff];
-    } catch (Exception $e) {
-        error_log('Error en eliminarMalla: ' . $e->getMessage());
-        return ['success' => false, 'message' => $e->getMessage()];
-    }
-}
 
 /**
  * Migrar datos desde `carrera_versiones`/`version_materia` a `mallas`/`malla_materia`.
@@ -5940,117 +5259,6 @@ function eliminarAsignacionMateria($id_relacion) {
  * @param int $nuevo_semestre Nuevo número de semestre
  * @return array Resultado de la operación
  */
-function actualizarSemestreAsignacion($id_relacion, $nuevo_semestre) {
-    global $db;
-
-    try {
-        // Obtener información actual para auditoría
-        $info_query = "SELECT cm.*, c.nombre_carrera, c.cod_carrera, 
-                              m.nombre_materia, m.cod_materia
-                       FROM carrera_materia cm
-                       JOIN carreras c ON cm.id_carrera = c.id_carrera
-                       JOIN materias m ON cm.id_materia = m.id_materia
-                       WHERE cm.id_relacion = ?";
-        
-        $info_stmt = $db->prepare($info_query);
-        if (!$info_stmt) {
-            throw new Exception('Error al preparar consulta de información: ' . $db->error);
-        }
-        
-        $info_stmt->bind_param("i", $id_relacion);
-        $info_stmt->execute();
-        $info_result = $info_stmt->get_result();
-        $relacion_info = $info_result->fetch_assoc();
-        $info_stmt->close();
-        
-        if (!$relacion_info) {
-            return [
-                'success' => false, 
-                'message' => 'No se encontró la relación especificada'
-            ];
-        }
-
-        // Actualizar el semestre
-        $update_query = "UPDATE carrera_materia SET semestre = ? WHERE id_relacion = ?";
-        
-        if ($update_stmt = $db->prepare($update_query)) {
-            $update_stmt->bind_param("ii", $nuevo_semestre, $id_relacion);
-            $execute_result = $update_stmt->execute();
-            $affected_rows = $update_stmt->affected_rows;
-            $update_stmt->close();
-            
-            if ($execute_result && $affected_rows > 0) {
-                // REGISTRAR EN AUDITORÍA - ACTUALIZACIÓN DE SEMESTRE
-                if (function_exists('registrarAuditoria')) {
-                    try {
-                        registrarAuditoria(
-                            "UPDATE", 
-                            "carrera_materia", 
-                            $id_relacion, 
-                            [
-                                'semestre_anterior' => $relacion_info['semestre'],
-                                'id_carrera' => $relacion_info['id_carrera'],
-                                'carrera_nombre' => $relacion_info['nombre_carrera'],
-                                'id_materia' => $relacion_info['id_materia'],
-                                'materia_nombre' => $relacion_info['nombre_materia']
-                            ], 
-                            [
-                                'semestre_nuevo' => $nuevo_semestre,
-                                'carrera_nombre' => $relacion_info['nombre_carrera'],
-                                'materia_nombre' => $relacion_info['nombre_materia']
-                            ], 
-                            "Carreras-Materias", 
-                            "Actualización de semestre en asignación materia-carrera"
-                        );
-                    } catch (Exception $e) {
-                        error_log("Error en auditoría actualizarSemestreAsignacion: " . $e->getMessage());
-                    }
-                }
-                
-                return [
-                    'success' => true,
-                    'message' => 'Semestre actualizado correctamente',
-                    'affected_rows' => $affected_rows
-                ];
-            } else {
-                throw new Exception($affected_rows === 0 
-                    ? 'No se encontró la asignación o no hubo cambios' 
-                    : 'Error al actualizar: ' . $db->error);
-            }
-        } else {
-            throw new Exception('Error preparando consulta de actualización: ' . $db->error);
-        }
-        
-    } catch (Exception $e) {
-        error_log("Error en actualizarSemestreAsignacion: " . $e->getMessage());
-        
-        // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR SEMESTRE
-        if (function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "ERROR", 
-                    "carrera_materia", 
-                    $id_relacion, 
-                    null, 
-                    [
-                        'id_relacion' => $id_relacion,
-                        'nuevo_semestre' => $nuevo_semestre,
-                        'error' => $e->getMessage()
-                    ], 
-                    "Carreras-Materias", 
-                    "Error al actualizar semestre de asignación"
-                );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de error actualizarSemestreAsignacion: " . $auditError->getMessage());
-            }
-        }
-        
-        return [
-            'success' => false,
-            'message' => 'Error al actualizar semestre: ' . $e->getMessage()
-        ];
-    }
-}
 
 
 /**
@@ -7008,86 +6216,6 @@ if (!function_exists('guardarMateria')) {
 
 //CAMBIAR A USERS
 
-function editarDocente($datos) {
-    global $db;
-    try {
-        // Validar campos requeridos (sin status)
-        $required = ['nombre', 'username', 'email', 'tlf', 'genero', 'id'];
-        foreach ($required as $field) {
-            if (empty($datos[$field])) {
-                throw new Exception("El campo $field es requerido");
-            }
-        }
-
-        // Validar formato de email
-        if (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
-            throw new Exception("El formato del email es inválido");
-        }
-
-        // Preparar consulta (sin status)
-        $stmt = $db->prepare("UPDATE users SET 
-            nombre = ?,
-            username = ?,
-            email = ?,
-            tlf = ?,
-            cel = ?,
-            genero = ?,
-            direccion = ?,
-            ciudad = ?,
-            estado = ?,
-            fecha_nac = ?,
-            fecha_act = NOW()
-            WHERE id = ?");
-
-        if (!$stmt) {
-            throw new Exception("Error en la preparación de la consulta: " . $db->error);
-        }
-
-        // Asignar valores por defecto a campos opcionales
-        $datos['cel'] = $datos['cel'] ?? '';
-        $datos['direccion'] = $datos['direccion'] ?? '';
-        $datos['ciudad'] = $datos['ciudad'] ?? '';
-        $datos['estado'] = $datos['estado'] ?? '';
-        $datos['fecha_nac'] = $datos['fecha_nac'] ?? null;
-
-        // Bind parameters (sin status)
-        $stmt->bind_param(
-            "ssssssssssi", // 10 's' y 1 'i' al final (id)
-            $datos['nombre'],
-            $datos['username'],
-            $datos['email'],
-            $datos['tlf'],
-            $datos['cel'],
-            $datos['genero'],
-            $datos['direccion'],
-            $datos['ciudad'],
-            $datos['estado'],
-            $datos['fecha_nac'],
-            $datos['id']
-        );
-
-        $resultado = $stmt->execute();
-        
-        if (!$resultado) {
-            throw new Exception("Error en la ejecución: " . $stmt->error);
-        }
-
-        $stmt->close();
-        
-        return [
-            'success' => true,
-            'message' => 'Docente actualizado correctamente',
-            'affected_rows' => $db->affected_rows
-        ];
-
-    } catch (Exception $e) {
-        error_log("Error en editarDocente: " . $e->getMessage());
-        return [
-            'success' => false,
-            'message' => $e->getMessage()
-        ];
-    }
-}
 
 
 /**
@@ -7248,61 +6376,10 @@ function eliminarPago($pago_id) {
 
 
 // Función para obtener pagos por día
-function obtenerPagosPorDia() {
-    global $db;
-    
-    $sql = "SELECT DATE(fecha_pago) as dia, 
-                   COUNT(*) as cantidad_pagos, 
-                   SUM(monto) as total_dia 
-            FROM pagos 
-            GROUP BY DATE(fecha_pago) 
-            ORDER BY dia DESC 
-            LIMIT 30";
-    
-    $result = mysqli_query($db, $sql);
-    
-    if (!$result) {
-        return ['success' => false, 'message' => 'Error al obtener pagos: ' . mysqli_error($db)];
-    }
-    
-    $pagos = [];
-    while ($row = mysqli_fetch_assoc($result)) {
-        $pagos[] = $row;
-    }
-    
-    return ['success' => true, 'data' => $pagos];
-}
 
 
 
 // Función para obtener detalles de pagos por día (CORREGIDA)
-function obtenerDetallesPagos($dia) {
-    global $db;
-    
-    $sql = "SELECT p.*, 
-                   u.nombre as estudiante_nombre, 
-                   u.idusuario as estudiante_cedula
-            FROM pagos p 
-            LEFT JOIN users u ON p.estudiante_id = u.id 
-            WHERE DATE(p.fecha_pago) = ? 
-            ORDER BY p.fecha_pago DESC";
-    
-    $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, "s", $dia);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    
-    if (!$result) {
-        return ['success' => false, 'message' => 'Error al obtener detalles: ' . mysqli_error($db)];
-    }
-    
-    $detalles = [];
-    while ($row = mysqli_fetch_assoc($result)) {
-        $detalles[] = $row;
-    }
-    
-    return ['success' => true, 'data' => $detalles];
-}
 
 /**
  * Busca estudiantes EXCLUSIVAMENTE por cédula (idusuario)
@@ -7314,19 +6391,21 @@ function buscarEstudiantePorCedula($cedula) {
     global $db;
     
     try {
-        // Consulta mejorada con más campos relevantes
+        // Consulta mejorada con JOIN a la tabla carreras para obtener el nombre
         $query = "SELECT 
-                    id, 
-                    idusuario AS cedula, 
-                    nombre,
-                    carrera,
-                    email,
-                    tlf,
-                    cel
-                  FROM users 
-                  WHERE idusuario LIKE CONCAT('%', ?, '%')
-                  AND estudiante = 1
-                  ORDER BY idusuario ASC
+                    u.id, 
+                    u.idusuario AS cedula, 
+                    u.nombre,
+                    u.carrera AS id_carrera,
+                    c.nombre_carrera,
+                    u.email,
+                    u.tlf,
+                    u.cel
+                  FROM users u
+                  LEFT JOIN carreras c ON (u.carrera = c.id_carrera OR u.carrera = c.cod_carrera)
+                  WHERE u.idusuario LIKE CONCAT('%', ?, '%')
+                  AND u.estudiante = 1
+                  ORDER BY u.idusuario ASC
                   LIMIT 10";
         
         $stmt = $db->prepare($query);
@@ -7345,12 +6424,15 @@ function buscarEstudiantePorCedula($cedula) {
         $estudiantes = [];
 
         while ($row = $result->fetch_assoc()) {
+            $nombre_carrera = !empty($row['nombre_carrera']) ? $row['nombre_carrera'] : ($row['id_carrera'] ?? 'No asignada');
             $estudiantes[] = [
                 'id' => (int)$row['id'],
                 'idusuario' => $row['cedula'],
                 'cedula' => $row['cedula'],
                 'nombre' => $row['nombre'],
-                'carrera' => $row['carrera'] ?? 'No especificado',
+                'id_carrera' => $row['id_carrera'],
+                'carrera' => $nombre_carrera,
+                'nombre_carrera' => $nombre_carrera,
                 'contacto' => $row['cel'] ?: ($row['tlf'] ?: 'Sin teléfono'),
                 'email' => $row['email'] ?? 'Sin email'
             ];
@@ -7381,45 +6463,6 @@ function buscarEstudiantePorCedula($cedula) {
  * 
  * @return array Array asociativo con todos los usuarios ordenados por nombre
  */
-function obtenerListaCompletaUsuarios() {
-  global $db; // Asume que $db es una conexión MySQLi válida
-  
-  // Preparar la consulta SQL
-  $query = "SELECT id, nombre, username, email, status, 
-                   super_user, admin, docente, estudiante, editar_user 
-            FROM users 
-            ORDER BY nombre ASC";
-  
-  // Preparar la sentencia
-  $stmt = $db->prepare($query);
-  
-  if (!$stmt) {
-      // Manejar error en la preparación
-      die("Error al preparar la consulta: " . $db->error);
-  }
-  
-  // Ejecutar la consulta
-  $stmt->execute();
-  
-  // Obtener el resultado
-  $result = $stmt->get_result();
-  
-  // Inicializar array para los usuarios
-  $usuarios = array();
-  
-  // Verificar si hay resultados
-  if ($result && $result->num_rows > 0) {
-      // Recorrer todos los registros
-      while ($row = $result->fetch_assoc()) {
-          $usuarios[] = $row;
-      }
-  }
-  
-  // Cerrar la sentencia
-  $stmt->close();
-  
-  return $usuarios;
-}
 
 
 //DATOS PREDEFINIDOS****************************************************************************************
@@ -7491,7 +6534,7 @@ function obtenerTiposCedula($db) {
         throw new InvalidArgumentException("Se esperaba una conexión MySQLi válida");
     }
     
-    $query = "SELECT id, tipo FROM tipo_cedula";
+    $query = "SELECT id, tipo FROM tipo_cedula ORDER BY id ASC";
     
     try {
         if (!$stmt = $db->prepare($query)) {
@@ -7523,7 +6566,7 @@ function obtenerEstadosCiviless($db) {
     }
 
     $estados = [];
-    $query = "SELECT id, estado_civil FROM estado_civil ORDER BY estado_civil ASC";
+    $query = "SELECT id, estado_civil FROM estado_civil ORDER BY id ASC";
     
     try {
         if (!$stmt = $db->prepare($query)) {
@@ -7910,16 +6953,6 @@ function procesarOperacionDatosPredefinidos($tabla, $accion, $id = null, $nuevo_
 }
 
 // Función para verificar si un ID existe en una tabla - SOLO LECTURA, SIN AUDITORÍA
-function verificarIdExistente($tabla, $id) {
-    global $db;
-    
-    $stmt = $db->prepare("SELECT id FROM $tabla WHERE id = ?");
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $stmt->store_result();
-    
-    return $stmt->num_rows > 0;
-}
 
 
 
@@ -8068,68 +7101,16 @@ function crearSeccion($db, $datos) {
  * @param int $id_seccion ID de la sección
  * @return array|null Datos de la sección o null si no existe
  */
-function obtenerSeccionPorId($id_seccion) {
-    global $db;
-    
-    $query = "SELECT s.*, 
-                     c.nombre_carrera,
-                     t.numero_trayecto,
-                     t.nombre_trayecto,
-                     pa.nombre_periodo
-              FROM secciones s
-              LEFT JOIN carreras c ON s.id_carrera = c.id_carrera
-              LEFT JOIN trayectos t ON s.id_trayecto = t.id_trayecto
-              LEFT JOIN periodos_academicos pa ON s.id_periodo = pa.id_periodo
-              WHERE s.id_seccion = " . intval($id_seccion);
-    
-    $result = $db->query($query);
-    if ($result && $result->num_rows > 0) {
-        return $result->fetch_assoc();
-    }
-    return null;
-}
 
 /**
  * Obtener todos los trayectos
  * @return array Lista de trayectos
  */
-function obtenerTodosLosTrayectos() {
-    global $db;
-    $trayectos = [];
-    
-    $query = "SELECT id_trayecto, numero_trayecto, nombre_trayecto 
-              FROM trayectos 
-              ORDER BY numero_trayecto ASC";
-    
-    $result = $db->query($query);
-    if ($result) {
-        while ($row = $result->fetch_assoc()) {
-            $trayectos[] = $row;
-        }
-    }
-    return $trayectos;
-}
 
 /**
  * Obtener todos los períodos académicos
  * @return array Lista de períodos
  */
-function obtenerTodosLosPeriodos() {
-    global $db;
-    $periodos = [];
-    
-    $query = "SELECT id_periodo, nombre_periodo 
-              FROM periodos_academicos 
-              ORDER BY id_periodo DESC";
-    
-    $result = $db->query($query);
-    if ($result) {
-        while ($row = $result->fetch_assoc()) {
-            $periodos[] = $row;
-        }
-    }
-    return $periodos;
-}
 
 /**
  * Actualizar una sección
@@ -8143,73 +7124,6 @@ function obtenerTodosLosPeriodos() {
  * @param string $inicia Fecha de inicio
  * @return array Resultado de la operación
  */
-function actualizarSeccion($id_seccion, $codigo_seccion, $id_carrera, $id_trayecto, $turno, $id_periodo, $capacidad_maxima, $inicia) {
-    global $db;
-    
-    // Verificar que la sección existe
-    $check = "SELECT id_seccion FROM secciones WHERE id_seccion = $id_seccion";
-    $check_result = $db->query($check);
-    if (!$check_result || $check_result->num_rows == 0) {
-        return ['success' => false, 'message' => 'La sección no existe'];
-    }
-    
-    // Verificar que la carrera existe
-    $check_carrera = "SELECT id_carrera FROM carreras WHERE id_carrera = $id_carrera";
-    $check_carrera_result = $db->query($check_carrera);
-    if (!$check_carrera_result || $check_carrera_result->num_rows == 0) {
-        return ['success' => false, 'message' => 'La carrera seleccionada no existe'];
-    }
-    
-    // Verificar que el trayecto existe
-    $check_trayecto = "SELECT id_trayecto FROM trayectos WHERE id_trayecto = $id_trayecto";
-    $check_trayecto_result = $db->query($check_trayecto);
-    if (!$check_trayecto_result || $check_trayecto_result->num_rows == 0) {
-        return ['success' => false, 'message' => 'El trayecto seleccionado no existe'];
-    }
-    
-    // Verificar que el período existe
-    $check_periodo = "SELECT id_periodo FROM periodos_academicos WHERE id_periodo = $id_periodo";
-    $check_periodo_result = $db->query($check_periodo);
-    if (!$check_periodo_result || $check_periodo_result->num_rows == 0) {
-        return ['success' => false, 'message' => 'El período seleccionado no existe'];
-    }
-    
-    // Actualizar
-    $query = "UPDATE secciones SET 
-                id_carrera = $id_carrera,
-                id_trayecto = $id_trayecto,
-                turno = '$turno',
-                id_periodo = $id_periodo,
-                capacidad_maxima = $capacidad_maxima,
-                inicia = '$inicia'
-              WHERE id_seccion = $id_seccion";
-    
-    if ($db->query($query)) {
-        // Registrar en auditoría
-        if (function_exists('registrarAuditoria')) {
-            registrarAuditoria(
-                "UPDATE",
-                "secciones",
-                $id_seccion,
-                null,
-                [
-                    'id_carrera' => $id_carrera,
-                    'id_trayecto' => $id_trayecto,
-                    'turno' => $turno,
-                    'id_periodo' => $id_periodo,
-                    'capacidad_maxima' => $capacidad_maxima,
-                    'inicia' => $inicia
-                ],
-                "Edición de Sección",
-                "Sección actualizada correctamente"
-            );
-        }
-        
-        return ['success' => true, 'message' => 'Sección actualizada correctamente'];
-    } else {
-        return ['success' => false, 'message' => 'Error al actualizar: ' . $db->error];
-    }
-}
 
 
 
@@ -8775,19 +7689,6 @@ function actualizarEstadoSeccion($db, $seccion_id, $count) {
  * @param mysqli $db Conexión a la base de datos
  * @param int $periodo_id ID del período académico
  */
-function desactivarSeccionesDePeriodo($db, $periodo_id) {
-    $stmt = $db->prepare("UPDATE secciones SET estatus = 'inactiva' WHERE id_periodo = ?");
-    if (!$stmt) {
-        error_log("Error en preparación desactivarSeccionesDePeriodo: " . $db->error);
-        return;
-    }
-    
-    $stmt->bind_param("i", $periodo_id);
-    if (!$stmt->execute()) {
-        error_log("Error en ejecución desactivarSeccionesDePeriodo: " . $stmt->error);
-    }
-    $stmt->close();
-}
 
 /**
  * Obtiene el listado de secciones con opción de filtrar por período
@@ -9119,19 +8020,6 @@ function obtenerHorariosSeccion($db, $id_seccion) {
  * @param array $horas Array de horas disponibles
  * @return int Número de filas que debe ocupar
  */
-function calcularRowspan($hora_inicio, $hora_fin, $horas) {
-    $inicio = date('H:i', strtotime($hora_inicio));
-    $fin = date('H:i', strtotime($hora_fin));
-    
-    $inicio_index = array_search($inicio, $horas);
-    $fin_index = array_search($fin, $horas);
-    
-    if ($inicio_index === false || $fin_index === false) {
-        return 1; // Por defecto 1 si no encontramos las horas
-    }
-    
-    return $fin_index - $inicio_index;
-}
 
 /**
  * Obtiene información básica de una sección por su ID
@@ -9139,29 +8027,6 @@ function calcularRowspan($hora_inicio, $hora_fin, $horas) {
  * @param int $seccion_id ID de la sección
  * @return array Información básica de la sección
  */
-function obtenerInfoBasicaSeccion($db, $seccion_id) {
-    $stmt = $db->prepare("SELECT s.codigo_seccion, c.nombre_carrera, t.numero_trayecto, p.nombre_periodo
-                         FROM secciones s
-                         JOIN carreras c ON s.id_carrera = c.id_carrera
-                         JOIN trayectos t ON s.id_trayecto = t.id_trayecto
-                         JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
-                         WHERE s.id_seccion = ?");
-    if (!$stmt) {
-        error_log("Error en preparación obtenerInfoBasicaSeccion: " . $db->error);
-        return [];
-    }
-    
-    $stmt->bind_param("i", $seccion_id);
-    if (!$stmt->execute()) {
-        error_log("Error en ejecución obtenerInfoBasicaSeccion: " . $stmt->error);
-        return [];
-    }
-    
-    $result = $stmt->get_result();
-    $seccion = $result->fetch_assoc();
-    $stmt->close();
-    return $seccion ?: [];
-}
 
 /**
  * Verifica si una sección existe y está activa
@@ -9169,48 +8034,12 @@ function obtenerInfoBasicaSeccion($db, $seccion_id) {
  * @param int $seccion_id ID de la sección
  * @return bool True si la sección existe y está activa
  */
-function seccionExisteYActiva($db, $seccion_id) {
-    $stmt = $db->prepare("SELECT COUNT(*) as total FROM secciones 
-                         WHERE id_seccion = ? AND estatus = 'activa'");
-    if (!$stmt) {
-        error_log("Error en preparación seccionExisteYActiva: " . $db->error);
-        return false;
-    }
-    
-    $stmt->bind_param("i", $seccion_id);
-    if (!$stmt->execute()) {
-        error_log("Error en ejecución seccionExisteYActiva: " . $stmt->error);
-        return false;
-    }
-    
-    $result = $stmt->get_result();
-    $count = $result->fetch_assoc()['total'];
-    $stmt->close();
-    return $count > 0;
-}
 
 /**
  * Obtiene el número total de secciones activas
  * @param mysqli $db Conexión a la base de datos
  * @return int Número total de secciones activas
  */
-function obtenerTotalSeccionesActivas($db) {
-    $stmt = $db->prepare("SELECT COUNT(*) as total FROM secciones WHERE estatus = 'activa'");
-    if (!$stmt) {
-        error_log("Error en preparación obtenerTotalSeccionesActivas: " . $db->error);
-        return 0;
-    }
-    
-    if (!$stmt->execute()) {
-        error_log("Error en ejecución obtenerTotalSeccionesActivas: " . $stmt->error);
-        return 0;
-    }
-    
-    $result = $stmt->get_result();
-    $count = $result->fetch_assoc()['total'];
-    $stmt->close();
-    return $count;
-}
 
 /**
  * Obtiene las secciones por carrera
@@ -9570,97 +8399,12 @@ function obtenerSeccionesDisponiblesPorCarreraYTurno($carrera_id, $turno) {
 /**
  * Obtiene todas las secciones de una carrera (incluyendo llenas o inactivas)
  */
-function obtenerTodasSeccionesPorCarrera($carrera_id) {
-    global $db;
-    
-    $query = "SELECT 
-        s.id_seccion,
-        s.codigo_seccion,
-        s.capacidad_maxima,
-        s.turno,
-        s.status,
-        p.activo as periodo_activo,
-        (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion AND estatus = 'activo') as inscritos
-    FROM secciones s
-    INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
-    WHERE s.id_carrera = ?
-    ORDER BY s.codigo_seccion ASC";
-    
-    $stmt = $db->prepare($query);
-    if (!$stmt) {
-        error_log("Error en obtenerTodasSeccionesPorCarrera: " . $db->error);
-        return [];
-    }
-    
-    $stmt->bind_param('i', $carrera_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $secciones = [];
-    while ($row = $result->fetch_assoc()) {
-        $row['inscritos'] = $row['inscritos'] ?? 0;
-        $secciones[] = $row;
-    }
-    
-    return $secciones;
-}
 
 
 
 /**
  * Asigna un estudiante a una sección específica (selección manual)
  */
-function asignarEstudianteASeccionEspecifica($usuario_id, $seccion_id) {
-    global $db;
-    
-    // Verificar cupo en la sección
-    $query = "SELECT 
-        s.id_seccion,
-        s.codigo_seccion,
-        s.capacidad_maxima,
-        COUNT(e.id_usuario) as inscritos
-    FROM secciones s
-    LEFT JOIN estudiante_seccion e ON s.id_seccion = e.id_seccion
-    WHERE s.id_seccion = ?
-    GROUP BY s.id_seccion";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param('i', $seccion_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $seccion = $result->fetch_assoc();
-    
-    if (!$seccion) {
-        return ['success' => false, 'message' => 'La sección no existe'];
-    }
-    
-    if ($seccion['inscritos'] >= $seccion['capacidad_maxima']) {
-        return ['success' => false, 'message' => 'La sección no tiene cupos disponibles'];
-    }
-    
-    // Verificar si ya está inscrito
-    $check = $db->prepare("SELECT id FROM estudiante_seccion WHERE id_usuario = ? AND id_seccion = ?");
-    $check->bind_param('ii', $usuario_id, $seccion_id);
-    $check->execute();
-    if ($check->get_result()->num_rows > 0) {
-        return ['success' => false, 'message' => 'El estudiante ya está inscrito en esta sección'];
-    }
-    
-    // Inscribir estudiante
-    $fecha = date('Y-m-d H:i:s');
-    $insert = $db->prepare("INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus) VALUES (?, ?, ?, 'activo')");
-    $insert->bind_param('iis', $usuario_id, $seccion_id, $fecha);
-    
-    if ($insert->execute()) {
-        return [
-            'success' => true, 
-            'message' => 'Estudiante asignado a la sección ' . $seccion['codigo_seccion'],
-            'seccion' => $seccion['codigo_seccion']
-        ];
-    }
-    
-    return ['success' => false, 'message' => 'Error al asignar estudiante a la sección'];
-}
 
 /**
  * Asigna un estudiante a una sección disponible
@@ -10853,37 +9597,6 @@ function obtenerMateriasDisponiblesIndividual($id_usuario, $trayecto, $id_carrer
 /**
  * Obtener materias inscritas actuales del estudiante en el período activo
  */
-function obtenerMateriasInscritasActualesIndividual($id_usuario) {
-    global $db;
-    
-    $periodo = obtenerPeriodoActivo();
-    if (!$periodo) {
-        return [];
-    }
-    
-    $id_periodo = $periodo['id_periodo'];
-    
-    $query = "SELECT n.id_materia, n.id_periodo,
-                     m.cod_materia, m.nombre_materia, m.creditos, m.trayecto, m.es_proyecto_socio as es_proyecto,
-                     p.nombre_periodo
-              FROM notas_definitivas n
-              INNER JOIN materias m ON n.id_materia = m.id_materia
-              LEFT JOIN periodos_academicos p ON n.id_periodo = p.id_periodo
-              WHERE n.id_usuario = $id_usuario 
-              AND n.id_periodo = $id_periodo
-              ORDER BY m.cod_materia";
-    
-    $result = $db->query($query);
-    $materias = [];
-    
-    if ($result) {
-        while ($row = $result->fetch_assoc()) {
-            $materias[] = $row;
-        }
-    }
-    
-    return $materias;
-}
 
 /**
  * Obtener el trayecto actual del estudiante basado en sección
@@ -11345,65 +10058,6 @@ function obtenerAsignacionesSecciones() {
 /**
  * Obtiene las materias disponibles para un docente en una sección específica
  */
-function obtenerMateriasDisponiblesParaDocente($id_docente, $id_seccion) {
-    global $db;
-    
-    try {
-        // Obtener la carrera de la sección
-        $query_carrera = "SELECT id_carrera FROM secciones WHERE id_seccion = ?";
-        $stmt_carrera = $db->prepare($query_carrera);
-        $stmt_carrera->bind_param("i", $id_seccion);
-        $stmt_carrera->execute();
-        $result_carrera = $stmt_carrera->get_result();
-        $seccion_info = $result_carrera->fetch_assoc();
-        $stmt_carrera->close();
-        
-        if (!$seccion_info) {
-            return array();
-        }
-        
-        $id_carrera = $seccion_info['id_carrera'];
-        
-        // Obtener materias del docente en esa carrera que no estén ya asignadas a la sección
-        $query = "SELECT DISTINCT m.id_materia, m.nombre_materia, m.cod_materia 
-                  FROM docente_materia dm
-                  JOIN materias m ON dm.id_materia = m.id_materia
-                  JOIN carrera_materia cm ON m.id_materia = cm.id_materia
-                  WHERE dm.id_usuario = ?
-                  AND cm.id_carrera = ?
-                  AND m.id_materia NOT IN (
-                      SELECT id_materia FROM docente_seccion 
-                      WHERE id_seccion = ? AND id_usuario = ?
-                  )
-                  AND m.activa = 1
-                  ORDER BY m.nombre_materia";
-        
-        $stmt = $db->prepare($query);
-        if (!$stmt) {
-            throw new Exception("Error en preparación: " . $db->error);
-        }
-        
-        $stmt->bind_param("iiii", $id_docente, $id_carrera, $id_seccion, $id_docente);
-        
-        if (!$stmt->execute()) {
-            throw new Exception("Error en ejecución: " . $stmt->error);
-        }
-        
-        $result = $stmt->get_result();
-        $materias = array();
-        
-        while($row = $result->fetch_assoc()) {
-            $materias[] = $row;
-        }
-        
-        $stmt->close();
-        return $materias;
-        
-    } catch (Exception $e) {
-        error_log("Error en obtenerMateriasDisponiblesParaDocente: " . $e->getMessage());
-        return array();
-    }
-}
 
 
 
@@ -11987,26 +10641,6 @@ function esEstudiante($db, $user_id) {
 /**
  * Obtiene las secciones en las que está inscrito un estudiante
  */
-function obtenerSeccionesEstudiante($db, $estudiante_id) {
-    $sql = "SELECT s.*, c.nombre_carrera, t.numero_trayecto, pa.nombre_periodo 
-            FROM secciones s
-            JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion
-            JOIN carreras c ON s.id_carrera = c.id_carrera
-            JOIN trayectos t ON s.id_trayecto = t.id_trayecto
-            JOIN periodos_academicos pa ON s.id_periodo = pa.id_periodo
-            WHERE es.id_usuario = ? AND s.estatus = 'activa'";
-    
-    try {
-        $stmt = $db->prepare($sql);
-        $stmt->bind_param("i", $estudiante_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        return $result->fetch_all(MYSQLI_ASSOC);
-    } catch (mysqli_sql_exception $e) {
-        error_log("Error al obtener secciones: " . $e->getMessage());
-        return [];
-    }
-}
 
 /**
  * Obtiene los compañeros de sección (excluyendo al estudiante actual)
@@ -12072,34 +10706,10 @@ function registrarAuditoria($accion, $tabla_afectada = null, $registro_id = null
 /**
  * Función para registrar el inicio de sesión
  */
-function registrarLoginAuditoria($usuario_id, $exitoso = true) {
-    $descripcion = $exitoso ? "Inicio de sesión exitoso" : "Intento de inicio de sesión fallido";
-    
-    registrarAuditoria(
-        "LOGIN", 
-        "users", 
-        $usuario_id, 
-        null, 
-        null, 
-        "Autenticación", 
-        $descripcion
-    );
-}
 
 /**
  * Función para registrar el cierre de sesión
  */
-function registrarLogoutAuditoria($usuario_id) {
-    registrarAuditoria(
-        "LOGOUT", 
-        "users", 
-        $usuario_id, 
-        null, 
-        null, 
-        "Autenticación", 
-        "Cierre de sesión"
-    );
-}
 
 /**
  * Obtener usuarios para el filtro de auditoría
@@ -12134,65 +10744,10 @@ function esAdministrador() {
 /**
  * Obtener datos completos del estudiante para auditoría
  */
-function obtenerDatosEstudianteCompletos($id) {
-    global $db;
-    
-    $query = "SELECT u.*, c.nombre as nombre_carrera, g.nombre as nombre_genero
-              FROM users u 
-              LEFT JOIN carreras c ON u.carrera = c.id 
-              LEFT JOIN generos g ON u.genero = g.id 
-              WHERE u.id = ?";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows === 0) {
-        return false;
-    }
-    
-    return $result->fetch_assoc();
-}
 
 /**
  * Detectar cambios detallados para auditoría
  */
-function detectarCambiosDetallados($datos_antiguos, $datos_nuevos) {
-    $campos_modificados = [];
-    $valores_antiguos = [];
-    $valores_nuevos = [];
-    
-    $nombres_campos = [
-        'nombre' => 'Nombre completo',
-        'username' => 'Cédula/Usuario',
-        'email' => 'Correo electrónico',
-        'tlf' => 'Teléfono principal',
-        'num_telf_opc' => 'Teléfono opcional',
-        'carrera' => 'Programa/Carrera',
-        'genero' => 'Género',
-        'fecha_nac' => 'Fecha de nacimiento',
-        'fecha_ingreso' => 'Fecha de ingreso',
-        'status' => 'Estado'
-    ];
-    
-    foreach ($nombres_campos as $campo => $nombre_legible) {
-        $valor_antiguo = $datos_antiguos[$campo] ?? null;
-        $valor_nuevo = $datos_nuevos[$campo] ?? null;
-        
-        if (normalizarValor($valor_antiguo, $campo) !== normalizarValor($valor_nuevo, $campo)) {
-            $campos_modificados[$campo] = $nombre_legible;
-            $valores_antiguos[$nombre_legible] = formatearValorParaAuditoria($valor_antiguo, $campo, $datos_antiguos);
-            $valores_nuevos[$nombre_legible] = formatearValorParaAuditoria($valor_nuevo, $campo, $datos_nuevos);
-        }
-    }
-    
-    return [
-        'campos_modificados' => $campos_modificados,
-        'valores_antiguos' => $valores_antiguos,
-        'valores_nuevos' => $valores_nuevos
-    ];
-}
 
 /**
  * Normalizar valor para comparación
@@ -12243,19 +10798,6 @@ function formatearValorParaAuditoria($valor, $campo, $datos_completos = []) {
 /**
  * Generar descripción detallada para auditoría
  */
-function generarDescripcionAuditoria($cambios) {
-    $descripcion = "Edición de estudiante. Campos modificados:\n";
-    
-    foreach ($cambios['campos_modificados'] as $campo => $nombre_legible) {
-        $valor_antiguo = $cambios['valores_antiguos'][$nombre_legible] ?? 'No especificado';
-        $valor_nuevo = $cambios['valores_nuevos'][$nombre_legible] ?? 'No especificado';
-        
-        $descripcion .= "• {$nombre_legible}: ";
-        $descripcion .= "DE '{$valor_antiguo}' A '{$valor_nuevo}'\n";
-    }
-    
-    return $descripcion;
-}
 
 
 
@@ -12462,42 +11004,6 @@ function generarMembreteJS() {
 }
 
 // Función para generar PDF desde HTML
-function generarPDFDesdeHTML($elementoHTML, $nombreArchivo = 'documento.pdf') {
-    // Insertar el código JS del membrete (define agregarMembretePDF)
-    echo generarMembreteJS();
-
-    // Generar el PDF en cliente: primero obtener startY desde agregarMembretePDF (devuelve Promise)
-    echo "<script>
-        (function() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
-            const margin = 10;
-            const pageWidth = doc.internal.pageSize.getWidth();
-
-            // Obtener la posición de inicio del contenido después del membrete
-            agregarMembretePDF(doc, pageWidth, margin).then(function(startY) {
-                // Capturar el contenido HTML y agregarlo al PDF
-                html2canvas(document.getElementById('$elementoHTML'), {
-                    scale: 2,
-                    useCORS: true,
-                    logging: false
-                }).then(function(canvas) {
-                    const imgData = canvas.toDataURL('image/jpeg', 1.0);
-                    const imgWidth = pageWidth - (margin * 2);
-                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-                    // Agregar contenido al PDF
-                    doc.addImage(imgData, 'JPEG', margin, startY, imgWidth, imgHeight);
-
-                    // Guardar el PDF
-                    doc.save('$nombreArchivo');
-                });
-            }).catch(function(err) {
-                console.error('Error al generar membrete:', err);
-            });
-        })();
-    </script>";
-}
 
 
 
@@ -12745,36 +11251,6 @@ function procesarEdicionNotaTrimestral() {
  * @param int $materia_id ID de la materia
  * @return array Array con el historial de cambios
  */
-function obtenerHistorialCambiosNotasPorMateria($estudiante_id, $materia_id) {
-    global $db;
-    
-    $historial = [];
-    
-    $query = "SELECT 
-                hc.id,
-                hc.trayecto,
-                hc.nota_anterior,
-                hc.nota_nueva,
-                hc.justificacion,
-                hc.fecha_cambio,
-                u.nombre as nombre_admin
-              FROM historial_cambios_notas hc
-              INNER JOIN notas_trimestres nt ON hc.id_nota_trimestre = nt.id
-              LEFT JOIN users u ON hc.id_admin = u.id
-              WHERE nt.id_usuario = " . intval($estudiante_id) . "
-              AND nt.id_materia = " . intval($materia_id) . "
-              ORDER BY hc.fecha_cambio DESC";
-    
-    $result = $db->query($query);
-    
-    if ($result && $result->num_rows > 0) {
-        while ($row = $result->fetch_assoc()) {
-            $historial[] = $row;
-        }
-    }
-    
-    return $historial;
-}
 
 
 
@@ -12981,76 +11457,10 @@ function obtenerEstadisticasGrupoTrimestres($docente_id, $materia_id, $periodo_i
 
 
 // FUNCIÓN PARA OBTENER NOTAS DEFINITIVAS (SOLO LECTURA - SIN AUDITORÍA)
-function obtenerNotasDefinitivas($estudiante_id, $materia_id) {
-    global $db;
-    $query = "SELECT * FROM notas_definitivas 
-              WHERE id_usuario = ? AND id_materia = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("ii", $estudiante_id, $materia_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
-}
 
 // FUNCIÓN PARA OBTENER DATOS COMPLETOS DE notas_pendientes (SOLO LECTURA - SIN AUDITORÍA)
-function obtenerNotasPendientesEstudiante($id_estudiante, $id_materia, $id_periodo, $id_docente) {
-    global $db;
-    
-    $query = "SELECT * FROM notas_pendientes 
-              WHERE id_usuario = ? 
-              AND id_materia = ? 
-              AND id_periodo = ? 
-              AND id_docente = ? 
-              LIMIT 1";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("iiii", $id_estudiante, $id_materia, $id_periodo, $id_docente);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        return $result->fetch_assoc();
-    }
-    
-    return null;
-}
 
 // FUNCIÓN MEJORADA PARA OBTENER ESTADO (CORREGIDA) (SOLO LECTURA - SIN AUDITORÍA)
-function obtenerEstadoCorregido($id_estudiante, $id_materia, $id_periodo, $id_docente) {
-    global $db;
-    
-    // PRIMERO: Verificar si está en notas_definitivas (APROBADA)
-    $query_definitivas = "SELECT id FROM notas_definitivas 
-                         WHERE id_usuario = ? AND id_materia = ?";
-    $stmt = $db->prepare($query_definitivas);
-    $stmt->bind_param("ii", $id_estudiante, $id_materia);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        return 'aprobada'; // Está en notas_definitivas = APROBADA
-    }
-    
-    // SEGUNDO: Verificar si existe en notas_pendientes
-    $query_pendientes = "SELECT id, estado FROM notas_pendientes 
-                        WHERE id_usuario = ? AND id_materia = ? AND id_periodo = ? AND id_docente = ?";
-    $stmt = $db->prepare($query_pendientes);
-    $stmt->bind_param("iiii", $id_estudiante, $id_materia, $id_periodo, $id_docente);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        // Si tiene campo estado, usarlo; si no, asumir "en_revision"
-        if (isset($row['estado']) && $row['estado'] === 'rechazada') {
-            return 'rechazada';
-        }
-        return 'en_revision'; // SIEMPRE muestra como "En Revisión" si está en pendientes
-    }
-    
-    // No existe en ninguna tabla
-    return 'pendiente';
-}
 
 /**
  * Obtiene información completa de una materia incluyendo trayecto (SOLO LECTURA - SIN AUDITORÍA)
@@ -13110,16 +11520,6 @@ function obtenerEstudiantesPorSeccion($seccion_id) {
 /**
  * Obtiene las notas de un estudiante en una materia específica (SOLO LECTURA - SIN AUDITORÍA)
  */
-function obtenerNotasEstudiante($estudiante_id, $materia_id) {
-    global $db;
-    $query = "SELECT * FROM notas_pendientes 
-              WHERE id_usuario = ? AND id_materia = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("ii", $estudiante_id, $materia_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
-}
 
 /**
  * Obtiene el período académico de una sección (SOLO LECTURA - SIN AUDITORÍA)
@@ -13178,76 +11578,10 @@ if (!function_exists('to_iso')) {
  * Insertar espacios en palabras largas para evitar que FPDF no las parta.
  * Divide secuencias largas sin espacios cada $limit caracteres.
  */
-function insertarEspaciosEnPalabrasLargas($s, $limit = 30) {
-    if ($s === null) return '';
-    if (!function_exists('mb_strlen')) return $s;
-    $parts = preg_split('/(\s+)/u', $s, -1, PREG_SPLIT_DELIM_CAPTURE);
-    foreach ($parts as &$p) {
-        // solo procesar partes que no sean espacios
-        if (trim($p) === '') continue;
-        $len = mb_strlen($p, 'UTF-8');
-        if ($len > $limit) {
-            // insertar espacios cada $limit chars
-            $new = '';
-            for ($i = 0; $i < $len; $i += $limit) {
-                $chunk = mb_substr($p, $i, $limit, 'UTF-8');
-                $new .= $chunk;
-                if ($i + $limit < $len) $new .= ' ';
-            }
-            $p = $new;
-        }
-    }
-    return implode('', $parts);
-}
 
 /**
  * Calcular cuántas líneas ocupará un texto en FPDF para un ancho dado.
  */
-function calcularLineasFPDF($pdf, $txt, $w) {
-    if (!$pdf) return 1;
-    // manejar saltos de línea explícitos
-    $lines = 0;
-    $parts = explode("\n", (string)$txt);
-    foreach ($parts as $part) {
-        $part = trim($part);
-        if ($part === '') { $lines++; continue; }
-        $words = preg_split('/(\s+)/u', $part, -1, PREG_SPLIT_NO_EMPTY);
-        $cur = '';
-        foreach ($words as $word) {
-            $test = ($cur === '') ? $word : $cur . ' ' . $word;
-            $wtest = $pdf->GetStringWidth($test);
-            if ($wtest <= $w - 2*$pdf->cMargin) {
-                $cur = $test;
-            } else {
-                // word itself may be longer than width -> split
-                if ($pdf->GetStringWidth($word) > $w - 2*$pdf->cMargin) {
-                    // split by characters
-                    $len = mb_strlen($word, 'UTF-8');
-                    $tmp = '';
-                    for ($i=0;$i<$len;$i++) {
-                        $ch = mb_substr($word,$i,1,'UTF-8');
-                        if ($pdf->GetStringWidth($tmp.$ch) <= $w - 2*$pdf->cMargin) {
-                            $tmp .= $ch;
-                        } else {
-                            $lines++; $tmp = $ch;
-                        }
-                    }
-                    if ($tmp !== '') {
-                        $cur = $tmp;
-                    } else {
-                        $cur = '';
-                    }
-                } else {
-                    // move current to next line
-                    $lines++;
-                    $cur = $word;
-                }
-            }
-        }
-        if ($cur !== '') $lines++;
-    }
-    return max(1, $lines);
-}
 
 // Función global para agregar membrete a un objeto FPDF
 if (!function_exists('agregarMembreteFPDF')) {
@@ -14144,11 +12478,6 @@ function obtenerTiposHorario($db) {
 /**
  * Obtener un tipo de horario por ID - SOLO LECTURA, SIN AUDITORÍA
  */
-function obtenerTipoHorarioPorId($db, $id) {
-    $query = "SELECT * FROM tipos_horario WHERE id = $id";
-    $result = $db->query($query);
-    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
-}
 
 /**
  * Agregar un nuevo tipo de horario - CON AUDITORÍA
@@ -14657,138 +12986,14 @@ function asignarTipoHorarioUsuario($db, $id_usuario, $id_tipo_horario) {
 /**
  * Obtener tipos de horario de un usuario - SOLO LECTURA, SIN AUDITORÍA
  */
-function obtenerTiposHorarioUsuario($db, $id_usuario) {
-    $query = "SELECT th.* 
-              FROM tipo_horario_personal thp
-              JOIN tipos_horario th ON thp.id_tipo_horario = th.id
-              WHERE thp.id_usuario = $id_usuario
-              ORDER BY th.nombre";
-    $result = $db->query($query);
-    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
-}
 
 /**
  * Eliminar asignación de horario de usuario - CON AUDITORÍA
  */
-function eliminarTipoHorarioUsuario($db, $id_usuario, $id_tipo_horario) {
-    try {
-        // Obtener información para auditoría
-        $query_info = "SELECT u.nombre as usuario_nombre, u.username, th.nombre as horario_nombre
-                       FROM tipo_horario_personal thp
-                       JOIN users u ON thp.id_usuario = u.id
-                       JOIN tipos_horario th ON thp.id_tipo_horario = th.id
-                       WHERE thp.id_usuario = $id_usuario AND thp.id_tipo_horario = $id_tipo_horario";
-        
-        $result_info = $db->query($query_info);
-        
-        if ($result_info->num_rows === 0) {
-            return false;
-        }
-        
-        $info = $result_info->fetch_assoc();
-        
-        $query = "DELETE FROM tipo_horario_personal 
-                  WHERE id_usuario = $id_usuario AND id_tipo_horario = $id_tipo_horario";
-        $result = $db->query($query);
-        
-        if ($result) {
-            // REGISTRAR EN AUDITORÍA - ASIGNACIÓN DE HORARIO ELIMINADA
-            if (function_exists('registrarAuditoria')) {
-                try {
-                    registrarAuditoria(
-                        "DELETE", 
-                        "tipo_horario_personal", 
-                        null, 
-                        [
-                            'id_usuario' => $id_usuario,
-                            'usuario_nombre' => $info['usuario_nombre'],
-                            'usuario_username' => $info['username'],
-                            'id_tipo_horario' => $id_tipo_horario,
-                            'horario_nombre' => $info['horario_nombre']
-                        ], 
-                        [
-                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
-                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
-                            'fecha_eliminacion' => date('Y-m-d H:i:s')
-                        ], 
-                        "Horario Personal", 
-                        "Horario eliminado de usuario: " . $info['horario_nombre'] . " ← " . $info['usuario_nombre']
-                    );
-                } catch (Exception $e) {
-                    error_log("Error en auditoría eliminarTipoHorarioUsuario: " . $e->getMessage());
-                }
-            }
-            
-            return true;
-        } else {
-            // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR ASIGNACIÓN
-            if (function_exists('registrarAuditoria')) {
-                try {
-                    registrarAuditoria(
-                        "ERROR", 
-                        "tipo_horario_personal", 
-                        null, 
-                        null, 
-                        [
-                            'id_usuario' => $id_usuario,
-                            'usuario_nombre' => $info['usuario_nombre'],
-                            'id_tipo_horario' => $id_tipo_horario,
-                            'horario_nombre' => $info['horario_nombre'],
-                            'error' => $db->error,
-                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
-                        ], 
-                        "Horario Personal", 
-                        "Error al eliminar horario de usuario"
-                    );
-                } catch (Exception $e) {
-                    error_log("Error en auditoría de error eliminarTipoHorarioUsuario: " . $e->getMessage());
-                }
-            }
-            
-            return false;
-        }
-        
-    } catch (Exception $e) {
-        error_log("Error en eliminarTipoHorarioUsuario: " . $e->getMessage());
-        
-        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ELIMINAR ASIGNACIÓN
-        if (function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "ERROR", 
-                    "tipo_horario_personal", 
-                    null, 
-                    null, 
-                    [
-                        'id_usuario' => $id_usuario,
-                        'id_tipo_horario' => $id_tipo_horario,
-                        'error' => $e->getMessage(),
-                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
-                    ], 
-                    "Horario Personal", 
-                    "Excepción al eliminar horario de usuario"
-                );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de excepción eliminarTipoHorarioUsuario: " . $auditError->getMessage());
-            }
-        }
-        
-        return false;
-    }
-}
 
 /**
  * Obtener usuarios por tipo de horario - SOLO LECTURA, SIN AUDITORÍA
  */
-function obtenerUsuariosPorTipoHorario($db, $id_tipo_horario) {
-    $query = "SELECT u.* 
-              FROM tipo_horario_personal thp
-              JOIN users u ON thp.id_usuario = u.id
-              WHERE thp.id_tipo_horario = $id_tipo_horario
-              ORDER BY u.nombre";
-    $result = $db->query($query);
-    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
-}
 
 /**
  * Obtener texto del tipo de usuario (estético) - SOLO LÓGICA, SIN AUDITORÍA
@@ -16360,42 +14565,10 @@ function subirSoporte($archivo) {
 /**
  * Función para eliminar un archivo de soporte anterior
  */
-function eliminarSoporteAnterior($nombreArchivo) {
-    if (empty($nombreArchivo)) return false;
-    
-    $rutaCompleta = dirname(__DIR__) . '/soportes/' . $nombreArchivo;
-    
-    if (file_exists($rutaCompleta)) {
-        return @unlink($rutaCompleta);
-    }
-    return false;
-}
 
 /**
  * Función para obtener los datos de soporte actuales de la BD
  */
-function obtenerSoporteActual($id_estudiante, $id_materia, $id_periodo) {
-    global $db;
-    
-    $query = "SELECT soporte, tipo_archivo FROM notas_pendientes 
-              WHERE id_usuario = ? 
-              AND id_materia = ? 
-              AND id_periodo = ? 
-              LIMIT 1";
-    
-    // Usamos sentencias preparadas para mayor seguridad
-    if ($stmt = $db->prepare($query)) {
-        $stmt->bind_param("iii", $id_estudiante, $id_materia, $id_periodo);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($result && $result->num_rows > 0) {
-            return $result->fetch_assoc();
-        }
-    }
-    
-    return null;
-}
 
 
 
@@ -16633,33 +14806,6 @@ class PDF_PlanillaNotas {
 /**
  * Generar planilla PDF para lista de estudiantes con casillas de notas
  */
-function generarPlanillaNotasPDF($seccion_id, $materia_id, $docente_id) {
-    global $db;
-    
-    // Verificar que el docente tiene acceso a esta sección y materia
-    if (!verificarAccesoDocente($docente_id, $seccion_id, $materia_id)) {
-        return false;
-    }
-    
-    // Obtener información de la sección y materia
-    $info = obtenerInfoSeccionMateria($seccion_id, $materia_id);
-    if (!$info) {
-        return false;
-    }
-    
-    // Obtener estudiantes de la sección
-    $estudiantes = obtenerEstudiantesSeccion($seccion_id);
-    
-    if (empty($estudiantes)) {
-        return false;
-    }
-    
-    // Crear PDF
-    $pdf = new PDF_PlanillaNotas();
-    $pdf->generarPlanilla($info, $estudiantes);
-    
-    return true;
-}
 
 /**
  * Verificar acceso del docente a la sección y materia
@@ -17523,73 +15669,10 @@ function obtenerUsuarioPorId($id_usuario) {
 /**
  * Función para obtener carreras sin director asignado
  */
-function obtenerCarrerasSinDirector() {
-    global $db;
-    
-    try {
-        $carreras = [];
-        $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera
-                  FROM carreras c
-                  WHERE c.activa = 1 
-                  AND c.id_carrera NOT IN (
-                      SELECT DISTINCT carrera_di 
-                      FROM users 
-                      WHERE usuario = 1 
-                      AND carrera_di IS NOT NULL 
-                      AND carrera_di != 0
-                  )
-                  ORDER BY c.nombre_carrera ASC";
-        
-        if ($stmt = $db->prepare($query)) {
-            $stmt->execute();
-            $result = $stmt->get_result();
-            
-            while ($row = $result->fetch_assoc()) {
-                $carreras[] = $row;
-            }
-            
-            $stmt->close();
-            return $carreras;
-        } else {
-            throw new Exception("Error en preparación: " . $db->error);
-        }
-        
-    } catch (Exception $e) {
-        error_log("Error en obtenerCarrerasSinDirector: " . $e->getMessage());
-        return [];
-    }
-}
 
 /**
  * Función para verificar si una carrera ya tiene director
  */
-function carreraTieneDirector($id_carrera) {
-    global $db;
-    
-    try {
-        $query = "SELECT COUNT(*) as total 
-                  FROM users 
-                  WHERE usuario = 1 
-                  AND carrera_di = ?";
-        
-        $stmt = $db->prepare($query);
-        if (!$stmt) {
-            return false;
-        }
-        
-        $stmt->bind_param("i", $id_carrera);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $count = $result->fetch_assoc()['total'];
-        $stmt->close();
-        
-        return $count > 0;
-        
-    } catch (Exception $e) {
-        error_log("Error en carreraTieneDirector: " . $e->getMessage());
-        return false;
-    }
-}
 
 
 
@@ -18030,76 +16113,6 @@ function obtenerProfesores() {
 }
 
 // Nueva función para buscar profesores por término - CON AUDITORÍA
-function buscarProfesores($termino) {
-    global $db;
-    
-    try {
-        $query = "SELECT id, idusuario, nombre 
-                  FROM users 
-                  WHERE docente = 1 
-                  AND (nombre LIKE ? OR idusuario LIKE ?)
-                  ORDER BY nombre
-                  LIMIT 10";
-        $stmt = $db->prepare($query);
-        $termino_like = "%$termino%";
-        $stmt->bind_param("ss", $termino_like, $termino_like);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        // REGISTRAR EN AUDITORÍA - BÚSQUEDA DE PROFESORES
-        if (function_exists('registrarAuditoria')) {
-            try {
-                $cantidad_resultados = $result->num_rows;
-                $resultado_busqueda = $cantidad_resultados > 0 ? 'ENCONTRADOS' : 'NO_ENCONTRADOS';
-                
-                registrarAuditoria(
-                    "CONSULTA", 
-                    "users", 
-                    null, 
-                    null, 
-                    [
-                        'termino_busqueda' => $termino,
-                        'cantidad_resultados' => $cantidad_resultados,
-                        'resultado_busqueda' => $resultado_busqueda,
-                        'tipo_consulta' => 'busqueda_profesores'
-                    ], 
-                    "Gestión de Docentes", 
-                    "Búsqueda de profesores - " . $resultado_busqueda
-                );
-            } catch (Exception $e) {
-                error_log("Error en auditoría buscarProfesores: " . $e->getMessage());
-            }
-        }
-        
-        return $result;
-        
-    } catch (Exception $e) {
-        error_log("Error en buscarProfesores: " . $e->getMessage());
-        
-        // REGISTRAR EN AUDITORÍA - ERROR EN BÚSQUEDA
-        if (function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "ERROR", 
-                    "users", 
-                    null, 
-                    null, 
-                    [
-                        'termino_busqueda' => $termino,
-                        'error' => $e->getMessage(),
-                        'tipo_consulta' => 'busqueda_profesores'
-                    ], 
-                    "Gestión de Docentes", 
-                    "Error en búsqueda de profesores"
-                );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de error buscarProfesores: " . $auditError->getMessage());
-            }
-        }
-        
-        return false;
-    }
-}
 
 // Obtener información de un profesor específico - CON AUDITORÍA
 function obtenerProfesorPorId($id) {
@@ -19961,27 +17974,6 @@ function verificarEstadosNotas($estudiantes, $materia_id, $periodo_id, $docente_
 /**
  * Obtener datos completos de notas_pendientes
  */
-function obtenerNotasPendientes($id_estudiante, $id_materia, $id_periodo, $id_docente) {
-    global $db;
-    
-    $query = "SELECT *, estado as estado_pendiente FROM notas_pendientes 
-              WHERE id_usuario = ? 
-              AND id_materia = ? 
-              AND id_periodo = ? 
-              AND id_docente = ? 
-              LIMIT 1";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("iiii", $id_estudiante, $id_materia, $id_periodo, $id_docente);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        return $result->fetch_assoc();
-    }
-    
-    return null;
-}
 
 
 
@@ -20046,40 +18038,6 @@ function buscarEstudiantePorCedula($cedula) {
 /**
  * Función auxiliar para buscar carreras por nombre
  */
-function obtenerCarrerasPorNombre($nombre_carrera) {
-    global $db;
-    
-    try {
-        $query = "SELECT id_carrera, nombre_carrera 
-                  FROM carreras 
-                  WHERE nombre_carrera LIKE ? 
-                  AND activa = 1";
-        
-        $stmt = $db->prepare($query);
-        if (!$stmt) {
-            throw new Exception("Error en preparación: " . $db->error);
-        }
-
-        $nombre_like = "%" . $nombre_carrera . "%";
-        $stmt->bind_param("s", $nombre_like);
-        if (!$stmt->execute()) {
-            throw new Exception("Error en ejecución: " . $stmt->error);
-        }
-
-        $result = $stmt->get_result();
-        $carreras = [];
-        while ($row = $result->fetch_assoc()) {
-            $carreras[] = $row;
-        }
-
-        $stmt->close();
-        return $carreras;
-        
-    } catch (Exception $e) {
-        error_log("Error al obtener carreras por nombre: " . $e->getMessage());
-        return [];
-    }
-}
 
 /**
  * Obtener estudiante por ID
@@ -20144,43 +18102,6 @@ function obtenerCarrerasEstudiante($estudiante_id) {
 /**
  * Obtener materias por carrera - VERSIÓN CON TABLA DE RELACIÓN
  */
-function obtenerMateriasPorCarrera($id_carrera) {
-    global $db;
-    
-    try {
-        // Usamos la tabla carrera_materia para obtener las materias relacionadas
-        $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia, m.trayecto, cm.semestre
-                  FROM materias m
-                  INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
-                  WHERE cm.id_carrera = ? 
-                  AND m.activa = 1 
-                  ORDER BY cm.semestre, m.trayecto, m.nombre_materia";
-        
-        $stmt = $db->prepare($query);
-        if (!$stmt) {
-            throw new Exception("Error en preparación materias: " . $db->error);
-        }
-
-        $stmt->bind_param("i", $id_carrera);
-        
-        if (!$stmt->execute()) {
-            throw new Exception("Error en ejecución materias: " . $stmt->error);
-        }
-
-        $result = $stmt->get_result();
-        $materias = [];
-        while ($row = $result->fetch_assoc()) {
-            $materias[] = $row;
-        }
-
-        $stmt->close();
-        return $materias;
-        
-    } catch (Exception $e) {
-        error_log("Error al obtener materias: " . $e->getMessage());
-        return [];
-    }
-}
 
 // NUEVA FUNCIÓN: Obtener materias con notas del estudiante
 function obtenerMateriasConNotas($id_estudiante, $id_carrera) {
@@ -20240,28 +18161,6 @@ function obtenerNotasEstudianteMateria($id_estudiante, $id_materia) {
 }
 
 // FUNCIÓN: Obtener historial de cambios de una nota - CORREGIDA
-function obtenerHistorialCambiosNota($id_nota) {
-    global $db;
-    
-    $sql = "SELECT h.*, u.nombre as admin_nombre 
-            FROM historial_cambios_notas h 
-            LEFT JOIN users u ON h.id_admin = u.id 
-            WHERE h.id_nota = ? 
-            ORDER BY h.fecha_cambio DESC";
-    
-    $stmt = $db->prepare($sql);
-    $stmt->bind_param("i", $id_nota);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $historial = [];
-    while ($row = $result->fetch_assoc()) {
-        $historial[] = $row;
-    }
-    
-    $stmt->close();
-    return $historial;
-}
 
 // FUNCIÓN: Procesar edición de nota
 function procesarEdicionNota() {
@@ -20570,19 +18469,6 @@ function obtenerMateriasAprobadas($id_usuario, $trayecto = null) {
  * @param int $id_carrera ID de la carrera
  * @return array Materias reprobadas
  */
-function obtenerMateriasReprobadas($id_usuario, $trayecto, $id_carrera) {
-    $materias_trayecto = obtenerMateriasTrayecto($id_carrera, $trayecto);
-    $materias_aprobadas = obtenerMateriasAprobadas($id_usuario, $trayecto);
-    
-    $reprobadas = [];
-    foreach ($materias_trayecto as $materia) {
-        if (!isset($materias_aprobadas[$materia['id_materia']])) {
-            $reprobadas[] = $materia;
-        }
-    }
-    
-    return $reprobadas;
-}
 
 /**
  * Verifica si el estudiante puede avanzar al siguiente trayecto
@@ -20792,46 +18678,6 @@ function tienePrimerTitulo($id_usuario) {
  * @param int $id_carrera ID de la carrera
  * @return int Trayecto actual (0, 1, 2, 3, 4)
  */
-function obtenerTrayectoActualReal($id_usuario, $id_carrera) {
-    global $db;
-    
-    // Primero, verificar si el estudiante tiene notas registradas
-    $sql = "SELECT MAX(m.trayecto) as max_trayecto_con_notas
-            FROM notas_definitivas nd
-            INNER JOIN materias m ON nd.id_materia = m.id_materia
-            WHERE nd.id_usuario = ? 
-            AND m.id_materia IN (
-                SELECT cm.id_materia 
-                FROM carrera_materia cm 
-                WHERE cm.id_carrera = ?
-            )";
-    
-    $stmt = $db->prepare($sql);
-    $stmt->bind_param("ii", $id_usuario, $id_carrera);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $row = $result->fetch_assoc();
-    $max_trayecto_con_notas = $row['max_trayecto_con_notas'] ?? -1;
-    
-    // Si no tiene notas, empezar desde trayecto 0
-    if ($max_trayecto_con_notas === -1 || $max_trayecto_con_notas === null) {
-        return 0;
-    }
-    
-    // Ahora determinar en qué trayecto está realmente
-    for ($trayecto = $max_trayecto_con_notas; $trayecto >= 0; $trayecto--) {
-        // Verificar si puede avanzar desde este trayecto
-        $resultado = puedeAvanzarTrayecto($id_usuario, $trayecto, $id_carrera);
-        if ($resultado['puede_avanzar']) {
-            // Si puede avanzar, está en el siguiente trayecto
-            return $trayecto + 1;
-        }
-    }
-    
-    // Si no puede avanzar desde ningún trayecto, está en el último con notas
-    return $max_trayecto_con_notas;
-}
 
 /**
  * Obtiene las materias en las que el estudiante está actualmente inscrito
@@ -20839,52 +18685,6 @@ function obtenerTrayectoActualReal($id_usuario, $id_carrera) {
  * @param int $id_usuario ID del usuario
  * @return array Materias inscritas
  */
-function obtenerMateriasInscritas($id_usuario) {
-    global $db;
-    
-    // Primero, obtener el período activo
-    $periodo_activo = obtenerPeriodoActivo();
-    if (!$periodo_activo) {
-        return [];
-    }
-    
-    // Consulta para obtener materias inscritas en el período activo
-    $sql = "SELECT DISTINCT m.*, s.codigo_seccion, nd.id_periodo,
-                   CASE 
-                     WHEN nd.trayecto_0 IS NOT NULL THEN nd.trayecto_0
-                     WHEN nd.trayecto_1 IS NOT NULL THEN nd.trayecto_1
-                     WHEN nd.trayecto_2 IS NOT NULL THEN nd.trayecto_2
-                     WHEN nd.trayecto_3 IS NOT NULL THEN nd.trayecto_3
-                     WHEN nd.trayecto_4 IS NOT NULL THEN nd.trayecto_4
-                     ELSE NULL
-                   END as nota_actual
-            FROM notas_definitivas nd
-            INNER JOIN materias m ON nd.id_materia = m.id_materia
-            LEFT JOIN carrera_materia cm ON m.id_materia = cm.id_materia
-            LEFT JOIN secciones s ON cm.id_carrera = s.id_carrera AND s.id_periodo = nd.id_periodo
-            LEFT JOIN estudiante_seccion es ON nd.id_usuario = es.id_usuario AND s.id_seccion = es.id_seccion
-            WHERE nd.id_usuario = ?
-            AND nd.id_periodo = ?
-            AND es.estatus = 'Activo'
-            ORDER BY m.trayecto, m.nombre_materia";
-    
-    $stmt = $db->prepare($sql);
-    if (!$stmt) {
-        error_log("Error preparando consulta: " . $db->error);
-        return [];
-    }
-    
-    $stmt->bind_param("ii", $id_usuario, $periodo_activo['id_periodo']);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $materias_inscritas = [];
-    while ($row = $result->fetch_assoc()) {
-        $materias_inscritas[] = $row;
-    }
-    
-    return $materias_inscritas;
-}
 
 /**
  * Obtiene el historial de secciones del estudiante
@@ -20919,51 +18719,12 @@ function obtenerHistorialSecciones($id_usuario) {
  * @param int $id_usuario ID del usuario
  * @return bool True si ya está inscrito
  */
-function estaInscritoEnPeriodo($id_usuario) {
-    global $db;
-    
-    $periodo_activo = obtenerPeriodoActivo();
-    if (!$periodo_activo) {
-        return false;
-    }
-    
-    $sql = "SELECT COUNT(*) as total
-            FROM estudiante_seccion es
-            INNER JOIN secciones s ON es.id_seccion = s.id_seccion
-            WHERE es.id_usuario = ? AND s.id_periodo = ?";
-    
-    $stmt = $db->prepare($sql);
-    $stmt->bind_param("ii", $id_usuario, $periodo_activo['id_periodo']);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $row = $result->fetch_assoc();
-    
-    return $row['total'] > 0;
-}
 
 /**
  * Obtiene el último período en el que el estudiante estuvo inscrito
  * @param int $id_usuario ID del usuario
  * @return array Información del último período
  */
-function obtenerUltimoPeriodoInscrito($id_usuario) {
-    global $db;
-    
-    $sql = "SELECT p.*
-            FROM periodos_academicos p
-            INNER JOIN secciones s ON p.id_periodo = s.id_periodo
-            INNER JOIN estudiante_seccion es ON s.id_seccion = es.id_seccion
-            WHERE es.id_usuario = ?
-            ORDER BY p.fecha_inicio DESC
-            LIMIT 1";
-    
-    $stmt = $db->prepare($sql);
-    $stmt->bind_param("i", $id_usuario);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    return $result->fetch_assoc();
-}
 
 /**
  * Determina si el estudiante es nuevo (sin historial académico)
@@ -21294,55 +19055,6 @@ function obtenerNotaMinimaMateria($id_materia) {
  * Script para marcar materias como Proyecto Socio Integrador
  * Ejecutar una sola vez después de agregar el campo
  */
-function marcarProyectosSocio() {
-    global $db;
-    
-    $palabras_clave = [
-        'proyecto socio integrador',
-        'proyecto sociointegrador',
-        'proyecto integrador',
-        'socio integrador',
-        'proyecto socio',
-        'sociointegrador',
-        'trabajo especial de grado',
-        'proyecto final',
-        'trabajo de grado'
-    ];
-    
-    $total_actualizadas = 0;
-    
-    foreach ($palabras_clave as $palabra) {
-        $sql = "UPDATE materias 
-                SET es_proyecto_socio = 1 
-                WHERE LOWER(nombre_materia) LIKE ? 
-                AND es_proyecto_socio = 0";
-        
-        $busqueda = "%" . $palabra . "%";
-        $stmt = $db->prepare($sql);
-        $stmt->bind_param("s", $busqueda);
-        $stmt->execute();
-        
-        $total_actualizadas += $stmt->affected_rows;
-    }
-    
-    $codigos_proyecto = ['PSI', 'PROYSOC', 'TEG', 'PROYECTO'];
-    
-    foreach ($codigos_proyecto as $codigo) {
-        $sql = "UPDATE materias 
-                SET es_proyecto_socio = 1 
-                WHERE UPPER(cod_materia) LIKE ? 
-                AND es_proyecto_socio = 0";
-        
-        $busqueda = "%" . $codigo . "%";
-        $stmt = $db->prepare($sql);
-        $stmt->bind_param("s", $busqueda);
-        $stmt->execute();
-        
-        $total_actualizadas += $stmt->affected_rows;
-    }
-    
-    return $total_actualizadas;
-}
 
 
 
@@ -21584,54 +19296,6 @@ function aprobarAvanceTrayecto($id_usuario, $id_carrera, $trayecto_actual, $moti
  * Obtiene el ID del usuario actual de sesión
  * @return int ID del usuario o 0 si no está definido
  */
-function obtenerUsuarioActualId() {
-    global $db;
-    
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-    
-    // Si tenemos un username en sesión, buscar el ID en la base de datos
-    if (isset($_SESSION['username']) && !empty($_SESSION['username'])) {
-        $username = $_SESSION['username'];
-        
-        $sql = "SELECT id FROM users WHERE username = ? LIMIT 1";
-        $stmt = $db->prepare($sql);
-        $stmt->bind_param("s", $username);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($row = $result->fetch_assoc()) {
-            return $row['id'];
-        }
-    }
-    
-    // Si tenemos email en sesión, buscar el ID
-    if (isset($_SESSION['email']) && !empty($_SESSION['email'])) {
-        $email = $_SESSION['email'];
-        
-        $sql = "SELECT id FROM users WHERE email = ? LIMIT 1";
-        $stmt = $db->prepare($sql);
-        $stmt->bind_param("s", $email);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($row = $result->fetch_assoc()) {
-            return $row['id'];
-        }
-    }
-    
-    // Intentar obtener directamente de variables de sesión
-    if (isset($_SESSION['user_id']) && $_SESSION['user_id'] > 0) {
-        return $_SESSION['user_id'];
-    } elseif (isset($_SESSION['id']) && $_SESSION['id'] > 0) {
-        return $_SESSION['id'];
-    } elseif (isset($_SESSION['idusuario']) && $_SESSION['idusuario'] > 0) {
-        return $_SESSION['idusuario'];
-    }
-    
-    return 0;
-}
 
 
 
@@ -21645,48 +19309,6 @@ function obtenerUsuarioActualId() {
  * @param string $motivo Motivo de la aprobación
  * @return array Resultado de la operación
  */
-function aprobarAvanceTrayectoConAprobador($id_usuario, $id_carrera, $trayecto_actual, $aprobado_por, $motivo = '') {
-    global $db;
-    
-    // Verificar que el trayecto no sea el último (4)
-    if ($trayecto_actual >= 4) {
-        return [
-            'success' => false,
-            'message' => 'No se puede aprobar avance desde el último trayecto (4)'
-        ];
-    }
-    
-    // CORRECCIÓN: Ajustar la consulta SQL
-    $sql = "INSERT INTO control_avance_trayecto 
-            (id_usuario, id_carrera, trayecto_actual, puede_avanzar, aprobado_por, fecha_aprobacion, motivo, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, NOW(), ?, NOW(), NOW())
-            ON DUPLICATE KEY UPDATE 
-            puede_avanzar = VALUES(puede_avanzar),
-            aprobado_por = VALUES(aprobado_por),
-            fecha_aprobacion = VALUES(fecha_aprobacion),
-            motivo = VALUES(motivo),
-            updated_at = NOW()";
-    
-    $stmt = $db->prepare($sql);
-    
-    // CORRECCIÓN: Agregar el valor para 'puede_avanzar'
-    $puede_avanzar = 1;
-    
-    // 6 variables: i, i, i, i, i, s
-    $stmt->bind_param("iiiiis", $id_usuario, $id_carrera, $trayecto_actual, $puede_avanzar, $aprobado_por, $motivo);
-    
-    if ($stmt->execute()) {
-        return [
-            'success' => true,
-            'message' => 'Avance de trayecto aprobado exitosamente'
-        ];
-    } else {
-        return [
-            'success' => false,
-            'message' => 'Error al aprobar avance: ' . $stmt->error
-        ];
-    }
-}
 
 
 
@@ -22103,48 +19725,12 @@ function formatearNombreCarrera($nombre_carrera, $tipo_formacion = '') {
  * Función auxiliar para obtener el tipo de formación de la base de datos
  */
 if (!function_exists('obtenerTipoFormacionCarrera')) {
-function obtenerTipoFormacionCarrera($id_carrera) {
-    global $db;
-    
-    try {
-        $query = "SELECT tipo_formacion FROM carreras WHERE id_carrera = ?";
-        $stmt = $db->prepare($query);
-        $stmt->bind_param("i", $id_carrera);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($result->num_rows > 0) {
-            $row = $result->fetch_assoc();
-            return $row['tipo_formacion'] ?? '';
-        }
-        
-        return '';
-        
-    } catch (Exception $e) {
-        error_log("Error al obtener tipo de formación: " . $e->getMessage());
-        return '';
-    }
-}
 }
 
 /**
  * Función mejorada para obtener carrera del estudiante incluyendo tipo de formación
  */
 if (!function_exists('obtenerCarreraEstudianteCompleta')) {
-function obtenerCarreraEstudianteCompleta($estudiante_id) {
-    global $db;
-    
-    $query = "SELECT c.id_carrera, c.nombre_carrera, c.cod_carrera, c.tipo_formacion 
-              FROM users u
-              INNER JOIN carreras c ON u.carrera = c.id_carrera
-              WHERE u.id = ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $estudiante_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    return $result->num_rows > 0 ? $result->fetch_assoc() : null;
-}
 }
 
 
@@ -22426,494 +20012,15 @@ function generar_pago_mensualidad(){
 
 // VERIFICAR QUE NO EXISTA PEDIDOS EN ESPERA
 // STATATUS = PENDIENTE   RECHAZADO   APROBADO
-function verificar_status(){
-    global $db, $usua, $ci_nro_cuenta, $monto, $nro_transf, $banco_emisor, $banco_destino, $fecha_transf,$mes_de_pago_actual, $debe_pagar, $operador, $modal_usuario_bloqueado, $monto_favor,
-$mens_monto_favor, $cuentas_bancarias;
-
-    if (isActive()){
-
-      $query = "SELECT * FROM pedidos  WHERE usuario = '$usua' AND status_pedido IN('ESPERANDO','APROBADO')";
-		$result = mysqli_query($db, $query);
-		$rows =  mysqli_num_rows($result);
-if ($rows > 0){
-
-	echo '<div class="alert alert-danger" role="alert" >
-				<h3>
-		LO SENTIMOS, USTED POSEE UN PEDIDO DE TARJETAS UN1CA EN ESPERA, DEBE ESPERAR SEA DESPACHADO SU PEDIDO PARA PODER EFECTUAR UN NUEVO PEDIDO.
-				</h3>
-			</div>';
-
-
-} else {
-
-	$queryvpm = "SELECT * FROM pagos WHERE user = '$usua' AND mes_de_pago = '$mes_de_pago_actual' AND concepto = 'MENS_MOVILNET' AND status_pago = 'APROBADO' ORDER by id DESC LIMIT 1";
-	$resultvpm = mysqli_query($db, $queryvpm);
-	$rowsvpm =  mysqli_num_rows($resultvpm);
-    $rowdato = mysqli_fetch_assoc($resultvpm);
-    $motivo = $rowdato['motivo_rechazo'];
-
-	if ($rowdato['status_pago'] == "PENDIENTE") {
-		echo '<div class="alert alert-danger" role="alert" >
-				<h3>
-		LO SENTIMOS, SU PAGO DE LA MENSUALIDAD <b>'.strtoupper ($mes_de_pago_actual) .'</b> AUN NO HA SIDO CONFORMADO
-				</h3>
-			</div>';
-    }
-
-    else if ($rowdato['status_pago'] == "RECHAZADO") {
-		echo '<div class="alert alert-danger" role="alert" >
-				<h3>
-		LO SENTIMOS, USTED NO PUEDE EFECTUAR PEDIDOS YA QUE SU PAGO DE LA MENSUALIDAD <b>'.strtoupper ($mes_de_pago_actual) .'</b> FUE RECHAZADO POR EL SIGUIENTE MOTIVO: <b>'.strtoupper ($motivo) .'</b><br> LE INVITAMOS A A EFECTUAR SU PAGO DE MENSUALIDAD Y DECLARARLO <a href="mensualidad_movilnet.php">AQUI</a>
-				</h3>
-			</div>';
-	}
-
-	else if ($rowdato['status_pago'] == "APROBADO"){
-
-    a_favor();
-    echo $mens_monto_favor;
-    $monto_favor = $GLOBALS['monto_a_favor'];
-
-        echo $cuentas_bancarias;
-contenido('bancario');
-
-echo ' <form autocomplete="off" class="was-validated" method="post" action= "pedidos_movilnet.php">';
-
-echo '<input type="hidden" name="operador" value="'.$operador.'">';
-
-echo '<div class="form-group">
-<label for="monto">Seleccione Monto de su Pedido</label>
-<select class="custom-select" id="monto" name="monto" value="';
-echo $monto;
-echo '" required >
-<option value="">Seleccione:</option>';
-monto();
-echo '</select> <div class="invalid-feedback">Debe Seleccionar el monto de su transferencia.</div>
-</div>
-
-<div class="form-group">
-<label for="banco_emisor">Desde Que banco Transfirio</label>
-<select class="custom-select" id="banco_emisor" name="banco_emisor" value="';
-echo $banco_emisor;
-echo '" required >
-<option value="">Seleccione:</option>';
-banco_emisor();
-echo '</select> <div class="invalid-feedback">Debe Seleccionar desde que banco efectuo su transferencia.</div>
-</div>
-
-<div class="form-group">
-<label for="banco_destino">A que Banco Transfirio</label>
-<select class="custom-select" id="banco_destino" name="banco_destino" value="';
-echo $banco_destino;
-echo '" required >
-<option value="">Seleccione:</option>';
-banco_destino();
-echo '</select>
-<div class="invalid-feedback">Debe Seleccionar a que banco usted efectuo su transferencia.</div>
-</div>
-
-<div class="form-group">
-<label for="nroTransf">Numero de Transferencia</label>
-<input  pattern="[0-9]{8,15}" title = "Debe utilizar solo Numeros, Minimo 8 digitos y Maximo 15 digitos. Si su banco solo le ha suministrado un numero de 4 digitos debe rellenar los espacios faltantes con el numero cero, ejemplo: 00001234"  type="text" class="form-control" id="nro_transf" aria-describedby="nro_transf" placeholder="Numero de Operacion Bancaria" name="nro_transf" value="';
-echo $nro_transf;
-echo '" required>
-<div class="invalid-feedback">Debe indicar el numero de operacion bancaria indicada por su Banco. Si su banco solo le ha suministrado un numero de 4 digitos debe rellenar los espacios faltantes con el numero cero, ejemplo: 00001234</div>
-</div>
-
-<div class="form-group">
-<label for="ci_nro_cuenta">Cedula del Titular de la Cuenta Origen</label>
-<input  pattern="[0-9]{7,10}" title = "Debe utilizar solo Numeros, Minimo 7 digitos y Maximo 10 digitos"  type="text" class="form-control" id="ci_nro_cuenta" aria-describedby="ci_nro_cuenta" placeholder="Numero de Cedula Titular de la Cuenta Origen" name="ci_nro_cuenta" value="';
-echo $ci_nro_cuenta;
-echo '" required>
-<div class="invalid-feedback">Debe indicar el numero de cedula del titular de la cuenta desde donde usted efectuo su transferencia.</div>
-</div>
-
-<div class="form-group">
-<label for="fechaTransf">Fecha de su Transferencia</label>
-<input pattern="(?: 30)) | (? :(? : 0 [13578] | 1 [02]) - 31)) / (? :(?: 0 [1-9] | 1 [0-2]) - (?: 0 [1-9] | 1 [0 -9] | 2 [0-9]) | (? :( ?! 02) (?: 0 [1-9] | 1 [0-2]) / (?: 19 | 20) [0-9] {2}" title = "Debe utilizar el formato DD/MM/YYYY" type="date" class="form-control" id="fecha_transf" aria-describedby="fecha_transf" placeholder="Numero de Operacion Bancaria" name ="fecha_transf" value="';
-echo $fecha_transf;
-echo '" required>
-<div class="invalid-feedback">Debe Seleccione la fecha en que usted efectuo su transferencia.</div>
-</div>
-
-<input type="hidden" name="user" value="'.$usua.'">
-
-<input type="hidden" name="sin_plan" value="0">
-
-<button type="submit" class="btn btn-primary" name="pedido_btn">Enviar</button>
-
-</form>';
-	}  else {
-	echo $debe_pagar;
-}
-}
-
-    } else {
-
-      echo $modal_usuario_bloqueado;
-
-    }
-}
 
 
 
 // VERIFICAR QUE NO EXISTA PEDIDOS EN ESPERA OPERADORES
 // STATATUS = PENDIENTE   RECHAZADO   APROBADO
-function verificar_status2(){
-  global $db, $usua, $ci_nro_cuenta, $monto, $nro_transf, $banco_emisor, $banco_destino, $fecha_transf,$mes_de_pago_actual, $debe_pagar, $debe_pagar_operador, $concepto, $operador, $num_min, $text_num_min, $ph, $modal_usuario_bloqueado, $monto_favor, $mens_monto_favor, $cuentas_bancarias, $movilnet_msn, $rowsvpm;
 
-  selector_operador();
 
-  if (isActive()){
 
-  //INICIO SI ES MOVILNET
-  if ($operador == "Movilnet"){
 
-
-
-    $query = "SELECT * FROM pedidos  WHERE usuario = '$usua' AND operador = '$operador' AND status_pedido IN('ESPERANDO','APROBADO')";
-  $result = mysqli_query($db, $query);
-  $rows =  mysqli_num_rows($result);
-if ($rows > 0){
-
-echo '<div class="alert alert-danger" role="alert" >
-      <h3>
-  LO SENTIMOS, USTED POSEE UN PEDIDO EN ESPERA
-      </h3>
-    </div>';
-
-
-} else {
-
-$queryvpm = "SELECT * FROM pagos WHERE user = '$usua' AND concepto = '$concepto' AND mes_de_pago = '$mes_de_pago_actual' ORDER by id DESC LIMIT 1";
-$resultvpm = mysqli_query($db, $queryvpm);
-$rowsvpm =  mysqli_num_rows($resultvpm);
-  $rowdato = mysqli_fetch_assoc($resultvpm);
-  $motivo = $rowdato['motivo_rechazo'];
-
-if ($rowdato['status_pago'] == "PENDIENTE") {
-  echo '<div class="alert alert-danger" role="alert" >
-      <h3>
-  LO SENTIMOS, SU PAGO DE LA MENSUALIDAD <b>'.strtoupper ($mes_de_pago_actual) .'</b> AUN NO HA SIDO CONFORMADO
-      </h3>
-    </div>';
-  }
-
-  else if ($rowdato['status_pago'] == "RECHAZADO") {
-  echo '<div class="alert alert-danger" role="alert" >
-      <h3>
-  LO SENTIMOS, USTED NO PUEDE EFECTUAR PEDIDOS YA QUE SU PAGO DE LA MENSUALIDAD <b>'.strtoupper ($mes_de_pago_actual) .'</b> FUE RECHAZADO POR EL SIGUIENTE MOTIVO: <b>'.strtoupper ($motivo) .'</b><br> LE INVITAMOS A A EFECTUAR SU PAGO DE MENSUALIDAD Y DECLARARLO <a href="mensualidad_movilnet.php">AQUI</a>
-      </h3>
-    </div>';
-}
-
-else if ($rowdato['status_pago'] == "APROBADO"){
-
-  a_favor();
-  echo $mens_monto_favor;
-  $monto_favor = $GLOBALS['monto_a_favor'];
-
-      echo $cuentas_bancarias;
-contenido('bancario');
-
-echo ' <form autocomplete="off" class="was-validated" method="post" action= "pedidos_movilnet.php">';
-
-echo '<div class="form-group">
-<label for="monto">Seleccione Monto de su Pedido</label>
-<select class="custom-select" id="monto" name="monto" value="';
-echo $monto;
-echo '" required >
-<option value="">Seleccione:</option>';
-monto();
-echo '</select> <div class="invalid-feedback">Debe Seleccionar el monto de su transferencia.</div>
-</div>
-
-<div class="form-group">
-<label for="banco_emisor">Desde Que banco Transfirio</label>
-<select class="custom-select" id="banco_emisor" name="banco_emisor" value="';
-echo $banco_emisor;
-echo '" required >
-<option value="">Seleccione:</option>';
-banco_emisor();
-echo '</select> <div class="invalid-feedback">Debe Seleccionar desde que banco efectuo su transferencia.</div>
-</div>
-
-<div class="form-group">
-<label for="banco_destino">A que Banco Transfirio</label>
-<select class="custom-select" id="banco_destino" name="banco_destino" value="';
-echo $banco_destino;
-echo '" required >
-<option value="">Seleccione:</option>';
-banco_destino();
-echo '</select>
-<div class="invalid-feedback">Debe Seleccionar a que banco usted efectuo su transferencia.</div>
-</div>
-
-<div class="form-group">
-<label for="nroTransf">Numero de Transferencia</label>
-<input  pattern="[0-9]{8,15}" title = "Debe utilizar solo Numeros, Minimo 8 digitos y Maximo 15 digitos. Si su banco solo le ha suministrado un numero de 4 digitos debe rellenar los espacios faltantes con el numero cero, ejemplo: 00001234"  type="text" class="form-control" id="nro_transf" aria-describedby="nro_transf" placeholder="Numero de Operacion Bancaria" name="nro_transf" value="';
-echo $nro_transf;
-echo '" required>
-<div class="invalid-feedback">Debe indicar el numero de operacion bancaria indicada por su Banco. Si su banco solo le ha suministrado un numero de 4 digitos debe rellenar los espacios faltantes con el numero cero, ejemplo: 00001234</div>
-</div>
-
-<div class="form-group">
-<label for="ci_nro_cuenta">Cedula del Titular de la Cuenta Origen</label>
-<input  pattern="[0-9]{7,10}" title = "Debe utilizar solo Numeros, Minimo 7 digitos y Maximo 10 digitos"  type="text" class="form-control" id="ci_nro_cuenta" aria-describedby="ci_nro_cuenta" placeholder="Numero de Cedula Titular de la Cuenta Origen" name="ci_nro_cuenta" value="';
-echo $ci_nro_cuenta;
-echo '" required>
-<div class="invalid-feedback">Debe indicar el numero de cedula del titular de la cuenta desde donde usted efectuo su transferencia.</div>
-</div>
-
-<div class="form-group">
-<label for="fechaTransf">Fecha de su Transferencia</label>
-<input pattern="(?: 30)) | (? :(? : 0 [13578] | 1 [02]) - 31)) / (? :(?: 0 [1-9] | 1 [0-2]) - (?: 0 [1-9] | 1 [0 -9] | 2 [0-9]) | (? :( ?! 02) (?: 0 [1-9] | 1 [0-2]) / (?: 19 | 20) [0-9] {2}" title = "Debe utilizar el formato DD/MM/YYYY" type="date" class="form-control" id="fecha_transf" aria-describedby="fecha_transf" placeholder="Numero de Operacion Bancaria" name ="fecha_transf" value="';
-echo $fecha_transf;
-echo '" required>
-<div class="invalid-feedback">Debe Seleccione la fecha en que usted efectuo su transferencia.</div>
-</div>
-
-<input type="hidden" name="user" value="'.$usua.'">
-<input type="hidden" name="monto_favor" value="'.$monto_favor.'">
-<input type="hidden" name="sin_plan" value="0">
-
-<button type="submit" class="btn btn-primary" name="pedido_btn">Enviar</button>
-
-</form>';
-}  else {
-echo $debe_pagar;
-
-}
-}
-
-}
-//INICIO SI ES OPERADOR DIFERENTE A MOVILNET
-else if ($operador == $operador){
-  echo '<h1>'.$operador.'</h1>';
-
-  $query = "SELECT * FROM pedidos  WHERE usuario = '$usua' AND operador = '$operador' AND status_pedido IN('ESPERANDO','APROBADO') AND sin_plan = '0' ORDER BY id DESC LIMIT 1";
-  $result = mysqli_query($db, $query);
-  $rows =  mysqli_num_rows($result);
-  // ANALIZAR QUE NO TENGA PEDIDOS EN ESPERA
-if ($rows > 5){
-
-echo '<div class="alert alert-danger" role="alert" >
-      <h3>
-  LO SENTIMOS, USTED POSEE UN REGISTRO DE RECARGAS QUE AUN NO HA SIDO ATENDIDO.
-      </h3>
-    </div>';
-
-
-} else {
-
-$queryvpm = "SELECT *, DATEDIFF(fin, NOW()) as DiasRestantes FROM pagos WHERE user = '$usua' AND concepto = '$concepto' AND DATEDIFF(fin, inicio)>'0' ORDER by id DESC LIMIT 1";
-  $resultvpm = mysqli_query($db, $queryvpm);
-  $rowsvpm =  mysqli_num_rows($resultvpm);
-  $rowdato = mysqli_fetch_assoc($resultvpm);
-  $motivo = $rowdato['motivo_rechazo'];
-
-if ($rowdato['DiasRestantes'] > 0)
-{
-
-if ($rowdato['status_pago'] == "PENDIENTE") {
-  echo '<div class="alert alert-danger" role="alert" >
-      <h3>
-  LO SENTIMOS, SU PAGO DE LA MENSUALIDAD PARA EL USO DE LA PLATAFORMA <b>'.strtoupper ($operador) .'</b> AUN NO HA SIDO CONFORMADO.
-      </h3>
-    </div>';
-  }
-
-  else if ($rowdato['status_pago'] == "RECHAZADO") {
-  echo '<div class="alert alert-danger" role="alert" >
-      <h3>
-  LO SENTIMOS, USTED NO PUEDE EFECTUAR SOLICITUDES DE RECARGA YA QUE SU PAGO DE LA MENSUALIDAD PARA EL USO DE LA PLATAFORMA <b>'.strtoupper ($operador) .'</b> FUE RECHAZADO POR EL SIGUIENTE MOTIVO: <b>'.strtoupper ($motivo) .'</b><br> LE INVITAMOS A A EFECTUAR SU PAGO DE MENSUALIDAD Y DECLARARLO NUEVAMENTE <a href="mensualidad_'.strtolower ($operador) .'.php">AQUI</a>
-      </h3>
-    </div>';
-}
-
-else if ($rowdato['status_pago'] == "APROBADO"){
-
-  if ($operador == 'Movilnet') {
-    echo $movilnet_msn;
-  }
-      echo ' VERIFIQUE MUY BIEN LOS DATOS QUE VA A INGRESAR AL SISTEMA';
-
-echo ' <form autocomplete="off" class="was-validated" method="post" action= "">';
-
-echo '<div class="form-group">
-<label for="monto">Seleccione Monto a recargar</label>
-<select class="custom-select form-control-lg" id="monto" name="monto" value="';
-//echo $monto;
-echo '" required >
-<option value="">Seleccione:</option>';
-monto_recarga();
-echo '</select> <div class="invalid-feedback">Debe Seleccionar el monto a recargar.</div>
-</div>
-
-<div class="form-group">
-<label for="nro">Numero A Recargar</label>
-<input title = "'.$text_num_min.'"  type="num"  pattern="'.$num_min.'" minlenght="8" maxlenght="11" class="form-control form-control-lg" id="nro" aria-describedby="nro" placeholder="'.$ph.'" name="nro" value="';
-//echo $nro;
-echo '" required>
-<div class="invalid-feedback">'.$text_num_min.'</div>
-</div>
-<input type="hidden" name="accion" value="insert">
-<input type="hidden" name="user" value="'.$usua.'">
-<input type="hidden" name="operador" value="'.$operador.'">
-<input type="hidden" name="sin_plan" value="0">
-
-<button type="submit" class="btn btn-primary" name="registrar_recarga_btn"><i class="fa fa-save"></i> Registrar</button>
-
-</form>';
-}
-}  else {
-echo $debe_pagar_operador;
-
-}
-} // CIERRE VERIFICAR QUE NO TENGA PEDIDOS EN ESPERA
-
-
-
-
-} // CIERRE PARA MOVISTAR
-
-
-} // TODO ANTES DE ESTO PASA SI EL USUARIO ESTA ACTIVO
-else {
-
-    echo $modal_usuario_bloqueado;
-
-  }
-
-}
-
-
-
-function verificar_status3(){
-  global $db, $username, $usua, $ci_nro_cuenta, $monto, $nro_transf, $banco_emisor, $banco_destino, $fecha_transf, $status_pedido, $fecha_pedido, $status_pago, $fecha_aprobacion,$mes_de_pago_actual, $debe_pagar, $debe_pagar_operador, $concepto, $operador, $link, $t, $num_min, $text_num_min, $ph, $fecha_sistema, $modal_usuario_bloqueado, $monto_favor, $mens_monto_favor, $movilnet_msn;
-
-  selector_operador();
-
-  if (isActive()){
-
-  if ($operador == $operador){
-  echo '<h1>'.$operador.'</h1>';
-
-
-  $query = "SELECT * FROM pedidos  WHERE usuario = '$usua' AND operador = '$operador' AND status_pedido IN('ESPERANDO','APROBADO') AND sin_plan = '0' ORDER BY id DESC LIMIT 1";
-  $result = mysqli_query($db, $query);
-  $rows =  mysqli_num_rows($result);
-  // ANALIZAR QUE NO TENGA PEDIDOS EN ESPERA
-if ($rows > 5){
-
-echo '<div class="alert alert-danger" role="alert" >
-      <h3>
-  LO SENTIMOS, USTED POSEE 5 REGISTROS DE RECARGAS QUE AUN NO HA SIDO ATENDIDO.
-      </h3>
-    </div>';
-
-
-} else {
-
-$queryvpm = "SELECT *, DATEDIFF(fin, NOW()) as DiasRestantes FROM pagos WHERE user = '$usua' AND concepto = '$concepto' AND DATEDIFF(fin, inicio)>'0' ORDER by id DESC LIMIT 1";
-  $resultvpm = mysqli_query($db, $queryvpm);
-  $rowsvpm =  mysqli_num_rows($resultvpm);
-  $rowdato = mysqli_fetch_assoc($resultvpm);
-  $motivo = $rowdato['motivo_rechazo'];
-
-if ($rowdato['DiasRestantes'] > 0)
-{
-
-if ($rowdato['status_pago'] == "PENDIENTE") {
-  echo '<div class="alert alert-danger" role="alert" >
-      <h3>
-  LO SENTIMOS, SU PAGO DE LA MENSUALIDAD PARA EL USO DE LA PLATAFORMA <b>'.strtoupper ($operador) .'</b> AUN NO HA SIDO CONFORMADO.
-      </h3>
-    </div>';
-  }
-
-  else if ($rowdato['status_pago'] == "RECHAZADO") {
-  echo '<div class="alert alert-danger" role="alert" >
-      <h3>
-  LO SENTIMOS, USTED NO PUEDE EFECTUAR SOLICITUDES DE RECARGA YA QUE SU PAGO DE LA MENSUALIDAD PARA EL USO DE LA PLATAFORMA <b>'.strtoupper ($operador) .'</b> FUE RECHAZADO POR EL SIGUIENTE MOTIVO: <b>'.strtoupper ($motivo) .'</b><br> LE INVITAMOS A A EFECTUAR SU PAGO DE MENSUALIDAD Y DECLARARLO NUEVAMENTE <a href="mensualidad_'.strtolower ($operador) .'.php">AQUI</a>
-      </h3>
-    </div>';
-}
-
-else if ($rowdato['status_pago'] == "APROBADO"){
-
-  if ($operador == 'Movilnet') {
-    echo $movilnet_msn;
-  }
-      echo ' VERIFIQUE MUY BIEN LOS DATOS QUE VA A INGRESAR AL SISTEMA';
-
-echo ' <form autocomplete="off" class="was-validated" method="post" action= "">';
-
-echo '<div class="form-group">
-<label for="monto">Seleccione Monto a recargar</label>
-<select class="custom-select form-control-lg" id="monto" name="monto" value="';
-//echo $monto;
-echo '" required >
-<option value="">Seleccione:</option>';
-monto_recarga();
-echo '</select> <div class="invalid-feedback">Debe Seleccionar el monto a recargar.</div>
-</div>
-
-<div class="form-group">
-<label for="nro">Numero A Recargar</label>
-<input title = "'.$text_num_min.'"  type="num"  pattern="'.$num_min.'" minlenght="8" maxlenght="11" class="form-control form-control-lg" id="nro" aria-describedby="nro" placeholder="'.$ph.'" name="nro" value="';
-//echo $nro;
-echo '" required>
-<div class="invalid-feedback">'.$text_num_min.'</div>
-</div>
-<input type="hidden" name="accion" value="insert">
-<input type="hidden" name="user" value="'.$usua.'">
-<input type="hidden" name="operador" value="'.$operador.'">
-<input type="hidden" name="sin_plan" value="0">
-
-<button type="submit" class="btn btn-primary" name="registrar_recarga_btn"><i class="fa fa-save"></i> Registrar</button>
-
-</form>';
-}
-}  else {
-echo $debe_pagar_operador;
-
-}
-} // CIERRE VERIFICAR QUE NO TENGA PEDIDOS EN ESPERA
-
-
-
-
-} // CIERRE PARA MOVISTAR
-
-
-} //TODO ANTES DE ESTO PASA SI EL USUARIO ESTA ACTIVO
-else {
-
-    echo $modal_usuario_bloqueado;
-
-  }
-
-}
-
-function contar_en_espera(){
-      global $db, $username, $usua, $contar_pedido,
-      $pendiente_pedido, $mes_de_pago_actual, $ganancia_bantecom, $esperando;
-
-      $query = "SELECT SUM(CASE WHEN confirmacion = 'Esperando_Operador' THEN 1 ELSE 0 END) AS 'esperando' FROM `recargar`";
-      $result = mysqli_query($db, $query);
-      $rows =  mysqli_fetch_assoc($result);
-      $esperando = $rows['esperando'];
-
-      if ($esperando>0) {
-        $esperando = $esperando;
-      } else {
-      $esperando = "";
-      }
-
-      $esperando = $esperando ;
-
-    }
 
 
 	
@@ -22922,153 +20029,6 @@ function contar_en_espera(){
 
 //BOTONERA EDITAR NUMERO DE SOLICITUD DE RECARGA
 // $a = id de recarga
-function botonera_recarga($a){
-  global $db, $usua, $accion, $concepto, $operador, $link, $multiplo, $num_min, $text_num_min, $ph, $nro, $op, $opciones, $monto_minimo, $monto_maximo, $titulopag, $porcentaje;
-
-  $query = "SELECT * FROM recargar WHERE id = '$a'";
-  $result = mysqli_query($db, $query);
-    $rows =  mysqli_num_rows($result);
-    $row = mysqli_fetch_array($result);
-
-    if ($rows<1){
-      $_SESSION['recarga']  = "Lo sentimos,la accion que intenta efectuar no se puede llevar a cabo motivado q que intenta editar un id que no existe<br>";
-      //mysqli_close($db);
-    } else {
-
-            $nro = $row['nro'];
-            $monto = $row['monto'];
-            $operador = $row['operador'];
-            $tipo = $row['tipo'];
-            selector_operador();
-
-$boton_editar = '<div data-html="true" href="#" data-toggle="popover" title="EDITAR NUMERO A RECARGAR" data-content="Editar Numero <br> <b>'.$nro.'</b>.">
-<i class="fa fa-edit"></i>
-</div>';
-
-$boton_editar2 ='<!-- Button trigger modal -->
-<button type="button" class="mx-auto btn btn-sm btn-outline-info" data-toggle="modal" data-target="#editar'.$a.'" title="EDITAR NUMERO '.$nro.'">
-'.$boton_editar.'
-</button>';
-
-$boton_eliminar = '<div data-html="true" href="#" data-toggle="popover" title="ELIMINAR NUMERO A RECARGAR" data-content="Eliminar Numero <br> <b>'.$nro.'</b>.">
-<i class="fa fa-trash-alt"></i>
-</div>';
-
-$boton_eliminar2 ='<!-- Button trigger modal -->
-<button type="button" class="mx-auto btn btn-sm btn-outline-danger" data-toggle="modal" data-target="#eliminar'.$a.'" title="ELIMINAR NUMERO '.$nro.'">
-'.$boton_eliminar.'
-</button>';
-
-$boton_eliminar2 .= '<!-- Modal -->
-<div class="modal fade" id="eliminar'.$a.'" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="exampleModalLabel">Eliminar Numero</h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <div class="modal-body">
-      Confirme que desea eliminar la solicitud de recarga al numero : <b>' .$nro .'</b> por un monto de <b>' .$monto .' Bs.</b><br>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">cerrar</button>
-        <form autocomplete="off" class="was-validated" method="post" action= "">
-        <input type="hidden" name="id" value="'.$a.'">
-        <input type="hidden" name="accion" value="eliminar">
-        <button type="submit" class="btn btn-danger" name="registrar_recarga_btn">Eliminar</button>
-        </form>
-      </div>
-    </div>
-  </div>
-</div>';
-
-$boton_editar2 .= '<!-- Modal -->
-          <div class="modal fade" id="editar'.$a.'" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-            <div class="modal-dialog" role="document">
-              <div class="modal-content">
-                <div class="modal-header">
-                  <h5 class="modal-title" id="exampleModalLabel">Editar Recarga</h5>
-                  <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                  </button>
-                </div>
-                <div class="modal-body">';
-
-
-    $editar_recarga = ' <form autocomplete="off" class="was-validated" method="post" action= "">';
-
-    //$editar_recarga .= 'Identificador: ' .$a .'<br>';
-    $editar_recarga .= 'Editar Numero: ' .$nro .'<br>';
-    $editar_recarga .= 'Monto: ' .number_format($monto,2,',','.') .' Bs.<br>';
-    $editar_recarga .= 'Tipo: ' .$tipo .'<br>';
-    $editar_recarga .= '<div class="dropdown-divider"></div>';
-
-
-    $editar_recarga .= '<div class="form-group">
-    <label for="monto">Seleccione Monto a recargar</label>
-    <select class="custom-select form-control-lg" id="monto" name="monto" value="';
-    $editar_recarga .= $monto;
-    $monto_f=number_format($monto,2,',','.');
-    $editar_recarga .= 'Bs." required> <option value="'.$monto.'">'.$monto_f.' Bs.</option>';
-    selector_operador();
-
-
-	$query2 = "SELECT * FROM `monto_recarga` WHERE mod (monto, '$multiplo') = 0 AND monto >= $monto_minimo AND monto <= $monto_maximo ORDER BY monto ASC";
-	$results2 = mysqli_query($db, $query2);
-
-  //$foo = 'Hola mundo';
-
-if (strpos($titulopag, 'Sin Plan')) {
-  while ($valores = mysqli_fetch_array($results2)) {
-
-    $monto = $valores['monto'];
-    $monto_f = number_format($monto,2,',','.');
-    $calculo = $monto * $porcentaje / 100;
-    $total = $monto + $calculo;
-    $total_f = number_format($total,2,',','.');
-
-  $editar_recarga .= '<option value="'.$monto.'"> Para Recargar '.$monto_f.' Bs Deberá Pagar '.$total_f.' Bs.</option>';
-    }
-} else {
-
-
-	while ($valores = mysqli_fetch_array($results2)) {
-    $monto_f = number_format($valores['monto'],2,',','.');
-    $editar_recarga .= '<option value="'.$valores['monto'].'">'.$monto_f.' Bs.</option>';
-
-  }
-  }
-    $editar_recarga .= '</select> <div class="invalid-feedback">Debe Seleccionar el monto a recargar.</div>
-    </div>
-
-
-
-    <div class="form-group">
-<label for="nro">Numero A Recargar</label>
-<input  pattern="'.$num_min.'" minlenght="8" maxlenght="11" title = "'.$text_num_min.'"  type="text" class="form-control form-control-lg" id="nro" aria-describedby="nro" placeholder="'.$ph.'" name="nro" value="';
-    $editar_recarga .= $nro;
-    $editar_recarga .= '" required>
-    <div class="invalid-feedback">'.$text_num_min.'</div>
-    </div>
-    <input type="hidden" name="accion" value="update">
-    <input type="hidden" name="id" value="'.$a.'">
-    <input type="hidden" name="user" value="'.$usua.'">
-    <input type="hidden" name="operador" value="'.$operador.'">
-    <button type="submit" class="btn btn-primary" name="registrar_recarga_btn"><i class="fa fa-save"></i> Registrar</button>
-
-    </form>
-
-                    </div>
-                  </div>
-                </div>
-              </div>
-              ';
-  $boton_editar2 .=  $editar_recarga;
-  $accion = '<div class="btn-group-horizontal" >' . $boton_editar2.$boton_eliminar2.'</div>';
-}
-}
 
 
 // BOTONERA USUARIO
@@ -23445,165 +20405,7 @@ function editar_mensajeria(){
 
 
 
-function modal_edicion_usuario(){
-    global $rowid, $idusuario, $nombre_usuario, $email_usuario, $telefono_usuario, $celular_usuario, $direccion_usuario, $ciudad_usuario, $estado_usuario, $status_usuario;
 
-    $acciones_usuario = '
-    <!-- Button trigger modal -->
-    <input type="hidden" name="id" value="'.$rowid.'">
-    <a class="btn btn-outline-primary btn-sm" data-toggle="modal" data-target="#exampleModal" href="#">
-      Editar
-    </a>
-    ';
-
-$acciones_usuario .= ' <!-- Modal DEL Boton Editar -->
-<div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="exampleModalLabel">Editar Usuario</h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-
-      <div class="modal-body">';
-
-
-
-      $acciones_usuario .= ' <form autocomplete="off" class="was-validated" method="post" action= "usuarios.php">';
-
-      $acciones_usuario .= 'Identificador: ' .$rowid;
-
-      $acciones_usuario .= '<div class="form-group">
-      <label for="idusuario">Id del Usuario</label>
-      <input type="text" class="form-control" id="idusuario" aria-describedby="idusuario" placeholder="Ingrese el idusuario" name="idusuario" value="';
-      $acciones_usuario .= $idusuario;
-      $acciones_usuario .= '" required>
-      <div class="invalid-feedback">Debe indicar el numero de ID del Usuario.</div>
-      </div>
-
-      <div class="form-group">
-      <label for="nombre_usuario">Nombre del Usuario</label>
-      <input type="text" class="form-control" id="nombre_usuario" aria-describedby="nombre_usuario" placeholder="Ingrese el Nombre del Usuario" name="nombre_usuario" value="';
-      $acciones_usuario .= $nombre_usuario;
-      $acciones_usuario .= '" required>
-      <div class="invalid-feedback">Debe indicar el numero de ID del Usuario.</div>
-      </div>
-
-      <div class="form-group">
-      <label for="email_usuario">Email del Usuario</label>
-      <input type="text" class="form-control" id="email_usuario" aria-describedby="email_usuario" placeholder="Ingrese el Email del Usuario" name="email_usuario" value="';
-      $acciones_usuario .= $email_usuario;
-      $acciones_usuario .= '" required>
-      <div class="invalid-feedback">Debe indicar el Email del Usuario.</div>
-      </div>
-
-      <div class="form-group">
-      <label for="telefono_usuario">Telefono del Usuario</label>
-      <input type="text" class="form-control" id="telefono_usuario" aria-describedby="telefono_usuario" placeholder="Ingrese el Telefono del Usuario" name="telefono_usuario" value="';
-      $acciones_usuario .= $telefono_usuario;
-      $acciones_usuario .= '" required>
-      <div class="invalid-feedback">Debe indicar el Telefono del Usuario.</div>
-      </div>
-
-      <div class="form-group">
-      <label for="celular_usuario">Celular del Usuario</label>
-      <input type="text" class="form-control" id="celular_usuario" aria-describedby="celular_usuario" placeholder="Ingrese el Celular del Usuario" name="celular_usuario" value="';
-      $acciones_usuario .= $celular_usuario;
-      $acciones_usuario .= '" required>
-      <div class="invalid-feedback">Debe indicar el Celular del Usuario.</div>
-      </div>
-
-      <div class="form-group">
-      <label for="direccion_usuario">Direccion del Usuario</label>
-      <input type="text" class="form-control" id="direccion_usuario" aria-describedby="direccion_usuario" placeholder="Ingrese la Direccion" name="direccion_usuario" value="';
-      $acciones_usuario .= $direccion_usuario;
-      $acciones_usuario .= '" required>
-      <div class="invalid-feedback">Debe indicar el Direccion del Usuario.</div>
-      </div>
-
-      <div class="form-group">
-      <label for="ciudad_usuario">Ciudad del Usuario</label>
-      <input type="text" class="form-control" id="ciudad_usuario" aria-describedby="ciudad_usuario" placeholder="Ingrese la Ciudad" name="ciudad_usuario" value="';
-      $acciones_usuario .= $ciudad_usuario;
-      $acciones_usuario .= '" required>
-      <div class="invalid-feedback">Debe indicar la Ciudad del Usuario.</div>
-      </div>
-
-      <div class="form-group">
-      <label for="estado_usuario">Estado del Usuario</label>
-      <input type="text" class="form-control" id="estado_usuario" aria-describedby="estado_usuario" placeholder="Ingrese el Estado" name="estado_usuario" value="';
-      $acciones_usuario .= $estado_usuario;
-      $acciones_usuario .= '" required>
-      <div class="invalid-feedback">Debe indicar el Estado de ubicacion del Usuario.</div>
-      </div>
-
-      <div class="form-group">
-      <label for="estado_usuario">Status del Usuario</label>
-      <input type="text" class="form-control" id="status_usuario" aria-describedby="status_usuario" placeholder="Ingrese el Status" name="status_usuario" value="';
-      $acciones_usuario .= $status_usuario;
-      $acciones_usuario .= '" required>
-
-      <div class="invalid-feedback">Debe indicar el Status del Usuario 1 Para activarlo y 0 para Desactivarlo.</div>
-      </div>
-
-
-      <button type="submit" class="btn btn-primary" name="editar_usuario_btn">Enviar</button>
-
-      </form>';
-
-
-      $acciones_usuario .= '</div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
-        <button type="button" class="btn btn-primary">Guardar Cambios</button>
-      </div>
-    </div>
-  </div>
-</div>';
-
-
-}
-
-function activar_desactivar() {
-  global $db, $logo, $footer_correo;
-  $id    = e($_REQUEST['id']);
-
-  $query  = "SELECT * FROM users WHERE idusuario = '$id'";
-  $resultado = mysqli_query($db, $query) or mysqli_error($db);
-    while ($row = mysqli_fetch_assoc($resultado))
-     {
-       $nombre = $row['nombre'];
-       $rowUser = $row['idusuario'];
-
-     }
-
-     $a = "Bloquear Usuario";
-
-     $salida = '<b>'. strtoupper($a).'</b><br>'.strtoupper($a) .'<br> Usuario: '. $nombre . '<br> Identificador: '. $rowUser . '<br>';
-
-     $editar_contenido = ' <form autocomplete="off" class="was-validated" method="post" action= "activar_desactivar.php?id='.$id.'">';
-
-  $editar_contenido .= '<label for="motivo">Motivo del Bloqueo</label>
-<textarea width = "100%" type="text" class="form-control" id="motivo" aria-describedby="motivo" placeholder="Ingrese el motivo" name="motivo" ></textarea>
-';
-
-$editar_contenido .= '<button type="submit" class="btn btn-primary" name="procesar_bloqueo_btn">Enviar</button>';
-
-
-  echo '<div class="row">';
-echo '<div class="col-xs-12 col-md-4">';
-echo $salida;
-  echo '</div>';
-
-  echo '<div class="col-xs-12 col-md-8 form-group">';
-  echo $editar_contenido;
-  echo '</div>';
-
-  echo '</div>';
-
-}
 
 function procesar_bloqueo(){
   global $db, $logo, $footer_correo;
@@ -24113,73 +20915,9 @@ function suma_mensualidad(){
 
 
 //DETALLADO SUMA MENSUALIDAD
-function detallado_suma_mensualidad(){
-  global $db, $usua;
-  if (isAdmin()) {
-    //$sql="SELECT sum(monto) as total FROM pagos ";
-    $sql="SELECT sum(monto) AS 'total',
-    SUM(CASE WHEN status_pago = 'PENDIENTE' THEN 1 ELSE 0 END) AS 'pendiente',
-      SUM(CASE WHEN status_pago = 'APROBADO' THEN 1 ELSE 0 END) AS 'aprobado'
-    FROM pagos ";
-    $result = mysqli_query($db, $sql);
-
-    while ($row = mysqli_fetch_assoc($result))
-  {
-    if ($row['total']<1){
-      echo "No hay datos";
-        } else {
-     echo "Cantidad en Bs. Pagados a la fecha ".number_format($row['total'],2,',','.') ." Bs<br>";
-     echo "Cantidad de Pagos Aprobados " .$row['aprobado']."<br>";
-     echo "Cantidad de Pagos Pendientes ".$row['pendiente']."<br>";
-
-  }
-
-  }} else {
-  $sql="SELECT sum(monto) as total,
-  SUM(CASE WHEN status_pago = 'PENDIENTE' THEN 1 ELSE 0 END) AS 'pendiente',
-  SUM(CASE WHEN status_pago = 'APROBADO' THEN 1 ELSE 0 END) AS 'aprobado'
-  FROM pagos
-  WHERE user = '$usua' ";
-  $result = mysqli_query($db, $sql);
-
-  while ($row = mysqli_fetch_assoc($result))
-  {
-    if ($row['total']<1){
-      echo "No hay Pagos Aprobados";
-        } else {
-     //echo "Cantidad en Bs. Pagados a la fecha ".$row['total']." Bs.<br>";
-     echo "<h2>Resumen</h2><br>";
-     echo "Cantidad de Pagos Aprobados " .$row['aprobado']."<br>";
-     echo "Cantidad de Pagos Pendientes ".$row['pendiente']."<br>";
-  }
-}
-//  mysqli_close($db);
-}
-
-}
 
 
 // PAGO DE MENSUALIDAD
-function verificar_pago_mes() {
-	global $db, $username, $usua, $mes_de_pago_actual;
-
-	$queryvpm = "SELECT * FROM pagos WHERE user = '$usua' AND mes_de_pago = '$mes_de_pago_actual'";
-	$resultvpm = mysqli_query($db, $queryvpm);
-	$rowsvpm =  mysqli_num_rows($resultvpm);
-
-    if ($rowsvpm > 0){
-	echo '<div class="alert alert-info" role="alert" >
-	<h3>'
-.$mes_de_pago_actual .' Pagado		</h3>
-</div>';
-    } else {
-		echo '<div class="alert alert-danger" role="alert" >
-        <h3>
-Lo sentimos usted no ha efectuado el pago correspondiente a ' .$mes_de_pago_actual .'
-        </h3>
-	</div>';
-	exit;
-    }}
 
 //PARA EL MODAL DE PAGO DE MENSUALIDAD
 function pago_mensualidad(){
@@ -24313,25 +21051,6 @@ contenido('bancario');
   }
 
 
-  function verificar_pago_mensualidad(){
-  	global $db, $usua, $mmo, $concepto, $operador, $link, $m_dias_r, $fecha_sistema, $como_pagar, $pago_mensualidad;
-
-  	analisis_dias_restantes();
-  	if ($pago_mensualidad == 0) {
-  		// SI NO HAY MENSUALIDAD PAGA
-  	$pago_mensualidad = '';
-  	}
-  	else {
-  		// SI SE DETECTA PAGO DE MENSUALIDAD
-  		$pago_mensualidad = '<hr>';
-  		//$pago_mensualidad .= $img_recarga_sin_necesidad;
-  		$pago_mensualidad .= '<div class="alert alert-warning" role="alert">USTED HA PAGADO SU MENSUALIDAD PARA USAR LA PLATAFORMA '.strtoupper ($operador) .' Y TIENE ACTIVO TODOS LOS MODULOS </div>';
-  		$pago_mensualidad .= '';
-  		$pago_mensualidad .= '';
-  		$pago_mensualidad .= '<hr>';
-  	}
-  	echo $pago_mensualidad;
-  }
 
 
 
@@ -24556,235 +21275,6 @@ $_SESSION['pago_mensualidad']  .= "Se ha Actualizado status de Pago de $nombre d
 
 
 //LISTA PAGO OPERADORES
-function lista_pagos_operador(){
-    global $db, $usua, $mes, $limit_end, $accion, $concepto;
-
-    selector_operador();
-
-  $url = basename($_SERVER ["PHP_SELF"]);
-
-  if (isset($_REQUEST['busqueda'])) {
-    $busqueda = strtolower(e($_REQUEST['busqueda']));
-  } else {
-    $busqueda = "";
-  }
-
-
-	if (isset($_GET['p']))
-		$ini=$_GET['p'];
-	else
-		$ini=1;
-    $init = ($ini-1) * $limit_end;
-
-
-        if (isAdmin()) {
-            //SI ES ADMIN
-
-          if (empty($busqueda)) {
-            $busqueda = "";
-
-            $countmes="SELECT COUNT(*) FROM pagos
-            INNER JOIN users
-            ON pagos.user=users.idusuario
-            WHERE status_pago = 'PENDIENTE'";
-
-            $querymes = "SELECT pagos.*, users.nombre, users.email, users.username FROM pagos
-             INNER JOIN users
-                        ON pagos.user=users.idusuario
-                        WHERE status_pago = 'PENDIENTE' ORDER BY fecha_pago ASC LIMIT $init, $limit_end";
-
-	        $resultmes = mysqli_query($db, $querymes);
-            $rowmes =  mysqli_num_rows($resultmes);
-
-            $mensaje  = '<i class="fa fa-exclamation-triangle"></i> No hay Mensualidades Pendientes.';
-          } else {
-
-            $countmes="SELECT COUNT(*) FROM pagos
-            INNER JOIN users
-            ON pagos.user=users.idusuario
-            WHERE status_pago = 'PENDIENTE' AND (user LIKE '%$busqueda%' OR nombre LIKE '%$busqueda%' OR email LIKE '%$busqueda%' OR status_pago LIKE '%$busqueda%' OR mes_de_pago LIKE '%$busqueda%' OR afiliacion LIKE '%$busqueda%'  OR banco_origen LIKE '%$busqueda%' OR banco_destino LIKE '%$busqueda%' OR nro_transf LIKE '%$busqueda%'  OR ci_nro_cuenta LIKE '%$busqueda%' )";
-
-            $querymes = "SELECT pagos.*, users.nombre, users.email, users.username
-            FROM pagos
-            INNER JOIN users
-            ON pagos.user=users.idusuario
-            WHERE status_pago = 'PENDIENTE'
-            AND (user LIKE '%$busqueda%' OR nombre LIKE '%$busqueda%' OR email LIKE '%$busqueda%' OR status_pago LIKE '%$busqueda%' OR mes_de_pago LIKE '%$busqueda%' OR afiliacion LIKE '%$busqueda%'  OR banco_origen LIKE '%$busqueda%' OR banco_destino LIKE '%$busqueda%' OR nro_transf LIKE '%$busqueda%'  OR ci_nro_cuenta LIKE '%$busqueda%' )
-            ORDER BY fecha_pago ASC
-            LIMIT $init, $limit_end";
-
-	          $resultmes = mysqli_query($db, $querymes);
-            $rowmes =  mysqli_num_rows($resultmes);
-
-            $mensaje  = '<i class="fa fa-exclamation-triangle"></i> No resultados con su criterio de busqueda.';
-
-          }
-
-        } else {
-// SI ES USUARIO
-            $countmes="SELECT COUNT(*) FROM pagos WHERE user = '$usua' AND concepto = '$concepto'";
-            $querymes = "SELECT * FROM pagos  WHERE user = '$usua' AND concepto = '$concepto' ORDER BY id DESC LIMIT $init, $limit_end";
-            $resultmes = mysqli_query($db, $querymes);
-            $rowmes =  mysqli_num_rows($resultmes);
-
-            $mensaje  = '<i class="fa fa-exclamation-triangle"></i> No hay Mensualidades que Mostrar del usuario ' .ucwords(strtolower($_SESSION['user']['nombre']));
-
-
-        }
-
-	if (!$rowmes){
-
-	echo '<div class="alert alert-danger" role="alert" >';
-	echo '<h3>';
-	echo $mensaje;
-	echo '</h3>';
-	echo '</div>';
-
-	} else {
-		$num = $db->query($countmes);
-		$x = $num->fetch_array();
-    $total = ceil($x[0]/$limit_end);
-    echo '<div class="d-none d-sm-none d-md-block">';
-        pag($ini, $limit_end, $total);
-    echo "</div>";
-    echo '<div class="d-block d-sm-block d-md-none">';
-    pag_test($ini, $limit_end, $total);
-    echo "</div>";
-        if (isAdmin()){
-    // SI ES ADMIN
-
-	echo '<div class="table-responsive">';
-    echo '<table id="tabla1" class="table table-bordered table-hover ">
-    <thead>
-     <tr>
-     <th>ID</th>
-     <th>Usuario</th>
-     <th>Nombre</th>
-      <th>Fecha de Transf </th>
-      <th>Monto / Mes Pagado</th>
-      <th>Nro Transf / CI</th>
-      <th>Desde / Hasta</th>
-      <th>Accion</th>
-     </tr>
-     </thead>
-     <tbody>';
-
-     $c = $db->query($querymes);
-     while($rowmes = $c->fetch_array(MYSQLI_ASSOC))
-      {
-      $date = date_create($rowmes['fecha_transf']);
-      $fecha = date_format($date, 'd-m-Y');
-      $fecha_pago = $fecha;
-      $rowUser = $rowmes['user'];
-      $rowid = $rowmes['id'];
-
-      $rowNombre = $rowmes['nombre'];
-
-
-      // MENSUALIDADES
-
-        $aprobar = '<form autocomplete="off" class="was-validated" method="post" action= "">
-
-        <input type="hidden" name="id" value="'.$rowid.'">
-        <input type="hidden" name="user" value="'.$rowUser.'">
-
-        <button type="submit" class="btn btn-success btn-block" name="aprobar_pago_btn" data-html="true" data-toggle="popover" title="Aprobar Pago" data-content="Aca podra aprobar el pago de esta mensualidad y notificar a <b>'.$rowNombre.'</b> con un correo electronico.">Aprobar <i class="fa fa-check-circle"></i></button> ';
-
-
-       $rechazar = '<a href= "rechazar.php?id='.$rowid.'&user='.$rowUser.'&asunto=mensualidad" type="submit" class="btn btn-danger btn-block" data-html="true" data-toggle="popover" title="Rechazar Pago" data-content="Aca podra rechazar el pago de esta mensualidad y notificar a <b>'.$rowNombre.'</b> con un correo electronico.">Rechazar  <i class="fa fa-times-circle"></i></a></form>';
-
-       botonera_usuario($rowNombre, $rowUser);
-
-        $link = '<div class="btn-group-vertical" role="group" >'. $aprobar .$rechazar . $accion . '</div>';
-
-
-echo '<tr>';
-echo '<td>'.$rowid.'</td>
-       <td>'.$rowUser.'</td>
-       <td>'.$rowNombre.'</td>
-       <td>'.$fecha_pago .'</td>
-       <td>'.$rowmes['monto'].' Bs. / '.$rowmes['mes_de_pago']. '</td>
-       <td>'.$rowmes['nro_transf'] . ' / '.$rowmes['ci_nro_cuenta'].'</td>
-       <td>'.$rowmes['banco_origen'].' / '.$rowmes['banco_destino'] .'</td>
-       <td>'.$link .'</td>
-      </tr>';
-      }
-      echo '</tbody></table>';
-
-
-        }
-        else
-        // SI ES USUARIO
-        {
-
-	echo '<div class="table-responsive">';
-    echo '<table id="tabla1" class="table table-bordered table-hover ">
-    <thead>
-     <tr>
-      <th>Fecha de Pago</th>
-      <th>Monto</th>
-      <th>Mes</th>
-      <th>Desde / Hasta</th>
-      <th>Status de Pago</th>
-
-     </tr>
-     </thead>
-     <tbody>';
-
-     $c = $db->query($querymes);
-     while($rowmes = $c->fetch_array(MYSQLI_ASSOC)) {
-
-     $statuspago = $rowmes['status_pago'];
-     $mes = $rowmes['mes_de_pago'];
-     $motivo = strip_tags($rowmes['motivo_rechazo']);
-
-     if ($statuspago == "PENDIENTE") {
-       $statuspago = '<div class="text-center w-70 mx-auto alert alert-warning" role="alert" data-toggle="popover" title="PENDIENTE" data-content="Su pago aun no ha sido conformado.">
-       PENDIENTE  <i class="fa fa-clock"></i>
-     </div>';
-     } else if ($statuspago == "APROBADO") {
-
-      $statuspago = '<div class="text-center w-70 mx-auto alert alert-success" role="alert" data-toggle="popover" title="APROBADO" data-content="Su pago ya fue aprobado, ya puede generar pedidos en el periodo '.$mes.' .">
-       APROBADO  <i class="fa fa-thumbs.-up"></i>
-     </div>';
-
-     }
-     else if ($statuspago == "RECHAZADO") {
-
-        $statuspago = '<div class="text-center w-70 mx-auto alert alert-danger" role="alert" data-toggle="popover" title="RECHAZADO" data-content="Su pago fue rechazado, por el siguiente motivo: '.$motivo.'.">
-         RECHAZADO  <i class="fa fa-exclamation-triangle"></i>
-       </div>';
-
-       }
-
-
-      $date = date_create($rowmes['fecha_pago']);
-      $fecha = date_format($date, 'd-m-Y');
-      $fecha_pago = $fecha;
-echo '<tr>';
-echo '<td>'.$fecha_pago .'</td>
-       <td>'.$rowmes['monto'].' Bs. Plan '.$rowmes['afiliacion'].'</td>
-       <td>'.$rowmes['mes_de_pago'] .'</td>
-       <td>'.$rowmes['inicio'] . ' / '.$rowmes['fin'] .'</td>
-       <td>'.$statuspago .'</td>
-      </tr>';
-      }
-      echo '</tbody></table>';
-
-        }
-
-
-
-        echo '<div class="d-none d-sm-none d-md-block">';
-            pag($ini, $limit_end, $total);
-        echo "</div>";
-        echo '<div class="d-block d-sm-block d-md-none">';
-        pag_test($ini, $limit_end, $total);
-        echo "</div>";
-}
-
-
-}
 
 $dest ="";
 
@@ -24856,306 +21346,10 @@ function img_ope($a){
 }
 
 // LISTAR PAGOS MENSUALES LISTA MESES
-function lista_pagos_mes(){
-	global $db, $usua, $mes, $limit_end, $accion, $concepto, $dest, $img_ope;
-
-  $url = basename($_SERVER ["PHP_SELF"]);
-
-  if (isset($_REQUEST['busqueda'])) {
-    $busqueda = strtolower(e($_REQUEST['busqueda']));
-  } else {
-    $busqueda = "";
-  }
-
-
-	if (isset($_GET['p']))
-		$ini=$_GET['p'];
-	else
-		$ini=1;
-    $init = ($ini-1) * $limit_end;
-
-
-        if (isAdmin()) {
-            //SI ES ADMIN
-
-          if (empty($busqueda)) {
-            $busqueda = "";
-
-            $countmes="SELECT COUNT(*) FROM pagos
-            INNER JOIN users
-            ON pagos.user=users.idusuario
-            WHERE status_pago = 'PENDIENTE'";
-
-            $querymes = "SELECT pagos.*, users.cel, users.tlf, users.nombre, users.email, users.username FROM pagos
-             INNER JOIN users
-                        ON pagos.user=users.idusuario
-                        WHERE status_pago = 'PENDIENTE' ORDER BY fecha_pago ASC LIMIT $init, $limit_end";
-
-	        $resultmes = mysqli_query($db, $querymes);
-            $rowmes =  mysqli_num_rows($resultmes);
-
-            $mensaje  = '<i class="fa fa-exclamation-triangle"></i> No hay Mensualidades Pendientes.';
-          } else {
-
-            $countmes="SELECT COUNT(*) FROM pagos
-            INNER JOIN users
-            ON pagos.user=users.idusuario
-            WHERE status_pago = 'PENDIENTE' AND (user LIKE '%$busqueda%' OR nombre LIKE '%$busqueda%' OR email LIKE '%$busqueda%' OR status_pago LIKE '%$busqueda%' OR mes_de_pago LIKE '%$busqueda%' OR afiliacion LIKE '%$busqueda%'  OR banco_origen LIKE '%$busqueda%' OR banco_destino LIKE '%$busqueda%' OR nro_transf LIKE '%$busqueda%'  OR ci_nro_cuenta LIKE '%$busqueda%' )";
-
-            $querymes = "SELECT pagos.*, users.cel, users.tlf, users.nombre, users.email, users.username FROM pagos
-            INNER JOIN users
-            ON pagos.user=users.idusuario
-             WHERE status_pago = 'PENDIENTE'  AND (user LIKE '%$busqueda%' OR nombre LIKE '%$busqueda%' OR email LIKE '%$busqueda%' OR status_pago LIKE '%$busqueda%' OR mes_de_pago LIKE '%$busqueda%' OR afiliacion LIKE '%$busqueda%'  OR banco_origen LIKE '%$busqueda%' OR banco_destino LIKE '%$busqueda%' OR nro_transf LIKE '%$busqueda%'  OR ci_nro_cuenta LIKE '%$busqueda%' ) ORDER BY fecha_pago ASC LIMIT $init, $limit_end";
-
-	        $resultmes = mysqli_query($db, $querymes);
-            $rowmes =  mysqli_num_rows($resultmes);
-
-            $mensaje  = '<i class="fa fa-exclamation-triangle"></i> No resultados con su criterio de busqueda.';
-
-          }
-
-        } else {
-
-// SI ES USUARIO
-selector_operador();
-
-            $countmes="SELECT COUNT(*) FROM pagos WHERE user = '$usua' AND concepto = '$concepto'";
-            $querymes = "SELECT * FROM pagos  WHERE user = '$usua' AND concepto = '$concepto' ORDER BY id DESC LIMIT $init, $limit_end";
-            $resultmes = mysqli_query($db, $querymes);
-            $rowmes =  mysqli_num_rows($resultmes);
-
-            $mensaje  = '<i class="fa fa-exclamation-triangle"></i> No hay Mensualidades que Mostrar del usuario ' .ucwords(strtolower($_SESSION['user']['nombre']));
-
-
-        }
-
-	if (!$rowmes){
-
-	echo '<div class="alert alert-danger" role="alert" >';
-	echo '<h3>';
-	echo $mensaje;
-	echo '</h3>';
-	echo '</div>';
-
-	} else {
-		$num = $db->query($countmes);
-		$x = $num->fetch_array();
-    $total = ceil($x[0]/$limit_end);
-    echo '<div class="d-none d-sm-none d-md-block">';
-        pag($ini, $limit_end, $total);
-    echo "</div>";
-    echo '<div class="d-block d-sm-block d-md-none">';
-    pag_test($ini, $limit_end, $total);
-    echo "</div>";
-        if (isAdmin()){
-
-
-
-// SI ES ADMIN
-
-	echo '<div class="table-responsive">';
-    echo '<table id="tabla1" class="table table-bordered table-hover ">
-    <thead>
-     <tr>
-     <th>ID</th>
-     <th>Usuario / Nombre / Tlf</th>
-      <th>Fecha de Transf </th>
-      <th>Monto / Mes Pagado / Concepto / Nro Transf / CI</th>
-
-      <th>Desde / Hasta</th>
-      <th>Accion</th>
-     </tr>
-     </thead>
-     <tbody>';
-
-     $c = $db->query($querymes);
-     while($rowmes = $c->fetch_array(MYSQLI_ASSOC))
-      {
-      //$date = date_create($rowmes['fecha_transf']);
-      //$fecha = date_format($date, 'd-m-Y');
-      //$fecha_pago = $fecha;
-      $rowUser = $rowmes['user'];
-      $rowid = $rowmes['id'];
-      $cel = $rowmes['cel'];
-      $tlf = $rowmes['tlf'];
-      $rowNombre = $rowmes['nombre'];
-      $concep = $rowmes['concepto'];
-
-
-      $destino = $rowmes['banco_destino'];
-
-
-      // MENSUALIDADES
-
-        $aprobar = '<form autocomplete="off" class="was-validated" method="post" action= "">
-
-        <input type="hidden" name="id" value="'.$rowid.'">
-        <input type="hidden" name="user" value="'.$rowUser.'">
-
-        <button type="submit" class="btn btn-success btn-block" name="aprobar_pago_btn" data-html="true" data-toggle="popover" title="Aprobar Pago" data-content="Aca podra aprobar el pago de esta mensualidad y notificar a <b>'.$rowNombre.'</b> con un correo electronico.">Aprobar <i class="fa fa-check-circle"></i></button> ';
-
-
-       $rechazar = '<a href= "rechazar.php?id='.$rowid.'&user='.$rowUser.'&asunto=mensualidad" type="submit" class="btn btn-danger btn-block" data-html="true" data-toggle="popover" title="Rechazar Pago" data-content="Aca podra rechazar el pago de esta mensualidad y notificar a <b>'.$rowNombre.'</b> con un correo electronico.">Rechazar  <i class="fa fa-times-circle"></i></a></form>';
-
-       botonera_usuario($rowNombre, $rowUser);
-
-        $link = '<div class="btn-group-vertical" role="group" >'. $aprobar .$rechazar . $accion . '</div>';
-
-selector_bancario($destino);
-img_ope($concep);
-
-//var_dump($img_ope);
-
-echo '<tr>';
-echo '<td>'.$rowid.'</td>
-       <td>'.$rowUser.'<br>'.$rowNombre.'<br>'.$tlf.'<br>'.$cel.'</td>
-       <td>'.$rowmes['fecha_transf'] .'</td>
-       <td>Transf: '.$rowmes['monto'].' Bs. <br>A Favor:  '.$rowmes['a_favor'].' Bs. <br> '.$rowmes['mes_de_pago']. '<br>'.$concep. '<br>Transf: '. $rowmes['nro_transf'] .'<br>C.I.: '.$rowmes['ci_nro_cuenta'] .'<br></td>
-       <td>'.$rowmes['banco_origen'].' / '.$dest.'<br>'.$img_ope.'<br></td>
-       <td>'.$link .'</td>
-      </tr>';
-      }
-      echo '</tbody></table>';
-
-
-        }
-        else
-        // SI ES USUARIO
-        {
-
-	echo '<div class="table-responsive">';
-    echo '<table id="tabla1" class="table table-bordered table-hover ">
-    <thead>
-     <tr>
-      <th>Fecha de Pago</th>
-      <th>Monto</th>
-      <th>Mes</th>
-      <th>Status de Pago</th>
-     </tr>
-     </thead>
-     <tbody>';
-
-     $c = $db->query($querymes);
-     while($rowmes = $c->fetch_array(MYSQLI_ASSOC)) {
-
-     $statuspago = $rowmes['status_pago'];
-     $mes = $rowmes['mes_de_pago'];
-     $motivo = strip_tags($rowmes['motivo_rechazo']);
-
-     if ($statuspago == "PENDIENTE") {
-       $statuspago = '<div class="text-center w-70 mx-auto alert alert-warning" role="alert" data-toggle="popover" title="PENDIENTE" data-content="Su pago aun no ha sido conformado.">
-       PENDIENTE  <i class="fa fa-clock"></i>
-     </div>';
-     } else if ($statuspago == "APROBADO") {
-
-      $statuspago = '<div class="text-center w-70 mx-auto alert alert-success" role="alert" data-toggle="popover" title="APROBADO" data-content="Su pago ya fue aprobado, ya puede generar pedidos en el periodo '.$mes.' .">
-       APROBADO  <i class="fa fa-thumbs.-up"></i>
-     </div>';
-
-     }
-     else if ($statuspago == "RECHAZADO") {
-
-        $statuspago = '<div class="text-center w-70 mx-auto alert alert-danger" role="alert" data-toggle="popover" title="RECHAZADO" data-content="Su pago fue rechazado, por el siguiente motivo: '.$motivo.'.">
-         RECHAZADO  <i class="fa fa-exclamation-triangle"></i>
-       </div>';
-
-       }
-
-
-      $date = date_create($rowmes['fecha_pago']);
-      $fecha = date_format($date, 'd-m-Y');
-      $fecha_pago = $fecha;
-echo '<tr>';
-echo '<td>'.$fecha_pago .'</td>
-       <td>'.$rowmes['monto'].' Bs. Plan '.$rowmes['afiliacion'].'</td>
-       <td>'.$rowmes['mes_de_pago'] .'</td>
-       <td>'.$statuspago .'</td>
-      </tr>';
-      }
-      echo '</tbody></table>';
-
-        }
-
-
-
-        echo '<div class="d-none d-sm-none d-md-block">';
-            pag($ini, $limit_end, $total);
-        echo "</div>";
-        echo '<div class="d-block d-sm-block d-md-none">';
-        pag_test($ini, $limit_end, $total);
-        echo "</div>";
-}
-
-
-}
 
 
 
 //PARA EL MODAL DE AGREGAR USUARIO
-function modal_agregar_usuario(){
-	global $nombre_usuario, $email_usuario,  $telefono_usuario,
-    $celular_usuario, $user_type;
-
-
-echo ' <form autocomplete="off" class="was-validated" method="post" action= "usuarios.php">
-
-<div class="form-group">
-<label for="idusuario">Id del Usuario</label>
-<input type="text" pattern="[V,J,G,E]{1}[-][0-9]{7,9}" class="form-control" id="idusuario" aria-describedby="idusuario" placeholder="Ingrese el idusuario" name="idusuario" value="';
-//echo $idusuario;
-echo '" required>
-<div class="invalid-feedback">Debe indicar el numero de ID del Usuario.</div>
-</div>
-
-<div class="form-group">
-<label for="nombre_usuario">Nombre del Usuario</label>
-<input type="text" class="form-control" id="nombre_usuario" aria-describedby="nombre_usuario" placeholder="Ingrese el Nombre del Nuevo Usuario" name="nombre_usuario" value="';
-echo $nombre_usuario;
-echo '" required>
-<div class="invalid-feedback">Debe indicar el numero de ID del Usuario.</div>
-</div>
-
-<div class="form-group">
-<label for="email_usuario">Email del Usuario</label>
-<input type="email" pattern="[a-zA-Z0-9]{0,}([.]?[_.a-zA-Z0-9]{1,})[@](gmail.com|hotmail.com|yahoo.com|yahoo.es|outlook.es|outlook.com|hotmail.es|cantv.net|cantv.com)" title="Debe utilizar solo correos gmail, yahoo, hotmail o cantv" class="form-control" id="email_usuario" aria-describedby="email_usuario" placeholder="Ingrese el Email del Nuevo Usuario Debe utilizar solo correos gmail, yahoo, hotmail o cantv" name="email_usuario" value="';
-echo $email_usuario;
-echo '" required>
-<div class="invalid-feedback">Debe indicar el Email del Usuario.</div>
-</div>
-
-<div class="form-group">
-<label for="telefono_usuario">Telefono del Usuario</label>
-<input pattern="[0-9]{11}" title = "Debe ingresar un telefono valido con 11 digitos, no se requiere el codigo de discado internacional" type="tel" class="form-control" id="telefono_usuario" aria-describedby="telefono_usuario" placeholder="Ingrese el Telefono del Nuevo Usuario" name="telefono_usuario" value="';
-echo $telefono_usuario;
-echo '" required>
-<div class="invalid-feedback">Debe indicar el Telefono del Usuario.</div>
-</div>
-
-<div class="form-group">
-<label for="celular_usuario">Celular del Usuario</label>
-<input pattern="[0]{1}[4]{1}[1,2]{1}[2,4,6]{1}[0-9]{7}" title = "Debe utilizar solo Numeros, Minimo 11 digitos debe incluir el codigo de la operadora, Ejemplo: 04161234567, 04141234567 o 04121234567" type="tel" class="form-control" id="celular_usuario" aria-describedby="celular_usuario" placeholder="Ingrese el Celular del Nuevo Usuario" name="celular_usuario" value="';
-echo $celular_usuario;
-echo '" required>
-<div class="invalid-feedback">Debe indicar el Celular del Usuario.</div>
-</div>
-
-<div class="form-group">
-<label for="user_type">Tipo de Usuario</label>
-<select class="custom-select" id="user_type" name="user_type" value="';
-echo $user_type;
-echo '" required >';
-//echo '<option value="">Seleccione:</option>';
-user_type();
-echo '</select>
-<div class="invalid-feedback">Debe Seleccionar El tipo de Usuario.</div>
-</div>
-
-
-
-<button type="submit" class="btn btn-primary" name="agregar_usuario_btn">Enviar</button>
-
-</form>';
-}
 
 //PARA EL MODAL DE EDITAR USUARIO
 function modal_editar_desde_usuario(){
@@ -25294,130 +21488,6 @@ $modal_editar_usuario .= '<input type="file" class="form-control-file" id="logo_
 echo $modal_editar_usuario;
 }
 
-function modal_editar_desde_usuario2(){
-	global $db, $idusuario,
-    $nombre_usuario, $email_usuario,  $telefono_usuario,
-    $celular_usuario, $password_usuario, $user_type, $rowid;
-
-    $usua = ($_SESSION['user']['username']);
-
-    $query = "SELECT * FROM users WHERE username = '$usua'";
-    $result = mysqli_query($db, $query);
-    $row = mysqli_fetch_array($result);
-
-    $rowid = $row['username'];
-   // $rowid = $row['id'];
-          $idusuario = $row['idusuario'];
-          $nombre_usuario = $row['nombre'];
-          $email_usuario = $row['email'];
-          $telefono_usuario = $row['tlf'];
-          $celular_usuario = $row['cel'];
-          $direccion_usuario = $row['direccion'];
-          $ciudad_usuario = $row['ciudad'];
-          $estado_usuario = $row['estado'];
-          $municipio_usuario = $row['municipio'];
-          $parroquia_usuario = $row['parroquia'];
-          //$password_usuario = $row['password'];
-          $status_usuario = $row['status'];
-
-$modal_editar_usuario = ' <form autocomplete="off" class="was-validated" method="post" action= "perfil.php">';
-
-$modal_editar_usuario .= 'Identificador: ' .$rowid .'<br>';
-$modal_editar_usuario .= 'Nombre: ' .$nombre_usuario .'<br>';
-$modal_editar_usuario .= 'Email: ' .$email_usuario .'<br>';
-$modal_editar_usuario .= '<div class="dropdown-divider"></div>';
-
-
-
-
-
-
-$modal_editar_usuario .= '<div class="form-group">
-<label for="telefono_usuario">Numero de Telefono Local</label>
-<input type="tel" pattern="[0]{1}[2]{1}[1-9]{1}[0-9]{8}" title = "Debe utilizar solo Numeros, Minimo 11 digitos debe incluir el codigo de area, Ejemplo: 02431234567" class="form-control" id="telefono_usuario" aria-describedby="telefono_usuario" placeholder="Ingrese su numero de Telefono local" name="telefono_usuario" value="';
-$modal_editar_usuario .= $telefono_usuario;
-$modal_editar_usuario .= '" required>
-<div class="invalid-feedback">Debe indicar el numero de Telefono local, Debe usar minimo 11 digitos debe incluir el codigo de area, Ejemplo: 02431234567.</div>
-</div>
-
-<div class="form-group">
-<label for="celular_usuario">Numero de Celular</label>
-<input type="tel" pattern="[0]{1}[4]{1}[1,2]{1}[2,4,6]{1}[0-9]{7}" title = "Debe utilizar solo Numeros, Minimo 11 digitos debe incluir el codigo de la operadora, Ejemplo: 04161234567, 04141234567 o 04121234567" class="form-control" class="form-control" id="celular_usuario" aria-describedby="celular_usuario" placeholder="Ingrese su numero de Celular" name="celular_usuario" value="';
-$modal_editar_usuario .= $celular_usuario;
-$modal_editar_usuario .= '" required>
-<div class="invalid-feedback">Debe indicar su numero de telefono Celular, debe incluir el codigo de la operadora, Ejemplo: 04161234567, 04141234567 o 04121234567.</div>
-</div>
-
-<div class="form-group">
-<label for="direccion_usuario">Su Direccion Completa</label>
-<input type="textarea" class="form-control" id="direccion_usuario" aria-describedby="direccion_usuario" placeholder="Ingrese su Direccion" name="direccion_usuario" value="';
-$modal_editar_usuario .= $direccion_usuario;
-$modal_editar_usuario .= '" required>
-<div class="invalid-feedback">Debe indicar su Direccion completa.</div>
-</div>
-
-
-
-';
-
-$sq = "SELECT * FROM estados ORDER BY id_estado";
-$results = mysqli_query($db, $sq);
-$modal_editar_usuario .= '<div class="form-group">
-<label for="banco_emisor">Seleccione su Estado</label>
-<select class="custom-select" id="estado_id" name="estado_id" value="" required >
-<option value="">Seleccione:</option>';
-while ($a = mysqli_fetch_array($results)) {
-  $modal_editar_usuario .= '<option value="'.$a['id_estado'].'">'.$a['estado'].'</option>';
-}
-$modal_editar_usuario .= '</select> <div class="invalid-feedback">Debe Seleccionar su estado.</div>
-</div>';
-
-
-$modal_editar_usuario .= '<div class="form-group">
-   <label for="name1">Ciudad</label>
-   <select id="ciudad_id" class="form-control" name="ciudad_id" required>
-     <option value="">-- SELECCIONE --</option>
-  </select> <div class="invalid-feedback">Debe Seleccionar su estado.</div>
- </div>';
-
-
-$modal_editar_usuario .= '
-
-
-<div class="form-group">
-<label for="estado_usuario">Estado donde Vive</label>
-<input type="text" class="form-control" id="estado_usuario" aria-describedby="estado_usuario" placeholder="Ingrese el Estado" name="estado_usuario" value="';
-$modal_editar_usuario .= $estado_usuario;
-$modal_editar_usuario .= '" required>
-<div class="invalid-feedback">Debe indicar el Estado donde vive.</div>
-</div>
-
-<div class="form-group">
-<label for="ciudad_usuario">Ciudad donde vive</label>
-<input type="text" class="form-control" id="ciudad_usuario" aria-describedby="ciudad_usuario" placeholder="Ingrese la Ciudad" name="ciudad_usuario" value="';
-$modal_editar_usuario .= $ciudad_usuario;
-$modal_editar_usuario .= '" required>
-<div class="invalid-feedback">Debe indicar la Ciudad donde vive.</div>
-</div>
-
-<div class="form-group">
-<label for="municipio_usuario">Municipio donde vive</label>
-<input type="text" class="form-control" id="municipio_usuario" aria-describedby="municipio_usuario" placeholder="Ingrese el Municipio" name="municipio_usuario" value="';
-$modal_editar_usuario .= $municipio_usuario;
-$modal_editar_usuario .= '" required>
-<div class="invalid-feedback">Debe indicar el Municipio de ubicacion.</div>
-</div>
-
-<div class="form-group">
-<label for="parroquia_usuario">Parroquia donde vive</label>
-<input type="text" class="form-control" id="parroquia_usuario" aria-describedby="parroquia_usuario" placeholder="Ingrese el Parroquia" name="parroquia_usuario" value="';
-$modal_editar_usuario .= $parroquia_usuario;
-$modal_editar_usuario .= '" required>
-<div class="invalid-feedback">Debe indicar la Parroquia de ubicacion.</div>
-</div>';
-
-echo $modal_editar_usuario;
-}
 
 //PARA EL MODAL DE EDITAR USUARIO
 function modal_editar_password_desde_usuario(){
@@ -25476,69 +21546,6 @@ echo $modal_editar_usuario;
 }
 
 //PARA EL MODAL DE EDITAR USUARIO
-function modal_editar_usuario(){
-	global $db, $usua, $idusuario,
-    $nombre_usuario, $email_usuario,  $telefono_usuario,
-    $celular_usuario, $password_usuario, $user_type, $rowid;
-
-
-$modal_editar_usuario = ' <form autocomplete="off" class="was-validated" method="post" action= "usuarios.php">';
-
-$modal_editar_usuario .= 'Identificador: ' .$rowid;
-
-$modal_editar_usuario .= '<div class="form-group">
-<label for="idusuario">Id del Usuario</label>
-<input type="text" class="form-control" id="idusuario" aria-describedby="idusuario" placeholder="Ingrese el idusuario" name="idusuario" value="';
-$modal_editar_usuario .= $idusuario;
-$modal_editar_usuario .= '" required>
-<div class="invalid-feedback">Debe indicar el numero de ID del Usuario.</div>
-</div>
-
-<div class="form-group">
-<label for="nombre_usuario">Nombre del Usuario</label>
-<input type="text" class="form-control" id="nombre_usuario" aria-describedby="nombre_usuario" placeholder="Ingrese el Nombre del Nuevo Usuario" name="nombre_usuario" value="';
-$modal_editar_usuario .= $nombre_usuario;
-$modal_editar_usuario .= '" required>
-<div class="invalid-feedback">Debe indicar el numero de ID del Usuario.</div>
-</div>
-
-<div class="form-group">
-<label for="email_usuario">Email del Usuario</label>
-<input type="text" class="form-control" id="email_usuario" aria-describedby="email_usuario" placeholder="Ingrese el Email del Nuevo Usuario" name="email_usuario" value="';
-$modal_editar_usuario .= $email_usuario;
-$modal_editar_usuario .= '" required>
-<div class="invalid-feedback">Debe indicar el Email del Usuario.</div>
-</div>
-
-<div class="form-group">
-<label for="telefono_usuario">Telefono del Usuario</label>
-<input type="text" class="form-control" id="telefono_usuario" aria-describedby="telefono_usuario" placeholder="Ingrese el Telefono del Nuevo Usuario" name="telefono_usuario" value="';
-$modal_editar_usuario .= $telefono_usuario;
-$modal_editar_usuario .= '" required>
-<div class="invalid-feedback">Debe indicar el Telefono del Usuario.</div>
-</div>
-
-<div class="form-group">
-<label for="celular_usuario">Celular del Usuario</label>
-<input type="text" class="form-control" id="celular_usuario" aria-describedby="celular_usuario" placeholder="Ingrese el Celular del Nuevo Usuario" name="celular_usuario" value="';
-$modal_editar_usuario .= $celular_usuario;
-$modal_editar_usuario .= '" required>
-<div class="invalid-feedback">Debe indicar el Celular del Usuario.</div>
-</div>
-
-<div class="form-group">
-<label for="password_usuario">Password del Usuario</label>
-<input type="text" class="form-control" id="password_usuario" aria-describedby="password_usuario" placeholder="Ingrese el Password del Nuevo Usuario" name="password_usuario" value="';
-$modal_editar_usuario .= $password_usuario;
-$modal_editar_usuario .= '" required>
-<div class="invalid-feedback">Debe indicar el Password del Usuario.</div>
-</div>
-
-<button type="submit" class="btn btn-primary" name="agregar_usuario_btn">Enviar</button>
-
-</form>';
-return $modal_editar_usuario;
-}
 
 function agregar_usuario(){
     global $db, $error;
@@ -25889,174 +21896,7 @@ echo $editar_usuario;
 
 //MOSTRAR PERFIL
 
-function mostrar_perfil(){
-    global $db, $usua;
-    $query = "SELECT * FROM users WHERE username = '$usua'";
-    $result = mysqli_query($db, $query);
-    $rows = mysqli_fetch_array($result);
 
-    $id = $rows['id'];
-    $control = $rows['control'];
-
-    echo '<h3>Los datos de su Usuario</h3>';
-
-    echo '<div class="card">';
-    echo '<ul class="list-group list-group-flush">';
-
-    echo '<li class="list-group-item">';
-    echo '<b>Usuario: </b>';
-    echo $rows['username'];
-    echo '<br><b>Nombre: </b>';
-    echo $rows['nombre'];
-    echo '<br><b>Email: </b>';
-    echo $rows['email'];
-    echo  '</li>';
-
-    echo '<li class="list-group-item">';
-    echo '<b>Telefono: </b>';
-    echo $rows['tlf'];
-    echo '<br><b>Celular: </b>';
-    echo $rows['cel'];
-    echo '<br><b>Direccion: </b>';
-    echo $rows['direccion'];
-    echo '<br><b>Estado: </b>';
-    echo $rows['estado'];
-    echo '<br><b>Ciudad: </b>';
-    echo $rows['ciudad'];
-    echo '<br><b>Municipio: </b>';
-    echo $rows['municipio'];
-    echo '<br><b>Parroquia: </b>';
-    echo $rows['parroquia'];
-    echo '</li>';
-
-
-    echo '<li class="list-group-item">';
-    echo '<b>Nombre de Comercio: </b>';
-    echo $rows['nombre_comercio'];
-    echo '<br><b>Direccion Comercio: </b>';
-    echo $rows['direccion_comercio'];
-    echo '<br><b>Logo: </b>';
-    echo $rows['logo_comercio'];
-    echo '</li>';
-
-
-    echo '</ul>';
-
-    echo '</div>';
-
-    echo '<div class="text-right">
-    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#exampleModal">
-    <i class="fa fa-user-edit"></i> Editar</button>
-
-    <a  class="btn btn-danger" type="button" href="../crear_password.php?id='.$id.'&control='.$control.'"><i class="fa fa-key"></i> Cambiar Contraseña</a>
-    </div>';
-
-
-    echo '<!-- Modal -->
-    <div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-      <div class="modal-dialog" role="document">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="exampleModalLabel">Editar Usuario</h5>
-            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-              <span aria-hidden="true">&times;</span>
-            </button>
-          </div>
-          <div class="modal-body">';
-          modal_editar_desde_usuario();
-          echo '
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
-            <button name="editar_desde_usuario_btn" type="submit" class="btn btn-primary">Guardar Cambios</button> </form>
-          </div>
-        </div>
-      </div>
-    </div>';
-
-
-
-
-    echo '<!-- Modal -->
-    <div class="modal fade" id="cambiarpassword" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-      <div class="modal-dialog" role="document">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="exampleModalLabel">Cambiar Password o Contraseña de Acceso</h5>
-            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-              <span aria-hidden="true">&times;</span>
-            </button>
-          </div>
-          <div class="modal-body">';
-          modal_editar_password_desde_usuario();
-          echo '
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
-            <button name="editar_password_desde_usuario_btn" type="submit" class="btn btn-primary">Guardar Cambios</button> </form>
-          </div>
-        </div>
-      </div>
-    </div>';
-
-}
-
-function preparar_entrega_pedido() {
-global $db, $errors, $nombre;
-   $id_pedido = ($_GET['id']);
-   $user = ($_GET['user']);
-
-   $lote_pedido="";
-
-   $sql="SELECT sum(monto) AS 'total'
-   FROM tarjetas
-   WHERE usuario = '$user' AND id_pedido = '$id_pedido'";
-   $result = mysqli_query($db, $sql);
-
-   $query = "SELECT pedidos.*, users.id AS uid, users.nombre, users.email, users.username FROM pedidos INNER JOIN users ON pedidos.usuario=users.idusuario WHERE pedidos.id= '$id_pedido' ";
-   $resultado = mysqli_query($db, $query) or mysqli_error($db);
-   while ($row = mysqli_fetch_assoc($resultado)){
-    $monto	 	    	= $row['monto'];
-    $nombre	 	    	= $row['nombre'];
-
-   }
-   echo '<div class="container">';
-   echo "Entrega para el Usuario <b>";
-   echo $nombre;
-   echo "</b><br>";
-   echo "Identificador <b>";
-   echo $user;
-   echo "</b><br>";
-   while ($row = mysqli_fetch_assoc($result))
-   {
-     if ($row['total']<1){
-       echo "No se Han Asignado Tarjetas Aun <br>";
-       echo "Se deben asignar <b> $monto Bs.</b><br>";
-         } else {
-          echo "A Este Pedido ya se le han asignado <b>".$row['total']. " Bs. </b><br>";
-   }
- }
-
-echo ' <form autocomplete="off" class="was-validated" method="post" action= "preparar_entrega_pedido.php?id='.$id_pedido.'&user='.$user.'">
-
-<div class="form-group">
-<label for="lote">Monto, Codigo y Serial</label>
-<input minlength="31" required  type="text" class="form-control" id="lote" aria-describedby="lote" placeholder="Ingrese el lote" name="lote"';
-echo 'value="';
-echo $lote_pedido;
-echo '">';
-echo '
-<div class="invalid-feedback">Se debe utilizar el siguiente formato: 3 1234 1234 1234 1234 123456789 sin puntos ni coma, solo separado con espacios</div>
-</div>
-<input class="input-group-text" id="finalcount" value="0" disabled />
-
-<button type="submit" class="btn btn-primary" name="entregar_pedido_btn">Enviar</button>
-
-</form>
-</div>';
-
-
-}
 function confirmaciones(){
     global $db, $fecha_act;
 
@@ -26366,139 +22206,16 @@ $_SESSION['msn_pedidos']  .= '<i class="fa fa-envelope"></i> Se ha enviado un co
 
 
 
-  function analizar_mensualidad(){
-    global $db, $usua, $mes_de_pago_actual, $limite_basico,
-    $limite_avanzado, $limite_vip, $titulopag, $planes, $operador, $como_pagar, $registrar_mensualidad;
-
-    $montos_permitidos ="";
-    $limite_base = 0;
-
-
-      $inicio = new DateTime();
-      $fin = new DateTime();
-      $fin = $fin->modify('last day of this month');
-
-      $hoy_a = date('d/m/Y');
-      $fin_a = $fin->format('d/m/Y');
-
-      $interval = $inicio->diff($fin);
-      $interval = $interval->days .' Dias';
-
-
-  $query = "SELECT * FROM pagos WHERE user='$usua' AND mes_de_pago = '$mes_de_pago_actual' AND concepto = 'MENS_MOVILNET' AND status_pago ='APROBADO' ORDER BY `id` DESC LIMIT 1";
-  $resultado = mysqli_query($db, $query);
-  $row = mysqli_fetch_assoc($resultado);
-
-  if ($row['afiliacion']=='BASICO'){
-   $l = $limite_basico;
-  } else if ($row['afiliacion']=='AVANZADO') {
-   $l = $limite_avanzado;
-  } else {
-    $l = $limite_vip;
-   }
-
-   $sql = "SELECT * FROM monto LIMIT $limite_base, $l ";
-  $resultadosql = mysqli_query($db, $sql);
-  $num_datos = mysqli_num_rows($resultadosql);
-  while ($rowsql=mysqli_fetch_row($resultadosql)){
-      if ($num_datos ==1)
-      {
-        $montos_permitidos = $montos_permitidos .  $rowsql[1] . " Bs.";
-      }
-      else if ($num_datos ==2)
-      {
-        $montos_permitidos = $montos_permitidos .  $rowsql[1] . " Bs y ";
-      }
-      else if ($num_datos > 2)
-      {
-        $montos_permitidos = $montos_permitidos .  $rowsql[1] . " Bs., ";
-      }
-      $num_datos--;
-    }
-  $logo_movilnet = '<img src="../images/operadoras/movilnet.png" class="img-fluid ${3|rounded-top,rounded-right,rounded-bottom,rounded-left,rounded-circle,|}" alt="">';
-
-  if (mysqli_num_rows($resultado)){
-      echo $logo_movilnet;
-    echo ' De la platafoma <b>'. $operador .'</b> le quedan <b>'.$interval.'</b> Restantes para disfrutar de su plan. <b>'.$row['afiliacion'].'
-    </b>';
-
-    $actual = $row['mes_de_pago'];
-
-
-  echo '<hr><div class="alert alert-success" role="alert">
-   <h3>SOBRE SU PLAN MOVILNET CONTRATADO</h3>En el periodo correspondiente al mes de <b> '.strtoupper($actual).'</b> su tipo de Plan es Afiliacion <b>'.$row['afiliacion'].'
-  </b> y Vence el dia <b>'. $fin_a .'</b> Usted puede efectuar pedidos de los siguientes Montos: <b>'.$montos_permitidos.'</b> por cada una de sus solicitudes, la cantidad de pedidos diarios, semanales o mensuales son ilimitados. Cada vez que la operadora le asigne un pedido usted podra generar un nuevo pedido, evite hacer transferencias adelantadas, efectue solo la transferencia del pedido que va a declarar. </div><hr>';
-  } else {
-
-    if ($titulopag == "Movilnet")
-  {
-    $link = $registrar_mensualidad;
-  } else {
-    $link = '<a class="btn btn-danger" href="mensualidad_movilnet.php"><span  class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span> <b>PAGUE SU MENSUALIDAD</b> <span  class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span></a>';
-  }
-
-    echo $como_pagar;
-    echo $logo_movilnet;
-    echo ' No se ha detectado pago de mensualidad para el uso del servicio <b>'.$titulopag.'</b>.';
-    echo '<hr><div class="alert alert-warning" role="alert">
-    Lo sentimos aun no se ha registrado o aprobado pagos de Mensualidad correspondientes de la operadora '.strtoupper($operador).' del mes de: <b>'.strtoupper($mes_de_pago_actual).'</b> si no ha efectuado pago le invitamos a hacerlo ingresando a:<br> '.$link.'<br>Si por el contrario ya efectuo su pago debe esperar a que el mismo sea conformado.<br><br>
-    <h5>Vigencia de su Plan '.$operador.'</h5>Por ejemplo:<br>Aprobandose su pago hoy: <b>'. $hoy_a .'</b> Su renta venceria el <b>'. $fin_a .'</b><br>Pudiendo disfrutar de  <b>'.$interval . '</b> de su Plan.<br> <br>Si no desea pagar mensualidades por uso de la plataforma ahora tendra la posibilidad de efectuar pedidos para consumo personal<br><br> <a href="pedidos_movilnet_sin_plan.php" class="btn btn-info" ><b><span  class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span> <i class="fas fa-hand-point-right"></i>  HACER PEDIDOS SIN PAGAR MENSUALIDADES  <span  class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span></b></a> </div><hr>';
-
-  planes_movilnet();
-
-  }
-
-
-
-  }
-
-
-
-
-function m_o($a){
-  global $db, $montos;
-
-  $sql ="SELECT * FROM `monto_recarga` WHERE mod (monto, $a) = 0";
- $resultadosql = mysqli_query($db, $sql);
- $num_datos = mysqli_num_rows($resultadosql);
- while ($rowsql=mysqli_fetch_row($resultadosql)){
-
-  if($num_datos ==1)
-  {
-     $montos = $montos . "y " . $rowsql[1] . " Bs.";
-  }
-  else
-  {
-
-     $montos = $montos . $rowsql[1] . " Bs., ";
-  }
-
-     $num_datos--;
- }
-
-
-}
 
 
 
 
 
 
-function analizar_mensualidad2(){
-    global $db, $usua, $mes_de_pago_actual, $limite_basico,
-    $limite_avanzado, $limite_vip, $operador, $planes, $fecha_actual_sistema, $concepto, $m_dias_r, $como_pagar, $me, $pago_mensualidad, $cabecera_privada;
-
-    $montos_permitidos ="";
-    $limite_base = 0;
-
-    selector_operador();
 
 
-  analisis_dias_restantes();
-  $cabecera_privada = $como_pagar;
-  $cabecera_privada .= '<img width="20%" src="../images/operadoras/'.strtolower ($operador) .'.png" class="img-fluid ${3|rounded-top,rounded-right,rounded-bottom,rounded-left,rounded-circle,|}" alt="">';
-  $cabecera_privada .= $m_dias_r;
-  }
+
+
 
 
 function ejecutar_editar_contenido(){
@@ -26566,43 +22283,6 @@ if ($destinatario == 'JESUMINISTROSYMAS'){
 
 
 
-function breadcrumbs($sep = ' » ', $home = 'Inicio') {
-    $bc     =   '<ul class="breadcrumb">';
-    //Get the server http address
-    $site   =   'https://'.$_SERVER['HTTP_HOST'];
-    //Get all vars en skip the empty ones
-    $crumbs =   array_filter( explode("/",$_SERVER["REQUEST_URI"]) );
-    //Create the homepage breadcrumb
-    $bc    .=   '<li><a href="'.$site.'">'.$home.'</a>'.$sep.'</li>';
-    //Count all not empty breadcrumbs
-    $nm     =   count($crumbs);
-    $i      =   1;
-    //Loop through the crumbs
-    foreach($crumbs as $crumb){
-    //grab the last crumb
-    $last_piece = end($crumbs);
-
-        //Make the link look nice
-        $link    =  ucfirst( str_replace( array(".php","-","_"), array(""," "," ") ,$crumb) );
-
-        //Loose the last seperator
-        $sep     =  $i==$nm?'':$sep;
-        //Add crumbs to the root
-        $site   .=  '/'.$crumb;
-        //Check if last crumb
-        if ($last_piece!==$crumb){
-        //Make the next crumb
-        $bc     .= '<li><a href="'.$site.'">'.$link.'</a>'.$sep.'</li>';
-        } else {
-        //Last crumb, do not make it a link
-        $bc     .= '<li class="active">'.ucfirst( str_replace( array(".php","-","_"), array(""," "," ") ,$last_piece)).'</li>';
-        }
-        $i++;
-    }
-    $bc .=  '</ul>';
-    //Return the result
-    return $bc;
-    }
 
 
     
@@ -26695,14 +22375,6 @@ VALUES(null, '$user', '$comentario')";
 }
 }
 
-function mostrar_alert($a) {
-if (isset($_SESSION[$a])) {
-			echo '<div class="alert alert-danger" role="alert" ><h3>';
-			echo $_SESSION[$a];
-			unset($_SESSION[$a]);
-			echo '</h3></div>';
-}
-}
 
 
 
@@ -26773,131 +22445,7 @@ echo '</nav>';
 }
 
 
-function admin_comentarios(){
-  global $db, $limit_end;
-  //$limit_end = 1;
-  //$init = "";
 
-if (isset($_GET['p']))
-$ini=$_GET['p'];
-else
-$ini=1;
-
-$init = ($ini-1) * $limit_end;
-
-  $count_query="SELECT COUNT(*) FROM comentario";
-
-  $query = "SELECT *, comentario.id AS idrow, users.nombre AS 'nombre'
-  FROM comentario
-  INNER JOIN users ON (comentario.user=users.idusuario)
-  ORDER BY fecha DESC
-  LIMIT $init, $limit_end";
-
-  //$result = mysqli_query($db,$query);
-$result_count = mysqli_query($db, $count_query);
-
-
-
-  if (isAdmin()){
-    $num = $db->query($count_query);
-    $x = $num->fetch_array();
-    $total = ceil($x[0]/$limit_end);
-
-    echo '<div class="d-none d-sm-none d-md-block">';
-        pag($ini, $limit_end, $total);
-    echo "</div>";
-    echo '<div class="d-block d-sm-block d-md-none">';
-    pag_test($ini, $limit_end, $total);
-    echo "</div>";
-
-    $admin_comentarios = '<div class="table-responsive">';
-    $admin_comentarios .= '<table id="tabla1" class="table table-bordered table-hover stacktable">
-      <thead>
-       <tr>
-       <th>ID</th>
-       <th>Fecha del Comentario</th>
-       <th>Nombre</th>
-        <th>Comentario </th>
-        <th>Accion</th>
-       </tr>
-       </thead>
-       <tbody>';
-
-       $c = $db->query($query);
-       while($row = $c->fetch_array(MYSQLI_ASSOC))
-        {
-        $date = date_create($row['fecha']);
-        $fecha = date_format($date, 'd-m-Y');
-        $fecha_comentario = $fecha;
-        $comentario = $row['comentario'];
-        $id = $row['idrow'];
-        $nombre = $row['nombre'];
-        $user = $row['user'];
-
-        $visible = $row['visible'];
-
-    if ($visible==1)
-    {
-      $stdp = '<button type="submit" class="btn btn-success btn-sm" name="activar_desactivar_comentario_btn" data-toggle="popover" title="ACTIVO" data-content="Comentario ACTIVO haga click para desactivarlo y que no se muestre.">ACT <i class="fa fa-thumbs.-up"></i></button>';
-
-} else {
-      $stdp = '<button type="submit" class="btn btn-danger btn-sm" name="activar_desactivar_comentario_btn" data-toggle="popover" title="BLOQUEADO" data-content="Comentario BLOQUEADO, haga click para activarlo.">BLOQUEADO <i class="fa fa-thumbs.-down"></i></button>';
-
-    }
-
-    $link = '<form autocomplete="off" class="was-validated" method="post" action= "">
-       <input type="hidden" name="id" value="'.$id.'">
-    <input type="hidden" name="visible" value="'.$visible.'">
-    '.$stdp.' </form>';
-
-
-
-    $visible = $link;
-
-
-    $admin_comentarios .= '<tr>';
-    $admin_comentarios .= '<td>'.$id.'</td>
-                          <td>'.$fecha_comentario.'</td>
-                          <td>'.$nombre.'</td>
-                          <td>'.$comentario .'</td>
-                          <td>'.$visible.'</td>
-                          </tr>';
-        }
-        $admin_comentarios .= '</tbody></table>';
-
-
-          }
-
-echo $admin_comentarios;
-echo '<div class="d-none d-sm-none d-md-block">';
-    pag($ini, $limit_end, $total);
-echo "</div>";
-echo '<div class="d-block d-sm-block d-md-none">';
-pag_test($ini, $limit_end, $total);
-echo "</div>";
-}
-
-function error_fatal($a){
-    global $db, $nombrepag, $usua;
-//echo $usua;
-$query = "SELECT * FROM users WHERE username='$usua' LIMIT 1";
-$rows =  mysqli_fetch_array(mysqli_query($db, $query));
-
-$id_usuario = $rows['id'];
-
-
-$ip = get_client_ip();
-
-$query_error_fatal = "INSERT INTO error_fatal (id, id_usuario, ip, web, area) VALUES(null, '$id_usuario', '$ip', '$nombrepag', '$a')";
-
-if (mysqli_query($db, $query_error_fatal)) {
-  echo '<div class="alert alert-warning" role="alert">
-  <h1>Se ha registrado esta accion y se ha generado un alerta, evite continuar con esta practica no permitida.</h1>
-</div>';
-} else {
-  echo 'error '. mysqli_error($db);
- }
-}
 
 
 function isLoggedIn()
@@ -27149,86 +22697,6 @@ function display_error() {
 
 
 
-function analizar_mensualidades(){
-  global $db, $usua, $mes_de_pago_actual, $limite_basico,
-  $limite_avanzado, $limite_vip, $titulopag, $planes, $operador, $como_pagar, $fecha_actual_sistema, $concepto, $m_dias_r, $como_pagar, $me, $img_ope, $fecha_sistema;
-
-  $montos_permitidos ="";
-  $limite_base = 0;
-
-
-    $inicio = new DateTime();
-    $fin = new DateTime();
-    $fin = $fin->modify('last day of this month');
-
-    $hoy_a = date('d/m/Y');
-    $fin_a = $fin->format('d/m/Y');
-
-    $interval = $inicio->diff($fin);
-    $interval = $interval->days .' Dias';
-
-    $query = "SELECT * FROM pagos WHERE user='$usua' AND status_pago ='APROBADO' AND DATEDIFF(fin, NOW()) > 0";
-    $resultado = mysqli_query($db, $query);
-    $row = mysqli_fetch_assoc($resultado);
-
-    if (mysqli_num_rows($resultado)>0) {
-
-if (mysqli_num_rows($resultado)==1){
-$tituloA = '<h3>Usted actualmente posee activo un solo plan:</h3>';
-} else {
-$tituloA = '<h3>Usted actualmente posee activo los siguientes planes:</h3>';
-}
-echo $tituloA;
-
-
-} // Cierre de if (mysqli_num_rows($resultado)>0)
-else {
-  echo '<hr>';
-  echo '<div class="alert alert-warning" role="alert">En el Periodo <b>'.strtoupper($mes_de_pago_actual).'</b> No posee Ningun Plan Activado</div>';
-  echo '<hr>';
-}
-
-$query2 = "SELECT *, DATEDIFF(fin, NOW()) as DiasRestantes FROM pagos WHERE user = '$usua' AND status_pago = 'APROBADO' ORDER BY id DESC LIMIT 4";
-
-$resul = mysqli_query($db, $query2);
-
-while ($a = mysqli_fetch_assoc($resul)) {
-
-  if ($a['DiasRestantes']>0) {
-    $concepto = $a['concepto'];
-    img_ope($concepto);
-    $operador = ucwords(strtolower(str_replace("MENS_", "", $concepto)));
-    echo '<hr>';
-    echo '<div class="container">
-  <div class="row">';
-    echo '<div class="col-2">';
-    echo $img_ope;
-    echo '</div>';
-    if ($a['DiasRestantes']==1) {
-      $t_dias = "Dia restante";
-    }
-    else {
-      $t_dias = "Dias restantes";
-    }
-    echo '<div class="col-10">';
-    echo ' De la platafoma <b>'. $operador .'</b> le quedan <b>'.$a['DiasRestantes'].'</b> '.$t_dias.' para disfrutar de su plan de Recargas. <b><a href="recargas_'.strtolower($operador).'.php">'.strtoupper($operador).'
-    </a></b>';
-    echo '</div>';
-    echo '</div></div>';
-    echo '<hr>';
-
-$date = date_create($a['fin']);
-$fin_a = date_format($date, 'd/m/Y');
-$actual = $a['mes_de_pago'];
-
-    echo '<div class="alert alert-success" role="alert">
-   <h3>SOBRE SU PLAN '.strtoupper($operador).' CONTRATADO</h3>En el periodo correspondiente al mes de <b>'.strtoupper($actual).' </b> su Plan Vence el dia <b>'. $fin_a .'</b>. y puede acceder cuando guste y hacer uso del servicio de recargas <a data-toggle="popover" data-content="Aca podrá ingresar directamente al area de recargas '.strtoupper($operador).'." href="recargas_'.strtolower($operador).'.php"><b>AQUI</b></a> </div><hr>';
-
-    //echo $concepto;
-  }
-}
-
-}
 
 
 function a_favor(){
@@ -27812,190 +23280,8 @@ function visita() {
 
 
 
-function mostrar_mensajes(){
-  global $db, $limit_end, $usua;
-
-  $url = basename($_SERVER ["PHP_SELF"]);
-
-  if (isset($_GET['p']))
-    $ini=$_GET['p'];
-  else
-    $ini=1;
-  $init = ($ini-1) * $limit_end;
-
-  // SI ES ADMIN
-  if (isAdmin()) {
-    $count_mensajeria="SELECT COUNT(*) FROM mensajes";
-    $query_mensajeria = "SELECT * FROM mensajes ORDER BY id DESC LIMIT $init, $limit_end";
-    $result_mensajeria = mysqli_query($db, $query_mensajeria);
-    $row_mensajeria =  mysqli_num_rows($result_mensajeria);
-    $mensaje  = 'No hay mensajes que Mostrar';
-
-  } else {
-    //Si es Usuario
-    $count_mensajeria="SELECT COUNT(*) FROM mensajes WHERE destinatario IN ('GENERAL','$usua') OR origen = '$usua'";
-    $query_mensajeria = "SELECT * FROM mensajes WHERE destinatario IN ('GENERAL','$usua') OR origen = '$usua' ORDER BY id DESC LIMIT $init, $limit_end";
-    $result_mensajeria = mysqli_query($db, $query_mensajeria);
-    $row_mensajeria =  mysqli_num_rows($result_mensajeria);
-
-    $mensaje  = '<i class="fa fa-exclamation-triangle"></i> ESTAMOS MEJORANDO ESTE MODULO';
-  }
-
-  /* querys */
-
-  if (!$row_mensajeria){
-    echo '<div class="alert alert-danger" role="alert" >';
-    echo '<h3>';
-    echo $mensaje;
-    echo '</h3>';
-    echo '</div>';
-  } else {
-    $num = $db->query($count_mensajeria);
-    $x = $num->fetch_array();
-    $total = ceil($x[0]/$limit_end);
-    pag_test($ini, $limit_end, $total);
-    if (isAdmin()){
-      echo '<div class="table-responsive"><table id="tabla1" class="table table-bordered table-hover">
-      <thead>
-      <tr>
-      <th>ID / Fecha de Mensaje / Asunto / Para</th>
-      <th>Contenido</th>
-      <th>Accion</th>
-      </tr>
-      </thead>
-      <tbody>';
-
-      $c = $db->query($query_mensajeria);
-      while($row_mensajeria = $c->fetch_array(MYSQLI_ASSOC))
-      {
-        $date = date_create($row_mensajeria['fecha_mensaje']);
-        $fecha = date_format($date, 'd-m-Y');
-        $fecha_mensaje = $fecha;
-        $asunto = $row_mensajeria['asunto'];
-        $rowid = $row_mensajeria['id'];
-        $contenido = $row_mensajeria['contenido'];
-        $rowid = $row_mensajeria['id'];
-        $origen = $row_mensajeria['origen'];
-        $destinatario = $row_mensajeria['destinatario'];
-
-        $boton_editar = '<a class="btn btn-outline-dark btn-sm" href="editar_mensajeria.php?id='.$rowid.'" data-toggle="popover" title="EDITAR CONTENIDO" data-content="Editar este contenido.">
-        Editar
-        </a>';
-
-      $accion = '<div class="btn-group" >'. $boton_editar. '</div>';
-
-      $consultar_nombre = "SELECT nombre FROM users WHERE id = '$origen'";
-      $resultado_consultar_nombre=mysqli_query($db,$consultar_nombre);
-      $rcn = mysqli_fetch_assoc($resultado_consultar_nombre);
-
-
-      echo '<tr>';
-      echo '<td><b>'.$rowid.'</b><br>'.$fecha_mensaje.'<br>'.$asunto.'<br><b>'.$destinatario.'</b></td>
-      <td>'.$contenido .'</td>
-      <td>'.$accion.'</td>
-      </tr>';
-      }
-      echo '</tbody></table></div>';
-
-
-    }
-    else
-      // SI ES USER NO ES ADMIN
-    {
-      echo '<div class="accordion" id="accordionExample">';
-
-      $c = $db->query($query_mensajeria);
-      while($row_mensajeria = $c->fetch_array(MYSQLI_ASSOC))
-      {
-        $date = date_create($row_mensajeria['fecha_mensaje']);
-        $fecha = date_format($date, 'd-m-Y');
-        $fecha_mensaje = $fecha;
-        $asunto = $row_mensajeria['asunto'];
-        $contenido = $row_mensajeria['contenido'];
-        $rowid = $row_mensajeria['id'];
-        $origen = $row_mensajeria['origen'];
-        $destinatario = $row_mensajeria['destinatario'];
-        $control = $row_mensajeria['control'];
-
-        if ($destinatario == 'GENERAL') {
-          $destino = '<span class="justify-content-end badge badge-pill badge-info">Mensaje General</span></div>';
-        } else if ($destinatario == 'JESUMINISTROSYMAS' && $control == '0') {
-          $destino = '<span class="justify-content-end badge badge-pill badge-danger">Solicitud de Soporte</span></div>';
-        } else if ($destinatario == 'JESUMINISTROSYMAS' && $control == '1') {
-          $destino = '<span class="justify-content-end badge badge-pill badge-success">Soporte Atendido</span></div>';
-        } else {
-          $destino = '<span class="justify-content-end badge badge-pill badge-warning">Mensaje Para Usted</span></div>';
-        }
-
-        $a = '
-        <div class="card">
-        <div class="card-header" id="headingOne'.$rowid.'">
-        <h5 class="row mb-0">
-        <button  title="Ver detalles de '.$asunto.'" class="btn btn-link collapsed col-12" type="button" data-toggle="collapse" data-target="#collapseOne'.$rowid.'" aria-expanded="true" aria-controls="collapseOne'.$rowid.'">
-
-        <div class="row no-gutters">
-        <div class="d-flex justify-content-start col-sm-8">'.$asunto.'</div>
-        <div class="d-flex justify-content-end col-sm-4">'.$destino.'
-        </div>
-
-        </button>
-        </h5>
-        </div>
-
-        <div id="collapseOne'.$rowid.'" class="collapse" aria-labelledby="headingOne'.$rowid.'" data-parent="#accordionExample">
-        <div class="card-body">
-        Publicado en Fecha: '.$fecha_mensaje.'<br><h2>'.$asunto.'</h2>'.$contenido.'
-        </div>
-        </div>
-        </div>
-
-        ';
-echo $a;
-      }
-      echo '</div>';
-
-    }
-
-    pag_test($ini, $limit_end, $total);
-  }
-
-}
 
 // CONTAR MENSAJES
-function contar_mensajes(){
-  global $db, $usua, $contador_msn, $contador_msn_badge;
-
-  $id_usuario = $_SESSION['user']['id'];
-  $web = "mensajeria.php";
-
-  $cont_visita = "SELECT * FROM visitas
-  WHERE fecha_visita =  (
-    SELECT MAX(fecha_visita)
-    FROM visitas WHERE web = '$web' AND id_usuario = '$id_usuario')  ";
-  $result_visita = mysqli_query($db, $cont_visita);
-  $row_visita =  mysqli_fetch_assoc($result_visita);
-
-  $fecha_visita = $row_visita['fecha_visita'];
-  $cont_msn = "SELECT * FROM mensajes
-  WHERE (destinatario IN ('GENERAL','$usua') OR origen = '$usua')
-  AND fecha_mensaje > '$fecha_visita'";
-
-  $resultcont = mysqli_query($db, $cont_msn);
-  $rowcont =  mysqli_num_rows($resultcont);
-
-
-  if ($rowcont >= 1) {
-    $contador_msn_badge = $rowcont;
-    $contador_msn = 'Tiene '.$rowcont .' mensaje por leer!';
-  }
-  else {
-    $contador_msn_badge = "";
-    $contador_msn = "No hay Mensajes Nuevos";
-  }
-
-  $contador_msn .= '<br>Ahora puedes enviarnos mensajes que seran atendidos a la brevedad.';
-
-}
 
 // MOSTRAR ERROR
 function display_error2() {
@@ -28014,63 +23300,8 @@ function display_error2() {
 }
 
 // VERIFICAR STATUS DE USUARIO
-function status_usuario(){
-  global $db, $usua, $operador, $nombrepag;
-  $sql ="SELECT * FROM users WHERE username = '$usua' ";
-  $result = mysqli_query($db, $sql);
-  $row = mysqli_fetch_assoc($result);
-
-  $motivo= $row['motivo_bloqueo'];
-  $status = $row['status'];
-
-  if (!$motivo){
-    $motivo = 'No se ha especificado un motivo en particular, si considera que es un error usted puede comunicarse con el <a href="http://www.jesuministrosymas.com.ve/contactenos" target="_blank"> Area de Soporte J.E Suministros y Mas, C.A.</a>.';
-  } else {
-    $motivo= $row['motivo_bloqueo'];
-  }
-
-  if ( $status == 0){
-
-    $ndp = 'mensualidad_'.strtolower($operador).'.php';
-
-    if ($operador == "Mensualidades" || $nombrepag == $ndp ) {
-      $complemento ='<hr>Active cualquier plan disponible para que pueda desbloquear su usuario de forma automatizada. <i class="far fa-arrow-alt-circle-down fa-2x"></i>
-      ';
-    } else {
-
-      $complemento = '<hr>Tambien es posible desbloquear su usuario efectuando el pago de su mensualidad hoy mismo, puedes hacerlo ingresando a: <a href="mensualidades.php"><b> ACTIVAR ALGUN PLAN DISPONIBLE</b></a>';
-    }
-
-    echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
-
-    <h2 class="text-center"><i class="fa fa-exclamation-triangle fa-fw fa-bars "></i>Usuario Bloqueado<i class="fa fa-exclamation-triangle fa-fw fa-bars "></i></h2> <h3>Motivo:</h3>' . $motivo . '<hr>Si considera que es un error o desea que sea reconsiderada su suspension puede comunicarse a los canales de comunicacion explicando su caso <a target="_BLANK" href="mensajeria.php"><b> COMUNIQUESE CON NOSOTROS AQUI</b></a>'.$complemento.'</div>';
-  }
-
-}
 
 // VERIFICAR TRANSFERENCIAS
-function verificar_transferencias($a){
-  global $db, $mensaje_verificacion;
-
-  $verf = "SELECT nro_transf FROM pedidos WHERE (nro_transf LIKE '%$a') OR (nro_transf LIKE '%$a') AND STR_TO_DATE(fecha_transf,'%Y-%m-%d %T')
-  BETWEEN DATE_SUB(NOW(), INTERVAL 60 DAY) AND NOW()";
-
-  $result = mysqli_query($db, $verf);
-  $rows =  mysqli_num_rows($result);
-
-  $verf2 = "SELECT nro_transf FROM pagos WHERE (nro_transf LIKE '%$a') OR (nro_transf LIKE '%$a') AND STR_TO_DATE(fecha_transf,'%Y-%m-%d %T')
-  BETWEEN DATE_SUB(NOW(), INTERVAL 60 DAY) AND NOW()";
-
-  $result2 = mysqli_query($db, $verf2);
-  $rows2 =  mysqli_num_rows($result2);
-
-  $sumarows = $rows + $rows2;
-
-  if ($sumarows>0){
-    $mensaje_verificacion  = '<i class="fa fa-exclamation-triangle fa-fw"></i> Lo sentimos, el numero de transferencia que intenta utilizar ya fue utilizado, recuerde que no debe utilizar un numero de transferencia usado en alguna otra operacion de declaracion de mensualidades u otros pagos de pedidos, evite ser suspendido/a.<br>';
-    mysqli_close($db);
-  }
-}
 
   
 // $ini=1; VALOR SUMINISTRADO POR LA FUNCTION
@@ -28139,36 +23370,6 @@ function pag($ini, $limit_end, $total)
 }
 
 
-function formatearCantidad($cantidad, $tipo) {
-  $cantidad_final = $cantidad;
-  $unidad = "";
-
-  if ($cantidad == 0) {
-    return "Sin Existencia"; // O el mensaje que desees mostrar si no hay cantidad
-  }
-
-  if ($tipo == 'liq') {
-    if ($cantidad >= 1000) {
-      $cantidad_final = $cantidad / 1000; 
-      $unidad = ($cantidad_final > 1) ? "Litros" : "Litro"; 
-    } else {
-      $unidad =  "mililitro" . ($cantidad > 1 ? "s" : "");
-    }
-  } else if ($tipo == 'sol') {
-    if ($cantidad >= 1000) {
-      $cantidad_final = $cantidad / 1000; 
-      $unidad = ($cantidad_final > 1) ? "Kilos" : "Kilo";
-    } else {
-      $unidad =  "gramo" . ($cantidad > 1 ? "s" : ""); 
-    }
-  } else { //  Para otros tipos,  puedes manejarlo como desees
-    $unidad = "";
-  }
-
-  $cantidad_final = round($cantidad_final, 2);
-
-  return $cantidad_final . " " . $unidad;
-}
 
 
 
@@ -28183,159 +23384,11 @@ $formatter = IntlDateFormatter::create(
 );
 
 
-function respaldarDatosUsuario($id_usua) {
-  global $db, $pag_web;
-
-  // 1. Crear la carpeta de respaldos si no existe:
-  $carpetaRespaldos = 'respaldos/' . $id_usua . '/';
-  if (!file_exists($carpetaRespaldos)) {
-      mkdir($carpetaRespaldos, 0777, true); 
-  }
-
-  // 2. Definir el nombre del archivo del respaldo 
-  $nombreArchivo = 'respaldo_' . date('Ymd_His') . '.sql';
-
-  try {
-      // Iniciar la transacción para un respaldo consistente:
-      $db->begin_transaction();
-
-      // 3. Obtener los datos de las tablas:
-      $tablas = [
-          'clientes' => "SELECT * FROM clientes WHERE idusuario = '$id_usua'",
-          'ventas' => "SELECT * FROM ventas WHERE id_usuario = '$id_usua'",
-          'inventario_componente' => "SELECT * FROM inventario_componente WHERE id_usuario = '$id_usua'",
-          'inventario_producto_terminado' => "SELECT * FROM inventario_producto_terminado WHERE id_usuario = '$id_usua'"
-      ];
 
 
-      $sql = ''; // Acumular las consultas SQL
-
-      foreach ($tablas as $tabla => $consulta) {
-          $sql .= "-- Respaldo de datos de la tabla '$tabla'\n";
-          $sql .= "DROP TABLE IF EXISTS `$tabla`;\n";
-          $resultadoTabla = $db->query("SHOW CREATE TABLE `$tabla`");
-          $filaTabla = $resultadoTabla->fetch_assoc();
-          $sql .= $filaTabla['Create Table'] . ";\n\n";
-
-          $resultadoDatos = $db->query($consulta);
-          while ($filaDatos = $resultadoDatos->fetch_assoc()) {
-              $campos = implode("`, `", array_keys($filaDatos));
-              $valores = "'" . implode("', '", array_values($filaDatos)) . "'";
-              $sql .= "INSERT INTO `$tabla` (`$campos`) VALUES ($valores);\n";
-          }
-          $sql .= "\n\n";
-      }
-
-      // 4. Escribir el SQL en el archivo
-      $rutaArchivo = $carpetaRespaldos . $nombreArchivo; 
-      file_put_contents($rutaArchivo, $sql);
-
-      // Cerrar la transacción si todo salió bien
-      $db->commit();
-
-      // Mostrar mensaje de éxito 
-      echo '<div class="alert alert-success">Respaldo generado exitosamente en: <a href="'. $pag_web . '/usuario/'. $rutaArchivo .'" target="_BLANK">' . $rutaArchivo . '</a></div>';
-  } catch (Exception $e) {
-      // Si ocurre un error durante la transacción, hacer rollback 
-      $db->rollback();
-      echo '<div class="alert alert-danger">Error al generar el respaldo: ' . $e->getMessage() . '</div>';
-  }
-}
 
 
-function optimizarTablasUsuario($id_usua) {
-global $db;
-// Implementar la lógica de optimización, por ejemplo:
-  $tablas = ['clientes', 'ventas', 'inventario_materia_prima', 'inventario_producto_terminado'];
-  
-  foreach ($tablas as $tabla) {
-    $sql = "OPTIMIZE TABLE $tabla"; 
-    $db->query($sql); 
-  }
-  
-  echo '<div class="alert alert-success">Tablas optimizadas correctamente.</div>'; 
-} 
 
-
-function respaldarDatosAdmin() {
-  global $db; // Asegúrate de que $db está definida globalmente o pásala como parámetro a la función.
-
-  // Carpeta para almacenar los respaldos (crea la carpeta si no existe)
-  $carpetaRespaldos = 'respaldos/admin/';
-  if (!file_exists($carpetaRespaldos)) {
-      mkdir($carpetaRespaldos, 0777, true);
-  }
-
-  // Nombre del archivo de respaldo
-  $nombreArchivo = 'respaldo_completo_' . date('Ymd_His') . '.sql'; 
-  $rutaArchivo = $carpetaRespaldos . $nombreArchivo;
-
-  try {
-      $db->begin_transaction(); 
-
-      // Obtener todas las tablas de la base de datos
-      $resultadoTablas = $db->query("SHOW TABLES");
-      $tablas = []; 
-      while ($fila = $resultadoTablas->fetch_row()) {
-          $tablas[] = $fila[0];
-      }
-
-      // Generar el SQL para el respaldo 
-      $sql = ''; 
-      foreach ($tablas as $tabla) {
-          $sql .= "-- Respaldo de datos de la tabla '$tabla'\n";
-          $sql .= "DROP TABLE IF EXISTS `$tabla`;\n";
-
-          $resultadoTabla = $db->query("SHOW CREATE TABLE `$tabla`");
-          $filaTabla = $resultadoTabla->fetch_assoc();
-          $sql .= $filaTabla['Create Table'] . ";\n\n";
-
-          $resultadoDatos = $db->query("SELECT * FROM `$tabla`"); 
-          while ($filaDatos = $resultadoDatos->fetch_assoc()) {
-              $campos = implode("`, `", array_keys($filaDatos));
-              $valores = "'" . implode("', '", array_values($filaDatos)) . "'"; 
-              $sql .= "INSERT INTO `$tabla` (`$campos`) VALUES ($valores);\n";
-          }
-
-          $sql .= "\n\n"; 
-      }
-
-      // Escribir el SQL al archivo
-      file_put_contents($rutaArchivo, $sql);
-
-      // Cerrar la transacción
-      $db->commit();
-
-      echo '<div class="alert alert-success">Respaldo completo generado exitosamente: <a href="'. $rutaArchivo .'" target="_BLANK">' . $rutaArchivo . '</a></div>';
-  } catch (Exception $e) {
-      $db->rollback(); // Revertir la transacción si hay errores. 
-      echo '<div class="alert alert-danger">Error al generar el respaldo: ' . $e->getMessage() . '</div>';
-  }
-}
-
-function optimizarTablasAdmin() {
-  global $db; // Asegúrate de que $db está definida globalmente o pásala como parámetro.
-  
-  try {
-      // Iniciar transacción (opcional pero recomendado para garantizar la consistencia)
-      $db->begin_transaction();
-
-      // Obtener todas las tablas de la base de datos 
-      $resultadoTablas = $db->query('SHOW TABLES');
-      while ($fila = $resultadoTablas->fetch_row()) {
-          $tabla = $fila[0]; 
-          $db->query("OPTIMIZE TABLE `$tabla`"); 
-      }
-
-      // Cerrar transacción
-      $db->commit();
-      
-      echo '<div class="alert alert-success">Todas las tablas de la base de datos han sido optimizadas correctamente.</div>';
-  } catch (Exception $e) {
-      $db->rollback(); // Revertir si hay errores. 
-      echo '<div class="alert alert-danger">Error al optimizar las tablas: ' . $e->getMessage() . '</div>';
-  }
-}
 
 
 

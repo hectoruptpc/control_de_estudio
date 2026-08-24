@@ -49,6 +49,20 @@ $ingresos = obtenerIngresos($db);
 $generos = obtenerGeneros($db);
 $tiposFormacion = obtenerTiposFormacion($db);
 
+// Ordenar todos los datos por orden numérico de ID
+if (is_array($tiposCedula)) {
+    usort($tiposCedula, function($a, $b) {
+        return (int)($a['id'] ?? 0) <=> (int)($b['id'] ?? 0);
+    });
+}
+if (is_array($estadosCiviles)) ksort($estadosCiviles, SORT_NUMERIC);
+if (is_array($tiposVivienda)) ksort($tiposVivienda, SORT_NUMERIC);
+if (is_array($tenenciasVivienda)) ksort($tenenciasVivienda, SORT_NUMERIC);
+if (is_array($opcionesStatus)) ksort($opcionesStatus, SORT_NUMERIC);
+if (is_array($ingresos)) ksort($ingresos, SORT_NUMERIC);
+if (is_array($generos)) ksort($generos, SORT_NUMERIC);
+if (is_array($tiposFormacion)) ksort($tiposFormacion, SORT_NUMERIC);
+
 include("includes/head.php");
 ?>
 

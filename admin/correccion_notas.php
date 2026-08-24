@@ -27,11 +27,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'buscar_estudiante':
                 $cedula = trim($_POST['cedula'] ?? '');
                 if (!empty($cedula)) {
-                    $estudiante = buscarEstudiantePorCedula($cedula);
-                    if ($estudiante) {
+                    $res_est = buscarEstudiantePorCedula($cedula);
+                    if (is_array($res_est) && !empty($res_est)) {
+                        if (isset($res_est['id'])) {
+                            $estudiante = $res_est;
+                        } else if (isset($res_est[0]['id'])) {
+                            $estudiante = $res_est[0];
+                        }
+                    }
+                    if ($estudiante && isset($estudiante['id'])) {
                         $carreras = obtenerCarrerasEstudiante($estudiante['id']);
                         $historial_completo = obtenerHistorialCambiosNotasEstudiante($estudiante['id']);
                     } else {
+                        $estudiante = null;
                         $mensaje = 'No se encontró ningún estudiante con esa cédula';
                         $tipo_mensaje = 'warning';
                     }
@@ -185,16 +193,16 @@ include("includes/head.php");
                         </button>
                     </form>
                     
-                    <?php if ($estudiante): ?>
+                    <?php if ($estudiante && is_array($estudiante) && isset($estudiante['id'])): ?>
                     <div class="mt-3 p-3 bg-light rounded">
                         <div class="row">
                             <div class="col-md-6">
-                                <p><strong>Nombre:</strong> <?php echo htmlspecialchars($estudiante['nombre']); ?></p>
-                                <p><strong>Cédula:</strong> <?php echo htmlspecialchars($estudiante['idusuario']); ?></p>
+                                <p><strong>Nombre:</strong> <?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?></p>
+                                <p><strong>Cédula:</strong> <?php echo htmlspecialchars($estudiante['idusuario'] ?? $estudiante['cedula'] ?? ''); ?></p>
                             </div>
                             <div class="col-md-6">
-                                <p><strong>ID Estudiante:</strong> <?php echo $estudiante['id']; ?></p>
-                                <p><strong>Total de cambios:</strong> <span class="badge badge-info"><?php echo count($historial_completo); ?></span></p>
+                                <p><strong>ID Estudiante:</strong> <?php echo htmlspecialchars((string)($estudiante['id'] ?? '')); ?></p>
+                                <p><strong>Total de cambios:</strong> <span class="badge badge-info"><?php echo is_array($historial_completo) ? count($historial_completo) : 0; ?></span></p>
                             </div>
                         </div>
                     </div>
@@ -203,7 +211,7 @@ include("includes/head.php");
             </div>
 
             <!-- Paso 2: Seleccionar Carrera -->
-            <?php if ($estudiante && !empty($carreras)): ?>
+            <?php if ($estudiante && is_array($estudiante) && isset($estudiante['id']) && !empty($carreras)): ?>
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-primary">Seleccionar Carrera</h6>
@@ -212,7 +220,7 @@ include("includes/head.php");
                 <div class="card-body">
                     <form method="POST">
                         <input type="hidden" name="accion" value="seleccionar_carrera">
-                        <input type="hidden" name="id_usuario" value="<?php echo $estudiante['id']; ?>">
+                        <input type="hidden" name="id_usuario" value="<?php echo htmlspecialchars((string)($estudiante['id'] ?? '')); ?>">
                         <input type="hidden" name="cedula" value="<?php echo htmlspecialchars($_POST['cedula'] ?? ''); ?>">
                         
                         <div class="form-group">
@@ -411,13 +419,13 @@ include("includes/head.php");
             <?php endif; ?>
 
             <!-- HISTORIAL DE CAMBIOS -->
-            <?php if ($estudiante): ?>
+            <?php if ($estudiante && is_array($estudiante) && isset($estudiante['id'])): ?>
             <div class="card shadow mt-4">
                 <div class="card-header bg-info text-white">
                     <h6 class="m-0 font-weight-bold">
                         <i class="fas fa-history"></i> Historial de Cambios de Notas
                     </h6>
-                    <small>Todos los cambios realizados a las notas de <?php echo htmlspecialchars($estudiante['nombre']); ?></small>
+                    <small>Todos los cambios realizados a las notas de <?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?></small>
                 </div>
                 <div class="card-body">
                     <?php if (!empty($historial_completo)): ?>

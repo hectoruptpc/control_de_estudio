@@ -681,22 +681,44 @@ include("includes/head.php");
                         </div>
                         <?php endforeach; ?>
                         
-                        <!-- Paginación -->
+                        <!-- Paginación Elegante y Responsiva (Sliding Window) -->
                         <?php if ($total_paginas > 1): ?>
-                        <div class="d-flex justify-content-between align-items-center mt-4">
+                        <div class="d-flex justify-content-between align-items-center mt-4 flex-wrap" style="gap: 10px;">
                             <div>
                                 <?php if ($pagina_actual > 1): ?>
                                     <a href="?user_id=<?= $usuario_seleccionado['id'] ?>&pagina=<?= $pagina_actual - 1 ?>&fecha_desde=<?= urlencode($filtros['fecha_desde']) ?>&fecha_hasta=<?= urlencode($filtros['fecha_hasta']) ?>" 
-                                       class="btn btn-outline-primary">
+                                       class="btn btn-outline-primary btn-sm">
                                         <i class="fas fa-chevron-left mr-1"></i> Anterior
                                     </a>
                                 <?php endif; ?>
                             </div>
                             
-                            <div class="text-center">
-                                <nav>
-                                    <ul class="pagination mb-0">
-                                        <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
+                            <div class="text-center my-1">
+                                <nav aria-label="Paginación de visitas">
+                                    <ul class="pagination pagination-sm mb-0 flex-wrap justify-content-center">
+                                        <?php
+                                        $rango_paginas = 2;
+                                        $inicio_pag = max(1, $pagina_actual - $rango_paginas);
+                                        $fin_pag = min($total_paginas, $pagina_actual + $rango_paginas);
+
+                                        if ($pagina_actual <= 3) {
+                                            $fin_pag = min($total_paginas, 5);
+                                        }
+                                        if ($pagina_actual >= $total_paginas - 2) {
+                                            $inicio_pag = max(1, $total_paginas - 4);
+                                        }
+                                        ?>
+
+                                        <?php if ($inicio_pag > 1): ?>
+                                            <li class="page-item">
+                                                <a class="page-link" href="?user_id=<?= $usuario_seleccionado['id'] ?>&pagina=1&fecha_desde=<?= urlencode($filtros['fecha_desde']) ?>&fecha_hasta=<?= urlencode($filtros['fecha_hasta']) ?>">1</a>
+                                            </li>
+                                            <?php if ($inicio_pag > 2): ?>
+                                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+
+                                        <?php for ($i = $inicio_pag; $i <= $fin_pag; $i++): ?>
                                             <?php if ($i == $pagina_actual): ?>
                                                 <li class="page-item active">
                                                     <span class="page-link"><?= $i ?></span>
@@ -710,6 +732,15 @@ include("includes/head.php");
                                                 </li>
                                             <?php endif; ?>
                                         <?php endfor; ?>
+
+                                        <?php if ($fin_pag < $total_paginas): ?>
+                                            <?php if ($fin_pag < $total_paginas - 1): ?>
+                                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                                            <?php endif; ?>
+                                            <li class="page-item">
+                                                <a class="page-link" href="?user_id=<?= $usuario_seleccionado['id'] ?>&pagina=<?= $total_paginas ?>&fecha_desde=<?= urlencode($filtros['fecha_desde']) ?>&fecha_hasta=<?= urlencode($filtros['fecha_hasta']) ?>"><?= $total_paginas ?></a>
+                                            </li>
+                                        <?php endif; ?>
                                     </ul>
                                 </nav>
                             </div>
@@ -717,7 +748,7 @@ include("includes/head.php");
                             <div>
                                 <?php if ($pagina_actual < $total_paginas): ?>
                                     <a href="?user_id=<?= $usuario_seleccionado['id'] ?>&pagina=<?= $pagina_actual + 1 ?>&fecha_desde=<?= urlencode($filtros['fecha_desde']) ?>&fecha_hasta=<?= urlencode($filtros['fecha_hasta']) ?>" 
-                                       class="btn btn-outline-primary">
+                                       class="btn btn-outline-primary btn-sm">
                                         Siguiente <i class="fas fa-chevron-right ml-1"></i>
                                     </a>
                                 <?php endif; ?>
