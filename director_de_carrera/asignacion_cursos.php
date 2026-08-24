@@ -398,15 +398,26 @@ include("includes/head.php");
 
             <!-- Sección de Asignaciones Actuales -->
             <div class="card mb-4 shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <i class="fas fa-list"></i> Asignaciones Actuales - Todas las Carreras
+                <div class="card-header bg-primary text-white text-center">
+                    <h5 class="mb-0 font-weight-bold"><i class="fas fa-list mr-2"></i> Asignaciones Actuales - Todas las Carreras</h5>
                 </div>
-                <div class="card-body">
-                    <div class="alert alert-warning">
-                        <i class="fas fa-info-circle"></i> 
-                        Solo puede editar o eliminar asignaciones de su propia carrera: 
-                        <strong><?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?></strong>
+                    <!-- Buscador en tiempo real arriba de la tabla -->
+                    <div class="form-group mb-3">
+                        <label for="buscar_tabla_asignaciones"><i class="fas fa-search text-primary mr-1"></i> Buscar personas o materias en tiempo real:</label>
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text"><i class="fas fa-filter"></i></span>
+                            </div>
+                            <input type="text" id="buscar_tabla_asignaciones" class="form-control" placeholder="Escriba para buscar docentes (cédula o nombre), materias, código o carrera..." autocomplete="off">
+                            <div class="input-group-append">
+                                <button class="btn btn-outline-secondary" type="button" id="btn_limpiar_tabla">
+                                    <i class="fas fa-times"></i> Limpiar
+                                </button>
+                            </div>
+                        </div>
+                        <small class="form-text text-muted" id="tabla_coincidencias_info">Filtrado en tiempo real activado.</small>
                     </div>
+
                     <div class="table-responsive">
                         <table class="table table-bordered table-hover" id="dataTable" width="100%" cellspacing="0">
                             <thead class="thead-dark">
@@ -534,121 +545,131 @@ include("includes/head.php");
                 </div>
             </div>
 
-            <!-- Sección para Asignar Nueva Materia -->
-            <div class="card mb-4 shadow-sm">
-                <div class="card-header bg-success text-white">
-                    <i class="fas fa-chalkboard-teacher"></i> Asignar Nueva Materia - <?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>
-                </div>
-                <div class="card-body">
-                    <form method="post" action="">
-                        <div class="form-row">
-                            <div class="form-group col-md-6">
-                                <label for="id_profesor">
-                                    <i class="fas fa-user-tie"></i> Seleccionar Profesor:
-                                </label>
-                                <select class="form-control" id="id_profesor" name="id_profesor" required>
-                                    <option value="">-- Seleccione --</option>
-                                    <?php
-                                    $query = "SELECT id, idusuario, nombre FROM users WHERE docente = 1 ORDER BY nombre";
-                                    $result = $db->query($query);
+            <!-- Fila centrada con las 2 tarjetas lado a lado (50% cada una) centradas en pantalla -->
+            <div class="row justify-content-center mx-auto" style="width: 100%;">
+                <!-- Columna Izquierda: Asignar Nueva Materia -->
+                <div class="col-lg-6 col-md-12 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header bg-success text-white">
+                            <i class="fas fa-chalkboard-teacher"></i> Asignar Nueva Materia - <?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" action="">
+                                <div class="form-row">
+                                    <div class="form-group col-md-6">
+                                        <label for="id_profesor">
+                                            <i class="fas fa-user-tie"></i> Seleccionar Profesor:
+                                        </label>
+                                        <input type="text" id="buscar_profesor_input" class="form-control form-control-sm mb-1" placeholder="🔍 Buscar profesor por nombre o cédula..." autocomplete="off">
+                                        <select class="form-control" id="id_profesor" name="id_profesor" required>
+                                            <option value="">-- Seleccione --</option>
+                                            <?php
+                                            $query = "SELECT id, idusuario, nombre FROM users WHERE docente = 1 ORDER BY nombre";
+                                            $result = $db->query($query);
+                                            
+                                            if($result && $result->num_rows > 0) {
+                                                while($row = $result->fetch_assoc()) {
+                                                    $searchMeta = htmlspecialchars(mb_strtolower($row['nombre'] . ' ' . $row['idusuario'], 'UTF-8'));
+                                                    echo "<option value='".$row['id']."' data-search='".$searchMeta."'>".htmlspecialchars($row['nombre'])." (".htmlspecialchars($row['idusuario']).")</option>";
+                                                }
+                                            }
+                                            ?>
+                                        </select>
+                                    </div>
                                     
-                                    if($result && $result->num_rows > 0) {
-                                        while($row = $result->fetch_assoc()) {
-                                            echo "<option value='".$row['id']."'>".htmlspecialchars($row['nombre'])." (".htmlspecialchars($row['idusuario']).")</option>";
-                                        }
-                                    }
-                                    ?>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group col-md-6">
-                                <label for="carrera">
-                                    <i class="fas fa-graduation-cap"></i> Carrera:
-                                </label>
-                                <input type="text" class="form-control" value="<?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>" readonly>
-                                <input type="hidden" name="carrera" value="<?php echo $carrera_director; ?>">
-                            </div>
-                        </div>
-                        
-                        <div class="form-row">
-                            <div class="form-group col-md-12">
-                                <label for="id_materia">
-                                    <i class="fas fa-book-open"></i> Materia:
-                                </label>
-                                <select class="form-control" id="id_materia" name="id_materia" required>
-                                    <option value="">-- Seleccione una materia --</option>
-                                    <?php
-                                    // Obtener materias de la carrera del director
-                                    $query_materias = "SELECT m.id_materia, m.nombre_materia, m.cod_materia 
-                                                      FROM carrera_materia cm
-                                                      JOIN materias m ON cm.id_materia = m.id_materia
-                                                      WHERE cm.id_carrera = ? AND m.activa = 1
-                                                      ORDER BY cm.semestre, m.nombre_materia";
-                                    $stmt = $db->prepare($query_materias);
-                                    $stmt->bind_param("s", $carrera_director);
-                                    $stmt->execute();
-                                    $materias_result = $stmt->get_result();
-                                    
-                                    while($materia = $materias_result->fetch_assoc()): 
-                                    ?>
-                                        <option value="<?php echo $materia['id_materia']; ?>">
-                                            <?php echo htmlspecialchars($materia['nombre_materia'] . ' (' . $materia['cod_materia'] . ')'); ?>
-                                        </option>
-                                    <?php endwhile; ?>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <button type="submit" name="asignar_materia" class="btn btn-success">
-                            <i class='fas fa-save'></i> Asignar Materia
-                        </button>
-                    </form>
-                </div>
-            </div>
-            
-            <!-- Sección de Recomendaciones -->
-            <div class="card mb-4 shadow-sm">
-                <div class="card-header bg-info text-white">
-                    <i class="fas fa-graduation-cap"></i> Recomendaciones por Títulos Académicos - <?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>
-                </div>
-                <div class="card-body">
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label for="carrera_recomendacion">
-                                <i class="fas fa-graduation-cap"></i> Carrera:
-                            </label>
-                            <input type="text" class="form-control" value="<?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>" readonly>
-                        </div>
-                        <div class="form-group col-md-6">
-                            <label for="materia_recomendacion">
-                                <i class="fas fa-book"></i> Materia:
-                            </label>
-                            <select class="form-control" id="materia_recomendacion" name="materia_recomendacion">
-                                <option value="">-- Seleccione una materia --</option>
-                                <?php
-                                // Obtener materias de la carrera del director
-                                $query_materias = "SELECT m.id_materia, m.nombre_materia, m.cod_materia 
-                                                  FROM carrera_materia cm
-                                                  JOIN materias m ON cm.id_materia = m.id_materia
-                                                  WHERE cm.id_carrera = ? AND m.activa = 1
-                                                  ORDER BY cm.semestre, m.nombre_materia";
-                                $stmt = $db->prepare($query_materias);
-                                $stmt->bind_param("s", $carrera_director);
-                                $stmt->execute();
-                                $materias_result = $stmt->get_result();
+                                    <div class="form-group col-md-6">
+                                        <label for="carrera">
+                                            <i class="fas fa-graduation-cap"></i> Carrera:
+                                        </label>
+                                        <div class="d-none d-md-block mb-1" style="height: 31px;"></div>
+                                        <input type="text" class="form-control" value="<?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>" readonly>
+                                        <input type="hidden" name="carrera" value="<?php echo $carrera_director; ?>">
+                                    </div>
+                                </div>
                                 
-                                while($materia = $materias_result->fetch_assoc()): 
-                                ?>
-                                    <option value="<?php echo $materia['id_materia']; ?>">
-                                        <?php echo htmlspecialchars($materia['nombre_materia'] . ' (' . $materia['cod_materia'] . ')'); ?>
-                                    </option>
-                                <?php endwhile; ?>
-                            </select>
+                                <div class="form-group">
+                                    <label for="id_materia">
+                                        <i class="fas fa-book-open"></i> Materia:
+                                    </label>
+                                    <select class="form-control" id="id_materia" name="id_materia" required>
+                                        <option value="">-- Seleccione una materia --</option>
+                                        <?php
+                                        // Obtener materias de la carrera del director
+                                        $query_materias = "SELECT m.id_materia, m.nombre_materia, m.cod_materia 
+                                                          FROM carrera_materia cm
+                                                          JOIN materias m ON cm.id_materia = m.id_materia
+                                                          WHERE cm.id_carrera = ? AND m.activa = 1
+                                                          ORDER BY cm.semestre, m.nombre_materia";
+                                        $stmt = $db->prepare($query_materias);
+                                        $stmt->bind_param("s", $carrera_director);
+                                        $stmt->execute();
+                                        $materias_result = $stmt->get_result();
+                                        
+                                        while($materia = $materias_result->fetch_assoc()): 
+                                        ?>
+                                            <option value="<?php echo $materia['id_materia']; ?>">
+                                                <?php echo htmlspecialchars($materia['nombre_materia'] . ' (' . $materia['cod_materia'] . ')'); ?>
+                                            </option>
+                                        <?php endwhile; ?>
+                                    </select>
+                                </div>
+                                
+                                <div class="text-center mt-3">
+                                    <button type="submit" name="asignar_materia" class="btn btn-success font-weight-bold px-4">
+                                        <i class='fas fa-save mr-1'></i> Asignar Materia
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
-                    
-                    <div id="resultados-recomendaciones" class="mt-3">
-                        <!-- Aquí se cargarán las recomendaciones via AJAX -->
+                </div>
+                
+                <!-- Columna Derecha: Recomendaciones por Títulos Académicos -->
+                <div class="col-lg-6 col-md-12 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header bg-info text-white">
+                            <i class="fas fa-graduation-cap"></i> Recomendaciones por Títulos Académicos - <?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label for="carrera_recomendacion">
+                                        <i class="fas fa-graduation-cap"></i> Carrera:
+                                    </label>
+                                    <input type="text" class="form-control" value="<?php echo htmlspecialchars($carrera_info['nombre_carrera']); ?>" readonly>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label for="materia_recomendacion">
+                                        <i class="fas fa-book"></i> Materia:
+                                    </label>
+                                    <select class="form-control" id="materia_recomendacion" name="materia_recomendacion">
+                                        <option value="">-- Seleccione una materia --</option>
+                                        <?php
+                                        // Obtener materias de la carrera del director
+                                        $query_materias = "SELECT m.id_materia, m.nombre_materia, m.cod_materia 
+                                                          FROM carrera_materia cm
+                                                          JOIN materias m ON cm.id_materia = m.id_materia
+                                                          WHERE cm.id_carrera = ? AND m.activa = 1
+                                                          ORDER BY cm.semestre, m.nombre_materia";
+                                        $stmt = $db->prepare($query_materias);
+                                        $stmt->bind_param("s", $carrera_director);
+                                        $stmt->execute();
+                                        $materias_result = $stmt->get_result();
+                                        
+                                        while($materia = $materias_result->fetch_assoc()): 
+                                        ?>
+                                            <option value="<?php echo $materia['id_materia']; ?>">
+                                                <?php echo htmlspecialchars($materia['nombre_materia'] . ' (' . $materia['cod_materia'] . ')'); ?>
+                                            </option>
+                                        <?php endwhile; ?>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div id="resultados-recomendaciones" class="mt-3">
+                                <!-- Aquí se cargarán las recomendaciones via AJAX -->
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -760,6 +781,82 @@ if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
         $(this).attr('data-native-menu', 'true');
     });
 }
+
+// 1. Buscador en tiempo real para la tabla de asignaciones
+document.addEventListener('DOMContentLoaded', function() {
+    const inputBuscarTabla = document.getElementById('buscar_tabla_asignaciones');
+    const btnLimpiarTabla = document.getElementById('btn_limpiar_tabla');
+    const infoTabla = document.getElementById('tabla_coincidencias_info');
+    const filasTabla = document.querySelectorAll('#dataTable tbody tr');
+
+    if (inputBuscarTabla && filasTabla.length) {
+        function filtrarTabla() {
+            const query = inputBuscarTabla.value.toLowerCase().trim();
+            let coincidenciaCount = 0;
+
+            filasTabla.forEach(function(row) {
+                const text = row.textContent.toLowerCase();
+                const isMatch = text.includes(query);
+                row.style.display = isMatch ? '' : 'none';
+                if (isMatch) coincidenciaCount++;
+            });
+
+            if (infoTabla) {
+                if (query === '') {
+                    infoTabla.textContent = 'Mostrando todas las ' + filasTabla.length + ' asignaciones.';
+                    infoTabla.className = 'form-text text-muted';
+                } else {
+                    infoTabla.textContent = 'Se encontraron ' + coincidenciaCount + ' de ' + filasTabla.length + ' asignaciones.';
+                    infoTabla.className = coincidenciaCount > 0 ? 'form-text text-success font-weight-bold' : 'form-text text-danger font-weight-bold';
+                }
+            }
+        }
+
+        inputBuscarTabla.addEventListener('input', filtrarTabla);
+
+        if (btnLimpiarTabla) {
+            btnLimpiarTabla.addEventListener('click', function() {
+                inputBuscarTabla.value = '';
+                filtrarTabla();
+                inputBuscarTabla.focus();
+            });
+        }
+    }
+
+    // 2. Buscador en tiempo real para el selector de profesores
+    const inputBuscarProfesor = document.getElementById('buscar_profesor_input');
+    const selectProfesor = document.getElementById('id_profesor');
+
+    if (inputBuscarProfesor && selectProfesor) {
+        const opcionesOriginales = Array.from(selectProfesor.options);
+
+        inputBuscarProfesor.addEventListener('input', function() {
+            const query = this.value.toLowerCase().trim();
+            selectProfesor.innerHTML = '';
+            let contador = 0;
+            let primeraCoincidencia = null;
+
+            opcionesOriginales.forEach(function(opt) {
+                if (opt.value === '') {
+                    selectProfesor.appendChild(opt.cloneNode(true));
+                    return;
+                }
+
+                const searchMeta = opt.getAttribute('data-search') || opt.text.toLowerCase();
+                if (query === '' || searchMeta.includes(query)) {
+                    const optClon = opt.cloneNode(true);
+                    selectProfesor.appendChild(optClon);
+                    contador++;
+                    if (!primeraCoincidencia) primeraCoincidencia = optClon.value;
+                }
+            });
+
+            if (query !== '' && contador === 1 && primeraCoincidencia) {
+                selectProfesor.value = primeraCoincidencia;
+            }
+        });
+    }
+});
 </script>
 
 <?php include("includes/footer.php"); ?>

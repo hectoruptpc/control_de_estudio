@@ -46,9 +46,9 @@ if (isset($_POST['buscar']) && !empty($_POST['cedula'])) {
 include("includes/head.php");
 ?>
 
-<div class="container-fluid mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-10">
+<div class="container-fluid px-4 mt-4">
+    <div class="row">
+        <div class="col-12">
             <div class="card shadow mb-4">
                 <div class="card-header bg-primary text-white py-3">
                     <h5 class="mb-0"><i class="fas fa-file-contract mr-2"></i> Generador de Constancias</h5>

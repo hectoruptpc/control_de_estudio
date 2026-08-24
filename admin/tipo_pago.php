@@ -15,29 +15,32 @@ visita();
 // Variables
 $error = $success = '';
 $id = $tipopago = '';
+$precio = '0.00';
 
 // Procesar formulario de creación/edición
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['eliminar_id'])) {
     $id = $_POST['id'] ?? '';
     $tipopago = trim($_POST['tipopago'] ?? '');
+    $precio = floatval($_POST['precio'] ?? 0);
     
     // Validar datos
-    $validacion = validarTipoPago($tipopago);
+    $validacion = validarTipoPago($tipopago, $precio);
     if (!$validacion['success']) {
         $error = $validacion['message'];
     } else {
         if (empty($id)) {
             // Crear nuevo registro
-            $resultado = crearTipoPago($tipopago);
+            $resultado = crearTipoPago($tipopago, $precio);
         } else {
             // Actualizar registro existente
-            $resultado = actualizarTipoPago($id, $tipopago);
+            $resultado = actualizarTipoPago($id, $tipopago, $precio);
         }
         
         if ($resultado['success']) {
             $success = $resultado['message'];
             // Limpiar formulario después de éxito
             $id = $tipopago = '';
+            $precio = '0.00';
         } else {
             $error = $resultado['message'];
         }
@@ -95,12 +98,21 @@ include("includes/head.php");
                     <form method="POST" action="">
                         <input type="hidden" name="id" id="form_id" value="<?php echo htmlspecialchars($id); ?>">
                         
-                        <div class="form-group">
-                            <label for="tipopago">Tipo de Pago:</label>
-                            <input type="text" class="form-control" id="tipopago" name="tipopago" 
-                                   value="<?php echo htmlspecialchars($tipopago); ?>" required 
-                                   placeholder="Ingrese el tipo de pago" maxlength="100">
-                            <small class="form-text text-muted">Mínimo 2 caracteres, máximo 100 caracteres</small>
+                        <div class="form-row">
+                            <div class="form-group col-md-8">
+                                <label for="tipopago">Tipo de Pago:</label>
+                                <input type="text" class="form-control" id="tipopago" name="tipopago" 
+                                       value="<?php echo htmlspecialchars($tipopago); ?>" required 
+                                       placeholder="Ingrese el tipo de pago" maxlength="100">
+                                <small class="form-text text-muted">Mínimo 2 caracteres, máximo 100 caracteres</small>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="precio">Precio Predefinido (Bs):</label>
+                                <input type="number" step="0.01" min="0" class="form-control" id="precio" name="precio" 
+                                       value="<?php echo htmlspecialchars($precio); ?>" required 
+                                       placeholder="0.00">
+                                <small class="form-text text-muted">Monto sugerido en Bs</small>
+                            </div>
                         </div>
                         
                         <button type="submit" class="btn btn-primary" id="form_submit_btn">
@@ -130,6 +142,7 @@ include("includes/head.php");
                                     <tr>
                                         <th>ID</th>
                                         <th>Tipo de Pago</th>
+                                        <th>Precio Predefinido</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
@@ -138,10 +151,12 @@ include("includes/head.php");
                                         <tr id="row-<?php echo $tipo['id']; ?>">
                                             <td><?php echo htmlspecialchars($tipo['id']); ?></td>
                                             <td><?php echo htmlspecialchars($tipo['tipopago']); ?></td>
+                                            <td><strong>Bs <?= number_format($tipo['precio'] ?? 0, 2, ',', '.') ?></strong></td>
                                             <td>
                                                 <button class="btn btn-warning btn-sm edit-btn" 
                                                         data-id="<?php echo $tipo['id']; ?>" 
-                                                        data-tipopago="<?php echo htmlspecialchars($tipo['tipopago']); ?>">
+                                                        data-tipopago="<?php echo htmlspecialchars($tipo['tipopago']); ?>"
+                                                        data-precio="<?php echo htmlspecialchars($tipo['precio'] ?? '0.00'); ?>">
                                                     <i class="fas fa-edit"></i> Editar
                                                 </button>
                                                 <button class="btn btn-danger btn-sm delete-btn" 
@@ -179,6 +194,10 @@ include("includes/head.php");
                         <label for="edit_tipopago">Tipo de Pago:</label>
                         <input type="text" class="form-control" id="edit_tipopago" name="tipopago" required maxlength="100">
                         <small class="form-text text-muted">Mínimo 2 caracteres, máximo 100 caracteres</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_precio">Precio Predefinido (Bs):</label>
+                        <input type="number" step="0.01" min="0" class="form-control" id="edit_precio" name="precio" required placeholder="0.00">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -234,9 +253,11 @@ include("includes/head.php");
         $('.edit-btn').click(function() {
             var id = $(this).data('id');
             var tipopago = $(this).data('tipopago');
+            var precio = $(this).data('precio');
             
             $('#edit_id').val(id);
             $('#edit_tipopago').val(tipopago);
+            $('#edit_precio').val(precio);
             
             $('#editModal').modal('show');
         });

@@ -57,9 +57,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 include("includes/head.php");
 ?>
 
-<div class="container-fluid py-4">
-    <div class="row justify-content-center">
-        <div class="col-lg-10">
+<div class="container-fluid px-4 py-4">
+    <div class="row">
+        <div class="col-12">
             <div class="card border-0">
                 <div class="card-header bg-white py-3">
                     <h5 class="mb-0"><i class="fas fa-user-graduate me-2"></i>Agregar Nuevo Estudiante</h5>

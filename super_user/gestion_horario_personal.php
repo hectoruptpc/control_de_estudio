@@ -74,15 +74,31 @@ if (isset($mensaje)) {
                 </div>
                 <div class="card-body">
                     <?php if (count($personal_sin_horario) > 0): ?>
-                    <form method="POST" action="">
+                        <!-- Buscador en tiempo real por Cédula o Nombre -->
                         <div class="form-group">
-                            <label for="id_usuario">Personal:</label>
+                            <label for="buscar_personal"><i class="fas fa-search text-primary mr-1"></i> Buscar Personal (Cédula o Nombre):</label>
+                            <div class="input-group mb-2">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="fas fa-filter"></i></span>
+                                </div>
+                                <input type="text" id="buscar_personal" class="form-control" placeholder="Escriba la cédula o nombre para filtrar en tiempo real..." autocomplete="off">
+                                <div class="input-group-append">
+                                    <button class="btn btn-outline-secondary" type="button" id="btn_limpiar_busqueda">
+                                        <i class="fas fa-times"></i> Limpiar
+                                    </button>
+                                </div>
+                            </div>
+                            <small class="form-text text-muted" id="personal_coincidencias_info">Mostrando <?php echo count($personal_sin_horario); ?> personas sin horario asignado.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="id_usuario">Personal Seleccionado:</label>
                             <select class="form-control" id="id_usuario" name="id_usuario" required>
                                 <option value="">Seleccionar personal</option>
                                 <?php foreach ($personal_sin_horario as $usuario): 
                                     $tipo_usuario = obtenerTipoUsuarioTexto($usuario);
                                 ?>
-                                    <option value="<?php echo $usuario['id']; ?>">
+                                    <option value="<?php echo $usuario['id']; ?>" data-search="<?php echo htmlspecialchars(mb_strtolower($usuario['nombre'] . ' ' . $usuario['idusuario'] . ' ' . $tipo_usuario, 'UTF-8')); ?>">
                                         <?php echo htmlspecialchars($usuario['nombre'] . ' (C.I: ' . $usuario['idusuario'] . ') - ' . $tipo_usuario); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -315,6 +331,74 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.find('#delete_nombre').text(nombre);
         modal.find('#delete_horario').text(horario);
     });
+
+    // Filtro en tiempo real para el select de personal sin horario
+    const inputBuscar = document.getElementById('buscar_personal');
+    const selectPersonal = document.getElementById('id_usuario');
+    const infoCoincidencias = document.getElementById('personal_coincidencias_info');
+    const btnLimpiar = document.getElementById('btn_limpiar_busqueda');
+
+    if (inputBuscar && selectPersonal) {
+        const opcionesOriginales = Array.from(selectPersonal.options);
+
+        function filtrarOpciones() {
+            const query = inputBuscar.value.toLowerCase().trim();
+            selectPersonal.innerHTML = '';
+            
+            let contador = 0;
+            let primeraCoincidencia = null;
+
+            opcionesOriginales.forEach(function(opt) {
+                if (opt.value === '') {
+                    selectPersonal.appendChild(opt.cloneNode(true));
+                    return;
+                }
+
+                const searchMeta = opt.getAttribute('data-search') || opt.text.toLowerCase();
+                if (query === '' || searchMeta.includes(query)) {
+                    const optClon = opt.cloneNode(true);
+                    selectPersonal.appendChild(optClon);
+                    contador++;
+                    if (!primeraCoincidencia) {
+                        primeraCoincidencia = optClon.value;
+                    }
+                }
+            });
+
+            if (query !== '') {
+                if (contador === 1 && primeraCoincidencia) {
+                    selectPersonal.value = primeraCoincidencia;
+                } else if (contador === 0) {
+                    const optVacia = document.createElement('option');
+                    optVacia.value = '';
+                    optVacia.textContent = '❌ No se encontró personal que coincida con la búsqueda';
+                    optVacia.disabled = true;
+                    optVacia.selected = true;
+                    selectPersonal.appendChild(optVacia);
+                }
+            }
+
+            if (infoCoincidencias) {
+                if (query === '') {
+                    infoCoincidencias.textContent = 'Mostrando ' + (opcionesOriginales.length - 1) + ' personas disponibles.';
+                    infoCoincidencias.className = 'form-text text-muted';
+                } else {
+                    infoCoincidencias.textContent = 'Se encontraron ' + contador + ' de ' + (opcionesOriginales.length - 1) + ' personas.';
+                    infoCoincidencias.className = contador > 0 ? 'form-text text-success font-weight-bold' : 'form-text text-danger font-weight-bold';
+                }
+            }
+        }
+
+        inputBuscar.addEventListener('input', filtrarOpciones);
+
+        if (btnLimpiar) {
+            btnLimpiar.addEventListener('click', function() {
+                inputBuscar.value = '';
+                filtrarOpciones();
+                inputBuscar.focus();
+            });
+        }
+    }
 });
 </script>
 
