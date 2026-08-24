@@ -38,7 +38,7 @@ require_once("includes/head.php");
 $docentes = getUsersByType(1);
 ?>
 
-<div class="container">
+<div class="container-fluid py-3">
     <h2>Lista de docentes</h2>
     
     <?php if (isset($_SESSION['user']['agregar_docente']) && $_SESSION['user']['agregar_docente'] == 1): ?>

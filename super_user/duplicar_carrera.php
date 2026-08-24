@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 include('includes/head.php');
 ?>
-<div class="container mt-4">
+<div class="container-fluid py-3">
     <h2>Duplicar Carrera para Nueva Fecha</h2>
 
     <?php if (!empty($mensaje)): ?>

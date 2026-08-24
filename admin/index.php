@@ -238,7 +238,7 @@ visita();
 </head>
 
 <body>
-    <div class="container py-4 py-md-5">
+    <div class="container-fluid py-4 py-md-5">
         <!-- Encabezado optimizado para móviles -->
         <div class="dashboard-header p-3 p-md-4 mb-4 mb-md-5 text-center">
             <h1 class="display-5 display-md-4 font-weight-bold text-break">

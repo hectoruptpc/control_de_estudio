@@ -45,9 +45,9 @@ if ($estudiante) {
 include("includes/head.php");
 ?>
 
-<div class="container-fluid mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-10">
+<div class="container-fluid py-3">
+    <div class="row">
+        <div class="col-12">
             <!-- Encabezado del panel -->
             <div class="dashboard-header p-4 mb-4 text-center">
                 <h3 class="font-weight-bold"><i class="fas fa-file-alt mr-3"></i>Constancias y Solicitudes</h3>

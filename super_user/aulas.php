@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 include("includes/head.php");
 ?>
 
-<div class="container mt-4">
+<div class="container-fluid py-3">
     <h2 class="mb-4">Gestión de Aulas</h2>
     
     <?php if (isset($_SESSION['mensaje'])): ?>

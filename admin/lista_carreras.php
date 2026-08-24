@@ -8,7 +8,7 @@ require_once '../funciones/functions.php';
 include("includes/head.php");
 ?>
 
-<div class="container mt-4">
+<div class="container-fluid py-3">
     <h2>Listado de Carreras Registradas</h2>
     
     <div id="tabla-carreras">

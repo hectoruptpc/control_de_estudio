@@ -33,7 +33,7 @@ if (isset($_GET['action'])) {
 $listaMaterias = getAllMaterias();
 ?>
 
-<div class="container mt-4">
+<div class="container-fluid py-3">
     <!-- Mensajes de sesión -->
     <?php if (isset($_SESSION['mensaje'])): ?>
         <div class="alert alert-success"><?= $_SESSION['mensaje']; unset($_SESSION['mensaje']); ?></div>

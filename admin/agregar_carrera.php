@@ -63,7 +63,7 @@ include("includes/head.php");
 
 <?php if (tienePermiso('agregar_carrera')): ?>
 
-<div class="container mt-4">
+<div class="container-fluid py-3">
     <h2>Agregar Nuevo Programa</h2>
     
     <?php echo $mensaje; ?>

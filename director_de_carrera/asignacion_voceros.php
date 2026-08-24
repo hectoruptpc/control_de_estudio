@@ -365,7 +365,7 @@ $result = $stmt->get_result();
     </style>
 </head>
 <body>
-    <div class="container py-4">
+    <div class="container-fluid py-3">
         <div class="d-flex align-items-center justify-content-between mb-4">
             <h3 class="mb-0">
                 <i class="fas fa-users"></i> <?= htmlspecialchars($titulopag) ?>

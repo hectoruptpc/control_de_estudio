@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 include("includes/head.php");
 ?>
 
-<div class="container mt-4">
+<div class="container-fluid py-3">
     <h2>Editar Programa Académico</h2>
     
     <?php echo $mensaje; ?>

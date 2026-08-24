@@ -63,7 +63,7 @@ $carreras = obtenerCarrerasActivas();
 include("includes/head.php");
 ?>
 
-<div class="container mt-4">
+<div class="container-fluid py-3">
     <h2>Códigos de Secciones</h2>
     
     <?php if (isset($_SESSION['mensaje'])): ?>

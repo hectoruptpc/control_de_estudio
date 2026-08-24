@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['guardar'])) {
 include("includes/head.php");
 ?>
 
-<div class="container mt-5">
+<div class="container-fluid py-3">
     <h2 class="mb-4"><i class="fas fa-user-lock"></i> Gestión de Niveles de Acceso</h2>
     
     <?php if (isset($_SESSION['msg'])): ?>

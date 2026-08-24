@@ -127,7 +127,7 @@ visita();
 </head>
 
 <body>
-    <div class="container py-5">
+    <div class="container-fluid py-3">
         <!-- Encabezado -->
         <div class="dashboard-header p-4 mb-5 text-center">
             <h1 class="display-4 font-weight-bold"><i class="fas fa-chalkboard-teacher mr-3"></i>Panel de Director de Carrera</h1>

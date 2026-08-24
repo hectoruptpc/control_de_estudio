@@ -334,7 +334,7 @@ if (isset($_SESSION['valores_formulario'])) {
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="container-fluid py-3">
         <h1>Crear Nuevo Usuario</h1>
         
         <?php if (!empty($mensaje)): ?>

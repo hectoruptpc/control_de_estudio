@@ -57,7 +57,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 include("includes/head.php");
 ?>
 
-<div class="container py-5">
+<div class="container-fluid py-4">
     <div class="row justify-content-center">
         <div class="col-lg-10">
             <div class="card border-0">
