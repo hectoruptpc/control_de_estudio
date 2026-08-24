@@ -10,7 +10,7 @@ if (session_status() === PHP_SESSION_NONE) {
 chdir(__DIR__);
 
     include('variables.php');
-    include('conexion.php');
+    require_once('conexion.php');
     include('cabecera_footer.php');
     include('selector_operador.php');
     include('limite_planes.php');
@@ -43,7 +43,7 @@ chdir(__DIR__);
             $skip_system_close = true;
         }
 
-        if (isset($db) && mysqli_ping($db)) {
+        if (isset($db) && ($db instanceof mysqli) && !$db->connect_errno && @$db->stat() !== false) {
             $seguridad_global = new Seguridad($db);
             global $seguridad;
             $seguridad = $seguridad_global;
@@ -3250,7 +3250,7 @@ function registrarNuevaCarrera(
     int $duracion_anios,
     string $titulo_principal,
     string $titulo_opcional = '',
-    string $vigencia_fecha = null
+    ?string $vigencia_fecha = null
 ): array {
     global $db;
     
