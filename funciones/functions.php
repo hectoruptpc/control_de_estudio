@@ -19,6 +19,20 @@ chdir(__DIR__);
     include('registrar.php');
     include('enviar_email.php');
 
+    // Cargar Servicios Orientados a Objetos (POO)
+    require_once __DIR__ . '/services/EstudianteService.php';
+    require_once __DIR__ . '/services/CarreraService.php';
+    require_once __DIR__ . '/services/SeccionService.php';
+    require_once __DIR__ . '/services/PreinscripcionService.php';
+
+    global $estudianteService, $carreraService, $seccionService, $preinscripcionService;
+    if (isset($db) && ($db instanceof mysqli) && !$db->connect_errno) {
+        $estudianteService = new EstudianteService($db);
+        $carreraService = new CarreraService($db);
+        $seccionService = new SeccionService($db);
+        $preinscripcionService = new PreinscripcionService($db);
+    }
+
     if (file_exists(__DIR__ . '/seguridad.php')) {
         require_once __DIR__ . '/seguridad.php';
         $uri = $_SERVER['REQUEST_URI'] ?? '';
@@ -154,46 +168,13 @@ function desactivarPeriodosVencidos($db) {
 
 // VISUALIZACION DE ESTUDIANTES
 
-
 function obtenerEstudiantes() {
-    global $db;
-    
-    $estudiantes = [];
-    $query = "SELECT 
-                u.id,
-                u.idusuario AS cedula,
-                u.nombre,
-                c.nombre_carrera AS carrera,
-                u.genero,
-                u.tlf AS num_telf,
-                u.email AS correo,
-                u.fecha_ingreso,
-                u.fecha_nac,
-                u.embarazada,
-                u.status
-              FROM users u
-              LEFT JOIN carreras c ON u.carrera = c.id_carrera
-              WHERE u.user_type = ?
-              ORDER BY u.fecha_ingreso DESC";
-    
-    if ($stmt = $db->prepare($query)) {
-        $tipoUsuario = 'estudiante';
-        $stmt->bind_param("s", $tipoUsuario);
-        
-        if ($stmt->execute()) {
-            $result = $stmt->get_result();
-            while ($row = $result->fetch_assoc()) {
-                $estudiantes[] = $row;
-            }
-            $stmt->close();
-            return $estudiantes;
-        } else {
-            $stmt->close();
-            return ['error' => "Error al ejecutar la consulta: " . $stmt->error];
-        }
-    } else {
-        return ['error' => "Error al preparar la consulta: " . $db->error];
+    global $db, $estudianteService;
+    if ($estudianteService) {
+        return $estudianteService->obtenerEstudiantes();
     }
+    $service = new EstudianteService($db);
+    return $service->obtenerEstudiantes();
 }
 
 /**
@@ -202,49 +183,21 @@ function obtenerEstudiantes() {
 * @return array Array con los detalles del estudiante o mensaje de error
 */
 function obtenerDetalleEstudiante($id) {
-    global $db;
-    
-    $query = "SELECT 
-                e.*,
-                c.nombre_carrera AS carrera_nombre
-              FROM estudiantes e
-              LEFT JOIN carreras c ON e.carrera = c.id_carrera
-              WHERE e.id = ?";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $id);
-    
-    if ($stmt->execute()) {
-        $result = $stmt->get_result();
-        $estudiante = $result->fetch_assoc();
-        $stmt->close();
-        
-        if ($estudiante) {
-            $estudiante['carrera'] = $estudiante['carrera_nombre'];
-            return $estudiante;
-        } else {
-            return ['error' => "Estudiante no encontrado"];
-        }
-    } else {
-        return ['error' => "Error al obtener detalle del estudiante: " . $stmt->error];
+    global $db, $estudianteService;
+    if ($estudianteService) {
+        return $estudianteService->obtenerDetalleEstudiante($id);
     }
+    $service = new EstudianteService($db);
+    return $service->obtenerDetalleEstudiante($id);
 }
 
-
-
-
-
 function obtenerNombreCarrera($carrera_id) {
-    global $db;
-    $sql = "SELECT nombre_carrera FROM carreras WHERE id_carrera = ? AND activa = 1";
-    $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, "i", $carrera_id);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    if ($row = mysqli_fetch_assoc($result)) {
-        return $row['nombre_carrera'];
+    global $db, $carreraService;
+    if ($carreraService) {
+        return $carreraService->obtenerNombreCarrera($carrera_id);
     }
-    return 'No especificada';
+    $service = new CarreraService($db);
+    return $service->obtenerNombreCarrera($carrera_id);
 }
 
 
