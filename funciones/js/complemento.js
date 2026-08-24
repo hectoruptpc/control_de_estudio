@@ -50,11 +50,13 @@ document.addEventListener('DOMContentLoaded', function() {
   // Obtén el botón de impresión
   var botonImprimir = document.getElementById('botonImprimir');
 
-  // Agrega un EventListener al botón
-  botonImprimir.addEventListener('click', function() {
-    printDiv('areaImprimir');
-    $('.modal').modal('hide');
-  });
+  // Agrega un EventListener al botón solo si existe en la página
+  if (botonImprimir) {
+    botonImprimir.addEventListener('click', function() {
+      printDiv('areaImprimir');
+      $('.modal').modal('hide');
+    });
+  }
 });
 
 function printDiv(nombreDiv) {
@@ -70,3 +72,10 @@ function printDiv(nombreDiv) {
     // Reinicia la página después de imprimir
     location.reload();
 }
+
+// Conversión automática universal a Mayúsculas en entradas de texto del sistema
+document.addEventListener('input', function(e) {
+  if (e.target && e.target.tagName === 'INPUT' && (e.target.type === 'text' || e.target.type === 'search')) {
+    e.target.value = e.target.value.toUpperCase();
+  }
+});
