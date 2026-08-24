@@ -42,6 +42,8 @@ if (!isLoggedIn() || !isAdmin()) {
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
 <!-- Font Awesome -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<!-- Roles Theme CSS -->
+<link rel="stylesheet" href="/control_de_estudio/css/roles_theme.css">
 
 <style>
     /* ESTILOS GENERALES */
@@ -147,8 +149,8 @@ if (!isLoggedIn() || !isAdmin()) {
 </head>
 <body>
 <!-- NAVEGACIÓN PRINCIPAL -->
-<nav class="navbar navbar-expand-lg navbar-dark fixed-top" style="background-color: #212529;">
-    <div class="container">
+<nav class="navbar navbar-expand-lg navbar-dark fixed-top navbar-theme-superuser">
+    <div class="container-fluid">
         <!-- Logo -->
         <a title="Cargar Inicio" class="navbar-brand" href="index.php">
             <?php echo $logopertenencia; ?>
@@ -339,7 +341,7 @@ if (!isLoggedIn() || !isAdmin()) {
                        aria-haspopup="true" aria-expanded="false">
                         <i class="fa fa-cogs fa-fw"></i> Ajustes
                     </a>
-                    <div class="dropdown-menu" aria-labelledby="navbarDropdownAjustes">
+                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdownAjustes">
                     <!-- Mensajería -->
                     <a title="Sistema de Mensajería" class="dropdown-item position-relative" href="mensajeria.php">
                         <i class="fas fa-envelope fa-fw"></i> Mensajes
@@ -437,7 +439,7 @@ if (!isLoggedIn() || !isAdmin()) {
 </nav>
 
 <!-- CONTENIDO PRINCIPAL -->
-<div class="container">
+<div class="container-fluid">
     <div class="row">
         <div class="col-sm-6">
             <b class="mt-5"><?php echo 'Bienvenido ' .$_SESSION['user']['nombre']; ?></b>

@@ -46,6 +46,8 @@ $admin_url = $base_url . '/admin';
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
 <!-- Font Awesome -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<!-- Roles Theme CSS -->
+<link rel="stylesheet" href="<?= $base_url ?>/css/roles_theme.css">
 
 <style>
     /* ESTILOS GENERALES */
@@ -183,8 +185,8 @@ $admin_url = $base_url . '/admin';
 </head>
 <body>
 <!-- NAVEGACIÓN PRINCIPAL -->
-<nav class="navbar navbar-expand-lg navbar-light fixed-top" style="background-color: #c2d9fe;">
-    <div class="container">
+<nav class="navbar navbar-expand-lg navbar-light fixed-top navbar-theme-admin">
+    <div class="container-fluid">
         <!-- Logo -->
         <a title="Cargar Inicio" class="navbar-brand" href="<?= $admin_url ?>/index.php">
             <?php echo $logopertenencia; ?>
@@ -371,7 +373,7 @@ $admin_url = $base_url . '/admin';
                        aria-haspopup="true" aria-expanded="false">
                         <i class="fa fa-cogs fa-fw"></i> Ajustes
                     </a>
-                    <div class="dropdown-menu" aria-labelledby="navbarDropdownAjustes">
+                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdownAjustes">
                         
                         <!-- Mensajería -->
                         <a title="Sistema de Mensajería" class="dropdown-item position-relative" href="<?= $admin_url ?>/mensajeria.php">
@@ -480,7 +482,7 @@ $admin_url = $base_url . '/admin';
 <div id="mobileNavbarBackdrop" class="mobile-navbar-backdrop"></div>
 
 <!-- CONTENIDO PRINCIPAL -->
-<div class="container">
+<div class="container-fluid">
     <div class="row">
         <div class="col-sm-6">
             <b class="mt-5"><?php echo 'Bienvenido ' .$_SESSION['user']['nombre']; ?></b>

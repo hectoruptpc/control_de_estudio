@@ -41,6 +41,7 @@ if (!isLoggedIn() || !isDocente()) {
 <title><?php echo $titulopag; ?></title>
 
 <?php echo $bootstrap_head; ?>
+<link rel="stylesheet" href="/control_de_estudio/css/roles_theme.css">
 
 <style>
     /* ESTILOS GENERALES MEJORADOS */
@@ -156,10 +157,10 @@ if (!isLoggedIn() || !isDocente()) {
 
 <body>
 
-<div class="container">
+<div class="container-fluid">
 <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-light fixed-top" style="background-color: #4CAF50;">
-      <div class="container">
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top navbar-theme-docente">
+      <div class="container-fluid">
         <a title="Cargar Inicio" class="navbar-brand" href="index.php">
           <?php echo $logopertenencia; ?>
         </a>
@@ -190,7 +191,7 @@ if (!isLoggedIn() || !isDocente()) {
               <a title="Ir a Ajustes" class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
               <i class="fa fa-cogs fa-fw"></i>  Ajustes
               </a>
-              <div id="dropdown-ajus" class="dropdown-menu" aria-labelledby="navbarDropdown">
+              <div id="dropdown-ajus" class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdown">
                 <!-- Nueva opción: Cambiar Perfil -->
                 <a title="Cambiar Perfil de Usuario" class="dropdown-item" href="../profile_selector.php">
                   <i class="fas fa-user-edit fa-fw"></i> Cambiar Perfil
@@ -209,7 +210,7 @@ if (!isLoggedIn() || !isDocente()) {
       </div>
     </nav>
     <div id="mobileNavbarBackdrop" class="mobile-navbar-backdrop"></div>
-    <div class="container">
+    <div class="container-fluid">
     <div class="row">
 <div class="col-sm-6">
     <b class="mt-5"><?php echo 'Bienvenido ' .$_SESSION['user']['nombre']; ?></b>

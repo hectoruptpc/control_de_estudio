@@ -37,6 +37,7 @@ if (!isLoggedIn() || !isUser()) {
 <meta name="author" content="Sistema de Gestión">
 <title><?php echo $titulopag; ?></title>
 <?php echo $bootstrap_head;?>
+<link rel="stylesheet" href="/control_de_estudio/css/roles_theme.css">
 
 <style>
     /* ESTILOS GENERALES MEJORADOS */
@@ -160,10 +161,10 @@ if (!isLoggedIn() || !isUser()) {
 </style>
 </head>
 <body>
-<div class="container">
+<div class="container-fluid">
 <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-light fixed-top" style="background-color: #fd7e14;">
-      <div class="container">
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top navbar-theme-director">
+      <div class="container-fluid">
         <a title="Cargar Inicio" class="navbar-brand" href="index.php">
           <?php echo $logopertenencia; ?>
         </a>
@@ -217,7 +218,7 @@ if (!isLoggedIn() || !isUser()) {
                 <a title="Ir a Ajustes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownAjustesDirector" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="fa fa-cogs fa-fw"></i> Ajustes
                 </a>
-                <div id="dropdown-ajustes-director-menu" class="dropdown-menu" aria-labelledby="navbarDropdownAjustesDirector">
+                <div id="dropdown-ajustes-director-menu" class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdownAjustesDirector">
                     <!-- Mensajería -->
                     <a title="Sistema de Mensajería" class="dropdown-item position-relative" href="mensajeria.php">
                         <i class="fas fa-envelope fa-fw"></i> Mensajes
@@ -243,7 +244,7 @@ if (!isLoggedIn() || !isUser()) {
       </div>
     </nav>
     <div id="mobileNavbarBackdrop" class="mobile-navbar-backdrop"></div>
-    <div class="container">
+    <div class="container-fluid">
     <div class="row">
         <div class="col-sm-6">
             <b class="mt-5"><?php echo 'Bienvenido ' .$_SESSION['user']['nombre']; ?></b>
