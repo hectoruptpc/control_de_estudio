@@ -298,28 +298,17 @@ include("includes/head.php");
                                         </button>
                                     </div>
                                     <div class="card-body" id="filtrosBody">
-                                        <div class="row mb-3">
-                                            <div class="col-md-12">
-                                                <div class="input-group">
-                                                    <span class="input-group-text bg-primary text-white"><i class="fas fa-id-card"></i></span>
-                                                    <input type="text" id="buscadorCedula" class="form-control" 
-                                                           placeholder="Buscar por cédula (Ej: V12345678)..." autocomplete="off">
-                                                    <button type="button" id="limpiarBusqueda" class="btn btn-secondary">
-                                                        <i class="fas fa-times"></i> Limpiar todos los filtros
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
                                         <div class="row">
+                                            <!-- Carrera -->
                                             <div class="col-md-3 mb-3">
-                                                <div class="card">
-                                                    <div class="card-header bg-light"><strong><i class="fas fa-graduation-cap"></i> Carrera</strong></div>
-                                                    <div class="card-body" style="max-height: 250px; overflow-y: auto;">
+                                                <div class="card h-100">
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-graduation-cap text-primary me-1"></i> Carrera</strong></div>
+                                                    <div class="card-body" style="max-height: 220px; overflow-y: auto;">
                                                         <div class="form-check">
                                                             <input class="form-check-input filtro-carrera" type="checkbox" value="todas" id="filtroTodasCarreras" checked>
-                                                            <label class="form-check-label" for="filtroTodasCarreras"><strong>Todas las carreras</strong></label>
+                                                            <label class="form-check-label text-primary" for="filtroTodasCarreras"><strong>Seleccionar Todas</strong></label>
                                                         </div>
-                                                        <hr>
+                                                        <hr class="my-2">
                                                         <?php foreach ($carrerasUnicas as $carrera): ?>
                                                             <?php if (!empty($carrera)): ?>
                                                             <div class="form-check">
@@ -331,66 +320,63 @@ include("includes/head.php");
                                                     </div>
                                                 </div>
                                             </div>
+                                            <!-- Género -->
                                             <div class="col-md-3 mb-3">
-                                                <div class="card">
-                                                    <div class="card-header bg-light"><strong><i class="fas fa-venus-mars"></i> Género</strong></div>
+                                                <div class="card h-100">
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-venus-mars text-primary me-1"></i> Género</strong></div>
                                                     <div class="card-body">
-                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="masculino" id="filtroMasculino"><label class="form-check-label" for="filtroMasculino">Masculino</label></div>
-                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="femenino" id="filtroFemenino"><label class="form-check-label" for="filtroFemenino">Femenino</label></div>
+                                                        <div class="form-check">
+                                                            <input class="form-check-input filtro-genero-master" type="checkbox" value="todos" id="filtroTodosGeneros" checked>
+                                                            <label class="form-check-label text-primary" for="filtroTodosGeneros"><strong>Seleccionar Todos</strong></label>
+                                                        </div>
+                                                        <hr class="my-2">
+                                                        <div class="form-check"><input class="form-check-input filtro-genero" type="checkbox" value="masculino" id="filtroMasculino"><label class="form-check-label" for="filtroMasculino">Masculino</label></div>
+                                                        <div class="form-check"><input class="form-check-input filtro-genero" type="checkbox" value="femenino" id="filtroFemenino"><label class="form-check-label" for="filtroFemenino">Femenino</label></div>
                                                     </div>
                                                 </div>
                                             </div>
+                                            <!-- Estado Civil -->
                                             <div class="col-md-3 mb-3">
-                                                <div class="card">
-                                                    <div class="card-header bg-light"><strong><i class="fas fa-heart"></i> Estado Civil</strong></div>
+                                                <div class="card h-100">
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-heart text-primary me-1"></i> Estado Civil</strong></div>
                                                     <div class="card-body">
-                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="soltero" id="filtroSoltero"><label class="form-check-label" for="filtroSoltero">Soltero/a</label></div>
-                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="casado" id="filtroCasado"><label class="form-check-label" for="filtroCasado">Casado/a</label></div>
+                                                        <div class="form-check">
+                                                            <input class="form-check-input filtro-edocivil-master" type="checkbox" value="todos" id="filtroTodosEdoCivil" checked>
+                                                            <label class="form-check-label text-primary" for="filtroTodosEdoCivil"><strong>Seleccionar Todos</strong></label>
+                                                        </div>
+                                                        <hr class="my-2">
+                                                        <div class="form-check"><input class="form-check-input filtro-edocivil" type="checkbox" value="soltero" id="filtroSoltero"><label class="form-check-label" for="filtroSoltero">Soltero/a</label></div>
+                                                        <div class="form-check"><input class="form-check-input filtro-edocivil" type="checkbox" value="casado" id="filtroCasado"><label class="form-check-label" for="filtroCasado">Casado/a</label></div>
                                                     </div>
                                                 </div>
                                             </div>
+                                            <!-- Estado / Status -->
                                             <div class="col-md-3 mb-3">
-                                                <div class="card">
-                                                    <div class="card-header bg-light"><strong><i class="fas fa-user-check"></i> Estado</strong></div>
+                                                <div class="card h-100">
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-user-check text-primary me-1"></i> Estado (Estatus)</strong></div>
                                                     <div class="card-body">
-                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="activo" id="filtroActivo"><label class="form-check-label" for="filtroActivo">Activo</label></div>
-                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="inactivo" id="filtroInactivo"><label class="form-check-label" for="filtroInactivo">Inactivo</label></div>
+                                                        <div class="form-check">
+                                                            <input class="form-check-input filtro-status-master" type="checkbox" value="todos" id="filtroTodosStatus" checked>
+                                                            <label class="form-check-label text-primary" for="filtroTodosStatus"><strong>Seleccionar Todos</strong></label>
+                                                        </div>
+                                                        <hr class="my-2">
+                                                        <div class="form-check"><input class="form-check-input filtro-status" type="checkbox" value="activo" id="filtroActivo"><label class="form-check-label" for="filtroActivo">Activo</label></div>
+                                                        <div class="form-check"><input class="form-check-input filtro-status" type="checkbox" value="inactivo" id="filtroInactivo"><label class="form-check-label" for="filtroInactivo">Inactivo</label></div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
                                         <div class="row mt-2">
+                                            <!-- Sede -->
                                             <div class="col-md-3 mb-3">
-                                                <div class="card">
-                                                    <div class="card-header bg-light"><strong><i class="fas fa-baby-carriage"></i> Embarazo</strong></div>
+                                                <div class="card h-100">
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-building text-primary me-1"></i> Sede</strong></div>
                                                     <div class="card-body">
-                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="embarazada" id="filtroEmbarazada"><label class="form-check-label" for="filtroEmbarazada">Solo Embarazadas</label></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-3 mb-3">
-                                                <div class="card">
-                                                    <div class="card-header bg-light"><strong><i class="fas fa-child"></i> Edad</strong></div>
-                                                    <div class="card-body">
-                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="menor" id="filtroMenor"><label class="form-check-label" for="filtroMenor">Menores de 18 años</label></div>
-                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="mayor" id="filtroMayor"><label class="form-check-label" for="filtroMayor">Mayores de 18 años</label></div>
-                                                        <div class="row mt-2"><div class="col-6"><input type="number" class="form-control form-control-sm" id="edadMin" placeholder="Edad mín"></div><div class="col-6"><input type="number" class="form-control form-control-sm" id="edadMax" placeholder="Edad máx"></div></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-3 mb-3">
-                                                <div class="card">
-                                                    <div class="card-header bg-light"><strong><i class="fas fa-calendar-alt"></i> Fecha Ingreso</strong></div>
-                                                    <div class="card-body">
-                                                        <div class="form-group"><label>Desde</label><input type="date" class="form-control form-control-sm" id="fechaIngresoDesde"></div>
-                                                        <div class="form-group mt-2"><label>Hasta</label><input type="date" class="form-control form-control-sm" id="fechaIngresoHasta"></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-3 mb-3">
-                                                <div class="card">
-                                                    <div class="card-header bg-light"><strong><i class="fas fa-building"></i> Sede</strong></div>
-                                                    <div class="card-body">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input filtro-sede-master" type="checkbox" value="todas" id="filtroTodasSedes" checked>
+                                                            <label class="form-check-label text-primary" for="filtroTodasSedes"><strong>Seleccionar Todas</strong></label>
+                                                        </div>
+                                                        <hr class="my-2">
                                                         <div class="form-check">
                                                             <input class="form-check-input filtro-sede" type="checkbox" value="puerto cabello" id="filtroSedePuertoCabello">
                                                             <label class="form-check-label" for="filtroSedePuertoCabello">Puerto Cabello</label>
@@ -402,12 +388,16 @@ include("includes/head.php");
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div class="row mt-2">
+                                            <!-- Ciudad -->
                                             <div class="col-md-3 mb-3">
-                                                <div class="card">
-                                                    <div class="card-header bg-light"><strong><i class="fas fa-city"></i> Ciudad</strong></div>
-                                                    <div class="card-body" style="max-height: 250px; overflow-y: auto;">
+                                                <div class="card h-100">
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-city text-primary me-1"></i> Ciudad</strong></div>
+                                                    <div class="card-body" style="max-height: 220px; overflow-y: auto;">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input filtro-ciudad-master" type="checkbox" value="todas" id="filtroTodasCiudades" checked>
+                                                            <label class="form-check-label text-primary" for="filtroTodasCiudades"><strong>Seleccionar Todas</strong></label>
+                                                        </div>
+                                                        <hr class="my-2">
                                                         <?php foreach ($ciudades as $ciudad): ?>
                                                             <?php if (!empty($ciudad)): ?>
                                                             <div class="form-check">
@@ -419,8 +409,59 @@ include("includes/head.php");
                                                     </div>
                                                 </div>
                                             </div>
+                                            <!-- Embarazo -->
+                                            <div class="col-md-3 mb-3">
+                                                <div class="card h-100">
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-baby-carriage text-primary me-1"></i> Embarazo</strong></div>
+                                                    <div class="card-body">
+                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="embarazada" id="filtroEmbarazada"><label class="form-check-label" for="filtroEmbarazada">Solo Embarazadas</label></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <!-- Edad -->
+                                            <div class="col-md-3 mb-3">
+                                                <div class="card h-100">
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-child text-primary me-1"></i> Edad</strong></div>
+                                                    <div class="card-body">
+                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="menor" id="filtroMenor"><label class="form-check-label" for="filtroMenor">Menores de 18 años</label></div>
+                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="mayor" id="filtroMayor"><label class="form-check-label" for="filtroMayor">Mayores de 18 años</label></div>
+                                                        <div class="row mt-2"><div class="col-6"><input type="number" class="form-control form-control-sm" id="edadMin" placeholder="Edad mín"></div><div class="col-6"><input type="number" class="form-control form-control-sm" id="edadMax" placeholder="Edad máx"></div></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row mt-2">
+                                            <!-- Fecha Ingreso -->
+                                            <div class="col-md-4 mb-3">
+                                                <div class="card h-100">
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-calendar-alt text-primary me-1"></i> Fecha Ingreso</strong></div>
+                                                    <div class="card-body">
+                                                        <div class="row">
+                                                            <div class="col-6"><label class="small">Desde</label><input type="date" class="form-control form-control-sm" id="fechaIngresoDesde"></div>
+                                                            <div class="col-6"><label class="small">Hasta</label><input type="date" class="form-control form-control-sm" id="fechaIngresoHasta"></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BARRA DE BÚSQUEDA GENERAL (Ubicada DEBAJO de los Filtros y ENCIMA de la Tabla) -->
+                        <div id="buscadorContainer" class="row mb-3">
+                            <div class="col-12">
+                                <div class="input-group input-group-lg shadow-sm">
+                                    <span class="input-group-text bg-primary text-white"><i class="fas fa-search"></i></span>
+                                    <input type="text" id="buscadorCedula" class="form-control" 
+                                           placeholder="Escriba aquí para buscar por Nombre, Apellidos, Cédula, Correo o Usuario..." autocomplete="off">
+                                    <button type="button" id="limpiarBusqueda" class="btn btn-secondary">
+                                        <i class="fas fa-times me-1"></i> Limpiar filtros
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                                 </div>
                             </div>
                         </div>
@@ -457,7 +498,10 @@ include("includes/head.php");
                                         $carrera = $estudiante['nombre_carrera'] ?? '';
                                         $sede = $estudiante['sede'] ?? '';
                                     ?>
-                                        <tr data-cedula="<?php echo htmlspecialchars(strtoupper($cedula)); ?>"
+                                        <tr data-cedula="<?php echo htmlspecialchars(strtolower($cedula)); ?>"
+                                            data-nombre="<?php echo htmlspecialchars(strtolower($estudiante['nombre'] ?? '')); ?>"
+                                            data-username="<?php echo htmlspecialchars(strtolower($estudiante['username'] ?? '')); ?>"
+                                            data-email="<?php echo htmlspecialchars(strtolower($estudiante['email'] ?? '')); ?>"
                                             data-genero="<?php echo strtolower($estudiante['genero'] ?? ''); ?>"
                                             data-status="<?php echo $status; ?>"
                                             data-embarazada="<?php echo $estaEmbarazada ? '1' : '0'; ?>"
@@ -478,13 +522,13 @@ include("includes/head.php");
                                             <td>
                                                 <?php echo htmlspecialchars($estudiante['genero'] ?? ''); ?>
                                                 <?php if ($esFemenino && $estaEmbarazada): ?><span class="badge bg-info ms-1" title="Embarazada">🤰</span><?php endif; ?>
-                                            </div>
-                                            <td><?php echo $edad; ?></div>
-                                            <td><?php echo htmlspecialchars($estudiante['edo_civil'] ?? ''); ?></div>
-                                            <td><?php echo htmlspecialchars($ciudad); ?></div>
-                                            <td><?php echo htmlspecialchars($sede); ?></div>
-                                            <td><?php echo ($status == 1) ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-secondary">Inactivo</span>'; ?></div>
-                                            <td><?php echo !empty($fechaIngreso) ? date('d/m/Y', strtotime($fechaIngreso)) : ''; ?></div>
+                                            </td>
+                                            <td><?php echo $edad; ?></td>
+                                            <td><?php echo htmlspecialchars($estudiante['edo_civil'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($ciudad); ?></td>
+                                            <td><?php echo htmlspecialchars($sede); ?></td>
+                                            <td><?php echo ($status == 1) ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-secondary">Inactivo</span>'; ?></td>
+                                            <td><?php echo !empty($fechaIngreso) ? date('d/m/Y', strtotime($fechaIngreso)) : ''; ?></td>
                                             <td>
                                                 <div class="d-flex flex-wrap gap-1">
                                                     <button class="btn btn-info btn-details btn-sm" data-id="<?php echo $estudiante['id']; ?>"><i class="fas fa-eye"></i></button>
@@ -492,7 +536,7 @@ include("includes/head.php");
                                                         <button class="btn btn-warning btn-sm btn-edit" data-id="<?php echo $estudiante['id']; ?>"><i class="fas fa-edit"></i></button>
                                                     <?php endif; ?>
                                                 </div>
-                                            </div>
+                                            </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -625,12 +669,40 @@ document.addEventListener('DOMContentLoaded', function() {
     aplicarFiltrosYActualizar();
 });
 
+function setupMasterToggle(masterId, childSelector) {
+    const master = document.getElementById(masterId);
+    if (!master) return;
+    master.addEventListener('change', function() {
+        const checkAll = this.checked;
+        document.querySelectorAll(childSelector).forEach(cb => {
+            if (cb !== master) {
+                cb.checked = checkAll;
+                cb.disabled = checkAll;
+            }
+        });
+        aplicarFiltrosYActualizar();
+    });
+    if (master.checked) {
+        document.querySelectorAll(childSelector).forEach(cb => {
+            if (cb !== master) {
+                cb.checked = true;
+                cb.disabled = true;
+            }
+        });
+    }
+}
+
 function configurarFiltros() {
-    document.getElementById('filtroTodasCarreras').addEventListener('change', aplicarFiltrosYActualizar);
-    document.querySelectorAll('.filtro-carrera').forEach(cb => cb.addEventListener('change', aplicarFiltrosYActualizar));
-    document.querySelectorAll('.filtro-ciudad').forEach(cb => cb.addEventListener('change', aplicarFiltrosYActualizar));
-    document.querySelectorAll('.filtro-sede').forEach(cb => cb.addEventListener('change', aplicarFiltrosYActualizar));
-    document.querySelectorAll('.filtro').forEach(cb => cb.addEventListener('change', aplicarFiltrosYActualizar));
+    setupMasterToggle('filtroTodasCarreras', '.filtro-carrera');
+    setupMasterToggle('filtroTodosGeneros', '.filtro-genero');
+    setupMasterToggle('filtroTodosEdoCivil', '.filtro-edocivil');
+    setupMasterToggle('filtroTodosStatus', '.filtro-status');
+    setupMasterToggle('filtroTodasSedes', '.filtro-sede');
+    setupMasterToggle('filtroTodasCiudades', '.filtro-ciudad');
+
+    document.querySelectorAll('.filtro-carrera, .filtro-ciudad, .filtro-sede, .filtro-genero, .filtro-edocivil, .filtro-status, .filtro').forEach(cb => {
+        cb.addEventListener('change', aplicarFiltrosYActualizar);
+    });
     document.getElementById('edadMin').addEventListener('input', aplicarFiltrosYActualizar);
     document.getElementById('edadMax').addEventListener('input', aplicarFiltrosYActualizar);
     document.getElementById('fechaIngresoDesde').addEventListener('change', aplicarFiltrosYActualizar);
@@ -644,23 +716,31 @@ function aplicarFiltrosYActualizar() {
 }
 
 function aplicarFiltros() {
-    let termino = document.getElementById('buscadorCedula').value.toUpperCase();
+    let termino = document.getElementById('buscadorCedula').value.trim().toLowerCase();
+    
+    let todosGeneros = document.getElementById('filtroTodosGeneros')?.checked;
     let filtroMasculino = document.getElementById('filtroMasculino').checked;
     let filtroFemenino = document.getElementById('filtroFemenino').checked;
+    
+    let todosStatus = document.getElementById('filtroTodosStatus')?.checked;
     let filtroActivo = document.getElementById('filtroActivo').checked;
     let filtroInactivo = document.getElementById('filtroInactivo').checked;
+    
     let filtroEmbarazada = document.getElementById('filtroEmbarazada').checked;
     let filtroMenor = document.getElementById('filtroMenor').checked;
     let filtroMayor = document.getElementById('filtroMayor').checked;
+    
+    let todosEdoCivil = document.getElementById('filtroTodosEdoCivil')?.checked;
     let filtroSoltero = document.getElementById('filtroSoltero').checked;
     let filtroCasado = document.getElementById('filtroCasado').checked;
+    
     let edadMin = document.getElementById('edadMin').value;
     let edadMax = document.getElementById('edadMax').value;
     let fechaDesde = document.getElementById('fechaIngresoDesde').value;
     let fechaHasta = document.getElementById('fechaIngresoHasta').value;
     
     let carrerasSeleccionadas = [];
-    let todasCarreras = document.getElementById('filtroTodasCarreras').checked;
+    let todasCarreras = document.getElementById('filtroTodasCarreras')?.checked;
     if (!todasCarreras) {
         document.querySelectorAll('.filtro-carrera:checked').forEach(cb => {
             if (cb.value !== 'todas') carrerasSeleccionadas.push(cb.value.toLowerCase());
@@ -668,37 +748,45 @@ function aplicarFiltros() {
     }
     
     let ciudadesSeleccionadas = [];
-    document.querySelectorAll('.filtro-ciudad:checked').forEach(cb => {
-        ciudadesSeleccionadas.push(cb.value.toLowerCase());
-    });
+    let todasCiudades = document.getElementById('filtroTodasCiudades')?.checked;
+    if (!todasCiudades) {
+        document.querySelectorAll('.filtro-ciudad:checked').forEach(cb => {
+            if (cb.value !== 'todas') ciudadesSeleccionadas.push(cb.value.toLowerCase());
+        });
+    }
     
     let sedesSeleccionadas = [];
-    document.querySelectorAll('.filtro-sede:checked').forEach(cb => {
-        sedesSeleccionadas.push(cb.value.toLowerCase());
-    });
+    let todasSedes = document.getElementById('filtroTodasSedes')?.checked;
+    if (!todasSedes) {
+        document.querySelectorAll('.filtro-sede:checked').forEach(cb => {
+            if (cb.value !== 'todas') sedesSeleccionadas.push(cb.value.toLowerCase());
+        });
+    }
     
     filasFiltradas = todasLasFilas.filter(fila => {
-        let cedula = fila.getAttribute('data-cedula') || '';
-        if (termino !== '' && !cedula.includes(termino)) return false;
+        let textoFila = (fila.textContent || fila.innerText || '').toLowerCase();
+
+        if (termino !== '' && !textoFila.includes(termino)) return false;
+        
         if (!todasCarreras && carrerasSeleccionadas.length > 0) {
-            let carrera = fila.getAttribute('data-carrera') || '';
+            let carrera = (fila.getAttribute('data-carrera') || '').toLowerCase();
             if (!carrerasSeleccionadas.includes(carrera)) return false;
         }
-        if (ciudadesSeleccionadas.length > 0) {
-            let ciudad = fila.getAttribute('data-ciudad') || '';
+        if (!todasCiudades && ciudadesSeleccionadas.length > 0) {
+            let ciudad = (fila.getAttribute('data-ciudad') || '').toLowerCase();
             if (!ciudadesSeleccionadas.includes(ciudad)) return false;
         }
-        if (sedesSeleccionadas.length > 0) {
-            let sede = fila.getAttribute('data-sede') || '';
+        if (!todasSedes && sedesSeleccionadas.length > 0) {
+            let sede = (fila.getAttribute('data-sede') || '').toLowerCase();
             if (!sedesSeleccionadas.includes(sede)) return false;
         }
-        if (filtroMasculino || filtroFemenino) {
-            let genero = fila.getAttribute('data-genero') || '';
+        if (!todosGeneros && (filtroMasculino || filtroFemenino)) {
+            let genero = (fila.getAttribute('data-genero') || '').toLowerCase();
             if (filtroMasculino && filtroFemenino) {}
             else if (filtroMasculino && genero !== 'masculino') return false;
             else if (filtroFemenino && genero !== 'femenino') return false;
         }
-        if (filtroActivo || filtroInactivo) {
+        if (!todosStatus && (filtroActivo || filtroInactivo)) {
             let status = fila.getAttribute('data-status') || '';
             if (filtroActivo && filtroInactivo) {}
             else if (filtroActivo && status !== '1') return false;
@@ -706,7 +794,7 @@ function aplicarFiltros() {
         }
         if (filtroEmbarazada) {
             let embarazada = fila.getAttribute('data-embarazada') || '0';
-            let genero = fila.getAttribute('data-genero') || '';
+            let genero = (fila.getAttribute('data-genero') || '').toLowerCase();
             if (embarazada !== '1' || genero !== 'femenino') return false;
         }
         if (filtroMenor || filtroMayor) {
@@ -721,10 +809,10 @@ function aplicarFiltros() {
             if (edadMin !== '' && edad < parseInt(edadMin)) return false;
             if (edadMax !== '' && edad > parseInt(edadMax)) return false;
         }
-        if (filtroSoltero || filtroCasado) {
-            let edoCivil = fila.getAttribute('data-edo-civil') || '';
-            if (filtroSoltero && edoCivil !== 'soltero/a') return false;
-            if (filtroCasado && edoCivil !== 'casado/a') return false;
+        if (!todosEdoCivil && (filtroSoltero || filtroCasado)) {
+            let edoCivil = (fila.getAttribute('data-edo-civil') || '').toLowerCase();
+            if (filtroSoltero && !edoCivil.includes('soltero')) return false;
+            if (filtroCasado && !edoCivil.includes('casado')) return false;
         }
         if (fechaDesde !== '' || fechaHasta !== '') {
             let fechaIngreso = fila.getAttribute('data-fecha-ingreso') || '';
@@ -885,11 +973,14 @@ function generarReportePDF() {
 
 document.getElementById('limpiarBusqueda').addEventListener('click', function() {
     document.getElementById('buscadorCedula').value = '';
+    ['filtroTodasCarreras', 'filtroTodosGeneros', 'filtroTodosEdoCivil', 'filtroTodosStatus', 'filtroTodasSedes', 'filtroTodasCiudades'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.checked = true;
+            el.dispatchEvent(new Event('change'));
+        }
+    });
     document.querySelectorAll('.filtro').forEach(cb => cb.checked = false);
-    document.querySelectorAll('.filtro-ciudad').forEach(cb => cb.checked = false);
-    document.querySelectorAll('.filtro-sede').forEach(cb => cb.checked = false);
-    document.querySelectorAll('.filtro-carrera').forEach(cb => { if (cb.value !== 'todas') cb.checked = false; });
-    document.getElementById('filtroTodasCarreras').checked = true;
     document.getElementById('edadMin').value = '';
     document.getElementById('edadMax').value = '';
     document.getElementById('fechaIngresoDesde').value = '';
@@ -962,14 +1053,14 @@ function submitEditForm(form) {
 function mostrarMensaje(titulo, mensaje, esExito = true, recargar = false) {
     const header = document.getElementById('resultadoModalHeader');
     const body = document.getElementById('resultadoModalBody');
-    const label = document.getElementById('resultadoModalLabel');
-    if (header && body && label) {
+    const label = document.querySelector('#resultadoModal .modal-title');
+    if (header && body) {
         header.className = `modal-header bg-${esExito ? 'success' : 'danger'} text-white`;
-        body.innerHTML = `<div class="text-center"><i class="fas fa-${esExito ? 'check-circle' : 'exclamation-circle'} fa-3x mb-3"></i><h4>${titulo}</h4><p>${mensaje}</p></div>`;
-        label.textContent = titulo;
+        body.innerHTML = `<div class="text-center py-3"><i class="fas fa-${esExito ? 'check-circle' : 'exclamation-circle'} fa-3x mb-3 text-${esExito ? 'success' : 'danger'}"></i><h4>${titulo}</h4><p class="mb-0">${mensaje}</p></div>`;
+        if (label) label.textContent = titulo;
         $('#resultadoModal').modal('show');
-        if (recargar) $('#resultadoModal').on('hidden.bs.modal', () => location.reload());
-    } else { alert(mensaje); }
+        if (recargar) $('#resultadoModal').off('hidden.bs.modal').on('hidden.bs.modal', () => location.reload());
+    }
 }
 
 $('#detalleModal, #editarEstudianteModal, #agregarEstudianteModal').on('hidden.bs.modal', function() {

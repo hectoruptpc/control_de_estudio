@@ -101,16 +101,9 @@ $bootstrap_head ='
 
   
   $bootstrap_footer = ' 
-    <!-- WHATSAPP CHAT -->
-      <a target="_blank" href="https://wa.me/584141448515/?text=%C2%A1Saludos!%20Me%20gustar%C3%ADa%20contactar%20con%20ustedes%20..." class="float float-bottom-left float-floating" style="background-color: #31D92B">
-      <i class="whatsapp-icon-3x" style="background-image:url('.$pag_web.'/images/whatsapp3x.png)"></i>
-      </a>
+    
 
-    <!-- TELEGRAM CHAT -->
-      <a target="_blank" href="https://t.me/joher60" class="float float-bottom-right float-floating" style="
-      left: 100px">
-      <i class="telegram-icon-3x" style="background-image:url('.$pag_web.'/images/telegram.png)"></i>
-      </a>
+    
 
        <!-- JAVASCRIPT -->
        <script src="'.$pag_web.'/funciones/node_modules/jquery/dist/jquery.slim.js" ></script>

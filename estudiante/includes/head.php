@@ -181,11 +181,7 @@ if (isset($_SESSION['user']['id'])) {
 
         <div class="collapse navbar-collapse" id="navbarResponsive">
           <ul class="navbar-nav ml-auto">
-            <li class="nav-item">
-              <a title="Cargar Inicio" class="nav-link" href="index.php"><i class="fas fa-home fa-fw"></i> Inicio
-                <span class="sr-only">(current)</span>
-              </a>
-            </li>
+            
 
             <!-- NUEVA OPCIÓN: SOLICITUDES Y CONSTANCIAS - CON MISMO ESTILO -->
             <li class="nav-item">
@@ -204,16 +200,7 @@ if (isset($_SESSION['user']['id'])) {
             <?php endif; ?>
 
             <!-- Icono de Mensajería con Notificación para Estudiantes -->
-            <li class="nav-item nav-item-mensajes">
-              <a title="Sistema de Mensajería" class="nav-link position-relative" href="mensajeria_estudiantes.php">
-                <i class="fas fa-envelope fa-fw"></i> Mensajes
-                <?php if ($mensajes_no_leidos > 0): ?>
-                  <span class="badge badge-danger badge-notificacion">
-                    <?= $mensajes_no_leidos ?>
-                  </span>
-                <?php endif; ?>
-              </a>
-            </li>
+            
 
             <li id="dropdown-clases" class="nav-item dropdown">
               <a title="Mis Clases" class="nav-link dropdown-toggle" href="#" id="navbarDropdownClases" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">

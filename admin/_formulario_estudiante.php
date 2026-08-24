@@ -82,15 +82,15 @@ $fechaSolicitud = date('Y-m-d');
         <div class="col-md-6">
             <!-- Foto de Perfil -->
             <div class="mb-3">
-    <label for="foto_perfil<?php echo $prefijo; ?>" class="form-label required">Foto de Perfil <span class="text-danger">*</span></label>
-    <input type="file" class="form-control" id="foto_perfil<?php echo $prefijo; ?>" name="foto_perfil" 
-           accept=".jpg,.jpeg,.png,.pdf,.webp" required
-           onchange="previewImage(this, 'preview<?php echo $prefijo; ?>')">
-    <small class="text-muted">Formatos permitidos: JPG, JPEG, PNG, WEBP, PDF (Máx: 5MB). <span class="text-danger">Este campo es obligatorio.</span></small>
-    <div id="preview<?php echo $prefijo; ?>" class="mt-2" style="display:none;">
-        <img id="previewImage<?php echo $prefijo; ?>" src="#" alt="Vista previa" style="max-width: 150px; max-height: 150px; border-radius: 8px;">
-    </div>
-</div>
+                <label for="foto_perfil<?php echo $prefijo; ?>" class="form-label">Foto de Perfil <span class="badge bg-secondary">Opcional</span></label>
+                <input type="file" class="form-control" id="foto_perfil<?php echo $prefijo; ?>" name="foto_perfil" 
+                       accept=".jpg,.jpeg,.png,.pdf,.webp" 
+                       onchange="window.previewImage(this, 'preview<?php echo $prefijo; ?>', 'previewImage<?php echo $prefijo; ?>')">
+                <small class="text-muted d-block mt-1">Formatos permitidos: JPG, JPEG, PNG, WEBP (Máx: 5MB). No es obligatorio.</small>
+                <div id="preview<?php echo $prefijo; ?>" class="mt-2" style="display:none;">
+                    <img id="previewImage<?php echo $prefijo; ?>" src="#" alt="Vista previa" style="max-width: 140px; max-height: 140px; border-radius: 8px; border: 2px solid #0d6efd; padding: 2px; object-fit: cover;">
+                </div>
+            </div>
 
             <div class="mb-3">
                 <label for="fecha_nac<?php echo $prefijo; ?>" class="form-label required">Fecha de Nacimiento</label>
@@ -1378,12 +1378,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
 
-        // Validación de foto de perfil
-const fotoPerfil = document.getElementById('foto_perfil' + prefijo);
-if (fotoPerfil && !fotoPerfil.files.length) {
-    mensajesError.push('Debe seleccionar una foto de perfil (JPG, PNG, WEBP o PDF)');
-    isValid = false;
-}
+        // Foto de perfil opcional (no se requiere validación obligatoria)
         
         const nombre = document.getElementById('nombre' + prefijo).value;
         if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s']+$/.test(nombre.trim())) {
@@ -1536,4 +1531,35 @@ if (fotoPerfil && !fotoPerfil.files.length) {
         });
     });
 });
+
+window.previewImage = function(input, previewDivId, previewImgId) {
+    const previewDiv = document.getElementById(previewDivId);
+    let previewImg = document.getElementById(previewImgId);
+    if (!previewImg && previewDivId) {
+        previewImg = document.getElementById(previewDivId.replace('preview', 'previewImage'));
+    }
+    if (input && input.files && input.files[0]) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            if (file.type.startsWith('image/')) {
+                if (previewImg) {
+                    previewImg.src = e.target.result;
+                    previewImg.style.display = 'inline-block';
+                }
+                if (previewDiv) {
+                    previewDiv.style.display = 'block';
+                }
+            } else {
+                if (previewDiv) {
+                    previewDiv.innerHTML = '<div class="alert alert-info py-1 px-2 small mb-0"><i class="fas fa-file-pdf text-danger me-1"></i> Documento ' + file.name + ' seleccionado</div>';
+                    previewDiv.style.display = 'block';
+                }
+            }
+        };
+        reader.readAsDataURL(file);
+    } else {
+        if (previewDiv) previewDiv.style.display = 'none';
+    }
+};
 </script>

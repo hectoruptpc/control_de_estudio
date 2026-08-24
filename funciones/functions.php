@@ -7606,7 +7606,7 @@ function obtenerTiposVivienda($db) {
     }
 
     $viviendas = [];
-    $query = "SELECT id, vivienda FROM tipo_vivienda ORDER BY vivienda ASC";
+    $query = "SELECT id, vivienda FROM tipo_vivienda ORDER BY CASE WHEN LOWER(vivienda) LIKE '%otro%' THEN 1 ELSE 0 END ASC, id ASC";
     
     try {
         if (!$stmt = $db->prepare($query)) {
@@ -7641,7 +7641,7 @@ function obtenerTenenciaViviendas($db) {
     }
 
     $tenencias = [];
-    $query = "SELECT id, tenencia FROM tenencia_vivienda ORDER BY tenencia ASC";
+    $query = "SELECT id, tenencia FROM tenencia_vivienda ORDER BY CASE WHEN LOWER(tenencia) LIKE '%otro%' THEN 1 ELSE 0 END ASC, id ASC";
     
     try {
         if (!$stmt = $db->prepare($query)) {
@@ -7695,7 +7695,7 @@ function obtenerOpcionesStatus($db) {
 
 function obtenerIngresos($db) {
     $ingresos = [];
-    $query = "SELECT id, ingreso FROM ingresos ORDER BY id";
+    $query = "SELECT id, ingreso FROM ingresos ORDER BY CASE WHEN LOWER(ingreso) LIKE '%otro%' THEN 1 ELSE 0 END ASC, id ASC";
     $result = $db->query($query);
     
     while ($row = $result->fetch_assoc()) {
@@ -27812,43 +27812,48 @@ function login(){
 }
 
 function visita() {
-  global $pool, $nombrepag, $usua, $stmt_visita;
+  global $db, $pool, $nombrepag, $usua, $stmt_visita;
   try {
-      // Obtener una conexión del pool
-      $db = $pool->getConnection();
-      // Preparar la consulta para seleccionar el usuario
-      $query = "SELECT * FROM users WHERE username = ? LIMIT 1";
-      $stmt = $db->prepare($query);
-      $stmt->bind_param("s", $usua);
+      $conn = null;
+      if (isset($db) && $db instanceof mysqli) {
+          $conn = $db;
+      } elseif (isset($pool) && is_object($pool) && method_exists($pool, 'getConnection')) {
+          $conn = $pool->getConnection();
+      }
+      if (!$conn) return;
+
+      $usuario_buscar = !empty($usua) ? $usua : ($_SESSION['user']['username'] ?? '');
+      if (empty($usuario_buscar)) return;
+
+      $query = "SELECT id FROM users WHERE username = ? LIMIT 1";
+      $stmt = $conn->prepare($query);
+      if (!$stmt) return;
+      
+      $stmt->bind_param("s", $usuario_buscar);
       $stmt->execute();
       $results = $stmt->get_result();
-      if ($results !== null && $results->num_rows > 0) {
+      
+      if ($results && $results->num_rows > 0) {
           $logged_in_user = $results->fetch_assoc();
           $id_usuario = $logged_in_user['id'];
-          $ip = get_client_ip();
-          // Preparar la consulta para insertar la visita
+          $ip = function_exists('get_client_ip') ? get_client_ip() : ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
+          $web = !empty($nombrepag) ? $nombrepag : ($_SERVER['PHP_SELF'] ?? 'sitio');
+
           $query_visita = "INSERT INTO visitas (id, id_usuario, ip, fecha_visita, web) VALUES (null, ?, ?, NOW(), ?)";
-          $stmt_visita = $db->prepare($query_visita);
-          $stmt_visita->bind_param("iss", $id_usuario, $ip, $nombrepag);
-          $stmt_visita->execute();
-          if ($stmt_visita->error) {
-              // Manejo del error
-              echo 'Error al insertar la visita: ' . $stmt_visita->error;
+          $stmt_visita = $conn->prepare($query_visita);
+          if ($stmt_visita) {
+              $stmt_visita->bind_param("iss", $id_usuario, $ip, $web);
+              $stmt_visita->execute();
+              $stmt_visita->close();
           }
-      } else {
-          // Manejo del error
-          echo 'Error: no se encontró ningún usuario registrado con el nombre de usuario actual.';
       }
-      // Cerrar los statement y liberar la conexión
-      if ($stmt !== null) {
-          $stmt->close();
+      $stmt->close();
+
+      if (isset($pool) && is_object($pool) && method_exists($pool, 'releaseConnection') && $conn !== $db) {
+          $pool->releaseConnection($conn);
       }
-      if ($stmt_visita !== null) {
-          $stmt_visita->close();
-      }
-      $pool->releaseConnection($db);
-  } catch (Exception $e) {
-      echo "Error: " . $e->getMessage();
+  } catch (Throwable $e) {
+      error_log("Error en visita(): " . $e->getMessage());
   }
 }
 
@@ -28214,85 +28219,7 @@ function formatearCantidad($cantidad, $tipo) {
 }
 
 
-// Función para obtener la cantidad total de materia prima
-function totalMateriaPrima() {
-  global $db, $id_usua;
-  $sql = "SELECT 
-          SUM(CASE WHEN descripcion = 1 THEN cantidad END) AS total 
-          FROM inventario_componente 
-          WHERE id_usuario = $id_usua";
-  $result = $db->query($sql);
-  if ($result->num_rows > 0) {
-      $row = $result->fetch_assoc();
-      return $row['total'];
-  } else {
-      return 0;
-  }
-}
 
-// Función para obtener la cantidad de materia prima ingresada en un mes específico
-function ingresoMateriaPrimaPorMes($mes, $año) {
-  global $db, $id_usua;
-  $sql = "SELECT 
-  SUM(CASE WHEN descripcion = 1 THEN cantidad END) AS total 
-          FROM inventario_componente 
-          WHERE MONTH(fecha) = '$mes' AND YEAR(fecha) = '$año' AND id_usuario = '$id_usua'";
-  $result = $db->query($sql);
-  if ($result->num_rows > 0) {
-      $row = $result->fetch_assoc();
-      return $row['total'];
-  } else {
-      return 0;
-  }
-}
-
-// Función para obtener la cantidad total de producto terminado
-function totalProductoTerminado() {
-  global $db, $id_usua;
-  $sql = "SELECT 
-    SUM(CASE WHEN descripcion = 1 THEN cantidad END) AS total  
-FROM 
-    inventario_producto_terminado 
-WHERE 
-    id_usuario = $id_usua";
-  $result = $db->query($sql);
-  if ($result->num_rows > 0) {
-      $row = $result->fetch_assoc();
-      return $row['total'];
-  } else {
-      return 0;
-  }
-}
-
-// Función para obtener la cantidad de producto terminado producido en un mes específico
-function productoTerminadoPorMes($mes, $año) {
-  global $db, $id_usua;
-  $sql = "SELECT 
- SUM(CASE WHEN descripcion = 1 THEN cantidad END) AS total 
-          FROM inventario_producto_terminado 
-          WHERE MONTH(fecha) = '$mes' AND YEAR(fecha) = '$año' AND id_usuario = '$id_usua'";
-  $result = $db->query($sql);
-  if ($result->num_rows > 0) {
-      $row = $result->fetch_assoc();
-      return $row['total'];
-  } else {
-      return 0;
-  }
-}
-
-function kilo($a){
-  if ($a>1000){
-      $a = $a/1000;
-      $a = number_format($a, 2, ',', '.') . ' Kilos';
-  }
-  else if ($a == 0){
-      $a = "No hay Registros";
-  }
-  else {
-      $a = number_format($a, 2, ',', '.') . ' Gramos';
-  }
-  return $a;
-}
 
 $formatter = IntlDateFormatter::create(
   'es_ES',
@@ -28460,107 +28387,7 @@ function optimizarTablasAdmin() {
 
 
 
-function verificar_precios(){
-  global $db, $id_usua;
-  
-  $query = "SELECT p.id, p.nombre 
-FROM productos p
-LEFT JOIN precios pre ON p.id = pre.id_producto AND pre.id_usuario = '$id_usua' 
-WHERE pre.id_producto IS NULL AND p.id IN (
-    SELECT ipt.id_producto
-    FROM inventario_producto_terminado ipt
-    WHERE ipt.id_usuario = '$id_usua')";
-  
-  $result = $db->query($query);
-  
-  if ($result->num_rows > 0) {
 
-    echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
-    <strong>Advertencia!</strong> Se ha detectado la existencia en Stock de Productos pero que aun no se le han asignado Precio. Se sugiere ir a la seccion de <a href="precios.php">Precios</a> y crear el precio correspondiente para que el mismo pueda aparecer en la lista de Venta. <ul>';
-    while($row = $result->fetch_assoc()){
-        echo "<li><a href='#' class='crear-precio' data-id='" . $row['id'] . "' data-nombre='" . $row['nombre'] . "'>" . $row['nombre'] . "</a></li>"; 
-    }
-    echo ' </ul><button type="button" class="close" data-dismiss="alert" aria-label="Close">
-    <span aria-hidden="true">×</span>
-    </button>
-    </div> ';
-    
-    // Mostrar el modal con el producto
-    echo '<div class="modal fade" id="modalCrearPrecio" tabindex="-1" role="dialog" aria-labelledby="modalCrearPrecioLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalCrearPrecioLabel">Crear Precio</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">×</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <form id="formCrearPrecio">
-                    <input type="hidden" id="producto" name="producto">
-                    <div class="form-group">
-                        <label for="productoNombre">Producto:</label>
-                        <input type="text" class="form-control" id="productoNombre" name="productoNombre" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label for="precio">Precio:</label>
-                        <input type="text" class="form-control" id="precio" name="precio" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-tag"></i> Crear Precio</button>
-                </form>
-            </div>
-        </div>
-    </div>
-    </div>';
-
-    // Agregar JavaScript para manejar el evento click en los links
-    echo '<script>
-    $(document).ready(function() {
-        // Evento click en los links para abrir el modal
-        $(".crear-precio").click(function(event) {
-            event.preventDefault();
-            var producto = $(this).data("id");
-            var productoNombre = $(this).data("nombre");
-            $("#producto").val(producto);
-            $("#productoNombre").val(productoNombre);
-            $("#modalCrearPrecio").modal("show");
-        });
-    
-        // Submit del formulario del modal
-        $("#formCrearPrecio").submit(function(e) {
-            e.preventDefault();
-            var producto = $("#producto").val();
-            var precio = $("#precio").val();
-            
-            // Realizar la solicitud AJAX para guardar el precio
-            $.ajax({
-                url: "funciones/guardar_precios.php",
-                type: "POST",
-                body: formCrearPrecio,
-                data: {
-                    producto: producto,
-                    precio: precio
-                },
-                success: function(response) {
-                  $("#modalCrearPrecio").modal("hide");
-                  alert("Precio creado correctamente.");
-
-                  //  Recargar la página actual
-                  location.reload(); 
-                },
-                error: function(xhr, status, error) {
-                    console.error("Error al crear el precio: " + error);
-                    alert("Error al crear el precio. Por favor, inténtalo de nuevo.");
-                }
-            });
-        });
-    });
-    </script>';
-
-} else {
-    //echo "<h1>No se encontraron productos sin precio</h1>"; 
-}
-}
 
 /**
  * Obtiene todos los códigos de secciones
