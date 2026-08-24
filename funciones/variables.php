@@ -233,6 +233,7 @@ $direccion_comercio = "";
 $logo_comercio = "";
 
 $logo_web = '<img class="img-fluid" src="'.$pag_web.'/images/logo.png" width="150" height="25">';
+$logo_mppeu = '<img class="img-fluid" src="'.$pag_web.'/images/mppeu_bb.png" width="150" height="25">';
 $logo_empresa = '<img class="img-fluid" src="'.$pag_web.'/images/logoempresa.png" width="100" height="100">';
 $logo_empresag = '<img class="img-fluid" src="'.$pag_web.'/images/logoempresa.png" width="500" height="500">';
 $logo_web_login = '<img class="img-fluid" src="'.$pag_web.'/images/logo.png" width="450" height="80">';

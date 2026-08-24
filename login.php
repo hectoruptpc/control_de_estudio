@@ -31,7 +31,7 @@ $mostrarProsecucion = obtenerConfiguracionSecretaria('mostrar_prosecucion', '1')
             <?php echo $logopertenencia; ?>
         </div>
         <div class="header-logo-right">
-            <img src="images/EDUCACIÓN UNIVERSITARIA BORDE BLANCO.png" class="img-fluid" style="max-height: 55px; width: auto;" alt="Educación Universitaria">
+            <?php echo $logo_mppeu; ?>
         </div>
     </div>
 </header>
