@@ -423,8 +423,13 @@ include("includes/head.php");
                                                 <div class="card h-100">
                                                     <div class="card-header bg-light"><strong><i class="fas fa-child text-primary me-1"></i> Edad</strong></div>
                                                     <div class="card-body">
-                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="menor" id="filtroMenor"><label class="form-check-label" for="filtroMenor">Menores de 18 años</label></div>
-                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="mayor" id="filtroMayor"><label class="form-check-label" for="filtroMayor">Mayores de 18 años</label></div>
+                                                        <div class="form-check">
+                                                            <input class="form-check-input filtro-edad-master" type="checkbox" value="todas" id="filtroTodasEdades" checked>
+                                                            <label class="form-check-label text-primary" for="filtroTodasEdades"><strong>Seleccionar Todas</strong></label>
+                                                        </div>
+                                                        <hr class="my-2">
+                                                        <div class="form-check"><input class="form-check-input filtro-edad" type="checkbox" value="menor" id="filtroMenor" checked><label class="form-check-label" for="filtroMenor">Menores de 18 años</label></div>
+                                                        <div class="form-check"><input class="form-check-input filtro-edad" type="checkbox" value="mayor" id="filtroMayor" checked><label class="form-check-label" for="filtroMayor">Mayores de 18 años</label></div>
                                                         <div class="row mt-2"><div class="col-6"><input type="number" class="form-control form-control-sm" id="edadMin" placeholder="Edad mín"></div><div class="col-6"><input type="number" class="form-control form-control-sm" id="edadMax" placeholder="Edad máx"></div></div>
                                                     </div>
                                                 </div>
@@ -699,8 +704,9 @@ function configurarFiltros() {
     setupMasterToggle('filtroTodosStatus', '.filtro-status');
     setupMasterToggle('filtroTodasSedes', '.filtro-sede');
     setupMasterToggle('filtroTodasCiudades', '.filtro-ciudad');
+    setupMasterToggle('filtroTodasEdades', '.filtro-edad');
 
-    document.querySelectorAll('.filtro-carrera, .filtro-ciudad, .filtro-sede, .filtro-genero, .filtro-edocivil, .filtro-status, .filtro').forEach(cb => {
+    document.querySelectorAll('.filtro-carrera, .filtro-ciudad, .filtro-sede, .filtro-genero, .filtro-edocivil, .filtro-status, .filtro-edad, .filtro').forEach(cb => {
         cb.addEventListener('change', aplicarFiltrosYActualizar);
     });
     document.getElementById('edadMin').addEventListener('input', aplicarFiltrosYActualizar);
@@ -727,6 +733,7 @@ function aplicarFiltros() {
     let filtroInactivo = document.getElementById('filtroInactivo').checked;
     
     let filtroEmbarazada = document.getElementById('filtroEmbarazada').checked;
+    let todasEdades = document.getElementById('filtroTodasEdades')?.checked;
     let filtroMenor = document.getElementById('filtroMenor').checked;
     let filtroMayor = document.getElementById('filtroMayor').checked;
     
@@ -797,7 +804,7 @@ function aplicarFiltros() {
             let genero = (fila.getAttribute('data-genero') || '').toLowerCase();
             if (embarazada !== '1' || genero !== 'femenino') return false;
         }
-        if (filtroMenor || filtroMayor) {
+        if (!todasEdades && (filtroMenor || filtroMayor)) {
             let menor = fila.getAttribute('data-menor') || '0';
             let mayor = fila.getAttribute('data-mayor') || '0';
             if (filtroMenor && filtroMayor) {}
@@ -973,7 +980,7 @@ function generarReportePDF() {
 
 document.getElementById('limpiarBusqueda').addEventListener('click', function() {
     document.getElementById('buscadorCedula').value = '';
-    ['filtroTodasCarreras', 'filtroTodosGeneros', 'filtroTodosEdoCivil', 'filtroTodosStatus', 'filtroTodasSedes', 'filtroTodasCiudades'].forEach(id => {
+    ['filtroTodasCarreras', 'filtroTodosGeneros', 'filtroTodosEdoCivil', 'filtroTodosStatus', 'filtroTodasSedes', 'filtroTodasCiudades', 'filtroTodasEdades'].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
             el.checked = true;
