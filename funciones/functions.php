@@ -12,7 +12,6 @@ chdir(__DIR__);
     include('variables.php');
     require_once('conexion.php');
     include('cabecera_footer.php');
-    include('selector_operador.php');
     include('limite_planes.php');
     include('botoneras.php');
     include('geolocalizacion.php');
