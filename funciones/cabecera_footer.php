@@ -19,12 +19,6 @@ $bootstrap_head ='
       <link rel="icon" href="'.$pag_web.'/images/favicon/favicon-16x16.png" sizes="16x16" type="image/png">
       <link rel="icon" href="'.$pag_web.'/images/favicon/favicon.ico">
 
-  <script src="'.$pag_web.'/funciones/node_modules/jquery/dist/jquery.slim.js" ></script>
-
-  <!-- MOMENT -->
-  <script src="'.$pag_web.'/funciones/ajax/libs/moment/moment.min.js" integrity="sha512-qTXRIMyZIFb8iQcfjXWCO8+M5Tbc38Qi5WzdPOYZHIlZpzBHG3L3by84BBBOiRGiEb7KKtAOAs5qYdUiZiQNNQ==" crossorigin="anonymous"></script>
-  <script src="'.$pag_web.'/funciones/ajax/libs/moment/es-us.min.js" integrity="sha512-QfUPyAMVgJBoL2yYVx8xkXmPFL7IKoF+eP5hq5xF4O/Mz1eqvxdy/vBEWDiJNPwGw7K8FCcCllrppqLpSWK/ng==" crossorigin="anonymous"></script>
-
   <!-- JQUERY       -->
       <script src="'.$pag_web.'/funciones/jquery/jquery-3.7.1.js"></script>
 
@@ -48,6 +42,21 @@ $bootstrap_head ='
   <!-- INTERNO -->
   <link href="'.$pag_web.$linklocal.'/css/new.css" rel="stylesheet">
   <link href="'.$pag_web.'/css/modelo.css" rel="stylesheet">
+
+  <!-- UNIFORMIDAD GLOBAL A MAYÚSCULAS -->
+  <style>
+    table.table th,
+    table.table td,
+    .card-header,
+    .modal-title,
+    .badge,
+    form label,
+    select.form-control,
+    input.form-control,
+    .dropdown-item {
+        text-transform: uppercase !important;
+    }
+  </style>
 
 
   <!-- PUSH -->
@@ -106,9 +115,6 @@ $bootstrap_head ='
     
 
        <!-- JAVASCRIPT -->
-       <script src="'.$pag_web.'/funciones/node_modules/jquery/dist/jquery.slim.js" ></script>
-
-       
         <!-- JQUERY       -->
         <script src="'.$pag_web.'/funciones/jquery/jquery-3.7.1.js"></script>
      
@@ -139,7 +145,7 @@ $bootstrap_head ='
       <script src="'.$pag_web.'/funciones/js/bootbox.all.min.js"></script>
       
       <!-- COMPLEMENTO -->
-      <script src="'.$pag_web.'/funciones/js/complemento.js"></script>
+      <script src="'.$pag_web.'/funciones/js/complemento.js?v='.filemtime(__DIR__.'/js/complemento.js').'"></script>
       
 
 ';

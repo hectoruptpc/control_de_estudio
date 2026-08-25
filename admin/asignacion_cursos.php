@@ -313,11 +313,28 @@ include("includes/head.php");
             </div>
 
             <!-- Sección de Asignaciones Actuales -->
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <i class="fas fa-list"></i> Asignaciones Actuales
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-primary text-white text-center">
+                    <h5 class="mb-0 font-weight-bold"><i class="fas fa-list mr-2"></i> Asignaciones Actuales</h5>
                 </div>
                 <div class="card-body">
+                    <!-- Buscador en tiempo real arriba de la tabla -->
+                    <div class="form-group mb-3">
+                        <label for="buscar_tabla_asignaciones"><i class="fas fa-search text-primary mr-1"></i> Buscar personas o materias en tiempo real:</label>
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text"><i class="fas fa-filter"></i></span>
+                            </div>
+                            <input type="text" id="buscar_tabla_asignaciones" class="form-control" placeholder="Escriba para buscar docentes (cédula o nombre), materias, código o carrera..." autocomplete="off">
+                            <div class="input-group-append">
+                                <button class="btn btn-outline-secondary" type="button" id="btn_limpiar_tabla">
+                                    <i class="fas fa-times"></i> Limpiar
+                                </button>
+                            </div>
+                        </div>
+                        <small class="form-text text-muted" id="tabla_coincidencias_info">Filtrado en tiempo real activado.</small>
+                    </div>
+
                     <div class="table-responsive">
                         <table class="table table-bordered table-hover" id="dataTable" width="100%" cellspacing="0">
                             <thead class="thead-dark">
@@ -426,91 +443,98 @@ include("includes/head.php");
             </div>
 
             <?php if (tienePermiso('gestion_asig_cursos')): ?>
-            <!-- Sección para Asignar Nueva Materia -->
-            <div class="card mb-4">
-                <div class="card-header bg-success text-white">
-                    <i class="fas fa-chalkboard-teacher"></i> Asignar Nueva Materia
-                </div>
-                <div class="card-body">
-                    <form method="post" action="">
-                        <div class="form-row">
-                            <div class="form-group col-md-6">
-                                <label for="id_profesor">Seleccionar Profesor:</label>
-                                <select class="form-control" id="id_profesor" name="id_profesor" required>
-                                    <option value="">-- Seleccione --</option>
-                                    <?php
-                                    $query = "SELECT id, idusuario, nombre FROM users WHERE docente = 1 ORDER BY nombre";
-                                    $result = $db->query($query);
+            <!-- Fila centrada con las 2 tarjetas lado a lado (50% cada una) centradas en pantalla -->
+            <div class="row justify-content-center mx-auto" style="width: 100%;">
+                <!-- Columna Izquierda: Asignar Nueva Materia -->
+                <div class="col-lg-6 col-md-12 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header bg-success text-white">
+                            <i class="fas fa-chalkboard-teacher"></i> Asignar Nueva Materia
+                        </div>
+                        <div class="card-body">
+                            <form method="post" action="">
+                                <div class="form-row">
+                                    <div class="form-group col-md-6">
+                                        <label for="id_profesor">Seleccionar Profesor:</label>
+                                        <select class="form-control" id="id_profesor" name="id_profesor" required>
+                                            <option value="">-- Seleccione --</option>
+                                            <?php
+                                            $query = "SELECT id, idusuario, nombre FROM users WHERE docente = 1 ORDER BY nombre";
+                                            $result = $db->query($query);
+                                            
+                                            if($result && $result->num_rows > 0) {
+                                                while($row = $result->fetch_assoc()) {
+                                                    echo "<option value='".$row['id']."'>".htmlspecialchars($row['nombre'])." (".htmlspecialchars($row['idusuario']).")</option>";
+                                                }
+                                            }
+                                            ?>
+                                        </select>
+                                    </div>
                                     
-                                    if($result && $result->num_rows > 0) {
-                                        while($row = $result->fetch_assoc()) {
-                                            echo "<option value='".$row['id']."'>".htmlspecialchars($row['nombre'])." (".htmlspecialchars($row['idusuario']).")</option>";
-                                        }
-                                    }
-                                    ?>
-                                </select>
+                                    <div class="form-group col-md-6">
+                                        <label for="carrera">Carrera:</label>
+                                        <select class="form-control" id="carrera" name="carrera" onchange="cargarMaterias()" required>
+                                            <option value="">-- Seleccione una carrera --</option>
+                                            <?php foreach($carreras as $carrera): ?>
+                                                <option value="<?php echo $carrera['id']; ?>">
+                                                    <?php echo htmlspecialchars($carrera['nombre']); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="id_materia">Materia:</label>
+                                    <select class="form-control" id="id_materia" name="id_materia" required disabled>
+                                        <option value="">Primero seleccione una carrera</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="text-center mt-3">
+                                    <button type="submit" name="asignar_materia" class="btn btn-success font-weight-bold px-4">
+                                        <i class="fas fa-save"></i> Asignar Materia
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Columna Derecha: Recomendaciones por Títulos Académicos -->
+                <div class="col-lg-6 col-md-12 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header bg-info text-white">
+                            <i class="fas fa-graduation-cap"></i> Recomendaciones por Títulos Académicos
+                        </div>
+                        <div class="card-body">
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label for="carrera_recomendacion">Carrera:</label>
+                                    <select class="form-control" id="carrera_recomendacion" onchange="cargarMateriasRecomendacion()">
+                                        <option value="">-- Seleccione una carrera --</option>
+                                        <?php foreach($carreras as $carrera): ?>
+                                            <option value="<?php echo $carrera['id']; ?>">
+                                                <?php echo htmlspecialchars($carrera['nombre']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label for="materia_recomendacion">Materia:</label>
+                                    <select class="form-control" id="materia_recomendacion" name="materia_recomendacion" disabled>
+                                        <option value="">Primero seleccione una carrera</option>
+                                    </select>
+                                </div>
                             </div>
                             
-                            <div class="form-group col-md-6">
-                                <label for="carrera">Carrera:</label>
-                                <select class="form-control" id="carrera" name="carrera" onchange="cargarMaterias()" required>
-                                    <option value="">-- Seleccione una carrera --</option>
-                                    <?php foreach($carreras as $carrera): ?>
-                                        <option value="<?php echo $carrera['id']; ?>">
-                                            <?php echo htmlspecialchars($carrera['nombre']); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
+                            <div id="resultados-recomendaciones" class="mt-3">
+                                <!-- Aquí se cargarán las recomendaciones via AJAX -->
                             </div>
                         </div>
-                        
-                        <div class="form-row">
-                            <div class="form-group col-md-12">
-                                <label for="id_materia">Materia:</label>
-                                <select class="form-control" id="id_materia" name="id_materia" required disabled>
-                                    <option value="">Primero seleccione una carrera</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <button type="submit" name="asignar_materia" class="btn btn-success">
-                            <i class="fas fa-save"></i> Asignar Materia
-                        </button>
-                    </form>
+                    </div>
                 </div>
             </div>
-            
-            <!-- Sección de Recomendaciones -->
-            <div class="card mb-4">
-                <div class="card-header bg-info text-white">
-                    <i class="fas fa-graduation-cap"></i> Recomendaciones por Títulos Académicos
-                </div>
-                <div class="card-body">
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label for="carrera_recomendacion">Carrera:</label>
-                            <select class="form-control" id="carrera_recomendacion" onchange="cargarMateriasRecomendacion()">
-                                <option value="">-- Seleccione una carrera --</option>
-                                <?php foreach($carreras as $carrera): ?>
-                                    <option value="<?php echo $carrera['id']; ?>">
-                                        <?php echo htmlspecialchars($carrera['nombre']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                                </select>
-                        </div>
-                        <div class="form-group col-md-6">
-                            <label for="materia_recomendacion">Materia:</label>
-                            <select class="form-control" id="materia_recomendacion" name="materia_recomendacion" disabled>
-                                <option value="">Primero seleccione una carrera</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div id="resultados-recomendaciones" class="mt-3">
-                        <!-- Aquí se cargarán las recomendaciones via AJAX -->
-                    </div>
-                </div>
-
             <?php endif; ?>
 
             </div>
@@ -815,8 +839,45 @@ $(document).ready(function() {
             setTimeout(function() {
                 alertDiv.alert('close');
             }, 5000);
+    // Buscador en tiempo real para la tabla de asignaciones
+    const inputBuscarTabla = document.getElementById('buscar_tabla_asignaciones');
+    const btnLimpiarTabla = document.getElementById('btn_limpiar_tabla');
+    const infoTabla = document.getElementById('tabla_coincidencias_info');
+    const filasTabla = document.querySelectorAll('#dataTable tbody tr');
+
+    if (inputBuscarTabla && filasTabla.length) {
+        function filtrarTabla() {
+            const query = inputBuscarTabla.value.toLowerCase().trim();
+            let coincidenciaCount = 0;
+
+            filasTabla.forEach(function(row) {
+                const text = row.textContent.toLowerCase();
+                const isMatch = text.includes(query);
+                row.style.display = isMatch ? '' : 'none';
+                if (isMatch) coincidenciaCount++;
+            });
+
+            if (infoTabla) {
+                if (query === '') {
+                    infoTabla.textContent = 'Mostrando todas las ' + filasTabla.length + ' asignaciones.';
+                    infoTabla.className = 'form-text text-muted';
+                } else {
+                    infoTabla.textContent = 'Se encontraron ' + coincidenciaCount + ' de ' + filasTabla.length + ' asignaciones.';
+                    infoTabla.className = coincidenciaCount > 0 ? 'form-text text-success font-weight-bold' : 'form-text text-danger font-weight-bold';
+                }
+            }
         }
-    });
+
+        inputBuscarTabla.addEventListener('input', filtrarTabla);
+
+        if (btnLimpiarTabla) {
+            btnLimpiarTabla.addEventListener('click', function() {
+                inputBuscarTabla.value = '';
+                filtrarTabla();
+                inputBuscarTabla.focus();
+            });
+        }
+    }
 });
 </script>
 

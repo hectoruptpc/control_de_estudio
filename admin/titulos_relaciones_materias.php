@@ -202,6 +202,24 @@ include("includes/head.php");
                     <h5 class="mb-0"><i class="fas fa-graduation-cap"></i> Títulos</h5>
                 </div>
                 <div class="card-body">
+                    <!-- Formulario para agregar título (ARRIBA) -->
+                    <div class="card bg-light border-primary mb-3">
+                        <div class="card-body p-3">
+                            <h6 class="font-weight-bold text-primary mb-2"><i class="fas fa-plus-circle mr-1"></i> Agregar Nuevo Título</h6>
+                            <form method="POST">
+                                <div class="form-group mb-2">
+                                    <input type="text" name="nombre" class="form-control" placeholder="Nombre del título" required>
+                                </div>
+                                <div class="form-group mb-2">
+                                    <textarea name="descripcion" class="form-control" placeholder="Descripción (opcional)" rows="2"></textarea>
+                                </div>
+                                <button type="submit" name="add_title" class="btn btn-primary btn-block">
+                                    <i class="fas fa-plus"></i> Agregar Título
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
                     <!-- Buscador -->
                     <div class="input-group mb-3">
                         <div class="input-group-prepend">
@@ -211,7 +229,7 @@ include("includes/head.php");
                     </div>
 
                     <!-- Tabla de resultados (se actualiza con AJAX) -->
-                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
                         <table class="table table-hover">
                             <thead class="thead-light">
                                 <tr>
@@ -225,19 +243,6 @@ include("includes/head.php");
                             </tbody>
                         </table>
                     </div>
-
-                    <!-- Formulario para agregar título -->
-                    <form method="POST" class="mt-3">
-                        <div class="form-group">
-                            <input type="text" name="nombre" class="form-control" placeholder="Nombre del título" required>
-                        </div>
-                        <div class="form-group">
-                            <textarea name="descripcion" class="form-control" placeholder="Descripción"></textarea>
-                        </div>
-                        <button type="submit" name="add_title" class="btn btn-primary btn-block">
-                            <i class="fas fa-plus"></i> Agregar Título
-                        </button>
-                    </form>
                 </div>
             </div>
         </div>
@@ -249,6 +254,45 @@ include("includes/head.php");
                     <h5 class="mb-0"><i class="fas fa-link"></i> Relaciones con Materias</h5>
                 </div>
                 <div class="card-body">
+                    <!-- Formulario para crear relación (ARRIBA) -->
+                    <div class="card bg-light border-success mb-3">
+                        <div class="card-body p-3">
+                            <h6 class="font-weight-bold text-success mb-2"><i class="fas fa-link mr-1"></i> Crear Nueva Relación</h6>
+                            <form method="POST">
+                                <div class="form-row">
+                                    <div class="col-md-5 mb-2">
+                                        <select name="id_titulo" class="form-control" required>
+                                            <option value="">Seleccionar título</option>
+                                            <?php
+                                            $titulos = obtenerTodosTitulos();
+                                            while ($t = $titulos->fetch_assoc()) {
+                                                echo "<option value='{$t['id']}'>{$t['nombre']}</option>";
+                                            }
+                                            ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-5 mb-2">
+                                        <select name="id_materia" class="form-control" required>
+                                            <option value="">Seleccionar materia</option>
+                                            <?php
+                                            $materias = obtenerTodasMaterias();
+                                            while ($m = $materias->fetch_assoc()) {
+                                                echo "<option value='{$m['id_materia']}'>{$m['cod_materia']} - {$m['nombre_materia']}</option>";
+                                            }
+                                            ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 mb-2">
+                                        <input type="number" name="prioridad" class="form-control" placeholder="Prioridad" min="1" value="1" required>
+                                    </div>
+                                </div>
+                                <button type="submit" name="relate_title_subject" class="btn btn-success btn-block mt-1">
+                                    <i class="fas fa-link"></i> Crear Relación
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
                     <!-- Buscador -->
                     <div class="input-group mb-3">
                         <div class="input-group-prepend">
@@ -258,7 +302,7 @@ include("includes/head.php");
                     </div>
 
                     <!-- Tabla de relaciones (se actualiza con AJAX) -->
-                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
                         <table class="table table-hover">
                             <thead class="thead-light">
                                 <tr>
@@ -274,40 +318,6 @@ include("includes/head.php");
                             </tbody>
                         </table>
                     </div>
-
-                    <!-- Formulario para crear relación -->
-                    <form method="POST" class="mt-3">
-                        <div class="form-row">
-                            <div class="col-md-5">
-                                <select name="id_titulo" class="form-control" required>
-                                    <option value="">Seleccionar título</option>
-                                    <?php
-                                    $titulos = obtenerTodosTitulos();
-                                    while ($t = $titulos->fetch_assoc()) {
-                                        echo "<option value='{$t['id']}'>{$t['nombre']}</option>";
-                                    }
-                                    ?>
-                                </select>
-                            </div>
-                            <div class="col-md-5">
-                                <select name="id_materia" class="form-control" required>
-                                    <option value="">Seleccionar materia</option>
-                                    <?php
-                                    $materias = obtenerTodasMaterias();
-                                    while ($m = $materias->fetch_assoc()) {
-                                        echo "<option value='{$m['id_materia']}'>{$m['cod_materia']} - {$m['nombre_materia']}</option>";
-                                    }
-                                    ?>
-                                </select>
-                            </div>
-                            <div class="col-md-2">
-                                <input type="number" name="prioridad" class="form-control" placeholder="Prioridad" min="1" value="1" required>
-                            </div>
-                        </div>
-                        <button type="submit" name="relate_title_subject" class="btn btn-success btn-block mt-2">
-                            <i class="fas fa-link"></i> Crear Relación
-                        </button>
-                    </form>
                 </div>
             </div>
         </div>

@@ -313,23 +313,24 @@ function actualizarNotificaciones() {
     fetch('../funciones/contar_mensajes_no_leidos.php')
         .then(response => response.json())
         .then(data => {
-            const link = document.querySelector('.nav-link[href="mensajeria_estudiantes.php"]');
-            const badge = link?.querySelector('.badge-notificacion');
-            
-            if (data.mensajes_no_leidos > 0) {
-                if (badge) {
-                    badge.textContent = data.mensajes_no_leidos;
-                } else if (link) {
-                    // Crear el badge si no existe
-                    const newBadge = document.createElement('span');
-                    newBadge.className = 'badge badge-danger badge-notificacion';
-                    newBadge.textContent = data.mensajes_no_leidos;
-                    link.appendChild(newBadge);
-                }
-            } else {
-                // Eliminar el badge si no hay mensajes
-                if (badge) {
-                    badge.remove();
+            const link = document.querySelector('.nav-link[href="mensajeria_estudiantes.php"]') || document.querySelector('a[href*="mensajeria"]');
+            if (link) {
+                const badge = link.querySelector('.badge-notificacion');
+                if (data.mensajes_no_leidos > 0) {
+                    if (badge) {
+                        badge.textContent = data.mensajes_no_leidos;
+                    } else {
+                        // Crear el badge si no existe
+                        const newBadge = document.createElement('span');
+                        newBadge.className = 'badge badge-danger badge-notificacion';
+                        newBadge.textContent = data.mensajes_no_leidos;
+                        link.appendChild(newBadge);
+                    }
+                } else {
+                    // Eliminar el badge si no hay mensajes
+                    if (badge) {
+                        badge.remove();
+                    }
                 }
             }
         })

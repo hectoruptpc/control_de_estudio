@@ -101,6 +101,38 @@ if(isset($_GET['eliminar'])) {
     }
 }
 
+// Actualizar asignación existente
+if(isset($_POST['actualizar_asignacion_seccion'])) {
+    $id_docente_seccion = $db->real_escape_string($_POST['id_docente_seccion_editar']);
+    $nueva_seccion = $db->real_escape_string($_POST['id_seccion_editar']);
+    $nueva_materia = $db->real_escape_string($_POST['id_materia_editar']);
+    
+    // Verificar que la asignación pertenezca a la carrera del director
+    $query_check_e = "SELECT ds.id_docente_seccion, s.id_carrera 
+                      FROM docente_seccion ds
+                      INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+                      WHERE ds.id_docente_seccion = $id_docente_seccion";
+    $result_check_e = $db->query($query_check_e);
+    if ($result_check_e && $result_check_e->num_rows > 0) {
+        $row_check_e = $result_check_e->fetch_assoc();
+        if ($row_check_e['id_carrera'] != $id_carrera_director) {
+            $tipo_mensaje = 'error';
+            $texto_mensaje = mb_strtoupper('NO TIENE PERMISOS PARA EDITAR ESTA ASIGNACIÓN DE SECCIÓN', 'UTF-8');
+        } else {
+            $q_update = "UPDATE docente_seccion 
+                         SET id_seccion = '$nueva_seccion', id_materia = '$nueva_materia' 
+                         WHERE id_docente_seccion = '$id_docente_seccion'";
+            if($db->query($q_update)) {
+                $tipo_mensaje = 'success';
+                $texto_mensaje = mb_strtoupper('ASIGNACIÓN DE SECCIÓN ACTUALIZADA CORRECTAMENTE', 'UTF-8');
+            } else {
+                $tipo_mensaje = 'error';
+                $texto_mensaje = mb_strtoupper('ERROR AL ACTUALIZAR LA ASIGNACIÓN DE SECCIÓN EN EL SERVIDOR', 'UTF-8');
+            }
+        }
+    }
+}
+
 include("includes/head.php");
 ?>
 
@@ -189,23 +221,82 @@ include("includes/head.php");
                 </div>
             </div>
 
+            <!-- Modal para Editar Asignación de Sección -->
+            <div class="modal fade" id="modalEditar" tabindex="-1" role="dialog" aria-labelledby="modalEditarLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title font-weight-bold" id="modalEditarLabel">
+                                <i class="fas fa-edit mr-1"></i> EDITAR ASIGNACIÓN DE SECCIÓN
+                            </h5>
+                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <form method="post" action="">
+                            <div class="modal-body">
+                                <input type="hidden" name="id_docente_seccion_editar" id="id_docente_seccion_editar">
+                                <div class="form-group">
+                                    <label><i class="fas fa-user-tie mr-1"></i> DOCENTE:</label>
+                                    <input type="text" class="form-control text-uppercase font-weight-bold" id="docente_editar_nombre" readonly>
+                                </div>
+                                <div class="form-group">
+                                    <label for="id_seccion_editar"><i class="fas fa-door-open mr-1"></i> NUEVA SECCIÓN:</label>
+                                    <select class="form-control text-uppercase" id="id_seccion_editar" name="id_seccion_editar" required onchange="cargarMateriasEditarModal()">
+                                        <option value="">SELECCIONE UNA SECCIÓN</option>
+                                        <?php
+                                        $query_secciones_modal = "SELECT s.id_seccion, s.codigo_seccion, s.id_carrera, c.nombre_carrera
+                                                            FROM secciones s
+                                                            INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+                                                            WHERE s.id_carrera = $id_carrera_director AND s.estatus = 'Activa'
+                                                            ORDER BY s.codigo_seccion";
+                                        $result_secciones_modal = $db->query($query_secciones_modal);
+                                        if($result_secciones_modal && $result_secciones_modal->num_rows > 0) {
+                                            while($sec_m = $result_secciones_modal->fetch_assoc()) {
+                                                echo "<option value='".$sec_m['id_seccion']."' data-carrera='".$sec_m['id_carrera']."'>".htmlspecialchars(mb_strtoupper($sec_m['codigo_seccion'].' - '.$sec_m['nombre_carrera'], 'UTF-8'))."</option>";
+                                            }
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="id_materia_editar"><i class="fas fa-book mr-1"></i> NUEVA MATERIA:</label>
+                                    <select class="form-control text-uppercase" id="id_materia_editar" name="id_materia_editar" required>
+                                        <option value="">SELECCIONE UNA MATERIA</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                                    <i class="fas fa-times mr-1"></i> CANCELAR
+                                </button>
+                                <button type="submit" name="actualizar_asignacion_seccion" class="btn btn-primary font-weight-bold">
+                                    <i class="fas fa-save mr-1"></i> GUARDAR CAMBIOS
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
             <!-- Mostrar mensaje en toast -->
             <?php if($tipo_mensaje): ?>
             <div id="toastMessage" data-type="<?php echo $tipo_mensaje; ?>" data-message="<?php echo htmlspecialchars($texto_mensaje); ?>"></div>
             <?php endif; ?>
 
-            <div class="card mb-4">
-                <div class="card-header">
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-success text-white font-weight-bold">
                     <i class="fas fa-user-plus mr-1"></i>
-                    Asignar Nueva Sección a Docente
+                    ASIGNAR NUEVA SECCIÓN A DOCENTE
                 </div>
                 <div class="card-body">
                     <form method="post" action="" id="asignarForm">
                         <div class="form-row">
                             <div class="form-group col-md-4">
-                                <label for="id_usuario">Docente:</label>
-                                <select class="form-control" id="id_usuario" name="id_usuario" required onchange="cargarMateriasPorCarrera()">
-                                    <option value="">Seleccione un docente</option>
+                                <label for="id_usuario" class="font-weight-bold"><i class="fas fa-user-tie mr-1"></i> DOCENTE:</label>
+                                <input type="text" id="buscar_docente_input" class="form-control form-control-sm mb-1 text-uppercase" placeholder="🔍 BUSCAR DOCENTE POR NOMBRE O CÉDULA..." autocomplete="off">
+                                <select class="form-control text-uppercase" id="id_usuario" name="id_usuario" required onchange="cargarMateriasPorCarrera()">
+                                    <option value="">SELECCIONE UN DOCENTE</option>
                                     <?php
                                     $query_docentes = "SELECT id, nombre, idusuario, carrera 
                                                        FROM users 
@@ -220,21 +311,24 @@ include("includes/head.php");
                                                 $result_carrera_doc = $db->query($query_carrera_doc);
                                                 if($result_carrera_doc->num_rows > 0) {
                                                     $carrera_doc = $result_carrera_doc->fetch_assoc();
-                                                    $nombre_carrera = ' - ' . $carrera_doc['nombre_carrera'];
+                                                    $nombre_carrera = ' - ' . mb_strtoupper($carrera_doc['nombre_carrera'], 'UTF-8');
                                                 }
                                             }
-                                            echo "<option value='".$docente['id']."'>".$docente['nombre']." (".$docente['idusuario'].")" . $nombre_carrera . "</option>";
+                                            $searchMeta = htmlspecialchars(mb_strtolower($docente['nombre'] . ' ' . $docente['idusuario'], 'UTF-8'));
+                                            $nombre_fmt = htmlspecialchars(mb_strtoupper($docente['nombre'], 'UTF-8'));
+                                            $cedula_fmt = htmlspecialchars($docente['idusuario']);
+                                            echo "<option value='".$docente['id']."' data-search='".$searchMeta."'>".$nombre_fmt." (".$cedula_fmt.")" . $nombre_carrera . "</option>";
                                         }
                                     } else {
-                                        echo "<option value=''>No hay docentes disponibles</option>";
+                                        echo "<option value=''>NO HAY DOCENTES DISPONIBLES</option>";
                                     }
                                     ?>
                                 </select>
                             </div>
                             <div class="form-group col-md-4">
-                                <label for="id_seccion">Sección:</label>
-                                <select class="form-control" id="id_seccion" name="id_seccion" required onchange="cargarMateriasPorCarrera()">
-                                    <option value="">Seleccione una sección</option>
+                                <label for="id_seccion" class="font-weight-bold"><i class="fas fa-door-open mr-1"></i> SECCIÓN:</label>
+                                <select class="form-control text-uppercase" id="id_seccion" name="id_seccion" required onchange="cargarMateriasPorCarrera()">
+                                    <option value="">SELECCIONE UNA SECCIÓN</option>
                                     <?php
                                     $query_secciones = "SELECT s.id_seccion, s.codigo_seccion, s.id_carrera, c.nombre_carrera
                                                         FROM secciones s
@@ -244,45 +338,45 @@ include("includes/head.php");
                                     $result_secciones = $db->query($query_secciones);
                                     if($result_secciones->num_rows > 0) {
                                         while($seccion = $result_secciones->fetch_assoc()) {
-                                            echo "<option value='".$seccion['id_seccion']."' data-carrera='".$seccion['id_carrera']."'>".$seccion['codigo_seccion']." - ".$seccion['nombre_carrera']."</option>";
+                                            echo "<option value='".$seccion['id_seccion']."' data-carrera='".$seccion['id_carrera']."'>".mb_strtoupper($seccion['codigo_seccion']." - ".$seccion['nombre_carrera'], 'UTF-8')."</option>";
                                         }
                                     } else {
-                                        echo "<option value=''>No hay secciones activas disponibles para su carrera</option>";
+                                        echo "<option value=''>NO HAY SECCIONES ACTIVAS DISPONIBLES PARA SU CARRERA</option>";
                                     }
                                     ?>
                                 </select>
                             </div>
                             <div class="form-group col-md-4">
-                                <label for="id_materia">Materia:</label>
-                                <select class="form-control" id="id_materia" name="id_materia" required disabled>
-                                    <option value="">Primero seleccione docente y sección</option>
+                                <label for="id_materia" class="font-weight-bold"><i class="fas fa-book mr-1"></i> MATERIA:</label>
+                                <select class="form-control text-uppercase" id="id_materia" name="id_materia" required disabled>
+                                    <option value="">PRIMERO SELECCIONE DOCENTE Y SECCIÓN</option>
                                 </select>
                             </div>
                         </div>
-                        <button type="submit" name="asignar" class="btn btn-primary">
-                            <i class="fas fa-save mr-1"></i> Asignar Sección
+                        <button type="submit" name="asignar" class="btn btn-success font-weight-bold px-4">
+                            <i class="fas fa-save mr-1"></i> ASIGNAR SECCIÓN
                         </button>
-                        <button type="reset" class="btn btn-secondary">
-                            <i class="fas fa-undo mr-1"></i> Limpiar
+                        <button type="reset" class="btn btn-secondary font-weight-bold">
+                            <i class="fas fa-undo mr-1"></i> LIMPIAR
                         </button>
                     </form>
                 </div>
             </div>
             
-            <div class="card mb-4">
-                <div class="card-header">
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-primary text-white font-weight-bold">
                     <i class="fas fa-table mr-1"></i>
-                    Asignaciones Actuales
+                    ASIGNACIONES ACTUALES
                 </div>
                 <div class="card-body">
                     <!-- DIAGNÓSTICO VISIBLE -->
                     <?php
-                    // Contar total de registros en docente_seccion (CORREGIDO: usar 1 en lugar de 'activo')
+                    // Contar total de registros en docente_seccion
                     $query_total = "SELECT COUNT(*) as total FROM docente_seccion WHERE estatus = 1";
                     $result_total = $db->query($query_total);
                     $total_registros = $result_total->fetch_assoc();
                     
-                    // Contar registros de la carrera del director (CORREGIDO: usar 1 en lugar de 'activo')
+                    // Contar registros de la carrera del director
                     $query_total_carrera = "SELECT COUNT(*) as total 
                                             FROM docente_seccion ds
                                             INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
@@ -291,29 +385,43 @@ include("includes/head.php");
                     $total_carrera = $result_total_carrera->fetch_assoc();
                     ?>
                     <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i>
-                        <strong>Diagnóstico:</strong> 
-                        Total asignaciones en sistema: <strong><?php echo $total_registros['total']; ?></strong> | 
-                        Asignaciones de su carrera: <strong><?php echo $total_carrera['total']; ?></strong>
+                        <i class="fas fa-info-circle mr-1"></i>
+                        <strong>DIAGNÓSTICO:</strong> 
+                        TOTAL ASIGNACIONES EN SISTEMA: <strong><?php echo $total_registros['total']; ?></strong> | 
+                        ASIGNACIONES DE SU CARRERA: <strong><?php echo $total_carrera['total']; ?></strong>
+                    </div>
+
+                    <!-- Buscador en tiempo real arriba de la tabla -->
+                    <div class="form-group mb-3">
+                        <label for="buscar_tabla_asignaciones" class="font-weight-bold text-primary"><i class="fas fa-search mr-1"></i> BUSCAR DOCENTE, SECCIÓN O MATERIA EN TIEMPO REAL:</label>
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text"><i class="fas fa-filter"></i></span>
+                            </div>
+                            <input type="text" id="buscar_tabla_asignaciones" class="form-control text-uppercase" placeholder="ESCRIBA PARA BUSCAR DOCENTE (CÉDULA O NOMBRE), SECCIÓN O MATERIA..." autocomplete="off">
+                            <div class="input-group-append">
+                                <button class="btn btn-outline-secondary" type="button" id="btn_limpiar_tabla">
+                                    <i class="fas fa-times"></i> LIMPIAR
+                                </button>
+                            </div>
+                        </div>
+                        <small class="form-text text-muted font-weight-bold" id="tabla_coincidencias_info">FILTRADO EN TIEMPO REAL ACTIVADO.</small>
                     </div>
                     
                     <div class="table-responsive">
-                        <table class="table table-bordered table-hover" id="dataTable" width="100%" cellspacing="0">
+                        <table class="table table-bordered table-hover text-uppercase" id="dataTable" width="100%" cellspacing="0">
                             <thead class="thead-dark">
                                 <tr>
-                                    <th>Docente</th>
-                                    <th>Sección</th>
-                                    <th>Carrera</th>
-                                    <th>Materia</th>
-                                    <th>Fecha Asignación</th>
-                                    <th>Acciones</th>
+                                    <th>DOCENTE</th>
+                                    <th>SECCIÓN</th>
+                                    <th>CARRERA</th>
+                                    <th>MATERIA</th>
+                                    <th>FECHA ASIGNACIÓN</th>
+                                    <th>ACCIONES</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php
-                                // ============================================================
-                                // CORREGIDO: Usar estatus = 1 (numérico) en lugar de 'activo'
-                                // ============================================================
                                 $query_asignaciones = "SELECT 
                                     ds.id_docente_seccion,
                                     ds.id_usuario,
@@ -339,28 +447,46 @@ include("includes/head.php");
 
                                 $result_asignaciones = $db->query($query_asignaciones);
                                 
-                                if($result_asignaciones->num_rows > 0) {
+                                if($result_asignaciones && $result_asignaciones->num_rows > 0) {
                                     while($row = $result_asignaciones->fetch_assoc()) {
+                                        $docente_upper = htmlspecialchars(mb_strtoupper($row['docente'], 'UTF-8'));
+                                        $cedula_upper = htmlspecialchars($row['cedula_docente']);
+                                        $seccion_upper = htmlspecialchars(mb_strtoupper($row['codigo_seccion'], 'UTF-8'));
+                                        $carrera_upper = htmlspecialchars(mb_strtoupper($row['nombre_carrera'], 'UTF-8'));
+                                        $materia_upper = htmlspecialchars(mb_strtoupper($row['nombre_materia'], 'UTF-8'));
+                                        $cod_mat_upper = htmlspecialchars(mb_strtoupper($row['cod_materia'], 'UTF-8'));
+
                                         echo "<tr>
                                                 <td>
-                                                    <strong>".htmlspecialchars($row['docente'])."</strong><br>
-                                                    <small class='text-muted'>Cédula: ".htmlspecialchars($row['cedula_docente'])."</small>
+                                                    <strong>".$docente_upper."</strong><br>
+                                                    <small class='text-muted'>CÉDULA: ".$cedula_upper."</small>
                                                 </td>
-                                                <td><span class='badge badge-primary'>".htmlspecialchars($row['codigo_seccion'])."</span></td>
-                                                <td>".htmlspecialchars($row['nombre_carrera'])."</td>
+                                                <td><span class='badge badge-primary'>".$seccion_upper."</span></td>
+                                                <td>".$carrera_upper."</td>
                                                 <td>
-                                                    <strong>".htmlspecialchars($row['nombre_materia'])."</strong><br>
-                                                    <small class='text-muted'>Código: ".htmlspecialchars($row['cod_materia'])."</small>
+                                                    <strong>".$materia_upper."</strong><br>
+                                                    <small class='text-muted'>CÓDIGO: ".$cod_mat_upper."</small>
                                                 </td>
                                                 <td>".date('d/m/Y H:i', strtotime($row['fecha_asignacion']))."</td>
-                                                <td>
+                                                <td class='text-nowrap'>
+                                                    <button class='btn btn-sm btn-primary editar-asignacion mr-1' 
+                                                            data-toggle='modal' 
+                                                            data-target='#modalEditar'
+                                                            data-id='".$row['id_docente_seccion']."'
+                                                            data-docente='".$docente_upper."'
+                                                            data-cedula='".$cedula_upper."'
+                                                            data-id-docente='".$row['id_usuario']."'
+                                                            data-id-seccion='".$row['id_seccion']."'
+                                                            data-id-materia='".$row['id_materia']."'>
+                                                        <i class='fas fa-edit mr-1'></i> CAMBIAR
+                                                    </button>
                                                     <button class='btn btn-sm btn-danger eliminar-asignacion' 
                                                             data-toggle='modal' 
                                                             data-target='#confirmDeleteModal'
                                                             data-id='".$row['id_docente_seccion']."'
-                                                            data-docente='".htmlspecialchars($row['docente'])."'
-                                                            data-seccion='".htmlspecialchars($row['codigo_seccion'])."'>
-                                                        <i class='fas fa-trash-alt mr-1'></i> Eliminar
+                                                            data-docente='".$docente_upper."'
+                                                            data-seccion='".$seccion_upper."'>
+                                                        <i class='fas fa-trash-alt mr-1'></i> ELIMINAR
                                                     </button>
                                                 </td>
                                               </tr>";
@@ -368,12 +494,12 @@ include("includes/head.php");
                                 } else {
                                     echo '<tr>
                                             <td colspan="6" class="text-center">
-                                                <div class="alert alert-warning">
+                                                <div class="alert alert-warning mb-0">
                                                     <i class="fas fa-exclamation-triangle mr-2"></i>
-                                                    <strong>No hay asignaciones registradas para su carrera</strong><br>
+                                                    <strong>NO HAY ASIGNACIONES REGISTRADAS PARA SU CARRERA</strong><br>
                                                     <small class="text-muted">
-                                                        Total en sistema: '.htmlspecialchars($total_registros['total']).' | 
-                                                        De su carrera: '.htmlspecialchars($total_carrera['total']).'
+                                                        TOTAL EN SISTEMA: '.htmlspecialchars($total_registros['total']).' | 
+                                                        DE SU CARRERA: '.htmlspecialchars($total_carrera['total']).'
                                                     </small>
                                                 </div>
                                             </td>
@@ -398,12 +524,12 @@ function cargarMateriasPorCarrera() {
     var idCarrera = selectSeccion.options[selectSeccion.selectedIndex]?.getAttribute('data-carrera') || '0';
     
     if(idDocente === '' || selectSeccion.value === '') {
-        selectMaterias.innerHTML = '<option value="">Primero seleccione docente y sección</option>';
+        selectMaterias.innerHTML = '<option value="">PRIMERO SELECCIONE DOCENTE Y SECCIÓN</option>';
         selectMaterias.disabled = true;
         return;
     }
     
-    selectMaterias.innerHTML = '<option value="">Cargando materias...</option>';
+    selectMaterias.innerHTML = '<option value="">CARGANDO MATERIAS...</option>';
     selectMaterias.disabled = true;
     
     var xhr = new XMLHttpRequest();
@@ -419,33 +545,82 @@ function cargarMateriasPorCarrera() {
                     materias.forEach(function(materia) {
                         var option = document.createElement('option');
                         option.value = materia.id_materia;
-                        option.textContent = materia.nombre_materia + ' (' + materia.cod_materia + ')';
+                        option.textContent = (materia.nombre_materia + ' (' + materia.cod_materia + ')').toUpperCase();
                         selectMaterias.appendChild(option);
                     });
                     selectMaterias.disabled = false;
                 } else {
-                    selectMaterias.innerHTML = '<option value="">Este docente no tiene materias para esta carrera</option>';
+                    selectMaterias.innerHTML = '<option value="">ESTE DOCENTE NO TIENE MATERIAS PARA ESTA CARRERA</option>';
                     selectMaterias.disabled = true;
-                    showToast('warning', 'El docente no tiene materias asignadas para esta carrera');
+                    showToast('warning', 'EL DOCENTE NO TIENE MATERIAS ASIGNADAS PARA ESTA CARRERA');
                 }
             } catch(e) {
-                selectMaterias.innerHTML = '<option value="">Error al procesar materias</option>';
+                selectMaterias.innerHTML = '<option value="">ERROR AL PROCESAR MATERIAS</option>';
                 selectMaterias.disabled = true;
-                showToast('error', 'Error al cargar las materias');
+                showToast('error', 'ERROR AL CARGAR LAS MATERIAS');
             }
         } else {
-            selectMaterias.innerHTML = '<option value="">Error al cargar materias</option>';
+            selectMaterias.innerHTML = '<option value="">ERROR AL CARGAR MATERIAS</option>';
             selectMaterias.disabled = true;
-            showToast('error', 'Error de conexión al servidor');
+            showToast('error', 'ERROR DE CONEXIÓN AL SERVIDOR');
         }
     };
     
     xhr.onerror = function() {
-        selectMaterias.innerHTML = '<option value="">Error de conexión</option>';
+        selectMaterias.innerHTML = '<option value="">ERROR DE CONEXIÓN</option>';
         selectMaterias.disabled = true;
-        showToast('error', 'Error de conexión con el servidor');
+        showToast('error', 'ERROR DE CONEXIÓN CON EL SERVIDOR');
     };
     
+    xhr.send();
+}
+
+function cargarMateriasEditarModal(idMateriaSeleccionar) {
+    var idDocente = $('#docente_editar_nombre').attr('data-id-docente');
+    var selectSeccion = document.getElementById('id_seccion_editar');
+    var selectMaterias = document.getElementById('id_materia_editar');
+    
+    if(!selectSeccion) return;
+    var idCarrera = selectSeccion.options[selectSeccion.selectedIndex]?.getAttribute('data-carrera') || '0';
+    
+    if(!idDocente || !selectSeccion.value) {
+        selectMaterias.innerHTML = '<option value="">PRIMERO SELECCIONE SECCIÓN</option>';
+        selectMaterias.disabled = true;
+        return;
+    }
+    
+    selectMaterias.innerHTML = '<option value="">CARGANDO MATERIAS...</option>';
+    selectMaterias.disabled = true;
+    
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '?ajax=materias_docente_carrera&id_docente=' + idDocente + '&id_carrera=' + idCarrera, true);
+    
+    xhr.onload = function() {
+        if(this.status == 200) {
+            try {
+                var materias = JSON.parse(this.responseText);
+                if(materias.length > 0) {
+                    selectMaterias.innerHTML = '';
+                    materias.forEach(function(materia) {
+                        var option = document.createElement('option');
+                        option.value = materia.id_materia;
+                        option.textContent = (materia.nombre_materia + ' (' + materia.cod_materia + ')').toUpperCase();
+                        if(idMateriaSeleccionar && materia.id_materia == idMateriaSeleccionar) {
+                            option.selected = true;
+                        }
+                        selectMaterias.appendChild(option);
+                    });
+                    selectMaterias.disabled = false;
+                } else {
+                    selectMaterias.innerHTML = '<option value="">ESTE DOCENTE NO TIENE MATERIAS PARA ESTA SECCIÓN</option>';
+                    selectMaterias.disabled = true;
+                }
+            } catch(e) {
+                selectMaterias.innerHTML = '<option value="">ERROR AL PROCESAR MATERIAS</option>';
+                selectMaterias.disabled = true;
+            }
+        }
+    };
     xhr.send();
 }
 
@@ -455,7 +630,7 @@ function showToast(type, message) {
                      type === 'warning' ? 'alert-warning' : 'alert-info';
     
     var toast = document.createElement('div');
-    toast.className = 'alert ' + alertClass + ' alert-dismissible fade show';
+    toast.className = 'alert ' + alertClass + ' alert-dismissible fade show font-weight-bold';
     toast.style.position = 'fixed';
     toast.style.top = '20px';
     toast.style.right = '20px';
@@ -463,7 +638,7 @@ function showToast(type, message) {
     toast.style.minWidth = '300px';
     toast.innerHTML = `
         <button type="button" class="close" data-dismiss="alert">&times;</button>
-        <strong>${type === 'success' ? 'Éxito!' : type === 'error' ? 'Error!' : 'Advertencia!'}</strong> ${message}
+        <strong>${type === 'success' ? 'ÉXITO!' : type === 'error' ? 'ERROR!' : 'ADVERTENCIA!'}</strong> ${message.toUpperCase()}
     `;
     
     document.body.appendChild(toast);
@@ -474,6 +649,94 @@ function showToast(type, message) {
 }
 
 $(document).ready(function() {
+    // BUSCADOR EN TIEMPO REAL PARA SELECTOR DE DOCENTE (POR NOMBRE O CÉDULA)
+    const inputBuscarDocente = document.getElementById('buscar_docente_input');
+    if (inputBuscarDocente) {
+        inputBuscarDocente.addEventListener('input', function() {
+            const val = this.value.toLowerCase().trim();
+            const select = document.getElementById('id_usuario');
+            const options = select.querySelectorAll('option');
+            let visibleCount = 0;
+            let lastVisibleOption = null;
+
+            options.forEach(opt => {
+                if (opt.value === '') {
+                    opt.hidden = false;
+                    return;
+                }
+                const searchMeta = opt.getAttribute('data-search') || opt.textContent.toLowerCase();
+                if (searchMeta.includes(val)) {
+                    opt.hidden = false;
+                    visibleCount++;
+                    lastVisibleOption = opt;
+                } else {
+                    opt.hidden = true;
+                }
+            });
+
+            if (visibleCount === 1 && lastVisibleOption) {
+                select.value = lastVisibleOption.value;
+                cargarMateriasPorCarrera();
+            }
+        });
+    }
+
+    // BUSCADOR EN TIEMPO REAL DE LA TABLA DE ASIGNACIONES
+    const inputBuscarTabla = document.getElementById('buscar_tabla_asignaciones');
+    const btnLimpiarTabla = document.getElementById('btn_limpiar_tabla');
+    const tablaInfo = document.getElementById('tabla_coincidencias_info');
+
+    if (inputBuscarTabla) {
+        function filtrarTabla() {
+            const filter = inputBuscarTabla.value.toLowerCase().trim();
+            const filas = document.querySelectorAll('#dataTable tbody tr');
+            let visibles = 0;
+
+            filas.forEach(fila => {
+                const texto = fila.textContent.toLowerCase();
+                if (texto.includes(filter)) {
+                    fila.style.display = '';
+                    visibles++;
+                } else {
+                    fila.style.display = 'none';
+                }
+            });
+
+            if (tablaInfo) {
+                if (filter === '') {
+                    tablaInfo.textContent = 'FILTRADO EN TIEMPO REAL ACTIVADO.';
+                } else {
+                    tablaInfo.textContent = 'MOSTRANDO ' + visibles + ' COINCIDENCIA(S) DE ' + filas.length + ' ASIGNACIONES.';
+                }
+            }
+        }
+
+        inputBuscarTabla.addEventListener('input', filtrarTabla);
+        if (btnLimpiarTabla) {
+            btnLimpiarTabla.addEventListener('click', function() {
+                inputBuscarTabla.value = '';
+                filtrarTabla();
+            });
+        }
+    }
+
+    // MODAL EDITAR ASIGNACIÓN DE SECCIÓN
+    $(document).on('click', '.editar-asignacion', function() {
+        var id = $(this).data('id');
+        var docente = $(this).data('docente');
+        var cedula = $(this).data('cedula');
+        var idDocente = $(this).data('id-docente');
+        var idSeccion = $(this).data('id-seccion');
+        var idMateria = $(this).data('id-materia');
+        
+        $('#id_docente_seccion_editar').val(id);
+        $('#docente_editar_nombre').val(docente + ' (CÉDULA: ' + cedula + ')').attr('data-id-docente', idDocente);
+        $('#id_seccion_editar').val(idSeccion);
+        
+        cargarMateriasEditarModal(idMateria);
+    });
+
+    // MODAL ELIMINAR ASIGNACIÓN DE SECCIÓN
     $(document).on('click', '.eliminar-asignacion', function() {
         var id = $(this).data('id');
         var docente = $(this).data('docente');
@@ -482,7 +745,7 @@ $(document).ready(function() {
         $('#confirmDeleteButton').attr('href', '?eliminar=' + id);
         
         $('#confirmDeleteModal .modal-body p:first').html(
-            '¿Está seguro de eliminar la asignación de <strong>' + docente + '</strong> a la sección <strong>' + seccion + '</strong>?'
+            '¿ESTÁ SEGURO DE ELIMINAR LA ASIGNACIÓN DE <strong>' + docente + '</strong> A LA SECCIÓN <strong>' + seccion + '</strong>?'
         );
     });
     
@@ -508,15 +771,23 @@ $(document).ready(function() {
         var idMateria = $('#id_materia');
         if(idMateria.is(':disabled') || idMateria.val() === '') {
             e.preventDefault();
-            showToast('error', 'Por favor seleccione una materia válida');
+            showToast('error', 'POR FAVOR SELECCIONE UNA MATERIA VÁLIDA');
             return false;
         }
         return true;
     });
     
     $('#asignarForm button[type="reset"]').on('click', function() {
-        $('#id_materia').html('<option value="">Primero seleccione docente y sección</option>').prop('disabled', true);
-        showToast('info', 'Formulario limpiado');
+        $('#id_materia').html('<option value="">PRIMERO SELECCIONE DOCENTE Y SECCIÓN</option>').prop('disabled', true);
+        if(inputBuscarDocente) inputBuscarDocente.value = '';
+        const options = document.querySelectorAll('#id_usuario option');
+        options.forEach(opt => opt.hidden = false);
+        showToast('info', 'FORMULARIO LIMPIADO');
+    });
+
+    // CONVERSIÓN AUTOMÁTICA A MAYÚSCULAS EN ENTRADAS DE TEXTO
+    $(document).on('input', 'input[type="text"]', function() {
+        this.value = this.value.toUpperCase();
     });
 });
 </script>

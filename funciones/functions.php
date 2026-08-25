@@ -17364,7 +17364,7 @@ function obtenerTodasMaterias() {
 function obtenerTiposPago() {
     global $db;
     
-    $query = "SELECT id, tipopago FROM tipo_pago ORDER BY tipopago";
+    $query = "SELECT id, tipopago, precio FROM tipo_pago ORDER BY tipopago";
     $result = $db->query($query);
     
     if ($result) {
@@ -17375,13 +17375,14 @@ function obtenerTiposPago() {
 }
 
 // Función para crear un nuevo tipo de pago - CON AUDITORÍA
-function crearTipoPago($tipopago) {
+function crearTipoPago($tipopago, $precio = 0.00) {
     global $db;
+    $precio = (float)$precio;
     
     try {
         $tipopago_original = $tipopago;
-        $stmt = $db->prepare("INSERT INTO tipo_pago (tipopago) VALUES (?)");
-        $stmt->bind_param("s", $tipopago);
+        $stmt = $db->prepare("INSERT INTO tipo_pago (tipopago, precio) VALUES (?, ?)");
+        $stmt->bind_param("sd", $tipopago, $precio);
         
         if ($stmt->execute()) {
             $id_insertado = $db->insert_id;
@@ -17397,12 +17398,13 @@ function crearTipoPago($tipopago) {
                         null, 
                         [
                             'tipo_pago' => $tipopago_original,
+                            'precio' => $precio,
                             'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
                             'usuario_id' => $_SESSION['user']['id'] ?? 0,
                             'fecha_creacion' => date('Y-m-d H:i:s')
                         ], 
                         "Tipos de Pago", 
-                        "Tipo de pago creado: " . $tipopago_original
+                        "Tipo de pago creado: " . $tipopago_original . " (Bs " . $precio . ")"
                     );
                 } catch (Exception $e) {
                     error_log("Error en auditoría crearTipoPago: " . $e->getMessage());
@@ -17467,12 +17469,13 @@ function crearTipoPago($tipopago) {
 }
 
 // Función para actualizar un tipo de pago - CON AUDITORÍA
-function actualizarTipoPago($id, $tipopago) {
+function actualizarTipoPago($id, $tipopago, $precio = 0.00) {
     global $db;
+    $precio = (float)$precio;
     
     try {
         // Obtener datos actuales para auditoría
-        $stmt_actual = $db->prepare("SELECT tipopago FROM tipo_pago WHERE id = ?");
+        $stmt_actual = $db->prepare("SELECT tipopago, precio FROM tipo_pago WHERE id = ?");
         $stmt_actual->bind_param("i", $id);
         $stmt_actual->execute();
         $result_actual = $stmt_actual->get_result();
@@ -17485,8 +17488,8 @@ function actualizarTipoPago($id, $tipopago) {
         $stmt_actual->close();
         
         $tipopago_original = $tipopago;
-        $stmt = $db->prepare("UPDATE tipo_pago SET tipopago = ? WHERE id = ?");
-        $stmt->bind_param("si", $tipopago, $id);
+        $stmt = $db->prepare("UPDATE tipo_pago SET tipopago = ?, precio = ? WHERE id = ?");
+        $stmt->bind_param("sdi", $tipopago, $precio, $id);
         
         if ($stmt->execute()) {
             $stmt->close();
@@ -17499,16 +17502,18 @@ function actualizarTipoPago($id, $tipopago) {
                         "tipo_pago", 
                         $id, 
                         [
-                            'tipo_pago_anterior' => $tipo_pago_actual['tipopago']
+                            'tipo_pago_anterior' => $tipo_pago_actual['tipopago'],
+                            'precio_anterior' => $tipo_pago_actual['precio']
                         ], 
                         [
                             'tipo_pago_nuevo' => $tipopago_original,
+                            'precio_nuevo' => $precio,
                             'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
                             'usuario_id' => $_SESSION['user']['id'] ?? 0,
                             'fecha_actualizacion' => date('Y-m-d H:i:s')
                         ], 
                         "Tipos de Pago", 
-                        "Tipo de pago actualizado: " . $tipo_pago_actual['tipopago'] . " → " . $tipopago_original
+                        "Tipo de pago actualizado: " . $tipo_pago_actual['tipopago'] . " → " . $tipopago_original . " (Bs " . $precio . ")"
                     );
                 } catch (Exception $e) {
                     error_log("Error en auditoría actualizarTipoPago: " . $e->getMessage());
@@ -17680,7 +17685,7 @@ function eliminarTipoPago($id) {
 }
 
 // Función para validar tipo de pago - SOLO VALIDACIÓN, SIN AUDITORÍA
-function validarTipoPago($tipopago) {
+function validarTipoPago($tipopago, $precio = 0.00) {
     $tipopago = trim($tipopago);
     
     if (empty($tipopago)) {
@@ -17693,6 +17698,10 @@ function validarTipoPago($tipopago) {
     
     if (strlen($tipopago) > 100) {
         return ['success' => false, 'message' => 'El tipo de pago no puede exceder los 100 caracteres'];
+    }
+    
+    if ((float)$precio < 0) {
+        return ['success' => false, 'message' => 'El precio debe ser mayor o igual a cero'];
     }
     
     return ['success' => true, 'message' => ''];

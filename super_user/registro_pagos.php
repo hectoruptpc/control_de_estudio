@@ -331,11 +331,13 @@ $fecha_fin = date('Y-m-d');
                         <div class="form-group">
                             <label for="tipo_pago">Tipo de Pago:</label>
                             <select class="form-control" id="tipo_pago" name="tipo_pago" required>
-                                <option value="">-- Seleccionar Tipo de Pago --</option>
+                                <option value="" data-precio="">-- Seleccionar Tipo de Pago --</option>
                                 <?php foreach ($tipos_pago as $tipo): ?>
-                                    <option value="<?= $tipo['id'] ?>"><?= htmlspecialchars($tipo['tipopago']) ?></option>
+                                    <option value="<?= $tipo['id'] ?>" data-precio="<?= htmlspecialchars($tipo['precio'] ?? '0.00') ?>">
+                                        <?= htmlspecialchars($tipo['tipopago']) ?> <?php if (isset($tipo['precio']) && (float)$tipo['precio'] > 0): ?>(Bs <?= number_format($tipo['precio'], 2, ',', '.') ?>)<?php endif; ?>
+                                    </option>
                                 <?php endforeach; ?>
-                                <option value="0">Otro concepto</option>
+                                <option value="0" data-precio="0.00">Otro concepto</option>
                             </select>
                         </div>
                         
@@ -603,8 +605,8 @@ $fecha_fin = date('Y-m-d');
 </div>
 
 <script>
-// Mostrar/ocultar campo "Otro concepto" según selección
-document.getElementById('tipo_pago').addEventListener('change', function() {
+// Mostrar/ocultar campo "Otro concepto" según selección y precargar precio
+document.getElementById('tipo_pago')?.addEventListener('change', function() {
     const otroConceptoGroup = document.getElementById('otro_concepto_group');
     const otroConceptoInput = document.getElementById('otro_concepto');
     
@@ -615,6 +617,17 @@ document.getElementById('tipo_pago').addEventListener('change', function() {
         otroConceptoGroup.style.display = 'none';
         otroConceptoInput.removeAttribute('required');
         otroConceptoInput.value = '';
+    }
+
+    const selectedOption = this.options[this.selectedIndex];
+    if (selectedOption) {
+        const precio = selectedOption.getAttribute('data-precio');
+        if (precio !== null && precio !== undefined && precio !== '') {
+            const montoInput = document.getElementById('monto');
+            if (montoInput) {
+                montoInput.value = precio;
+            }
+        }
     }
 });
 

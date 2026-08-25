@@ -17,6 +17,50 @@ $registros_por_pagina = obtener_registros_por_pagina();
 $pagina_actual = isset($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
 if ($pagina_actual < 1) $pagina_actual = 1;
 
+// Manejar búsqueda AJAX por POST en tiempo de ejecución (sin recargar ni usar GET)
+if (isset($_POST['ajax_filtrar'])) {
+    header('Content-Type: application/json');
+    $filtros = [
+        'buscar' => trim($_POST['buscar'] ?? ''),
+        'estado' => trim($_POST['estado'] ?? ''),
+        'carrera' => trim($_POST['carrera'] ?? '')
+    ];
+    $pagina_actual = isset($_POST['pagina']) ? (int)$_POST['pagina'] : 1;
+    $registros_por_pagina = isset($_POST['registros_por_pagina']) ? (int)$_POST['registros_por_pagina'] : 20;
+    
+    $datos_paginacion = obtener_estudiantes_graduacion_paginados($filtros, $pagina_actual, $registros_por_pagina);
+    $estudiantes = $datos_paginacion['resultados'];
+    
+    ob_start();
+    if (is_array($estudiantes) && count($estudiantes) > 0) {
+        foreach ($estudiantes as $estudiante) {
+            $nombre_carrera = $estudiante['nombre_carrera'] ?: 'Carrera ' . $estudiante['carrera'];
+            echo "<tr class='text-uppercase'>";
+            echo "<td>" . htmlspecialchars($estudiante['idusuario']) . "</td>";
+            echo "<td><strong>" . htmlspecialchars(mb_strtoupper($estudiante['nombre'], 'UTF-8')) . "</strong></td>";
+            echo "<td>" . htmlspecialchars(mb_strtoupper($nombre_carrera, 'UTF-8')) . "</td>";
+            echo "<td>" . obtener_badge_estado($estudiante['estado']) . "</td>";
+            echo "<td>" . ($estudiante['fecha_graduacion'] ? date('d/m/Y', strtotime($estudiante['fecha_graduacion'])) : '-') . "</td>";
+            if (tienePermiso('gestion_grado')) {
+                echo "<td class='text-nowrap'>" . generar_botones_accion($estudiante) . "</td>";
+            }
+            echo "</tr>";
+        }
+    } else {
+        echo "<tr><td colspan='6' class='text-center font-weight-bold text-muted p-4'><i class='fas fa-exclamation-circle text-warning mr-2'></i> NO SE ENCONTRARON ESTUDIANTES PARA GRADUACIÓN CON LOS FILTROS SELECCIONADOS</td></tr>";
+    }
+    $html = ob_get_clean();
+    
+    echo json_encode([
+        'status' => 'success',
+        'html' => $html,
+        'total_registros' => $datos_paginacion['total_registros'],
+        'total_paginas' => $datos_paginacion['total_paginas'],
+        'pagina_actual' => $pagina_actual
+    ]);
+    exit();
+}
+
 // Procesar acciones
 if (isset($_POST['marcar_graduado'])) {
     marcar_como_graduado($_POST['id_usuario']);
@@ -32,76 +76,47 @@ include("includes/head.php");
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <h1 class="h3 mb-4 text-gray-800">Gestión de Graduación</h1>
-            
-            <!-- ============================================= -->
-            <!-- 🐛 INSTRUCCIONES DEBUG - COMO ACTIVAR EL MODO DEBUG -->
-            <!-- ============================================= -->
-            <!-- 
-            PARA ACTIVAR EL MODO DEBUG USA ESTAS URLS:
-            
-            1. DEBUG COMPLETO (todos los estudiantes):
-               http://tudominio.com/admin/grado.php?debug=1
-            
-            2. DEBUG SOLO ESTUDIANTES APTOS:
-               http://tudominio.com/admin/grado.php?debug=1&estado=cumple_requisitos
-            
-            3. DEBUG CON FILTROS ESPECÍFICOS:
-               http://tudominio.com/admin/grado.php?debug=1&carrera=Ingeniería&buscar=nombre
-            
-            El modo DEBUG te muestra información detallada de por qué cada estudiante 
-            es considerado APTO o NO APTO para graduarse.
-            -->
-            
-            <!-- DEBUG: Información de depuración -->
-            <?php if (isset($_GET['debug'])): ?>
-            <div class="alert alert-info">
-                <h5>🔍 MODO DEBUG ACTIVADO</h5>
-                <p>Esta información te ayuda a ver por qué los estudiantes aparecen como aptos o no aptos.</p>
-                <small>
-                    <a href="grado.php" class="text-primary">[Ocultar DEBUG]</a> | 
-                    <a href="grado.php?debug=1&estado=cumple_requisitos" class="text-primary">[DEBUG Solo Aptos]</a> |
-                    <a href="grado.php?debug=1" class="text-primary">[DEBUG Todos]</a>
-                </small>
-            </div>
-            <?php endif; ?>
+            <h1 class="h3 mb-4 text-gray-800 font-weight-bold">GESTIÓN DE GRADUACIÓN</h1>
             
             <!-- Filtros -->
             <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Filtros de Búsqueda</h6>
+                <div class="card-header py-3 bg-primary text-white font-weight-bold">
+                    <h6 class="m-0 font-weight-bold"><i class="fas fa-search mr-1"></i> FILTROS DE BÚSQUEDA EN TIEMPO REAL (POST)</h6>
                 </div>
                 <div class="card-body">
-                    <form method="GET" class="form-inline">
-                        <input type="hidden" name="pagina" value="1">
+                    <form id="filtroGradoForm" onsubmit="return false;" class="form-inline">
                         <div class="form-group mr-2 mb-2">
-                            <input type="text" class="form-control" name="buscar" placeholder="Buscar por nombre o cédula" 
-                                   value="<?php echo isset($_GET['buscar']) ? htmlspecialchars($_GET['buscar']) : ''; ?>">
+                            <input type="text" class="form-control text-uppercase" id="buscar_input" name="buscar" placeholder="🔍 BUSCAR POR NOMBRE O CÉDULA..." 
+                                   value="<?php echo isset($_GET['buscar']) ? htmlspecialchars($_GET['buscar']) : ''; ?>" autocomplete="off">
                         </div>
                         <div class="form-group mr-2 mb-2">
-                            <select class="form-control" name="estado">
-                                <option value="">Todos los estados</option>
-                                <option value="cumple_requisitos" <?php echo (isset($_GET['estado']) && $_GET['estado'] == 'cumple_requisitos') ? 'selected' : ''; ?>>Cumple Requisitos</option>
-                                <option value="graduado" <?php echo (isset($_GET['estado']) && $_GET['estado'] == 'graduado') ? 'selected' : ''; ?>>Graduados</option>
-                                <option value="titulo_entregado" <?php echo (isset($_GET['estado']) && $_GET['estado'] == 'titulo_entregado') ? 'selected' : ''; ?>>Título Entregado</option>
+                            <select class="form-control text-uppercase" id="estado_select" name="estado">
+                                <option value="">TODOS LOS ESTADOS</option>
+                                <option value="cumple_requisitos" <?php echo (isset($_GET['estado']) && $_GET['estado'] == 'cumple_requisitos') ? 'selected' : ''; ?>>CUMPLE REQUISITOS</option>
+                                <option value="graduado" <?php echo (isset($_GET['estado']) && $_GET['estado'] == 'graduado') ? 'selected' : ''; ?>>GRADUADOS</option>
+                                <option value="titulo_entregado" <?php echo (isset($_GET['estado']) && $_GET['estado'] == 'titulo_entregado') ? 'selected' : ''; ?>>TÍTULO ENTREGADO</option>
                             </select>
                         </div>
                         <div class="form-group mr-2 mb-2">
-                            <select class="form-control" name="carrera">
-                                <option value="">Todas las carreras</option>
+                            <select class="form-control text-uppercase" id="carrera_select" name="carrera">
+                                <option value="">TODAS LAS CARRERAS</option>
                                 <?php
                                 $carreras = obtener_carreras();
                                 if ($carreras) {
                                     while ($carrera = mysqli_fetch_assoc($carreras)) {
                                         $selected = (isset($_GET['carrera']) && $_GET['carrera'] == $carrera['nombre_carrera']) ? 'selected' : '';
-                                        echo "<option value='" . htmlspecialchars($carrera['nombre_carrera']) . "' $selected>" . htmlspecialchars($carrera['nombre_carrera']) . "</option>";
+                                        echo "<option value='" . htmlspecialchars($carrera['nombre_carrera']) . "' $selected>" . htmlspecialchars(mb_strtoupper($carrera['nombre_carrera'], 'UTF-8')) . "</option>";
                                     }
                                 }
                                 ?>
                             </select>
                         </div>
-                        <button type="submit" class="btn btn-primary mb-2">Filtrar</button>
-                        <a href="grado.php" class="btn btn-secondary mb-2 ml-2">Limpiar</a>
+                        <button type="button" class="btn btn-secondary mb-2 ml-2 font-weight-bold" id="btnLimpiarFiltros">
+                            <i class="fas fa-times mr-1"></i> LIMPIAR
+                        </button>
+                    </form>
+                </div>
+            </div>
                         
                         <!-- Enlace de depuración -->
                         <div class="ml-2">
@@ -227,38 +242,37 @@ include("includes/head.php");
                     </div>
 
                     <div class="table-responsive">
-                        <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
-                            <thead>
+                        <table class="table table-bordered table-hover text-uppercase" id="dataTable" width="100%" cellspacing="0">
+                            <thead class="thead-dark">
                                 <tr>
-                                    <th>Cédula</th>
-                                    <th>Nombre Completo</th>
-                                    <th>Carrera</th>
-                                    <th>Estado</th>
-                                    <th>Fecha Graduación</th>
+                                    <th>CÉDULA</th>
+                                    <th>NOMBRE COMPLETO</th>
+                                    <th>CARRERA</th>
+                                    <th>ESTADO</th>
+                                    <th>FECHA GRADUACIÓN</th>
                                      <?php if (tienePermiso('gestion_grado')): ?>
-                                    <th>Acciones</th>
+                                    <th>ACCIONES</th>
                                         <?php endif; ?>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="tableBodyGraduacion">
                                 <?php
                                 if (is_array($estudiantes) && count($estudiantes) > 0) {
-                                    // Si es un array (resultado filtrado)
                                     foreach ($estudiantes as $estudiante) {
-                                        echo "<tr>";
+                                        $nombre_carrera = $estudiante['nombre_carrera'] ?: 'Carrera ' . $estudiante['carrera'];
+                                        echo "<tr class='text-uppercase'>";
                                         echo "<td>" . htmlspecialchars($estudiante['idusuario']) . "</td>";
-                                        echo "<td>" . htmlspecialchars($estudiante['nombre']) . "</td>";
-                                        echo "<td>" . htmlspecialchars($estudiante['nombre_carrera'] ?: 'Carrera ' . $estudiante['carrera']) . "</td>";
+                                        echo "<td><strong>" . htmlspecialchars(mb_strtoupper($estudiante['nombre'], 'UTF-8')) . "</strong></td>";
+                                        echo "<td>" . htmlspecialchars(mb_strtoupper($nombre_carrera, 'UTF-8')) . "</td>";
                                         echo "<td>" . obtener_badge_estado($estudiante['estado']) . "</td>";
                                         echo "<td>" . ($estudiante['fecha_graduacion'] ? date('d/m/Y', strtotime($estudiante['fecha_graduacion'])) : '-') . "</td>";
-                                       // Solo mostrar acciones si tiene permiso
-                    if (tienePermiso('gestion_grado')) {
-                        echo "<td>" . generar_botones_accion($estudiante) . "</td>";
-                    }
+                                        if (tienePermiso('gestion_grado')) {
+                                            echo "<td class='text-nowrap'>" . generar_botones_accion($estudiante) . "</td>";
+                                        }
                                         echo "</tr>";
                                     }
                                 } else {
-                                    echo "<tr><td colspan='6' class='text-center'>No se encontraron estudiantes</td></tr>";
+                                    echo "<tr><td colspan='6' class='text-center font-weight-bold text-muted p-4'>NO SE ENCONTRARON ESTUDIANTES</td></tr>";
                                 }
                                 ?>
                             </tbody>
@@ -307,26 +321,26 @@ include("includes/head.php");
 
 <!-- Modal para confirmar graduación -->
 <div class="modal fade" id="modalGraduacion" tabindex="-1" role="dialog">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <form method="POST">
-                <div class="modal-header">
-                    <h5 class="modal-title">Confirmar Graduación</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <div class="modal-header bg-success text-white font-weight-bold">
+                    <h5 class="modal-title"><i class="fas fa-graduation-cap mr-1"></i> CONFIRMAR GRADUACIÓN</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <p>¿Está seguro de marcar a este estudiante como GRADUADO?</p>
+                    <p class="font-weight-bold">¿ESTÁ SEGURO DE MARCAR A ESTE ESTUDIANTE COMO GRADUADO?</p>
                     <input type="hidden" name="id_usuario" id="id_usuario_modal">
                     <div class="form-group">
-                        <label>Observaciones:</label>
-                        <textarea class="form-control" name="observaciones" rows="3" placeholder="Observaciones opcionales..."></textarea>
+                        <label class="font-weight-bold">OBSERVACIONES:</label>
+                        <textarea class="form-control text-uppercase" name="observaciones" rows="3" placeholder="OBSERVACIONES OPCIONALES..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                    <button type="submit" name="marcar_graduado" class="btn btn-success">Confirmar Graduación</button>
+                    <button type="button" class="btn btn-secondary font-weight-bold" data-dismiss="modal">CANCELAR</button>
+                    <button type="submit" name="marcar_graduado" class="btn btn-success font-weight-bold">CONFIRMAR GRADUACIÓN</button>
                 </div>
             </form>
         </div>
@@ -342,27 +356,71 @@ function confirmarGraduacion(idUsuario) {
 }
 
 function verEstudiantesCumplenRequisitos() {
-    window.location.href = 'grado.php?estado=cumple_requisitos&pagina=1';
+    $('#estado_select').val('cumple_requisitos').trigger('change');
 }
 
 function cambiarRegistrosPorPagina(cantidad) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('registros_por_pagina', cantidad);
-    url.searchParams.set('pagina', 1);
-    window.location.href = url.toString();
+    realizarBusquedaGraduacionPost(1, cantidad);
 }
 
-// =============================================
-// 🐛 INSTRUCCIONES DEBUG EN CONSOLA
-// =============================================
-console.log("🔍 MODO DEBUG DISPONIBLE:");
-console.log("1. grado.php?debug=1 - Ver evaluación completa");
-console.log("2. grado.php?debug=1&estado=cumple_requisitos - Ver solo aptos");
-console.log("3. grado.php?debug=1&carrera=X&buscar=Y - Ver con filtros específicos");
-console.log("");
-console.log("📊 ESTADOS DE GRADUACIÓN:");
-console.log("- Cumple Requisitos: Estudiantes que pueden graduarse");
-console.log("- Pendiente: Estudiantes que NO cumplen requisitos");
-console.log("- Graduado: Estudiantes marcados como graduados");
-console.log("- Título Entregado: Estudiantes que recibieron su título");
+function realizarBusquedaGraduacionPost(pagina, cantidadRegistros) {
+    pagina = pagina || 1;
+    var buscar = $('#buscar_input').val();
+    var estado = $('#estado_select').val();
+    var carrera = $('#carrera_select').val();
+    var registros = cantidadRegistros || 20;
+
+    $.ajax({
+        url: 'grado.php',
+        type: 'POST',
+        data: {
+            ajax_filtrar: 1,
+            buscar: buscar,
+            estado: estado,
+            carrera: carrera,
+            pagina: pagina,
+            registros_por_pagina: registros
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response && response.status === 'success') {
+                $('#tableBodyGraduacion').html(response.html);
+            }
+        }
+    });
+}
+
+$(document).ready(function() {
+    var searchTimeout = null;
+
+    // Búsqueda en tiempo real instantánea (filtrado local) + AJAX por POST en tiempo de ejecución
+    $('#buscar_input').on('input', function() {
+        var val = this.value.toLowerCase().trim();
+        
+        // Filtrado instantáneo local en la tabla visible
+        $('#tableBodyGraduacion tr').each(function() {
+            var text = $(this).text().toLowerCase();
+            $(this).toggle(text.indexOf(val) > -1);
+        });
+
+        // Petición AJAX POST en segundo plano con debounce
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            realizarBusquedaGraduacionPost(1);
+        }, 250);
+    });
+
+    // Filtro inmediato al cambiar Selects
+    $('#estado_select, #carrera_select').on('change', function() {
+        realizarBusquedaGraduacionPost(1);
+    });
+
+    // Botón Limpiar sin recargar ni usar GET en URL
+    $('#btnLimpiarFiltros').on('click', function() {
+        $('#buscar_input').val('');
+        $('#estado_select').val('');
+        $('#carrera_select').val('');
+        realizarBusquedaGraduacionPost(1);
+    });
+});
 </script>

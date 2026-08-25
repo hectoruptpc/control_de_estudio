@@ -140,5 +140,4 @@ include('includes/head.php');
     });
 </script>
 
-</body>
-</html>
+<?php include('includes/footer.php'); ?>

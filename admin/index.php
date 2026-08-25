@@ -347,8 +347,7 @@ visita();
 
     <?php include("includes/footer.php"); ?>
 
-    <!-- jQuery and Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"></script>
+    <!-- Popper and Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
 
@@ -361,6 +360,8 @@ visita();
                 body: 'Bienvenido al sistema de gestión',
                 icon: '../images/logo_mini.png',
                 timeout: 4000
+            }).catch(function(error) {
+                // Silenciar error cuando los permisos de notificación son denegados por el usuario
             });
         }
     });

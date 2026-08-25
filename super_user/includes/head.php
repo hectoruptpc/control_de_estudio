@@ -502,21 +502,22 @@ function actualizarNotificaciones() {
     fetch('../funciones/contar_mensajes_no_leidos.php')
         .then(response => response.json())
         .then(data => {
-            const link = document.querySelector('.nav-link[href="mensajeria.php"]');
-            const badge = link.querySelector('.badge-notificacion');
-            
-            if (data.mensajes_no_leidos > 0) {
-                if (badge) {
-                    badge.textContent = data.mensajes_no_leidos;
+            const link = document.querySelector('.nav-link[href="mensajeria.php"]') || document.querySelector('a[href*="mensajeria"]');
+            if (link) {
+                const badge = link.querySelector('.badge-notificacion');
+                if (data.mensajes_no_leidos > 0) {
+                    if (badge) {
+                        badge.textContent = data.mensajes_no_leidos;
+                    } else {
+                        const newBadge = document.createElement('span');
+                        newBadge.className = 'badge badge-danger badge-notificacion';
+                        newBadge.textContent = data.mensajes_no_leidos;
+                        link.appendChild(newBadge);
+                    }
                 } else {
-                    const newBadge = document.createElement('span');
-                    newBadge.className = 'badge badge-danger badge-notificacion';
-                    newBadge.textContent = data.mensajes_no_leidos;
-                    link.appendChild(newBadge);
-                }
-            } else {
-                if (badge) {
-                    badge.remove();
+                    if (badge) {
+                        badge.remove();
+                    }
                 }
             }
         })
@@ -526,18 +527,24 @@ function actualizarNotificaciones() {
 // SOLUCIÓN SIMPLE PARA DROPDOWNS EN MÓVILES
 document.addEventListener('DOMContentLoaded', function() {
     // Manejar logout
-    document.getElementById('logoutLink').addEventListener('click', function(e) {
-        e.preventDefault();
-        $('#logoutModal').modal('show');
-    });
+    const logoutLink = document.getElementById('logoutLink');
+    if (logoutLink) {
+        logoutLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            $('#logoutModal').modal('show');
+        });
+    }
     
-    document.getElementById('confirmLogout').addEventListener('click', function(e) {
-        e.preventDefault();
-        $('#logoutModal').modal('hide');
-        setTimeout(function() {
-            window.location.href = '../logout.php';
-        }, 500);
-    });
+    const confirmLogout = document.getElementById('confirmLogout');
+    if (confirmLogout) {
+        confirmLogout.addEventListener('click', function(e) {
+            e.preventDefault();
+            $('#logoutModal').modal('hide');
+            setTimeout(function() {
+                window.location.href = '../logout.php';
+            }, 500);
+        });
+    }
     
     // SOLUCIÓN PARA DROPDOWNS EN MÓVILES
     if (window.innerWidth <= 991) {

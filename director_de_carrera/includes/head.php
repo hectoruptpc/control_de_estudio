@@ -304,23 +304,24 @@ function actualizarNotificaciones() {
     fetch('../funciones/contar_mensajes_no_leidos.php')
         .then(response => response.json())
         .then(data => {
-            const link = document.querySelector('.nav-link[href="mensajeria.php"]');
-            const badge = link.querySelector('.badge-notificacion');
-            
-            if (data.mensajes_no_leidos > 0) {
-                if (badge) {
-                    badge.textContent = data.mensajes_no_leidos;
+            const link = document.querySelector('.nav-link[href="mensajeria.php"]') || document.querySelector('a[href*="mensajeria"]');
+            if (link) {
+                const badge = link.querySelector('.badge-notificacion');
+                if (data.mensajes_no_leidos > 0) {
+                    if (badge) {
+                        badge.textContent = data.mensajes_no_leidos;
+                    } else {
+                        // Crear el badge si no existe
+                        const newBadge = document.createElement('span');
+                        newBadge.className = 'badge badge-danger badge-notificacion';
+                        newBadge.textContent = data.mensajes_no_leidos;
+                        link.appendChild(newBadge);
+                    }
                 } else {
-                    // Crear el badge si no existe
-                    const newBadge = document.createElement('span');
-                    newBadge.className = 'badge badge-danger badge-notificacion';
-                    newBadge.textContent = data.mensajes_no_leidos;
-                    link.appendChild(newBadge);
-                }
-            } else {
-                // Eliminar el badge si no hay mensajes
-                if (badge) {
-                    badge.remove();
+                    // Eliminar el badge si no hay mensajes
+                    if (badge) {
+                        badge.remove();
+                    }
                 }
             }
         })
@@ -333,23 +334,29 @@ setInterval(actualizarNotificaciones, 30000);
 // Script para manejar el modal de logout y mejoras móviles
 document.addEventListener('DOMContentLoaded', function() {
     // Manejar el clic en el enlace de logout
-    document.getElementById('logoutLink').addEventListener('click', function(e) {
-        e.preventDefault(); // Prevenir el comportamiento por defecto
-        $('#logoutModal').modal('show'); // Mostrar el modal
-    });
+    const logoutLink = document.getElementById('logoutLink');
+    if (logoutLink) {
+        logoutLink.addEventListener('click', function(e) {
+            e.preventDefault(); // Prevenir el comportamiento por defecto
+            $('#logoutModal').modal('show'); // Mostrar el modal
+        });
+    }
     
     // Manejar la confirmación de logout
-    document.getElementById('confirmLogout').addEventListener('click', function(e) {
-        e.preventDefault(); // Prevenir cualquier acción por defecto
-        
-        // Cerrar el modal
-        $('#logoutModal').modal('hide');
-        
-        // Redirigir después de que el modal se haya ocultado
-        setTimeout(function() {
-            window.location.href = '../logout.php';
-        }, 500);
-    });
+    const confirmLogout = document.getElementById('confirmLogout');
+    if (confirmLogout) {
+        confirmLogout.addEventListener('click', function(e) {
+            e.preventDefault(); // Prevenir cualquier acción por defecto
+            
+            // Cerrar el modal
+            $('#logoutModal').modal('hide');
+            
+            // Redirigir después de que el modal se haya ocultado
+            setTimeout(function() {
+                window.location.href = '../logout.php';
+            }, 500);
+        });
+    }
     
     // MEJORA PARA DROPDOWNS EN MÓVILES
     if (window.innerWidth <= 991) {
