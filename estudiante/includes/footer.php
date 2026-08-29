@@ -7,7 +7,7 @@
 
 <div class="row">
     <div class="col-sm-6 col-xs-12">
-    <div class="py-1"><img src="<?php echo $pag_web; ?>/images/educacion_universitaria.jpg" style="max-height: 38px; width: auto;" alt="Logo Pertenencia"></div>
+    <?php echo $logo_mppeu; ?>
     </div>
     <div class="col-sm-6 col-xs-12">
 
