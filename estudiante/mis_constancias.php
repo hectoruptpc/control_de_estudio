@@ -38,6 +38,11 @@ if ($estudiante) {
     $infoTrayecto = obtenerInfoTrayecto($trayecto_actual);
     $estudiante['trayecto_n'] = $infoTrayecto['numero_trayecto'];
     $estudiante['trayecto_nombre'] = $infoTrayecto['nombre_trayecto'];
+
+    // Evaluación de aptitud para Intensivo, Evaluación Extraordinaria y Pasantías/Proyecto
+    $es_apto_intensivo = esAptoParaIntensivo($estudiante['id']);
+    $es_apto_extraordinario = esAptoParaExtraordinario($estudiante['id']);
+    $es_apto_pasantias = esAptoParaPasantias($estudiante['id']);
 } else {
     $error = "No se pudo cargar tu información. Por favor, contacta con administración.";
 }
@@ -50,9 +55,11 @@ include("includes/head.php");
         <div class="col-12">
             <!-- Encabezado del panel -->
             <div class="dashboard-header p-4 mb-4 text-center">
-                <h3 class="font-weight-bold"><i class="fas fa-file-alt mr-3"></i>Constancias y Solicitudes</h3>
-                <p class="mb-0">Genera tus constancias académicas y gestiona tus solicitudes</p>
+                <h3 class="font-weight-bold text-uppercase"><i class="fas fa-file-alt mr-3"></i>CONSTANCIAS Y SOLICITUDES</h3>
+                <p class="mb-0 text-uppercase">GENERA TUS CONSTANCIAS ACADÉMICAS Y GESTIONA TUS SOLICITUDES</p>
             </div>
+
+
 
             <?php if ($error): ?>
                 <div class="alert alert-danger shadow-sm">
@@ -165,22 +172,39 @@ include("includes/head.php");
                                     <!-- Constancia de Intensivo -->
                                     <div class="col-lg-6 mb-3">
                                         <div class="card h-100 border-warning">
-                                            <div class="card-header bg-warning-light bg-white py-2">
-                                                <h6 class="font-weight-bold text-warning mb-0">
-                                                    <i class="fas fa-file-contract mr-1"></i> Constancia de Intensivo
+                                            <div class="card-header bg-warning-light bg-white py-2 d-flex justify-content-between align-items-center">
+                                                <h6 class="font-weight-bold text-warning mb-0 text-uppercase">
+                                                    <i class="fas fa-file-contract mr-1"></i> CONSTANCIA DE INTENSIVO
                                                 </h6>
+                                                <?php if ($es_apto_intensivo): ?>
+                                                    <span class="badge badge-success">APTO</span>
+                                                <?php else: ?>
+                                                    <span class="badge badge-danger">NO APTO</span>
+                                                <?php endif; ?>
                                             </div>
                                             <div class="card-body py-2">
-                                                <p class="small text-muted mb-2">
-                                                    Para cursar materias en período intensivo o vacacional.
+                                                <p class="small text-muted mb-2 text-uppercase">
+                                                    PARA CURSAR MATERIAS EN PERÍODO INTENSIVO O VACACIONAL.
                                                 </p>
+                                                <?php if (!$es_apto_intensivo): ?>
+                                                    <div class="alert alert-warning p-2 mb-0 text-uppercase font-weight-bold small">
+                                                        <i class="fas fa-exclamation-triangle mr-1"></i> NO CUMPLE REQUISITOS PARA ESTE TRÁMITE.
+                                                    </div>
+                                                <?php endif; ?>
                                             </div>
                                             <div class="card-footer bg-white border-0 pb-3">
-                                                <a class="btn btn-warning btn-block" 
-                                                   href="../admin/constancias/pdf_intensivo.php?id=<?php echo $estudiante['id']; ?>" 
-                                                   target="_blank">
-                                                    <i class="fas fa-file-pdf mr-1"></i> Generar PDF
-                                                </a>
+                                                <?php if ($es_apto_intensivo): ?>
+                                                    <a class="btn btn-warning btn-block font-weight-bold text-uppercase" 
+                                                       href="../admin/constancias/pdf_intensivo.php?id=<?php echo $estudiante['id']; ?>" 
+                                                       target="_blank">
+                                                        <i class="fas fa-file-pdf mr-1"></i> GENERAR PDF
+                                                    </a>
+                                                <?php else: ?>
+                                                    <button type="button" class="btn btn-warning btn-block font-weight-bold text-uppercase" 
+                                                            data-toggle="modal" data-target="#modalNoAptoIntensivo">
+                                                        <i class="fas fa-file-pdf mr-1"></i> GENERAR PDF
+                                                    </button>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
                                     </div>
@@ -188,22 +212,39 @@ include("includes/head.php");
                                     <!-- Evaluación Extraordinaria -->
                                     <div class="col-lg-6 mb-3">
                                         <div class="card h-100 border-danger">
-                                            <div class="card-header bg-danger-light bg-white py-2">
-                                                <h6 class="font-weight-bold text-danger mb-0">
-                                                    <i class="fas fa-redo mr-1"></i> Evaluación Extraordinaria
+                                            <div class="card-header bg-danger-light bg-white py-2 d-flex justify-content-between align-items-center">
+                                                <h6 class="font-weight-bold text-danger mb-0 text-uppercase">
+                                                    <i class="fas fa-redo mr-1"></i> EVALUACIÓN EXTRAORDINARIA
                                                 </h6>
+                                                <?php if ($es_apto_extraordinario): ?>
+                                                    <span class="badge badge-success">APTO</span>
+                                                <?php else: ?>
+                                                    <span class="badge badge-danger">NO APTO</span>
+                                                <?php endif; ?>
                                             </div>
                                             <div class="card-body py-2">
-                                                <p class="small text-muted mb-2">
-                                                    Solicitud para presentar evaluación extraordinaria.
+                                                <p class="small text-muted mb-2 text-uppercase">
+                                                    SOLICITUD PARA PRESENTAR EVALUACIÓN EXTRAORDINARIA Y/O SUFICIENCIA.
                                                 </p>
+                                                <?php if (!$es_apto_extraordinario): ?>
+                                                    <div class="alert alert-danger p-2 mb-0 text-uppercase font-weight-bold small">
+                                                        <i class="fas fa-exclamation-triangle mr-1"></i> NO CUMPLE REQUISITOS PARA ESTE TRÁMITE.
+                                                    </div>
+                                                <?php endif; ?>
                                             </div>
                                             <div class="card-footer bg-white border-0 pb-3">
-                                                <a class="btn btn-danger btn-block" 
-                                                   href="../admin/constancias/pdf_evaluacion_extraordinaria.php?id=<?php echo $estudiante['id']; ?>" 
-                                                   target="_blank">
-                                                    <i class="fas fa-file-pdf mr-1"></i> Generar PDF
-                                                </a>
+                                                <?php if ($es_apto_extraordinario): ?>
+                                                    <a class="btn btn-danger btn-block font-weight-bold text-uppercase" 
+                                                       href="../admin/constancias/pdf_evaluacion_extraordinaria.php?id=<?php echo $estudiante['id']; ?>" 
+                                                       target="_blank">
+                                                        <i class="fas fa-file-pdf mr-1"></i> GENERAR PDF
+                                                    </a>
+                                                <?php else: ?>
+                                                    <button type="button" class="btn btn-danger btn-block font-weight-bold text-uppercase" 
+                                                            data-toggle="modal" data-target="#modalNoAptoExtraordinario">
+                                                        <i class="fas fa-file-pdf mr-1"></i> GENERAR PDF
+                                                    </button>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
                                     </div>
@@ -234,22 +275,39 @@ include("includes/head.php");
                                     <!-- Pasantías/Proyecto -->
                                     <div class="col-lg-6 mb-3">
                                         <div class="card h-100 border-success">
-                                            <div class="card-header bg-success-light bg-white py-2">
-                                                <h6 class="font-weight-bold text-success mb-0">
-                                                    <i class="fas fa-briefcase mr-1"></i> Pasantías/Proyecto
+                                            <div class="card-header bg-success-light bg-white py-2 d-flex justify-content-between align-items-center">
+                                                <h6 class="font-weight-bold text-success mb-0 text-uppercase">
+                                                    <i class="fas fa-briefcase mr-1"></i> PASANTÍAS / PROYECTO
                                                 </h6>
+                                                <?php if ($es_apto_pasantias): ?>
+                                                    <span class="badge badge-success">APTO</span>
+                                                <?php else: ?>
+                                                    <span class="badge badge-danger">NO APTO</span>
+                                                <?php endif; ?>
                                             </div>
                                             <div class="card-body py-2">
-                                                <p class="small text-muted mb-2">
-                                                    Inscripción en pasantías o proyecto sociointegrador.
+                                                <p class="small text-muted mb-2 text-uppercase">
+                                                    INSCRIPCIÓN EN PASANTÍAS O PROYECTO SOCIOINTEGRADOR.
                                                 </p>
+                                                <?php if (!$es_apto_pasantias): ?>
+                                                    <div class="alert alert-warning p-2 mb-0 text-uppercase font-weight-bold small">
+                                                        <i class="fas fa-exclamation-triangle mr-1"></i> RESERVADO PARA TRAYECTO I O SUPERIOR.
+                                                    </div>
+                                                <?php endif; ?>
                                             </div>
                                             <div class="card-footer bg-white border-0 pb-3">
-                                                <a class="btn btn-success btn-block" 
-                                                   href="../admin/constancias/pdf_inscripcion_practicas.php?id=<?php echo $estudiante['id']; ?>" 
-                                                   target="_blank">
-                                                    <i class="fas fa-file-pdf mr-1"></i> Generar PDF
-                                                </a>
+                                                <?php if ($es_apto_pasantias): ?>
+                                                    <a class="btn btn-success btn-block font-weight-bold text-uppercase" 
+                                                       href="../admin/constancias/pdf_inscripcion_practicas.php?id=<?php echo $estudiante['id']; ?>" 
+                                                       target="_blank">
+                                                        <i class="fas fa-file-pdf mr-1"></i> GENERAR PDF
+                                                    </a>
+                                                <?php else: ?>
+                                                    <button type="button" class="btn btn-success btn-block font-weight-bold text-uppercase" 
+                                                            data-toggle="modal" data-target="#modalNoAptoPasantias">
+                                                        <i class="fas fa-file-pdf mr-1"></i> GENERAR PDF
+                                                    </button>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
                                     </div>
@@ -360,6 +418,104 @@ include("includes/head.php");
                 </div>
 
                 
+
+            <!-- Modal para Estudiante No Apto para Intensivo -->
+            <div class="modal fade" id="modalNoAptoIntensivo" tabindex="-1" role="dialog" aria-labelledby="modalNoAptoIntensivoLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered" role="document">
+                    <div class="modal-content border-danger shadow">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title font-weight-bold text-uppercase" id="modalNoAptoIntensivoLabel">
+                                <i class="fas fa-exclamation-circle mr-2"></i> TRÁMITE NO PERMITIDO
+                            </h5>
+                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Cerrar">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body text-center p-4">
+                            <div class="mb-3">
+                                <i class="fas fa-user-slash text-danger" style="font-size: 3.5rem;"></i>
+                            </div>
+                            <h5 class="font-weight-bold text-danger text-uppercase mb-3">NO TE ENCUENTRAS APTO PARA INTENSIVO</h5>
+                            <div class="alert alert-warning text-uppercase small font-weight-bold text-left mb-3">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                ESTIMADO(A) <strong><?php echo htmlspecialchars(mb_strtoupper($estudiante['nombre'], 'UTF-8')); ?></strong> (CÉDULA: <?php echo htmlspecialchars($estudiante['idusuario']); ?>), USTED NO CUMPLE CON LOS REQUISITOS ACADÉMICOS NECESARIOS O SU ESTATUS ACTUAL NO PERMITE PROCESAR UNA CONSTANCIA DE CURSO INTENSIVO EN ESTE PERÍODO.
+                            </div>
+                            <p class="text-muted text-uppercase small mb-0 font-weight-bold">
+                                SI CONSIDERAS QUE ESTO ES UN ERROR O NECESITAS ORIENTACIÓN SOBRE TU EXPEDIENTE ACADÉMICO, POR FAVOR ACUDE A LA OFICINA DE <strong>CONTROL DE ESTUDIOS</strong>.
+                            </p>
+                        </div>
+                        <div class="modal-footer bg-light">
+                            <button type="button" class="btn btn-secondary font-weight-bold text-uppercase px-4" data-dismiss="modal">
+                                <i class="fas fa-times mr-1"></i> ENTENDIDO
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            <!-- Modal para Estudiante No Apto para Evaluación Extraordinaria -->
+            <div class="modal fade" id="modalNoAptoExtraordinario" tabindex="-1" role="dialog" aria-labelledby="modalNoAptoExtraordinarioLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered" role="document">
+                    <div class="modal-content border-danger shadow">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title font-weight-bold text-uppercase" id="modalNoAptoExtraordinarioLabel">
+                                <i class="fas fa-exclamation-triangle mr-2"></i> TRÁMITE NO PERMITIDO
+                            </h5>
+                            <button type="button" class="close text-white" data-dismiss="modal" aria-label="Cerrar">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body text-center p-4">
+                            <div class="mb-3">
+                                <i class="fas fa-file-excel text-danger" style="font-size: 3.5rem;"></i>
+                            </div>
+                            <h5 class="font-weight-bold text-danger text-uppercase mb-3">NO APTO PARA EVALUACIÓN EXTRAORDINARIA</h5>
+                            <div class="alert alert-danger text-uppercase small font-weight-bold text-left mb-3">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                ESTIMADO(A) <strong><?php echo htmlspecialchars(mb_strtoupper($estudiante['nombre'], 'UTF-8')); ?></strong> (CÉDULA: <?php echo htmlspecialchars($estudiante['idusuario']); ?>), USTED NO CUENTA CON MATERIAS REPROBADAS NI REGISTRO DE ASIGNATURAS APLAZADAS EN SU EXPEDIENTE QUE REQUIERAN O CALIFIQUEN PARA PRESENTAR UNA EVALUACIÓN EXTRAORDINARIA.
+                            </div>
+                            <p class="text-muted text-uppercase small mb-0 font-weight-bold">
+                                SI CONSIDERAS QUE EXISTE ALGUNA INCONSISTENCIA EN TUS NOTAS, POR FAVOR ACUDE A LA OFICINA DE <strong>CONTROL DE ESTUDIOS</strong> PARA REVISAR TU HISTORIAL ACADÉMICO.
+                            </p>
+                        </div>
+                        <div class="modal-footer bg-light">
+                            <button type="button" class="btn btn-secondary font-weight-bold text-uppercase px-4" data-dismiss="modal">
+                                <i class="fas fa-times mr-1"></i> ENTENDIDO
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            <!-- Modal para Estudiante No Apto para Pasantías/Proyecto -->
+            <div class="modal fade" id="modalNoAptoPasantias" tabindex="-1" role="dialog" aria-labelledby="modalNoAptoPasantiasLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered" role="document">
+                    <div class="modal-content border-warning shadow">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title font-weight-bold text-uppercase" id="modalNoAptoPasantiasLabel">
+                                <i class="fas fa-exclamation-circle mr-2"></i> TRÁMITE NO DISPONIBLE
+                            </h5>
+                            <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Cerrar">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body text-center p-4">
+                            <div class="mb-3">
+                                <i class="fas fa-briefcase text-warning" style="font-size: 3.5rem;"></i>
+                            </div>
+                            <h5 class="font-weight-bold text-dark text-uppercase mb-3">RESERVADO PARA TRAYECTO I O SUPERIOR</h5>
+                            <div class="alert alert-warning text-uppercase small font-weight-bold text-left mb-3">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                ESTIMADO(A) <strong><?php echo htmlspecialchars(mb_strtoupper($estudiante['nombre'], 'UTF-8')); ?></strong> (CÉDULA: <?php echo htmlspecialchars($estudiante['idusuario']); ?>), LA INSCRIPCIÓN EN PASANTÍAS Y PROYECTO SOCIOINTEGRADOR ESTÁ DESTINADA A ESTUDIANTES QUE SE ENCUENTRAN CURSANDO TRAYECTO I O SUPERIOR DEL PNF. SU UBICACIÓN ACTUAL ES <strong><?php echo htmlspecialchars(mb_strtoupper($estudiante['trayecto_nombre'], 'UTF-8')); ?></strong>.
+                            </div>
+                            <p class="text-muted text-uppercase small mb-0 font-weight-bold">
+                                UNA VEZ CULMINADO Y APROBADO EL TRAYECTO INICIAL (TRAYECTO 0), PODRÁS SOLICITAR TU CONSTANCIA DE INSCRIPCIÓN EN PASANTÍAS / PROYECTO.
+                            </p>
+                        </div>
+                        <div class="modal-footer bg-light">
+                            <button type="button" class="btn btn-secondary font-weight-bold text-uppercase px-4" data-dismiss="modal">
+                                <i class="fas fa-times mr-1"></i> ENTENDIDO
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <?php endif; ?>
         </div>

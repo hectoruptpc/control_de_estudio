@@ -43,7 +43,7 @@ $bootstrap_head ='
   <link href="'.$pag_web.$linklocal.'/css/new.css" rel="stylesheet">
   <link href="'.$pag_web.'/css/modelo.css" rel="stylesheet">
 
-  <!-- UNIFORMIDAD GLOBAL A MAYÚSCULAS -->
+  <!-- UNIFORMIDAD GLOBAL A MAYÚSCULAS (Excluyendo Login y credenciales) -->
   <style>
     table.table th,
     table.table td,
@@ -52,9 +52,18 @@ $bootstrap_head ='
     .badge,
     form label,
     select.form-control,
-    input.form-control,
+    input.form-control:not(.no-uppercase):not([name="username"]):not([name="password"]):not([type="password"]):not([type="email"]),
     .dropdown-item {
         text-transform: uppercase !important;
+    }
+
+    body.page-login input.form-control,
+    input.no-uppercase,
+    input[name="username"],
+    input[name="password"],
+    input[type="password"],
+    input[type="email"] {
+        text-transform: none !important;
     }
   </style>
 
