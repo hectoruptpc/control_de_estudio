@@ -451,6 +451,8 @@ include("includes/head.php");
                         </div>
                     </div>
                 </div>
+            </div>
+
             <!-- Modal para Estudiante No Apto para Evaluación Extraordinaria -->
             <div class="modal fade" id="modalNoAptoExtraordinario" tabindex="-1" role="dialog" aria-labelledby="modalNoAptoExtraordinarioLabel" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered" role="document">
@@ -483,6 +485,8 @@ include("includes/head.php");
                         </div>
                     </div>
                 </div>
+            </div>
+
             <!-- Modal para Estudiante No Apto para Pasantías/Proyecto -->
             <div class="modal fade" id="modalNoAptoPasantias" tabindex="-1" role="dialog" aria-labelledby="modalNoAptoPasantiasLabel" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered" role="document">
