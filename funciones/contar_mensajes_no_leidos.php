@@ -3,26 +3,15 @@ require_once('functions.php');
 
 if (!isLoggedIn()) {
     header('HTTP/1.1 401 Unauthorized');
+    echo json_encode(['error' => 'No autorizado']);
     exit();
 }
 
-function contarMensajesNoLeidos($user_id) {
-    global $db;
-    
-    $query = "SELECT COUNT(*) as total 
-              FROM mensajeria 
-              WHERE id_usuario_destinatario = ? 
-              AND leido = FALSE 
-              AND eliminado_destinatario = FALSE";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->fetch_assoc()['total'];
-}
+$user_id = $_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? 0;
 
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 echo json_encode([
-    'mensajes_no_leidos' => contarMensajesNoLeidos($_SESSION['user']['id'])
+    'success' => true,
+    'mensajes_no_leidos' => contarMensajesNoLeidos($user_id)
 ]);
 ?>

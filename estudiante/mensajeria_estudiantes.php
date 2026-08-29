@@ -8,335 +8,369 @@ if (!isLoggedIn() || !isEstudiante()) {
     exit();
 }
 
+$current_user_id = $_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? 0;
+
 // Verificar si el estudiante es vocero
-$user_id = $_SESSION['user']['id'];
-$query = "SELECT vocero FROM users WHERE id = ?";
-$stmt = $db->prepare($query);
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$result = $stmt->get_result();
-$usuario = $result->fetch_assoc();
-$es_vocero = ($usuario && $usuario['vocero'] == 1);
+$query_vocero = "SELECT vocero FROM users WHERE id = ?";
+$stmt_vocero = $db->prepare($query_vocero);
+$stmt_vocero->bind_param("i", $current_user_id);
+$stmt_vocero->execute();
+$res_vocero = $stmt_vocero->get_result();
+$u_vocero = $res_vocero ? $res_vocero->fetch_assoc() : null;
+$es_vocero = ($u_vocero && $u_vocero['vocero'] == 1);
+$stmt_vocero->close();
 
 // LLAMAR A LA FUNCIÓN DE VISITA
 visita();
 
-$titulopag = "Sistema de Mensajería - Estudiante";
-include("includes/head.php");
+// Asegurar sesión y CSRF token
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 
-// Procesar filtros y búsqueda (solo para voceros)
-$filtro_tipo = isset($_GET['filtro_tipo']) ? $_GET['filtro_tipo'] : '';
-$busqueda_cedula = isset($_GET['busqueda_cedula']) ? trim($_GET['busqueda_cedula']) : '';
+// ==========================================
+// CONTROLADORES AJAX (100% POST PURO)
+// ==========================================
+if (isset($_POST['ajax_buscar_destinatarios'])) {
+    if (ob_get_length()) ob_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    
+    if (!$es_vocero) {
+        echo json_encode(['success' => false, 'error' => 'Permiso denegado']);
+        exit();
+    }
+    
+    $termino = trim($_POST['termino'] ?? '');
+    $filtro_tipo = trim($_POST['filtro_tipo'] ?? '');
+    
+    $usuarios_res = obtenerUsuariosMensajeria($filtro_tipo, $termino, $current_user_id, 30);
+    $usuarios = [];
+    
+    if ($usuarios_res) {
+        while ($u = $usuarios_res->fetch_assoc()) {
+            $usuarios[] = [
+                'id' => (int)$u['id'],
+                'nombre' => $u['nombre'],
+                'usuario' => $u['usuario'],
+                'cedula' => $u['idusuario'],
+                'email' => $u['email'] ?? '',
+                'tipo' => obtenerTipoUsuario($u)
+            ];
+        }
+    }
+    
+    echo json_encode(['success' => true, 'usuarios' => $usuarios]);
+    exit();
+}
 
-// Enviar mensaje (solo para voceros)
+if (isset($_POST['ajax_ver_mensaje'])) {
+    if (ob_get_length()) ob_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    
+    $mensaje_id = (int)($_POST['mensaje_id'] ?? 0);
+    $tipo = ($_POST['tipo'] ?? '') === 'enviados' ? 'enviados' : 'recibidos';
+    
+    if ($mensaje_id <= 0) {
+        echo json_encode(['success' => false, 'error' => 'ID de mensaje inválido']);
+        exit();
+    }
+    
+    $mensaje = obtenerMensaje($mensaje_id, $current_user_id, $tipo);
+    if (!$mensaje) {
+        echo json_encode(['success' => false, 'error' => 'Mensaje no encontrado']);
+        exit();
+    }
+    
+    // Si es recibido y no leído, marcar como leído
+    if ($tipo === 'recibidos' && empty($mensaje['leido'])) {
+        marcarMensajeLeido($mensaje_id, $current_user_id);
+        $mensaje['leido'] = 1;
+    }
+    
+    $mensaje['tipo_usuario'] = obtenerTipoUsuario($mensaje);
+    $mensaje['fecha_formateada'] = date('d/m/Y h:i A', strtotime($mensaje['fecha_envio']));
+    
+    echo json_encode(['success' => true, 'mensaje' => $mensaje, 'tipo' => $tipo]);
+    exit();
+}
+
+if (isset($_POST['ajax_eliminar_mensaje'])) {
+    if (ob_get_length()) ob_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        echo json_encode(['success' => false, 'error' => 'Token CSRF inválido']);
+        exit();
+    }
+    
+    $mensaje_id = (int)($_POST['mensaje_id'] ?? 0);
+    $tipo = ($_POST['tipo'] ?? '') === 'enviados' ? 'enviados' : 'recibidos';
+    
+    if ($mensaje_id > 0 && eliminarMensaje($mensaje_id, $current_user_id, $tipo)) {
+        echo json_encode(['success' => true, 'message' => 'Mensaje eliminado exitosamente']);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'No se pudo eliminar el mensaje']);
+    }
+    exit();
+}
+
+// ==========================================
+// PROCESAR ENVÍO DE MENSAJE (POST)
+// ==========================================
+$mensaje_exito = '';
+$mensaje_error = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enviar_mensaje'])) {
     if (!$es_vocero) {
-        $mensaje_error = "No tienes permisos para enviar mensajes. Solo los voceros pueden hacerlo.";
+        $mensaje_error = "Solo los voceros estudiantiles tienen autorización para enviar mensajes.";
+    } elseif (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        $mensaje_error = "Error de seguridad. Token CSRF inválido.";
     } else {
-        $remitente_id = $_SESSION['user']['id'];
-        $destinatario_id = (int)$_POST['destinatario'];
-        $titulo = trim($_POST['titulo']);
-        $mensaje = trim($_POST['mensaje']);
+        $destinatario_id = (int)($_POST['destinatario_id'] ?? 0);
+        $titulo = trim($_POST['titulo'] ?? '');
+        $mensaje_txt = trim($_POST['mensaje'] ?? '');
         
-        if (!empty($titulo) && !empty($mensaje) && $destinatario_id > 0) {
-            if (enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje)) {
-                $mensaje_exito = "Mensaje enviado correctamente";
+        if ($destinatario_id > 0 && !empty($titulo) && !empty($mensaje_txt)) {
+            $resp = enviarMensaje($current_user_id, $destinatario_id, $titulo, $mensaje_txt);
+            if ($resp['success']) {
+                $mensaje_exito = $resp['message'];
             } else {
-                $mensaje_error = "Error al enviar el mensaje";
+                $mensaje_error = $resp['message'];
             }
         } else {
-            $mensaje_error = "Por favor complete todos los campos";
+            $mensaje_error = "Por favor seleccione un destinatario y complete todos los campos obligatorios.";
         }
     }
 }
 
-// Marcar como leído
-if (isset($_GET['marcar_leido'])) {
-    $mensaje_id = (int)$_GET['marcar_leido'];
-    $user_id = $_SESSION['user']['id'];
-    marcarMensajeLeido($mensaje_id, $user_id);
-}
+$titulopag = "Sistema de Mensajería - Estudiante";
+include("includes/head.php");
 
-// Obtener mensaje para modal si se solicita
-$mensaje_modal = null;
-if (isset($_GET['ver_mensaje'])) {
-    $mensaje_id = (int)$_GET['ver_mensaje'];
-    $tipo = $_GET['tipo'];
-    $user_id = $_SESSION['user']['id'];
-    
-    $mensaje_modal = obtenerMensaje($mensaje_id, $user_id, $tipo);
-    
-    if ($tipo === 'recibidos' && $mensaje_modal && !$mensaje_modal['leido']) {
-        marcarMensajeLeido($mensaje_id, $user_id);
-        $mensaje_modal['leido'] = true;
-    }
-}
-
-// Obtener usuarios para destinatarios (solo para voceros)
-$usuarios = obtenerUsuariosMensajeria($filtro_tipo, $busqueda_cedula);
-
-// Obtener mensajes recibidos CON la información de vocero (consulta específica para este panel)
-$query_recibidos = "SELECT m.*, 
-                    u.nombre as remitente_nombre, 
-                    u.usuario as remitente_usuario, 
-                    u.idusuario as remitente_cedula,
-                    u.email as remitente_email,
-                    u.vocero as remitente_vocero,
-                    CASE 
-                        WHEN u.estudiante = 1 THEN 'Estudiante'
-                        WHEN u.docente = 1 THEN 'Docente'
-                        WHEN u.admin = 1 THEN 'Administrador'
-                        ELSE 'Usuario'
-                    END as remitente_tipo
-                    FROM mensajeria m
-                    LEFT JOIN users u ON m.id_usuario_remitente = u.id
-                    WHERE m.id_usuario_destinatario = ? 
-                    AND m.eliminado_destinatario = FALSE
-                    ORDER BY m.fecha_envio DESC";
-$stmt_recibidos = $db->prepare($query_recibidos);
-$stmt_recibidos->bind_param("i", $_SESSION['user']['id']);
-$stmt_recibidos->execute();
-$mensajes_recibidos = $stmt_recibidos->get_result();
-
-// Obtener mensajes enviados CON la información de vocero (consulta específica para este panel)
-$query_enviados = "SELECT m.*, 
-                    u.nombre as destinatario_nombre, 
-                    u.usuario as destinatario_usuario, 
-                    u.idusuario as destinatario_cedula,
-                    u.email as destinatario_email,
-                    u.vocero as destinatario_vocero,
-                    CASE 
-                        WHEN u.estudiante = 1 THEN 'Estudiante'
-                        WHEN u.docente = 1 THEN 'Docente'
-                        WHEN u.admin = 1 THEN 'Administrador'
-                        ELSE 'Usuario'
-                    END as destinatario_tipo
-                    FROM mensajeria m
-                    LEFT JOIN users u ON m.id_usuario_destinatario = u.id
-                    WHERE m.id_usuario_remitente = ? 
-                    AND m.eliminado_remitente = FALSE
-                    ORDER BY m.fecha_envio DESC";
-$stmt_enviados = $db->prepare($query_enviados);
-$stmt_enviados->bind_param("i", $_SESSION['user']['id']);
-$stmt_enviados->execute();
-$mensajes_enviados = $stmt_enviados->get_result();
+// Obtener mensajes para la vista
+$mensajes_recibidos = obtenerMensajesRecibidos($current_user_id);
+$mensajes_enviados = obtenerMensajesEnviados($current_user_id);
+$total_no_leidos = contarMensajesNoLeidos($current_user_id);
 ?>
 
 <div class="container-fluid">
-    <h2 class="my-4">Sistema de Mensajería - Estudiante</h2>
-    
-    <?php if (!$es_vocero): ?>
-        <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle"></i> 
-            <strong>Modo solo lectura:</strong> Tu cuenta no tiene permisos de vocero. Solo puedes leer los mensajes que recibes.
+    <div class="d-flex justify-content-between align-items-center my-4">
+        <div>
+            <h2 class="mb-0"><i class="fas fa-envelope-open-text text-primary mr-2"></i>Sistema de Mensajería</h2>
+            <?php if ($es_vocero): ?>
+                <span class="badge badge-success"><i class="fas fa-bullhorn mr-1"></i>Perfil de Vocero Autorizado</span>
+            <?php endif; ?>
         </div>
-    <?php else: ?>
-        <div class="alert alert-success">
-            <i class="fas fa-microphone-alt"></i> 
-            <strong>Bienvenido Vocero:</strong> Tienes permisos para enviar mensajes.
+        <span class="badge badge-primary p-2 font-weight-bold" id="badge_total_no_leidos">
+            <i class="fas fa-bell mr-1"></i> <?= $total_no_leidos ?> sin leer
+        </span>
+    </div>
+    
+    <?php if (!empty($mensaje_exito)): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle mr-1"></i> <?= htmlspecialchars($mensaje_exito) ?>
+            <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
         </div>
     <?php endif; ?>
     
-    <?php if (isset($mensaje_exito)): ?>
-        <div class="alert alert-success"><?= $mensaje_exito ?></div>
-    <?php endif; ?>
-    
-    <?php if (isset($mensaje_error)): ?>
-        <div class="alert alert-danger"><?= $mensaje_error ?></div>
+    <?php if (!empty($mensaje_error)): ?>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle mr-1"></i> <?= htmlspecialchars($mensaje_error) ?>
+            <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
+        </div>
     <?php endif; ?>
     
     <div class="row">
-        <!-- Panel de escritura de mensajes (solo para voceros) -->
-        <?php if ($es_vocero): ?>
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header bg-success text-white">
-                    <h5><i class="fas fa-paper-plane"></i> Nuevo Mensaje</h5>
+        <!-- Panel de redacción de mensajes (solo voceros) o Info -->
+        <div class="col-lg-4 mb-4">
+            <?php if ($es_vocero): ?>
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-pen-fancy mr-2"></i>Nuevo Mensaje</h5>
                 </div>
                 <div class="card-body">
-                    <form method="GET" class="mb-3">
-                        <div class="form-group">
-                            <label for="filtro_tipo">Filtrar por tipo:</label>
-                            <select class="form-control" id="filtro_tipo" name="filtro_tipo" onchange="this.form.submit()">
-                                <option value="">Todos los usuarios</option>
-                                <option value="estudiante" <?= $filtro_tipo === 'estudiante' ? 'selected' : '' ?>>Estudiantes</option>
-                                <option value="docente" <?= $filtro_tipo === 'docente' ? 'selected' : '' ?>>Docentes</option>
-                                <option value="admin" <?= $filtro_tipo === 'admin' ? 'selected' : '' ?>>Administradores</option>
-                            </select>
-                        </div>
+                    <form method="POST" action="" id="formNuevoMensaje">
+                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                        <input type="hidden" name="destinatario_id" id="destinatario_id" value="" required>
                         
-                        <div class="form-group">
-                            <label for="busqueda_cedula">Buscar por cédula:</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="busqueda_cedula" name="busqueda_cedula" 
-                                       value="<?= htmlspecialchars($busqueda_cedula) ?>" placeholder="Ej: V12345678">
-                                <div class="input-group-append">
-                                    <button type="submit" class="btn btn-outline-secondary">
-                                        <i class="fas fa-search"></i>
+                        <!-- Filtro y buscador en tiempo real de destinatarios -->
+                        <div class="form-group position-relative">
+                            <label class="font-weight-bold">Destinatario:</label>
+                            
+                            <div class="input-group mb-2">
+                                <select class="custom-select" id="filtro_rol_destinatario" style="max-width: 130px;">
+                                    <option value="">Todos</option>
+                                    <option value="docente">Docentes</option>
+                                    <option value="director_carrera">Directores</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="estudiante">Estudiantes</option>
+                                </select>
+                                <input type="text" class="form-control" id="buscador_destinatario" 
+                                       placeholder="Buscar por cédula o nombre..." autocomplete="off">
+                                <div class="input-group-append" id="spinner_busqueda_dest" style="display: none;">
+                                    <span class="input-group-text bg-white"><i class="fas fa-spinner fa-spin text-primary"></i></span>
+                                </div>
+                            </div>
+                            
+                            <!-- Contenedor flotante de sugerencias -->
+                            <div id="sugerencias_destinatarios" class="list-group shadow position-absolute w-100" 
+                                 style="z-index: 9999; display: none; max-height: 280px; overflow-y: auto; left: 0; right: 0; background: #ffffff; border: 1px solid #ced4da; border-radius: 4px;">
+                            </div>
+                            
+                            <!-- Card del destinatario seleccionado -->
+                            <div id="destinatario_seleccionado_card" class="p-2 border rounded bg-light mt-2" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="fas fa-user-check text-success mr-1"></i>
+                                        <strong id="dest_nombre_badge"></strong>
+                                        <div class="small text-muted" id="dest_detalles_badge"></div>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" id="btn_cambiar_destinatario" title="Cambiar destinatario">
+                                        <i class="fas fa-times"></i>
                                     </button>
                                 </div>
                             </div>
                         </div>
-                    </form>
-                    
-                    <form method="POST">
+                        
                         <div class="form-group">
-                            <label for="destinatario">Destinatario:</label>
-                            <select class="form-control" id="destinatario" name="destinatario" required>
-                                <option value="">Seleccionar usuario...</option>
-                                <?php while ($usuario = $usuarios->fetch_assoc()): ?>
-                                    <option value="<?= $usuario['id'] ?>">
-                                        <?= htmlspecialchars($usuario['nombre']) ?> 
-                                        (<?= htmlspecialchars($usuario['usuario']) ?>)
-                                        - <?= obtenerTipoUsuario($usuario) ?>
-                                        - Cédula: <?= htmlspecialchars($usuario['idusuario']) ?>
-                                    </option>
-                                <?php endwhile; ?>
-                            </select>
+                            <label for="titulo" class="font-weight-bold">Asunto:</label>
+                            <input type="text" class="form-control" id="titulo" name="titulo" placeholder="Asunto del mensaje..." required>
                         </div>
                         
                         <div class="form-group">
-                            <label for="titulo">Asunto:</label>
-                            <input type="text" class="form-control" id="titulo" name="titulo" required>
+                            <label for="mensaje" class="font-weight-bold">Mensaje:</label>
+                            <textarea class="form-control" id="mensaje" name="mensaje" rows="5" placeholder="Escriba su mensaje aquí..." required></textarea>
                         </div>
                         
-                        <div class="form-group">
-                            <label for="mensaje">Mensaje:</label>
-                            <textarea class="form-control" id="mensaje" name="mensaje" rows="5" required></textarea>
-                        </div>
-                        
-                        <button type="submit" name="enviar_mensaje" class="btn btn-success">
-                            <i class="fas fa-paper-plane"></i> Enviar Mensaje
+                        <button type="submit" name="enviar_mensaje" id="btn_enviar_mensaje" class="btn btn-success btn-block shadow-sm">
+                            <i class="fas fa-paper-plane mr-1"></i> Enviar Mensaje
                         </button>
-                        
-                        <?php if (!empty($filtro_tipo) || !empty($busqueda_cedula)): ?>
-                            <a href="mensajeria_estudiantes.php" class="btn btn-secondary ml-2">
-                                <i class="fas fa-times"></i> Limpiar filtros
-                            </a>
-                        <?php endif; ?>
                     </form>
                 </div>
             </div>
-        </div>
-        <div class="col-md-8">
-        <?php else: ?>
-        <div class="col-md-12">
-        <?php endif; ?>
-        
-            <ul class="nav nav-tabs" id="mensajesTab" role="tablist">
-                <li class="nav-item">
-                    <a class="nav-link active" id="recibidos-tab" data-toggle="tab" href="#recibidos" role="tab">
-                        Mensajes Recibidos
-                        <span class="badge badge-primary">
-                            <?= $mensajes_recibidos->num_rows ?>
-                        </span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" id="enviados-tab" data-toggle="tab" href="#enviados" role="tab">
-                        Mensajes Enviados
-                        <span class="badge badge-info">
-                            <?= $mensajes_enviados->num_rows ?>
-                        </span>
-                    </a>
-                </li>
-            </ul>
-            
-            <div class="tab-content" id="mensajesTabContent">
-                <!-- Mensajes Recibidos -->
-                <div class="tab-pane fade show active" id="recibidos" role="tabpanel">
-                    <div class="card mt-3">
-                        <div class="card-body">
-                            <?php if ($mensajes_recibidos->num_rows > 0): ?>
-                                <div class="list-group">
-                                    <?php while ($mensaje = $mensajes_recibidos->fetch_assoc()): ?>
-                                        <div class="list-group-item <?= !$mensaje['leido'] ? 'list-group-item-warning' : '' ?>">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <h6 class="mb-1">
-                                                    <?php if (!$mensaje['leido']): ?>
-                                                        <span class="badge badge-danger">Nuevo</span>
-                                                    <?php endif; ?>
-                                                    <?= htmlspecialchars($mensaje['titulo']) ?>
-                                                </h6>
-                                                <small><?= date('d/m/Y H:i', strtotime($mensaje['fecha_envio'])) ?></small>
-                                            </div>
-                                            <p class="mb-1">
-                                                <strong>De:</strong> 
-                                                <?= htmlspecialchars($mensaje['remitente_nombre']) ?>
-                                                (<?= htmlspecialchars($mensaje['remitente_usuario']) ?>)
-                                                
-                                                <?php if (isset($mensaje['remitente_vocero']) && $mensaje['remitente_vocero'] == 1): ?>
-                                                    <span class="badge badge-success ml-2">
-                                                        <i class="fas fa-microphone-alt"></i> Vocero
-                                                    </span>
-                                                <?php endif; ?>
-                                                
-                                                - <?= $mensaje['remitente_tipo'] ?>
-                                                - Cédula: <?= htmlspecialchars($mensaje['remitente_cedula']) ?>
-                                            </p>
-                                            <p class="mb-2 text-muted">
-                                                <?= nl2br(htmlspecialchars(substr($mensaje['mensaje'], 0, 100))) ?>
-                                                <?= strlen($mensaje['mensaje']) > 100 ? '...' : '' ?>
-                                            </p>
-                                            <div>
-                                                <button type="button" class="btn btn-info btn-sm ver-mensaje-btn" 
-                                                        data-id="<?= $mensaje['id'] ?>" 
-                                                        data-tipo="recibidos">
-                                                    <i class="fas fa-eye"></i> Leer
-                                                </button>
-                                            </div>
-                                        </div>
-                                    <?php endwhile; ?>
-                                </div>
-                            <?php else: ?>
-                                <p class="text-muted">No tienes mensajes recibidos.</p>
-                            <?php endif; ?>
-                        </div>
+            <?php else: ?>
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle mr-2"></i>Información</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        Bienvenido a su bandeja de mensajería estudiantil. Aquí puede consultar todos los comunicados y mensajes institucionales enviados por docentes, directores o coordinadores.
+                    </p>
+                    <div class="alert alert-light border">
+                        <i class="fas fa-bullhorn text-warning mr-1"></i> <strong>Nota:</strong> El envío de mensajes desde el panel de estudiantes está reservado exclusivamente para los <strong>Voceros de Sección</strong>.
                     </div>
                 </div>
+            </div>
+            <?php endif; ?>
+        </div>
+        
+        <!-- Panel de Bandejas (Recibidos y Enviados) -->
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white p-0 border-bottom-0">
+                    <ul class="nav nav-tabs nav-justified" id="mensajesTab" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active font-weight-bold py-3" id="recibidos-tab" data-toggle="tab" href="#recibidos" role="tab">
+                                <i class="fas fa-inbox text-primary mr-2"></i>Bandeja de Entrada
+                                <span class="badge badge-primary ml-1" id="badge_recibidos_count"><?= $mensajes_recibidos ? $mensajes_recibidos->num_rows : 0 ?></span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link font-weight-bold py-3" id="enviados-tab" data-toggle="tab" href="#enviados" role="tab">
+                                <i class="fas fa-paper-plane text-info mr-2"></i>Mensajes Enviados
+                                <span class="badge badge-info ml-1"><?= $mensajes_enviados ? $mensajes_enviados->num_rows : 0 ?></span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
                 
-                <!-- Mensajes Enviados -->
-                <div class="tab-pane fade" id="enviados" role="tabpanel">
-                    <div class="card mt-3">
-                        <div class="card-body">
-                            <?php if ($mensajes_enviados->num_rows > 0): ?>
-                                <div class="list-group">
-                                    <?php while ($mensaje = $mensajes_enviados->fetch_assoc()): ?>
-                                        <div class="list-group-item">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <h6 class="mb-1"><?= htmlspecialchars($mensaje['titulo']) ?></h6>
-                                                <small><?= date('d/m/Y H:i', strtotime($mensaje['fecha_envio'])) ?></small>
+                <div class="card-body">
+                    <div class="tab-content" id="mensajesTabContent">
+                        <!-- Bandeja de Entrada -->
+                        <div class="tab-pane fade show active" id="recibidos" role="tabpanel">
+                            <?php if ($mensajes_recibidos && $mensajes_recibidos->num_rows > 0): ?>
+                                <div class="list-group" id="lista_recibidos">
+                                    <?php while ($m = $mensajes_recibidos->fetch_assoc()): ?>
+                                        <div class="list-group-item list-group-item-action d-flex flex-column flex-md-row justify-content-between align-items-md-center p-3 mb-2 rounded border <?= empty($m['leido']) ? 'border-primary bg-light' : '' ?>" id="item_msg_<?= $m['id'] ?>">
+                                            <div class="mr-md-3 mb-2 mb-md-0">
+                                                <div class="d-flex align-items-center mb-1">
+                                                    <?php if (empty($m['leido'])): ?>
+                                                        <span class="badge badge-danger mr-2 badge-nuevo"><i class="fas fa-envelope mr-1"></i>NUEVO</span>
+                                                    <?php else: ?>
+                                                        <span class="badge badge-secondary mr-2"><i class="fas fa-envelope-open mr-1"></i>Leído</span>
+                                                    <?php endif; ?>
+                                                    <h6 class="mb-0 font-weight-bold text-dark"><?= htmlspecialchars($m['titulo']) ?></h6>
+                                                </div>
+                                                <small class="text-muted d-block">
+                                                    <i class="fas fa-user text-secondary"></i> <strong><?= htmlspecialchars($m['remitente_nombre']) ?></strong> 
+                                                    (<?= obtenerTipoUsuario($m) ?> - C.I: <?= htmlspecialchars($m['remitente_cedula']) ?>)
+                                                </small>
+                                                <div class="small text-muted mt-1 text-truncate" style="max-width: 500px;">
+                                                    <?= htmlspecialchars(substr($m['mensaje'], 0, 110)) ?><?= strlen($m['mensaje']) > 110 ? '...' : '' ?>
+                                                </div>
                                             </div>
-                                            <p class="mb-1">
-                                                <strong>Para:</strong> 
-                                                <?= htmlspecialchars($mensaje['destinatario_nombre']) ?>
-                                                (<?= htmlspecialchars($mensaje['destinatario_usuario']) ?>)
-                                                
-                                                <?php if (isset($mensaje['destinatario_vocero']) && $mensaje['destinatario_vocero'] == 1): ?>
-                                                    <span class="badge badge-success ml-2">
-                                                        <i class="fas fa-microphone-alt"></i> Vocero
-                                                    </span>
-                                                <?php endif; ?>
-                                                
-                                                - <?= $mensaje['destinatario_tipo'] ?>
-                                                - Cédula: <?= htmlspecialchars($mensaje['destinatario_cedula']) ?>
-                                            </p>
-                                            <p class="mb-2 text-muted">
-                                                <?= nl2br(htmlspecialchars(substr($mensaje['mensaje'], 0, 100))) ?>
-                                                <?= strlen($mensaje['mensaje']) > 100 ? '...' : '' ?>
-                                            </p>
-                                            <div>
-                                                <button type="button" class="btn btn-info btn-sm ver-mensaje-btn" 
-                                                        data-id="<?= $mensaje['id'] ?>" 
-                                                        data-tipo="enviados">
-                                                    <i class="fas fa-eye"></i> Ver
+                                            <div class="text-md-right flex-shrink-0">
+                                                <div class="small text-muted mb-2"><i class="far fa-clock"></i> <?= date('d/m/Y h:i A', strtotime($m['fecha_envio'])) ?></div>
+                                                <button type="button" class="btn btn-sm btn-outline-primary mr-1 btn-ver-mensaje" 
+                                                        data-id="<?= $m['id'] ?>" data-tipo="recibidos">
+                                                    <i class="fas fa-eye mr-1"></i> Leer
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-danger btn-eliminar-mensaje" 
+                                                        data-id="<?= $m['id'] ?>" data-tipo="recibidos">
+                                                    <i class="fas fa-trash-alt"></i>
                                                 </button>
                                             </div>
                                         </div>
                                     <?php endwhile; ?>
                                 </div>
                             <?php else: ?>
-                                <p class="text-muted">No has enviado mensajes.</p>
+                                <div class="text-center py-5 text-muted">
+                                    <i class="fas fa-inbox fa-3x mb-3 text-muted"></i>
+                                    <h5>No tienes mensajes recibidos.</h5>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <!-- Mensajes Enviados -->
+                        <div class="tab-pane fade" id="enviados" role="tabpanel">
+                            <?php if ($mensajes_enviados && $mensajes_enviados->num_rows > 0): ?>
+                                <div class="list-group" id="lista_enviados">
+                                    <?php while ($m = $mensajes_enviados->fetch_assoc()): ?>
+                                        <div class="list-group-item list-group-item-action d-flex flex-column flex-md-row justify-content-between align-items-md-center p-3 mb-2 rounded border" id="item_msg_<?= $m['id'] ?>">
+                                            <div class="mr-md-3 mb-2 mb-md-0">
+                                                <div class="d-flex align-items-center mb-1">
+                                                    <h6 class="mb-0 font-weight-bold text-dark"><?= htmlspecialchars($m['titulo']) ?></h6>
+                                                </div>
+                                                <small class="text-muted d-block">
+                                                    <i class="fas fa-user-check text-info"></i> Para: <strong><?= htmlspecialchars($m['destinatario_nombre']) ?></strong> 
+                                                    (<?= obtenerTipoUsuario($m) ?> - C.I: <?= htmlspecialchars($m['destinatario_cedula']) ?>)
+                                                </small>
+                                                <div class="small text-muted mt-1 text-truncate" style="max-width: 500px;">
+                                                    <?= htmlspecialchars(substr($m['mensaje'], 0, 110)) ?><?= strlen($m['mensaje']) > 110 ? '...' : '' ?>
+                                                </div>
+                                            </div>
+                                            <div class="text-md-right flex-shrink-0">
+                                                <div class="small text-muted mb-2"><i class="far fa-clock"></i> <?= date('d/m/Y h:i A', strtotime($m['fecha_envio'])) ?></div>
+                                                <button type="button" class="btn btn-sm btn-outline-info mr-1 btn-ver-mensaje" 
+                                                        data-id="<?= $m['id'] ?>" data-tipo="enviados">
+                                                    <i class="fas fa-eye mr-1"></i> Ver
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-danger btn-eliminar-mensaje" 
+                                                        data-id="<?= $m['id'] ?>" data-tipo="enviados">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    <?php endwhile; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="text-center py-5 text-muted">
+                                    <i class="fas fa-paper-plane fa-3x mb-3 text-muted"></i>
+                                    <h5>No has enviado mensajes.</h5>
+                                </div>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -346,24 +380,20 @@ $mensajes_enviados = $stmt_enviados->get_result();
     </div>
 </div>
 
-<!-- Modal para ver mensaje (igual que antes) -->
-<div class="modal fade" id="modalMensaje" tabindex="-1" role="dialog" aria-labelledby="modalMensajeLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header bg-info text-white">
-                <h5 class="modal-title" id="modalMensajeLabel">Cargando mensaje...</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+<!-- Modal para ver mensaje (Cargado 100% por AJAX POST) -->
+<div class="modal fade" id="modalVerMensaje" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalMsgTitulo"><i class="fas fa-envelope mr-2"></i>Cargando...</h5>
+                <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
             </div>
-            <div class="modal-body" id="modalMensajeBody">
-                <div class="text-center">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="sr-only">Cargando...</span>
-                    </div>
+            <div class="modal-body p-4" id="modalMsgBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer bg-light">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
             </div>
         </div>
@@ -371,146 +401,225 @@ $mensajes_enviados = $stmt_enviados->get_result();
 </div>
 
 <script>
-$(document).ready(function() {
-    $('.ver-mensaje-btn').click(function() {
-        var mensajeId = $(this).data('id');
-        var tipo = $(this).data('tipo');
-        
-        $.ajax({
-            url: 'mensajeria_estudiantes.php',
-            type: 'GET',
-            data: {
-                ver_mensaje: mensajeId,
-                tipo: tipo
-            },
-            success: function(response) {
-                var tempDiv = $('<div>').html(response);
-                var mensajeData = tempDiv.find('#mensajeModalContent').html();
-                
-                if (mensajeData) {
-                    $('#modalMensajeBody').html(mensajeData);
-                    $('#modalMensajeLabel').text(tempDiv.find('#modalTitulo').text());
-                } else {
-                    $('#modalMensajeBody').html('<p class="text-danger">Error al cargar el mensaje.</p>');
-                }
-                
-                $('#modalMensaje').modal('show');
-            },
-            error: function() {
-                $('#modalMensajeBody').html('<p class="text-danger">Error al cargar el mensaje.</p>');
-                $('#modalMensaje').modal('show');
-            }
+document.addEventListener('DOMContentLoaded', function() {
+    const csrfToken = '<?= $_SESSION['csrf_token'] ?>';
+    const inputBuscador = document.getElementById('buscador_destinatario');
+    const selectFiltro = document.getElementById('filtro_rol_destinatario');
+    const sugerenciasContainer = document.getElementById('sugerencias_destinatarios');
+    const spinnerBusqueda = document.getElementById('spinner_busqueda_dest');
+    const inputDestinatarioId = document.getElementById('destinatario_id');
+    const cardSeleccionado = document.getElementById('destinatario_seleccionado_card');
+    const badgeNombre = document.getElementById('dest_nombre_badge');
+    const badgeDetalles = document.getElementById('dest_detalles_badge');
+    const btnCambiarDest = document.getElementById('btn_cambiar_destinatario');
+    let debounceTimer = null;
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const map = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'};
+        return text.toString().replace(/[&<>"']/g, m => map[m]);
+    }
+
+    // Búsqueda en tiempo real de destinatarios (si es vocero)
+    function buscarDestinatarios() {
+        if (!inputBuscador) return;
+        const termino = (inputBuscador.value || '').trim();
+        const filtro = selectFiltro ? selectFiltro.value : '';
+        clearTimeout(debounceTimer);
+
+        if (termino.length === 0 && !filtro) {
+            sugerenciasContainer.style.display = 'none';
+            sugerenciasContainer.innerHTML = '';
+            if (spinnerBusqueda) spinnerBusqueda.style.display = 'none';
+            return;
+        }
+
+        if (spinnerBusqueda) spinnerBusqueda.style.display = 'flex';
+
+        debounceTimer = setTimeout(() => {
+            const fd = new FormData();
+            fd.append('ajax_buscar_destinatarios', '1');
+            fd.append('termino', termino);
+            fd.append('filtro_tipo', filtro);
+
+            fetch('', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    if (spinnerBusqueda) spinnerBusqueda.style.display = 'none';
+                    sugerenciasContainer.innerHTML = '';
+
+                    if (data.success && Array.isArray(data.usuarios) && data.usuarios.length > 0) {
+                        data.usuarios.forEach(u => {
+                            const item = document.createElement('a');
+                            item.href = 'javascript:void(0);';
+                            item.className = 'list-group-item list-group-item-action p-2 d-flex justify-content-between align-items-center border-bottom text-decoration-none';
+                            item.style.cursor = 'pointer';
+                            item.innerHTML = `
+                                <div>
+                                    <strong class="text-dark"><i class="fas fa-user mr-1 text-primary"></i> ${escapeHtml(u.nombre)}</strong>
+                                    <div class="small text-muted">
+                                        <span>C.I: ${escapeHtml(u.cedula)}</span> | 
+                                        <span class="badge badge-info">${escapeHtml(u.tipo)}</span>
+                                    </div>
+                                </div>
+                                <span class="btn btn-sm btn-success py-1 px-2"><i class="fas fa-check mr-1"></i>Elegir</span>
+                            `;
+
+                            item.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                seleccionarDestinatario(u);
+                            });
+
+                            sugerenciasContainer.appendChild(item);
+                        });
+                        sugerenciasContainer.style.display = 'block';
+                    } else {
+                        sugerenciasContainer.innerHTML = `
+                            <div class="list-group-item p-3 text-center text-muted">
+                                <i class="fas fa-user-slash mr-1"></i> No se encontraron usuarios.
+                            </div>
+                        `;
+                        sugerenciasContainer.style.display = 'block';
+                    }
+                })
+                .catch(err => {
+                    if (spinnerBusqueda) spinnerBusqueda.style.display = 'none';
+                    console.error("Error buscando destinatarios:", err);
+                });
+        }, 200);
+    }
+
+    function seleccionarDestinatario(u) {
+        if (!inputDestinatarioId) return;
+        inputDestinatarioId.value = u.id;
+        badgeNombre.textContent = u.nombre;
+        badgeDetalles.textContent = `Cédula: ${u.cedula} | ${u.tipo} (${u.email || u.usuario})`;
+        cardSeleccionado.style.display = 'block';
+        inputBuscador.parentElement.style.display = 'none';
+        sugerenciasContainer.style.display = 'none';
+        sugerenciasContainer.innerHTML = '';
+    }
+
+    if (btnCambiarDest) {
+        btnCambiarDest.addEventListener('click', function() {
+            inputDestinatarioId.value = '';
+            cardSeleccionado.style.display = 'none';
+            inputBuscador.parentElement.style.display = 'flex';
+            inputBuscador.value = '';
+            inputBuscador.focus();
+        });
+    }
+
+    if (inputBuscador) {
+        inputBuscador.addEventListener('input', buscarDestinatarios);
+        inputBuscador.addEventListener('focus', buscarDestinatarios);
+    }
+    if (selectFiltro) {
+        selectFiltro.addEventListener('change', buscarDestinatarios);
+    }
+
+    document.addEventListener('click', function(e) {
+        if (inputBuscador && !inputBuscador.contains(e.target) && !sugerenciasContainer.contains(e.target)) {
+            sugerenciasContainer.style.display = 'none';
+        }
+    });
+
+    // Ver mensaje vía POST AJAX
+    document.querySelectorAll('.btn-ver-mensaje').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const msgId = this.getAttribute('data-id');
+            const tipo = this.getAttribute('data-tipo');
+            const itemElement = document.getElementById('item_msg_' + msgId);
+
+            $('#modalMsgTitulo').html('<i class="fas fa-spinner fa-spin mr-2"></i>Cargando mensaje...');
+            $('#modalMsgBody').html('<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>');
+            $('#modalVerMensaje').modal('show');
+
+            const fd = new FormData();
+            fd.append('ajax_ver_mensaje', '1');
+            fd.append('mensaje_id', msgId);
+            fd.append('tipo', tipo);
+
+            fetch('', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success && res.mensaje) {
+                        const m = res.mensaje;
+                        $('#modalMsgTitulo').text(m.titulo);
+                        
+                        const deOpara = (tipo === 'recibidos') ? 
+                            `<p class="mb-1"><strong>De:</strong> ${escapeHtml(m.remitente_nombre)} <span class="badge badge-info">${escapeHtml(m.tipo_usuario)}</span> (C.I: ${escapeHtml(m.remitente_cedula)})</p>` :
+                            `<p class="mb-1"><strong>Para:</strong> ${escapeHtml(m.destinatario_nombre)} <span class="badge badge-info">${escapeHtml(m.tipo_usuario)}</span> (C.I: ${escapeHtml(m.destinatario_cedula)})</p>`;
+                        
+                        const html = `
+                            <div class="row pb-3 mb-3 border-bottom">
+                                <div class="col-md-7">
+                                    ${deOpara}
+                                    <p class="mb-0 text-muted small"><i class="far fa-envelope mr-1"></i>${escapeHtml(m.remitente_email || m.destinatario_email || '')}</p>
+                                </div>
+                                <div class="col-md-5 text-md-right mt-2 mt-md-0">
+                                    <small class="text-muted"><i class="far fa-clock mr-1"></i>${m.fecha_formateada}</small>
+                                </div>
+                            </div>
+                            <div class="mensaje-cuerpo p-3 bg-light rounded" style="white-space: pre-wrap; font-size: 1.05rem; line-height: 1.6;">${escapeHtml(m.mensaje)}</div>
+                        `;
+                        $('#modalMsgBody').html(html);
+
+                        // Si era un mensaje nuevo recibido, actualizar la interfaz
+                        if (tipo === 'recibidos' && itemElement) {
+                            itemElement.classList.remove('border-primary', 'bg-light');
+                            const badgeNuevo = itemElement.querySelector('.badge-nuevo');
+                            if (badgeNuevo) {
+                                badgeNuevo.className = 'badge badge-secondary mr-2';
+                                badgeNuevo.innerHTML = '<i class="fas fa-envelope-open mr-1"></i>Leído';
+                            }
+                        }
+                    } else {
+                        $('#modalMsgBody').html(`<div class="alert alert-danger mb-0">${escapeHtml(res.error || 'Error al cargar mensaje')}</div>`);
+                    }
+                })
+                .catch(err => {
+                    $('#modalMsgBody').html('<div class="alert alert-danger mb-0">Error de conexión al cargar el mensaje.</div>');
+                });
         });
     });
-    
-    <?php if ($mensaje_modal): ?>
-    $(window).on('load', function() {
-        $('#modalMensajeLabel').text("<?= htmlspecialchars($mensaje_modal['titulo']) ?>");
-        
-        <?php
-        // Consulta para obtener el vocero del remitente en el modal
-        $query_vocero_modal = "SELECT vocero FROM users WHERE id = " . (int)$mensaje_modal['id_usuario_remitente'];
-        $result_vocero_modal = $db->query($query_vocero_modal);
-        $remitente_vocero_modal = ($result_vocero_modal && $result_vocero_modal->fetch_assoc()['vocero'] == 1);
-        ?>
-        
-        var contenidoModal = `
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <?php if ($tipo === 'recibidos'): ?>
-                        <p><strong>De:</strong> <?= htmlspecialchars($mensaje_modal['remitente_nombre']) ?>
-                            <?php if ($remitente_vocero_modal): ?>
-                                <span class="badge badge-success ml-2">
-                                    <i class="fas fa-microphone-alt"></i> Vocero
-                                </span>
-                            <?php endif; ?>
-                        </p>
-                        <p><strong>Usuario:</strong> <?= htmlspecialchars($mensaje_modal['remitente_usuario']) ?></p>
-                        <p><strong>Tipo:</strong> <?= obtenerTipoUsuario($mensaje_modal) ?></p>
-                        <p><strong>Cédula:</strong> <?= htmlspecialchars($mensaje_modal['remitente_cedula']) ?></p>
-                        <p><strong>Email:</strong> <?= htmlspecialchars($mensaje_modal['remitente_email']) ?></p>
-                    <?php else: ?>
-                        <p><strong>Para:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_nombre']) ?></p>
-                        <p><strong>Usuario:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_usuario']) ?></p>
-                        <p><strong>Tipo:</strong> <?= obtenerTipoUsuario($mensaje_modal) ?></p>
-                        <p><strong>Cédula:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_cedula']) ?></p>
-                        <p><strong>Email:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_email']) ?></p>
-                    <?php endif; ?>
-                </div>
-                <div class="col-md-6 text-right">
-                    <p><strong>Fecha:</strong> <?= date('d/m/Y H:i', strtotime($mensaje_modal['fecha_envio'])) ?></p>
-                    <?php if ($tipo === 'recibidos'): ?>
-                        <p><strong>Estado:</strong> 
-                            <span class="badge badge-<?= $mensaje_modal['leido'] ? 'success' : 'warning' ?>">
-                                <?= $mensaje_modal['leido'] ? 'Leído' : 'No leído' ?>
-                            </span>
-                        </p>
-                    <?php endif; ?>
-                </div>
-            </div>
-            
-            <hr>
-            
-            <div class="mensaje-contenido">
-                <?= nl2br(htmlspecialchars($mensaje_modal['mensaje'])) ?>
-            </div>
-        `;
-        
-        $('#modalMensajeBody').html(contenidoModal);
-        $('#modalMensaje').modal('show');
+
+    // Eliminar mensaje vía POST AJAX
+    document.querySelectorAll('.btn-eliminar-mensaje').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const msgId = this.getAttribute('data-id');
+            const tipo = this.getAttribute('data-tipo');
+            const itemElement = document.getElementById('item_msg_' + msgId);
+
+            if (!confirm('¿Está seguro de que desea eliminar este mensaje de su bandeja?')) {
+                return;
+            }
+
+            const fd = new FormData();
+            fd.append('ajax_eliminar_mensaje', '1');
+            fd.append('mensaje_id', msgId);
+            fd.append('tipo', tipo);
+            fd.append('csrf_token', csrfToken);
+
+            fetch('', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        if (itemElement) {
+                            itemElement.style.transition = 'all 0.3s';
+                            itemElement.style.opacity = '0';
+                            setTimeout(() => itemElement.remove(), 300);
+                        }
+                    } else {
+                        alert(res.error || 'No se pudo eliminar el mensaje.');
+                    }
+                })
+                .catch(err => {
+                    alert('Error de conexión al intentar eliminar el mensaje.');
+                });
+        });
     });
-    <?php endif; ?>
 });
 </script>
-
-<?php 
-if ($mensaje_modal):
-    $query_vocero_modal = "SELECT vocero FROM users WHERE id = " . (int)$mensaje_modal['id_usuario_remitente'];
-    $result_vocero_modal = $db->query($query_vocero_modal);
-    $remitente_vocero_modal = ($result_vocero_modal && $result_vocero_modal->fetch_assoc()['vocero'] == 1);
-?>
-    <div id="mensajeModalContent" style="display: none;">
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <?php if ($tipo === 'recibidos'): ?>
-                    <p><strong>De:</strong> <?= htmlspecialchars($mensaje_modal['remitente_nombre']) ?>
-                        <?php if ($remitente_vocero_modal): ?>
-                            <span class="badge badge-success ml-2">
-                                <i class="fas fa-microphone-alt"></i> Vocero
-                            </span>
-                        <?php endif; ?>
-                    </p>
-                    <p><strong>Usuario:</strong> <?= htmlspecialchars($mensaje_modal['remitente_usuario']) ?></p>
-                    <p><strong>Tipo:</strong> <?= obtenerTipoUsuario($mensaje_modal) ?></p>
-                    <p><strong>Cédula:</strong> <?= htmlspecialchars($mensaje_modal['remitente_cedula']) ?></p>
-                    <p><strong>Email:</strong> <?= htmlspecialchars($mensaje_modal['remitente_email']) ?></p>
-                <?php else: ?>
-                    <p><strong>Para:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_nombre']) ?></p>
-                    <p><strong>Usuario:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_usuario']) ?></p>
-                    <p><strong>Tipo:</strong> <?= obtenerTipoUsuario($mensaje_modal) ?></p>
-                    <p><strong>Cédula:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_cedula']) ?></p>
-                    <p><strong>Email:</strong> <?= htmlspecialchars($mensaje_modal['destinatario_email']) ?></p>
-                <?php endif; ?>
-            </div>
-            <div class="col-md-6 text-right">
-                <p><strong>Fecha:</strong> <?= date('d/m/Y H:i', strtotime($mensaje_modal['fecha_envio'])) ?></p>
-                <?php if ($tipo === 'recibidos'): ?>
-                    <p><strong>Estado:</strong> 
-                        <span class="badge badge-<?= $mensaje_modal['leido'] ? 'success' : 'warning' ?>">
-                            <?= $mensaje_modal['leido'] ? 'Leído' : 'No leído' ?>
-                        </span>
-                    </p>
-                <?php endif; ?>
-            </div>
-        </div>
-        
-        <hr>
-        
-        <div class="mensaje-contenido">
-            <?= nl2br(htmlspecialchars($mensaje_modal['mensaje'])) ?>
-        </div>
-    </div>
-    <div id="modalTitulo" style="display: none;"><?= htmlspecialchars($mensaje_modal['titulo']) ?></div>
-<?php endif; ?>
 
 <?php include("includes/footer.php"); ?>

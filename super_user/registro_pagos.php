@@ -4,12 +4,9 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 require_once('../funciones/functions.php');
 
-//CARGAR PERMISOS
+// CARGAR PERMISOS
 cargarPermisosUsuario();
 verificarPermiso('pagos');
-
-
-
 
 // Verificar autenticación y rol
 if (!isLoggedIn() || !isAdmin()) {
@@ -21,582 +18,461 @@ if (!isLoggedIn() || !isAdmin()) {
 // LLAMAR A LA FUNCIÓN DE VISITA
 visita();
 
-$titulopag = "Registro de Pagos";
-include("includes/head.php");
+$current_user_id = $_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? 0;
 
-// Función para buscar estudiante por cédula
-function buscarEstudiantePorCedulaPagos($cedula) {
-    global $db;
+// ==========================================
+// CONTROLADOR AJAX PARA BÚSQUEDA EN TIEMPO REAL
+// ==========================================
+if (isset($_POST['ajax_buscar_estudiantes_pagos'])) {
+    if (ob_get_length()) ob_clean();
+    header('Content-Type: application/json; charset=utf-8');
     
-    $query = "SELECT u.id, u.nombre, u.idusuario, u.carrera, c.nombre_carrera 
-              FROM users u 
-              LEFT JOIN carreras c ON u.carrera = c.id_carrera 
-              WHERE u.idusuario = ? AND u.estudiante = 1";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("s", $cedula);
-    $stmt->execute();
-    $result = $stmt->get_result();
+    $termino = trim($_POST['termino'] ?? '');
+    $estudiantes = buscarEstudiantesPagosAjax($termino, 15);
     
-    if ($result->num_rows > 0) {
-        $estudiante = $result->fetch_assoc();
-        return $estudiante;
-    }
-    
-    return null;
+    echo json_encode(['success' => true, 'estudiantes' => $estudiantes]);
+    exit();
 }
 
-
-// Función para registrar un pago
-function registrarPago($estudiante_id, $tipo_pago, $otro_concepto, $monto, $observaciones, $registrado_por) {
-    global $db;
-    
-    $query = "INSERT INTO pagos (estudiante_id, tipo_pago, otro_concepto, monto, fecha_pago, observaciones, registrado_por) 
-              VALUES (?, ?, ?, ?, NOW(), ?, ?)";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("iisdsi", $estudiante_id, $tipo_pago, $otro_concepto, $monto, $observaciones, $registrado_por);
-    
-    if ($stmt->execute()) {
-        $pago_id = $stmt->insert_id;
-        
-        // Registrar en auditoría
-        $valores_nuevos = [
-            'estudiante_id' => $estudiante_id,
-            'tipo_pago' => $tipo_pago,
-            'otro_concepto' => $otro_concepto,
-            'monto' => $monto,
-            'observaciones' => $observaciones,
-            'registrado_por' => $registrado_por
-        ];
-        
-        registrarAuditoria(
-            "INSERT", 
-            "pagos", 
-            $pago_id, 
-            null, 
-            $valores_nuevos, 
-            "Pagos", 
-            "Registro de nuevo pago"
-        );
-        
-        return true;
-    }
-    
-    return false;
+// Asegurar token CSRF
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// Función para obtener todos los pagos
-function obtenerTodosLosPagos() {
-    global $db;
-    
-    $query = "SELECT p.*, u.nombre as nombre_estudiante, u.idusuario as cedula, 
-                     tp.tipopago as nombre_tipo_pago,
-                     ur.nombre as nombre_registrador
-              FROM pagos p
-              INNER JOIN users u ON p.estudiante_id = u.id
-              INNER JOIN tipo_pago tp ON p.tipo_pago = tp.id
-              INNER JOIN users ur ON p.registrado_por = ur.id
-              ORDER BY p.fecha_pago DESC";
-    
-    $result = $db->query($query);
-    
-    $pagos = [];
-    while ($row = $result->fetch_assoc()) {
-        $pagos[] = $row;
-    }
-    
-    return $pagos;
-}
-
-// Función para obtener el total de pagos del día actual
-function obtenerTotalPagosDelDia() {
-    global $db;
-    
-    $query = "SELECT SUM(monto) as total FROM pagos WHERE DATE(fecha_pago) = CURDATE()";
-    $result = $db->query($query);
-    
-    return $result->fetch_assoc()['total'] ?? 0;
-}
-
-// Función para obtener los pagos por rango de fechas
-function obtenerPagosPorRangoFechas($fecha_inicio, $fecha_fin) {
-    global $db;
-    
-    $query = "SELECT p.*, u.nombre as nombre_estudiante, u.idusuario as cedula, 
-                     tp.tipopago as nombre_tipo_pago,
-                     ur.nombre as nombre_registrador
-              FROM pagos p
-              INNER JOIN users u ON p.estudiante_id = u.id
-              INNER JOIN tipo_pago tp ON p.tipo_pago = tp.id
-              INNER JOIN users ur ON p.registrado_por = ur.id
-              WHERE DATE(p.fecha_pago) BETWEEN ? AND ?
-              ORDER BY p.fecha_pago DESC";
-    
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("ss", $fecha_inicio, $fecha_fin);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $pagos = [];
-    while ($row = $result->fetch_assoc()) {
-        $pagos[] = $row;
-    }
-    
-    return $pagos;
-}
-
-// Función para obtener el total de pagos por rango de fechas
-function obtenerTotalPagosPorRangoFechas($fecha_inicio, $fecha_fin) {
-    global $db;
-    
-    $query = "SELECT SUM(monto) as total FROM pagos WHERE DATE(fecha_pago) BETWEEN ? AND ?";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("ss", $fecha_inicio, $fecha_fin);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    return $result->fetch_assoc()['total'] ?? 0;
-}
-
-// Procesar búsqueda de estudiante
-$estudiante = null;
 $mensaje_error = '';
 $mensaje_exito = '';
+$estudiante = null;
 
-// Procesar registro de pago
+// ==========================================
+// PROCESAR ACCIONES POST
+// ==========================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['buscar_cedula'])) {
-        // Búsqueda de estudiante
-        $cedula = trim($_POST['cedula']);
-        
-        if (!empty($cedula)) {
-            $estudiante = buscarEstudiantePorCedulaPagos($cedula);
-            
-            if (!$estudiante) {
-                $mensaje_error = "No se encontró ningún estudiante con la cédula: " . htmlspecialchars($cedula);
-                
-                // Registrar en auditoría - Búsqueda fallida
-                registrarAuditoria(
-                    "SEARCH", 
-                    "users", 
-                    null, 
-                    null, 
-                    ['cedula' => $cedula], 
-                    "Pagos", 
-                    "Búsqueda fallida de estudiante por cédula"
-                );
-            } else {
-                // Registrar en auditoría - Búsqueda exitosa
-                registrarAuditoria(
-                    "SEARCH", 
-                    "users", 
-                    $estudiante['id'], 
-                    null, 
-                    ['cedula' => $cedula, 'estudiante' => $estudiante['nombre']], 
-                    "Pagos", 
-                    "Búsqueda exitosa de estudiante por cédula"
-                );
-            }
-        } else {
-            $mensaje_error = "Por favor, ingrese una cédula para buscar.";
-        }
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        $mensaje_error = "Error de seguridad CSRF.";
     }
+    // 1. Registro manual de pago
     elseif (isset($_POST['registrar_pago'])) {
-        // Registro de pago
-        $estudiante_id = (int)$_POST['estudiante_id'];
-        $tipo_pago = (int)$_POST['tipo_pago'];
-        $otro_concepto = trim($_POST['otro_concepto']);
-        $monto = (float)$_POST['monto'];
-        $observaciones = trim($_POST['observaciones']);
-        $registrado_por = $_SESSION['user']['id'];
+        $estudiante_id     = intval($_POST['estudiante_id'] ?? 0);
+        $tipo_pago         = trim($_POST['tipo_pago'] ?? '');
+        $otro_concepto     = trim($_POST['otro_concepto'] ?? '');
+        $monto             = (float)($_POST['monto'] ?? 0);
+        $metodo_pago       = trim($_POST['metodo_pago'] ?? 'Transferencia');
+        $banco_destino_id  = intval($_POST['banco_destino_id'] ?? 0);
+        $banco_origen      = trim($_POST['banco_origen'] ?? '');
+        $fecha_transaccion = trim($_POST['fecha_transaccion'] ?? date('Y-m-d'));
+        $referencia        = trim($_POST['referencia'] ?? '');
+        $observaciones     = trim($_POST['observaciones'] ?? '');
         
-        if ($monto > 0) {
-            if (registrarPago($estudiante_id, $tipo_pago, $otro_concepto, $monto, $observaciones, $registrado_por)) {
-                $mensaje_exito = "Pago registrado exitosamente.";
-                $estudiante = null; // Limpiar formulario después de registro exitoso
+        // Manejo opcional de comprobante adjuntado por admin
+        $comprobante_rel_path = '';
+        if (isset($_FILES['comprobante']) && $_FILES['comprobante']['error'] === UPLOAD_ERR_OK) {
+            $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
+            $ext = strtolower(pathinfo($_FILES['comprobante']['name'], PATHINFO_EXTENSION));
+            if (in_array($ext, $allowed)) {
+                $dir = __DIR__ . '/../uploads/comprobantes_pagos/';
+                if (!is_dir($dir)) @mkdir($dir, 0777, true);
+                $uname = 'pago_admin_' . $estudiante_id . '_' . time() . '.' . $ext;
+                if (move_uploaded_file($_FILES['comprobante']['tmp_name'], $dir . $uname)) {
+                    $comprobante_rel_path = 'uploads/comprobantes_pagos/' . $uname;
+                }
+            }
+        }
+        
+        if ($estudiante_id > 0 && $monto > 0) {
+            $pago_id = registrarPago(
+                $estudiante_id, $tipo_pago, $otro_concepto, $monto, $observaciones,
+                $current_user_id, $metodo_pago, $banco_destino_id, $banco_origen,
+                $fecha_transaccion, $referencia, $comprobante_rel_path, 'aprobado'
+            );
+            if ($pago_id) {
+                $mensaje_exito = "Pago registrado y aprobado exitosamente.";
+                $estudiante = null;
             } else {
-                $mensaje_error = "Error al registrar el pago. Por favor, intente nuevamente.";
-                
-                // Registrar en auditoría - Error al registrar pago
-                registrarAuditoria(
-                    "ERROR", 
-                    "pagos", 
-                    null, 
-                    null, 
-                    [
-                        'estudiante_id' => $estudiante_id,
-                        'tipo_pago' => $tipo_pago,
-                        'monto' => $monto
-                    ], 
-                    "Pagos", 
-                    "Error al intentar registrar pago"
-                );
+                $mensaje_error = "Error al registrar el pago en la base de datos.";
             }
         } else {
-            $mensaje_error = "El monto debe ser mayor a cero.";
+            $mensaje_error = "Datos inválidos. El monto debe ser mayor a cero y debe seleccionar un estudiante válido.";
         }
     }
-    elseif (isset($_POST['editar_pago'])) {
-        // Edición de pago
-        $pago_id = (int)$_POST['pago_id'];
-        $tipo_pago = (int)$_POST['tipo_pago_edit'];
-        $otro_concepto = trim($_POST['otro_concepto_edit']);
-        $monto = (float)$_POST['monto_edit'];
-        $observaciones = trim($_POST['observaciones_edit']);
-        
-        if ($monto > 0) {
-            if (actualizarPago($pago_id, $tipo_pago, $otro_concepto, $monto, $observaciones)) {
-                $mensaje_exito = "Pago actualizado exitosamente.";
-            } else {
-                $mensaje_error = "Error al actualizar el pago. Por favor, intente nuevamente.";
-            }
+    // 2. Aprobar pago declarado por estudiante
+    elseif (isset($_POST['aprobar_pago'])) {
+        $pago_id = intval($_POST['pago_id']);
+        if (cambiarEstadoPagoAdmin($pago_id, 'aprobado', '', $current_user_id)) {
+            $mensaje_exito = "Pago #{$pago_id} aprobado exitosamente.";
         } else {
-            $mensaje_error = "El monto debe ser mayor a cero.";
+            $mensaje_error = "Error al aprobar el pago.";
+        }
+    }
+    // 3. Rechazar pago declarado por estudiante
+    elseif (isset($_POST['rechazar_pago'])) {
+        $pago_id = intval($_POST['pago_id']);
+        $motivo  = trim($_POST['motivo_rechazo'] ?? 'Comprobante no válido o datos no coincidentes');
+        if (cambiarEstadoPagoAdmin($pago_id, 'rechazado', $motivo, $current_user_id)) {
+            $mensaje_exito = "Pago #{$pago_id} rechazado.";
+        } else {
+            $mensaje_error = "Error al rechazar el pago.";
+        }
+    }
+    // 4. Eliminar pago
+    elseif (isset($_POST['eliminar_pago_id'])) {
+        $pago_id = intval($_POST['eliminar_pago_id']);
+        if (eliminarPago($pago_id)) {
+            $mensaje_exito = "Pago eliminado exitosamente.";
+        } else {
+            $mensaje_error = "Error al eliminar el pago.";
         }
     }
 }
 
-// Procesar eliminación de pago (vía GET por seguridad)
-if (isset($_GET['eliminar_pago'])) {
-    $pago_id = (int)$_GET['eliminar_pago'];
-    
-    if (eliminarPago($pago_id)) {
-        $mensaje_exito = "Pago eliminado exitosamente.";
-    } else {
-        $mensaje_error = "Error al eliminar el pago. Por favor, intente nuevamente.";
-    }
+// Filtro de estado vía POST o sesión
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtro_status'])) {
+    $_SESSION['filtro_pagos_status'] = trim($_POST['filtro_status']);
+} elseif (isset($_GET['status'])) {
+    $_SESSION['filtro_pagos_status'] = trim($_GET['status']);
 }
+$filtro_status        = $_SESSION['filtro_pagos_status'] ?? '';
+$todos_los_pagos      = obtenerTodosLosPagos(500, $filtro_status);
+$tipos_pago           = obtenerTiposPago(true);
+$metodos_pago_activos = obtenerMetodosPago(true);
+$bancos_pm            = obtenerBancos(true, 'pago_movil');
+$bancos_trans         = obtenerBancos(true, 'transferencia');
+$bancos_todos         = obtenerBancos(true);
+$total_pagos_hoy      = obtenerTotalPagosDelDia();
 
-// Obtener tipos de pago
-$tipos_pago = obtenerTiposPago();
-
-// Obtener todos los pagos
-$todos_los_pagos = obtenerTodosLosPagos();
-$total_pagos_hoy = obtenerTotalPagosDelDia();
-
-// Fechas por defecto (hoy)
-$fecha_inicio = date('Y-m-d');
-$fecha_fin = date('Y-m-d');
+$titulopag = "Registro y Control de Pagos - Super Usuario";
+include("includes/head.php");
 ?>
 
-<div class="container-fluid">
-    <h2 class="my-4">Registro de Pagos</h2>
+<div class="container-fluid px-2 px-sm-3 px-md-4">
+    <div class="d-flex justify-content-between align-items-center my-4">
+        <h2 class="mb-0" style="font-size: 1.4rem;">
+            <i class="fas fa-cash-register text-primary mr-2"></i>Registro y Control de Pagos
+        </h2>
+    </div>
     
     <?php if (!empty($mensaje_exito)): ?>
-        <div class="alert alert-success"><?= $mensaje_exito ?></div>
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+            <i class="fas fa-check-circle mr-1"></i> <?= htmlspecialchars($mensaje_exito) ?>
+            <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
+        </div>
     <?php endif; ?>
     
     <?php if (!empty($mensaje_error)): ?>
-        <div class="alert alert-danger"><?= $mensaje_error ?></div>
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+            <i class="fas fa-exclamation-circle mr-1"></i> <?= htmlspecialchars($mensaje_error) ?>
+            <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
+        </div>
     <?php endif; ?>
     
     <div class="row">
         <!-- Formulario de búsqueda y registro -->
-        <div class="col-md-6">
-            <div class="card mb-4">
+        <div class="col-12 col-lg-5 mb-4">
+            <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-primary text-white">
-                    <h5>Buscar Estudiante y Registrar Pago</h5>
+                    <h5 class="mb-0"><i class="fas fa-search mr-1"></i> Buscar Estudiante y Registrar Pago</h5>
                 </div>
-                <div class="card-body">
-                    <!-- Formulario de búsqueda -->
-                    <form method="POST" class="mb-4">
-                        <div class="form-group">
-                            <label for="cedula">Cédula del Estudiante:</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="cedula" name="cedula" 
-                                       placeholder="Ej: V12345678" value="<?= isset($_POST['cedula']) ? htmlspecialchars($_POST['cedula']) : '' ?>" required>
-                                <div class="input-group-append">
-                                    <button type="submit" name="buscar_cedula" class="btn btn-success">
-                                        <i class="fas fa-search"></i> Buscar
-                                    </button>
+                <div class="card-body p-3">
+                    <!-- Buscador en tiempo real -->
+                    <div class="form-group position-relative mb-3">
+                        <label for="buscador_estudiante_pago" class="font-weight-bold">
+                            <i class="fas fa-id-card text-secondary mr-1"></i> Cédula o Nombre del Estudiante:
+                        </label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="buscador_estudiante_pago" 
+                                   placeholder="Escriba cédula o nombre del estudiante..." autocomplete="off">
+                            <div class="input-group-append" id="spinner_busqueda_est" style="display: none;">
+                                <span class="input-group-text bg-white"><i class="fas fa-spinner fa-spin text-primary"></i></span>
+                            </div>
+                        </div>
+                        
+                        <!-- Lista flotante de sugerencias -->
+                        <div id="sugerencias_estudiantes_pago" class="list-group shadow position-absolute w-100" 
+                             style="z-index: 9999; display: none; max-height: 280px; overflow-y: auto; left: 0; right: 0; background: #ffffff; border: 1px solid #ced4da; border-radius: 4px;">
+                        </div>
+                    </div>
+                    
+                    <!-- Tarjeta de estudiante seleccionado -->
+                    <div id="card_estudiante_seleccionado" class="alert alert-info p-3 mb-3" style="<?= $estudiante ? '' : 'display: none;' ?>">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="font-weight-bold mb-1 text-primary">
+                                    <i class="fas fa-user-graduate mr-1"></i> <span id="lbl_est_nombre"><?= $estudiante ? htmlspecialchars($estudiante['nombre']) : '' ?></span>
+                                </h6>
+                                <div class="small text-dark">
+                                    <strong>Cédula:</strong> <span id="lbl_est_cedula"><?= $estudiante ? htmlspecialchars($estudiante['cedula']) : '' ?></span>
+                                </div>
+                                <div class="small text-muted">
+                                    <strong>Carrera:</strong> <span id="lbl_est_carrera"><?= $estudiante ? htmlspecialchars($estudiante['nombre_carrera']) : '' ?></span>
                                 </div>
                             </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger" id="btn_limpiar_estudiante" title="Cambiar estudiante">
+                                <i class="fas fa-times"></i>
+                            </button>
                         </div>
-                    </form>
+                    </div>
                     
-                    <!-- Formulario de registro de pago (solo visible si se encontró estudiante) -->
-                    <?php if ($estudiante): ?>
-                    <form method="POST">
-                        <input type="hidden" name="estudiante_id" value="<?= $estudiante['id'] ?>">
+                    <!-- Formulario de Registro de Pago -->
+                    <form method="POST" action="" enctype="multipart/form-data" id="formRegistroPago" style="<?= $estudiante ? '' : 'display: none;' ?>">
+                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                        <input type="hidden" name="estudiante_id" id="estudiante_id" value="<?= $estudiante ? $estudiante['id'] : '' ?>" required>
                         
                         <div class="form-group">
-                            <label>Estudiante Encontrado:</label>
-                            <div class="alert alert-info">
-                                <strong><?= htmlspecialchars($estudiante['nombre']) ?></strong><br>
-                                Cédula: <?= htmlspecialchars($estudiante['idusuario']) ?><br>
-                                Carrera: <?= htmlspecialchars($estudiante['nombre_carrera']) ?>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="tipo_pago">Tipo de Pago:</label>
-                            <select class="form-control" id="tipo_pago" name="tipo_pago" required>
-                                <option value="" data-precio="">-- Seleccionar Tipo de Pago --</option>
+                            <label for="tipo_pago" class="font-weight-bold">Concepto / Arancel: <span class="text-danger">*</span></label>
+                            <select class="custom-select" id="tipo_pago" name="tipo_pago" required>
+                                <option value="" data-precio="">-- Seleccionar Concepto --</option>
                                 <?php foreach ($tipos_pago as $tipo): ?>
                                     <option value="<?= $tipo['id'] ?>" data-precio="<?= htmlspecialchars($tipo['precio'] ?? '0.00') ?>">
                                         <?= htmlspecialchars($tipo['tipopago']) ?> <?php if (isset($tipo['precio']) && (float)$tipo['precio'] > 0): ?>(Bs <?= number_format($tipo['precio'], 2, ',', '.') ?>)<?php endif; ?>
                                     </option>
                                 <?php endforeach; ?>
-                                <option value="0" data-precio="0.00">Otro concepto</option>
+                                <option value="otro" data-precio="0.00">Otro concepto personalizado</option>
                             </select>
                         </div>
                         
                         <div class="form-group" id="otro_concepto_group" style="display: none;">
-                            <label for="otro_concepto">Especificar Otro Concepto:</label>
+                            <label for="otro_concepto" class="font-weight-bold">Especificar Concepto:</label>
                             <input type="text" class="form-control" id="otro_concepto" name="otro_concepto" 
-                                   placeholder="Especifique el concepto de pago">
+                                   placeholder="Especifique el motivo o arancel">
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group col-md-6">
+                                <label for="metodo_pago" class="font-weight-bold">Método de Pago: <span class="text-danger">*</span></label>
+                                <select class="custom-select" id="metodo_pago" name="metodo_pago" required>
+                                    <?php if (!empty($metodos_pago_activos)): ?>
+                                        <?php foreach ($metodos_pago_activos as $idx => $mp): 
+                                            $disabled = false;
+                                            $extra_msg = '';
+                                            if ($mp['codigo'] === 'pago_movil' && empty($bancos_pm)) {
+                                                $disabled = true;
+                                                $extra_msg = ' (Sin cuentas activas)';
+                                            } elseif ($mp['codigo'] === 'transferencia' && empty($bancos_trans)) {
+                                                $disabled = true;
+                                                $extra_msg = ' (Sin cuentas activas)';
+                                            }
+                                        ?>
+                                            <option value="<?= htmlspecialchars($mp['nombre']) ?>" 
+                                                    data-codigo="<?= htmlspecialchars($mp['codigo']) ?>" 
+                                                    data-requiere-banco="<?= $mp['requiere_banco'] ?>" 
+                                                    <?= $disabled ? 'disabled' : '' ?>
+                                                    <?= ($idx === 0 && !$disabled) ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($mp['nombre']) . $extra_msg ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <option value="" disabled selected>(No hay métodos de pago habilitados)</option>
+                                    <?php endif; ?>
+                                </select>
+                            </div>
+                            <div class="form-group col-md-6">
+                                <label for="banco_destino_id" class="font-weight-bold">Banco Receptor (UPTPC):</label>
+                                <select class="custom-select" id="banco_destino_id" name="banco_destino_id">
+                                    <option value="">-- Seleccionar Banco --</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group col-md-6">
+                                <label for="banco_origen" class="font-weight-bold">Banco Emisor (Banco del Estudiante):</label>
+                                <select class="custom-select" id="banco_origen" name="banco_origen">
+                                    <option value="">-- Seleccionar Banco Emisor --</option>
+                                    <?php if (!empty($bancos_todos)): ?>
+                                        <?php foreach ($bancos_todos as $b): 
+                                            $codigo_banc = !empty($b['codigo_banco']) ? $b['codigo_banco'] . ' - ' : '';
+                                        ?>
+                                            <option value="<?= htmlspecialchars($b['nombre_banco']) ?>">
+                                                <?= htmlspecialchars($codigo_banc . $b['nombre_banco']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                    <option value="Otro">Otro Banco / Entidad</option>
+                                </select>
+                            </div>
+                            <div class="form-group col-md-6">
+                                <label for="fecha_transaccion" class="font-weight-bold">Fecha de Pago:</label>
+                                <input type="date" class="form-control" id="fecha_transaccion" name="fecha_transaccion" 
+                                       value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>">
+                            </div>
                         </div>
                         
                         <div class="form-group">
-                            <label for="monto">Monto:</label>
+                            <label for="referencia" class="font-weight-bold">N° de Referencia:</label>
+                            <input type="text" class="form-control" id="referencia" name="referencia" 
+                                   placeholder="Referencia o número de transacción">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="monto" class="font-weight-bold">Monto a Registrar (Bs): <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <div class="input-group-prepend">
-                                    <span class="input-group-text">Bs</span>
+                                    <span class="input-group-text font-weight-bold">Bs</span>
                                 </div>
-                                <input type="number" class="form-control" id="monto" name="monto" 
+                                <input type="number" class="form-control font-weight-bold" id="monto" name="monto" 
                                        step="0.01" min="0.01" required placeholder="0.00">
                             </div>
                         </div>
                         
                         <div class="form-group">
-                            <label for="observaciones">Referencia:</label>
-                            <textarea class="form-control" id="observaciones" name="observaciones" 
-                                      rows="3" placeholder="Referencia del pago"></textarea>
+                            <label class="font-weight-bold">Comprobante / Capture (Opcional):</label>
+                            <div class="custom-file">
+                                <input type="file" class="custom-file-input" id="comprobante" name="comprobante" accept="image/jpeg,image/png,application/pdf">
+                                <label class="custom-file-label" for="comprobante" id="lbl_comprobante">Seleccionar archivo...</label>
+                            </div>
                         </div>
                         
-                        <button type="submit" name="registrar_pago" class="btn btn-success btn-lg btn-block">
-                            <i class="fas fa-money-bill-wave"></i> Registrar Pago
+                        <div class="form-group">
+                            <label for="observaciones" class="font-weight-bold">Observaciones / Notas:</label>
+                            <textarea class="form-control" id="observaciones" name="observaciones" 
+                                      rows="2" placeholder="Notas internas o referencia bancaria..."></textarea>
+                        </div>
+                        
+                        <button type="submit" name="registrar_pago" class="btn btn-success btn-block shadow-sm py-2 font-weight-bold">
+                            <i class="fas fa-check-circle mr-1"></i> Confirmar y Registrar Pago
                         </button>
                     </form>
-                    <?php endif; ?>
                 </div>
             </div>
         </div>
         
-        <!-- Lista de todos los pagos -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-info text-white">
-                    <h5>Todos los Pagos Registrados</h5>
+        <!-- Lista de Pagos con Filtros -->
+        <div class="col-12 col-lg-7">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-list mr-1"></i> Control de Pagos y Verificación</h5>
+                    <span class="badge badge-light p-2 font-weight-bold text-dark">
+                        Total Aprobado Hoy: Bs <?= number_format($total_pagos_hoy, 2, ',', '.') ?>
+                    </span>
                 </div>
-                <div class="card-body">
-                    <div class="alert alert-primary">
-                        <strong>Total del día de hoy: Bs<?= number_format($total_pagos_hoy, 2, ',', '.') ?></strong>
-                    </div>
-                    
-                    <!-- Buscador por fechas -->
-                    <div class="card mb-3">
-                        <div class="card-header bg-secondary text-white">
-                            <h6>Buscar por rango de fechas</h6>
+                
+                <!-- Filtros rápidos por Estado (Puro POST) -->
+                <div class="card-body p-2 bg-light border-bottom">
+                    <form method="POST" action="" class="w-100 mb-0">
+                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                        <div class="btn-group btn-group-sm w-100" role="group">
+                            <button type="submit" name="filtro_status" value="" class="btn <?= empty($filtro_status) ? 'btn-primary font-weight-bold' : 'btn-outline-secondary' ?>">
+                                <i class="fas fa-list mr-1"></i> Todos los Pagos
+                            </button>
+                            <button type="submit" name="filtro_status" value="pendiente" class="btn <?= $filtro_status === 'pendiente' ? 'btn-warning text-dark font-weight-bold' : 'btn-outline-warning text-dark' ?>">
+                                <i class="fas fa-clock mr-1"></i> Pendientes
+                            </button>
+                            <button type="submit" name="filtro_status" value="aprobado" class="btn <?= $filtro_status === 'aprobado' ? 'btn-success font-weight-bold' : 'btn-outline-success' ?>">
+                                <i class="fas fa-check-circle mr-1"></i> Aprobados
+                            </button>
+                            <button type="submit" name="filtro_status" value="rechazado" class="btn <?= $filtro_status === 'rechazado' ? 'btn-danger font-weight-bold' : 'btn-outline-danger' ?>">
+                                <i class="fas fa-times-circle mr-1"></i> Rechazados
+                            </button>
                         </div>
-                        <div class="card-body">
-                            <form id="form-buscar-fechas">
-                                <div class="form-row">
-                                    <div class="col-md-5">
-                                        <label for="fecha_inicio">Fecha inicio:</label>
-                                        <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio" value="<?= $fecha_inicio ?>">
-                                    </div>
-                                    <div class="col-md-5">
-                                        <label for="fecha_fin">Fecha fin:</label>
-                                        <input type="date" class="form-control" id="fecha_fin" name="fecha_fin" value="<?= $fecha_fin ?>">
-                                    </div>
-                                    <div class="col-md-2 d-flex align-items-end">
-                                        <button type="submit" class="btn btn-primary btn-block">
-                                            <i class="fas fa-search"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                    
-                    <div id="resultados-pagos">
-                        <?php if (!empty($todos_los_pagos)): ?>
-                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                            <table class="table table-bordered table-striped table-sm">
-                                <thead class="thead-dark">
-                                    <tr>
-                                        <th>Fecha</th>
-                                        <th>Hora</th>
-                                        <th>Estudiante</th>
-                                        <th>Cédula</th>
-                                        <th>Concepto</th>
-                                        <th>Monto</th>
-                                        <th>Referencia</th>
-                                        <th>Registrado por</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php 
-                                    $current_date = null;
-                                    $daily_total = 0;
-                                    $first_row = true;
-                                    
-                                    foreach ($todos_los_pagos as $pago): 
-                                        $pago_date = date('Y-m-d', strtotime($pago['fecha_pago']));
-                                        
-                                        // Mostrar total del día anterior si cambió la fecha
-                                        if ($current_date !== null && $current_date !== $pago_date): ?>
-                                            <tr class="table-success">
-                                                <td colspan="5" class="text-right"><strong>Total del día <?= date('d/m/Y', strtotime($current_date)) ?>:</strong></td>
-                                                <td class="text-right"><strong>Bs<?= number_format($daily_total, 2, ',', '.') ?></strong></td>
-                                                <td colspan="3"></td>
-                                            </tr>
-                                            <?php 
-                                            $daily_total = 0;
-                                        endif;
-                                        
-                                        // Iniciar nuevo día
-                                        if ($current_date !== $pago_date): 
-                                            $current_date = $pago_date;
-                                            if (!$first_row): ?>
-                                                <tr>
-                                                    <td colspan="9" class="bg-light"></td>
-                                                </tr>
-                                            <?php endif;
-                                            $first_row = false;
-                                        endif;
-                                        
-                                        $daily_total += $pago['monto'];
-                                    ?>
-                                    <tr>
-                                        <td><?= date('d/m/Y', strtotime($pago['fecha_pago'])) ?></td>
-                                        <td><?= date('H:i', strtotime($pago['fecha_pago'])) ?></td>
-                                        <td><?= htmlspecialchars($pago['nombre_estudiante']) ?></td>
-                                        <td><?= htmlspecialchars($pago['cedula']) ?></td>
-                                        <td>
-                                            <?= htmlspecialchars($pago['nombre_tipo_pago']) ?>
-                                            <?php if (!empty($pago['otro_concepto'])): ?>
-                                                <br><small>(<?= htmlspecialchars($pago['otro_concepto']) ?>)</small>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td class="text-right">Bs<?= number_format($pago['monto'], 2, ',', '.') ?></td>
-                                        <td><?= !empty($pago['observaciones']) ? htmlspecialchars($pago['observaciones']) : 'N/A' ?></td>
-                                        <td><?= htmlspecialchars($pago['nombre_registrador']) ?></td>
-                                        <td>
-                                            <div class="btn-group btn-group-sm">
-                                                <button type="button" class="btn btn-warning" data-toggle="modal" data-target="#editarPagoModal<?= $pago['id'] ?>">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#eliminarPagoModal<?= $pago['id'] ?>">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </div>
-                                            
-                                            <!-- Modal para editar pago -->
-                                            <div class="modal fade" id="editarPagoModal<?= $pago['id'] ?>" tabindex="-1" role="dialog">
-                                                <div class="modal-dialog" role="document">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title">Editar Pago</h5>
-                                                            <button type="button" class="close" data-dismiss="modal">
-                                                                <span>&times;</span>
+                    </form>
+                </div>
+                
+                <div class="card-body p-2 p-sm-3">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped table-hover table-sm">
+                            <thead class="thead-dark text-center">
+                                <tr>
+                                    <th>Fecha / Hora</th>
+                                    <th>Estudiante</th>
+                                    <th>Concepto</th>
+                                    <th>Monto</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (!empty($todos_los_pagos)): ?>
+                                    <?php foreach ($todos_los_pagos as $pago): ?>
+                                        <tr>
+                                            <td class="small text-center align-middle">
+                                                <div><?= date('d/m/Y', strtotime($pago['fecha_transaccion'] ?: $pago['fecha_pago'])) ?></div>
+                                                <small class="text-muted"><?= date('h:i A', strtotime($pago['fecha_pago'])) ?></small>
+                                            </td>
+                                            <td class="align-middle">
+                                                <div class="font-weight-bold"><?= htmlspecialchars($pago['nombre_estudiante']) ?></div>
+                                                <small class="text-muted">C.I: <?= htmlspecialchars($pago['cedula']) ?></small>
+                                            </td>
+                                            <td class="align-middle">
+                                                <strong><?= htmlspecialchars($pago['nombre_tipo_pago']) ?></strong>
+                                                <div class="small text-muted">
+                                                    <?= htmlspecialchars($pago['metodo_pago'] ?: 'Pago') ?>
+                                                    <?php if (!empty($pago['referencia'])): ?>
+                                                        | Ref: <strong><?= htmlspecialchars($pago['referencia']) ?></strong>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <?php if (!empty($pago['nombre_banco_destino'])): ?>
+                                                    <small class="text-info d-block"><i class="fas fa-landmark mr-1"></i><?= htmlspecialchars($pago['nombre_banco_destino']) ?></small>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-right font-weight-bold text-success align-middle">
+                                                Bs <?= number_format($pago['monto'], 2, ',', '.') ?>
+                                            </td>
+                                            <td class="text-center align-middle">
+                                                <?php if ($pago['status_pago'] === 'aprobado'): ?>
+                                                    <span class="badge badge-success p-2"><i class="fas fa-check-circle mr-1"></i>Aprobado</span>
+                                                <?php elseif ($pago['status_pago'] === 'rechazado'): ?>
+                                                    <span class="badge badge-danger p-2" title="<?= htmlspecialchars($pago['motivo_rechazo'] ?? '') ?>">
+                                                        <i class="fas fa-times-circle mr-1"></i>Rechazado
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="badge badge-warning p-2 text-dark"><i class="fas fa-clock mr-1"></i>Pendiente</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-center align-middle">
+                                                <div class="btn-group btn-group-sm">
+                                                    <!-- Ver Detalles Completos -->
+                                                    <button type="button" class="btn btn-outline-primary btn-ver-detalles-pago" 
+                                                            data-pago='<?= htmlspecialchars(json_encode($pago), ENT_QUOTES, 'UTF-8') ?>'
+                                                            title="Ver Detalles Completos del Pago">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                    
+                                                    <!-- Ver Comprobante directo si existe -->
+                                                    <?php if (!empty($pago['comprobante'])): ?>
+                                                        <button type="button" class="btn btn-outline-info btn-ver-capture" 
+                                                                data-url="../<?= htmlspecialchars($pago['comprobante']) ?>" 
+                                                                data-titulo="Capture: <?= htmlspecialchars($pago['nombre_estudiante']) ?> (Ref: <?= htmlspecialchars($pago['referencia']) ?>)"
+                                                                title="Ver Capture">
+                                                            <i class="fas fa-image"></i>
+                                                        </button>
+                                                    <?php endif; ?>
+                                                    
+                                                    <!-- Acciones rápidas para pagos pendientes -->
+                                                    <?php if ($pago['status_pago'] === 'pendiente'): ?>
+                                                        <form method="POST" action="" class="d-inline">
+                                                            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                                                            <input type="hidden" name="pago_id" value="<?= $pago['id'] ?>">
+                                                            <button type="submit" name="aprobar_pago" class="btn btn-outline-success" title="Aprobar Pago">
+                                                                <i class="fas fa-check"></i>
                                                             </button>
-                                                        </div>
-                                                        <form method="POST">
-                                                            <div class="modal-body">
-                                                                <input type="hidden" name="pago_id" value="<?= $pago['id'] ?>">
-                                                                
-                                                                <div class="form-group">
-                                                                    <label>Estudiante:</label>
-                                                                    <div class="alert alert-info p-2">
-                                                                        <strong><?= htmlspecialchars($pago['nombre_estudiante']) ?></strong><br>
-                                                                        Cédula: <?= htmlspecialchars($pago['cedula']) ?>
-                                                                    </div>
-                                                                </div>
-                                                                
-                                                                <div class="form-group">
-                                                                    <label for="tipo_pago_edit<?= $pago['id'] ?>">Tipo de Pago:</label>
-                                                                    <select class="form-control" id="tipo_pago_edit<?= $pago['id'] ?>" name="tipo_pago_edit" required>
-                                                                        <option value="">-- Seleccionar Tipo de Pago --</option>
-                                                                        <?php foreach ($tipos_pago as $tipo): ?>
-                                                                            <option value="<?= $tipo['id'] ?>" <?= ($tipo['id'] == $pago['tipo_pago']) ? 'selected' : '' ?>>
-                                                                                <?= htmlspecialchars($tipo['tipopago']) ?>
-                                                                            </option>
-                                                                        <?php endforeach; ?>
-                                                                        <option value="0" <?= ($pago['tipo_pago'] == 0) ? 'selected' : '' ?>>Otro concepto</option>
-                                                                    </select>
-                                                                </div>
-                                                                
-                                                                <div class="form-group" id="otro_concepto_group_edit<?= $pago['id'] ?>" style="<?= ($pago['tipo_pago'] == 0) ? 'display: block;' : 'display: none;' ?>">
-                                                                    <label for="otro_concepto_edit<?= $pago['id'] ?>">Especificar Otro Concepto:</label>
-                                                                    <input type="text" class="form-control" id="otro_concepto_edit<?= $pago['id'] ?>" name="otro_concepto_edit" 
-                                                                           value="<?= htmlspecialchars($pago['otro_concepto']) ?>" placeholder="Especifique el concepto de pago">
-                                                                </div>
-                                                                
-                                                                <div class="form-group">
-                                                                    <label for="monto_edit<?= $pago['id'] ?>">Monto:</label>
-                                                                    <div class="input-group">
-                                                                        <div class="input-group-prepend">
-                                                                            <span class="input-group-text">Bs</span>
-                                                                        </div>
-                                                                        <input type="number" class="form-control" id="monto_edit<?= $pago['id'] ?>" name="monto_edit" 
-                                                                               step="0.01" min="0.01" required value="<?= $pago['monto'] ?>">
-                                                                    </div>
-                                                                </div>
-                                                                
-                                                                <div class="form-group">
-                                                                    <label for="observaciones_edit<?= $pago['id'] ?>">Referencia:</label>
-                                                                    <textarea class="form-control" id="observaciones_edit<?= $pago['id'] ?>" name="observaciones_edit" 
-                                                                              rows="3"><?= htmlspecialchars($pago['observaciones']) ?></textarea>
-                                                                </div>
-                                                            </div>
-                                                            <div class="modal-footer">
-                                                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                                                                <button type="submit" name="editar_pago" class="btn btn-primary">Guardar Cambios</button>
-                                                            </div>
                                                         </form>
-                                                    </div>
+                                                        
+                                                        <button type="button" class="btn btn-outline-warning btn-abrir-rechazo-pago" 
+                                                                data-id="<?= $pago['id'] ?>"
+                                                                data-estudiante="<?= htmlspecialchars($pago['nombre_estudiante']) ?>"
+                                                                title="Rechazar Pago">
+                                                            <i class="fas fa-ban"></i>
+                                                        </button>
+                                                    <?php endif; ?>
+                                                    
+                                                    <!-- Eliminar con Modal -->
+                                                    <button type="button" class="btn btn-outline-danger btn-abrir-eliminar-pago" 
+                                                            data-id="<?= $pago['id'] ?>" 
+                                                            data-estudiante="<?= htmlspecialchars($pago['nombre_estudiante']) ?>" 
+                                                            data-monto="Bs <?= number_format($pago['monto'], 2, ',', '.') ?>" 
+                                                            title="Eliminar">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </button>
                                                 </div>
-                                            </div>
-                                            
-                                            <!-- Modal para eliminar pago -->
-                                            <div class="modal fade" id="eliminarPagoModal<?= $pago['id'] ?>" tabindex="-1" role="dialog">
-                                                <div class="modal-dialog" role="document">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title">Eliminar Pago</h5>
-                                                            <button type="button" class="close" data-dismiss="modal">
-                                                                <span>&times;</span>
-                                                            </button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <p>¿Está seguro de que desea eliminar este pago?</p>
-                                                            <div class="alert alert-warning">
-                                                                <strong>Estudiante:</strong> <?= htmlspecialchars($pago['nombre_estudiante']) ?><br>
-                                                                <strong>Monto:</strong> $<?= number_format($pago['monto'], 2, ',', '.') ?><br>
-                                                                <strong>Fecha:</strong> <?= date('d/m/Y H:i', strtotime($pago['fecha_pago'])) ?>
-                                                            </div>
-                                                            <p class="text-danger"><strong>Esta acción no se puede deshacer.</strong></p>
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
-                                                            <a href="?eliminar_pago=<?= $pago['id'] ?>" class="btn btn-danger">Eliminar</a>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                            </td>
+                                        </tr>
                                     <?php endforeach; ?>
-                                    
-                                    <!-- Mostrar total del último día -->
-                                    <?php if ($current_date !== null): ?>
-                                    <tr class="table-success">
-                                        <td colspan="5" class="text-right"><strong>Total del día <?= date('d/m/Y', strtotime($current_date)) ?>:</strong></td>
-                                        <td class="text-right"><strong>Bs<?= number_format($daily_total, 2, ',', '.') ?></strong></td>
-                                        <td colspan="3"></td>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="6" class="text-center py-4 text-muted">No se encontraron pagos con los filtros seleccionados.</td>
                                     </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                        <?php else: ?>
-                            <div class="alert alert-warning">
-                                No se han registrado pagos.
-                            </div>
-                        <?php endif; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -604,147 +480,575 @@ $fecha_fin = date('Y-m-d');
     </div>
 </div>
 
-<script>
-// Mostrar/ocultar campo "Otro concepto" según selección y precargar precio
-document.getElementById('tipo_pago')?.addEventListener('change', function() {
-    const otroConceptoGroup = document.getElementById('otro_concepto_group');
-    const otroConceptoInput = document.getElementById('otro_concepto');
-    
-    if (this.value === '0') {
-        otroConceptoGroup.style.display = 'block';
-        otroConceptoInput.setAttribute('required', 'required');
-    } else {
-        otroConceptoGroup.style.display = 'none';
-        otroConceptoInput.removeAttribute('required');
-        otroConceptoInput.value = '';
-    }
-
-    const selectedOption = this.options[this.selectedIndex];
-    if (selectedOption) {
-        const precio = selectedOption.getAttribute('data-precio');
-        if (precio !== null && precio !== undefined && precio !== '') {
-            const montoInput = document.getElementById('monto');
-            if (montoInput) {
-                montoInput.value = precio;
-            }
-        }
-    }
-});
-
-// Mostrar/ocultar campo "Otro concepto" en modales de edición
-document.querySelectorAll('[id^="tipo_pago_edit"]').forEach(select => {
-    select.addEventListener('change', function() {
-        const id = this.id.replace('tipo_pago_edit', '');
-        const otroConceptoGroup = document.getElementById('otro_concepto_group_edit' + id);
-        const otroConceptoInput = document.getElementById('otro_concepto_edit' + id);
-        
-        if (this.value === '0') {
-            otroConceptoGroup.style.display = 'block';
-            otroConceptoInput.setAttribute('required', 'required');
-        } else {
-            otroConceptoGroup.style.display = 'none';
-            otroConceptoInput.removeAttribute('required');
-            otroConceptoInput.value = '';
-        }
-    });
-});
-
-// Formatear monto automáticamente
-document.getElementById('monto').addEventListener('blur', function() {
-    if (this.value) {
-        this.value = parseFloat(this.value).toFixed(2);
-    }
-});
-
-// Formatear monto automáticamente en modales de edición
-document.querySelectorAll('[id^="monto_edit"]').forEach(input => {
-    input.addEventListener('blur', function() {
-        if (this.value) {
-            this.value = parseFloat(this.value).toFixed(2);
-        }
-    });
-});
-
-// Buscar pagos por rango de fechas (AJAX)
-document.getElementById('form-buscar-fechas').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const fechaInicio = document.getElementById('fecha_inicio').value;
-    const fechaFin = document.getElementById('fecha_fin').value;
-    
-    // Validar fechas
-    if (!fechaInicio || !fechaFin) {
-        alert('Por favor, seleccione ambas fechas.');
-        return;
-    }
-    
-    if (fechaInicio > fechaFin) {
-        alert('La fecha de inicio no puede ser mayor a la fecha final.');
-        return;
-    }
-    
-    // Mostrar indicador de carga
-    document.getElementById('resultados-pagos').innerHTML = `
-        <div class="text-center py-4">
-            <div class="spinner-border text-primary" role="status">
-                <span class="sr-only">Cargando...</span>
+<!-- Modal Completo de Detalles del Pago -->
+<div class="modal fade" id="modalDetallesPago" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="modal-title mb-0" id="detallesPagoModalTitulo">
+                    <i class="fas fa-file-invoice-dollar mr-2"></i>Detalles del Pago #<span id="det_pago_id"></span>
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
             </div>
-            <p class="mt-2">Buscando pagos...</p>
-        </div>
-    `;
-    
-    // Realizar petición AJAX
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', 'buscar_pagos_fechas.php', true);
-    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-    xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4) {
-            if (xhr.status === 200) {
-                document.getElementById('resultados-pagos').innerHTML = xhr.responseText;
-                
-                // Re-inicializar los event listeners para los nuevos elementos
-                reinicializarEventListeners();
-            } else {
-                document.getElementById('resultados-pagos').innerHTML = `
-                    <div class="alert alert-danger">
-                        Error al cargar los pagos. Por favor, intente nuevamente.
+            <div class="modal-body p-3 p-md-4 bg-light">
+                <!-- Tarjeta de Estado y Monto -->
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-body p-3 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center bg-white rounded">
+                        <div>
+                            <span class="text-muted small d-block font-weight-bold">ESTADO DE LA DECLARACIÓN:</span>
+                            <span id="det_badge_status" class="badge badge-warning p-2 font-weight-bold" style="font-size: 0.95rem;">Pendiente</span>
+                        </div>
+                        <div class="mt-2 mt-sm-0 text-sm-right">
+                            <span class="text-muted small d-block font-weight-bold">MONTO REGISTRADO:</span>
+                            <span id="det_monto" class="text-success font-weight-bold" style="font-size: 1.35rem;">Bs 0,00</span>
+                        </div>
                     </div>
-                `;
-            }
-        }
-    };
-    xhr.send('fecha_inicio=' + encodeURIComponent(fechaInicio) + '&fecha_fin=' + encodeURIComponent(fechaFin));
-});
+                </div>
 
-// Función para reinicializar event listeners después de cargar contenido AJAX
-function reinicializarEventListeners() {
-    // Mostrar/ocultar campo "Otro concepto" en modales de edición
-    document.querySelectorAll('[id^="tipo_pago_edit"]').forEach(select => {
-        select.addEventListener('change', function() {
-            const id = this.id.replace('tipo_pago_edit', '');
-            const otroConceptoGroup = document.getElementById('otro_concepto_group_edit' + id);
-            const otroConceptoInput = document.getElementById('otro_concepto_edit' + id);
-            
-            if (this.value === '0') {
-                otroConceptoGroup.style.display = 'block';
-                otroConceptoInput.setAttribute('required', 'required');
+                <div class="row">
+                    <!-- Datos del Estudiante -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white font-weight-bold text-dark py-2 border-bottom">
+                                <i class="fas fa-user-graduate text-primary mr-1"></i> Información del Estudiante
+                            </div>
+                            <div class="card-body p-3 small">
+                                <p class="mb-2"><strong>Nombre Completo:</strong> <span id="det_est_nombre" class="text-dark"></span></p>
+                                <p class="mb-2"><strong>Cédula / Usuario:</strong> <span id="det_est_cedula" class="badge badge-light border text-dark"></span></p>
+                                <p class="mb-2"><strong>Carrera / PNF:</strong> <span id="det_est_carrera" class="text-muted"></span></p>
+                                <p class="mb-0"><strong>Correo Electrónico:</strong> <span id="det_est_email" class="text-muted"></span></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Datos de la Transacción -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white font-weight-bold text-dark py-2 border-bottom">
+                                <i class="fas fa-receipt text-success mr-1"></i> Datos de la Transacción
+                            </div>
+                            <div class="card-body p-3 small">
+                                <p class="mb-2"><strong>Concepto / Arancel:</strong> <span id="det_concepto" class="font-weight-bold text-primary"></span></p>
+                                <p class="mb-2"><strong>Forma de Pago:</strong> <span id="det_metodo" class="badge badge-info"></span></p>
+                                <p class="mb-2"><strong>N° de Referencia:</strong> <span id="det_referencia" class="font-weight-bold text-dark" style="font-family: monospace; font-size: 1rem;"></span></p>
+                                <p class="mb-2"><strong>Fecha de Pago:</strong> <span id="det_fecha_trans"></span></p>
+                                <p class="mb-0"><strong>Fecha de Registro:</strong> <span id="det_fecha_registro" class="text-muted"></span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Bancos Origen y Destino -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white font-weight-bold text-dark py-2 border-bottom">
+                                <i class="fas fa-university text-info mr-1"></i> Entidades Bancarias
+                            </div>
+                            <div class="card-body p-3 small">
+                                <p class="mb-2"><strong>Banco Emisor (Origen):</strong> <span id="det_banco_origen" class="text-dark font-weight-bold"></span></p>
+                                <p class="mb-2"><strong>Banco Receptor (UPTPC):</strong> <span id="det_banco_destino" class="text-dark font-weight-bold"></span></p>
+                                <div id="det_banco_destino_datos" class="p-2 bg-light rounded border text-muted small mb-0"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Auditoría y Notas -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-white font-weight-bold text-dark py-2 border-bottom">
+                                <i class="fas fa-clipboard-check text-secondary mr-1"></i> Auditoría y Notas
+                            </div>
+                            <div class="card-body p-3 small">
+                                <p class="mb-2"><strong>Registrado Por:</strong> <span id="det_registrador" class="text-muted"></span></p>
+                                <div id="det_motivo_rechazo_box" style="display: none;" class="alert alert-danger p-2 mb-2">
+                                    <strong>Motivo de Rechazo:</strong> <span id="det_motivo_rechazo"></span>
+                                </div>
+                                <p class="mb-0"><strong>Observaciones / Notas:</strong> <span id="det_observaciones" class="text-muted"></span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección de Comprobante / Capture -->
+                <div class="card border-0 shadow-sm" id="det_capture_card" style="display: none;">
+                    <div class="card-header bg-white font-weight-bold text-dark py-2 border-bottom d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-camera text-primary mr-1"></i> Comprobante / Capture Adjunto</span>
+                        <a href="#" id="det_btn_abrir_capture" target="_blank" class="btn btn-sm btn-outline-primary font-weight-bold">
+                            <i class="fas fa-external-link-alt mr-1"></i> Abrir en Pantalla Completa
+                        </a>
+                    </div>
+                    <div class="card-body p-3 text-center bg-white">
+                        <img id="det_img_capture" src="" class="img-fluid rounded border shadow-sm" alt="Comprobante" style="max-height: 450px; display: none;">
+                        <iframe id="det_pdf_capture" src="" style="width: 100%; height: 450px; border: none; display: none;"></iframe>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer con acciones condicionales -->
+            <div class="modal-footer bg-white d-flex justify-content-between align-items-center">
+                <div id="det_acciones_pendientes" style="display: none;">
+                    <form method="POST" action="" class="d-inline mr-2">
+                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                        <input type="hidden" name="pago_id" id="det_form_aprobar_id" value="0">
+                        <button type="submit" name="aprobar_pago" class="btn btn-success font-weight-bold">
+                            <i class="fas fa-check-circle mr-1"></i> Aprobar Pago
+                        </button>
+                    </form>
+                    <button type="button" class="btn btn-warning text-dark font-weight-bold" id="det_btn_rechazar_modal">
+                        <i class="fas fa-times-circle mr-1"></i> Rechazar Pago
+                    </button>
+                </div>
+                <div class="ml-auto">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Centralizado para Rechazar Pago -->
+<div class="modal fade" id="modalRechazarPagoCentral" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="">
+                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                <input type="hidden" name="pago_id" id="rechazar_pago_id_input" value="0">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="fas fa-times-circle mr-1"></i> Rechazar Declaración de Pago</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body text-left p-4">
+                    <p class="mb-2">Indique el motivo por el cual se rechaza el pago del estudiante <strong id="rechazar_pago_estudiante_nombre"></strong>:</p>
+                    <div class="form-group mb-0">
+                        <label class="font-weight-bold">Motivo del Rechazo: <span class="text-danger">*</span></label>
+                        <textarea class="form-control" name="motivo_rechazo" id="rechazar_motivo_textarea" rows="3" required placeholder="Ej: Comprobante ilegible, monto no recibido en cuenta institucional, referencia duplicada..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" name="rechazar_pago" class="btn btn-danger font-weight-bold">
+                        <i class="fas fa-times-circle mr-1"></i> Confirmar Rechazo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Ver Capture Simple -->
+<div class="modal fade" id="modalVerCaptureAdmin" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalCaptureTituloAdmin"><i class="fas fa-image mr-2"></i>Comprobante de Pago</h5>
+                <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body p-3 text-center">
+                <img id="imgCaptureModalAdmin" src="" class="img-fluid rounded" alt="Capture de pago" style="max-height: 75vh; display: none;">
+                <iframe id="pdfCaptureModalAdmin" src="" style="width: 100%; height: 75vh; border: none; display: none;"></iframe>
+            </div>
+            <div class="modal-footer bg-light">
+                <a href="#" id="btnDescargarCaptureAdmin" target="_blank" class="btn btn-primary"><i class="fas fa-download mr-1"></i> Abrir / Descargar</a>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const inputBuscador = document.getElementById('buscador_estudiante_pago');
+    const sugerenciasContainer = document.getElementById('sugerencias_estudiantes_pago');
+    const spinnerBusqueda = document.getElementById('spinner_busqueda_est');
+    const cardEstudiante = document.getElementById('card_estudiante_seleccionado');
+    const formPago = document.getElementById('formRegistroPago');
+    const inputEstudianteId = document.getElementById('estudiante_id');
+    const lblNombre = document.getElementById('lbl_est_nombre');
+    const lblCedula = document.getElementById('lbl_est_cedula');
+    const lblCarrera = document.getElementById('lbl_est_carrera');
+    const btnLimpiar = document.getElementById('btn_limpiar_estudiante');
+    const selectTipoPago = document.getElementById('tipo_pago');
+    const otroGroup = document.getElementById('otro_concepto_group');
+    const montoInput = document.getElementById('monto');
+    const fileComprobante = document.getElementById('comprobante');
+    const lblFile = document.getElementById('lbl_comprobante');
+    let debounceTimer = null;
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const map = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'};
+        return text.toString().replace(/[&<>"']/g, m => map[m]);
+    }
+
+    if (fileComprobante && lblFile) {
+        fileComprobante.addEventListener('change', function() {
+            if (this.files[0]) {
+                lblFile.textContent = this.files[0].name;
             } else {
-                otroConceptoGroup.style.display = 'none';
-                otroConceptoInput.removeAttribute('required');
-                otroConceptoInput.value = '';
+                lblFile.textContent = 'Seleccionar archivo...';
+            }
+        });
+    }
+
+    // Búsqueda AJAX reactiva con debounce
+    function buscarEstudiantes() {
+        const termino = (inputBuscador.value || '').trim();
+        clearTimeout(debounceTimer);
+
+        if (termino.length < 1) {
+            sugerenciasContainer.style.display = 'none';
+            sugerenciasContainer.innerHTML = '';
+            if (spinnerBusqueda) spinnerBusqueda.style.display = 'none';
+            return;
+        }
+
+        if (spinnerBusqueda) spinnerBusqueda.style.display = 'flex';
+
+        debounceTimer = setTimeout(() => {
+            const fd = new FormData();
+            fd.append('ajax_buscar_estudiantes_pagos', '1');
+            fd.append('termino', termino);
+
+            fetch('', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    if (spinnerBusqueda) spinnerBusqueda.style.display = 'none';
+                    sugerenciasContainer.innerHTML = '';
+
+                    if (data.success && Array.isArray(data.estudiantes) && data.estudiantes.length > 0) {
+                        data.estudiantes.forEach(est => {
+                            const item = document.createElement('div');
+                            item.className = 'list-group-item list-group-item-action p-2 cursor-pointer';
+                            item.style.cursor = 'pointer';
+                            item.innerHTML = `
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>${escapeHtml(est.nombre)}</strong>
+                                        <div class="small text-muted">C.I: ${escapeHtml(est.cedula)} | ${escapeHtml(est.nombre_carrera)}</div>
+                                    </div>
+                                    <span class="badge badge-primary"><i class="fas fa-check mr-1"></i>Seleccionar</span>
+                                </div>
+                            `;
+                            item.addEventListener('click', () => seleccionarEstudiante(est));
+                            sugerenciasContainer.appendChild(item);
+                        });
+                        sugerenciasContainer.style.display = 'block';
+                    } else {
+                        sugerenciasContainer.innerHTML = '<div class="list-group-item text-muted p-2 small text-center">No se encontraron estudiantes activos</div>';
+                        sugerenciasContainer.style.display = 'block';
+                    }
+                })
+                .catch(err => {
+                    if (spinnerBusqueda) spinnerBusqueda.style.display = 'none';
+                    console.error("Error al buscar estudiantes", err);
+                });
+        }, 300);
+    }
+
+    function seleccionarEstudiante(est) {
+        inputEstudianteId.value = est.id;
+        lblNombre.textContent = est.nombre;
+        lblCedula.textContent = est.cedula;
+        lblCarrera.textContent = est.nombre_carrera;
+        
+        cardEstudiante.style.display = 'block';
+        formPago.style.display = 'block';
+        sugerenciasContainer.style.display = 'none';
+        inputBuscador.value = '';
+    }
+
+    if (btnLimpiar) {
+        btnLimpiar.addEventListener('click', function() {
+            inputEstudianteId.value = '';
+            cardEstudiante.style.display = 'none';
+            formPago.style.display = 'none';
+            formPago.reset();
+            if (lblFile) lblFile.textContent = 'Seleccionar comprobante...';
+        });
+    }
+
+    if (inputBuscador) {
+        inputBuscador.addEventListener('input', buscarEstudiantes);
+        inputBuscador.addEventListener('focus', function() {
+            if (this.value.trim().length >= 1) buscarEstudiantes();
+        });
+    }
+
+    document.addEventListener('click', function(e) {
+        if (inputBuscador && sugerenciasContainer && !inputBuscador.contains(e.target) && !sugerenciasContainer.contains(e.target)) {
+            sugerenciasContainer.style.display = 'none';
+        }
+    });
+
+    if (selectTipoPago) {
+        selectTipoPago.addEventListener('change', function() {
+            const selectedOpt = this.options[this.selectedIndex];
+            if (!selectedOpt) return;
+
+            const montoRef = selectedOpt.getAttribute('data-monto');
+            if (montoRef !== null && montoRef !== undefined && montoRef !== '') {
+                montoInput.value = parseFloat(montoRef).toFixed(2);
+            }
+
+            if (this.value === 'otro') {
+                otroGroup.style.display = 'block';
+                document.getElementById('otro_concepto').setAttribute('required', 'required');
+            } else {
+                otroGroup.style.display = 'none';
+                document.getElementById('otro_concepto').removeAttribute('required');
+            }
+        });
+    }
+
+    // Reactividad Métodos de Pago y Bancos Disponibles
+    const selectMetodoPago  = document.getElementById('metodo_pago');
+    const selectBancoDestino = document.getElementById('banco_destino_id');
+    const bancosPagoMovil    = <?= json_encode($bancos_pm) ?>;
+    const bancosTransferencia = <?= json_encode($bancos_trans) ?>;
+    const bancosTodos        = <?= json_encode($bancos_todos) ?>;
+
+    function actualizarBancosDisponibles() {
+        if (!selectMetodoPago || !selectBancoDestino) return;
+        
+        const selectedOpt = selectMetodoPago.options[selectMetodoPago.selectedIndex];
+        if (!selectedOpt) return;
+
+        const codigo = selectedOpt.getAttribute('data-codigo');
+        const requiereBanco = selectedOpt.getAttribute('data-requiere-banco');
+        
+        selectBancoDestino.innerHTML = '<option value="">-- Seleccionar Banco Receptor --</option>';
+
+        if (requiereBanco === '0') {
+            const optDirecto = document.createElement('option');
+            optDirecto.value = "0";
+            optDirecto.textContent = "Directo / No requiere cuenta bancaria institucional";
+            optDirecto.selected = true;
+            selectBancoDestino.appendChild(optDirecto);
+            return;
+        }
+
+        let bancosList = [];
+        if (codigo === 'pago_movil') {
+            bancosList = bancosPagoMovil;
+        } else if (codigo === 'transferencia') {
+            bancosList = bancosTransferencia;
+        } else {
+            bancosList = bancosTodos;
+        }
+
+        if (bancosList.length === 0) {
+            const optVacio = document.createElement('option');
+            optVacio.value = "";
+            optVacio.textContent = "(No hay cuentas configuradas para este método)";
+            optVacio.disabled = true;
+            optVacio.selected = true;
+            selectBancoDestino.appendChild(optVacio);
+        } else {
+            bancosList.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b.id;
+                let detalle = '';
+                if (codigo === 'pago_movil' && b.telefono_pago_movil) {
+                    detalle = ` (PM: ${b.telefono_pago_movil})`;
+                } else if (codigo === 'transferencia' && b.numero_cuenta) {
+                    detalle = ` (Cta: ${b.numero_cuenta.substring(0, 10)}...)`;
+                }
+                opt.textContent = `${b.nombre_banco}${detalle}`;
+                selectBancoDestino.appendChild(opt);
+            });
+        }
+    }
+
+    if (selectMetodoPago) {
+        selectMetodoPago.addEventListener('change', actualizarBancosDisponibles);
+        actualizarBancosDisponibles();
+    }
+
+    // Modal visor de comprobantes
+    document.querySelectorAll('.btn-ver-capture').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const url = this.getAttribute('data-url');
+            const titulo = this.getAttribute('data-titulo');
+            
+            $('#modalCaptureTituloAdmin').text(titulo);
+            $('#btnDescargarCaptureAdmin').attr('href', url);
+
+            if (url.toLowerCase().endsWith('.pdf')) {
+                $('#imgCaptureModalAdmin').hide();
+                $('#pdfCaptureModalAdmin').attr('src', url).show();
+            } else {
+                $('#pdfCaptureModalAdmin').hide();
+                $('#imgCaptureModalAdmin').attr('src', url).show();
+            }
+
+            $('#modalVerCaptureAdmin').modal('show');
+        });
+    });
+
+    // Modal de Detalles Completos del Pago
+    document.querySelectorAll('.btn-ver-detalles-pago').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const rawData = this.getAttribute('data-pago');
+            if (!rawData) return;
+            
+            try {
+                const p = JSON.parse(rawData);
+                
+                // ID y Título
+                $('#det_pago_id').text(p.id);
+                
+                // Status Badge
+                const badgeStatus = $('#det_badge_status');
+                badgeStatus.removeClass('badge-warning badge-success badge-danger text-dark');
+                if (p.status_pago === 'aprobado') {
+                    badgeStatus.addClass('badge-success').html('<i class="fas fa-check-circle mr-1"></i> Aprobado');
+                } else if (p.status_pago === 'rechazado') {
+                    badgeStatus.addClass('badge-danger').html('<i class="fas fa-times-circle mr-1"></i> Rechazado');
+                } else {
+                    badgeStatus.addClass('badge-warning text-dark').html('<i class="fas fa-clock mr-1"></i> Pendiente');
+                }
+                
+                // Monto
+                const montoNum = parseFloat(p.monto || 0);
+                $('#det_monto').text('Bs ' + montoNum.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                
+                // Estudiante
+                $('#det_est_nombre').text(p.nombre_estudiante || 'N/A');
+                $('#det_est_cedula').text('C.I: ' + (p.cedula || 'N/A'));
+                $('#det_est_carrera').text(p.nombre_carrera || 'Sin Carrera');
+                $('#det_est_email').text(p.email_estudiante || 'No registrado');
+                
+                // Transacción
+                $('#det_concepto').text(p.nombre_tipo_pago || 'Arancel');
+                $('#det_metodo').text(p.metodo_pago || 'No especificado');
+                $('#det_referencia').text(p.referencia || '(Sin Referencia)');
+                $('#det_fecha_trans').text(p.fecha_transaccion ? p.fecha_transaccion : 'N/A');
+                $('#det_fecha_registro').text(p.fecha_pago || 'N/A');
+                
+                // Bancos
+                $('#det_banco_origen').text(p.banco_origen || '(No especificado)');
+                $('#det_banco_destino').text(p.nombre_banco_destino || 'Directo / Institucional');
+                
+                let bancoInfoHtml = '';
+                if (p.cuenta_banco_destino) {
+                    bancoInfoHtml += '<div><strong>Cuenta UPTPC:</strong> ' + escapeHtml(p.cuenta_banco_destino) + '</div>';
+                }
+                if (p.telefono_banco_destino) {
+                    bancoInfoHtml += '<div><strong>Teléfono Pago Móvil:</strong> ' + escapeHtml(p.telefono_banco_destino) + '</div>';
+                }
+                if (p.titular_banco_destino) {
+                    bancoInfoHtml += '<div><strong>Titular:</strong> ' + escapeHtml(p.titular_banco_destino) + '</div>';
+                }
+                if (p.rif_banco_destino) {
+                    bancoInfoHtml += '<div><strong>RIF:</strong> ' + escapeHtml(p.rif_banco_destino) + '</div>';
+                }
+                $('#det_banco_destino_datos').html(bancoInfoHtml || '<em>Información estándar institucional</em>');
+                
+                // Auditoría
+                $('#det_registrador').text(p.nombre_registrador || 'Estudiante / Portal Web');
+                $('#det_observaciones').text(p.observaciones || '(Ninguna)');
+                
+                if (p.status_pago === 'rechazado' && p.motivo_rechazo) {
+                    $('#det_motivo_rechazo').text(p.motivo_rechazo);
+                    $('#det_motivo_rechazo_box').show();
+                } else {
+                    $('#det_motivo_rechazo_box').hide();
+                }
+                
+                // Capture / Comprobante
+                if (p.comprobante) {
+                    const compUrl = '../' + p.comprobante;
+                    $('#det_btn_abrir_capture').attr('href', compUrl);
+                    if (compUrl.toLowerCase().endsWith('.pdf')) {
+                        $('#det_img_capture').hide();
+                        $('#det_pdf_capture').attr('src', compUrl).show();
+                    } else {
+                        $('#det_pdf_capture').hide();
+                        $('#det_img_capture').attr('src', compUrl).show();
+                    }
+                    $('#det_capture_card').show();
+                } else {
+                    $('#det_capture_card').hide();
+                }
+                
+                // Acciones pendientes dentro del modal
+                if (p.status_pago === 'pendiente') {
+                    $('#det_form_aprobar_id').val(p.id);
+                    $('#det_acciones_pendientes').show();
+                    
+                    $('#det_btn_rechazar_modal').off('click').on('click', function() {
+                        $('#modalDetallesPago').modal('hide');
+                        $('#rechazar_pago_id_input').val(p.id);
+                        $('#rechazar_pago_estudiante_nombre').text(p.nombre_estudiante);
+                        $('#rechazar_motivo_textarea').val('');
+                        $('#modalRechazarPagoCentral').modal('show');
+                    });
+                } else {
+                    $('#det_acciones_pendientes').hide();
+                }
+                
+                $('#modalDetallesPago').modal('show');
+            } catch(e) {
+                console.error("Error al parsear datos del pago", e);
             }
         });
     });
-    
-    // Formatear monto automáticamente en modales de edición
-    document.querySelectorAll('[id^="monto_edit"]').forEach(input => {
-        input.addEventListener('blur', function() {
-            if (this.value) {
-                this.value = parseFloat(this.value).toFixed(2);
-            }
+
+    // Botón rechazar individual desde tabla
+    document.querySelectorAll('.btn-abrir-rechazo-pago').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const pagoId = this.getAttribute('data-id');
+            const estNombre = this.getAttribute('data-estudiante');
+            
+            $('#rechazar_pago_id_input').val(pagoId);
+            $('#rechazar_pago_estudiante_nombre').text(estNombre);
+            $('#rechazar_motivo_textarea').val('');
+            $('#modalRechazarPagoCentral').modal('show');
         });
     });
-}
+
+    // Modal confirmación de eliminación de pago
+    document.querySelectorAll('.btn-abrir-eliminar-pago').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.getElementById('eliminar_pago_id_input').value = this.getAttribute('data-id');
+            document.getElementById('eliminar_pago_info_estudiante').textContent = this.getAttribute('data-estudiante');
+            document.getElementById('eliminar_pago_info_monto').textContent = this.getAttribute('data-monto');
+            $('#modalEliminarPago').modal('show');
+        });
+    });
+});
 </script>
+
+<!-- Modal Confirmación Eliminación de Pago -->
+<div class="modal fade" id="modalEliminarPago" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="">
+                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                <input type="hidden" name="eliminar_pago_id" id="eliminar_pago_id_input" value="0">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="fas fa-trash-alt mr-2"></i>Eliminar Registro de Pago</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
+                    <p class="mb-2">¿Está seguro de que desea eliminar este registro de pago del sistema?</p>
+                    <div class="alert alert-warning text-left mb-2">
+                        <div><strong>Estudiante:</strong> <span id="eliminar_pago_info_estudiante"></span></div>
+                        <div><strong>Monto:</strong> <span id="eliminar_pago_info_monto" class="text-success font-weight-bold"></span></div>
+                    </div>
+                    <small class="text-muted d-block">Esta acción eliminará el registro y no se puede deshacer.</small>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger font-weight-bold">
+                        <i class="fas fa-trash-alt mr-1"></i> Sí, Eliminar Registro
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <?php include("includes/footer.php"); ?>
