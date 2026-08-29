@@ -497,8 +497,8 @@ include("includes/head.php");
                     <h3 class="text-gray-800">No tienes horarios asignados</h3>
                     <p class="text-muted">Actualmente no tienes clases asignadas en tu horario.</p>
                     <p class="text-muted">Por favor, contacta con la administración para resolver esta situación.</p>
-                    <a href="../index.php" class="btn btn-primary mt-3">
-                        <i class="fas fa-home"></i> Volver al Inicio
+                    <a href="index.php" class="btn btn-primary mt-3 font-weight-bold">
+                        <i class="fas fa-home mr-1"></i> VOLVER AL INICIO
                     </a>
                 </div>
             </div>

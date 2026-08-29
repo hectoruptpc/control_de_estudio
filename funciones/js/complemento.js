@@ -73,9 +73,23 @@ function printDiv(nombreDiv) {
     location.reload();
 }
 
-// Conversión automática universal a Mayúsculas en entradas de texto del sistema
+// Conversión automática universal a Mayúsculas en entradas de texto del sistema (Excluyendo Login y contraseñas)
 document.addEventListener('input', function(e) {
-  if (e.target && e.target.tagName === 'INPUT' && (e.target.type === 'text' || e.target.type === 'search')) {
-    e.target.value = e.target.value.toUpperCase();
+  if (e.target && e.target.tagName === 'INPUT') {
+    // Excluir login, credenciales, contraseñas o elementos marcados con no-uppercase
+    if (e.target.classList.contains('no-uppercase') ||
+        e.target.hasAttribute('data-no-uppercase') ||
+        e.target.type === 'password' ||
+        e.target.type === 'email' ||
+        e.target.name === 'username' ||
+        e.target.name === 'password' ||
+        window.location.pathname.includes('login.php') ||
+        window.location.pathname.includes('recuperar_password') ||
+        document.body.classList.contains('page-login')) {
+      return;
+    }
+    if (e.target.type === 'text' || e.target.type === 'search' || e.target.type === 'User') {
+      e.target.value = e.target.value.toUpperCase();
+    }
   }
 });

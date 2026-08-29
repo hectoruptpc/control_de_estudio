@@ -23,7 +23,7 @@ $mostrarProsecucion = obtenerConfiguracionSecretaria('mostrar_prosecucion', '1')
 
 
 </head>
-<body>
+<body class="page-login">
 
 <header class="py-2 bg-white border-bottom shadow-sm mb-3">
     <div class="container-fluid d-flex align-items-center justify-content-between px-3 px-md-4">
@@ -104,12 +104,12 @@ unset($_SESSION['msg']);
 
 <div class="form-group">
 <label for="exampleInputUser">Usuario</label>
-<input type="User" class="form-control" id="exampleInputUser" aria-describedby="UserlHelp" placeholder="Usuario o Correo Electronico" name="username" required>
+<input type="text" class="form-control no-uppercase" id="exampleInputUser" aria-describedby="UserlHelp" placeholder="Usuario o Correo Electronico" name="username" required>
 <div class="invalid-feedback">Ingrese su numero de Usuario o Correo Electronico.</div>
 </div>
 <div class="form-group">
 <label for="exampleInputPassword1">Clave:</label>
-<input type="password" class="form-control" id="exampleInputPassword1" placeholder="Su Clave de Acceso" name="password" required>
+<input type="password" class="form-control no-uppercase" id="exampleInputPassword1" placeholder="Su Clave de Acceso" name="password" required>
 </div>
 
 <div class="btn-group-horizontal" >

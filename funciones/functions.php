@@ -14252,6 +14252,131 @@ function obtener_carreras() {
     }
 }
 
+/**
+ * Determinar si un estudiante es apto para solicitar constancia / cursar intensivo
+ * Criterios Académicos Inteligentes:
+ * 1. Estudiante activo (status = 1, estudiante = 1).
+ * 2. Debe poseer historial de notas o materias inscritas registradas en el sistema.
+ * 3. Debe poseer al menos una materia reprobada o con calificación pendiente por recuperar (nota < 12 en materias o < 16 en proyecto).
+ */
+function esAptoParaIntensivo($estudiante_id) {
+    global $db;
+    try {
+        $estudiante_id = intval($estudiante_id);
+        if ($estudiante_id <= 0) return false;
+
+        // 1. Verificar si el usuario existe y es estudiante activo
+        $query_user = "SELECT id, status, estudiante FROM users WHERE id = $estudiante_id LIMIT 1";
+        $res_user = mysqli_query($db, $query_user);
+        if (!$res_user || mysqli_num_rows($res_user) === 0) {
+            return false;
+        }
+        $user = mysqli_fetch_assoc($res_user);
+        if ($user['status'] != 1 || $user['estudiante'] != 1) {
+            return false;
+        }
+
+        // 2. Verificar si posee historial de notas registradas en el sistema
+        $query_notas_total = "SELECT 
+                                (SELECT COUNT(*) FROM notas_definitivas WHERE id_usuario = $estudiante_id) as def_count,
+                                (SELECT COUNT(*) FROM notas_trimestres WHERE id_usuario = $estudiante_id) as trim_count,
+                                (SELECT COUNT(*) FROM estudiante_materias WHERE id_usuario = $estudiante_id) as mat_count";
+        $res_total = mysqli_query($db, $query_notas_total);
+        if (!$res_total) return false;
+        $row_total = mysqli_fetch_assoc($res_total);
+        
+        $total_registros = intval($row_total['def_count']) + intval($row_total['trim_count']) + intval($row_total['mat_count']);
+        if ($total_registros === 0) {
+            // Sin historial de notas ni materias inscritas -> NO APTO
+            return false;
+        }
+
+        // 3. Verificar si posee materias reprobadas que califiquen para curso intensivo
+        $query_reprobadas = "SELECT 
+            (SELECT COUNT(*) 
+             FROM notas_definitivas nd 
+             INNER JOIN materias m ON nd.id_materia = m.id_materia 
+             WHERE nd.id_usuario = $estudiante_id 
+             AND (
+                (m.es_proyecto_socio = 1 AND (
+                    (nd.trayecto_0 IS NOT NULL AND nd.trayecto_0 < 16) OR
+                    (nd.trayecto_1 IS NOT NULL AND nd.trayecto_1 < 16) OR
+                    (nd.trayecto_2 IS NOT NULL AND nd.trayecto_2 < 16) OR
+                    (nd.trayecto_3 IS NOT NULL AND nd.trayecto_3 < 16) OR
+                    (nd.trayecto_4 IS NOT NULL AND nd.trayecto_4 < 16)
+                ))
+                OR
+                (m.es_proyecto_socio = 0 AND (
+                    (nd.trayecto_0 IS NOT NULL AND nd.trayecto_0 < 12) OR
+                    (nd.trayecto_1 IS NOT NULL AND nd.trayecto_1 < 12) OR
+                    (nd.trayecto_2 IS NOT NULL AND nd.trayecto_2 < 12) OR
+                    (nd.trayecto_3 IS NOT NULL AND nd.trayecto_3 < 12) OR
+                    (nd.trayecto_4 IS NOT NULL AND nd.trayecto_4 < 12)
+                ))
+             )
+            ) as reprobadas_def,
+            (SELECT COUNT(*) FROM estudiante_materias WHERE id_usuario = $estudiante_id AND nota_final IS NOT NULL AND nota_final < 12) as reprobadas_mat,
+            (SELECT COUNT(*) FROM notas_trimestres WHERE id_usuario = $estudiante_id AND nota IS NOT NULL AND nota < 12) as reprobadas_trim";
+        
+        $res_reprobadas = mysqli_query($db, $query_reprobadas);
+        if (!$res_reprobadas) return false;
+        $row_reprobadas = mysqli_fetch_assoc($res_reprobadas);
+
+        $total_reprobadas = intval($row_reprobadas['reprobadas_def']) + intval($row_reprobadas['reprobadas_mat']) + intval($row_reprobadas['reprobadas_trim']);
+
+        // Es apto si tiene materias reprobadas para recuperar
+        return ($total_reprobadas > 0);
+
+    } catch (Exception $e) {
+        error_log("Error en esAptoParaIntensivo: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Determinar si un estudiante es apto para solicitar / presentar Evaluación Extraordinaria
+ */
+function esAptoParaExtraordinario($estudiante_id) {
+    return esAptoParaIntensivo($estudiante_id);
+}
+
+/**
+ * Determinar si un estudiante es apto para solicitar constancia de Pasantías / Proyecto Sociointegrador
+ * Criterio Académico:
+ * 1. Estudiante activo (status = 1, estudiante = 1).
+ * 2. Estar cursando Trayecto I o superior (Trayecto 1, 2, 3, 4). Los estudiantes de Trayecto 0 (Inicial) NO aplican.
+ */
+function esAptoParaPasantias($estudiante_id) {
+    global $db;
+    try {
+        $estudiante_id = intval($estudiante_id);
+        if ($estudiante_id <= 0) return false;
+
+        $query_user = "SELECT id, status, estudiante, carrera FROM users WHERE id = $estudiante_id LIMIT 1";
+        $res_user = mysqli_query($db, $query_user);
+        if (!$res_user || mysqli_num_rows($res_user) === 0) return false;
+        $user = mysqli_fetch_assoc($res_user);
+        if ($user['status'] != 1 || $user['estudiante'] != 1) return false;
+
+        $id_carrera = intval($user['carrera']);
+        $trayecto_actual = 0;
+        if ($id_carrera > 0 && function_exists('obtenerTrayectoActual')) {
+            $trayecto_actual = obtenerTrayectoActual($estudiante_id, $id_carrera);
+        } else if (function_exists('obtenerTrayectoActualEstudiante')) {
+            $trayecto_actual = obtenerTrayectoActualEstudiante($estudiante_id);
+        }
+
+        $infoTrayecto = obtenerInfoTrayecto($trayecto_actual);
+        $trayecto_n = $infoTrayecto['numero_trayecto'] ?? 0;
+
+        // Requiere estar en Trayecto 1 o superior
+        return ($trayecto_n >= 1);
+    } catch (Exception $e) {
+        error_log("Error en esAptoParaPasantias: " . $e->getMessage());
+        return false;
+    }
+}
+
 // =============================================
 // FUNCIONES PARA EVALUACIÓN DE GRADOS (TSU Y GRADO COMPLETO)
 // =============================================
