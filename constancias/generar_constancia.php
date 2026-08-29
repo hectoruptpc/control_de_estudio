@@ -149,9 +149,24 @@ if (empty($turno_estudiante)) $turno_estudiante = 'DIURNO';
 /**
  * Convierte cadenas UTF-8 a ISO-8859-1 para compatibilidad total con FPDF
  */
-function txtPDF($texto) {
-    if ($texto === null) return '';
-    return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', (string)$texto);
+if (!function_exists('txtPDF')) {
+    function txtPDF($texto) {
+        if (function_exists('formatearTextoPDF')) {
+            return formatearTextoPDF($texto);
+        }
+        if ($texto === null || $texto === '') return '';
+        if (function_exists('iconv')) {
+            $c = @iconv('UTF-8', 'ISO-8859-1//TRANSLIT', (string)$texto);
+            if ($c !== false) return $c;
+        }
+        if (function_exists('mb_convert_encoding')) {
+            return mb_convert_encoding((string)$texto, 'ISO-8859-1', 'UTF-8');
+        }
+        if (function_exists('utf8_decode')) {
+            return utf8_decode((string)$texto);
+        }
+        return (string)$texto;
+    }
 }
 
 /**

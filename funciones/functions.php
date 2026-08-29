@@ -9,6 +9,64 @@ if (session_status() === PHP_SESSION_NONE) {
 // se resuelvan contra la carpeta /funciones en sistemas case-sensitive
 chdir(__DIR__);
 
+// ==============================================================================
+// COMPATIBILIDAD MULTIPLATAFORMA (WINDOWS / LINUX) - POLYFILL ICONV Y FORMATEO PDF
+// ==============================================================================
+if (!function_exists('iconv')) {
+    function iconv($from_encoding, $to_encoding, $string) {
+        if ($string === null || $string === '') return '';
+        $clean_to = strtoupper(preg_replace('/(\/\/TRANSLIT|\/\/IGNORE)$/i', '', trim((string)$to_encoding)));
+        $clean_from = strtoupper(trim((string)$from_encoding));
+        
+        if (function_exists('mb_convert_encoding')) {
+            $res = @mb_convert_encoding($string, $clean_to, $clean_from);
+            if ($res !== false) return $res;
+        }
+        
+        if (in_array($clean_to, ['ISO-8859-1', 'LATIN1', 'WINDOWS-1252']) && in_array($clean_from, ['UTF-8', 'UTF8'])) {
+            if (function_exists('utf8_decode')) {
+                return utf8_decode($string);
+            }
+        } elseif (in_array($clean_from, ['ISO-8859-1', 'LATIN1', 'WINDOWS-1252']) && in_array($clean_to, ['UTF-8', 'UTF8'])) {
+            if (function_exists('utf8_encode')) {
+                return utf8_encode($string);
+            }
+        }
+        
+        return $string;
+    }
+}
+
+if (!function_exists('formatearTextoPDF')) {
+    function formatearTextoPDF($texto) {
+        if ($texto === null || $texto === '') return '';
+        $texto = (string)$texto;
+        if (function_exists('iconv')) {
+            $conv = @iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+            if ($conv !== false) return $conv;
+        }
+        if (function_exists('mb_convert_encoding')) {
+            return mb_convert_encoding($texto, 'ISO-8859-1', 'UTF-8');
+        }
+        if (function_exists('utf8_decode')) {
+            return utf8_decode($texto);
+        }
+        return $texto;
+    }
+}
+
+if (!function_exists('txtPDF')) {
+    function txtPDF($texto) {
+        return formatearTextoPDF($texto);
+    }
+}
+
+if (!function_exists('txt')) {
+    function txt($texto) {
+        return formatearTextoPDF($texto);
+    }
+}
+
     include('variables.php');
     require_once('conexion.php');
     include('cabecera_footer.php');
