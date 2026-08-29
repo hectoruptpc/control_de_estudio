@@ -100,84 +100,142 @@ include("includes/head.php");
                                         <div class="row">
                                             <?php if ($estudiante['trayecto_n'] == 0): ?>
                                                 <div class="col-sm-6 mb-2">
-                                                    <a class="btn btn-outline-primary btn-block" href="constancias/pdf_inscripcion.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
-                                                        <i class="fas fa-file-invoice mr-1"></i> Constancia de Inscripción
-                                                    </a>
+                                                    <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
+                                                        <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
+                                                        <input type="hidden" name="tipo" value="inscripcion">
+                                                        <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                                                            <i class="fas fa-file-invoice mr-1"></i> Constancia de Inscripción
+                                                        </button>
+                                                    </form>
                                                 </div>
                                             <?php else: ?>
                                                 <div class="col-sm-6 mb-2">
-                                                    <a class="btn btn-outline-primary btn-block" href="constancias/pdf_estudios.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
-                                                        <i class="fas fa-user-graduate mr-1"></i> Constancia de Estudios
-                                                    </a>
+                                                    <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
+                                                        <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
+                                                        <input type="hidden" name="tipo" value="estudios">
+                                                        <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                                                            <i class="fas fa-user-graduate mr-1"></i> Constancia de Estudios
+                                                        </button>
+                                                    </form>
                                                 </div>
                                             <?php endif; ?>
 
                                             <div class="col-sm-6 mb-2">
-                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_intensivo.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
-                                                    <i class="fas fa-file-contract mr-1"></i> Constancia de Intensivo
-                                                </a>
+                                                <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
+                                                    <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
+                                                    <input type="hidden" name="tipo" value="intensivo">
+                                                    <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                                                        <i class="fas fa-file-contract mr-1"></i> Constancia de Intensivo
+                                                    </button>
+                                                </form>
                                             </div>
                                             <div class="col-sm-6 mb-2">
-                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_evaluacion_extraordinaria.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
-                                                    <i class="fas fa-redo mr-1"></i> Evaluación Extraordinaria
-                                                </a>
+                                                <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
+                                                    <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
+                                                    <input type="hidden" name="tipo" value="evaluacion_extraordinaria">
+                                                    <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                                                        <i class="fas fa-redo mr-1"></i> Evaluación Extraordinaria
+                                                    </button>
+                                                </form>
                                             </div>
                                             <div class="col-sm-6 mb-2">
-                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_adicion_retiro.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
-                                                    <i class="fas fa-exchange-alt mr-1"></i> Adición/Retiro
-                                                </a>
+                                                <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
+                                                    <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
+                                                    <input type="hidden" name="tipo" value="adicion_retiro">
+                                                    <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                                                        <i class="fas fa-exchange-alt mr-1"></i> Adición/Retiro
+                                                    </button>
+                                                </form>
                                             </div>
                                             <div class="col-sm-6 mb-2">
-                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_inscripcion_practicas.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
-                                                    <i class="fas fa-briefcase mr-1"></i> Pasantías/Proyecto
-                                                </a>
+                                                <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
+                                                    <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
+                                                    <input type="hidden" name="tipo" value="inscripcion_practicas">
+                                                    <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                                                        <i class="fas fa-briefcase mr-1"></i> Pasantías/Proyecto
+                                                    </button>
+                                                </form>
                                             </div>
                                             <div class="col-sm-6 mb-2">
-                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_cambio_carrera.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
-                                                    <i class="fas fa-random mr-1"></i> Cambio de Carrera
-                                                </a>
+                                                <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
+                                                    <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
+                                                    <input type="hidden" name="tipo" value="cambio_carrera">
+                                                    <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                                                        <i class="fas fa-random mr-1"></i> Cambio de Carrera
+                                                    </button>
+                                                </form>
                                             </div>
                                             <div class="col-sm-6 mb-2">
-                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_cambio_turno.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
-                                                    <i class="fas fa-clock mr-1"></i> Cambio Turno
-                                                </a>
-                                            </div>
-                                            <!-- NUEVO BOTÓN AÑADIDO AQUÍ -->
-                                            <div class="col-sm-6 mb-2">
-                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_cambio_seccion.php?id=<?php echo $estudiante['id']; ?>">
-                                                    <i class="fas fa-sync-alt mr-1"></i> Cambiar Sección
-                                                </a>
-                                            </div>
-                                            <!-- FIN DEL NUEVO BOTÓN -->
-                                            <div class="col-sm-6 mb-2">
-                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_renuncia_cupo.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
-                                                    <i class="fas fa-user-times mr-1"></i> Renuncia de Cupo
-                                                </a>
+                                                <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
+                                                    <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
+                                                    <input type="hidden" name="tipo" value="cambio_turno">
+                                                    <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                                                        <i class="fas fa-clock mr-1"></i> Cambio Turno
+                                                    </button>
+                                                </form>
                                             </div>
                                             <div class="col-sm-6 mb-2">
-                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_retiro_semestre.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
-                                                    <i class="fas fa-calendar-times mr-1"></i> Retiro de Semestre
-                                                </a>
+                                                <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
+                                                    <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
+                                                    <input type="hidden" name="tipo" value="cambio_seccion">
+                                                    <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                                                        <i class="fas fa-sync-alt mr-1"></i> Cambiar Sección
+                                                    </button>
+                                                </form>
                                             </div>
                                             <div class="col-sm-6 mb-2">
-                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_constancia_retiro.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
-                                                    <i class="fas fa-file-export mr-1"></i> Constancia de Retiro
-                                                </a>
+                                                <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
+                                                    <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
+                                                    <input type="hidden" name="tipo" value="renuncia_cupo">
+                                                    <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                                                        <i class="fas fa-user-times mr-1"></i> Renuncia de Cupo
+                                                    </button>
+                                                </form>
                                             </div>
                                             <div class="col-sm-6 mb-2">
-                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_constancia_traslado.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
-                                                    <i class="fas fa-truck-moving mr-1"></i> Constancia de Traslado
-                                                </a>
+                                                <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
+                                                    <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
+                                                    <input type="hidden" name="tipo" value="retiro_semestre">
+                                                    <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                                                        <i class="fas fa-calendar-times mr-1"></i> Retiro de Semestre
+                                                    </button>
+                                                </form>
                                             </div>
                                             <div class="col-sm-6 mb-2">
-                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_constancia_reincorporacion.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
-                                                    <i class="fas fa-user-plus mr-1"></i> Constancia de Reincorporación
-                                                </a>
+                                                <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
+                                                    <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
+                                                    <input type="hidden" name="tipo" value="constancia_retiro">
+                                                    <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                                                        <i class="fas fa-file-export mr-1"></i> Constancia de Retiro
+                                                    </button>
+                                                </form>
                                             </div>
                                             <div class="col-sm-6 mb-2">
-                                                <a class="btn btn-outline-primary btn-block" href="constancias/pdf_retiro_documento.php?id=<?php echo $estudiante['id']; ?>" target="_blank">
-                                                    <i class="fas fa-file-download mr-1"></i> Retiro de Documento
-                                                </a>
+                                                <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
+                                                    <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
+                                                    <input type="hidden" name="tipo" value="constancia_traslado">
+                                                    <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                                                        <i class="fas fa-truck-moving mr-1"></i> Constancia de Traslado
+                                                    </button>
+                                                </form>
+                                            </div>
+                                            <div class="col-sm-6 mb-2">
+                                                <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
+                                                    <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
+                                                    <input type="hidden" name="tipo" value="constancia_reincorporacion">
+                                                    <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                                                        <i class="fas fa-user-plus mr-1"></i> Constancia de Reincorporación
+                                                    </button>
+                                                </form>
+                                            </div>
+                                            <div class="col-sm-6 mb-2">
+                                                <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
+                                                    <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
+                                                    <input type="hidden" name="tipo" value="retiro_documento">
+                                                    <button type="submit" class="btn btn-outline-primary btn-block text-left">
+                                                        <i class="fas fa-file-download mr-1"></i> Retiro de Documento
+                                                    </button>
+                                                </form>
                                             </div>
                                         </div>
                                     </div>

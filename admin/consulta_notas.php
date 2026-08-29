@@ -222,47 +222,47 @@ if (!empty($cedula)) {
                             
                             <td class="text-center">
                                 <?php if ($t1 !== null): ?>
-                                    <span class="badge <?= $t1 >= 12 ? 'bg-success' : 'bg-danger' ?> p-2">
+                                    <span class="badge badge-<?= $t1 >= 12 ? 'success' : 'danger' ?> p-2">
                                         <?= number_format($t1, 1) ?>
                                     </span>
                                 <?php else: ?>
                                     <span class="text-muted">-</span>
                                 <?php endif; ?>
-                             </div>
+                            </td>
                             
                             <td class="text-center">
                                 <?php if ($t2 !== null): ?>
-                                    <span class="badge <?= $t2 >= 12 ? 'bg-success' : 'bg-danger' ?> p-2">
+                                    <span class="badge badge-<?= $t2 >= 12 ? 'success' : 'danger' ?> p-2">
                                         <?= number_format($t2, 1) ?>
                                     </span>
                                 <?php else: ?>
                                     <span class="text-muted">-</span>
                                 <?php endif; ?>
-                             </div>
+                            </td>
                             
                             <td class="text-center">
                                 <?php if ($t3 !== null): ?>
-                                    <span class="badge <?= $t3 >= 12 ? 'bg-success' : 'bg-danger' ?> p-2">
+                                    <span class="badge badge-<?= $t3 >= 12 ? 'success' : 'danger' ?> p-2">
                                         <?= number_format($t3, 1) ?>
                                     </span>
                                 <?php else: ?>
                                     <span class="text-muted">-</span>
                                 <?php endif; ?>
-                             </div>
+                            </td>
                             
                             <td class="text-center">
                                 <?php if ($nota_final !== null): ?>
-                                    <span class="badge <?= $nota_final >= 12 ? 'bg-success' : 'bg-danger' ?> p-2" style="font-size: 1rem;">
+                                    <span class="badge badge-<?= $nota_final >= 12 ? 'success' : 'danger' ?> p-2" style="font-size: 0.95rem;">
                                         <?= number_format($nota_final, 1) ?>
                                     </span>
                                 <?php else: ?>
-                                    <span class="text-muted">-</span>
+                                    <span class="badge badge-secondary">En curso</span>
                                 <?php endif; ?>
-                             </div>
+                            </td>
                             
                             <td class="text-center">
                                 <span class="badge badge-<?= $badge_estado ?>"><?= $estado ?></span>
-                             </div>
+                            </td>
                             
                             <td><?= htmlspecialchars($nota['nombre_periodo'] ?? '-') ?></td>
                             <td class="text-center"><?= !empty($nota['fecha_registro']) ? date('d/m/Y', strtotime($nota['fecha_registro'])) : '-' ?></td>

@@ -1,0 +1,2669 @@
+
+
+============================================================
+FILE: pdf_inscripcion.php
+============================================================
+<?php
+ob_start(); 
+error_reporting(0);
+ini_set('display_errors', 0);
+
+include('../../funciones/functions.php');
+
+if (!isset($_GET['id'])) { die("ID no proporcionado."); }
+$id_estudiante = intval($_GET['id']);
+
+// 1. Datos del estudiante y carrera
+$query_user = "SELECT * FROM users WHERE id = ? LIMIT 1";
+$stmt = $db->prepare($query_user);
+$stmt->bind_param("i", $id_estudiante);
+$stmt->execute();
+$estudiante = $stmt->get_result()->fetch_assoc();
+$carrera = obtenerCarreraEstudiante($id_estudiante);
+
+// 2. Datos de Periodos
+$query_periodo = "SELECT fecha_inicio, fecha_fin FROM periodos_academicos ORDER BY id_periodo DESC LIMIT 1";
+$res_p = mysqli_query($db, $query_periodo);
+
+$meses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+$texto_vigencia = "LAPSO NO DISPONIBLE";
+
+if ($res_p && mysqli_num_rows($res_p) > 0) {
+    $periodo_data = mysqli_fetch_assoc($res_p);
+    $f_inicio = strtotime($periodo_data['fecha_inicio']);
+    $f_fin = strtotime($periodo_data['fecha_fin']);
+    $texto_vigencia = $meses[date('n', $f_inicio)-1] . " " . date('Y', $f_inicio) . " - " . $meses[date('n', $f_fin)-1] . " " . date('Y', $f_fin);
+}
+
+require_once('../fpdf/fpdf.php'); 
+while (ob_get_level()) { ob_end_clean(); }
+
+$pdf = new FPDF('P', 'mm', 'A4');
+$pdf->AddPage();
+$pdf->SetMargins(25, 10, 25);
+$pdf->SetAutoPageBreak(false); 
+
+// --- MEMBRETE ---
+$pdf->Image('../images/uptpc.png', 20, 10, 18); 
+$pdf->SetFont('Arial', 'B', 7.5);
+$pdf->SetY(10);
+$pdf->Cell(0, 3.5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "REPÚBLICA BOLIVARIANA DE VENEZUELA"), 0, 1, 'C');
+$pdf->Cell(0, 3.5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA"), 0, 1, 'C');
+$pdf->Cell(0, 3.5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO"), 0, 1, 'C');
+$pdf->Cell(0, 3.5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA"), 0, 1, 'C');
+
+// --- TÍTULO ---
+$pdf->Ln(10);
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Cell(0, 8, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "CONSTANCIA DE INSCRIPCIÓN"), 0, 1, 'C');
+
+// --- CUERPO ---
+$pdf->Ln(6);
+$pdf->SetFont('Arial', '', 11);
+$pdf->MultiCell(0, 6, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Quien suscribe Jefe del Departamento de Control de Estudio de nuestra Institución, Hace Constar que el (la) Ciudadano (a) que se menciona a continuación"), 0, 'J');
+
+$pdf->Ln(5);
+$pdf->SetFont('Arial', 'B', 12);
+$pdf->Cell(0, 8, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', mb_strtoupper($estudiante['nombre'])), 0, 1, 'C');
+
+$pdf->Ln(5);
+$pdf->SetFont('Arial', '', 11);
+$pdf->MultiCell(0, 6, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Titular de la Cédula de Identidad " . $estudiante['idusuario'] . ", se encuentra inscrito en esta casa de estudio para cursar el TRAYECTO INICIAL del Programa Nacional de Formación en:"), 0, 'J');
+
+$pdf->Ln(4);
+$pdf->SetFont('Arial', 'B', 12);
+$pdf->Cell(0, 8, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', mb_strtoupper($carrera['nombre_carrera'])), 0, 1, 'C');
+
+$pdf->Ln(5);
+$pdf->SetFont('Arial', '', 11);
+$pdf->MultiCell(0, 6, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Cuyo lapso académico " . ($fads ?? '') . " y su vigencia corresponde desde"), 0, 'J');
+
+$pdf->Ln(4);
+$pdf->SetFont('Arial', 'B', 12);
+$pdf->Cell(0, 8, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto_vigencia), 0, 1, 'C');
+
+$pdf->Ln(6);
+$pdf->SetFont('Arial', '', 11);
+$dia_text = date('d');
+$anio_text = date('Y');
+$mes_text = strtolower($meses[date('n')-1]);
+$pdf->MultiCell(0, 6, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Constancia que se expide en la ciudad de Puerto Cabello a los $dia_text días del mes de $mes_text del año $anio_text."), 0, 'J');
+
+// --- BLOQUE DE FIRMA (POSICIONADO ABAJO) ---
+$pdf->SetY(-65); // Establecemos la posición Y contando desde el final de la hoja hacia arriba
+$pdf->Line(70, $pdf->GetY(), 140, $pdf->GetY()); // Línea para firmar: Line(x1, y1, x2, y2)
+$pdf->Ln(2);
+$pdf->SetFont('Arial', 'B', 9);
+$pdf->Cell(0, 4, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Dra. Zorangel E. Aponte Q."), 0, 1, 'C');
+$pdf->SetFont('Arial', '', 8);
+$pdf->Cell(0, 3.5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Jefa de Control de Estudios"), 0, 1, 'C');
+$pdf->Cell(0, 3.5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Resolución N° 07-2022 de fecha 01/11/2022"), 0, 1, 'C');
+$pdf->Cell(0, 3.5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Consejo N° 07 de fecha 01/11/2022"), 0, 1, 'C');
+
+// --- PIE DE PÁGINA (ESTÁTICO AL FINAL) ---
+$pdf->SetY(-30); 
+$pdf->SetFont('Arial', 'B', 9);
+$pdf->Cell(0, 6, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Este Documento NO ES VALIDO sin la firma y Sello del Departamento de Control De Estudios"), 0, 1, 'C');
+$pdf->SetFont('Arial', '', 7);
+$pdf->MultiCell(0, 3, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Urbanización la Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello\nNúmero Telefónico: (0242) 3700494. Correo Electrónico: control_de_estudios@uptpc.edu.ve"), 0, 'C');
+
+$pdf->Output('I', 'Constancia_Inscripcion.pdf');
+exit();
+
+============================================================
+FILE: pdf_estudios.php
+============================================================
+<?php
+ob_start(); 
+error_reporting(0);
+ini_set('display_errors', 0);
+
+include('../../funciones/functions.php');
+
+if (!isset($_GET['id'])) { die("ID no proporcionado."); }
+$id_estudiante = intval($_GET['id']);
+
+// 1. Datos del estudiante, Carrera y Trayecto
+$query_user = "SELECT * FROM users WHERE id = ? LIMIT 1";
+$stmt = $db->prepare($query_user);
+$stmt->bind_param("i", $id_estudiante);
+$stmt->execute();
+$estudiante = $stmt->get_result()->fetch_assoc();
+
+$carrera = obtenerCarreraEstudiante($id_estudiante);
+$res_m = obtenerMateriasCarrera($estudiante['carrera']);
+$m_data = $res_m->fetch_assoc();
+$infoT = obtenerInfoTrayecto($m_data['trayecto']);
+
+// 2. Datos de Periodos (Último periodo registrado)
+$query_periodo = "SELECT fecha_inicio, fecha_fin FROM periodos_academicos ORDER BY id_periodo DESC LIMIT 1";
+$res_p = mysqli_query($db, $query_periodo);
+
+$meses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+$texto_vigencia = "LAPSO NO DISPONIBLE";
+
+if ($res_p && mysqli_num_rows($res_p) > 0) {
+    $periodo_data = mysqli_fetch_assoc($res_p);
+    $f_inicio = strtotime($periodo_data['fecha_inicio']);
+    $f_fin = strtotime($periodo_data['fecha_fin']);
+    $texto_vigencia = $meses[date('n', $f_inicio)-1] . " " . date('Y', $f_inicio) . " - " . $meses[date('n', $f_fin)-1] . " " . date('Y', $f_fin);
+}
+
+require_once('../fpdf/fpdf.php'); 
+while (ob_get_level()) { ob_end_clean(); }
+
+$pdf = new FPDF('P', 'mm', 'A4');
+$pdf->AddPage();
+$pdf->SetMargins(25, 10, 25);
+$pdf->SetAutoPageBreak(false); 
+
+// --- MEMBRETE ---
+$pdf->Image('../images/uptpc.png', 20, 10, 18); 
+$pdf->SetFont('Arial', 'B', 7.5);
+$pdf->SetY(10);
+$pdf->Cell(0, 3.5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "REPÚBLICA BOLIVARIANA DE VENEZUELA"), 0, 1, 'C');
+$pdf->Cell(0, 3.5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA"), 0, 1, 'C');
+$pdf->Cell(0, 3.5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO"), 0, 1, 'C');
+$pdf->Cell(0, 3.5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA"), 0, 1, 'C');
+
+// --- TÍTULO ---
+$pdf->Ln(10);
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Cell(0, 8, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "CONSTANCIA DE ESTUDIOS"), 0, 1, 'C');
+
+// --- CUERPO ---
+$pdf->Ln(6);
+$pdf->SetFont('Arial', '', 11);
+$pdf->MultiCell(0, 6, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Quien suscribe Jefe del Departamento de Control de Estudio de nuestra Institución, Hace Constar que el (la) Ciudadano (a) que se menciona a continuación"), 0, 'J');
+
+$pdf->Ln(5);
+$pdf->SetFont('Arial', 'B', 12);
+$pdf->Cell(0, 8, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', mb_strtoupper($estudiante['nombre'])), 0, 1, 'C');
+
+$pdf->Ln(5);
+$pdf->SetFont('Arial', '', 11);
+$pdf->MultiCell(0, 6, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Titular de la Cédula de Identidad " . $estudiante['idusuario'] . ", se encuentra inscrito en esta casa de estudio y es cursante del Programa Nacional de Formación en:"), 0, 'J');
+
+$pdf->Ln(4);
+$pdf->SetFont('Arial', 'B', 12);
+$pdf->Cell(0, 8, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', mb_strtoupper($carrera['nombre_carrera'])), 0, 1, 'C');
+
+$pdf->Ln(5);
+$pdf->SetFont('Arial', '', 11);
+// Usamos $fads para el año/trimestre y $texto_vigencia para el rango de meses
+$pdf->MultiCell(0, 6, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Cuyo lapso académico " . ($fads ?? '') . " y su vigencia corresponde desde"), 0, 'J');
+
+$pdf->Ln(4);
+$pdf->SetFont('Arial', 'B', 12);
+$pdf->Cell(0, 8, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto_vigencia), 0, 1, 'C');
+
+$pdf->Ln(6);
+$pdf->SetFont('Arial', '', 11);
+$dia_text = date('d');
+$anio_text = date('Y');
+$mes_text = strtolower($meses[date('n')-1]);
+$pdf->MultiCell(0, 6, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Constancia que se expide en la ciudad de Puerto Cabello a los $dia_text días del mes de $mes_text del año $anio_text."), 0, 'J');
+
+// --- BLOQUE DE FIRMA (SUBIDO PARA EVITAR 2DA HOJA) ---
+$pdf->SetY(-65); 
+$pdf->Line(70, $pdf->GetY(), 140, $pdf->GetY()); // Línea centrada
+$pdf->Ln(2);
+$pdf->SetFont('Arial', 'B', 9);
+$pdf->Cell(0, 4, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Dra. Zorangel E. Aponte Q."), 0, 1, 'C');
+$pdf->SetFont('Arial', '', 8);
+$pdf->Cell(0, 3.5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Jefa de Control de Estudios"), 0, 1, 'C');
+$pdf->Cell(0, 3.5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Resolución N° 07-2022 de fecha 01/11/2022"), 0, 1, 'C');
+$pdf->Cell(0, 3.5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Consejo N° 07 de fecha 01/11/2022"), 0, 1, 'C');
+
+// --- PIE DE PÁGINA ---
+$pdf->SetY(-30); 
+$pdf->SetFont('Arial', 'B', 9);
+$pdf->Cell(0, 6, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Este Documento NO ES VALIDO sin la firma y Sello del Departamento de Control De Estudios"), 0, 1, 'C');
+$pdf->SetFont('Arial', '', 7);
+$pdf->MultiCell(0, 3, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', "Urbanización la Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello\nNúmero Telefónico: (0242) 3700494. Correo Electrónico: control_de_estudios@uptpc.edu.ve"), 0, 'C');
+
+$pdf->Output('I', 'Constancia_Estudios.pdf');
+exit();
+
+============================================================
+FILE: pdf_intensivo.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php');
+
+// 1. VALIDACIÓN Y OBTENCIÓN DE DATOS
+if (!isset($_GET['id'])) { 
+    die("ID de estudiante no proporcionado."); 
+}
+
+$id_estudiante = intval($_GET['id']);
+
+// Consulta de datos del estudiante
+$query_user = "SELECT * FROM users WHERE id = ? LIMIT 1";
+$stmt = $db->prepare($query_user);
+$stmt->bind_param("i", $id_estudiante);
+$stmt->execute();
+$estudiante = $stmt->get_result()->fetch_assoc();
+
+if (!$estudiante) die('Estudiante no encontrado.');
+
+$cedula = $estudiante['idusuario'];
+$carrera = obtenerCarreraEstudiante($id_estudiante);
+
+// Datos del curso intensivo (Estos valores deberían venir de tu base de datos)
+$lapso = "2025-1";
+$materia_intensivo = "MATEMÁTICA II";
+$fecha_inicio = "04-08-2025";
+$fecha_fin = "29-08-2025";
+
+/**
+ * Función para convertir texto a codificación ISO para FPDF
+ */
+function txt($texto) {
+    return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+}
+
+/**
+ * Función para los datos de la fecha con negritas
+ */
+function obtenerDatosFecha() {
+    $meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    $dias_letras = [
+        1 => "Primero", 2 => "dos", 3 => "tres", 4 => "cuatro", 5 => "cinco",
+        6 => "seis", 7 => "siete", 8 => "ocho", 9 => "nueve", 10 => "diez",
+        11 => "once", 12 => "doce", 13 => "trece", 14 => "catorce", 15 => "quince",
+        16 => "dieciséis", 17 => "diecisiete", 18 => "dieciocho", 19 => "diecinueve", 20 => "veinte",
+        21 => "veintiuno", 22 => "veintidós", 23 => "veintitrés", 24 => "veinticuatro", 25 => "veinticinco",
+        26 => "veintiséis", 27 => "veintisiete", 28 => "veintiocho", 29 => "veintinueve", 30 => "treinta",
+        31 => "treinta y uno"
+    ];
+
+    $d = (int)date('d');
+    $m = $meses[(int)date('m') - 1];
+    $y = date('Y');
+    $anio_letras = ($y == "2026") ? "dos mil veintiséis" : "dos mil " . $y;
+
+    return [
+        'dia_txt' => $dias_letras[$d] . " (" . str_pad($d, 2, "0", STR_PAD_LEFT) . ")",
+        'mes' => $m,
+        'anio_txt' => $anio_letras . " ($y)"
+    ];
+}
+
+// 2. CLASE FPDF
+class PDF_Intensivo extends FPDF {
+    function Header() {
+        if(file_exists('../images/uptpc.png')) {
+            $this->Image('../images/uptpc.png', 25, 12, 18);
+        }
+        $this->SetY(12);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(0, 4, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 4, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 4, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 4, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        
+        $this->Ln(15);
+        $this->SetFont('Arial', 'B', 11);
+        $this->Cell(0, 5, txt('CONSTANCIA DE ESTUDIOS DE INTENSIVO'), 0, 1, 'C');
+        $this->Ln(12);
+    }
+
+    function Footer() {
+        $this->SetY(-25);
+        $this->SetFont('Arial', 'I', 7);
+        $this->Cell(0, 4, txt("Este documento No es Valido sin la firma y sello del Departamento de Control de Estudios"), 0, 1, 'C');
+        $this->SetFont('Arial', '', 7);
+        $this->Cell(0, 3, txt("Urbanización la Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello"), 0, 1, 'C');
+        $this->Cell(0, 3, txt("Correo Electrónico: uptpccontroldeestudios03@gmail.com"), 0, 1, 'C');
+    }
+}
+
+// 3. GENERACIÓN
+$pdf = new PDF_Intensivo('P', 'mm', 'Letter');
+$pdf->SetMargins(25, 25, 25);
+$pdf->AddPage();
+$pdf->SetFont('Arial', '', 11);
+
+// Texto introductorio
+$pdf->Write(6, txt("Quien suscribe "));
+$pdf->SetFont('Arial', 'B', 11); $pdf->Write(6, txt("Dra. Zorangel E. Aponte Q."));
+$pdf->SetFont('Arial', '', 11); $pdf->Write(6, txt(", titular de la cédula de identidad "));
+$pdf->SetFont('Arial', 'B', 11); $pdf->Write(6, txt("V.-7.153.528"));
+$pdf->SetFont('Arial', '', 11); $pdf->Write(6, txt(". Jefe de Control de Estudio de nuestra Institución, hace constar que el (la) Ciudadano (a) que se menciona a continuación."));
+
+$pdf->Ln(12);
+$pdf->SetFont('Arial', 'B', 12);
+$pdf->Cell(0, 8, txt(strtoupper($estudiante['nombre'])), 0, 1, 'C');
+$pdf->Ln(5);
+
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write(6, txt("Titular de la Cédula de Identidad "));
+$pdf->SetFont('Arial', 'B', 11); $pdf->Write(6, txt("V-$cedula"));
+$pdf->SetFont('Arial', '', 11); $pdf->Write(6, txt(", se encuentra inscrito en esta casa de estudios y es cursante del Programa Nacional de Formación en:"));
+
+$pdf->Ln(12);
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Cell(0, 8, txt(strtoupper($carrera['nombre_carrera'])), 0, 1, 'C');
+$pdf->Ln(10);
+
+// Detalles del intensivo
+$pdf->SetFont('Arial', '', 11);
+$pdf->MultiCell(0, 6, txt("Para el lapso académico $lapso, para cursar el curso intensivo 2025 en la unidad curricular $materia_intensivo el cual inició el $fecha_inicio y finaliza el $fecha_fin."), 0, 'J');
+
+// --- Fecha con Negritas ---
+$datosFecha = obtenerDatosFecha();
+$pdf->Ln(15);
+$pdf->SetFont('Arial', '', 11);
+
+$texto_fecha = "Documento que se emite en la ciudad de Puerto Cabello, a los " . $datosFecha['dia_txt'] . " día del mes de " . $datosFecha['mes'] . " del año " . $datosFecha['anio_txt'] . ".";
+$w = $pdf->GetStringWidth(txt($texto_fecha));
+$pdf->SetX(($pdf->GetPageWidth() - $w) / 2);
+
+$pdf->Write(6, txt("Documento que se emite en la ciudad de Puerto Cabello, a los "));
+$pdf->SetFont('Arial', 'B', 11); $pdf->Write(6, txt($datosFecha['dia_txt']));
+$pdf->SetFont('Arial', '', 11); $pdf->Write(6, txt(" día del mes de "));
+$pdf->SetFont('Arial', 'B', 11); $pdf->Write(6, txt($datosFecha['mes']));
+$pdf->SetFont('Arial', '', 11); $pdf->Write(6, txt(" del año "));
+$pdf->SetFont('Arial', 'B', 11); $pdf->Write(6, txt($datosFecha['anio_txt']));
+$pdf->SetFont('Arial', '', 11); $pdf->Write(6, txt("."));
+
+// Firma
+$pdf->Ln(35);
+$pdf->SetFont('Arial', 'B', 10);
+$pdf->Cell(0, 5, txt("Dra. Zorangel E. Aponte Q."), 0, 1, 'C');
+$pdf->SetFont('Arial', '', 9);
+$pdf->Cell(0, 4, txt("Jefe de Control de Estudios"), 0, 1, 'C');
+$pdf->Cell(0, 4, txt("Resolución N° 07-2022 de fecha 01/11/2022 Consejo N°07"), 0, 1, 'C');
+$pdf->Cell(0, 4, txt("De fecha 01/11/2022"), 0, 1, 'C');
+
+ob_end_clean();
+$pdf->Output('I', "Constancia_Intensivo_$cedula.pdf");
+exit();
+
+============================================================
+FILE: pdf_evaluacion_extraordinaria.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php');
+
+// 1. VALIDACIÓN DE DATOS (Este formulario suele ser para un grupo o vacío para llenar)
+$fecha_hoy = date('d/m/Y');
+
+/**
+ * Función para convertir texto a codificación ISO para FPDF
+ */
+function txt($texto) {
+    return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+}
+
+// 2. CLASE FPDF PERSONALIZADA
+class PDF_Extraordinaria extends FPDF {
+    function Header() {
+        // Logo
+        if(file_exists('../images/uptpc.png')) {
+            $this->Image('../images/uptpc.png', 10, 10, 18);
+        }
+        
+        // Membrete
+        $this->SetY(10);
+        $this->SetFont('Arial', '', 7);
+        $this->Cell(0, 3, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        
+        $this->Ln(5);
+        $this->SetFont('Arial', 'B', 9);
+        $this->Cell(0, 4, txt('DIRECCIÓN DE PNF Y/O PTF'), 0, 1, 'C');
+        $this->Cell(0, 4, txt('SOLICITUD DE EVALUACIÓN EXTRAORDINARIA Y/O EXAMEN DE SUFICIENCIA'), 0, 1, 'C');
+        
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(0, 6, txt('FECHA: ________/________/________'), 0, 1, 'C');
+        $this->Ln(5);
+    }
+
+    function Footer() {
+        // Espacio para Control de Estudios al final
+        $this->SetY(-20);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(0, 10, txt('Control de Estudios Firma y Sello'), 0, 0, 'L');
+    }
+}
+
+// 3. GENERACIÓN DEL DOCUMENTO
+// Usamos orientación 'P' (Vertical) pero el formato de la imagen sugiere que es un cuadro ancho
+$pdf = new PDF_Extraordinaria('P', 'mm', 'Letter');
+$pdf->SetMargins(10, 15, 10);
+$pdf->AddPage();
+
+// Estilo de la tabla
+$pdf->SetFillColor(240, 240, 240);
+$pdf->SetFont('Arial', 'B', 7);
+
+// Encabezados de la tabla
+$h = 7; // Altura de celda
+$pdf->Cell(8, $h, txt('N°'), 1, 0, 'C', true);
+$pdf->Cell(25, $h, txt('Cédula'), 1, 0, 'C', true);
+$pdf->Cell(40, $h, txt('Apellidos'), 1, 0, 'C', true);
+$pdf->Cell(40, $h, txt('Nombres'), 1, 0, 'C', true);
+$pdf->Cell(25, $h, txt('PNF/PTF'), 1, 0, 'C', true);
+$pdf->Cell(58, $h, txt('Unidad Curricular'), 1, 1, 'C', true);
+
+// Filas en blanco (puedes hacer un loop con datos de la DB si los tienes)
+$pdf->SetFont('Arial', '', 7);
+for ($i = 1; $i <= 15; $i++) {
+    $pdf->Cell(8, 6, $i, 1, 0, 'C');
+    $pdf->Cell(25, 6, '', 1, 0, 'C');
+    $pdf->Cell(40, 6, '', 1, 0, 'C');
+    $pdf->Cell(40, 6, '', 1, 0, 'C');
+    $pdf->Cell(25, 6, '', 1, 0, 'C');
+    $pdf->Cell(58, 6, '', 1, 1, 'C');
+}
+
+$pdf->Ln(10);
+
+// Sección de firmas
+$pdf->SetFont('Arial', 'B', 8);
+
+// Definir coordenadas para las celdas de firmas
+$y_firma = $pdf->GetY();
+
+// Cuadro Firma Estudiante
+$pdf->Rect(10, $y_firma, 60, 20);
+$pdf->SetXY(10, $y_firma);
+$pdf->Cell(60, 5, txt('Firma Estudiante'), 0, 0, 'C');
+
+// Cuadro Firma Director
+$pdf->Rect(75, $y_firma, 60, 20);
+$pdf->SetXY(75, $y_firma);
+$pdf->Cell(60, 5, txt('Firma Director'), 0, 0, 'C');
+
+// Cuadro Observación
+$pdf->Rect(140, $y_firma, 66, 20);
+$pdf->SetXY(140, $y_firma);
+$pdf->Cell(66, 5, txt('Observación'), 0, 0, 'C');
+
+ob_end_clean();
+$pdf->Output('I', "Solicitud_Evaluacion_Extraordinaria.pdf");
+exit();
+
+============================================================
+FILE: pdf_adicion_retiro.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php'); // Corregido a ../../ según tus scripts previos
+
+// 1. OBTENCIÓN DE DATOS
+$id_estudiante = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$estudiante = ['nombre' => '', 'idusuario' => ''];
+$carrera_nombre = '';
+
+if ($id_estudiante > 0) {
+    $query_user = "SELECT * FROM users WHERE id = ? LIMIT 1";
+    $stmt = $db->prepare($query_user);
+    $stmt->bind_param("i", $id_estudiante);
+    $stmt->execute();
+    $estudiante = $stmt->get_result()->fetch_assoc();
+    $carrera_data = obtenerCarreraEstudiante($id_estudiante);
+    $carrera_nombre = strtoupper($carrera_data['nombre_carrera']);
+}
+
+function txt($texto) {
+    return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+}
+
+// 2. CLASE EXTENDIDA
+class PDF_Adicion extends FPDF {
+    // Función para líneas punteadas
+    function SetDash($w=null, $s=null) {
+        if($w!==null)
+            $s=sprintf(' [%.3F %.3F] 0 d',$w*$this->k,$s*$this->k);
+        else
+            $s=' [] 0 d';
+        $this->_out($s);
+    }
+
+    function DibujarFormato($y, $estudiante, $carrera) {
+        $this->SetY($y);
+        
+        // --- LOGO ---
+        // Se coloca en la esquina superior izquierda de cada bloque
+        if(file_exists('../images/uptpc.png')) {
+            $this->Image('../images/uptpc.png', 12, $y, 16);
+        }
+        
+        // --- MEMBRETE ---
+        $this->SetFont('Arial', '', 6);
+        $this->Cell(0, 2.5, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 2.5, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 2.5, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 2.5, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        
+        $this->Ln(3);
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(0, 4, txt('DIRECCIÓN DE MECÁNICA AUTOMOTRIZ Y/O MECÁNICA TÉRMICA'), 0, 1, 'C');
+        $this->Cell(0, 4, txt('SOLICITUD DE ADICIÓN Y RETIRO DE ASIGNATURA'), 0, 1, 'C');
+        
+        $this->Ln(2);
+        // --- TABLA DE DATOS ---
+        $this->SetFont('Arial', 'B', 7);
+        $this->Cell(30, 5, txt('FECHA'), 1, 0, 'C');
+        $this->Cell(40, 5, txt('CÉDULA DE IDENTIDAD'), 1, 0, 'C');
+        $this->Cell(120, 5, txt('APELLIDOS Y NOMBRES DEL ESTUDIANTE'), 1, 1, 'C');
+        
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(30, 7, date('d/m/Y'), 1, 0, 'C');
+        $this->Cell(40, 7, 'V-'.$estudiante['idusuario'], 1, 0, 'C');
+        $this->Cell(120, 7, txt(strtoupper($estudiante['nombre'])), 1, 1, 'C');
+        
+        $this->SetFont('Arial', 'B', 7);
+        $this->Cell(190, 4, txt('PNF / PTF'), 1, 1, 'C');
+        
+        $this->SetFont('Arial', '', 7);
+        $chk1 = (strpos($carrera, 'AUTOMOTRIZ') !== false) ? 'X' : ' ';
+        $chk2 = (strpos($carrera, 'TÉRMICA') !== false) ? 'X' : ' ';
+        $this->Cell(95, 6, txt("[ $chk1 ] MECÁNICA AUTOMOTRIZ"), 1, 0, 'C');
+        $this->Cell(95, 6, txt("[ $chk2 ] MECÁNICA TÉRMICA"), 1, 1, 'C');
+        
+        $this->SetFont('Arial', 'B', 7);
+        $this->Cell(90, 5, txt('UNIDADES CURRICULARES ADICIONALES'), 1, 0, 'C');
+        $this->Cell(65, 5, txt('PERIODO Y/O LAPSO'), 1, 0, 'C');
+        $this->Cell(35, 5, txt('SECCIÓN'), 1, 1, 'C');
+        
+        $this->SetFont('Arial', '', 8);
+        for($i=0; $i<3; $i++) {
+            $this->Cell(90, 6, '', 1, 0, 'L');
+            $this->Cell(65, 6, '', 1, 0, 'C');
+            $this->Cell(35, 6, '', 1, 1, 'C');
+        }
+        
+        // Espacio para firmas
+        $this->Cell(95, 12, '', 'LR', 0); $this->Cell(95, 12, '', 'R', 1);
+        $this->SetFont('Arial', 'B', 7);
+        $this->Cell(95, 4, txt('FIRMA DEL ESTUDIANTE'), 1, 0, 'C');
+        $this->Cell(95, 4, txt('FIRMA DEL DIRECTOR'), 1, 1, 'C');
+        
+        $this->Cell(190, 6, txt('DEPARTAMENTO DE CONTROL DE ESTUDIOS'), 1, 1, 'C');
+    }
+}
+
+// 3. GENERACIÓN
+$pdf = new PDF_Adicion('P', 'mm', 'Letter');
+$pdf->SetMargins(12, 10, 12);
+$pdf->AddPage();
+
+// Original (Superior)
+$pdf->DibujarFormato(10, $estudiante, $carrera_nombre);
+
+// Línea de corte
+$pdf->SetDash(1, 1);
+$pdf->Line(10, 138, 205, 138);
+$pdf->SetDash(); 
+
+// Copia (Inferior)
+$pdf->DibujarFormato(148, $estudiante, $carrera_nombre);
+
+ob_end_clean();
+$pdf->Output('I', "Adicion_Retiro_".$estudiante['idusuario'].".pdf");
+exit();
+
+============================================================
+FILE: pdf_inscripcion_practicas.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php');
+
+// 1. OBTENCIÓN DE DATOS DEL ESTUDIANTE
+$id_estudiante = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$estudiante = ['nombre' => '', 'idusuario' => '', 'f_nac' => '', 'lugar_nac' => '', 'correo' => '', 'direccion' => '', 'telefono' => ''];
+
+if ($id_estudiante > 0) {
+    // Aquí deberías ajustar la consulta según las columnas reales de tu tabla 'users'
+    $query_user = "SELECT * FROM users WHERE id = ? LIMIT 1";
+    $stmt = $db->prepare($query_user);
+    $stmt->bind_param("i", $id_estudiante);
+    $stmt->execute();
+    $estudiante = $stmt->get_result()->fetch_assoc();
+}
+
+function txt($texto) {
+    return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+}
+
+// 2. CLASE FPDF PERSONALIZADA
+class PDF_Inscripcion extends FPDF {
+    function Header() {
+        if(file_exists('../images/uptpc.png')) {
+            $this->Image('../images/uptpc.png', 15, 12, 18);
+        }
+        $this->SetY(12);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(0, 3, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('DEPARTAMENTO DE CONTROL DE ESTUDIOS'), 0, 1, 'C');
+        
+        $this->Ln(8);
+        $this->SetFont('Arial', 'B', 10);
+        $this->Cell(0, 5, txt('INSCRIPCIONES PASANTIAS Y PROYECTO'), 0, 1, 'C');
+        $this->Ln(5);
+    }
+
+    function Footer() {
+        $this->SetY(-25);
+        $this->SetFont('Arial', 'I', 7);
+        $this->Cell(0, 4, txt("Este documento No es Valido sin la firma y sello del Departamento de Control de Estudios"), 0, 1, 'C');
+        $this->SetFont('Arial', '', 7);
+        $this->Cell(0, 3, txt("Urbanización la Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello"), 0, 1, 'C');
+        $this->Cell(0, 3, txt("Correo Electrónico: uptpccontroldeestudios03@gmail.com"), 0, 1, 'C');
+        $this->Cell(0, 3, txt("Página (S): 1"), 0, 1, 'C');
+    }
+}
+
+// 3. GENERACIÓN DEL DOCUMENTO
+$pdf = new PDF_Inscripcion('P', 'mm', 'Letter');
+$pdf->SetMargins(15, 20, 15);
+$pdf->AddPage();
+
+// Fila 1: Fecha, C.I., Apellidos y Nombres
+$pdf->SetFont('Arial', 'B', 8);
+$pdf->SetFillColor(245, 245, 245);
+$pdf->Cell(35, 6, txt('FECHA'), 1, 0, 'C', true);
+$pdf->Cell(45, 6, txt('C. I.'), 1, 0, 'C', true);
+$pdf->Cell(105, 6, txt('APELLIDOS Y NOMBRES'), 1, 1, 'C', true);
+
+$pdf->SetFont('Arial', '', 9);
+$pdf->Cell(35, 8, date('d/m/Y'), 1, 0, 'C');
+$pdf->Cell(45, 8, 'V-'.$estudiante['idusuario'], 1, 0, 'C');
+$pdf->Cell(105, 8, txt(strtoupper($estudiante['nombre'])), 1, 1, 'C');
+
+$pdf->Ln(5);
+
+// Bloque de Datos Personales Detallados
+$pdf->SetFont('Arial', 'B', 8);
+$pdf->Cell(50, 6, txt('Fecha de Nacimiento:'), 'LTR', 0, 'L', true);
+$pdf->Cell(65, 6, txt('Lugar de Nacimiento'), 'TR', 0, 'L', true);
+$pdf->Cell(70, 6, txt('Correo Electrónico'), 'TR', 1, 'L', true);
+
+$pdf->SetFont('Arial', '', 8);
+$pdf->Cell(50, 8, txt($estudiante['f_nac']), 'LRB', 0, 'L');
+$pdf->Cell(65, 8, txt($estudiante['lugar_nac']), 'RB', 0, 'L');
+$pdf->Cell(70, 8, txt($estudiante['correo']), 'RB', 1, 'L');
+
+// Fila: Dirección y Teléfono
+$pdf->SetFont('Arial', 'B', 8);
+$pdf->Cell(115, 6, txt('Dirección de Habitación'), 'LR', 0, 'L', true);
+$pdf->Cell(70, 6, txt('Teléfono'), 'R', 1, 'L', true);
+
+$pdf->SetFont('Arial', '', 8);
+$pdf->Cell(115, 8, txt($estudiante['direccion']), 'LRB', 0, 'L');
+$pdf->Cell(70, 8, txt($estudiante['telefono']), 'RB', 1, 'L');
+
+// Fila: Datos de la Empresa
+$pdf->SetFont('Arial', 'B', 8);
+$pdf->Cell(85, 6, txt('Nombre de la Empresa'), 'LR', 0, 'L', true);
+$pdf->Cell(100, 6, txt('Dirección de la Empresa'), 'R', 1, 'L', true);
+
+$pdf->SetFont('Arial', '', 8);
+$pdf->Cell(85, 10, '', 'LRB', 0, 'L'); // Espacio para llenar
+$pdf->Cell(100, 10, '', 'RB', 1, 'L');
+
+// Fila Final: Firmas
+$pdf->Ln(2);
+$pdf->SetFont('Arial', 'B', 8);
+$pdf->Cell(85, 6, txt('Recibido y Procesado Por'), 'LR', 0, 'C', true);
+$pdf->Cell(100, 6, txt('Sello y Firma control de Estudios'), 'R', 1, 'C', true);
+
+$pdf->Cell(85, 20, '', 'LRB', 0, 'C');
+$pdf->Cell(100, 20, '', 'RB', 1, 'C');
+
+ob_end_clean();
+$pdf->Output('I', "Inscripcion_Pasantias_".$estudiante['idusuario'].".pdf");
+exit();
+
+============================================================
+FILE: pdf_cambio_seccion.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php');
+
+// 1. OBTENCIÓN DE DATOS
+$id_estudiante = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$estudiante = ['nombre' => '', 'idusuario' => ''];
+
+if ($id_estudiante > 0) {
+    $query_user = "SELECT * FROM users WHERE id = ? LIMIT 1";
+    $stmt = $db->prepare($query_user);
+    $stmt->bind_param("i", $id_estudiante);
+    $stmt->execute();
+    $estudiante = $stmt->get_result()->fetch_assoc();
+}
+
+function txt($texto) {
+    return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+}
+
+// 2. CLASE FPDF CON MEMBRETE
+class PDF_CambioSeccion extends FPDF {
+    function Header() {
+        if(file_exists('../images/uptpc.png')) {
+            $this->Image('../images/uptpc.png', 15, 10, 15);
+        }
+        $this->SetY(10);
+        $this->SetFont('Arial', '', 7);
+        $this->Cell(0, 3, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('DEPARTAMENTO DE CONTROL DE ESTUDIOS'), 0, 1, 'C');
+        
+        $this->Ln(5);
+        $this->SetFont('Arial', 'B', 10);
+        $this->Cell(0, 5, txt('SOLICITUD DE CAMBIO DE SECCIÓN'), 0, 1, 'C');
+        $this->Ln(4);
+    }
+}
+
+$pdf = new PDF_CambioSeccion('P', 'mm', 'Letter');
+$pdf->SetMargins(15, 10, 15);
+$pdf->AddPage();
+
+// --- SECCIÓN: DATOS PERSONALES DEL SOLICITANTE ---
+$pdf->SetFont('Arial', 'B', 7);
+$pdf->Cell(0, 5, txt('DATOS PERSONALES DEL SOLICITANTE'), 1, 1, 'C');
+$pdf->Cell(35, 5, txt('FECHA'), 1, 0, 'C');
+$pdf->Cell(45, 5, txt('C. I.'), 1, 0, 'C');
+$pdf->Cell(105, 5, txt('APELLIDOS Y NOMBRES'), 1, 1, 'C');
+
+$pdf->SetFont('Arial', '', 9);
+$pdf->Cell(35, 8, date('d/m/Y'), 1, 0, 'C');
+$pdf->Cell(45, 8, 'V-'.$estudiante['idusuario'], 1, 0, 'C');
+$pdf->Cell(105, 8, txt(strtoupper($estudiante['nombre'])), 1, 1, 'C');
+
+$pdf->Ln(4);
+
+// --- SECCIÓN: MOTIVOS DEL CAMBIO ---
+$pdf->SetFont('Arial', 'B', 7);
+$pdf->Cell(0, 5, txt('MOTIVOS DEL CAMBIO'), 1, 1, 'C');
+$pdf->SetFont('Arial', '', 9);
+for($i=0; $i<6; $i++) {
+    $pdf->Cell(0, 7, '', 'LRB', 1);
+}
+
+$pdf->Ln(8);
+
+// --- CONFIGURACIÓN DE FILAS DE FIRMAS (3 COLUMNAS) ---
+$w3 = 185 / 3; 
+$h_box = 22;   
+$h_tit = 10;   
+
+// FILA 1
+$x1 = $pdf->GetX();
+$y1 = $pdf->GetY();
+$pdf->SetFont('Arial', 'B', 6);
+
+$pdf->MultiCell($w3, 5, txt("Firma del Director del\nPNF/Carrera que cursa"), 1, 'C');
+$pdf->SetXY($x1 + $w3, $y1);
+$pdf->MultiCell($w3, 5, txt("Sello del PNF/Carrera\nque cursa"), 1, 'C');
+$pdf->SetXY($x1 + ($w3 * 2), $y1);
+$pdf->MultiCell($w3, 10, txt("Sello de Control de Estudio"), 1, 'C');
+
+$pdf->SetY($y1 + $h_tit);
+$pdf->Cell($w3, $h_box, '', 1, 0);
+$pdf->Cell($w3, $h_box, '', 1, 0);
+$pdf->Cell($w3, $h_box, '', 1, 1);
+
+$pdf->Ln(8);
+
+// FILA 2 (ALINEADA)
+$x2 = $pdf->GetX();
+$y2 = $pdf->GetY();
+
+$pdf->MultiCell($w3, 5, txt("Firma del Director de\nControl de Estudio"), 1, 'C');
+$pdf->SetXY($x2 + $w3, $y2);
+$pdf->MultiCell($w3, 5, txt("Firma del Jefe de\nAdmisión y control"), 1, 'C');
+$pdf->SetXY($x2 + ($w3 * 2), $y2);
+$pdf->MultiCell($w3, 10, txt("Observaciones"), 1, 'C');
+
+$pdf->SetY($y2 + $h_tit);
+$pdf->Cell($w3, $h_box, '', 1, 0);
+$pdf->Cell($w3, $h_box, '', 1, 0);
+$pdf->Cell($w3, $h_box, '', 1, 1);
+
+ob_end_clean();
+$pdf->Output('I', "Solicitud_Cambio_Seccion.pdf");
+exit();
+
+============================================================
+FILE: pdf_retiro_semestre.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php');
+
+// 1. DATOS DEL ESTUDIANTE
+$id_estudiante = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$nombre_est = "NOMBRE DEL ESTUDIANTE";
+$cedula_est = "00.000.000";
+$carrera_est = "PROGRAMA NACIONAL DE FORMACIÓN";
+
+if ($id_estudiante > 0) {
+    $query_user = "SELECT nombre, idusuario FROM users WHERE id = ? LIMIT 1";
+    $stmt = $db->prepare($query_user);
+    $stmt->bind_param("i", $id_estudiante);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+    
+    if ($res) {
+        $nombre_est = strtoupper($res['nombre']);
+        $cedula_est = $res['idusuario'];
+    }
+
+    $carrera_info = obtenerCarreraEstudiante($id_estudiante);
+    if ($carrera_info) {
+        $carrera_est = strtoupper($carrera_info['nombre_carrera']);
+    }
+}
+
+// Función de fecha legal
+function getFechaLegal() {
+    $meses = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    $dias_letras = ["", "UN (01)", "DOS (02)", "TRES (03)", "CUATRO (04)", "CINCO (05)", "SEIS (06)", "SIETE (07)", "OCHO (08)", "NUEVE (09)", "DIEZ (10)", 
+                    "ONCE (11)", "DOCE (12)", "TRECE (13)", "CATORCE (14)", "QUINCE (15)", "DIECISÉIS (16)", "DIECISIETE (17)", "DIECIOCHO (18)", 
+                    "DIECINUEVE (19)", "VEINTE (20)", "VEINTIÚN (21)", "VEINTIDÓS (22)", "VEINTITRÉS (23)", "VEINTICUATRO (24)", "VEINTICINCO (25)", 
+                    "VEINTISÉIS (26)", "VEINTISIETE (27)", "VEINTIOCHO (28)", "VEINTINUEVE (29)", "TREINTA (30)", "TREINTA Y UN (31)"];
+    
+    $anios_letras = [2025 => "DOS MIL VEINTICINCO", 2026 => "DOS MIL VEINTISÉIS"];
+    $anio_actual = intval(date('Y'));
+    
+    return [
+        'dia' => $dias_letras[intval(date('d'))],
+        'mes' => $meses[intval(date('m'))],
+        'anio_txt' => $anios_letras[$anio_actual] ?? $anio_actual,
+        'anio_num' => $anio_actual
+    ];
+}
+
+$f = getFechaLegal();
+function txt($t) { return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $t); }
+
+// 2. GENERACIÓN DEL PDF
+class PDF_RetiroSemestre extends FPDF {
+    function Header() {
+        if(file_exists('../images/uptpc.png')) { $this->Image('../images/uptpc.png', 20, 15, 18); }
+        $this->SetY(15);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(0, 3, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Ln(15);
+        $this->SetFont('Arial', 'B', 12);
+        $this->Cell(0, 10, txt('CONSTANCIA DE RETIRO DE SEMESTRE'), 0, 1, 'C');
+        $this->Ln(10);
+    }
+
+    function Footer() {
+        $this->SetY(-35);
+        $this->SetFont('Arial', '', 8);
+        $this->MultiCell(0, 4, txt("Este documento No es Valido sin la firma y sello del Departamento de Control de Estudios\nUrbanización la Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello\nCorreo Electrónico: uptpccontroldeestudios03@gmail.com"), 0, 'C');
+        $this->Cell(0, 5, txt('Página (S): 1'), 0, 0, 'R');
+    }
+}
+
+$pdf = new PDF_RetiroSemestre('P', 'mm', 'Letter');
+$pdf->SetMargins(25, 20, 25);
+$pdf->AddPage();
+$pdf->SetFont('Arial', '', 11);
+$lh = 8;
+
+// Párrafo de Autoridad
+$pdf->Write($lh, txt("Quien suscribe "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt("Dra. Zorangel E. Aponte Q."));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(", titular de la cédula de identidad N° "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt("V.- 7.153.528. Jefe de Control de Estudio"));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(" de nuestra Institución, hace constar que el (la) Ciudadano (a) que se menciona a continuación."));
+
+$pdf->Ln(15);
+$pdf->SetFont('Arial', 'B', 12);
+$pdf->Cell(0, 8, txt($nombre_est), 0, 1, 'C');
+$pdf->SetFont('Arial', '', 11);
+$pdf->Cell(0, 8, txt("Titular de la Cédula de Identidad V-" . $cedula_est . ", cursante del Trayecto inicial del"), 0, 1, 'C');
+$pdf->Cell(0, 8, txt("Programa Nacional de Formación y/o Carrera Tradicional en:"), 0, 1, 'C');
+
+$pdf->Ln(2);
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Cell(0, 8, txt($carrera_est), 0, 1, 'C');
+
+$pdf->Ln(10);
+// Línea de lapso manual
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt("El cual solicitó el retiro del semestre para el lapso "));
+$pdf->SetFont('Arial', 'BU', 11);
+$pdf->Write($lh, txt("                                        ")); // Línea para escribir a mano
+$pdf->Ln(15);
+
+// Fecha legal
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt("Documento que se emite en la ciudad de Puerto Cabello, los "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt($f['dia']));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(" días del mes de "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt($f['mes']));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(" del año "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt($f['anio_txt'] . " (" . $f['anio_num'] . ")"));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt("."));
+
+$pdf->Ln(30);
+// Firma y Resolución
+$pdf->SetFont('Arial', 'B', 10);
+$pdf->Cell(0, 5, txt('Dra. Zorangel E. Aponte Q.'), 0, 1, 'C');
+$pdf->Cell(0, 5, txt('Jefe de Control de Estudios'), 0, 1, 'C');
+$pdf->Cell(0, 4, txt('Resolución N° 07-2022 de fecha 01/11/2022 Consejo N° 07'), 0, 1, 'C');
+$pdf->Cell(0, 4, txt('De fecha 01/11/2022'), 0, 1, 'C');
+
+ob_end_clean();
+$pdf->Output('I', "Retiro_Semestre_".$cedula_est.".pdf");
+exit();
+
+============================================================
+FILE: pdf_cambio_carrera.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php');
+
+// 1. OBTENCIÓN DE DATOS
+$id_estudiante = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$estudiante = ['nombre' => '', 'idusuario' => ''];
+$carrera_actual = ""; 
+$carrera_aspira = ""; 
+
+if ($id_estudiante > 0) {
+    $query_user = "SELECT * FROM users WHERE id = ? LIMIT 1";
+    $stmt = $db->prepare($query_user);
+    $stmt->bind_param("i", $id_estudiante);
+    $stmt->execute();
+    $estudiante = $stmt->get_result()->fetch_assoc();
+    
+    $carrera_data = obtenerCarreraEstudiante($id_estudiante);
+    $carrera_actual = strtoupper($carrera_data['nombre_carrera']);
+}
+
+function txt($texto) {
+    return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+}
+
+// 2. CLASE FPDF
+class PDF_Cambio extends FPDF {
+    function Header() {
+        if(file_exists('../images/uptpc.png')) {
+            $this->Image('../images/uptpc.png', 15, 10, 15);
+        }
+        $this->SetY(10);
+        $this->SetFont('Arial', '', 7);
+        $this->Cell(0, 3, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('DEPARTAMENTO DE CONTROL DE ESTUDIOS'), 0, 1, 'C');
+        
+        $this->Ln(5);
+        $this->SetFont('Arial', 'B', 10);
+        $this->Cell(0, 5, txt('SOLICITUD DE CAMBIO DE CARRERA'), 0, 1, 'C');
+        $this->Ln(4);
+    }
+}
+
+$pdf = new PDF_Cambio('P', 'mm', 'Letter');
+$pdf->SetMargins(15, 10, 15);
+$pdf->AddPage();
+
+// --- TABLA DE IDENTIFICACIÓN ---
+$pdf->SetFont('Arial', 'B', 8);
+$pdf->Cell(35, 6, txt('FECHA'), 1, 0, 'C');
+$pdf->Cell(45, 6, txt('C. I.'), 1, 0, 'C');
+$pdf->Cell(105, 6, txt('APELLIDOS Y NOMBRES'), 1, 1, 'C');
+
+$pdf->SetFont('Arial', '', 9);
+$pdf->Cell(35, 8, date('d/m/Y'), 1, 0, 'C');
+$pdf->Cell(45, 8, ''.$estudiante['idusuario'], 1, 0, 'C');
+$pdf->Cell(105, 8, txt(strtoupper($estudiante['nombre'])), 1, 1, 'C');
+
+$pdf->Ln(5);
+
+// --- CUERPO DE CARRERAS ---
+$carreras = [
+    "CARRERA MECÁNICA AUTOMOTRIZ",
+    "CARRERA MECÁNICA TÉRMICA",
+    "PNF MECÁNICA",
+    "PNF MANTENIMIENTO",
+    "PNF MATERIALES INDUSTRIALES",
+    "PNF INFORMÁTICA",
+    "PNF DISTRIBUCIÓN Y LOGÍSTICA"
+];
+
+$pdf->SetFont('Arial', 'B', 7);
+$pdf->Cell(75, 5, txt('Indique PNF/Carrera que Cursa'), 1, 0, 'L');
+$pdf->Cell(17, 5, txt('Marcar'), 1, 0, 'C');
+$pdf->Cell(75, 5, txt('Indique PNF/Carrera que aspira cambio'), 1, 0, 'L');
+$pdf->Cell(18, 5, txt('Marcar'), 1, 1, 'C');
+
+$pdf->SetFont('Arial', '', 7);
+foreach ($carreras as $c) {
+    $mark_actual = (trim($carrera_actual) == $c) ? "X" : "";
+    $pdf->Cell(75, 5, txt($c), 1, 0, 'L');
+    $pdf->Cell(17, 5, $mark_actual, 1, 0, 'C');
+    
+    $mark_aspira = (trim($carrera_aspira) == $c) ? "X" : "";
+    $pdf->Cell(75, 5, txt($c), 1, 0, 'L');
+    $pdf->Cell(18, 5, $mark_aspira, 1, 1, 'C');
+}
+
+$pdf->Ln(5);
+
+// --- SECCIÓN DE FIRMAS Y SELLOS (AJUSTADA) ---
+$pdf->SetFont('Arial', 'B', 6); 
+$w_box = 46.25; 
+$h_text = 4; // Altura de línea para MultiCell
+$h_total_title = 8; // Altura total reservada para el título
+$h_firma = 20; // Espacio para el sello/firma real
+
+$x_start = $pdf->GetX();
+$y_start = $pdf->GetY();
+
+// Bloque 1
+$pdf->MultiCell($w_box, $h_text, txt("Firma del Director del\nPNF/Carrera que cursa"), 1, 'C');
+$pdf->SetXY($x_start + $w_box, $y_start);
+
+// Bloque 2
+$pdf->MultiCell($w_box, $h_text, txt("Sello del PNF/Carrera\nque cursa"), 1, 'C');
+$pdf->SetXY($x_start + ($w_box * 2), $y_start);
+
+// Bloque 3
+$pdf->MultiCell($w_box, $h_text, txt("Firma del\nOrientador"), 1, 'C');
+$pdf->SetXY($x_start + ($w_box * 3), $y_start);
+
+// Bloque 4
+$pdf->MultiCell($w_box, $h_text, txt("Sello de Control de\nEstudio"), 1, 'C');
+
+// Dibujar cuadros de firma abajo
+$pdf->SetY($y_start + $h_total_title);
+$pdf->Cell($w_box, $h_firma, '', 1, 0);
+$pdf->Cell($w_box, $h_firma, '', 1, 0);
+$pdf->Cell($w_box, $h_firma, '', 1, 0);
+$pdf->Cell($w_box, $h_firma, '', 1, 1);
+
+$pdf->Ln(5);
+
+// --- SECCIÓN FINAL ---
+$x_final = $pdf->GetX();
+$y_final = $pdf->GetY();
+
+$pdf->MultiCell(60, 4, txt("Firma del Director de\nControl de Estudio"), 1, 'C');
+$pdf->SetXY($x_final + 60, $y_final);
+$pdf->Cell(125, 8, txt("Observaciones"), 1, 1, 'C');
+
+$pdf->SetX($x_final);
+$pdf->Cell(60, 25, '', 1, 0);
+$pdf->Cell(125, 25, '', 1, 1);
+
+ob_end_clean();
+$pdf->Output('I', "Solicitud_Cambio_Carrera.pdf");
+exit();
+
+============================================================
+FILE: pdf_cambio_turno.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php');
+
+// 1. OBTENCIÓN DE DATOS
+$id_estudiante = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$estudiante = ['nombre' => '', 'idusuario' => ''];
+
+if ($id_estudiante > 0) {
+    // Ajusta esta consulta a tu estructura de base de datos
+    $query_user = "SELECT * FROM users WHERE id = ? LIMIT 1";
+    $stmt = $db->prepare($query_user);
+    $stmt->bind_param("i", $id_estudiante);
+    $stmt->execute();
+    $estudiante = $stmt->get_result()->fetch_assoc();
+}
+
+function txt($texto) {
+    return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+}
+
+// 2. CLASE FPDF CON MEMBRETE INSTITUCIONAL
+class PDF_CambioTurno extends FPDF {
+    function Header() {
+        if(file_exists('../images/uptpc.png')) {
+            $this->Image('../images/uptpc.png', 15, 10, 15);
+        }
+        $this->SetY(10);
+        $this->SetFont('Arial', '', 7);
+        $this->Cell(0, 3, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('DEPARTAMENTO DE CONTROL DE ESTUDIOS'), 0, 1, 'C');
+        
+        $this->Ln(5);
+        $this->SetFont('Arial', 'B', 10);
+        $this->Cell(0, 5, txt('SOLICITUD DE CAMBIO DE TURNO'), 0, 1, 'C');
+        $this->Ln(4);
+    }
+}
+
+$pdf = new PDF_CambioTurno('P', 'mm', 'Letter');
+$pdf->SetMargins(15, 10, 15);
+$pdf->AddPage();
+
+// --- SECCIÓN: DATOS PERSONALES DEL SOLICITANTE ---
+$pdf->SetFont('Arial', 'B', 7);
+$pdf->Cell(0, 5, txt('DATOS PERSONALES DEL SOLICITANTE'), 1, 1, 'C');
+$pdf->Cell(35, 5, txt('FECHA'), 1, 0, 'C');
+$pdf->Cell(45, 5, txt('C. I.'), 1, 0, 'C');
+$pdf->Cell(105, 5, txt('APELLIDOS Y NOMBRES'), 1, 1, 'C');
+
+$pdf->SetFont('Arial', '', 9);
+$pdf->Cell(35, 8, date('d/m/Y'), 1, 0, 'C');
+$pdf->Cell(45, 8, ''.$estudiante['idusuario'], 1, 0, 'C');
+$pdf->Cell(105, 8, txt(strtoupper($estudiante['nombre'])), 1, 1, 'C');
+
+$pdf->Ln(4);
+
+// --- SECCIÓN: MOTIVOS DEL CAMBIO ---
+$pdf->SetFont('Arial', 'B', 7);
+$pdf->Cell(0, 5, txt('MOTIVOS DEL CAMBIO'), 1, 1, 'C');
+$pdf->SetFont('Arial', '', 9);
+// Líneas para escritura manual según el formato original
+for($i=0; $i<6; $i++) {
+    $pdf->Cell(0, 7, '', 'LRB', 1);
+}
+
+$pdf->Ln(8);
+
+// --- CONFIGURACIÓN DE FILAS DE FIRMAS ---
+$w3 = 185 / 3; // Ancho para 3 columnas iguales
+$h_box = 22;   // Altura del área de firma/sello
+$h_tit = 10;   // Altura fija para los títulos de las celdas
+
+// --- FILA 1 DE FIRMAS ---
+$x1 = $pdf->GetX();
+$y1 = $pdf->GetY();
+
+$pdf->SetFont('Arial', 'B', 6);
+$pdf->MultiCell($w3, 5, txt("Firma del Director del\nPNF/Carrera que cursa"), 1, 'C');
+$pdf->SetXY($x1 + $w3, $y1);
+$pdf->MultiCell($w3, 5, txt("Sello del PNF/Carrera\nque cursa"), 1, 'C');
+$pdf->SetXY($x1 + ($w3 * 2), $y1);
+$pdf->MultiCell($w3, 10, txt("Sello de Control de Estudio"), 1, 'C');
+
+// Espacios para firmas Fila 1
+$pdf->SetY($y1 + $h_tit);
+$pdf->Cell($w3, $h_box, '', 1, 0);
+$pdf->Cell($w3, $h_box, '', 1, 0);
+$pdf->Cell($w3, $h_box, '', 1, 1);
+
+$pdf->Ln(8);
+
+// --- FILA 2 DE FIRMAS (CORREGIDA PARA ALINEACIÓN) ---
+$x2 = $pdf->GetX();
+$y2 = $pdf->GetY();
+
+$pdf->MultiCell($w3, 5, txt("Firma del Director de\nControl de Estudio"), 1, 'C');
+$pdf->SetXY($x2 + $w3, $y2);
+$pdf->MultiCell($w3, 5, txt("Firma del Jefe de\nAdmisión y control"), 1, 'C');
+$pdf->SetXY($x2 + ($w3 * 2), $y2);
+$pdf->MultiCell($w3, 10, txt("Observaciones"), 1, 'C');
+
+// Espacios para firmas/observaciones Fila 2
+$pdf->SetY($y2 + $h_tit);
+$pdf->Cell($w3, $h_box, '', 1, 0);
+$pdf->Cell($w3, $h_box, '', 1, 0);
+$pdf->Cell($w3, $h_box, '', 1, 1);
+
+ob_end_clean();
+$pdf->Output('I', "Cambio_Turno_".$estudiante['idusuario'].".pdf");
+exit();
+
+============================================================
+FILE: pdf_renuncia_cupo.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php');
+
+// 1. OBTENCIÓN DE DATOS
+$id_estudiante = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$datos = [
+    'nombre' => 'NOMBRE DEL ESTUDIANTE',
+    'cedula' => '00.000.000',
+    'nacionalidad' => 'V',
+    'anio_sni' => '2025',
+    'carrera' => 'MECÁNICA',
+    'telefono' => '',
+    'direccion' => '',
+    'correo' => ''
+];
+
+if ($id_estudiante > 0) {
+    $query = "SELECT * FROM users WHERE id = ? LIMIT 1";
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $id_estudiante);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+    
+    $datos['nombre'] = strtoupper($res['nombre']);
+    $datos['cedula'] = $res['idusuario'];
+    $carrera_info = obtenerCarreraEstudiante($id_estudiante);
+    $datos['carrera'] = strtoupper($carrera_info['nombre_carrera']);
+}
+
+function txt($texto) {
+    return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+}
+
+// 2. CLASE FPDF OPTIMIZADA
+class PDF_Renuncia extends FPDF {
+    function Header() {
+        if(file_exists('../images/uptpc.png')) {
+            $this->Image('../images/uptpc.png', 15, 10, 14);
+        }
+        $this->SetY(10);
+        $this->SetFont('Arial', 'B', 11);
+        $this->Cell(0, 10, txt('RENUNCIA DE CUPO'), 0, 1, 'C');
+    }
+}
+
+// 3. GENERACIÓN (Ajuste de márgenes y saltos)
+$pdf = new PDF_Renuncia('P', 'mm', 'Letter');
+$pdf->SetMargins(20, 10, 20); // Margen superior reducido a 10
+$pdf->AddPage();
+$pdf->SetFont('Arial', '', 10); // Fuente ligeramente más pequeña
+
+$lh = 7; // Altura de línea reducida de 8 a 7
+
+// Cuerpo del documento
+$pdf->Ln(5);
+$pdf->Write($lh, txt("Yo, "));
+$pdf->SetFont('Arial', 'B', 10);
+$pdf->Write($lh, txt($datos['nombre'] . " "));
+$pdf->SetFont('Arial', '', 10);
+$pdf->Write($lh, txt(", titular de la Cédula de Identidad N° " . $datos['nacionalidad'] . " ( ) E ( ) " . $datos['cedula']));
+$pdf->Write($lh, txt(", informo que participe en el Sistema Nacional de Ingreso (SNI) del año "));
+$pdf->Write($lh, txt("__________")); 
+$pdf->Write($lh, txt(", fui asignado a la Institución Universitaria ________________________ ( "));
+$pdf->Write($lh, txt("__________"));
+$pdf->Write($lh, txt(" ) en la carrera o Programa Nacional de Formación "));
+$pdf->SetFont('Arial', 'B', 10);
+$pdf->Write($lh, txt($datos['carrera']));
+$pdf->SetFont('Arial', '', 10);
+$pdf->Write($lh, txt(", hago constar por medio de la presente que renuncio al cupo en la carrera o PNF ____________________________________ en la institución antes mencionada."));
+
+$pdf->Ln(12);
+$pdf->Write($lh, txt("Motivo:"));
+$pdf->Ln(6);
+$pdf->Line(20, $pdf->GetY() + 4, 195, $pdf->GetY() + 4);
+$pdf->Line(20, $pdf->GetY() + 12, 195, $pdf->GetY() + 12);
+$pdf->Ln(18);
+
+$pdf->Write($lh, txt("La presente se expide en la ciudad de Puerto Cabello, a los ________ días del mes de ____________________ de ___________."));
+
+$pdf->Ln(12);
+$pdf->SetFont('Arial', 'B', 9);
+$pdf->Cell(0, 5, txt('DATOS DEL BACHILLER'), 0, 1, 'L');
+$pdf->SetFont('Arial', '', 9);
+
+// Campos de datos con interlineado compacto
+$campos = [
+    'Nombres y Apellidos' => $datos['nombre'],
+    'Cédula de Identidad' => $datos['cedula'],
+    'Teléfono' => $datos['telefono'],
+    'Dirección' => $datos['direccion'],
+    'Correo Electrónico' => $datos['correo']
+];
+
+foreach ($campos as $label => $valor) {
+    $pdf->Cell(35, 6, txt($label . ":"), 0, 0);
+    $pdf->Cell(0, 6, txt($valor), 'B', 1);
+    $pdf->Ln(1);
+}
+
+$pdf->Ln(10); // Espacio antes de firmas
+$pdf->SetFont('Arial', 'B', 9);
+
+// Área de firmas en una sola línea para ahorrar espacio
+$pdf->Cell(85, 6, txt('RECIBIDO POR: ___________________'), 0, 0, 'L');
+$pdf->Cell(0, 6, txt('C.I. ____________________'), 0, 1, 'L');
+
+$pdf->Ln(10);
+$pdf->Cell(0, 6, txt('FIRMA y SELLO: _____________________________________'), 0, 1, 'L');
+
+ob_end_clean();
+$pdf->Output('I', "Renuncia_Cupo.pdf");
+exit();
+
+============================================================
+FILE: pdf_constancia_retiro.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php');
+
+// 1. OBTENCIÓN DE DATOS
+$id_estudiante = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$nombre_est = "NOMBRE DEL ESTUDIANTE";
+$cedula_est = "00.000.000";
+$carrera_est = "PROGRAMA NACIONAL DE FORMACIÓN";
+
+if ($id_estudiante > 0) {
+    $query_user = "SELECT nombre, idusuario FROM users WHERE id = ? LIMIT 1";
+    $stmt = $db->prepare($query_user);
+    $stmt->bind_param("i", $id_estudiante);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+    
+    if ($res) {
+        $nombre_est = strtoupper($res['nombre']);
+        $cedula_est = $res['idusuario'];
+    }
+
+    $carrera_info = obtenerCarreraEstudiante($id_estudiante);
+    if ($carrera_info) {
+        $carrera_est = strtoupper($carrera_info['nombre_carrera']);
+    }
+}
+
+// Función para fecha legal completa
+function getFechaLegalCompleta() {
+    $meses = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    $dias_letras = ["", "UN (01)", "DOS (02)", "TRES (03)", "CUATRO (04)", "CINCO (05)", "SEIS (06)", "SIETE (07)", "OCHO (08)", "NUEVE (09)", "DIEZ (10)", 
+                    "ONCE (11)", "DOCE (12)", "TRECE (13)", "CATORCE (14)", "QUINCE (15)", "DIECISÉIS (16)", "DIECISIETE (17)", "DIECIOCHO (18)", 
+                    "DIECINUEVE (19)", "VEINTE (20)", "VEINTIÚN (21)", "VEINTIDÓS (22)", "VEINTITRÉS (23)", "VEINTICUATRO (24)", "VEINTICINCO (25)", 
+                    "VEINTISÉIS (26)", "VEINTISIETE (27)", "VEINTIOCHO (28)", "VEINTINUEVE (29)", "TREINTA (30)", "TREINTA Y UN (31)"];
+    
+    $anios_letras = [2025 => "DOS MIL VEINTICINCO", 2026 => "DOS MIL VEINTISÉIS"];
+    $anio_actual = intval(date('Y'));
+    
+    return [
+        'dia' => $dias_letras[intval(date('d'))],
+        'mes' => $meses[intval(date('m'))],
+        'anio_txt' => $anios_letras[$anio_actual] ?? $anio_actual,
+        'anio_num' => $anio_actual
+    ];
+}
+
+$f = getFechaLegalCompleta();
+
+function txt($t) { return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $t); }
+
+// 2. CLASE FPDF
+class PDF_RetiroEstudios extends FPDF {
+    function Header() {
+        if(file_exists('../images/uptpc.png')) { $this->Image('../images/uptpc.png', 20, 15, 18); }
+        $this->SetY(15);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(0, 3, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Ln(15);
+        $this->SetFont('Arial', 'B', 12);
+        $this->Cell(0, 10, txt('CONSTANCIA DE RETIRO'), 0, 1, 'C');
+        $this->Ln(10);
+    }
+
+    function Footer() {
+        $this->SetY(-35);
+        $this->SetFont('Arial', 'BI', 8);
+        $this->Cell(0, 4, txt('TRANSFORMACIÓN UNIVERSITARIA CON CALIDAD Y PERTENENCIA'), 0, 1, 'C');
+        $this->SetFont('Arial', '', 7);
+        $this->Cell(0, 3, txt('Urbanización la Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('Número Telefónico: (0242) 3700494. Correo Electrónico: uptpccontroldeestudios03@gmail.com'), 0, 1, 'C');
+        $this->Cell(0, 5, txt('Página 1'), 0, 0, 'R');
+    }
+}
+
+$pdf = new PDF_RetiroEstudios('P', 'mm', 'Letter');
+$pdf->SetMargins(25, 20, 25);
+$pdf->AddPage();
+$pdf->SetFont('Arial', '', 11);
+$lh = 8;
+
+// Párrafo inicial
+$pdf->Write($lh, txt("Quien suscribe "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt("Dra. Zorangel E. Aponte Q."));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(", titular de la cédula de identidad "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt("V.- 7.153.528"));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(" Jefa de Control de Estudios de nuestra Institución, hace constar que el (la) Ciudadano (a) que se menciona a continuación."));
+
+$pdf->Ln(15);
+$pdf->SetFont('Arial', 'B', 12);
+$pdf->Cell(0, 8, txt($nombre_est), 0, 1, 'C');
+$pdf->SetFont('Arial', '', 11);
+$pdf->Cell(0, 8, txt("Titular de la Cédula de Identidad " . $cedula_est . ", inscrita en esta casa de"), 0, 1, 'C');
+$pdf->Cell(0, 8, txt("estudios y es cursante del Programa Nacional de Formación en:"), 0, 1, 'C');
+
+$pdf->Ln(2);
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Cell(0, 8, txt($carrera_est), 0, 1, 'C');
+
+$pdf->Ln(10);
+$pdf->SetFont('Arial', '', 11);
+$pdf->Cell(0, 8, txt("Para el lapso académico " . $f['anio_num'] . " y su vigencia corresponde desde"), 0, 1, 'L');
+
+$pdf->Ln(5);
+$pdf->SetFont('Arial', 'B', 12);
+// Lapso de ejemplo según formato
+$pdf->Cell(0, 10, txt("MARZO - JUNIO"), 0, 1, 'C');
+
+$pdf->Ln(5);
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt("Solicita retiro de la misma, documento que se emite en la ciudad de Puerto Cabello, a los "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt($f['dia']));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(" días del mes de "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt($f['mes']));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(" del año "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt($f['anio_txt'] . " (" . $f['anio_num'] . ")"));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt("."));
+
+$pdf->Ln(30);
+$pdf->SetFont('Arial', 'I', 10);
+$pdf->Cell(0, 5, txt('Dra. Zorangel E. Aponte Q.'), 0, 1, 'C');
+$pdf->Cell(0, 5, txt('Jefe de Control de Estudios'), 0, 1, 'C');
+$pdf->Cell(0, 4, txt('Resolución N° 01 de fecha 17/10/2022 Consejo N° 7'), 0, 1, 'C');
+$pdf->Cell(0, 4, txt('De fecha 17/10/2022'), 0, 1, 'C');
+
+ob_end_clean();
+$pdf->Output('I', "Constancia_Retiro_".$cedula_est.".pdf");
+exit();
+
+============================================================
+FILE: pdf_constancia_traslado.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php');
+
+// 1. OBTENCIÓN DE DATOS
+$id_estudiante = isset($_GET['id']) ? intval($_GET['id']) : 0;
+// Institución de destino (Podrías pasarla por $_GET o tener un campo en la BD)
+$institucion_destino = isset($_GET['destino']) ? $_GET['destino'] : "UNIVERSIDAD POLITÉCNICA TERRITORIAL DE CIUDAD BOLÍVAR";
+
+$nombre_est = "NOMBRE DEL ESTUDIANTE";
+$cedula_est = "00.000.000";
+$carrera_est = "PROGRAMA NACIONAL DE FORMACIÓN";
+
+if ($id_estudiante > 0) {
+    $query_user = "SELECT nombre, idusuario FROM users WHERE id = ? LIMIT 1";
+    $stmt = $db->prepare($query_user);
+    $stmt->bind_param("i", $id_estudiante);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+    
+    if ($res) {
+        $nombre_est = strtoupper($res['nombre']);
+        $cedula_est = $res['idusuario'];
+    }
+
+    $carrera_info = obtenerCarreraEstudiante($id_estudiante);
+    if ($carrera_info) {
+        $carrera_est = strtoupper($carrera_info['nombre_carrera']);
+    }
+}
+
+// Función para fecha legal completa en letras
+function getFechaLegalTraslado() {
+    $meses = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    $dias_letras = ["", "UN (01)", "DOS (02)", "TRES (03)", "CUATRO (04)", "CINCO (05)", "SEIS (06)", "SIETE (07)", "OCHO (08)", "NUEVE (09)", "DIEZ (10)", 
+                    "ONCE (11)", "DOCE (12)", "TRECE (13)", "CATORCE (14)", "QUINCE (15)", "DIECISÉIS (16)", "DIECISIETE (17)", "DIECIOCHO (18)", 
+                    "DIECINUEVE (19)", "VEINTE (20)", "VEINTIÚN (21)", "VEINTIDÓS (22)", "VEINTITRÉS (23)", "VEINTICUATRO (24)", "VEINTICINCO (25)", 
+                    "VEINTISÉIS (26)", "VEINTISIETE (27)", "VEINTIOCHO (28)", "VEINTINUEVE (29)", "TREINTA (30)", "TREINTA Y UN (31)"];
+    
+    $anios_letras = [2025 => "DOS MIL VEINTICINCO", 2026 => "DOS MIL VEINTISÉIS"];
+    $anio_actual = intval(date('Y'));
+    
+    return [
+        'dia' => $dias_letras[intval(date('d'))],
+        'mes' => $meses[intval(date('m'))],
+        'anio_txt' => $anios_letras[$anio_actual] ?? $anio_actual,
+        'anio_num' => $anio_actual
+    ];
+}
+
+$f = getFechaLegalTraslado();
+
+function txt($t) { return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $t); }
+
+// 2. CLASE FPDF
+class PDF_Traslado extends FPDF {
+    function Header() {
+        if(file_exists('../images/uptpc.png')) { $this->Image('../images/uptpc.png', 20, 15, 18); }
+        $this->SetY(15);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(0, 3, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Ln(15);
+        $this->SetFont('Arial', 'B', 12);
+        $this->Cell(0, 10, txt('CONSTANCIA DE TRASLADO'), 0, 1, 'C');
+        $this->Ln(10);
+    }
+
+    function Footer() {
+        $this->SetY(-35);
+        $this->SetFont('Arial', '', 8);
+        $this->MultiCell(0, 4, txt("Este documento No es Valido sin la firma y sello del Departamento de Control de Estudios\nUrbanización la Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello\nCorreo Electrónico: uptpccontroldeestudios03@gmail.com"), 0, 'C');
+        $this->Cell(0, 5, txt('Página (S): 1'), 0, 0, 'R');
+    }
+}
+
+$pdf = new PDF_Traslado('P', 'mm', 'Letter');
+$pdf->SetMargins(25, 20, 25);
+$pdf->AddPage();
+$pdf->SetFont('Arial', '', 11);
+$lh = 8;
+
+// Párrafo Inicial con datos de la Jefa
+$pdf->Write($lh, txt("Quien suscribe "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt("Dra. Zorangel E. Aponte Q."));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(", titular de la cédula de identidad N° "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt("V.- 7.153.528. Jefe de Control de Estudio"));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(" de nuestra Institución, hace constar que el (la) Ciudadano (a) que se menciona a continuación."));
+
+$pdf->Ln(15);
+$pdf->SetFont('Arial', 'B', 12);
+$pdf->Cell(0, 8, txt($nombre_est), 0, 1, 'C');
+$pdf->SetFont('Arial', '', 11);
+$pdf->Cell(0, 8, txt("Titular de la Cédula de Identidad " . $cedula_est . ", cursa estudios, y es cursante del"), 0, 1, 'C');
+$pdf->Cell(0, 8, txt("Trayecto inicial del Programa Nacional de Formación en:"), 0, 1, 'C');
+
+$pdf->Ln(2);
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Cell(0, 8, txt($carrera_est), 0, 1, 'C');
+
+$pdf->Ln(10);
+$pdf->SetFont('Arial', 'B', 11);
+// Detalle del Traslado
+$pdf->MultiCell(0, 7, txt("El cual solicitad traslado para otra institución " . $institucion_destino), 0, 'C');
+
+$pdf->Ln(10);
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt("Documento que se emite en la ciudad de Puerto Cabello, con fines de traslado para otra institución (UPT) Ciudad Bolívar, solicitud que hace a los "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt($f['dia']));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(" días del mes de "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt($f['mes']));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(" del año "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt($f['anio_txt'] . " (" . $f['anio_num'] . ")"));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt("."));
+
+$pdf->Ln(30);
+$pdf->SetFont('Arial', 'B', 10);
+$pdf->Cell(0, 5, txt('Dra. Zorangel E. Aponte Q.'), 0, 1, 'C');
+$pdf->Cell(0, 5, txt('Jefe de Control de Estudios'), 0, 1, 'C');
+$pdf->SetFont('Arial', 'B', 10);
+$pdf->Cell(0, 4, txt('Resolución N° 07-2022 de fecha 01/11/2022 Consejo N° 07'), 0, 1, 'C');
+$pdf->Cell(0, 4, txt('De fecha 01/11/2022'), 0, 1, 'C');
+
+ob_end_clean();
+$pdf->Output('I', "Constancia_Traslado_".$cedula_est.".pdf");
+exit();
+
+============================================================
+FILE: pdf_constancia_reincorporacion.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php');
+
+// 1. OBTENCIÓN DE DATOS BÁSICOS
+$id_estudiante = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$nombre_est = "NOMBRE DEL ESTUDIANTE";
+$cedula_est = "00.000.000";
+$carrera_est = "PROGRAMA NACIONAL DE FORMACIÓN";
+
+if ($id_estudiante > 0) {
+    $query_user = "SELECT nombre, idusuario FROM users WHERE id = ? LIMIT 1";
+    $stmt = $db->prepare($query_user);
+    $stmt->bind_param("i", $id_estudiante);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+    
+    if ($res) {
+        $nombre_est = strtoupper($res['nombre']);
+        $cedula_est = $res['idusuario'];
+    }
+
+    $carrera_info = obtenerCarreraEstudiante($id_estudiante);
+    if ($carrera_info) {
+        $carrera_est = strtoupper($carrera_info['nombre_carrera']);
+    }
+}
+
+// Función para fecha legal
+function getFechaLegal() {
+    $meses = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    $dias_letras = ["", "UN (01)", "DOS (02)", "TRES (03)", "CUATRO (04)", "CINCO (05)", "SEIS (06)", "SIETE (07)", "OCHO (08)", "NUEVE (09)", "DIEZ (10)", 
+                    "ONCE (11)", "DOCE (12)", "TRECE (13)", "CATORCE (14)", "QUINCE (15)", "DIECISÉIS (16)", "DIECISIETE (17)", "DIECIOCHO (18)", 
+                    "DIECINUEVE (19)", "VEINTE (20)", "VEINTIÚN (21)", "VEINTIDÓS (22)", "VEINTITRÉS (23)", "VEINTICUATRO (24)", "VEINTICINCO (25)", 
+                    "VEINTISÉIS (26)", "VEINTISIETE (27)", "VEINTIOCHO (28)", "VEINTINUEVE (29)", "TREINTA (30)", "TREINTA Y UN (31)"];
+    
+    $anios_letras = [2025 => "DOS MIL VEINTICINCO", 2026 => "DOS MIL VEINTISÉIS"];
+    $anio_actual = intval(date('Y'));
+    
+    return [
+        'dia' => $dias_letras[intval(date('d'))],
+        'mes' => $meses[intval(date('m'))],
+        'anio_txt' => $anios_letras[$anio_actual] ?? $anio_actual,
+        'anio_num' => $anio_actual
+    ];
+}
+
+$f = getFechaLegal();
+function txt($t) { return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $t); }
+
+// 2. CLASE FPDF
+class PDF_Reincorporacion extends FPDF {
+    function Header() {
+        if(file_exists('../images/uptpc.png')) { $this->Image('../images/uptpc.png', 20, 15, 18); }
+        $this->SetY(15);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(0, 3, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Ln(15);
+        $this->SetFont('Arial', 'B', 12);
+        $this->Cell(0, 10, txt('CONSTANCIA DE REINCORPORACIÓN'), 0, 1, 'C');
+        $this->Ln(10);
+    }
+    function Footer() {
+        $this->SetY(-35);
+        $this->SetFont('Arial', '', 8);
+        $this->MultiCell(0, 4, txt("Este documento No es Valido sin la firma y sello del Departamento de Control de Estudios\nUrbanización la Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello\nCorreo Electrónico: uptpccontroldeestudios03@gmail.com"), 0, 'C');
+        $this->Cell(0, 5, txt('Página (S): 1'), 0, 0, 'R');
+    }
+}
+
+$pdf = new PDF_Reincorporacion('P', 'mm', 'Letter');
+$pdf->SetMargins(25, 20, 25);
+$pdf->AddPage();
+$pdf->SetFont('Arial', '', 11);
+$lh = 8;
+
+// Párrafo de la Autoridad
+$pdf->Write($lh, txt("Quien suscribe "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt("Dra. Zorangel E. Aponte Q."));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(", titular de la cédula de identidad N° "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt("V.- 7.153.528. Jefe de Control de Estudio"));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(" de nuestra Institución, hace constar que el (la) Ciudadano (a) que se menciona a continuación."));
+
+$pdf->Ln(15);
+$pdf->SetFont('Arial', 'B', 12);
+$pdf->Cell(0, 8, txt($nombre_est), 0, 1, 'C');
+$pdf->SetFont('Arial', '', 11);
+$pdf->Cell(0, 8, txt("Titular de la Cédula de Identidad " . $cedula_est . ", cursante del Trayecto inicial del"), 0, 1, 'C');
+$pdf->Cell(0, 8, txt("Programa Nacional de Formación y/o Carrera Tradicional en:"), 0, 1, 'C');
+
+$pdf->Ln(2);
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Cell(0, 8, txt($carrera_est), 0, 1, 'C');
+
+$pdf->Ln(10);
+// Línea de llenado manual para el lapso
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt("El cual solicitó el reincorporación para el lapso "));
+$pdf->SetFont('Arial', 'BU', 11);
+$pdf->Write($lh, txt("                          ")); // Espacio en blanco subrayado
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt(" por el cual debe solicitar reporte de inscripción e historial académico, para verificar estatus en el programa o carrera que cursa."));
+
+$pdf->Ln(15);
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt("Documento que se emite en la ciudad de Puerto Cabello, los "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt($f['dia']));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(" días del mes de "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt($f['mes']));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(" del año "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt($f['anio_txt'] . " (" . $f['anio_num'] . ")"));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt("."));
+
+$pdf->Ln(30);
+$pdf->SetFont('Arial', 'B', 10);
+$pdf->Cell(0, 5, txt('Dra. Zorangel E. Aponte Q.'), 0, 1, 'C');
+$pdf->Cell(0, 5, txt('Jefe de Control de Estudios'), 0, 1, 'C');
+$pdf->Cell(0, 4, txt('Resolución N° 07-2022 de fecha 01/11/2022 Consejo N° 07'), 0, 1, 'C');
+$pdf->Cell(0, 4, txt('De fecha 01/11/2022'), 0, 1, 'C');
+
+ob_end_clean();
+$pdf->Output('I', "Constancia_Reincorporacion_".$cedula_est.".pdf");
+exit();
+
+============================================================
+FILE: pdf_retiro_documento.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php');
+
+// 1. OBTENCIÓN DE DATOS
+$id_estudiante = isset($_GET['id']) ? intval($_GET['id']) : 0;
+
+$nombre_est = "NOMBRE DEL ESTUDIANTE";
+$cedula_est = "00.000.000";
+$carrera_est = "PROGRAMA NACIONAL DE FORMACIÓN";
+
+if ($id_estudiante > 0) {
+    $query_user = "SELECT nombre, idusuario FROM users WHERE id = ? LIMIT 1";
+    $stmt = $db->prepare($query_user);
+    $stmt->bind_param("i", $id_estudiante);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+    
+    if ($res) {
+        $nombre_est = strtoupper($res['nombre']);
+        $cedula_est = $res['idusuario'];
+    }
+
+    $carrera_info = obtenerCarreraEstudiante($id_estudiante);
+    if ($carrera_info) {
+        $carrera_est = strtoupper($carrera_info['nombre_carrera']);
+    }
+}
+
+// Función mejorada para fecha legal completa en letras
+function getFechaLegalCompleta() {
+    $meses = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    $dias_letras = ["", "UN (01)", "DOS (02)", "TRES (03)", "CUATRO (04)", "CINCO (05)", "SEIS (06)", "SIETE (07)", "OCHO (08)", "NUEVE (09)", "DIEZ (10)", 
+                    "ONCE (11)", "DOCE (12)", "TRECE (13)", "CATORCE (14)", "QUINCE (15)", "DIECISÉIS (16)", "DIECISIETE (17)", "DIECIOCHO (18)", 
+                    "DIECINUEVE (19)", "VEINTE (20)", "VEINTIÚN (21)", "VEINTIDÓS (22)", "VEINTITRÉS (23)", "VEINTICUATRO (24)", "VEINTICINCO (25)", 
+                    "VEINTISÉIS (26)", "VEINTISIETE (27)", "VEINTIOCHO (28)", "VEINTINUEVE (29)", "TREINTA (30)", "TREINTA Y UN (31)"];
+    
+    // Diccionario simple para años (puedes ampliarlo si es necesario)
+    $anios_letras = [
+        2024 => "DOS MIL VEINTICUATRO",
+        2025 => "DOS MIL VEINTICINCO",
+        2026 => "DOS MIL VEINTISÉIS",
+        2027 => "DOS MIL VEINTISIETE"
+    ];
+
+    $anio_actual = intval(date('Y'));
+    $anio_texto = isset($anios_letras[$anio_actual]) ? $anios_letras[$anio_actual] : $anio_actual;
+
+    return [
+        'dia' => $dias_letras[intval(date('d'))],
+        'mes' => $meses[intval(date('m'))],
+        'anio_letras' => $anio_texto,
+        'anio_num' => $anio_actual
+    ];
+}
+
+$fecha = getFechaLegalCompleta();
+
+function txt($texto) {
+    return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+}
+
+class PDF_Retiro extends FPDF {
+    function Header() {
+        if(file_exists('../images/uptpc.png')) {
+            $this->Image('../images/uptpc.png', 20, 15, 18);
+        }
+        $this->SetY(15);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(0, 3, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Ln(15);
+        $this->SetFont('Arial', 'B', 12);
+        $this->Cell(0, 10, txt('CONSTANCIA DE RETIRO DE DOCUMENTO'), 0, 1, 'C');
+        $this->Ln(10);
+    }
+
+    function Footer() {
+        $this->SetY(-35);
+        $this->SetFont('Arial', 'BI', 8);
+        $this->Cell(0, 4, txt('TRANSFORMACIÓN UNIVERSITARIA CON CALIDAD Y PERTENENCIA'), 0, 1, 'C');
+        $this->SetFont('Arial', '', 7);
+        $this->Cell(0, 3, txt('Urbanización la Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello'), 0, 1, 'C');
+        $this->Cell(0, 3, txt('Número Telefónico: (0242) 3700494. Correo Electrónico: uptpccontroldeestudios03@gmail.com'), 0, 1, 'C');
+        $this->Cell(0, 5, txt('Página 1'), 0, 0, 'R');
+    }
+}
+
+$pdf = new PDF_Retiro('P', 'mm', 'Letter');
+$pdf->SetMargins(25, 20, 25);
+$pdf->AddPage();
+$pdf->SetFont('Arial', '', 11);
+$lh = 8;
+
+// Párrafo de apertura con datos de la Jefa
+$pdf->Write($lh, txt("Quien suscribe "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt("Dra. Zorangel E. Aponte Q."));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(", titular de la cédula de identidad "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt("V.- 7.153.528"));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(" Jefa de Control de Estudios de nuestra Institución, hace constar que el (la) Ciudadano (a) que se menciona a continuación."));
+
+$pdf->Ln(15);
+
+// Identificación del Estudiante
+$pdf->SetFont('Arial', 'B', 12);
+$pdf->Cell(0, 8, txt($nombre_est), 0, 1, 'C');
+$pdf->SetFont('Arial', '', 11);
+$pdf->Cell(0, 8, txt("Titular de la Cédula de Identidad " . $cedula_est . ", inscrita en esta casa de"), 0, 1, 'C');
+$pdf->Cell(0, 8, txt("estudios y es cursante del Programa Nacional Formación en:"), 0, 1, 'C');
+
+$pdf->Ln(2);
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Cell(0, 8, txt($carrera_est), 0, 1, 'C');
+
+$pdf->Ln(10);
+
+// Detalle del retiro
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt("Para el lapso académico y su vigencia corresponde, "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt("RETIRO DE DOCUMENTOS DE INSCRIPCIÓN COPIAS. EXPEDIENTE COMPLETO."));
+
+$pdf->Ln(15);
+
+// Fecha con año en letras
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt("Solicita traslado de la misma, documento que se emite en la ciudad de Puerto Cabello, a los "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt($fecha['dia']));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(" días del mes de "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt($fecha['mes']));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt(" del año "));
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Write($lh, txt($fecha['anio_letras'] . " (" . $fecha['anio_num'] . ")"));
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write($lh, txt("."));
+
+$pdf->Ln(30);
+
+// Bloque de Firma Final
+$pdf->SetFont('Arial', 'I', 10);
+$pdf->Cell(0, 5, txt('Dra. Zorangel E. Aponte Q.'), 0, 1, 'C');
+$pdf->Cell(0, 5, txt('Jefe de Control de Estudios'), 0, 1, 'C');
+$pdf->Cell(0, 4, txt('Resolución N° 01 de fecha 17/10/2022 Consejo N° 7'), 0, 1, 'C');
+$pdf->Cell(0, 4, txt('De fecha 17/10/2022'), 0, 1, 'C');
+
+ob_end_clean();
+$pdf->Output('I', "Constancia_Retiro_".$cedula_est.".pdf");
+exit();
+
+============================================================
+FILE: pdf_servicio_comunitario.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php');
+
+// 1. VALIDACIÓN Y OBTENCIÓN DE DATOS
+if (!isset($_GET['id'])) { 
+    die("ID de estudiante no proporcionado."); 
+}
+
+$id_estudiante = intval($_GET['id']);
+
+$query_user = "SELECT * FROM users WHERE id = ? LIMIT 1";
+$stmt = $db->prepare($query_user);
+$stmt->bind_param("i", $id_estudiante);
+$stmt->execute();
+$estudiante = $stmt->get_result()->fetch_assoc();
+
+if (!$estudiante) {
+    die('Estudiante no encontrado en la base de datos.');
+}
+
+$cedula_estudiante = $estudiante['idusuario']; 
+$carrera = obtenerCarreraEstudiante($id_estudiante); 
+
+/**
+ * Función para convertir texto a codificación ISO para FPDF
+ */
+function txt($texto) {
+    return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+}
+
+/**
+ * Obtiene los componentes de la fecha por separado para aplicar estilos
+ */
+function obtenerDatosFecha() {
+    $meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    
+    $dias_letras = [
+        1 => "Primero", 2 => "dos", 3 => "tres", 4 => "cuatro", 5 => "cinco",
+        6 => "seis", 7 => "siete", 8 => "ocho", 9 => "nueve", 10 => "diez",
+        11 => "once", 12 => "doce", 13 => "trece", 14 => "catorce", 15 => "quince",
+        16 => "dieciséis", 17 => "diecisiete", 18 => "dieciocho", 19 => "diecinueve", 20 => "veinte",
+        21 => "veintiuno", 22 => "veintidós", 23 => "veintitrés", 24 => "veinticuatro", 25 => "veinticinco",
+        26 => "veintiséis", 27 => "veintisiete", 28 => "veintiocho", 29 => "veintinueve", 30 => "treinta",
+        31 => "treinta y uno"
+    ];
+
+    $d = (int)date('d');
+    $m = $meses[(int)date('m') - 1];
+    $y = date('Y');
+    
+    $anio_letras = ($y == "2026") ? "dos mil veintiséis" : (($y == "2025") ? "dos mil veinticinco" : "dos mil " . $y);
+    
+    return [
+        'dia_txt' => $dias_letras[$d] . " (" . str_pad($d, 2, "0", STR_PAD_LEFT) . ")",
+        'mes' => $m,
+        'anio_txt' => $anio_letras . " ($y)"
+    ];
+}
+
+// 2. EXTENSIÓN DE CLASE FPDF
+class PDF_Comunitario extends FPDF {
+    function Header() {
+        if(file_exists('../../images/uptpc.png')) {
+            $this->Image('../../images/uptpc.png', 25, 12, 18);
+        }
+        
+        $this->SetY(12);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(0, 4, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 4, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 4, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 4, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        
+        $this->Ln(15);
+        $this->SetFont('Arial', 'B', 11);
+        $this->Cell(0, 5, txt('ACTA DE CULMINACIÓN DE SERVICIO COMUNITARIO'), 0, 1, 'C');
+        $this->Ln(15);
+    }
+
+    function Footer() {
+        $this->SetY(-35);
+        $this->SetFont('Arial', '', 7);
+        $this->SetTextColor(80, 80, 80);
+        $this->MultiCell(0, 3.5, txt("Urbanización la Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello Rif:G-20005608-8\nNúmero Telefónico: (0242) 3700494. Correo Electrónico: uptpccontroldeestudios03@gmail.com\nuptpcsecretariacgu@gmail.com uptpcpuertocabello@gmail.com"), 0, 'C');
+    }
+}
+
+// 3. GENERACIÓN DEL DOCUMENTO
+$pdf = new PDF_Comunitario('P', 'mm', 'Letter');
+$pdf->SetMargins(25, 25, 25);
+$pdf->AddPage();
+
+// Párrafo Principal
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write(6, txt("Quienes suscriben, "));
+$pdf->SetFont('Arial', 'B', 11); $pdf->Write(6, txt("Dra. Crespo C. Blanca A."));
+$pdf->SetFont('Arial', '', 11); $pdf->Write(6, txt(", cédula de identidad N° "));
+$pdf->SetFont('Arial', 'B', 11); $pdf->Write(6, txt("V-10.959.330"));
+$pdf->SetFont('Arial', '', 11); $pdf->Write(6, txt(", Secretaria del Consejo de Gestión Universitaria de la Universidad Politécnica Territorial de Puerto Cabello, hacen constar que el(la) Bachiller: "));
+$pdf->SetFont('Arial', 'B', 11); $pdf->Write(6, txt(strtoupper($estudiante['nombre'])));
+$pdf->SetFont('Arial', '', 11); $pdf->Write(6, txt(", cédula de identidad N° "));
+$pdf->SetFont('Arial', 'B', 11); $pdf->Write(6, txt($cedula_estudiante));
+$pdf->SetFont('Arial', '', 11); $pdf->Write(6, txt(", estudiante regular del Programa Nacional de Formación en "));
+$pdf->SetFont('Arial', 'B', 11); $pdf->Write(6, txt(strtoupper($carrera['nombre_carrera'])));
+$pdf->SetFont('Arial', '', 11); $pdf->Write(6, txt(", cumplió con la ejecución de ciento veinte (120) horas de actividades de Servicio Comunitario según el plan de trabajo y metas establecidas en el Proyecto."));
+
+$pdf->Ln(15);
+
+// Segundo Párrafo
+$pdf->SetFont('Arial', '', 11);
+$pdf->MultiCell(0, 6, txt("Igualmente, se certifica un desempeño satisfactorio conforme a lo establecido en los artículos 8 y 18, de la Ley de Servicio Comunitario del Estudiante de Educación Superior (Gaceta Oficial 38.272 de fecha 14-09-05)"), 0, 'J');
+
+// --- Bloque de Fecha con Negritas ---
+$datosFecha = obtenerDatosFecha();
+$pdf->Ln(20);
+$pdf->SetFont('Arial', '', 11);
+
+// Cálculo para centrar el bloque de Write
+$texto_total = "En Puerto Cabello, a los " . $datosFecha['dia_txt'] . " días del mes de " . $datosFecha['mes'] . " del año " . $datosFecha['anio_txt'] . ".";
+$width_texto = $pdf->GetStringWidth(txt($texto_total));
+$pdf->SetX(($pdf->GetPageWidth() - $width_texto) / 2);
+
+$pdf->Write(6, txt("En Puerto Cabello, a los "));
+$pdf->SetFont('Arial', 'B', 11); 
+$pdf->Write(6, txt($datosFecha['dia_txt'])); // DIA EN NEGRITA
+
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write(6, txt(" días del mes de "));
+$pdf->SetFont('Arial', 'B', 11); 
+$pdf->Write(6, txt($datosFecha['mes'])); // MES EN NEGRITA
+
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write(6, txt(" del año "));
+$pdf->SetFont('Arial', 'B', 11); 
+$pdf->Write(6, txt($datosFecha['anio_txt'])); // AÑO EN NEGRITA
+
+$pdf->SetFont('Arial', '', 11);
+$pdf->Write(6, txt("."));
+
+$pdf->Ln(25);
+
+// Firma Central
+$pdf->SetFont('Arial', 'B', 10);
+$ancho_linea = 85;
+$x_inicio = ($pdf->GetPageWidth() - $ancho_linea) / 2;
+$y_actual = $pdf->GetY();
+$pdf->Line($x_inicio, $y_actual, $x_inicio + $ancho_linea, $y_actual);
+
+$pdf->Ln(2);
+$pdf->Cell(0, 5, txt("Dra. Blanca A. Crespo C."), 0, 1, 'C');
+$pdf->SetFont('Arial', '', 9);
+$pdf->Cell(0, 4, txt("Secretario del Consejo de Gestión Universitaria"), 0, 1, 'C');
+$pdf->Cell(0, 4, txt("Resolución N° 34 de fecha 20/07/2022 Gaceta Oficial República"), 0, 1, 'C');
+$pdf->Cell(0, 4, txt("Bolivariana de Venezuela N° 457.753 de fecha 22/07/2022"), 0, 1, 'C');
+
+ob_end_clean();
+$pdf->Output('I', "Acta_Comunitaria_" . $cedula_estudiante . ".pdf");
+exit();
+
+============================================================
+FILE: pdf_carta_culminacion.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../../fpdf/fpdf.php');
+
+if (!isset($_GET['id'])) { die("ID no proporcionado."); }
+$id_estudiante = intval($_GET['id']);
+$tipo_reporte = isset($_GET['tipo']) ? strtolower($_GET['tipo']) : 'tsu';
+
+// 1. OBTENCIÓN DE DATOS
+$query_user = "SELECT * FROM users WHERE id = ? LIMIT 1";
+$stmt = $db->prepare($query_user);
+$stmt->bind_param("i", $id_estudiante);
+$stmt->execute();
+$estudiante = $stmt->get_result()->fetch_assoc();
+
+if (!$estudiante) die('Estudiante no encontrado.');
+
+$cedula_estudiante = $estudiante['idusuario']; 
+$carrera = obtenerCarreraEstudiante($id_estudiante);
+
+// Lógica de distinción de títulos
+if ($tipo_reporte == 'ing') {
+    $titulo_obtener = "INGENIERO";
+} else {
+    $titulo_obtener = "TÉCNICO SUPERIOR UNIVERSITARIO";
+}
+
+// Función para obtener la fecha actual en formato del membrete
+function obtenerFechaMembrete() {
+    return date('d/m/Y');
+}
+
+function txt($texto) {
+    return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+}
+
+function fechaCarta() {
+    $meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    $d = (int)date('d');
+    $m = (int)date('m') - 1;
+    $y = date('Y');
+    
+    $dia_texto = ($d < 10) ? "0$d" : "$d";
+    $anio_letras = ($y == "2026") ? "dos mil veintiséis" : "dos mil veinticinco";
+    
+    return "en la ciudad de Puerto Cabello, a los $d ($dia_texto) días del mes de " . $meses[$m] . " del año $anio_letras ($y)";
+}
+
+// 2. CLASE FPDF CON MEMBRETE INTEGRADO
+class PDF_Culminacion extends FPDF {
+    function Header() {
+        // Obtener fecha actual
+        $fecha = date('d/m/Y');
+        
+        // Logo en la izquierda
+        if(file_exists('../../images/uptpc.png')) {
+            $this->Image('../../images/uptpc.png', $this->lMargin, 10, 20);
+        }
+        
+        // Textos del membrete (alineados al centro)
+        $this->SetY(10);
+        $this->SetFont('Arial', 'B', 10); // Reducido de 12 a 10 como en la función JS
+        $this->Cell(0, 5, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 5, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 5, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        
+        // Fecha alineada a la derecha
+        $this->SetFont('Arial', '', 9); // Reducido para la fecha
+        $this->SetXY($this->lMargin, 10);
+        $this->Cell($this->GetPageWidth() - ($this->lMargin + $this->rMargin), 5, txt($fecha), 0, 0, 'R');
+        
+        // Línea separadora debajo del membrete
+        $this->SetY(28);
+        $this->SetDrawColor(0, 0, 0);
+        $this->Line($this->lMargin, $this->GetY(), $this->GetPageWidth() - $this->rMargin, $this->GetY());
+        
+        // Título del documento con espacio después del membrete
+        $this->Ln(15);
+        $this->SetFont('Arial', 'BU', 11);
+        $this->Cell(0, 5, txt('CARTA DE CULMINACIÓN'), 0, 1, 'C');
+        $this->SetTextColor(0);
+        $this->Ln(10);
+    }
+
+    function Footer() {
+        $this->SetY(-30);
+        $this->SetFont('Arial', '', 7);
+        $this->Cell(0, 3, txt("Urbanización la Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello Rif:G-20005608-8"), 0, 1, 'C');
+        $this->Cell(0, 3, txt("Correo Electrónico: uptpccontroldeestudios03@gmail.com  uptpcsecretariacgu@gmail.com"), 0, 1, 'C');
+        $this->Ln(2);
+        $this->Cell(50, 4, txt("Universidad Politécnica Territorial de Puerto Cabello"), 0, 0, 'L');
+        $this->Cell(0, 4, txt("Página (s): ") . $this->PageNo(), 0, 1, 'R');
+    }
+}
+
+// 3. GENERACIÓN
+$pdf = new PDF_Culminacion('P', 'mm', 'Letter');
+$pdf->SetMargins(25, 20, 25);
+$pdf->AddPage();
+
+$pdf->SetFont('Arial', '', 11);
+
+// Texto de Introducción
+$pdf->Write(7, txt("Quien suscribe, "));
+$pdf->SetFont('Arial', 'I', 11); 
+$pdf->Write(7, txt("Dra. Blanca Crespo C."));
+$pdf->SetFont('Arial', '', 11); 
+$pdf->Write(7, txt(", titular de la cédula de identidad "));
+$pdf->SetFont('Arial', 'B', 11); 
+$pdf->Write(7, txt("V-10.959.330"));
+$pdf->SetFont('Arial', '', 11); 
+$pdf->Write(7, txt(", Secretario del Consejo de Gestión Universitaria de la Universidad Politécnica Territorial de Puerto Cabello certifica al Ciudadano(a):"));
+
+$pdf->Ln(20);
+
+// Nombre del Estudiante Centrado
+$pdf->SetFont('Arial', 'B', 12);
+$pdf->Cell(0, 10, txt(strtoupper($estudiante['nombre'])), 0, 1, 'C');
+
+$pdf->Ln(10);
+
+// Cuerpo de la carta
+$pdf->SetFont('Arial', '', 11);
+$pdf->MultiCell(0, 7, txt("Titular de la Cédula de Identidad V-") . $cedula_estudiante . txt(", Quien cursó y aprobó todas las asignaturas del Plan de estudios del Programa Nacional de Formación en ") . strtoupper($carrera['nombre_carrera']) . txt(" para obtener el Título de:"), 0, 'J');
+
+$pdf->Ln(15);
+
+// Título a obtener Centrado y Negrita
+$pdf->SetFont('Arial', 'B', 12);
+$pdf->Cell(0, 10, txt($titulo_obtener), 0, 1, 'C');
+
+$pdf->Ln(15);
+
+// Fecha de emisión
+$pdf->SetFont('Arial', '', 11);
+$pdf->MultiCell(0, 7, txt("Documento que se emite ") . fechaCarta(), 0, 'J');
+
+// Firma con línea
+$pdf->Ln(20); // Reducido de 35 a 20 para dejar espacio para la línea de firma
+
+// Línea de firma (aproximadamente 80mm de ancho, centrada)
+$lineWidth = 80;
+$pageWidth = $pdf->GetPageWidth();
+$lineX = ($pageWidth - $lineWidth) / 2;
+$lineY = $pdf->GetY();
+
+// Dibujar la línea de firma
+$pdf->SetDrawColor(0, 0, 0); // Color negro
+$pdf->SetLineWidth(0.5); // Grosor de la línea
+$pdf->Line($lineX, $lineY, $lineX + $lineWidth, $lineY);
+
+// Espacio después de la línea
+$pdf->Ln(8);
+
+// Información de la firmante
+$pdf->SetFont('Arial', 'BI', 10);
+$pdf->Cell(0, 4, txt("Dra. Blanca A. Crespo C."), 0, 1, 'C');
+$pdf->Ln(2);
+$pdf->SetFont('Arial', '', 9);
+$pdf->Cell(0, 4, txt("Secretario del Consejo de Gestión Universitaria"), 0, 1, 'C');
+$pdf->Cell(0, 4, txt("Resolución N° 34 de fecha 20/07/2022 Gaceta Oficial República"), 0, 1, 'C');
+$pdf->Cell(0, 4, txt("Bolivariana de Venezuela N° 457.753 de fecha 22/07/2022"), 0, 1, 'C');
+
+ob_end_clean();
+$pdf->Output('I', "Carta_Culminacion_" . $cedula_estudiante . ".pdf");
+?>
+
+============================================================
+FILE: pdf_notas_certificadas.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php');
+
+if (!isset($_GET['id'])) { die("ID no proporcionado."); }
+$id_estudiante = intval($_GET['id']);
+$tipo_reporte = isset($_GET['tipo']) ? strtolower($_GET['tipo']) : 'tsu';
+
+// 1. DATOS
+$query_user = "SELECT * FROM users WHERE id = ? LIMIT 1";
+$stmt = $db->prepare($query_user);
+$stmt->bind_param("i", $id_estudiante);
+$stmt->execute();
+$estudiante = $stmt->get_result()->fetch_assoc();
+
+if (!$estudiante) die('Estudiante no encontrado.');
+
+$cedula_estudiante = $estudiante['idusuario']; 
+$carrera = obtenerCarreraEstudiante($id_estudiante);
+$materias_carrera = obtenerMateriasCarrera($carrera['id_carrera']);
+$notas_estudiante = obtenerNotasEstudianteConsulta($id_estudiante);
+
+// Determinar etiqueta según tipo de formación: mostrar 'PNF' si la carrera es PNF, si no mostrar 'Carrera'
+$tipo_form = isset($carrera['tipo_formacion']) ? strtoupper(trim($carrera['tipo_formacion'])) : '';
+$etiqueta_tipo = (strpos($tipo_form, 'PNF') !== false) ? 'PNF' : 'Carrera';
+
+// Determinar si se deben usar 'Semestre' en lugar de 'Trayecto' cuando la carrera es PTF
+$periodo_label = (strpos($tipo_form, 'PTF') !== false) ? 'Semestre' : 'Trayecto';
+
+function txt($texto) {
+    return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+}
+
+function fechaEnLetras() {
+    $meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    $dias = ["cero", "un", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve", "diez", "once", "doce", "trece", "catorce", "quince", "diez y seis", "diez y siete", "diez y ocho", "diez y nueve", "veinte", "veintiuno", "veintidós", "veintitrés", "veinticuatro", "veinticinco", "veintiséis", "veintisiete", "veintiocho", "veintinueve", "treinta", "treinta y uno"];
+    $d = (int)date('d');
+    $m = (int)date('m') - 1;
+    $y = date('Y');
+    $dia_texto = ($d < 32) ? $dias[$d] : $d;
+    $anio_letras = ($y == "2026") ? "dos mil veintiséis" : (($y == "2025") ? "dos mil veinticinco" : "dos mil " . $y);
+    return "En la ciudad de Puerto Cabello a los $dia_texto ($d) días del mes de " . $meses[$m] . " del año " . $anio_letras . " ($y)";
+}
+
+if ($tipo_reporte == 'ing') {
+    $rango_trayectos = [3, 4];
+    $titulo_grado = "INGENIERO"; 
+} else {
+    $rango_trayectos = [0, 1, 2];
+    $titulo_grado = "TÉCNICO SUPERIOR UNIVERSITARIO";
+}
+
+class PDF_Certificacion extends FPDF {
+    function Header() {
+        $margin = 15;
+        if(file_exists('../../images/uptpc.png')) {
+            $this->Image('../../images/uptpc.png', $margin, 10, 20);
+        }
+        $this->SetY(12);
+        $this->SetFont('Arial', 'B', 10);
+        $this->Cell(0, 4, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 4, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 4, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->SetY(12);
+        $this->SetFont('Arial', '', 9);
+        $this->Cell(0, 0, date('d/m/Y'), 0, 0, 'R');
+        $this->SetY(28);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(0, 3, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Ln(8);
+        $this->SetFont('Arial', 'B', 10);
+        $this->Cell(0, 5, txt('CERTIFICACIÓN'), 0, 1, 'C');
+        $this->Ln(2);
+    }
+}
+
+$pdf = new PDF_Certificacion('P', 'mm', 'Letter');
+$pdf->AliasNbPages();
+$pdf->AddPage();
+$pdf->SetMargins(15, 10, 15);
+
+// INTRODUCCIÓN
+$pdf->SetFont('Arial', '', 9);
+$pdf->Write(4, txt("Quien suscribe, "));
+$pdf->SetFont('Arial', 'B', 9); $pdf->Write(4, txt("Dra. Blanca A. Crespo C."));
+$pdf->SetFont('Arial', '', 9); $pdf->Write(4, txt(", titular de la cédula de identidad "));
+$pdf->SetFont('Arial', 'B', 9); $pdf->Write(4, txt("V-10.959.330"));
+$pdf->SetFont('Arial', '', 9); $pdf->Write(4, txt(", "));
+$pdf->SetFont('Arial', 'B', 9); $pdf->Write(4, txt("Secretario del Consejo de Gestión Universitaria"));
+$pdf->SetFont('Arial', '', 9); $pdf->Write(4, txt(" de la Universidad Politécnica Territorial de Puerto Cabello certifica al Ciudadano (a):"));
+$pdf->Ln(7);
+
+// DATOS ALUMNO
+$pdf->SetFont('Arial', 'B', 8);
+$pdf->Cell(95, 5, txt('APELLIDOS Y NOMBRES'), 1, 0, 'C');
+$pdf->Cell(35, 5, txt('CÉDULA'), 1, 0, 'C');
+$pdf->Cell(56, 5, txt($etiqueta_tipo), 1, 1, 'C');
+$pdf->SetFont('Arial', '', 8);
+$pdf->Cell(95, 6, txt(strtoupper($estudiante['nombre'])), 1, 0, 'C');
+$pdf->Cell(35, 6, txt($cedula_estudiante), 1, 0, 'C');
+$pdf->Cell(56, 6, txt($carrera['nombre_carrera']), 1, 1, 'C');
+$pdf->Ln(3);
+
+$pdf->SetFont('Arial', '', 9);
+$pdf->Write(4, txt("quien cursó y aprobó todas las unidades curriculares del Plan de Estudios del Programa Nacional de Formación para obtener el Título de "));
+$pdf->SetFont('Arial', 'B', 9); $pdf->Write(4, txt($titulo_grado));
+$pdf->SetFont('Arial', '', 9); $pdf->Write(4, txt(", logrando las siguientes calificaciones:"));
+$pdf->Ln(6);
+
+// TABLA
+$pdf->SetFont('Arial', 'B', 7);
+$pdf->Cell(25, 5, txt('CÓDIGO'), 1, 0, 'C');
+$pdf->Cell(90, 5, txt('UNIDAD CURRICULAR'), 1, 0, 'C');
+$pdf->Cell(12, 5, txt('UC'), 1, 0, 'C');
+$pdf->Cell(12, 5, txt('NOTA'), 1, 0, 'C');
+$pdf->Cell(18, 5, txt('LAPSO'), 1, 0, 'C');
+$pdf->Cell(0, 5, txt('OBSERVACIÓN'), 1, 1, 'C');
+
+$suma_ponderada_total = 0; $total_uc_general = 0;
+$materias_por_trayecto = [];
+while ($m = $materias_carrera->fetch_assoc()) {
+    if (in_array((int)$m['trayecto'], $rango_trayectos)) $materias_por_trayecto[(int)$m['trayecto']][] = $m;
+}
+
+foreach ($materias_por_trayecto as $t_num => $materias) {
+    $uc_t = 0; $suma_t = 0; $rows = [];
+    foreach ($materias as $m) {
+        $nota = (float)($notas_estudiante[$m['id_materia']]['trayecto_'.$t_num] ?? 0);
+        $uc = (float)($m['creditos'] ?? 0);
+        if ($nota >= 12) {
+            $rows[] = ['c'=>$m['cod_materia'], 'n'=>$m['nombre_materia'], 'u'=>$uc, 'nt'=>$nota, 'l'=>$notas_estudiante[$m['id_materia']]['nombre_periodo']];
+            $uc_t += $uc; $suma_t += ($nota * $uc);
+        }
+    }
+    if (!empty($rows)) {
+        $pdf->SetFont('Arial', 'B', 7);
+        $pdf->Cell(115, 5, txt($periodo_label . ": " . $t_num), 'L', 0, 'L');
+        $pdf->SetFont('Arial', 'I', 6);
+        $pdf->Cell(0, 5, txt("IRA $t_num: ".number_format($suma_t/$uc_t, 3)."  Total UC: $uc_t"), 'R', 1, 'R');
+        $pdf->SetFont('Arial', '', 7);
+        foreach ($rows as $r) {
+            $pdf->Cell(25, 5, txt($r['c']), 1, 0, 'L');
+            $pdf->Cell(90, 5, txt(substr($r['n'], 0, 65)), 1, 0, 'L');
+            $pdf->Cell(12, 5, $r['u'], 1, 0, 'C');
+            $pdf->Cell(12, 5, str_pad($r['nt'], 2, "0", STR_PAD_LEFT), 1, 0, 'C');
+            $pdf->Cell(18, 5, txt($r['l']), 1, 0, 'C');
+            $pdf->Cell(0, 5, '', 1, 1, 'C');
+            $suma_ponderada_total += ($r['nt']*$r['u']); $total_uc_general += $r['u'];
+        }
+    }
+}
+
+// TOTALES E IRA
+$pdf->Ln(4);
+$ira_f = ($total_uc_general > 0) ? number_format($suma_ponderada_total/$total_uc_general, 3) : "0.000";
+$pdf->SetFont('Arial', 'B', 8);
+$pdf->Cell(0, 6, txt("Unidades de Créditos Cursadas y Aprobadas: $total_uc_general"), 1, 1, 'C');
+$pdf->Cell(0, 6, txt("Índice de Rendimiento Académico: $ira_f"), 1, 1, 'C');
+
+// PIE LEGAL
+$pdf->Ln(3);
+$pdf->SetFont('Arial', '', 6.5);
+$pdf->MultiCell(0, 2.5, txt("Lineamiento de Evaluación del desempeño estudiantil en los PNF:\n1) Según Resolución N° 549, Gaceta Oficial N° 39.483, de fecha 09/08/2010, art. 31: La Escala de Evaluación era de 01 al 05, siendo la Nota Mínima Aprobatoria 03 pts.\nLineamiento de Evaluación del desempeño estudiantil en los PNF en el Marco de la Misión Sucre y Misión Alma Mater:\n1) Según Resolución N° 2593, Gaceta Oficial N° 39.839, de fecha 10/01/2012, art. 18: La Escala de Evaluación es de 01 al 20, siendo la Nota Mínima Aprobatoria 12 pts.\n2) Según Resolución N° 2593, Gaceta Oficial N° 39.839, de fecha 10/01/2012, art. 19: Para la UC Proyecto, la Nota Mínima Aprobatoria es de 16 pts."), 0, 'L');
+
+// FECHA Y FIRMAS
+$pdf->Ln(4);
+$pdf->SetFont('Arial', 'I', 9);
+$pdf->Cell(0, 5, txt(fechaEnLetras()), 0, 1, 'C');
+
+$pdf->Ln(15); 
+$y_f = $pdf->GetY();
+$pdf->Line(25, $y_f, 85, $y_f); 
+$pdf->Line(130, $y_f, 190, $y_f);
+$pdf->Ln(2);
+$pdf->SetFont('Arial', 'B', 8);
+$pdf_y = $pdf->GetY();
+$pdf->SetXY(15, $pdf_y);
+$pdf->MultiCell(80, 3.5, txt("Dra. Zorangel E. Aponte Q.\nJefa de Control de Estudios\nResolución N° 07-2022 de fecha 01/11/2022\nConsejo N° 07 de fecha 01/11/2022"), 0, 'C');
+$pdf->SetXY(120, $pdf_y);
+$pdf->MultiCell(80, 3.5, txt("Dra. Blanca A. Crespo C.\nSecretario del Consejo de Gestión Universitaria\nResolución N° 34 de fecha 20/07/2022\nGaceta Oficial Bolivariana de Venezuela\nN° 457.753 de fecha 22/07/2022"), 0, 'C');
+
+ob_end_clean();
+$pdf->Output('I', "Certificacion_Final.pdf");
+exit();
+
+============================================================
+FILE: pdf_constancia.php
+============================================================
+<?php
+error_reporting(0);
+ini_set('display_errors', 0);
+ob_start();
+
+require_once('../../funciones/functions.php');
+require_once('../fpdf/fpdf.php');
+
+if (!isset($_GET['id'])) { die("ID no proporcionado."); }
+$id_estudiante = intval($_GET['id']);
+
+// 1. OBTENCIÓN DE DATOS
+$query_user = "SELECT * FROM users WHERE id = ? LIMIT 1";
+$stmt = $db->prepare($query_user);
+$stmt->bind_param("i", $id_estudiante);
+$stmt->execute();
+$estudiante = $stmt->get_result()->fetch_assoc();
+
+if (!$estudiante) die('Estudiante no encontrado.');
+
+$cedula = $estudiante['idusuario'];
+$nombre_estudiante = strtoupper($estudiante['nombre']);
+$carrera_data = obtenerCarreraEstudiante($id_estudiante);
+$nombre_carrera = strtoupper($carrera_data['nombre_carrera']);
+
+// Variables de ejemplo (puedes conectarlas a tu lógica de promedios)
+$puesto = "2"; 
+$total_promocion = "11";
+$indice_personal = "18,35";
+$indice_promocion = "16,36";
+
+function txt($texto) {
+    return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+}
+
+/**
+ * Función de fecha actualizada y dinámica
+ */
+function fechaConstancia() {
+    $meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    
+    $d = date('d');
+    $m = (int)date('m') - 1;
+    $y = date('Y');
+    
+    // Convertir año a letras de forma sencilla
+    $anios_letras = [
+        "2025" => "dos mil veinticinco",
+        "2026" => "dos mil veintiséis",
+        "2027" => "dos mil veintisiete"
+    ];
+    $anio_texto = isset($anios_letras[$y]) ? $anios_letras[$y] : "dos mil $y";
+    
+    $dia_texto = ($d == "01") ? "un (01)" : "$d ($d)";
+    
+    return "en la ciudad de Puerto Cabello, a los $dia_texto días del mes de " . $meses[$m] . " del año " . $anio_texto . " ($y).";
+}
+
+// 2. CLASE FPDF
+class PDF_Constancia extends FPDF {
+    function Header() {
+        if(file_exists('../../images/uptpc.png')) {
+            $this->Image('../../images/uptpc.png', 20, 10, 18);
+        }
+        $this->SetY(10);
+        $this->SetFont('Arial', '', 8);
+        $this->Cell(0, 3.5, txt('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
+        $this->Cell(0, 3.5, txt('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
+        $this->Cell(0, 3.5, txt('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 3.5, txt('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
+        
+        $this->Ln(20);
+        $this->SetFont('Arial', 'B', 12);
+        $this->Cell(0, 10, txt('CONSTANCIAS'), 0, 1, 'C');
+        $this->Ln(10);
+    }
+}
+
+// 3. GENERACIÓN
+$pdf = new PDF_Constancia('P', 'mm', 'Letter');
+$pdf->SetMargins(25, 20, 25);
+$pdf->AddPage();
+$pdf->SetFont('Arial', '', 12);
+
+$pdf->MultiCell(0, 7, txt("Quien suscribe, Dra. Blanca A. Crespo C., titular de la cédula de identidad V-10.959.330, Secretaria del Consejo de Gestión Universitaria de la Universidad Politécnica Territorial de Puerto Cabello certifica al Ciudadano(a):"), 0, 'J');
+
+$pdf->Ln(10);
+$pdf->SetFont('Arial', 'B', 13);
+$pdf->Cell(0, 10, txt($nombre_estudiante), 0, 1, 'C');
+$pdf->Ln(5);
+
+$pdf->SetFont('Arial', '', 12);
+$pdf->Write(7, txt("Titular de la Cédula de Identidad "));
+$pdf->SetFont('Arial', 'B', 12); $pdf->Write(7, txt("V-$cedula"));
+$pdf->SetFont('Arial', '', 12); $pdf->Write(7, txt(" cursó estudio obteniendo el Técnico Superior Universitario en el Programa Nacional de Formación en:"));
+
+$pdf->Ln(15);
+$pdf->SetFont('Arial', 'B', 12);
+$pdf->Cell(0, 10, txt($nombre_carrera), 0, 1, 'C');
+$pdf->Ln(10);
+
+// Párrafo con datos subrayados
+$pdf->SetFont('Arial', '', 12);
+$pdf->Write(7, txt("Así mismo se Certifica que obtuvo el "));
+$pdf->SetFont('Arial', 'B', 12); $pdf->Cell(15, 6, $puesto, 'B', 0, 'C');
+$pdf->SetFont('Arial', '', 12); $pdf->Write(7, txt(" lugar entre los "));
+$pdf->SetFont('Arial', 'B', 12); $pdf->Cell(15, 6, $total_promocion, 'B', 0, 'C');
+$pdf->SetFont('Arial', '', 12); $pdf->Write(7, txt(" de su promoción, su índice de rendimiento académico fue de "));
+$pdf->SetFont('Arial', 'B', 12); $pdf->Cell(20, 6, $indice_personal, 'B', 0, 'C');
+$pdf->SetFont('Arial', '', 12); $pdf->Write(7, txt(" y el de su promoción fue de "));
+$pdf->SetFont('Arial', 'B', 12); $pdf->Cell(20, 6, $indice_promocion, 'B', 0, 'C');
+$pdf->Write(7, ".");
+
+$pdf->Ln(20);
+$pdf->MultiCell(0, 7, txt("Documento que se emite " . fechaConstancia()), 0, 'J');
+
+// Firma
+$pdf->Ln(30);
+$pdf->SetFont('Arial', 'B', 10);
+$pdf->Cell(0, 4, txt("DRA. BLANCA A. CRESPO C."), 0, 1, 'C');
+$pdf->SetFont('Arial', '', 9);
+$pdf->Cell(0, 4, txt("Secretaria del Consejo de Gestión Universitaria"), 0, 1, 'C');
+$pdf->Cell(0, 4, txt("Resolución N° 34 de fecha 20/07/2022 Gaceta Oficial República"), 0, 1, 'C');
+$pdf->Cell(0, 4, txt("Bolivariana de Venezuela N° 457.753 de fecha 22/07/2022"), 0, 1, 'C');
+
+ob_end_clean();
+$pdf->Output('I', "Constancia_$cedula.pdf");
