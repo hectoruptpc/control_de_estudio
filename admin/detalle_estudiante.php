@@ -179,12 +179,12 @@ $cant_pendientes = count($solicitudes_pendientes);
                         </p>
                     </div>
                     <div>
-                        <a href="consulta_notas.php?cedula=<?= urlencode($estudiante['idusuario'] ?? '') ?>" 
-                           class="btn btn-info btn-sm" 
-                           target="_blank"
-                           title="Ver historial académico">
-                            <i class="fas fa-book-open me-1"></i> Historial Académico
-                        </a>
+                        <form method="POST" action="consulta_notas.php" class="d-inline m-0">
+                            <input type="hidden" name="cedula" value="<?= htmlspecialchars($estudiante['idusuario'] ?? '') ?>">
+                            <button type="submit" class="btn btn-info btn-sm font-weight-bold shadow-sm" title="Ver historial académico">
+                                <i class="fas fa-book-open me-1"></i> Historial Académico
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -196,9 +196,13 @@ $cant_pendientes = count($solicitudes_pendientes);
                     <i class="fas fa-exclamation-circle text-warning me-2"></i>
                     <strong>¡Atención!</strong> Este estudiante tiene <strong><?= $cant_pendientes ?></strong> solicitud(es) académica(s) pendiente(s) por revisión.
                 </div>
-                <a href="constancias.php" class="btn btn-sm btn-warning text-dark font-weight-bold" target="_blank">
-                    <i class="fas fa-tasks me-1"></i> Gestionar Solicitud
-                </a>
+                <form method="POST" action="constancias.php" class="d-inline m-0">
+                    <input type="hidden" name="id_estudiante" value="<?= $id ?>">
+                    <input type="hidden" name="tab" value="solicitudes">
+                    <button type="submit" class="btn btn-sm btn-warning text-dark font-weight-bold shadow-sm">
+                        <i class="fas fa-tasks me-1"></i> Gestionar Solicitud
+                    </button>
+                </form>
             </div>
         <?php endif; ?>
     </div>
@@ -556,9 +560,13 @@ $cant_pendientes = count($solicitudes_pendientes);
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>
-                                                    <a href="constancias.php" target="_blank" class="btn btn-xs btn-outline-primary btn-sm py-0 px-2" title="Gestionar en Solicitudes">
-                                                        <i class="fas fa-external-link-alt"></i> Gestionar
-                                                    </a>
+                                                    <form method="POST" action="constancias.php" class="d-inline m-0">
+                                                        <input type="hidden" name="id_estudiante" value="<?= $id ?>">
+                                                        <input type="hidden" name="tab" value="solicitudes">
+                                                        <button type="submit" class="btn btn-xs btn-outline-primary btn-sm py-0 px-2 font-weight-bold" title="Gestionar en Solicitudes">
+                                                            <i class="fas fa-tasks me-1"></i> Gestionar
+                                                        </button>
+                                                    </form>
                                                     <form method="POST" action="../constancias/generar_constancia.php" target="_blank" class="d-inline">
                                                         <input type="hidden" name="solicitud_id" value="<?= $se['id'] ?>">
                                                         <button type="submit" class="btn btn-xs btn-outline-danger btn-sm py-0 px-2" title="Ver PDF">

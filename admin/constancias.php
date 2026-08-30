@@ -61,9 +61,17 @@ $error = "";
 $cedula_busqueda = "";
 if (!isset($id_estudiante_sel)) $id_estudiante_sel = 0;
 
-// Si viene por GET id
-if (isset($_GET['id']) && intval($_GET['id']) > 0) {
+// Si viene por GET id, id_estudiante, cedula o tab
+if (isset($_GET['id_estudiante']) && intval($_GET['id_estudiante']) > 0) {
+    $id_estudiante_sel = intval($_GET['id_estudiante']);
+} elseif (isset($_GET['id']) && intval($_GET['id']) > 0) {
     $id_estudiante_sel = intval($_GET['id']);
+}
+if (isset($_GET['cedula']) && !empty($_GET['cedula'])) {
+    $cedula_busqueda = strtoupper(trim($_GET['cedula']));
+}
+if (isset($_GET['tab']) && !empty($_GET['tab'])) {
+    $tab_activa = trim($_GET['tab']);
 }
 
 // =========================================================================
