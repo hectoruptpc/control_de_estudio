@@ -1,0 +1,1 @@
+<?php header("Location: constancias.php"); exit; ?>

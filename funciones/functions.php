@@ -1,13 +1,8 @@
-
 <?php
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-
-// Asegura que los includes relativos dentro de este archivo
-// se resuelvan contra la carpeta /funciones en sistemas case-sensitive
-chdir(__DIR__);
 
 // ==============================================================================
 // COMPATIBILIDAD MULTIPLATAFORMA (WINDOWS / LINUX) - POLYFILL ICONV Y FORMATEO PDF
@@ -41,16 +36,48 @@ if (!function_exists('formatearTextoPDF')) {
     function formatearTextoPDF($texto) {
         if ($texto === null || $texto === '') return '';
         $texto = (string)$texto;
-        if (function_exists('iconv')) {
-            $conv = @iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
-            if ($conv !== false) return $conv;
+        if (!preg_match('/[\x80-\xFF]/', $texto)) {
+            return $texto;
         }
-        if (function_exists('mb_convert_encoding')) {
-            return mb_convert_encoding($texto, 'ISO-8859-1', 'UTF-8');
+
+        // Detectar si es UTF-8 válido
+        $is_utf8 = (bool)preg_match('%^(?:
+            [\x09\x0A\x0D\x20-\x7E]
+          | [\xC2-\xDF][\x80-\xBF]
+          |  \xE0[\xA0-\xBF][\x80-\xBF]
+          | [\xE1-\xEC\xEE\xEF][\x80-\xBF]{2}
+          |  \xED[\x80-\x9F][\x80-\xBF]
+          |  \xF0[\x90-\xBF][\x80-\xBF]{2}
+          | [\xF1-\xF3][\x80-\xBF]{3}
+          |  \xF4[\x80-\x8F][\x80-\xBF]{2}
+        )+$%xs', $texto);
+
+        if ($is_utf8) {
+            // Reemplazar caracteres tipográficos no estándar antes de convertir
+            $map = [
+                "\xE2\x80\x9C" => '"',
+                "\xE2\x80\x9D" => '"',
+                "\xE2\x80\x98" => "'",
+                "\xE2\x80\x99" => "'",
+                "\xE2\x80\x94" => "-",
+                "\xE2\x80\x93" => "-",
+                "\xE2\x80\xA6" => "..."
+            ];
+            $texto = strtr($texto, $map);
+
+            if (function_exists('mb_convert_encoding')) {
+                $conv = @mb_convert_encoding($texto, 'windows-1252', 'UTF-8');
+                if ($conv !== false && $conv !== '') return $conv;
+            }
+            if (function_exists('iconv')) {
+                $conv = @iconv('UTF-8', 'windows-1252//TRANSLIT//IGNORE', $texto);
+                if ($conv !== false && $conv !== '') return $conv;
+            }
+            if (function_exists('utf8_decode')) {
+                return @utf8_decode($texto);
+            }
         }
-        if (function_exists('utf8_decode')) {
-            return utf8_decode($texto);
-        }
+
         return $texto;
     }
 }
@@ -24247,4 +24274,493 @@ function generarCodigoSeccion($id_carrera, $turno) {
     return null; // No hay códigos disponibles
 }
 
-?>
+// ==============================================================================
+// SISTEMA AUTOMATIZADO DE SOLICITUDES Y TRÁMITES ACADÉMICOS
+// ==============================================================================
+
+/**
+ * Registra una nueva solicitud académica realizada por un estudiante o admin.
+ */
+function crearSolicitudAcademica($estudiante_id, $tipo_solicitud, $accion, $motivo, $materias_data = null, $seccion_origen_id = null, $seccion_destino_id = null) {
+    global $db;
+    
+    $estudiante_id = intval($estudiante_id);
+    $carrera_info = obtenerCarreraEstudiante($estudiante_id);
+    $id_carrera = intval($carrera_info['id_carrera'] ?? 0);
+    $periodo_activo = obtenerPeriodoActivo($db);
+    $id_periodo = intval($periodo_activo['id_periodo'] ?? 0);
+    
+    if ($id_periodo <= 0) {
+        $res_p = $db->query("SELECT id_periodo FROM periodos_academicos ORDER BY id_periodo DESC LIMIT 1");
+        if ($res_p && $row_p = $res_p->fetch_assoc()) {
+            $id_periodo = intval($row_p['id_periodo']);
+        }
+    }
+    
+    $materias_json = is_array($materias_data) ? json_encode($materias_data, JSON_UNESCAPED_UNICODE) : (is_string($materias_data) ? $materias_data : null);
+    $motivo = mb_substr(trim($motivo), 0, 100);
+    $accion = trim($accion);
+    $tipo_solicitud = trim($tipo_solicitud);
+    $sec_orig = ($seccion_origen_id && intval($seccion_origen_id) > 0) ? intval($seccion_origen_id) : null;
+    $sec_dest = ($seccion_destino_id && intval($seccion_destino_id) > 0) ? intval($seccion_destino_id) : null;
+    
+    // Prevenir duplicación accidental (F5 o reenvíos)
+    $chk_dup = $db->prepare("SELECT id FROM solicitudes_academicas WHERE estudiante_id = ? AND tipo_solicitud = ? AND status = 'pendiente' AND motivo = ? LIMIT 1");
+    $chk_dup->bind_param("iss", $estudiante_id, $tipo_solicitud, $motivo);
+    $chk_dup->execute();
+    $res_dup = $chk_dup->get_result();
+    if ($res_dup && $row_dup = $res_dup->fetch_assoc()) {
+        $existente_id = intval($row_dup['id']);
+        $chk_dup->close();
+        return $existente_id;
+    }
+    $chk_dup->close();
+    
+    $stmt = $db->prepare("INSERT INTO solicitudes_academicas 
+        (estudiante_id, tipo_solicitud, accion, id_periodo, id_carrera, motivo, materias_data, seccion_origen_id, seccion_destino_id, status, fecha_solicitud) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', NOW())");
+        
+    $stmt->bind_param("issiisssi", 
+        $estudiante_id, 
+        $tipo_solicitud, 
+        $accion, 
+        $id_periodo, 
+        $id_carrera, 
+        $motivo, 
+        $materias_json, 
+        $sec_orig, 
+        $sec_dest
+    );
+    
+    if ($stmt->execute()) {
+        $id_generado = $stmt->insert_id;
+        $stmt->close();
+        return $id_generado;
+    }
+    $stmt->close();
+    return false;
+}
+
+/**
+ * Obtiene el listado de solicitudes académicas con filtros.
+ */
+function obtenerSolicitudesAcademicas($filtro_status = '', $estudiante_id = null, $tipo_solicitud = '') {
+    global $db;
+    
+    $query = "SELECT sa.*, 
+                     u.nombre as nombre_estudiante, 
+                     u.idusuario as cedula_estudiante, 
+                     u.email as email_estudiante,
+                     u.tlf as tlf_estudiante,
+                     COALESCE(c.nombre_carrera, 'Sin Carrera') as nombre_carrera,
+                     COALESCE(c.cod_carrera, 'N/A') as cod_carrera,
+                     COALESCE(p.nombre_periodo, 'N/A') as nombre_periodo,
+                     COALESCE(sec_orig.codigo_seccion, 'N/A') as nombre_seccion_origen,
+                     COALESCE(sec_dest.codigo_seccion, 'N/A') as nombre_seccion_destino,
+                     admin_u.nombre as nombre_procesado_por
+              FROM solicitudes_academicas sa
+              INNER JOIN users u ON sa.estudiante_id = u.id
+              LEFT JOIN carreras c ON sa.id_carrera = c.id_carrera
+              LEFT JOIN periodos_academicos p ON sa.id_periodo = p.id_periodo
+              LEFT JOIN secciones sec_orig ON sa.seccion_origen_id = sec_orig.id_seccion
+              LEFT JOIN secciones sec_dest ON sa.seccion_destino_id = sec_dest.id_seccion
+              LEFT JOIN users admin_u ON sa.procesado_por = admin_u.id
+              WHERE 1=1 ";
+              
+    $params = [];
+    $types = "";
+    
+    if (!empty($filtro_status) && in_array($filtro_status, ['pendiente', 'aprobada', 'rechazada'])) {
+        $query .= " AND sa.status = ? ";
+        $params[] = $filtro_status;
+        $types .= "s";
+    }
+    
+    if (!empty($estudiante_id) && intval($estudiante_id) > 0) {
+        $query .= " AND sa.estudiante_id = ? ";
+        $params[] = intval($estudiante_id);
+        $types .= "i";
+    }
+    
+    if (!empty($tipo_solicitud)) {
+        $query .= " AND sa.tipo_solicitud = ? ";
+        $params[] = $tipo_solicitud;
+        $types .= "s";
+    }
+    
+    $query .= " ORDER BY sa.fecha_solicitud DESC, sa.id DESC";
+    
+    if (!empty($params)) {
+        $stmt = $db->prepare($query);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+    } else {
+        $result = $db->query($query);
+    }
+    
+    $solicitudes = [];
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $row['materias_parsed'] = !empty($row['materias_data']) ? json_decode($row['materias_data'], true) : [];
+            $solicitudes[] = $row;
+        }
+    }
+    return $solicitudes;
+}
+
+/**
+ * Obtiene una solicitud académica por su ID.
+ */
+function obtenerSolicitudAcademicaPorId($id_solicitud) {
+    global $db;
+    $id_solicitud = intval($id_solicitud);
+    $query = "SELECT sa.*, 
+                     u.nombre as nombre_estudiante, 
+                     u.idusuario as cedula_estudiante, 
+                     u.email as email_estudiante,
+                     u.tlf as tlf_estudiante,
+                     COALESCE(c.nombre_carrera, 'Sin Carrera') as nombre_carrera,
+                     COALESCE(c.cod_carrera, 'N/A') as cod_carrera,
+                     COALESCE(p.nombre_periodo, 'N/A') as nombre_periodo,
+                     COALESCE(sec_orig.codigo_seccion, 'N/A') as nombre_seccion_origen,
+                     COALESCE(sec_dest.codigo_seccion, 'N/A') as nombre_seccion_destino,
+                     admin_u.nombre as nombre_procesado_por
+              FROM solicitudes_academicas sa
+              INNER JOIN users u ON sa.estudiante_id = u.id
+              LEFT JOIN carreras c ON sa.id_carrera = c.id_carrera
+              LEFT JOIN periodos_academicos p ON sa.id_periodo = p.id_periodo
+              LEFT JOIN secciones sec_orig ON sa.seccion_origen_id = sec_orig.id_seccion
+              LEFT JOIN secciones sec_dest ON sa.seccion_destino_id = sec_dest.id_seccion
+              LEFT JOIN users admin_u ON sa.procesado_por = admin_u.id
+              WHERE sa.id = ? LIMIT 1";
+              
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $id_solicitud);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result && $row = $result->fetch_assoc()) {
+        $row['materias_parsed'] = !empty($row['materias_data']) ? json_decode($row['materias_data'], true) : [];
+        $stmt->close();
+        return $row;
+    }
+    $stmt->close();
+    return false;
+}
+
+/**
+ * Procesa y ejecuta la aprobación automática de una solicitud académica.
+ */
+function procesarAprobacionSolicitudAcademica($id_solicitud, $admin_id, $observacion = '') {
+    global $db;
+    $solicitud = obtenerSolicitudAcademicaPorId($id_solicitud);
+    if (!$solicitud) {
+        return ['success' => false, 'message' => 'Solicitud no encontrada'];
+    }
+    if ($solicitud['status'] === 'aprobada') {
+        return ['success' => false, 'message' => 'Esta solicitud ya ha sido aprobada previamente'];
+    }
+    
+    $estudiante_id = intval($solicitud['estudiante_id']);
+    $id_periodo = intval($solicitud['id_periodo']);
+    $id_carrera = intval($solicitud['id_carrera']);
+    $tipo = $solicitud['tipo_solicitud'];
+    $materias_data = $solicitud['materias_parsed'];
+    
+    $db->begin_transaction();
+    try {
+        // 1. Ejecutar acción automática según el tipo de solicitud
+        if ($tipo === 'adicion_retiro' || $tipo === 'adicion' || $tipo === 'retiro') {
+            // A) Procesar Retiros
+            $materias_retirar = $materias_data['retiros'] ?? [];
+            if (!empty($materias_retirar) && is_array($materias_retirar)) {
+                foreach ($materias_retirar as $mat) {
+                    $id_mat = is_array($mat) ? intval($mat['id']) : intval($mat);
+                    if ($id_mat > 0) {
+                        $stmt_ret = $db->prepare("UPDATE estudiante_materias SET estatus = 'retirada' WHERE id_usuario = ? AND id_materia = ? AND id_periodo = ?");
+                        $stmt_ret->bind_param("iii", $estudiante_id, $id_mat, $id_periodo);
+                        $stmt_ret->execute();
+                        $stmt_ret->close();
+                    }
+                }
+            }
+            
+            // B) Procesar Adiciones
+            $materias_adicionar = $materias_data['adiciones'] ?? [];
+            if (!empty($materias_adicionar) && is_array($materias_adicionar)) {
+                // Obtener sección del estudiante si existe
+                $seccion_id = 0;
+                $res_sec = $db->query("SELECT id_seccion FROM estudiante_seccion WHERE id_usuario = $estudiante_id AND estatus = 'activo' ORDER BY fecha_inscripcion DESC LIMIT 1");
+                if ($res_sec && $row_sec = $res_sec->fetch_assoc()) {
+                    $seccion_id = intval($row_sec['id_seccion']);
+                }
+                
+                foreach ($materias_adicionar as $mat) {
+                    $id_mat = is_array($mat) ? intval($mat['id']) : intval($mat);
+                    if ($id_mat > 0) {
+                        // Obtener trayecto de la materia
+                        $res_m = $db->query("SELECT trayecto FROM materias WHERE id_materia = $id_mat LIMIT 1");
+                        $trayecto_m = ($res_m && $row_m = $res_m->fetch_assoc()) ? intval($row_m['trayecto']) : 0;
+                        
+                        // Insertar o actualizar en estudiante_materias
+                        $stmt_chk = $db->prepare("SELECT id_inscripcion FROM estudiante_materias WHERE id_usuario = ? AND id_materia = ? AND id_periodo = ?");
+                        $stmt_chk->bind_param("iii", $estudiante_id, $id_mat, $id_periodo);
+                        $stmt_chk->execute();
+                        $res_chk = $stmt_chk->get_result();
+                        $stmt_chk->close();
+                        
+                        $val_seccion = ($seccion_id > 0) ? $seccion_id : null;
+                        
+                        if ($res_chk->num_rows == 0) {
+                            $stmt_ins = $db->prepare("INSERT INTO estudiante_materias (id_usuario, id_materia, id_seccion, id_periodo, fecha_inscripcion, estatus, nota_final) VALUES (?, ?, ?, ?, NOW(), 'activo', NULL)");
+                            $stmt_ins->bind_param("iiii", $estudiante_id, $id_mat, $val_seccion, $id_periodo);
+                            $stmt_ins->execute();
+                            $stmt_ins->close();
+                        } else {
+                            $stmt_up = $db->prepare("UPDATE estudiante_materias SET estatus = 'activo', id_seccion = ?, fecha_inscripcion = NOW() WHERE id_usuario = ? AND id_materia = ? AND id_periodo = ?");
+                            $stmt_up->bind_param("iiii", $val_seccion, $estudiante_id, $id_mat, $id_periodo);
+                            $stmt_up->execute();
+                            $stmt_up->close();
+                        }
+                        
+                        // Asegurar registro en notas_definitivas
+                        $stmt_not = $db->prepare("SELECT id FROM notas_definitivas WHERE id_usuario = ? AND id_materia = ? AND id_periodo = ?");
+                        $stmt_not->bind_param("iii", $estudiante_id, $id_mat, $id_periodo);
+                        $stmt_not->execute();
+                        $res_not = $stmt_not->get_result();
+                        $stmt_not->close();
+                        
+                        if ($res_not->num_rows == 0) {
+                            $col_tray = "trayecto_" . $trayecto_m;
+                            $stmt_ins_not = $db->prepare("INSERT INTO notas_definitivas (id_usuario, id_materia, id_periodo, fecha_registro, $col_tray) VALUES (?, ?, ?, NOW(), NULL)");
+                            $stmt_ins_not->bind_param("iii", $estudiante_id, $id_mat, $id_periodo);
+                            $stmt_ins_not->execute();
+                            $stmt_ins_not->close();
+                        }
+                    }
+                }
+            }
+        } elseif ($tipo === 'cambio_seccion') {
+            $seccion_dest = intval($solicitud['seccion_destino_id']);
+            if ($seccion_dest > 0) {
+                $stmt_cs1 = $db->prepare("UPDATE estudiante_seccion SET id_seccion = ?, fecha_inscripcion = CURDATE() WHERE id_usuario = ? AND estatus = 'activo'");
+                $stmt_cs1->bind_param("ii", $seccion_dest, $estudiante_id);
+                $stmt_cs1->execute();
+                $stmt_cs1->close();
+                
+                $stmt_cs2 = $db->prepare("UPDATE estudiante_materias SET id_seccion = ? WHERE id_usuario = ? AND id_periodo = ? AND estatus = 'activo'");
+                $stmt_cs2->bind_param("iii", $seccion_dest, $estudiante_id, $id_periodo);
+                $stmt_cs2->execute();
+                $stmt_cs2->close();
+            }
+        } elseif ($tipo === 'retiro_semestre') {
+            $stmt_rs = $db->prepare("UPDATE estudiante_materias SET estatus = 'retirada' WHERE id_usuario = ? AND id_periodo = ? AND estatus = 'activo'");
+            $stmt_rs->bind_param("ii", $estudiante_id, $id_periodo);
+            $stmt_rs->execute();
+            $stmt_rs->close();
+        } elseif ($tipo === 'cambio_carrera') {
+            $carrera_dest = intval($materias_data['carrera_destino_id'] ?? ($solicitud['carrera_destino_id'] ?? 0));
+            if ($carrera_dest > 0) {
+                $stmt_cc = $db->prepare("UPDATE users SET carrera = ? WHERE id = ?");
+                $stmt_cc->bind_param("ii", $carrera_dest, $estudiante_id);
+                $stmt_cc->execute();
+                $stmt_cc->close();
+            }
+        } elseif ($tipo === 'cambio_turno') {
+            $turno_dest = trim($materias_data['turno_destino'] ?? '');
+            if (!empty($turno_dest)) {
+                $stmt_ct = $db->prepare("UPDATE users SET turno = ? WHERE id = ?");
+                $stmt_ct->bind_param("si", $turno_dest, $estudiante_id);
+                $stmt_ct->execute();
+                $stmt_ct->close();
+            }
+        } elseif ($tipo === 'renuncia_cupo' || $tipo === 'constancia_retiro') {
+            $stmt_ren = $db->prepare("UPDATE users SET status = 0 WHERE id = ?");
+            $stmt_ren->bind_param("i", $estudiante_id);
+            $stmt_ren->execute();
+            $stmt_ren->close();
+            
+            $stmt_rm = $db->prepare("UPDATE estudiante_materias SET estatus = 'retirada' WHERE id_usuario = ? AND estatus = 'activo'");
+            $stmt_rm->bind_param("i", $estudiante_id);
+            $stmt_rm->execute();
+            $stmt_rm->close();
+        } elseif ($tipo === 'constancia_reincorporacion') {
+            $stmt_reinc = $db->prepare("UPDATE users SET status = 1 WHERE id = ?");
+            $stmt_reinc->bind_param("i", $estudiante_id);
+            $stmt_reinc->execute();
+            $stmt_reinc->close();
+        } elseif ($tipo === 'intensivo' || $tipo === 'evaluacion_extraordinaria') {
+            $mats = $materias_data['materias'] ?? [];
+            if (!empty($mats) && is_array($mats)) {
+                foreach ($mats as $m) {
+                    $m_id = is_array($m) ? intval($m['id']) : intval($m);
+                    if ($m_id > 0) {
+                        $stmt_mat = $db->prepare("INSERT INTO estudiante_materias (id_usuario, id_materia, id_periodo, fecha_inscripcion, estatus) VALUES (?, ?, ?, NOW(), 'activo') ON DUPLICATE KEY UPDATE estatus = 'activo'");
+                        $stmt_mat->bind_param("iii", $estudiante_id, $m_id, $id_periodo);
+                        $stmt_mat->execute();
+                        $stmt_mat->close();
+                    }
+                }
+            }
+        }
+        
+        // 2. Actualizar estado de la solicitud
+        $admin_id_val = intval($admin_id);
+        $obs_val = trim($observacion);
+        $stmt_app = $db->prepare("UPDATE solicitudes_academicas SET status = 'aprobada', procesado_por = ?, fecha_procesado = NOW(), observacion_admin = ? WHERE id = ?");
+        $stmt_app->bind_param("isi", $admin_id_val, $obs_val, $id_solicitud);
+        $stmt_app->execute();
+        $stmt_app->close();
+        
+        $db->commit();
+        return ['success' => true, 'message' => 'Solicitud aprobada y cambios académicos aplicados automáticamente con éxito.'];
+    } catch (Exception $e) {
+        $db->rollback();
+        return ['success' => false, 'message' => 'Error al procesar la aprobación: ' . $e->getMessage()];
+    }
+}
+
+/**
+ * Procesa el rechazo de una solicitud académica.
+ */
+function procesarRechazoSolicitudAcademica($id_solicitud, $admin_id, $motivo_rechazo, $observacion = '') {
+    global $db;
+    $id_solicitud = intval($id_solicitud);
+    $admin_id_val = intval($admin_id);
+    $motivo_val = mb_substr(trim($motivo_rechazo), 0, 100);
+    $obs_val = mb_substr(trim($observacion), 0, 100);
+    
+    if (empty($motivo_val)) {
+        return ['success' => false, 'message' => 'Debe especificar el motivo del rechazo.'];
+    }
+    
+    $stmt = $db->prepare("UPDATE solicitudes_academicas SET status = 'rechazada', procesado_por = ?, fecha_procesado = NOW(), motivo_rechazo = ?, observacion_admin = ? WHERE id = ?");
+    $stmt->bind_param("issi", $admin_id_val, $motivo_val, $obs_val, $id_solicitud);
+    if ($stmt->execute()) {
+        $stmt->close();
+        return ['success' => true, 'message' => 'La solicitud ha sido rechazada exitosamente.'];
+    }
+    $stmt->close();
+    return ['success' => false, 'message' => 'Error al rechazar la solicitud.'];
+}
+
+/**
+ * Cuenta las solicitudes pendientes.
+ */
+function contarSolicitudesPendientes() {
+    global $db;
+    $res = $db->query("SELECT COUNT(*) as total FROM solicitudes_academicas WHERE status = 'pendiente'");
+    if ($res && $row = $res->fetch_assoc()) {
+        return intval($row['total']);
+    }
+    return 0;
+}
+
+/**
+ * Cuenta las solicitudes pendientes de un estudiante específico.
+ */
+function contarSolicitudesPendientesEstudiante($estudiante_id) {
+    global $db;
+    $estudiante_id = intval($estudiante_id);
+    $res = $db->query("SELECT COUNT(*) as total FROM solicitudes_academicas WHERE estudiante_id = $estudiante_id AND status = 'pendiente'");
+    if ($res && $row = $res->fetch_assoc()) {
+        return intval($row['total']);
+    }
+    return 0;
+}
+
+/**
+ * Obtiene las materias que el estudiante tiene actualmente inscritas y activas.
+ */
+function obtenerMateriasInscritasParaRetiro($estudiante_id, $id_periodo = null) {
+    global $db;
+    $estudiante_id = intval($estudiante_id);
+    if (!$id_periodo) {
+        $periodo = obtenerPeriodoActivo($db);
+        $id_periodo = intval($periodo['id_periodo'] ?? 0);
+    }
+    
+    $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto, m.creditos as uc,
+                     em.id_inscripcion, em.fecha_inscripcion, em.estatus,
+                     COALESCE(s.codigo_seccion, 'Sin Sección') as nombre_seccion
+              FROM estudiante_materias em
+              INNER JOIN materias m ON em.id_materia = m.id_materia
+              LEFT JOIN secciones s ON em.id_seccion = s.id_seccion
+              WHERE em.id_usuario = ? AND (em.id_periodo = ? OR ? = 0) AND em.estatus = 'activo'
+              ORDER BY m.trayecto ASC, m.nombre_materia ASC";
+              
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("iii", $estudiante_id, $id_periodo, $id_periodo);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $materias = [];
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $materias[] = $row;
+        }
+    }
+    $stmt->close();
+    return $materias;
+}
+
+/**
+ * Obtiene las materias disponibles para que el estudiante pueda adicionar.
+ */
+function obtenerMateriasDisponiblesParaAdicion($estudiante_id, $id_carrera, $id_periodo = null) {
+    global $db;
+    $estudiante_id = intval($estudiante_id);
+    $id_carrera = intval($id_carrera);
+    if (!$id_periodo) {
+        $periodo = obtenerPeriodoActivo($db);
+        $id_periodo = intval($periodo['id_periodo'] ?? 0);
+    }
+    
+    // Obtener materias ya inscritas o aprobadas
+    $query_excluidas = "SELECT DISTINCT id_materia FROM estudiante_materias WHERE id_usuario = $estudiante_id AND (estatus = 'activo' OR nota_final >= 10) AND (id_periodo = $id_periodo OR $id_periodo = 0)
+                        UNION
+                        SELECT DISTINCT id_materia FROM notas_definitivas WHERE id_usuario = $estudiante_id AND (COALESCE(trayecto_0, 0) >= 10 OR COALESCE(trayecto_1, 0) >= 10 OR COALESCE(trayecto_2, 0) >= 10 OR COALESCE(trayecto_3, 0) >= 10 OR COALESCE(trayecto_4, 0) >= 10)";
+    $res_exc = $db->query($query_excluidas);
+    $excluidas = [];
+    if ($res_exc) {
+        while ($r = $res_exc->fetch_assoc()) {
+            $excluidas[] = intval($r['id_materia']);
+        }
+    }
+    
+    $where_not_in = !empty($excluidas) ? " AND m.id_materia NOT IN (" . implode(',', $excluidas) . ")" : "";
+    
+    $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto, m.creditos as uc
+              FROM carrera_materia cm
+              INNER JOIN materias m ON cm.id_materia = m.id_materia
+              WHERE cm.id_carrera = ? $where_not_in
+              ORDER BY m.trayecto ASC, m.nombre_materia ASC";
+              
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("i", $id_carrera);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $disponibles = [];
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $disponibles[] = $row;
+        }
+    }
+    $stmt->close();
+    return $disponibles;
+}
+
+/**
+ * Obtiene las carreras disponibles para cambio de carrera
+ */
+function obtenerCarrerasParaCambio($id_carrera_actual = 0) {
+    global $db;
+    $id_carrera_actual = intval($id_carrera_actual);
+    $res = $db->query("SELECT id_carrera, nombre_carrera, cod_carrera FROM carreras WHERE id_carrera > 0 AND id_carrera != $id_carrera_actual ORDER BY nombre_carrera ASC");
+    $carreras = [];
+    if ($res) {
+        while ($r = $res->fetch_assoc()) {
+            $carreras[] = $r;
+        }
+    }
+    return $carreras;
+}
