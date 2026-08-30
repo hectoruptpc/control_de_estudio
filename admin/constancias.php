@@ -348,11 +348,7 @@ include("includes/head.php");
             </h4>
             <p class="text-muted small mb-0">Escribe el nombre o cédula para buscar al estudiante en tiempo real y tramitar o emitir sus constancias.</p>
         </div>
-        <div>
-            <a href="estudiantes.php" class="btn btn-outline-secondary btn-sm shadow-sm font-weight-bold">
-                <i class="fas fa-users mr-1"></i> Lista de Estudiantes
-            </a>
-        </div>
+        
     </div>
 
     <?php if (!empty($mensaje)): ?>
