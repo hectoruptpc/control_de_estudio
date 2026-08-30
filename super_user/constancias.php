@@ -486,23 +486,21 @@ include("includes/head.php");
                                             <!-- 1. Constancia de Inscripción o Estudios (Descarga Directa) -->
                                             <?php if ($estudiante['trayecto_n'] == 0): ?>
                                                 <div class="col-sm-6 mb-2">
-                                                    <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
-                                                        <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
-                                                        <input type="hidden" name="tipo" value="inscripcion">
-                                                        <button type="submit" class="btn btn-outline-primary btn-block text-left font-weight-bold">
-                                                            <i class="fas fa-file-invoice mr-1 text-primary"></i> Constancia de Inscripción
-                                                        </button>
-                                                    </form>
+                                                    <button type="button" class="btn btn-outline-primary btn-block text-left font-weight-bold btn-abrir-pdf-directo"
+                data-id="<?php echo $estudiante['id']; ?>"
+                data-tipo="inscripcion"
+                data-titulo="CONSTANCIA DE INSCRIPCIÓN">
+            <i class="fas fa-file-invoice mr-1 text-primary"></i> Constancia de Inscripción
+        </button>
                                                 </div>
                                             <?php else: ?>
                                                 <div class="col-sm-6 mb-2">
-                                                    <form method="POST" action="../constancias/generar_constancia.php" target="_blank">
-                                                        <input type="hidden" name="id" value="<?php echo $estudiante['id']; ?>">
-                                                        <input type="hidden" name="tipo" value="estudios">
-                                                        <button type="submit" class="btn btn-outline-primary btn-block text-left font-weight-bold">
-                                                            <i class="fas fa-user-graduate mr-1 text-primary"></i> Constancia de Estudios
-                                                        </button>
-                                                    </form>
+                                                    <button type="button" class="btn btn-outline-primary btn-block text-left font-weight-bold btn-abrir-pdf-directo"
+                data-id="<?php echo $estudiante['id']; ?>"
+                data-tipo="estudios"
+                data-titulo="CONSTANCIA DE ESTUDIOS">
+            <i class="fas fa-user-graduate mr-1 text-primary"></i> Constancia de Estudios
+        </button>
                                                 </div>
                                             <?php endif; ?>
 
@@ -680,12 +678,12 @@ include("includes/head.php");
                                                                         </button>
 
                                                                         <!-- Comprobante PDF (POST) -->
-                                                                        <form method="POST" action="../constancias/generar_constancia.php" target="_blank" class="d-inline">
-                                                                            <input type="hidden" name="solicitud_id" value="<?php echo $s['id']; ?>">
-                                                                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Ver PDF">
-                                                                                <i class="fas fa-file-pdf text-danger"></i>
-                                                                            </button>
-                                                                        </form>
+                                                                        <button type="button" class="btn btn-outline-secondary btn-sm btn-ver-pdf-solicitud" 
+                data-solicitud-id="<?php echo $s['id']; ?>" 
+                data-titulo="COMPROBANTE DE TRÁMITE #<?php echo $s['id']; ?>" 
+                title="Ver Comprobante PDF en Modal">
+            <i class="fas fa-file-pdf text-danger"></i>
+        </button>
 
                                                                         <?php if ($s['status'] === 'pendiente'): ?>
                                                                             <!-- Aprobar -->
@@ -1388,20 +1386,6 @@ include("includes/head.php");
 </div>
 
 <!-- Formulario automático para abrir PDF generado en nueva pestaña -->
-<?php if ($solicitud_pdf_popup_id > 0): ?>
-    <form id="formAutoPdfPopup" method="POST" action="../constancias/generar_constancia.php" target="_blank" style="display: none;">
-        <input type="hidden" name="solicitud_id" value="<?php echo $solicitud_pdf_popup_id; ?>">
-    </form>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var formPdf = document.getElementById('formAutoPdfPopup');
-            if (formPdf) {
-                formPdf.submit();
-            }
-        });
-    </script>
-<?php endif; ?>
-
 <!-- ========================================================================= -->
 <!-- MODALES INTERACTIVOS DE DETALLE, APROBACIÓN Y RECHAZO -->
 <!-- ========================================================================= -->
@@ -1422,12 +1406,9 @@ include("includes/head.php");
                 <!-- Se llena dinámicamente vía JS -->
             </div>
             <div class="modal-footer bg-light d-flex justify-content-between">
-                <form method="POST" action="../constancias/generar_constancia.php" target="_blank" id="formPdfModalDetalle">
-                    <input type="hidden" name="solicitud_id" id="modal_detalle_solicitud_id" value="">
-                    <button type="submit" class="btn btn-outline-danger font-weight-bold">
-                        <i class="fas fa-file-pdf mr-1"></i> Ver Comprobante PDF
-                    </button>
-                </form>
+                <button type="button" class="btn btn-outline-danger font-weight-bold btn-modal-detalle-pdf" id="btnModalDetalleVerPdf">
+            <i class="fas fa-file-pdf mr-1"></i> Ver Comprobante PDF
+        </button>
                 <button type="button" class="btn btn-secondary font-weight-bold" data-dismiss="modal">Cerrar</button>
             </div>
         </div>
@@ -1526,6 +1507,134 @@ include("includes/head.php");
 </div>
 
 <script>
+
+
+let currentPdfBlobUrl = null;
+
+function mostrarPDFEnModal(params, titulo) {
+    titulo = titulo || 'DOCUMENTO OFICIAL';
+    const modalEl = $('#modalVisualizadorPDF');
+    const iframe = document.getElementById('iframeVisualizadorPDF');
+    const spinner = document.getElementById('spinnerCargandoPDF');
+    const tituloEl = document.getElementById('tituloVisualizadorPDF');
+    const btnDescargar = document.getElementById('btnDescargarPDFModal');
+
+    if (tituloEl) tituloEl.textContent = titulo;
+    if (spinner) {
+        spinner.style.display = 'flex';
+        spinner.innerHTML = `
+            <div class="spinner-border text-primary mb-3" style="width: 3.5rem; height: 3.5rem;" role="status">
+                <span class="sr-only">Cargando...</span>
+            </div>
+            <h6 class="font-weight-bold text-dark text-uppercase">Generando documento oficial en PDF...</h6>
+            <small class="text-muted">Por favor espera un momento mientras se procesa.</small>
+        `;
+    }
+    if (iframe) iframe.src = 'about:blank';
+    
+    if (currentPdfBlobUrl) {
+        URL.revokeObjectURL(currentPdfBlobUrl);
+        currentPdfBlobUrl = null;
+    }
+
+    modalEl.modal('show');
+
+    const formData = new FormData();
+    for (const key in params) {
+        if (params[key] !== undefined && params[key] !== null) {
+            formData.append(key, params[key]);
+        }
+    }
+
+    fetch('../constancias/generar_constancia.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(async response => {
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || ('Error en el servidor (' + response.status + ')'));
+        }
+        const blob = await response.blob();
+        if (blob.size === 0) {
+            throw new Error('El documento recibido está vacío.');
+        }
+        return blob;
+    })
+    .then(blob => {
+        const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+        currentPdfBlobUrl = URL.createObjectURL(pdfBlob);
+        
+        if (iframe) {
+            iframe.onload = function() {
+                if (spinner) spinner.style.display = 'none';
+            };
+            iframe.src = currentPdfBlobUrl;
+        }
+        
+        // Timeout de seguridad para ocultar spinner en todos los navegadores
+        setTimeout(function() {
+            if (spinner) spinner.style.display = 'none';
+        }, 500);
+
+        if (btnDescargar) {
+            btnDescargar.href = currentPdfBlobUrl;
+            btnDescargar.download = (titulo.replace(/[^a-zA-Z0-9_-]/g, '_') || 'documento') + '.pdf';
+        }
+    })
+    .catch(error => {
+        console.error('Error al generar PDF:', error);
+        if (spinner) {
+            spinner.innerHTML = `
+                <div class="text-center p-4">
+                    <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
+                    <h5 class="font-weight-bold text-danger">No se pudo cargar el documento</h5>
+                    <p class="text-muted small mb-3">${error.message || 'No se pudo generar el PDF solicitado.'}</p>
+                    <button type="button" class="btn btn-secondary font-weight-bold" data-dismiss="modal">Cerrar</button>
+                </div>
+            `;
+        }
+    });
+}
+
+// Delegación de eventos global
+document.addEventListener('click', function(e) {
+    // 1. Botones directos de constancias
+    const btnDirecto = e.target.closest('.btn-abrir-pdf-directo');
+    if (btnDirecto) {
+        e.preventDefault();
+        const id = btnDirecto.getAttribute('data-id');
+        const tipo = btnDirecto.getAttribute('data-tipo');
+        const titulo = btnDirecto.getAttribute('data-titulo') || 'CONSTANCIA';
+        const params = { tipo: tipo };
+        if (id) params.id = id;
+        mostrarPDFEnModal(params, titulo);
+        return;
+    }
+
+    // 2. Botones de la tabla de historial de solicitudes
+    const btnSol = e.target.closest('.btn-ver-pdf-solicitud');
+    if (btnSol) {
+        e.preventDefault();
+        const solId = btnSol.getAttribute('data-solicitud-id');
+        const titulo = btnSol.getAttribute('data-titulo') || ('COMPROBANTE #' + solId);
+        mostrarPDFEnModal({ solicitud_id: solId }, titulo);
+        return;
+    }
+
+    // 3. Botón Imprimir en modal
+    const btnImp = e.target.closest('#btnImprimirPDFModal');
+    if (btnImp) {
+        e.preventDefault();
+        const iframe = document.getElementById('iframeVisualizadorPDF');
+        if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+        }
+        return;
+    }
+});
+
 document.addEventListener('DOMContentLoaded', function() {
     // Contador de caracteres para rechazo
     var rechazoTextarea = document.getElementById('motivo_rechazo_textarea');
@@ -1813,6 +1922,90 @@ document.addEventListener('DOMContentLoaded', function() {
             $('#modalRechazarSolicitud').modal('show');
         });
     });
+});
+</script>
+
+
+
+
+<!-- ========================================================================= -->
+<!-- MODAL VISUALIZADOR DE PDF SIMPLE Y DIRECTO EN LA MISMA PÁGINA -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="modalVisualizadorPDF" tabindex="-1" role="dialog" aria-labelledby="modalVisualizadorPDFLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered" style="max-width: 90vw; height: 90vh;" role="document">
+        <div class="modal-content shadow-lg border-0 h-100" style="border-radius: 8px; overflow: hidden;">
+            <div class="modal-header bg-dark text-white py-2 px-3 d-flex justify-content-between align-items-center">
+                <h5 class="modal-title font-weight-bold text-uppercase mb-0" id="tituloVisualizadorPDF" style="font-size: 0.95rem;">
+                    <i class="fas fa-file-pdf text-danger mr-2"></i> DOCUMENTO OFICIAL
+                </h5>
+                <div>
+                    <a id="btnAbrirNuevaPestanaPDF" href="#" target="_blank" class="btn btn-sm btn-outline-light mr-2 font-weight-bold">
+                        <i class="fas fa-external-link-alt mr-1"></i> Abrir en ventana
+                    </a>
+                    <button type="button" class="btn btn-sm btn-danger font-weight-bold px-3" data-dismiss="modal">
+                        <i class="fas fa-times mr-1"></i> Cerrar
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body p-0 bg-secondary" style="height: calc(90vh - 50px);">
+                <iframe id="iframeVisualizadorPDF" src="" class="w-100 h-100 border-0" style="background-color: #525659;"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function abrirModalPDF(url, titulo) {
+    titulo = titulo || 'DOCUMENTO OFICIAL';
+    var titEl = document.getElementById('tituloVisualizadorPDF');
+    var btnExt = document.getElementById('btnAbrirNuevaPestanaPDF');
+    var iframe = document.getElementById('iframeVisualizadorPDF');
+
+    if (titEl) titEl.innerHTML = '<i class="fas fa-file-pdf text-danger mr-2"></i> ' + titulo;
+    if (btnExt) btnExt.href = url;
+    if (iframe) iframe.src = url;
+
+    $('#modalVisualizadorPDF').modal('show');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Limpiar iframe al cerrar modal
+    $('#modalVisualizadorPDF').on('hidden.bs.modal', function () {
+        var iframe = document.getElementById('iframeVisualizadorPDF');
+        if (iframe) iframe.src = '';
+    });
+
+    // 1. Botones directos de constancias (Inscripción / Estudios)
+    document.querySelectorAll('.btn-abrir-pdf-directo').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var tipo = this.getAttribute('data-tipo');
+            var id = this.getAttribute('data-id');
+            var titulo = this.getAttribute('data-titulo') || 'CONSTANCIA';
+            var url = '../constancias/generar_constancia.php?tipo=' + encodeURIComponent(tipo);
+            if (id) {
+                url += '&id=' + encodeURIComponent(id);
+            }
+            abrirModalPDF(url, titulo);
+        });
+    });
+
+    // 2. Botones de la tabla de historial de solicitudes
+    document.querySelectorAll('.btn-ver-pdf-solicitud').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var solId = this.getAttribute('data-solicitud-id');
+            var titulo = this.getAttribute('data-titulo') || ('COMPROBANTE #' + solId);
+            var url = '../constancias/generar_constancia.php?solicitud_id=' + encodeURIComponent(solId);
+            abrirModalPDF(url, titulo);
+        });
+    });
+
+    // 3. Disparador automático si viene de registro reciente
+    <?php if (!empty($solicitud_pdf_popup_id) && $solicitud_pdf_popup_id > 0): ?>
+        var urlAuto = '../constancias/generar_constancia.php?solicitud_id=<?php echo $solicitud_pdf_popup_id; ?>';
+        abrirModalPDF(urlAuto, 'COMPROBANTE DE TRÁMITE #<?php echo $solicitud_pdf_popup_id; ?>');
+    <?php endif; ?>
 });
 </script>
 

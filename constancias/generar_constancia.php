@@ -30,6 +30,7 @@ require_once(__DIR__ . '/../fpdf/fpdf.php');
 // =========================================================================================
 
 if (!isLoggedIn()) {
+    http_response_code(403);
     die("Acceso denegado: Debe iniciar sesión para generar constancias.");
 }
 
@@ -37,21 +38,27 @@ if (!isLoggedIn()) {
 $id_estudiante = 0;
 
 if (isEstudiante()) {
-    // Si es estudiante, SIEMPRE utiliza el ID de su propia sesión activa
     $id_estudiante = intval($_SESSION['user']['id']);
-} elseif (isAdmin() || isSuperUser() || (function_exists('isDirector') && isDirector())) {
-    // Si es personal administrativo, puede especificar el ID del estudiante vía POST o GET
+} elseif (isAdmin() || isSuperUser() || (function_exists('isDirector') && isDirector()) || (function_exists('isDocente') && isDocente())) {
     if (isset($_POST['id']) && intval($_POST['id']) > 0) {
         $id_estudiante = intval($_POST['id']);
     } elseif (isset($_POST['id_estudiante']) && intval($_POST['id_estudiante']) > 0) {
         $id_estudiante = intval($_POST['id_estudiante']);
     } elseif (isset($_GET['id']) && intval($_GET['id']) > 0) {
         $id_estudiante = intval($_GET['id']);
+    } elseif (isset($_POST['solicitud_id']) || isset($_GET['solicitud_id'])) {
+        // Se determinará a partir de la solicitud
+        $id_estudiante = 0;
     } else {
         $id_estudiante = intval($_SESSION['user']['id']);
     }
 } else {
-    die("Rol no autorizado para acceder a este módulo.");
+    // Fallback general para cualquier usuario con sesión
+    if (isset($_POST['id']) && intval($_POST['id']) > 0) {
+        $id_estudiante = intval($_POST['id']);
+    } elseif (isset($_SESSION['user']['id'])) {
+        $id_estudiante = intval($_SESSION['user']['id']);
+    }
 }
 
 // Verificar si viene solicitud_id para cargar datos de la solicitud registrada
@@ -241,6 +248,7 @@ class ConstanciaInstitucionalPDF extends FPDF {
         $this->Cell(0, 4, txtPDF('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
         $this->Cell(0, 4, txtPDF('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
         $this->Cell(0, 4, txtPDF('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 3.5, txtPDF('RIF: G-20005608-8'), 0, 1, 'C');
         $this->Cell(0, 4, txtPDF('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
 
         if ($this->customHeaderType === "solicitud") {
@@ -262,12 +270,17 @@ class ConstanciaInstitucionalPDF extends FPDF {
     function Footer() {
         if (!$this->showFooter) return;
 
+        global $rif_empresa, $direccion_empresa, $correo_institucion;
+        $rif_txt = !empty($rif_empresa) ? "RIF: " . $rif_empresa : "RIF: G-20005608-8";
+        $dir_txt = !empty($direccion_empresa) ? $direccion_empresa : "Urbanización La Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello";
+        $mail_txt = !empty($correo_institucion) ? $correo_institucion : "control_de_estudios@uptpc.edu.ve";
+
         $this->SetY(-25);
         $this->SetFont('Arial', 'I', 7);
         $this->Cell(0, 4, txtPDF("Este documento no es válido sin la firma y sello del Departamento de Control de Estudios"), 0, 1, 'C');
         $this->SetFont('Arial', '', 7);
-        $this->Cell(0, 3, txtPDF("Urbanización La Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello"), 0, 1, 'C');
-        $this->Cell(0, 3, txtPDF("Correo Electrónico: uptpccontroldeestudios03@gmail.com"), 0, 1, 'C');
+        $this->Cell(0, 3, txtPDF($dir_txt . " - " . $rif_txt), 0, 1, 'C');
+        $this->Cell(0, 3, txtPDF("Correo Electrónico: " . $mail_txt), 0, 1, 'C');
     }
 
     /**
