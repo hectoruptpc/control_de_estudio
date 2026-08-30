@@ -6,7 +6,7 @@ ini_set('display_startup_errors', '1');
 
 
 $titulo ="Ingreso al Sistema";
-include('funciones/functions.php');
+require_once('funciones/functions.php');
 
 $mostrarPreinscripcion = obtenerConfiguracionSecretaria('mostrar_preinscripcion', '1');
 $mostrarProsecucion = obtenerConfiguracionSecretaria('mostrar_prosecucion', '1');

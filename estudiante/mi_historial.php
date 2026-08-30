@@ -93,12 +93,13 @@ function obtenerInfoTrayecto($numero_trayecto) {
 }
 }
 
-// Función para obtener las notas APROBADAS del estudiante
+// Función para obtener las notas del estudiante
 if (!function_exists('obtenerNotasEstudianteTrimestres')) {
 function obtenerNotasEstudianteTrimestres($estudiante_id) {
     global $db;
     
     $notas = [];
+    $estudiante_id = intval($estudiante_id);
     
     $query = "SELECT 
                 nt.id_materia,
@@ -122,8 +123,8 @@ function obtenerNotasEstudianteTrimestres($estudiante_id) {
     $result = $stmt->get_result();
     
     while ($row = $result->fetch_assoc()) {
-        $materia_id = $row['id_materia'];
-        $trimestre = $row['trimestre_num'];
+        $materia_id = intval($row['id_materia']);
+        $trimestre = intval($row['trimestre_num']);
         
         if (!isset($notas[$materia_id])) {
             $notas[$materia_id] = [
@@ -131,22 +132,23 @@ function obtenerNotasEstudianteTrimestres($estudiante_id) {
                 'trimestre_2' => null,
                 'trimestre_3' => null,
                 'nota_final' => null,
-                'nombre_periodo' => $row['nombre_periodo'],
-                'fecha_registro' => $row['fecha_registro'],
-                'nombre_admin' => $row['nombre_admin'],
+                'nombre_periodo' => $row['nombre_periodo'] ?? '',
+                'fecha_registro' => $row['fecha_registro'] ?? '',
+                'nombre_admin' => $row['nombre_admin'] ?? '',
                 'estado' => $row['estado']
             ];
         }
         
         $notas[$materia_id]["trimestre_$trimestre"] = $row['nota'];
     }
+    $stmt->close();
     
     foreach ($notas as $materia_id => $nota_data) {
         $suma = 0;
         $count = 0;
         for ($i = 1; $i <= 3; $i++) {
             if ($nota_data["trimestre_$i"] !== null && $nota_data["trimestre_$i"] > 0) {
-                $suma += $nota_data["trimestre_$i"];
+                $suma += floatval($nota_data["trimestre_$i"]);
                 $count++;
             }
         }
@@ -154,6 +156,39 @@ function obtenerNotasEstudianteTrimestres($estudiante_id) {
             $notas[$materia_id]['nota_final'] = round($suma / $count, 1);
         }
     }
+    
+    // Consultar notas definitivas
+    $query_nd = "SELECT nd.*, m.trayecto, pa.nombre_periodo 
+                 FROM notas_definitivas nd
+                 INNER JOIN materias m ON nd.id_materia = m.id_materia
+                 LEFT JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+                 WHERE nd.id_usuario = ?";
+    $stmt_nd = $db->prepare($query_nd);
+    $stmt_nd->bind_param("i", $estudiante_id);
+    $stmt_nd->execute();
+    $res_nd = $stmt_nd->get_result();
+    while ($row_nd = $res_nd->fetch_assoc()) {
+        $materia_id = intval($row_nd['id_materia']);
+        $tray = intval($row_nd['trayecto']);
+        $col = "trayecto_" . $tray;
+        $nota_def = isset($row_nd[$col]) && $row_nd[$col] !== null ? floatval($row_nd[$col]) : null;
+        
+        if (!isset($notas[$materia_id])) {
+            $notas[$materia_id] = [
+                'trimestre_1' => null,
+                'trimestre_2' => null,
+                'trimestre_3' => null,
+                'nota_final' => $nota_def,
+                'nombre_periodo' => $row_nd['nombre_periodo'] ?? '',
+                'fecha_registro' => $row_nd['fecha_registro'] ?? '',
+                'nombre_admin' => 'Control de Estudios',
+                'estado' => ($nota_def !== null ? ($nota_def >= 12 ? 'aprobada' : 'reprobada') : 'en_curso')
+            ];
+        } elseif ($notas[$materia_id]['nota_final'] === null && $nota_def !== null) {
+            $notas[$materia_id]['nota_final'] = $nota_def;
+        }
+    }
+    $stmt_nd->close();
     
     return $notas;
 }

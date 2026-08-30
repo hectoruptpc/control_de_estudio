@@ -1,18 +1,25 @@
 <?php
 // Función para contar mensajes no leídos
-function contarMensajesNoLeidos($user_id) {
-    global $db;
-    
-    $query = "SELECT COUNT(*) as total 
-              FROM mensajeria 
-              WHERE id_usuario_destinatario = ? 
-              AND leido = FALSE 
-              AND eliminado_destinatario = FALSE";
-    $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->fetch_assoc()['total'];
+if (!function_exists('contarMensajesNoLeidos')) {
+    function contarMensajesNoLeidos($user_id) {
+        global $db;
+        $user_id = intval($user_id);
+        if ($user_id <= 0) return 0;
+        
+        $query = "SELECT COUNT(*) as total 
+                  FROM mensajeria 
+                  WHERE id_usuario_destinatario = ? 
+                  AND leido = 0 
+                  AND eliminado_destinatario = 0";
+        $stmt = $db->prepare($query);
+        if (!$stmt) return 0;
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result ? $result->fetch_assoc() : null;
+        $stmt->close();
+        return $row ? intval($row['total']) : 0;
+    }
 }
 
 // Contar mensajes no leídos para el usuario actual
@@ -188,6 +195,13 @@ if (isset($_SESSION['user']['id'])) {
             <li class="nav-item">
               <a title="Constancias y Solicitudes" class="nav-link" href="mis_constancias.php">
                 <i class="fas fa-file-alt fa-fw"></i> Solicitudes
+              </a>
+            </li>
+
+            <!-- OPCIÓN: DECLARAR PAGOS -->
+            <li class="nav-item">
+              <a title="Declarar Pagos y Aranceles" class="nav-link" href="declarar_pago.php">
+                <i class="fas fa-money-bill-wave fa-fw"></i> Declarar Pagos
               </a>
             </li>
 

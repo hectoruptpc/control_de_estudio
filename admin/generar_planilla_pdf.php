@@ -30,7 +30,19 @@ foreach ($carreras as $carrera) $carreraMap[$carrera['id']] = $carrera['nombre']
 $titulos = !empty($preinscripcion['titulos']) ? explode('|||', $preinscripcion['titulos']) : [];
 $institutos = !empty($preinscripcion['institutos']) ? explode('|||', $preinscripcion['institutos']) : [];
 
-function txt($texto) { return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto); }
+if (!function_exists('txt')) {
+    function txt($texto) {
+        if (function_exists('formatearTextoPDF')) return formatearTextoPDF($texto);
+        if ($texto === null || $texto === '') return '';
+        if (function_exists('iconv')) {
+            $c = @iconv('UTF-8', 'ISO-8859-1//TRANSLIT', (string)$texto);
+            if ($c !== false) return $c;
+        }
+        if (function_exists('mb_convert_encoding')) return mb_convert_encoding((string)$texto, 'ISO-8859-1', 'UTF-8');
+        if (function_exists('utf8_decode')) return utf8_decode((string)$texto);
+        return (string)$texto;
+    }
+}
 
 function convertirImagenAJPG($rutaOrigen, $extension) {
     $img = null;

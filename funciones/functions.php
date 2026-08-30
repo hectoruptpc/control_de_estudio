@@ -9,6 +9,64 @@ if (session_status() === PHP_SESSION_NONE) {
 // se resuelvan contra la carpeta /funciones en sistemas case-sensitive
 chdir(__DIR__);
 
+// ==============================================================================
+// COMPATIBILIDAD MULTIPLATAFORMA (WINDOWS / LINUX) - POLYFILL ICONV Y FORMATEO PDF
+// ==============================================================================
+if (!function_exists('iconv')) {
+    function iconv($from_encoding, $to_encoding, $string) {
+        if ($string === null || $string === '') return '';
+        $clean_to = strtoupper(preg_replace('/(\/\/TRANSLIT|\/\/IGNORE)$/i', '', trim((string)$to_encoding)));
+        $clean_from = strtoupper(trim((string)$from_encoding));
+        
+        if (function_exists('mb_convert_encoding')) {
+            $res = @mb_convert_encoding($string, $clean_to, $clean_from);
+            if ($res !== false) return $res;
+        }
+        
+        if (in_array($clean_to, ['ISO-8859-1', 'LATIN1', 'WINDOWS-1252']) && in_array($clean_from, ['UTF-8', 'UTF8'])) {
+            if (function_exists('utf8_decode')) {
+                return utf8_decode($string);
+            }
+        } elseif (in_array($clean_from, ['ISO-8859-1', 'LATIN1', 'WINDOWS-1252']) && in_array($clean_to, ['UTF-8', 'UTF8'])) {
+            if (function_exists('utf8_encode')) {
+                return utf8_encode($string);
+            }
+        }
+        
+        return $string;
+    }
+}
+
+if (!function_exists('formatearTextoPDF')) {
+    function formatearTextoPDF($texto) {
+        if ($texto === null || $texto === '') return '';
+        $texto = (string)$texto;
+        if (function_exists('iconv')) {
+            $conv = @iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $texto);
+            if ($conv !== false) return $conv;
+        }
+        if (function_exists('mb_convert_encoding')) {
+            return mb_convert_encoding($texto, 'ISO-8859-1', 'UTF-8');
+        }
+        if (function_exists('utf8_decode')) {
+            return utf8_decode($texto);
+        }
+        return $texto;
+    }
+}
+
+if (!function_exists('txtPDF')) {
+    function txtPDF($texto) {
+        return formatearTextoPDF($texto);
+    }
+}
+
+if (!function_exists('txt')) {
+    function txt($texto) {
+        return formatearTextoPDF($texto);
+    }
+}
+
     include('variables.php');
     require_once('conexion.php');
     include('cabecera_footer.php');
@@ -72,18 +130,12 @@ chdir(__DIR__);
         }
     }
 
-// Función para decodificar y devolver la URL
-function g($v) {
-    return base64_decode($v);
+// Configuración institucional y decodificación
+if (!function_exists('g')) {
+    function g($v) {
+        return is_string($v) ? base64_decode($v) : '';
+    }
 }
-
-// Asignación de las URLs decodificadas
-$github_file_url = g($a);
-$github_sin_acceso = g($b);
-$oa = g($oa);
-$ob = g($ob);
-$oc = g($oc);
-$od = g($od);
 
 
 // Función para leer el contenido del archivo
@@ -9557,6 +9609,7 @@ function obtenerMateriasAprobadasPorTrayecto($id_usuario, $trayecto) {
 
 /**
  * Obtener materias disponibles para inscripción individual
+ * Incluye materias del trayecto actual y materias pendientes/reprobadas de trayectos anteriores
  */
 function obtenerMateriasDisponiblesIndividual($id_usuario, $trayecto, $id_carrera) {
     global $db;
@@ -9566,32 +9619,137 @@ function obtenerMateriasDisponiblesIndividual($id_usuario, $trayecto, $id_carrer
         return [];
     }
     
-    $id_periodo = $periodo['id_periodo'];
+    $id_periodo = intval($periodo['id_periodo']);
+    $id_usuario = intval($id_usuario);
+    $id_carrera = intval($id_carrera);
+    $trayecto = intval($trayecto);
     
+    // Obtener todas las materias activas de la carrera hasta el trayecto de inscripción
     $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia, m.creditos, m.trayecto, m.es_proyecto_socio as es_proyecto
               FROM materias m
               INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
-              WHERE cm.id_carrera = $id_carrera 
-              AND m.trayecto = $trayecto
+              WHERE cm.id_carrera = ? 
+              AND m.trayecto <= ?
               AND m.activa = 1
-              AND m.id_materia NOT IN (
-                  SELECT n.id_materia 
-                  FROM notas_definitivas n
-                  WHERE n.id_usuario = $id_usuario 
-                  AND n.id_periodo = $id_periodo
-              )
-              ORDER BY m.cod_materia";
+              ORDER BY m.trayecto ASC, m.cod_materia ASC";
     
-    $result = $db->query($query);
-    $materias = [];
-    
-    if ($result) {
-        while ($row = $result->fetch_assoc()) {
-            $materias[] = $row;
-        }
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error al preparar consulta obtenerMateriasDisponiblesIndividual: " . $db->error);
+        return [];
     }
     
-    return $materias;
+    $stmt->bind_param("ii", $id_carrera, $trayecto);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $materias_disponibles = [];
+    
+    while ($m = $result->fetch_assoc()) {
+        $id_materia = intval($m['id_materia']);
+        $es_proyecto = !empty($m['es_proyecto']);
+        $nota_minima = $es_proyecto ? 16 : 12;
+        $m_trayecto = intval($m['trayecto']);
+        
+        // 1. Verificar si ya fue APROBADA en algún período anterior
+        $query_aprobada = "SELECT n.id, n.trayecto_0, n.trayecto_1, n.trayecto_2, n.trayecto_3, n.trayecto_4, n.id_periodo, p.nombre_periodo 
+                           FROM notas_definitivas n
+                           LEFT JOIN periodos_academicos p ON n.id_periodo = p.id_periodo
+                           WHERE n.id_usuario = ? AND n.id_materia = ?";
+        $stmt_ap = $db->prepare($query_aprobada);
+        $stmt_ap->bind_param("ii", $id_usuario, $id_materia);
+        $stmt_ap->execute();
+        $res_ap = $stmt_ap->get_result();
+        
+        $esta_aprobada = false;
+        $nota_anterior = null;
+        $veces_inscrita = 0;
+        $periodo_anterior = null;
+        
+        while ($row_ap = $res_ap->fetch_assoc()) {
+            $veces_inscrita++;
+            $col = "trayecto_" . $m_trayecto;
+            $nota_def = isset($row_ap[$col]) && $row_ap[$col] !== null ? floatval($row_ap[$col]) : null;
+            if ($nota_def !== null) {
+                $nota_anterior = $nota_def;
+                $periodo_anterior = $row_ap['nombre_periodo'] ?? '';
+                if ($nota_def >= $nota_minima) {
+                    $esta_aprobada = true;
+                }
+            }
+        }
+        $stmt_ap->close();
+        
+        // También verificar en notas_trimestres si tiene trimestres aprobados
+        if (!$esta_aprobada) {
+            $q_trim = "SELECT AVG(nota) as promedio, COUNT(*) as cant FROM notas_trimestres WHERE id_usuario = ? AND id_materia = ? AND estado = 'aprobada'";
+            $stmt_tr = $db->prepare($q_trim);
+            if ($stmt_tr) {
+                $stmt_tr->bind_param("ii", $id_usuario, $id_materia);
+                $stmt_tr->execute();
+                $res_tr = $stmt_tr->get_result()->fetch_assoc();
+                $stmt_tr->close();
+                if ($res_tr && $res_tr['cant'] >= 3 && floatval($res_tr['promedio']) >= $nota_minima) {
+                    $esta_aprobada = true;
+                    $nota_anterior = round(floatval($res_tr['promedio']), 1);
+                } elseif ($res_tr && $res_tr['cant'] > 0) {
+                    $veces_inscrita++;
+                }
+            }
+        }
+        
+        // Si ya está aprobada, NO debe aparecer como disponible para inscribir
+        if ($esta_aprobada) {
+            continue;
+        }
+        
+        // 2. Verificar si YA está inscrita en el período activo actual
+        $ya_inscrita = false;
+        $q_act = "SELECT id_inscripcion FROM estudiante_materias WHERE id_usuario = ? AND id_materia = ? AND id_periodo = ? AND estatus = 'activo'";
+        $stmt_act = $db->prepare($q_act);
+        if ($stmt_act) {
+            $stmt_act->bind_param("iii", $id_usuario, $id_materia, $id_periodo);
+            $stmt_act->execute();
+            if ($stmt_act->get_result()->num_rows > 0) {
+                $ya_inscrita = true;
+            }
+            $stmt_act->close();
+        }
+        
+        if (!$ya_inscrita) {
+            $q_act2 = "SELECT id FROM notas_definitivas WHERE id_usuario = ? AND id_materia = ? AND id_periodo = ?";
+            $stmt_act2 = $db->prepare($q_act2);
+            if ($stmt_act2) {
+                $stmt_act2->bind_param("iii", $id_usuario, $id_materia, $id_periodo);
+                $stmt_act2->execute();
+                if ($stmt_act2->get_result()->num_rows > 0) {
+                    $ya_inscrita = true;
+                }
+                $stmt_act2->close();
+            }
+        }
+        
+        // 3. Determinar el tipo de inscripción:
+        //    - NUEVA: Primera vez que la ve
+        //    - REINSCRIPCIÓN (REPITIENTE): Ya la cursó previamente y no la aprobó
+        //    - ARRASTRE: Pertenece a un trayecto anterior al actual de inscripción
+        $es_repitiente = ($veces_inscrita > 0 || ($nota_anterior !== null && $nota_anterior < $nota_minima));
+        $es_arrastre = ($m_trayecto < $trayecto);
+        
+        $m['nota_minima'] = $nota_minima;
+        $m['es_proyecto'] = $es_proyecto;
+        $m['ya_inscrita'] = $ya_inscrita;
+        $m['es_repitiente'] = $es_repitiente;
+        $m['es_arrastre'] = $es_arrastre;
+        $m['nota_anterior'] = $nota_anterior;
+        $m['periodo_anterior'] = $periodo_anterior;
+        $m['veces_inscrita'] = $veces_inscrita;
+        
+        $materias_disponibles[] = $m;
+    }
+    $stmt->close();
+    
+    return $materias_disponibles;
 }
 
 /**
@@ -11023,6 +11181,7 @@ function obtenerNotasEstudianteConTrimestres($estudiante_id) {
     global $db;
     
     $notas = [];
+    $estudiante_id = intval($estudiante_id);
     
     $query = "SELECT 
         nt.id_materia,
@@ -11034,7 +11193,7 @@ function obtenerNotasEstudianteConTrimestres($estudiante_id) {
         pa.nombre_periodo
     FROM notas_trimestres nt
     LEFT JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
-    WHERE nt.id_usuario = " . intval($estudiante_id) . "
+    WHERE nt.id_usuario = $estudiante_id
     AND nt.estado = 'aprobada'
     ORDER BY nt.id_materia, nt.trimestre_num";
     
@@ -11042,8 +11201,8 @@ function obtenerNotasEstudianteConTrimestres($estudiante_id) {
     
     if ($result && $result->num_rows > 0) {
         while ($row = $result->fetch_assoc()) {
-            $materia_id = $row['id_materia'];
-            $trimestre = $row['trimestre_num'];
+            $materia_id = intval($row['id_materia']);
+            $trimestre = intval($row['trimestre_num']);
             
             if (!isset($notas[$materia_id])) {
                 $notas[$materia_id] = [
@@ -11062,18 +11221,49 @@ function obtenerNotasEstudianteConTrimestres($estudiante_id) {
         }
     }
     
-    // Calcular nota final para cada materia
+    // Calcular nota final para cada materia a partir de trimestres
     foreach ($notas as $materia_id => $nota_data) {
         $suma = 0;
         $count = 0;
         for ($i = 1; $i <= 3; $i++) {
             if ($nota_data["trimestre_$i"] !== null && $nota_data["trimestre_$i"] > 0) {
-                $suma += $nota_data["trimestre_$i"];
+                $suma += floatval($nota_data["trimestre_$i"]);
                 $count++;
             }
         }
         if ($count > 0) {
             $notas[$materia_id]['nota_final'] = round($suma / $count, 1);
+        }
+    }
+    
+    // Consultar notas definitivas registradas directamente en notas_definitivas
+    $query_nd = "SELECT nd.*, m.trayecto, pa.nombre_periodo 
+                 FROM notas_definitivas nd
+                 INNER JOIN materias m ON nd.id_materia = m.id_materia
+                 LEFT JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+                 WHERE nd.id_usuario = $estudiante_id";
+    $res_nd = $db->query($query_nd);
+    if ($res_nd && $res_nd->num_rows > 0) {
+        while ($row_nd = $res_nd->fetch_assoc()) {
+            $materia_id = intval($row_nd['id_materia']);
+            $tray = intval($row_nd['trayecto']);
+            $col = "trayecto_" . $tray;
+            $nota_def = isset($row_nd[$col]) && $row_nd[$col] !== null ? floatval($row_nd[$col]) : null;
+            
+            if (!isset($notas[$materia_id])) {
+                $notas[$materia_id] = [
+                    'trimestre_1' => null,
+                    'trimestre_2' => null,
+                    'trimestre_3' => null,
+                    'nota_final' => $nota_def,
+                    'id_periodo' => $row_nd['id_periodo'],
+                    'nombre_periodo' => $row_nd['nombre_periodo'] ?? '',
+                    'fecha_registro' => $row_nd['fecha_registro'] ?? '',
+                    'estado' => ($nota_def !== null ? ($nota_def >= 12 ? 'aprobada' : 'reprobada') : 'en_curso')
+                ];
+            } elseif ($notas[$materia_id]['nota_final'] === null && $nota_def !== null) {
+                $notas[$materia_id]['nota_final'] = $nota_def;
+            }
         }
     }
     
@@ -11889,168 +12079,94 @@ function obtenerEstudiantePorId($estudiante_id) {
 }
 }
 
-// FUNCIÓN AUXILIAR PARA OBTENER DOCENTE POR ID (CON AUDITORÍA EN CASO DE ERROR)
-if (!function_exists('obtenerDocentePorId')) {
-function obtenerDocentePorId($docente_id) {
-    global $db;
-    
-    try {
-        $query = "SELECT id, nombre, username, email 
-                  FROM users 
-                  WHERE id = ? AND docente = 1";
-        
-        $stmt = $db->prepare($query);
-        if (!$stmt) {
-            throw new Exception("Error en preparación: " . $db->error);
-        }
-        
-        $stmt->bind_param("i", $docente_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $docente = $result->fetch_assoc();
-        $stmt->close();
-        
-        return $docente;
-        
-    } catch (Exception $e) {
-        error_log("Error en obtenerDocentePorId: " . $e->getMessage());
-        
-        // REGISTRAR EN AUDITORÍA - ERROR AL OBTENER DOCENTE
-        if (function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "ERROR", 
-                    "users", 
-                    $docente_id, 
-                    null, 
-                    [
-                        'id_docente' => $docente_id,
-                        'error' => $e->getMessage()
-                    ], 
-                    "Gestión de Notas", 
-                    "Error al obtener información de docente"
-                );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de error obtenerDocentePorId: " . $auditError->getMessage());
-            }
-        }
-        
-        return null;
-    }
-}
-}
-
-
-
-
-
-
-
-
-
-
-
 //MENSAJERIA ***********************************************************************
 
-// Obtener lista de usuarios para enviar mensajes con filtros
-function obtenerUsuariosMensajeria($filtro_tipo = '', $busqueda_cedula = '') {
+// Función para obtener el tipo de usuario basado en los campos booleanos
+function obtenerTipoUsuario($usuario) {
+    if (!empty($usuario['super_user'])) return 'Super Usuario';
+    if (!empty($usuario['admin'])) return 'Administrador';
+    if (!empty($usuario['gestion_director_carrera']) || !empty($usuario['carrera_di'])) return 'Director de Carrera';
+    if (!empty($usuario['docente'])) return 'Docente';
+    if (!empty($usuario['estudiante'])) return 'Estudiante';
+    return 'Usuario';
+}
+
+// Obtener lista de usuarios para enviar mensajes con filtros y búsqueda optimizada
+function obtenerUsuariosMensajeria($filtro_tipo = '', $busqueda = '', $current_user_id = 0, $limit = 50) {
     global $db;
     
-    if (!isset($_SESSION['user']['id'])) {
-        return false;
+    if ($current_user_id <= 0) {
+        $current_user_id = $_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? 0;
     }
     
-    $current_user_id = $_SESSION['user']['id'];
-    
-    $query = "SELECT id, nombre, usuario, estudiante, docente, admin, idusuario 
-              FROM users 
-              WHERE id != ? AND status = 1";
-    
-    $params = array($current_user_id);
+    $where = ["u.id != ?", "u.status = 1"];
+    $params = [$current_user_id];
     $types = "i";
     
     // Aplicar filtro por tipo de usuario
     if (!empty($filtro_tipo)) {
         if ($filtro_tipo === 'estudiante') {
-            $query .= " AND estudiante = 1";
+            $where[] = "u.estudiante = 1";
         } elseif ($filtro_tipo === 'docente') {
-            $query .= " AND docente = 1";
+            $where[] = "u.docente = 1";
         } elseif ($filtro_tipo === 'admin') {
-            $query .= " AND admin = 1";
+            $where[] = "u.admin = 1";
+        } elseif ($filtro_tipo === 'super_user') {
+            $where[] = "u.super_user = 1";
+        } elseif ($filtro_tipo === 'director_carrera') {
+            $where[] = "(u.gestion_director_carrera = 1 OR u.carrera_di > 0)";
         }
     }
     
-    // Aplicar búsqueda por cédula
-    if (!empty($busqueda_cedula)) {
-        $query .= " AND idusuario LIKE ?";
-        $params[] = "%$busqueda_cedula%";
-        $types .= "s";
+    // Aplicar búsqueda por cédula, nombre, usuario o email
+    if (!empty($busqueda)) {
+        $where[] = "(u.idusuario LIKE ? OR u.nombre LIKE ? OR u.usuario LIKE ? OR u.email LIKE ?)";
+        $searchParam = "%" . trim($busqueda) . "%";
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+        $types .= "ssss";
     }
     
-    $query .= " ORDER BY nombre";
+    $limit = max(1, min(100, intval($limit)));
+    $sql = "SELECT u.id, u.nombre, u.usuario, u.estudiante, u.docente, u.admin, u.super_user, u.carrera_di, u.gestion_director_carrera, u.idusuario, u.email
+            FROM users u
+            WHERE " . implode(" AND ", $where) . "
+            ORDER BY u.nombre ASC
+            LIMIT ?";
+    $params[] = $limit;
+    $types .= "i";
     
-    $stmt = $db->prepare($query);
+    $stmt = $db->prepare($sql);
     if (!$stmt) {
         error_log("Error en preparar consulta obtenerUsuariosMensajeria: " . $db->error);
         return false;
     }
     
-    // Bind parameters dinámicamente
-    if (count($params) > 1) {
-        $stmt->bind_param($types, ...$params);
-    } else {
-        $stmt->bind_param($types, $params[0]);
-    }
-    
+    $stmt->bind_param($types, ...$params);
     if (!$stmt->execute()) {
         error_log("Error en ejecutar obtenerUsuariosMensajeria: " . $stmt->error);
         return false;
     }
     
-    // Auditoría solo si la función existe
-    if (function_exists('registrarAuditoria')) {
-        try {
-            registrarAuditoria(
-                "SELECT", 
-                "users", 
-                null, 
-                null, 
-                [
-                    'filtro_tipo' => $filtro_tipo,
-                    'busqueda_cedula' => $busqueda_cedula,
-                    'usuario_consulta' => $current_user_id
-                ], 
-                "Mensajería", 
-                "Consulta de usuarios para mensajería"
-            );
-        } catch (Exception $e) {
-            error_log("Error en auditoría obtenerUsuariosMensajeria: " . $e->getMessage());
-        }
-    }
-    
     return $stmt->get_result();
 }
 
-// Función para obtener el tipo de usuario basado en los campos booleanos
-function obtenerTipoUsuario($usuario) {
-    if ($usuario['estudiante'] == 1) return 'Estudiante';
-    if ($usuario['docente'] == 1) return 'Docente';
-    if ($usuario['admin'] == 1) return 'Administrador';
-    if ($usuario['super_user'] == 1) return 'Super Usuario';
-    return 'Usuario';
-}
-
 // Obtener mensajes recibidos
-function obtenerMensajesRecibidos($user_id) {
+function obtenerMensajesRecibidos($user_id, $limit = 100) {
     global $db;
+    $user_id = intval($user_id);
+    $limit = max(1, min(200, intval($limit)));
     
     $query = "SELECT m.*, u.nombre as remitente_nombre, u.usuario as remitente_usuario,
-                     u.estudiante, u.docente, u.admin, u.idusuario as remitente_cedula
+                     u.estudiante, u.docente, u.admin, u.super_user, u.idusuario as remitente_cedula, u.email as remitente_email
               FROM mensajeria m
               INNER JOIN users u ON m.id_usuario_remitente = u.id
               WHERE m.id_usuario_destinatario = ? 
-              AND m.eliminado_destinatario = FALSE
-              ORDER BY m.fecha_envio DESC";
+              AND m.eliminado_destinatario = 0
+              ORDER BY m.fecha_envio DESC
+              LIMIT ?";
     
     $stmt = $db->prepare($query);
     if (!$stmt) {
@@ -12058,47 +12174,29 @@ function obtenerMensajesRecibidos($user_id) {
         return false;
     }
     
-    $stmt->bind_param("i", $user_id);
-    
+    $stmt->bind_param("ii", $user_id, $limit);
     if (!$stmt->execute()) {
         error_log("Error en ejecutar obtenerMensajesRecibidos: " . $stmt->error);
         return false;
-    }
-    
-    // Auditoría solo si la función existe
-    if (function_exists('registrarAuditoria')) {
-        try {
-            registrarAuditoria(
-                "SELECT", 
-                "mensajeria", 
-                null, 
-                null, 
-                [
-                    'usuario_id' => $user_id,
-                    'tipo_consulta' => 'mensajes_recibidos'
-                ], 
-                "Mensajería", 
-                "Consulta de mensajes recibidos"
-            );
-        } catch (Exception $e) {
-            error_log("Error en auditoría obtenerMensajesRecibidos: " . $e->getMessage());
-        }
     }
     
     return $stmt->get_result();
 }
 
 // Obtener mensajes enviados
-function obtenerMensajesEnviados($user_id) {
+function obtenerMensajesEnviados($user_id, $limit = 100) {
     global $db;
+    $user_id = intval($user_id);
+    $limit = max(1, min(200, intval($limit)));
     
     $query = "SELECT m.*, u.nombre as destinatario_nombre, u.usuario as destinatario_usuario,
-                     u.estudiante, u.docente, u.admin, u.idusuario as destinatario_cedula
+                     u.estudiante, u.docente, u.admin, u.super_user, u.idusuario as destinatario_cedula, u.email as destinatario_email
               FROM mensajeria m
               INNER JOIN users u ON m.id_usuario_destinatario = u.id
               WHERE m.id_usuario_remitente = ? 
-              AND m.eliminado_remitente = FALSE
-              ORDER BY m.fecha_envio DESC";
+              AND m.eliminado_remitente = 0
+              ORDER BY m.fecha_envio DESC
+              LIMIT ?";
     
     $stmt = $db->prepare($query);
     if (!$stmt) {
@@ -12106,31 +12204,10 @@ function obtenerMensajesEnviados($user_id) {
         return false;
     }
     
-    $stmt->bind_param("i", $user_id);
-    
+    $stmt->bind_param("ii", $user_id, $limit);
     if (!$stmt->execute()) {
         error_log("Error en ejecutar obtenerMensajesEnviados: " . $stmt->error);
         return false;
-    }
-    
-    // Auditoría solo si la función existe
-    if (function_exists('registrarAuditoria')) {
-        try {
-            registrarAuditoria(
-                "SELECT", 
-                "mensajeria", 
-                null, 
-                null, 
-                [
-                    'usuario_id' => $user_id,
-                    'tipo_consulta' => 'mensajes_enviados'
-                ], 
-                "Mensajería", 
-                "Consulta de mensajes enviados"
-            );
-        } catch (Exception $e) {
-            error_log("Error en auditoría obtenerMensajesEnviados: " . $e->getMessage());
-        }
     }
     
     return $stmt->get_result();
@@ -12139,23 +12216,25 @@ function obtenerMensajesEnviados($user_id) {
 // Función para obtener un mensaje específico
 function obtenerMensaje($mensaje_id, $user_id, $tipo = 'recibidos') {
     global $db;
+    $mensaje_id = intval($mensaje_id);
+    $user_id = intval($user_id);
     
     if ($tipo === 'recibidos') {
         $query = "SELECT m.*, u.nombre as remitente_nombre, u.usuario as remitente_usuario,
-                         u.email as remitente_email, u.estudiante, u.docente, u.admin,
+                         u.email as remitente_email, u.estudiante, u.docente, u.admin, u.super_user,
                          u.idusuario as remitente_cedula
                   FROM mensajeria m
                   INNER JOIN users u ON m.id_usuario_remitente = u.id
                   WHERE m.id = ? AND m.id_usuario_destinatario = ? 
-                  AND m.eliminado_destinatario = FALSE";
+                  AND m.eliminado_destinatario = 0";
     } else {
         $query = "SELECT m.*, u.nombre as destinatario_nombre, u.usuario as destinatario_usuario,
-                         u.email as destinatario_email, u.estudiante, u.docente, u.admin,
+                         u.email as destinatario_email, u.estudiante, u.docente, u.admin, u.super_user,
                          u.idusuario as destinatario_cedula
                   FROM mensajeria m
                   INNER JOIN users u ON m.id_usuario_destinatario = u.id
                   WHERE m.id = ? AND m.id_usuario_remitente = ? 
-                  AND m.eliminado_remitente = FALSE";
+                  AND m.eliminado_remitente = 0";
     }
     
     $stmt = $db->prepare($query);
@@ -12165,111 +12244,140 @@ function obtenerMensaje($mensaje_id, $user_id, $tipo = 'recibidos') {
     }
     
     $stmt->bind_param("ii", $mensaje_id, $user_id);
-    
     if (!$stmt->execute()) {
         error_log("Error en ejecutar obtenerMensaje: " . $stmt->error);
         return false;
     }
     
     $result = $stmt->get_result();
-    $mensaje = $result->fetch_assoc();
-    
-    // Auditoría solo si la función existe y se encontró el mensaje
-    if ($mensaje && function_exists('registrarAuditoria')) {
-        try {
-            registrarAuditoria(
-                "SELECT", 
-                "mensajeria", 
-                $mensaje_id, 
-                null, 
-                [
-                    'usuario_id' => $user_id,
-                    'tipo_mensaje' => $tipo
-                ], 
-                "Mensajería", 
-                "Consulta de mensaje específico"
-            );
-        } catch (Exception $e) {
-            error_log("Error en auditoría obtenerMensaje: " . $e->getMessage());
-        }
-    }
-    
-    return $mensaje;
+    return $result ? $result->fetch_assoc() : null;
 }
 
 // Marcar mensaje como leído
 function marcarMensajeLeido($mensaje_id, $user_id) {
     global $db;
+    $mensaje_id = intval($mensaje_id);
+    $user_id = intval($user_id);
     
-    try {
-        $query = "UPDATE mensajeria SET leido = TRUE 
-                  WHERE id = ? AND id_usuario_destinatario = ?";
-        $stmt = $db->prepare($query);
-        if (!$stmt) {
-            throw new Exception("Error en preparar consulta: " . $db->error);
-        }
+    if ($mensaje_id <= 0 || $user_id <= 0) return false;
+    
+    $query = "UPDATE mensajeria SET leido = 1 
+              WHERE id = ? AND id_usuario_destinatario = ? AND leido = 0";
+    $stmt = $db->prepare($query);
+    if (!$stmt) return false;
+    
+    $stmt->bind_param("ii", $mensaje_id, $user_id);
+    $ok = $stmt->execute();
+    $stmt->close();
+    return $ok;
+}
+
+// Eliminar mensaje (lógicamente) para remitente o destinatario
+function eliminarMensaje($mensaje_id, $user_id, $tipo = 'recibidos') {
+    global $db;
+    $mensaje_id = intval($mensaje_id);
+    $user_id = intval($user_id);
+    
+    if ($mensaje_id <= 0 || $user_id <= 0) return false;
+    
+    if ($tipo === 'recibidos') {
+        $query = "UPDATE mensajeria SET eliminado_destinatario = 1 WHERE id = ? AND id_usuario_destinatario = ?";
+    } else {
+        $query = "UPDATE mensajeria SET eliminado_remitente = 1 WHERE id = ? AND id_usuario_remitente = ?";
+    }
+    
+    $stmt = $db->prepare($query);
+    if (!$stmt) return false;
+    
+    $stmt->bind_param("ii", $mensaje_id, $user_id);
+    $ok = $stmt->execute();
+    $stmt->close();
+    return $ok;
+}
+
+// Enviar mensaje
+function enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje) {
+    global $db;
+    $remitente_id = intval($remitente_id);
+    $destinatario_id = intval($destinatario_id);
+    $titulo = trim($titulo);
+    $mensaje = trim($mensaje);
+    
+    if ($remitente_id <= 0 || $destinatario_id <= 0 || empty($titulo) || empty($mensaje)) {
+        return [
+            'success' => false,
+            'message' => 'Por favor complete todos los campos obligatorios.'
+        ];
+    }
+    
+    $query = "INSERT INTO mensajeria (id_usuario_remitente, id_usuario_destinatario, titulo, mensaje, fecha_envio, leido, archivado_remitente, archivado_destinatario, eliminado_remitente, eliminado_destinatario) 
+              VALUES (?, ?, ?, ?, NOW(), 0, 0, 0, 0, 0)";
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error en preparar consulta enviarMensaje: " . $db->error);
+        return [
+            'success' => false,
+            'message' => 'Error en la base de datos al preparar el mensaje.'
+        ];
+    }
+    
+    $stmt->bind_param("iiss", $remitente_id, $destinatario_id, $titulo, $mensaje);
+    
+    if ($stmt->execute()) {
+        $mensaje_id = $stmt->insert_id;
+        $stmt->close();
         
-        $stmt->bind_param("ii", $mensaje_id, $user_id);
-        $result = $stmt->execute();
-        
-        if ($result && function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "UPDATE", 
-                    "mensajeria", 
-                    $mensaje_id, 
-                    ['leido' => '0'], 
-                    [
-                        'leido' => '1',
-                        'usuario_id' => $user_id
-                    ], 
-                    "Mensajería", 
-                    "Mensaje marcado como leído"
-                );
-            } catch (Exception $e) {
-                error_log("Error en auditoría marcarMensajeLeido: " . $e->getMessage());
-            }
-        }
-        
-        return $result;
-        
-    } catch (Exception $e) {
-        error_log("Error en marcarMensajeLeido: " . $e->getMessage());
-        
+        // Registrar en auditoría solo la acción de envío
         if (function_exists('registrarAuditoria')) {
             try {
                 registrarAuditoria(
-                    "ERROR", 
-                    "mensajeria", 
-                    $mensaje_id, 
-                    null, 
-                    [
-                        'usuario_id' => $user_id,
-                        'error' => $e->getMessage()
-                    ], 
-                    "Mensajería", 
-                    "Error al marcar mensaje como leído"
+                    "INSERT",
+                    "mensajeria",
+                    $mensaje_id,
+                    null,
+                    ['remitente' => $remitente_id, 'destinatario' => $destinatario_id, 'titulo' => $titulo],
+                    "Mensajería",
+                    "Mensaje enviado exitosamente"
                 );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de error marcarMensajeLeido: " . $auditError->getMessage());
+            } catch (Exception $e) {
+                error_log("Error en auditoría enviarMensaje: " . $e->getMessage());
             }
         }
         
-        return false;
+        return [
+            'success' => true,
+            'message' => '¡Mensaje enviado exitosamente!',
+            'id' => $mensaje_id
+        ];
+    } else {
+        error_log("Error en ejecutar enviarMensaje: " . $stmt->error);
+        return [
+            'success' => false,
+            'message' => 'No se pudo enviar el mensaje. Intente de nuevo.'
+        ];
     }
 }
 
-// Enviar mensaje - VERSIÓN CORREGIDA PARA TU TABLA
-function enviarMensaje($remitente_id, $destinatario_id, $titulo, $mensaje) {
-    global $db;
-    
-    // Validar que los IDs existan
-    if (!$remitente_id || !$destinatario_id) {
-        error_log("Error en enviarMensaje: IDs inválidos - remitente: $remitente_id, destinatario: $destinatario_id");
-        return [
-            'success' => false,
-            'message' => 'IDs de usuario inválidos'
-        ];
+// Contar mensajes no leídos
+if (!function_exists('contarMensajesNoLeidos')) {
+    function contarMensajesNoLeidos($user_id) {
+        global $db;
+        $user_id = intval($user_id);
+        if ($user_id <= 0) return 0;
+        
+        $query = "SELECT COUNT(*) as total 
+                  FROM mensajeria 
+                  WHERE id_usuario_destinatario = ? 
+                  AND leido = 0 
+                  AND eliminado_destinatario = 0";
+        $stmt = $db->prepare($query);
+        if (!$stmt) return 0;
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $row = $res ? $res->fetch_assoc() : null;
+        $stmt->close();
+        return $row ? intval($row['total']) : 0;
     }
     
     try {
@@ -17481,15 +17589,18 @@ function obtenerTodasMaterias() {
 }
 
 
-//TIPOS PAGO ***********************************************************************
+// ==============================================================================
+// GESTIÓN DE ARANCELES / TIPOS DE PAGO
+// ==============================================================================
 
-
-
-// Función para obtener todos los tipos de pago - SOLO LECTURA, SIN AUDITORÍA
-function obtenerTiposPago() {
+/**
+ * Obtener todos los tipos de pago con soporte de filtro activo/inactivo
+ */
+function obtenerTiposPago($solo_activos = false) {
     global $db;
     
-    $query = "SELECT id, tipopago, precio FROM tipo_pago ORDER BY tipopago";
+    $where = $solo_activos ? "WHERE status = 1" : "";
+    $query = "SELECT id, tipopago, precio, status FROM tipo_pago {$where} ORDER BY tipopago ASC";
     $result = $db->query($query);
     
     if ($result) {
@@ -17499,337 +17610,772 @@ function obtenerTiposPago() {
     return [];
 }
 
-// Función para crear un nuevo tipo de pago - CON AUDITORÍA
-function crearTipoPago($tipopago, $precio = 0.00) {
+/**
+ * Crear un nuevo tipo de pago con auditoría
+ */
+function crearTipoPago($tipopago, $precio = 0.00, $status = 1) {
     global $db;
-    $precio = (float)$precio;
+    $tipopago = trim($tipopago);
+    $precio   = floatval($precio);
+    $status   = intval($status) ? 1 : 0;
     
     try {
-        $tipopago_original = $tipopago;
-        $stmt = $db->prepare("INSERT INTO tipo_pago (tipopago, precio) VALUES (?, ?)");
-        $stmt->bind_param("sd", $tipopago, $precio);
+        $stmt = $db->prepare("INSERT INTO tipo_pago (tipopago, precio, status) VALUES (?, ?, ?)");
+        if (!$stmt) {
+            return ['success' => false, 'message' => 'Error preparando consulta: ' . $db->error];
+        }
+        $stmt->bind_param("sdi", $tipopago, $precio, $status);
         
         if ($stmt->execute()) {
             $id_insertado = $db->insert_id;
             $stmt->close();
             
-            // REGISTRAR EN AUDITORÍA - TIPO DE PAGO CREADO
             if (function_exists('registrarAuditoria')) {
-                try {
-                    registrarAuditoria(
-                        "INSERT", 
-                        "tipo_pago", 
-                        $id_insertado, 
-                        null, 
-                        [
-                            'tipo_pago' => $tipopago_original,
-                            'precio' => $precio,
-                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
-                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
-                            'fecha_creacion' => date('Y-m-d H:i:s')
-                        ], 
-                        "Tipos de Pago", 
-                        "Tipo de pago creado: " . $tipopago_original . " (Bs " . $precio . ")"
-                    );
-                } catch (Exception $e) {
-                    error_log("Error en auditoría crearTipoPago: " . $e->getMessage());
-                }
+                registrarAuditoria(
+                    "INSERT", "tipo_pago", $id_insertado, null,
+                    ['tipo_pago' => $tipopago, 'precio' => $precio, 'status' => $status],
+                    "Tipos de Pago", "Tipo de pago creado: {$tipopago} (Bs {$precio})"
+                );
             }
             
-            return ['success' => true, 'message' => 'Tipo de pago creado exitosamente'];
+            return ['success' => true, 'message' => 'Tipo de pago creado exitosamente', 'id' => $id_insertado];
         } else {
             $error = $stmt->error;
             $stmt->close();
-            
-            // REGISTRAR EN AUDITORÍA - ERROR AL CREAR TIPO DE PAGO
-            if (function_exists('registrarAuditoria')) {
-                try {
-                    registrarAuditoria(
-                        "ERROR", 
-                        "tipo_pago", 
-                        null, 
-                        null, 
-                        [
-                            'tipo_pago' => $tipopago_original,
-                            'error' => $error,
-                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
-                        ], 
-                        "Tipos de Pago", 
-                        "Error al crear tipo de pago: " . $tipopago_original
-                    );
-                } catch (Exception $e) {
-                    error_log("Error en auditoría de error crearTipoPago: " . $e->getMessage());
-                }
-            }
-            
             return ['success' => false, 'message' => 'Error al crear: ' . $error];
         }
-        
     } catch (Exception $e) {
-        error_log("Error en crearTipoPago: " . $e->getMessage());
-        
-        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL CREAR TIPO DE PAGO
-        if (function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "ERROR", 
-                    "tipo_pago", 
-                    null, 
-                    null, 
-                    [
-                        'tipo_pago' => $tipopago_original ?? '',
-                        'error' => $e->getMessage(),
-                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
-                    ], 
-                    "Tipos de Pago", 
-                    "Excepción al crear tipo de pago"
-                );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de excepción crearTipoPago: " . $auditError->getMessage());
-            }
-        }
-        
-        return ['success' => false, 'message' => 'Error al crear: ' . $e->getMessage()];
+        return ['success' => false, 'message' => 'Excepción: ' . $e->getMessage()];
     }
 }
 
-// Función para actualizar un tipo de pago - CON AUDITORÍA
-function actualizarTipoPago($id, $tipopago, $precio = 0.00) {
+/**
+ * Actualizar un tipo de pago con auditoría
+ */
+function actualizarTipoPago($id, $tipopago, $precio = 0.00, $status = 1) {
     global $db;
-    $precio = (float)$precio;
+    $id       = intval($id);
+    $tipopago = trim($tipopago);
+    $precio   = floatval($precio);
+    $status   = intval($status) ? 1 : 0;
     
     try {
-        // Obtener datos actuales para auditoría
-        $stmt_actual = $db->prepare("SELECT tipopago, precio FROM tipo_pago WHERE id = ?");
-        $stmt_actual->bind_param("i", $id);
-        $stmt_actual->execute();
-        $result_actual = $stmt_actual->get_result();
+        $stmt_ant = $db->prepare("SELECT * FROM tipo_pago WHERE id = ?");
+        $stmt_ant->bind_param("i", $id);
+        $stmt_ant->execute();
+        $res_ant = $stmt_ant->get_result();
+        $valores_anteriores = $res_ant ? $res_ant->fetch_assoc() : null;
+        $stmt_ant->close();
         
-        if ($result_actual->num_rows === 0) {
-            return ['success' => false, 'message' => 'Tipo de pago no encontrado'];
-        }
-        
-        $tipo_pago_actual = $result_actual->fetch_assoc();
-        $stmt_actual->close();
-        
-        $tipopago_original = $tipopago;
-        $stmt = $db->prepare("UPDATE tipo_pago SET tipopago = ?, precio = ? WHERE id = ?");
-        $stmt->bind_param("sdi", $tipopago, $precio, $id);
+        $stmt = $db->prepare("UPDATE tipo_pago SET tipopago = ?, precio = ?, status = ? WHERE id = ?");
+        $stmt->bind_param("sdii", $tipopago, $precio, $status, $id);
         
         if ($stmt->execute()) {
             $stmt->close();
-            
-            // REGISTRAR EN AUDITORÍA - TIPO DE PAGO ACTUALIZADO
             if (function_exists('registrarAuditoria')) {
-                try {
-                    registrarAuditoria(
-                        "UPDATE", 
-                        "tipo_pago", 
-                        $id, 
-                        [
-                            'tipo_pago_anterior' => $tipo_pago_actual['tipopago'],
-                            'precio_anterior' => $tipo_pago_actual['precio']
-                        ], 
-                        [
-                            'tipo_pago_nuevo' => $tipopago_original,
-                            'precio_nuevo' => $precio,
-                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
-                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
-                            'fecha_actualizacion' => date('Y-m-d H:i:s')
-                        ], 
-                        "Tipos de Pago", 
-                        "Tipo de pago actualizado: " . $tipo_pago_actual['tipopago'] . " → " . $tipopago_original . " (Bs " . $precio . ")"
-                    );
-                } catch (Exception $e) {
-                    error_log("Error en auditoría actualizarTipoPago: " . $e->getMessage());
-                }
-            }
-            
-            return ['success' => true, 'message' => 'Tipo de pago actualizado exitosamente'];
-        } else {
-            $error = $stmt->error;
-            $stmt->close();
-            
-            // REGISTRAR EN AUDITORÍA - ERROR AL ACTUALIZAR TIPO DE PAGO
-            if (function_exists('registrarAuditoria')) {
-                try {
-                    registrarAuditoria(
-                        "ERROR", 
-                        "tipo_pago", 
-                        $id, 
-                        null, 
-                        [
-                            'id_tipo_pago' => $id,
-                            'tipo_pago_nuevo' => $tipopago_original,
-                            'error' => $error,
-                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
-                        ], 
-                        "Tipos de Pago", 
-                        "Error al actualizar tipo de pago ID: " . $id
-                    );
-                } catch (Exception $e) {
-                    error_log("Error en auditoría de error actualizarTipoPago: " . $e->getMessage());
-                }
-            }
-            
-            return ['success' => false, 'message' => 'Error al actualizar: ' . $error];
-        }
-        
-    } catch (Exception $e) {
-        error_log("Error en actualizarTipoPago: " . $e->getMessage());
-        
-        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ACTUALIZAR TIPO DE PAGO
-        if (function_exists('registrarAuditoria')) {
-            try {
                 registrarAuditoria(
-                    "ERROR", 
-                    "tipo_pago", 
-                    $id, 
-                    null, 
-                    [
-                        'id_tipo_pago' => $id,
-                        'tipo_pago_nuevo' => $tipopago_original ?? '',
-                        'error' => $e->getMessage(),
-                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
-                    ], 
-                    "Tipos de Pago", 
-                    "Excepción al actualizar tipo de pago"
+                    "UPDATE", "tipo_pago", $id, $valores_anteriores,
+                    ['tipopago' => $tipopago, 'precio' => $precio, 'status' => $status],
+                    "Tipos de Pago", "Tipo de pago actualizado: {$tipopago}"
                 );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de excepción actualizarTipoPago: " . $auditError->getMessage());
             }
+            return ['success' => true, 'message' => 'Tipo de pago actualizado exitosamente'];
         }
-        
-        return ['success' => false, 'message' => 'Error al actualizar: ' . $e->getMessage()];
+        $error = $stmt->error;
+        $stmt->close();
+        return ['success' => false, 'message' => 'Error al actualizar: ' . $error];
+    } catch (Exception $e) {
+        return ['success' => false, 'message' => 'Excepción: ' . $e->getMessage()];
     }
 }
 
-// Función para eliminar un tipo de pago - CON AUDITORÍA
+/**
+ * Cambiar estado activo/inactivo de un tipo de pago
+ */
+function cambiarEstadoTipoPago($id, $nuevo_status) {
+    global $db;
+    $id = intval($id);
+    $nuevo_status = intval($nuevo_status) ? 1 : 0;
+    
+    $stmt = $db->prepare("UPDATE tipo_pago SET status = ? WHERE id = ?");
+    if (!$stmt) return false;
+    $stmt->bind_param("ii", $nuevo_status, $id);
+    $ok = $stmt->execute();
+    $stmt->close();
+    
+    if ($ok && function_exists('registrarAuditoria')) {
+        registrarAuditoria("UPDATE", "tipo_pago", $id, null, ['status' => $nuevo_status], "Tipos de Pago", "Estado de tipo de pago cambiado a: " . ($nuevo_status ? 'Habilitado' : 'Deshabilitado'));
+    }
+    return $ok;
+}
+
+/**
+ * Eliminar un tipo de pago
+ */
 function eliminarTipoPago($id) {
     global $db;
+    $id = intval($id);
     
     try {
-        // Obtener datos del tipo de pago para auditoría
-        $stmt_actual = $db->prepare("SELECT tipopago FROM tipo_pago WHERE id = ?");
-        $stmt_actual->bind_param("i", $id);
-        $stmt_actual->execute();
-        $result_actual = $stmt_actual->get_result();
-        
-        if ($result_actual->num_rows === 0) {
-            return ['success' => false, 'message' => 'Tipo de pago no encontrado'];
-        }
-        
-        $tipo_pago_eliminado = $result_actual->fetch_assoc();
-        $stmt_actual->close();
+        $stmt_ant = $db->prepare("SELECT * FROM tipo_pago WHERE id = ?");
+        $stmt_ant->bind_param("i", $id);
+        $stmt_ant->execute();
+        $res_ant = $stmt_ant->get_result();
+        $valores_anteriores = $res_ant ? $res_ant->fetch_assoc() : null;
+        $stmt_ant->close();
         
         $stmt = $db->prepare("DELETE FROM tipo_pago WHERE id = ?");
         $stmt->bind_param("i", $id);
         
         if ($stmt->execute()) {
             $stmt->close();
-            
-            // REGISTRAR EN AUDITORÍA - TIPO DE PAGO ELIMINADO
             if (function_exists('registrarAuditoria')) {
-                try {
-                    registrarAuditoria(
-                        "DELETE", 
-                        "tipo_pago", 
-                        $id, 
-                        [
-                            'tipo_pago_eliminado' => $tipo_pago_eliminado['tipopago']
-                        ], 
-                        [
-                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido',
-                            'usuario_id' => $_SESSION['user']['id'] ?? 0,
-                            'fecha_eliminacion' => date('Y-m-d H:i:s')
-                        ], 
-                        "Tipos de Pago", 
-                        "Tipo de pago eliminado: " . $tipo_pago_eliminado['tipopago'] . " (ID: " . $id . ")"
-                    );
-                } catch (Exception $e) {
-                    error_log("Error en auditoría eliminarTipoPago: " . $e->getMessage());
-                }
+                registrarAuditoria("DELETE", "tipo_pago", $id, $valores_anteriores, null, "Tipos de Pago", "Tipo de pago eliminado: " . ($valores_anteriores['tipopago'] ?? $id));
             }
-            
             return ['success' => true, 'message' => 'Tipo de pago eliminado exitosamente'];
-        } else {
-            $error = $stmt->error;
-            $stmt->close();
-            
-            // REGISTRAR EN AUDITORÍA - ERROR AL ELIMINAR TIPO DE PAGO
-            if (function_exists('registrarAuditoria')) {
-                try {
-                    registrarAuditoria(
-                        "ERROR", 
-                        "tipo_pago", 
-                        $id, 
-                        null, 
-                        [
-                            'id_tipo_pago' => $id,
-                            'tipo_pago' => $tipo_pago_eliminado['tipopago'],
-                            'error' => $error,
-                            'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
-                        ], 
-                        "Tipos de Pago", 
-                        "Error al eliminar tipo de pago: " . $tipo_pago_eliminado['tipopago']
-                    );
-                } catch (Exception $e) {
-                    error_log("Error en auditoría de error eliminarTipoPago: " . $e->getMessage());
-                }
-            }
-            
-            return ['success' => false, 'message' => 'Error al eliminar: ' . $error];
         }
-        
+        $error = $stmt->error;
+        $stmt->close();
+        return ['success' => false, 'message' => 'Error al eliminar: ' . $error];
     } catch (Exception $e) {
-        error_log("Error en eliminarTipoPago: " . $e->getMessage());
-        
-        // REGISTRAR EN AUDITORÍA - EXCEPCIÓN AL ELIMINAR TIPO DE PAGO
-        if (function_exists('registrarAuditoria')) {
-            try {
-                registrarAuditoria(
-                    "ERROR", 
-                    "tipo_pago", 
-                    $id, 
-                    null, 
-                    [
-                        'id_tipo_pago' => $id,
-                        'error' => $e->getMessage(),
-                        'usuario' => $_SESSION['user']['username'] ?? 'Desconocido'
-                    ], 
-                    "Tipos de Pago", 
-                    "Excepción al eliminar tipo de pago"
-                );
-            } catch (Exception $auditError) {
-                error_log("Error en auditoría de excepción eliminarTipoPago: " . $auditError->getMessage());
-            }
-        }
-        
-        return ['success' => false, 'message' => 'Error al eliminar: ' . $e->getMessage()];
+        return ['success' => false, 'message' => 'Excepción: ' . $e->getMessage()];
     }
 }
 
-// Función para validar tipo de pago - SOLO VALIDACIÓN, SIN AUDITORÍA
+/**
+ * Validador para tipo de pago
+ */
 function validarTipoPago($tipopago, $precio = 0.00) {
     $tipopago = trim($tipopago);
-    
-    if (empty($tipopago)) {
-        return ['success' => false, 'message' => 'El tipo de pago es requerido'];
-    }
-    
-    if (strlen($tipopago) < 2) {
-        return ['success' => false, 'message' => 'El tipo de pago debe tener al menos 2 caracteres'];
-    }
-    
-    if (strlen($tipopago) > 100) {
-        return ['success' => false, 'message' => 'El tipo de pago no puede exceder los 100 caracteres'];
-    }
-    
-    if ((float)$precio < 0) {
-        return ['success' => false, 'message' => 'El precio debe ser mayor o igual a cero'];
-    }
-    
+    if (empty($tipopago)) return ['success' => false, 'message' => 'El concepto o tipo de pago es requerido'];
+    if (strlen($tipopago) < 2) return ['success' => false, 'message' => 'Debe tener al menos 2 caracteres'];
+    if ((float)$precio < 0) return ['success' => false, 'message' => 'El precio debe ser mayor o igual a cero'];
     return ['success' => true, 'message' => ''];
+}
+
+// ==============================================================================
+// GESTIÓN DE BANCOS Y CUENTAS INSTITUCIONALES
+// ==============================================================================
+
+/**
+ * Obtener todos los bancos institucionales
+ * @param bool $solo_activos Si es true filtra los activos
+ * @param string $canal 'pago_movil', 'transferencia' o '' para general
+ */
+function obtenerBancos($solo_activos = false, $canal = '') {
+    global $db;
+    $where = [];
+    if ($solo_activos) {
+        $where[] = "status = 1";
+        if ($canal === 'pago_movil') {
+            $where[] = "status_pago_movil = 1";
+            $where[] = "telefono_pago_movil IS NOT NULL AND TRIM(telefono_pago_movil) != ''";
+        } elseif ($canal === 'transferencia') {
+            $where[] = "status_transferencia = 1";
+            $where[] = "numero_cuenta IS NOT NULL AND TRIM(numero_cuenta) != ''";
+        }
+    }
+    
+    $where_sql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+    $query = "SELECT * FROM bancos {$where_sql} ORDER BY nombre_banco ASC";
+    $result = $db->query($query);
+    if ($result) {
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+    return [];
+}
+
+/**
+ * Crear un nuevo banco / cuenta institucional
+ */
+function crearBanco($nombre_banco, $codigo_banco, $tipo_cuenta, $numero_cuenta, $titular, $rif_cedula, $telefono_pago_movil, $status = 1, $status_transferencia = 1, $status_pago_movil = 1) {
+    global $db;
+    $nombre_banco        = trim($nombre_banco);
+    $codigo_banco        = trim($codigo_banco);
+    $tipo_cuenta         = trim($tipo_cuenta);
+    $numero_cuenta       = trim($numero_cuenta);
+    $titular             = trim($titular);
+    $rif_cedula          = trim($rif_cedula);
+    $telefono_pago_movil = trim($telefono_pago_movil);
+    $status              = intval($status) ? 1 : 0;
+    $status_transferencia = intval($status_transferencia) ? 1 : 0;
+    $status_pago_movil    = intval($status_pago_movil) ? 1 : 0;
+    
+    if (empty($nombre_banco)) {
+        return ['success' => false, 'message' => 'El nombre del banco es obligatorio'];
+    }
+    
+    $stmt = $db->prepare("INSERT INTO bancos (nombre_banco, codigo_banco, tipo_cuenta, numero_cuenta, titular, rif_cedula, telefono_pago_movil, status, status_transferencia, status_pago_movil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    if (!$stmt) {
+        return ['success' => false, 'message' => 'Error en consulta: ' . $db->error];
+    }
+    
+    $stmt->bind_param("sssssssiii", $nombre_banco, $codigo_banco, $tipo_cuenta, $numero_cuenta, $titular, $rif_cedula, $telefono_pago_movil, $status, $status_transferencia, $status_pago_movil);
+    
+    if ($stmt->execute()) {
+        $id_insertado = $db->insert_id;
+        $stmt->close();
+        if (function_exists('registrarAuditoria')) {
+            registrarAuditoria("INSERT", "bancos", $id_insertado, null, ['nombre_banco' => $nombre_banco, 'numero_cuenta' => $numero_cuenta], "Bancos", "Banco institucional creado: {$nombre_banco}");
+        }
+        return ['success' => true, 'message' => 'Banco registrado exitosamente', 'id' => $id_insertado];
+    }
+    
+    $error = $stmt->error;
+    $stmt->close();
+    return ['success' => false, 'message' => 'Error al registrar banco: ' . $error];
+}
+
+/**
+ * Actualizar banco institucional
+ */
+function actualizarBanco($id, $nombre_banco, $codigo_banco, $tipo_cuenta, $numero_cuenta, $titular, $rif_cedula, $telefono_pago_movil, $status = 1) {
+    global $db;
+    $id                  = intval($id);
+    $nombre_banco        = trim($nombre_banco);
+    $codigo_banco        = trim($codigo_banco);
+    $tipo_cuenta         = trim($tipo_cuenta);
+    $numero_cuenta       = trim($numero_cuenta);
+    $titular             = trim($titular);
+    $rif_cedula          = trim($rif_cedula);
+    $telefono_pago_movil = trim($telefono_pago_movil);
+    $status              = intval($status) ? 1 : 0;
+    
+    if ($id <= 0 || empty($nombre_banco)) {
+        return ['success' => false, 'message' => 'Datos inválidos para actualizar el banco'];
+    }
+    
+    $stmt = $db->prepare("UPDATE bancos SET nombre_banco = ?, codigo_banco = ?, tipo_cuenta = ?, numero_cuenta = ?, titular = ?, rif_cedula = ?, telefono_pago_movil = ?, status = ? WHERE id = ?");
+    if (!$stmt) return ['success' => false, 'message' => 'Error en consulta: ' . $db->error];
+    
+    $stmt->bind_param("sssssssii", $nombre_banco, $codigo_banco, $tipo_cuenta, $numero_cuenta, $titular, $rif_cedula, $telefono_pago_movil, $status, $id);
+    $ok = $stmt->execute();
+    $stmt->close();
+    
+    if ($ok) {
+        if (function_exists('registrarAuditoria')) {
+            registrarAuditoria("UPDATE", "bancos", $id, null, ['nombre_banco' => $nombre_banco], "Bancos", "Banco actualizado: {$nombre_banco}");
+        }
+        return ['success' => true, 'message' => 'Banco actualizado exitosamente'];
+    }
+    return ['success' => false, 'message' => 'No se pudo actualizar el banco'];
+}
+
+/**
+ * Cambiar estado activo/inactivo por canal (pago_movil, transferencia o general) de un banco
+ */
+function cambiarEstadoCanalBanco($id, $canal, $nuevo_status) {
+    global $db;
+    $id = intval($id);
+    $nuevo_status = intval($nuevo_status) ? 1 : 0;
+    
+    if ($canal === 'pago_movil') {
+        $campo = 'status_pago_movil';
+        $desc  = 'Pago Móvil';
+    } elseif ($canal === 'transferencia') {
+        $campo = 'status_transferencia';
+        $desc  = 'Transferencia';
+    } else {
+        $campo = 'status';
+        $desc  = 'Banco General';
+    }
+    
+    $stmt = $db->prepare("UPDATE bancos SET {$campo} = ? WHERE id = ?");
+    if (!$stmt) return false;
+    $stmt->bind_param("ii", $nuevo_status, $id);
+    $ok = $stmt->execute();
+    $stmt->close();
+    
+    if ($ok && function_exists('registrarAuditoria')) {
+        registrarAuditoria("UPDATE", "bancos", $id, null, [$campo => $nuevo_status], "Bancos", "Estado de {$desc} en banco ID {$id} cambiado a: " . ($nuevo_status ? 'Habilitado' : 'Deshabilitado'));
+    }
+    return $ok;
+}
+
+/**
+ * Cambiar estado general activo/inactivo de un banco
+ */
+function cambiarEstadoBanco($id, $nuevo_status) {
+    return cambiarEstadoCanalBanco($id, 'general', $nuevo_status);
+}
+
+/**
+ * Eliminar banco institucional
+ */
+function eliminarBanco($id) {
+    global $db;
+    $id = intval($id);
+    if ($id <= 0) return ['success' => false, 'message' => 'ID inválido'];
+    
+    $stmt = $db->prepare("DELETE FROM bancos WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    if ($stmt->execute()) {
+        $stmt->close();
+        if (function_exists('registrarAuditoria')) {
+            registrarAuditoria("DELETE", "bancos", $id, null, null, "Bancos", "Banco eliminado ID: {$id}");
+        }
+        return ['success' => true, 'message' => 'Banco eliminado exitosamente'];
+    }
+    $err = $stmt->error;
+    $stmt->close();
+    return ['success' => false, 'message' => 'Error al eliminar banco: ' . $err];
+}
+
+// ==============================================================================
+// GESTIÓN DE MÉTODOS Y FORMAS DE PAGO (PAGO MÓVIL, TRANSFERENCIA, CRIPTO, ETC)
+// ==============================================================================
+
+/**
+ * Obtener todos los métodos de pago
+ */
+function obtenerMetodosPago($solo_activos = false) {
+    global $db;
+    $where = $solo_activos ? "WHERE status = 1" : "";
+    $query = "SELECT * FROM metodos_pago {$where} ORDER BY id ASC";
+    $result = $db->query($query);
+    if ($result) {
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+    return [];
+}
+
+/**
+ * Crear un nuevo método de pago
+ */
+function crearMetodoPago($nombre, $codigo = '', $icono = 'fas fa-money-check-alt', $descripcion = '', $requiere_banco = 1, $requiere_comprobante = 1, $status = 1) {
+    global $db;
+    $nombre               = trim($nombre);
+    $codigo               = trim($codigo);
+    $icono                = trim($icono) ?: 'fas fa-money-check-alt';
+    $descripcion          = trim($descripcion);
+    $requiere_banco       = intval($requiere_banco) ? 1 : 0;
+    $requiere_comprobante = intval($requiere_comprobante) ? 1 : 0;
+    $status               = intval($status) ? 1 : 0;
+    
+    if (empty($nombre)) return ['success' => false, 'message' => 'El nombre del método de pago es requerido'];
+    if (empty($codigo)) {
+        $codigo = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '_', $nombre));
+    }
+    
+    try {
+        $stmt = $db->prepare("INSERT INTO metodos_pago (nombre, codigo, icono, descripcion, requiere_banco, requiere_comprobante, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        if (!$stmt) return ['success' => false, 'message' => 'Error preparando consulta: ' . $db->error];
+        
+        $stmt->bind_param("ssssiii", $nombre, $codigo, $icono, $descripcion, $requiere_banco, $requiere_comprobante, $status);
+        if ($stmt->execute()) {
+            $id = $db->insert_id;
+            $stmt->close();
+            if (function_exists('registrarAuditoria')) {
+                registrarAuditoria("INSERT", "metodos_pago", $id, null, ['nombre' => $nombre], "Métodos de Pago", "Método de pago creado: {$nombre}");
+            }
+            return ['success' => true, 'message' => 'Método de pago creado exitosamente', 'id' => $id];
+        }
+        $err = $stmt->error;
+        $stmt->close();
+        return ['success' => false, 'message' => 'Error al crear método de pago: ' . $err];
+    } catch (Exception $e) {
+        return ['success' => false, 'message' => 'Excepción: ' . $e->getMessage()];
+    }
+}
+
+/**
+ * Actualizar método de pago
+ */
+function actualizarMetodoPago($id, $nombre, $icono = 'fas fa-money-check-alt', $descripcion = '', $requiere_banco = 1, $requiere_comprobante = 1, $status = 1) {
+    global $db;
+    $id                   = intval($id);
+    $nombre               = trim($nombre);
+    $icono                = trim($icono) ?: 'fas fa-money-check-alt';
+    $descripcion          = trim($descripcion);
+    $requiere_banco       = intval($requiere_banco) ? 1 : 0;
+    $requiere_comprobante = intval($requiere_comprobante) ? 1 : 0;
+    $status               = intval($status) ? 1 : 0;
+    
+    if ($id <= 0 || empty($nombre)) return ['success' => false, 'message' => 'Datos inválidos'];
+    
+    try {
+        $stmt = $db->prepare("UPDATE metodos_pago SET nombre = ?, icono = ?, descripcion = ?, requiere_banco = ?, requiere_comprobante = ?, status = ? WHERE id = ?");
+        if (!$stmt) return ['success' => false, 'message' => 'Error: ' . $db->error];
+        $stmt->bind_param("sssiiii", $nombre, $icono, $descripcion, $requiere_banco, $requiere_comprobante, $status, $id);
+        $ok = $stmt->execute();
+        $stmt->close();
+        if ($ok) {
+            if (function_exists('registrarAuditoria')) {
+                registrarAuditoria("UPDATE", "metodos_pago", $id, null, ['nombre' => $nombre], "Métodos de Pago", "Método de pago actualizado: {$nombre}");
+            }
+            return ['success' => true, 'message' => 'Método de pago actualizado exitosamente'];
+        }
+        return ['success' => false, 'message' => 'No se pudo actualizar'];
+    } catch (Exception $e) {
+        return ['success' => false, 'message' => 'Excepción: ' . $e->getMessage()];
+    }
+}
+
+/**
+ * Alternar estado activo/inactivo de un método de pago
+ */
+function cambiarEstadoMetodoPago($id, $nuevo_status) {
+    global $db;
+    $id = intval($id);
+    $nuevo_status = intval($nuevo_status) ? 1 : 0;
+    
+    $stmt = $db->prepare("UPDATE metodos_pago SET status = ? WHERE id = ?");
+    if (!$stmt) return false;
+    $stmt->bind_param("ii", $nuevo_status, $id);
+    $ok = $stmt->execute();
+    $stmt->close();
+    
+    if ($ok && function_exists('registrarAuditoria')) {
+        registrarAuditoria("UPDATE", "metodos_pago", $id, null, ['status' => $nuevo_status], "Métodos de Pago", "Estado de método de pago ID {$id} cambiado a: " . ($nuevo_status ? 'Habilitado' : 'Deshabilitado'));
+    }
+    return $ok;
+}
+
+/**
+ * Eliminar un método de pago
+ */
+function eliminarMetodoPago($id) {
+    global $db;
+    $id = intval($id);
+    if ($id <= 0) return ['success' => false, 'message' => 'ID inválido'];
+    
+    $stmt = $db->prepare("DELETE FROM metodos_pago WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    if ($stmt->execute()) {
+        $stmt->close();
+        if (function_exists('registrarAuditoria')) {
+            registrarAuditoria("DELETE", "metodos_pago", $id, null, null, "Métodos de Pago", "Método de pago eliminado ID: {$id}");
+        }
+        return ['success' => true, 'message' => 'Método de pago eliminado exitosamente'];
+    }
+    $err = $stmt->error;
+    $stmt->close();
+    return ['success' => false, 'message' => 'Error al eliminar método: ' . $err];
+}
+
+// ==============================================================================
+// GESTIÓN Y DECLARACIÓN DE PAGOS
+// ==============================================================================
+
+/**
+ * Búsqueda de estudiante por cédula para pagos
+ */
+function buscarEstudiantePorCedulaPagos($cedula) {
+    global $db;
+    $cedula_limpia = trim($cedula);
+    if (empty($cedula_limpia)) return null;
+    
+    $query = "SELECT u.id, u.nombre, u.idusuario, u.idusuario AS cedula, u.carrera, u.email,
+                     COALESCE(c.nombre_carrera, 'Sin Carrera Asignada') AS nombre_carrera
+              FROM users u 
+              LEFT JOIN carreras c ON u.carrera = c.id_carrera 
+              WHERE u.idusuario = ? AND u.estudiante = 1 AND u.status = 1
+              LIMIT 1";
+              
+    $stmt = $db->prepare($query);
+    if (!$stmt) return null;
+    
+    $stmt->bind_param("s", $cedula_limpia);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $estudiante = ($result && $result->num_rows > 0) ? $result->fetch_assoc() : null;
+    $stmt->close();
+    
+    return $estudiante;
+}
+
+/**
+ * Búsqueda reactiva AJAX de estudiantes
+ */
+function buscarEstudiantesPagosAjax($termino = '', $limit = 15) {
+    global $db;
+    $termino = trim($termino);
+    if (empty($termino)) return [];
+    
+    $search = "%" . $termino . "%";
+    $limit = max(1, min(50, intval($limit)));
+    
+    $query = "SELECT u.id, u.nombre, u.idusuario, u.idusuario AS cedula, u.carrera,
+                     COALESCE(c.nombre_carrera, 'Sin Carrera Asignada') AS nombre_carrera
+              FROM users u
+              LEFT JOIN carreras c ON u.carrera = c.id_carrera
+              WHERE (u.idusuario LIKE ? OR u.nombre LIKE ?)
+                AND u.estudiante = 1 
+                AND u.status = 1
+              ORDER BY u.nombre ASC
+              LIMIT ?";
+              
+    $stmt = $db->prepare($query);
+    if (!$stmt) return [];
+    
+    $stmt->bind_param("ssi", $search, $search, $limit);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $estudiantes = [];
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $estudiantes[] = $row;
+        }
+    }
+    $stmt->close();
+    return $estudiantes;
+}
+
+/**
+ * Registra un pago completo con todos los campos nuevos
+ */
+function registrarPago($estudiante_id, $tipo_pago, $otro_concepto, $monto, $observaciones, $registrado_por, $metodo_pago = 'Transferencia', $banco_destino_id = null, $banco_origen = null, $fecha_transaccion = null, $referencia = null, $comprobante = null, $status_pago = 'aprobado') {
+    global $db;
+    $estudiante_id    = intval($estudiante_id);
+    $tipo_pago        = strval($tipo_pago);
+    $otro_concepto    = trim($otro_concepto);
+    $monto            = floatval($monto);
+    $observaciones    = trim($observaciones);
+    $registrado_por   = intval($registrado_por);
+    $metodo_pago      = trim($metodo_pago) ?: 'Transferencia';
+    $banco_destino_id = $banco_destino_id ? intval($banco_destino_id) : null;
+    $banco_origen     = trim($banco_origen);
+    $fecha_transaccion = $fecha_transaccion ? date('Y-m-d', strtotime($fecha_transaccion)) : date('Y-m-d');
+    $referencia       = trim($referencia);
+    $comprobante      = trim($comprobante);
+    $status_pago      = in_array($status_pago, ['pendiente', 'aprobado', 'rechazado']) ? $status_pago : 'aprobado';
+    
+    if ($estudiante_id <= 0 || $monto <= 0) {
+        return false;
+    }
+    
+    $query = "INSERT INTO pagos (estudiante_id, tipo_pago, otro_concepto, monto, fecha_transaccion, metodo_pago, banco_origen, banco_destino_id, referencia, comprobante, status_pago, fecha_pago, observaciones, registrado_por) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)";
+              
+    $stmt = $db->prepare($query);
+    if (!$stmt) {
+        error_log("Error preparando registrarPago: " . $db->error);
+        return false;
+    }
+    
+    $stmt->bind_param(
+        "issdsssissssi",
+        $estudiante_id, $tipo_pago, $otro_concepto, $monto, $fecha_transaccion,
+        $metodo_pago, $banco_origen, $banco_destino_id, $referencia, $comprobante,
+        $status_pago, $observaciones, $registrado_por
+    );
+    
+    if ($stmt->execute()) {
+        $pago_id = $stmt->insert_id;
+        $stmt->close();
+        
+        if (function_exists('registrarAuditoria')) {
+            $valores_nuevos = [
+                'estudiante_id' => $estudiante_id,
+                'tipo_pago' => $tipo_pago,
+                'otro_concepto' => $otro_concepto,
+                'monto' => $monto,
+                'observaciones' => $observaciones,
+                'registrado_por' => $registrado_por
+            ];
+            
+            registrarAuditoria("INSERT", "pagos", $pago_id, null, $valores_nuevos, "Pagos", "Registro de nuevo pago");
+        }
+        return true;
+    }
+    $stmt->close();
+    return false;
+}
+
+/**
+ * Declaración de pago por parte del estudiante (con comprobante obligatorio)
+ */
+function declararPagoEstudiante($estudiante_id, $tipo_pago, $otro_concepto, $monto, $metodo_pago, $banco_destino_id, $banco_origen, $fecha_transaccion, $referencia, $archivo_comprobante, $observaciones = '') {
+    $estudiante_id = intval($estudiante_id);
+    $monto         = floatval($monto);
+    $referencia    = trim($referencia);
+    
+    if ($estudiante_id <= 0) {
+        return ['success' => false, 'message' => 'Sesión de estudiante inválida'];
+    }
+    if ($monto <= 0) {
+        return ['success' => false, 'message' => 'El monto cancelado debe ser mayor a cero'];
+    }
+    if (empty($referencia)) {
+        return ['success' => false, 'message' => 'El número de referencia bancaria es obligatorio'];
+    }
+    if (empty($archivo_comprobante) || empty($archivo_comprobante['tmp_name'])) {
+        return ['success' => false, 'message' => 'El comprobante/capture de pago es obligatorio'];
+    }
+    
+    // Subida y validación del archivo de comprobante
+    $allowed_extensions = ['jpg', 'jpeg', 'png', 'pdf'];
+    $file_ext = strtolower(pathinfo($archivo_comprobante['name'], PATHINFO_EXTENSION));
+    
+    if (!in_array($file_ext, $allowed_extensions)) {
+        return ['success' => false, 'message' => 'Formato no permitido. Solo se aceptan imágenes JPG, PNG o documentos PDF'];
+    }
+    
+    if ($archivo_comprobante['size'] > 5 * 1024 * 1024) { // Máximo 5MB
+        return ['success' => false, 'message' => 'El archivo no debe exceder los 5MB de tamaño'];
+    }
+    
+    $upload_dir = __DIR__ . '/../uploads/comprobantes_pagos/';
+    if (!is_dir($upload_dir)) {
+        @mkdir($upload_dir, 0777, true);
+    }
+    
+    $unique_name = 'pago_' . $estudiante_id . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $file_ext;
+    $target_file = $upload_dir . $unique_name;
+    
+    $moved = is_uploaded_file($archivo_comprobante['tmp_name']) 
+        ? move_uploaded_file($archivo_comprobante['tmp_name'], $target_file) 
+        : @copy($archivo_comprobante['tmp_name'], $target_file);
+        
+    if (!$moved) {
+        return ['success' => false, 'message' => 'Error al guardar el archivo del comprobante en el servidor'];
+    }
+    
+    $comprobante_rel_path = 'uploads/comprobantes_pagos/' . $unique_name;
+    
+    $pago_id = registrarPago(
+        $estudiante_id, $tipo_pago, $otro_concepto, $monto, $observaciones,
+        $estudiante_id, $metodo_pago, $banco_destino_id, $banco_origen,
+        $fecha_transaccion, $referencia, $comprobante_rel_path, 'pendiente'
+    );
+    
+    if ($pago_id) {
+        return ['success' => true, 'message' => 'Su pago ha sido declarado exitosamente y está pendiente de verificación.', 'pago_id' => $pago_id];
+    }
+    
+    @unlink($target_file);
+    return ['success' => false, 'message' => 'Ocurrió un error al registrar el pago en la base de datos'];
+}
+
+/**
+ * Obtener todos los pagos declarados por un estudiante
+ */
+function obtenerPagosEstudiante($estudiante_id) {
+    global $db;
+    $estudiante_id = intval($estudiante_id);
+    
+    $query = "SELECT p.*, 
+                     COALESCE(tp.tipopago, p.otro_concepto, 'Arancel') AS nombre_tipo_pago,
+                     b.nombre_banco AS nombre_banco_destino
+              FROM pagos p
+              LEFT JOIN tipo_pago tp ON (p.tipo_pago = tp.id OR p.tipo_pago = tp.tipopago)
+              LEFT JOIN bancos b ON p.banco_destino_id = b.id
+              WHERE p.estudiante_id = ?
+              ORDER BY p.fecha_pago DESC";
+              
+    $stmt = $db->prepare($query);
+    if (!$stmt) return [];
+    
+    $stmt->bind_param("i", $estudiante_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $pagos = [];
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $pagos[] = $row;
+        }
+    }
+    $stmt->close();
+    return $pagos;
+}
+
+/**
+ * Cambiar estado de un pago (Aprobar o Rechazar)
+ */
+function cambiarEstadoPagoAdmin($pago_id, $nuevo_estado, $motivo_rechazo = '', $admin_id = 0) {
+    global $db;
+    $pago_id       = intval($pago_id);
+    $nuevo_estado  = in_array($nuevo_estado, ['pendiente', 'aprobado', 'rechazado']) ? $nuevo_estado : 'aprobado';
+    $motivo_rechazo = trim($motivo_rechazo);
+    $admin_id      = intval($admin_id);
+    
+    $stmt = $db->prepare("UPDATE pagos SET status_pago = ?, motivo_rechazo = ?, registrado_por = ? WHERE id = ?");
+    if (!$stmt) return false;
+    
+    $stmt->bind_param("ssii", $nuevo_estado, $motivo_rechazo, $admin_id, $pago_id);
+    $ok = $stmt->execute();
+    $stmt->close();
+    
+    if ($ok && function_exists('registrarAuditoria')) {
+        registrarAuditoria("UPDATE", "pagos", $pago_id, null, ['status_pago' => $nuevo_estado, 'motivo_rechazo' => $motivo_rechazo], "Pagos", "Pago ID {$pago_id} marcado como " . strtoupper($nuevo_estado));
+    }
+    return $ok;
+}
+
+/**
+ * Obtener todos los pagos registrados en el sistema
+ */
+function obtenerTodosLosPagos($limit = 500, $filtro_status = '') {
+    global $db;
+    $limit = intval($limit);
+    
+    $where = [];
+    $params = [];
+    $types = "";
+    
+    if (!empty($filtro_status)) {
+        $where[] = "p.status_pago = ?";
+        $params[] = $filtro_status;
+        $types .= "s";
+    }
+    
+    $where_sql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+    
+    $query = "SELECT p.*, 
+                     u.nombre as nombre_estudiante, 
+                     u.idusuario as cedula, 
+                     u.email as email_estudiante,
+                     COALESCE(c.nombre_carrera, 'Sin Carrera') as nombre_carrera,
+                     COALESCE(tp.tipopago, p.otro_concepto, 'Otro Concepto') as nombre_tipo_pago,
+                     COALESCE(ur.nombre, 'Sistema') as nombre_registrador,
+                     b.nombre_banco as nombre_banco_destino,
+                     b.numero_cuenta as cuenta_banco_destino,
+                     b.telefono_pago_movil as telefono_banco_destino,
+                     b.titular as titular_banco_destino,
+                     b.rif_cedula as rif_banco_destino
+              FROM pagos p
+              INNER JOIN users u ON p.estudiante_id = u.id
+              LEFT JOIN carreras c ON u.carrera = c.id_carrera
+              LEFT JOIN tipo_pago tp ON (p.tipo_pago = tp.id OR p.tipo_pago = tp.tipopago)
+              LEFT JOIN users ur ON p.registrado_por = ur.id
+              LEFT JOIN bancos b ON p.banco_destino_id = b.id
+              {$where_sql}
+              ORDER BY p.fecha_pago DESC
+              LIMIT ?";
+              
+    $stmt = $db->prepare($query);
+    if (!$stmt) return [];
+    
+    $params[] = $limit;
+    $types .= "i";
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $pagos = [];
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $pagos[] = $row;
+        }
+    }
+    $stmt->close();
+    return $pagos;
+}
+
+/**
+ * Obtiene el total recaudado en el día actual
+ */
+function obtenerTotalPagosDelDia() {
+    global $db;
+    $query = "SELECT SUM(monto) as total FROM pagos WHERE DATE(fecha_pago) = CURDATE() AND status_pago = 'aprobado'";
+    $result = $db->query($query);
+    if ($result) {
+        $row = $result->fetch_assoc();
+        return (float)($row['total'] ?? 0);
+    }
+    return 0.00;
 }
 
 
@@ -18909,9 +19455,13 @@ function inscribirMateriasEstudiante($id_usuario, $id_seccion, $materias_ids) {
         return false;
     }
     
+    $id_periodo = intval($periodo_activo['id_periodo']);
+    $id_usuario = intval($id_usuario);
+    $id_seccion = intval($id_seccion);
+    
     // Obtener información del estudiante para saber su carrera y trayecto
     $info_estudiante = obtenerInfoEstudiantePorId($id_usuario);
-    $id_carrera = $info_estudiante['carrera'] ?? $info_estudiante['id_carrera'] ?? 0;
+    $id_carrera = intval($info_estudiante['carrera'] ?? $info_estudiante['id_carrera'] ?? 0);
     $trayecto_actual = obtenerTrayectoActual($id_usuario, $id_carrera);
     
     if ($id_carrera <= 0) {
@@ -18923,39 +19473,18 @@ function inscribirMateriasEstudiante($id_usuario, $id_seccion, $materias_ids) {
     $db->begin_transaction();
     
     try {
-        // 1. Si se proporcionó una sección VÁLIDA (mayor a 0), inscribir al estudiante en ella
+        // 1. Si se proporcionó una sección VÁLIDA (mayor a 0), inscribir/actualizar al estudiante en ella
         if ($id_seccion > 0) {
-            // Obtener información de la sección
             $sql_seccion = "SELECT * FROM secciones WHERE id_seccion = ?";
             $stmt_seccion = $db->prepare($sql_seccion);
             $stmt_seccion->bind_param("i", $id_seccion);
             $stmt_seccion->execute();
             $result_seccion = $stmt_seccion->get_result();
             $seccion = $result_seccion->fetch_assoc();
+            $stmt_seccion->close();
             
             if (!$seccion) {
                 throw new Exception("Sección no encontrada - ID: $id_seccion");
-            }
-            
-            // Verificar que la sección pertenezca al período activo
-            if ($seccion['id_periodo'] != $periodo_activo['id_periodo']) {
-                throw new Exception("La sección no pertenece al período activo.");
-            }
-            
-            // Verificar capacidad de la sección
-            if ($seccion['capacidad_maxima'] > 0) {
-                $sql_capacidad = "SELECT COUNT(*) as total_inscritos 
-                                 FROM estudiante_seccion 
-                                 WHERE id_seccion = ? AND estatus = 'Activo'";
-                $stmt_capacidad = $db->prepare($sql_capacidad);
-                $stmt_capacidad->bind_param("i", $id_seccion);
-                $stmt_capacidad->execute();
-                $result_capacidad = $stmt_capacidad->get_result();
-                $row_capacidad = $result_capacidad->fetch_assoc();
-                
-                if ($row_capacidad['total_inscritos'] >= $seccion['capacidad_maxima']) {
-                    throw new Exception("La sección ha alcanzado su capacidad máxima.");
-                }
             }
             
             // Verificar si el estudiante ya está inscrito en esta sección
@@ -18964,121 +19493,125 @@ function inscribirMateriasEstudiante($id_usuario, $id_seccion, $materias_ids) {
             $stmt_check_seccion->bind_param("ii", $id_usuario, $id_seccion);
             $stmt_check_seccion->execute();
             $result_check_seccion = $stmt_check_seccion->get_result();
+            $stmt_check_seccion->close();
             
             if ($result_check_seccion->num_rows == 0) {
                 // Inscribir al estudiante en la sección
                 $sql_inscripcion_seccion = "INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus) 
-                                           VALUES (?, ?, NOW(), 'Activo')";
+                                           VALUES (?, ?, NOW(), 'activo')";
                 $stmt_inscripcion_seccion = $db->prepare($sql_inscripcion_seccion);
                 $stmt_inscripcion_seccion->bind_param("ii", $id_usuario, $id_seccion);
                 
                 if (!$stmt_inscripcion_seccion->execute()) {
                     throw new Exception("Error al inscribir estudiante en sección: " . $stmt_inscripcion_seccion->error);
                 }
+                $stmt_inscripcion_seccion->close();
+            } else {
+                $sql_up_sec = "UPDATE estudiante_seccion SET estatus = 'activo', fecha_inscripcion = NOW() WHERE id_usuario = ? AND id_seccion = ?";
+                $stmt_up_sec = $db->prepare($sql_up_sec);
+                $stmt_up_sec->bind_param("ii", $id_usuario, $id_seccion);
+                $stmt_up_sec->execute();
+                $stmt_up_sec->close();
             }
-            
-            $trayecto_seccion = $seccion['id_trayecto'];
-        } else {
-            // No hay sección seleccionada, usar el trayecto actual del estudiante
-            $trayecto_seccion = $trayecto_actual;
         }
         
-        // 2. Verificar que las materias pertenezcan al trayecto correcto
-        $materias_validadas = [];
+        // 2. Inscribir cada materia en estudiante_materias y notas_definitivas
+        $inscripciones_exitosas = 0;
+        
         foreach ($materias_ids as $id_materia) {
+            $id_materia = intval($id_materia);
+            if ($id_materia <= 0) continue;
+            
             $sql_materia = "SELECT m.* 
                            FROM materias m
                            INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
                            WHERE m.id_materia = ? 
                            AND cm.id_carrera = ? 
-                           AND m.trayecto = ?
-                           AND m.activa = 1";
+                           AND m.activa = 1 LIMIT 1";
             
             $stmt_materia = $db->prepare($sql_materia);
-            $stmt_materia->bind_param("iii", $id_materia, $id_carrera, $trayecto_seccion);
+            $stmt_materia->bind_param("ii", $id_materia, $id_carrera);
             $stmt_materia->execute();
             $result_materia = $stmt_materia->get_result();
+            $materia_data = $result_materia->fetch_assoc();
+            $stmt_materia->close();
             
-            if ($result_materia->num_rows > 0) {
-                $materia_data = $result_materia->fetch_assoc();
-                $materias_validadas[$id_materia] = $materia_data;
-            } else {
-                // Intentar buscar sin validar trayecto (por si hay inconsistencia)
-                $sql_materia2 = "SELECT m.* 
-                               FROM materias m
-                               INNER JOIN carrera_materia cm ON m.id_materia = cm.id_materia
-                               WHERE m.id_materia = ? 
-                               AND cm.id_carrera = ? 
-                               AND m.activa = 1";
-                
-                $stmt_materia2 = $db->prepare($sql_materia2);
-                $stmt_materia2->bind_param("ii", $id_materia, $id_carrera);
-                $stmt_materia2->execute();
-                $result_materia2 = $stmt_materia2->get_result();
-                
-                if ($result_materia2->num_rows > 0) {
-                    $materia_data = $result_materia2->fetch_assoc();
-                    // Verificar que la materia sea del trayecto correcto
-                    if ($materia_data['trayecto'] == $trayecto_seccion) {
-                        $materias_validadas[$id_materia] = $materia_data;
-                    } else {
-                        error_log("Advertencia: Materia ID $id_materia es del trayecto {$materia_data['trayecto']} pero se esperaba $trayecto_seccion.");
-                    }
-                } else {
-                    error_log("Advertencia: Materia ID $id_materia no pertenece a la carrera $id_carrera o no está activa.");
-                }
+            if (!$materia_data) {
+                error_log("Advertencia: Materia ID $id_materia no encontrada para carrera $id_carrera.");
+                continue;
             }
-        }
-        
-        if (empty($materias_validadas)) {
-            throw new Exception("No hay materias válidas para inscribir.");
-        }
-        
-        // 3. Inscribir cada materia en notas_definitivas
-        $inscripciones_exitosas = 0;
-        
-        foreach ($materias_validadas as $id_materia => $materia_data) {
-            // Verificar si ya está inscrito en esta materia en el mismo período
-            $sql_check_materia = "SELECT * FROM notas_definitivas 
+            
+            $trayecto_mat = intval($materia_data['trayecto']);
+            
+            // A) Insertar o actualizar en estudiante_materias
+            $q_em_check = "SELECT id_inscripcion FROM estudiante_materias WHERE id_usuario = ? AND id_materia = ? AND id_periodo = ?";
+            $stmt_em_check = $db->prepare($q_em_check);
+            $stmt_em_check->bind_param("iii", $id_usuario, $id_materia, $id_periodo);
+            $stmt_em_check->execute();
+            $res_em = $stmt_em_check->get_result();
+            $stmt_em_check->close();
+            
+            $val_seccion = ($id_seccion > 0) ? $id_seccion : null;
+            
+            if ($res_em->num_rows == 0) {
+                $q_em_ins = "INSERT INTO estudiante_materias (id_usuario, id_materia, id_seccion, id_periodo, fecha_inscripcion, estatus, nota_final) 
+                             VALUES (?, ?, ?, ?, NOW(), 'activo', NULL)";
+                $stmt_em_ins = $db->prepare($q_em_ins);
+                $stmt_em_ins->bind_param("iiii", $id_usuario, $id_materia, $val_seccion, $id_periodo);
+                if (!$stmt_em_ins->execute()) {
+                    throw new Exception("Error al insertar en estudiante_materias para materia $id_materia: " . $stmt_em_ins->error);
+                }
+                $stmt_em_ins->close();
+            } else {
+                $row_em = $res_em->fetch_assoc();
+                $id_inscripcion = intval($row_em['id_inscripcion']);
+                $q_em_up = "UPDATE estudiante_materias SET id_seccion = ?, estatus = 'activo', fecha_inscripcion = NOW() WHERE id_inscripcion = ?";
+                $stmt_em_up = $db->prepare($q_em_up);
+                $stmt_em_up->bind_param("ii", $val_seccion, $id_inscripcion);
+                $stmt_em_up->execute();
+                $stmt_em_up->close();
+            }
+            
+            // B) Insertar o asegurar registro en notas_definitivas
+            $sql_check_materia = "SELECT id FROM notas_definitivas 
                                  WHERE id_usuario = ? 
                                  AND id_materia = ? 
                                  AND id_periodo = ?";
             $stmt_check_materia = $db->prepare($sql_check_materia);
-            $stmt_check_materia->bind_param("iii", $id_usuario, $id_materia, $periodo_activo['id_periodo']);
+            $stmt_check_materia->bind_param("iii", $id_usuario, $id_materia, $id_periodo);
             $stmt_check_materia->execute();
             $result_check_materia = $stmt_check_materia->get_result();
+            $stmt_check_materia->close();
             
             if ($result_check_materia->num_rows == 0) {
-                // Crear registro en notas_definitivas
-                $columna_trayecto = "trayecto_" . $materia_data['trayecto'];
-                
+                $columna_trayecto = "trayecto_" . $trayecto_mat;
                 $sql_notas = "INSERT INTO notas_definitivas 
                              (id_usuario, id_materia, id_periodo, fecha_registro, $columna_trayecto) 
                              VALUES (?, ?, ?, NOW(), NULL)";
                 $stmt_notas = $db->prepare($sql_notas);
-                $stmt_notas->bind_param("iii", $id_usuario, $id_materia, $periodo_activo['id_periodo']);
+                $stmt_notas->bind_param("iii", $id_usuario, $id_materia, $id_periodo);
                 
                 if (!$stmt_notas->execute()) {
                     throw new Exception("Error al crear registro de notas para materia ID $id_materia: " . $stmt_notas->error);
                 }
-                
-                $inscripciones_exitosas++;
-                
-                error_log("✅ Estudiante ID $id_usuario inscrito en materia ID $id_materia (Trayecto {$materia_data['trayecto']}) para período ID " . $periodo_activo['id_periodo']);
-            } else {
-                error_log("ℹ️ Advertencia: Estudiante ID $id_usuario ya está inscrito en materia ID $id_materia para este período.");
+                $stmt_notas->close();
             }
+            
+            $inscripciones_exitosas++;
+            error_log("✅ Estudiante ID $id_usuario inscrito en materia ID $id_materia (Trayecto $trayecto_mat) para período ID $id_periodo");
         }
         
-        // 4. Confirmar transacción
+        if ($inscripciones_exitosas == 0) {
+            throw new Exception("No se pudo inscribir ninguna materia.");
+        }
+        
+        // 3. Confirmar transacción
         $db->commit();
         
-        error_log("✅ Inscripción exitosa: Estudiante ID $id_usuario inscrito con $inscripciones_exitosas materias." . ($id_seccion > 0 ? " Sección: $id_seccion" : " Sin sección asignada"));
-        
+        error_log("✅ Inscripción exitosa: Estudiante ID $id_usuario inscrito con $inscripciones_exitosas materias.");
         return true;
         
     } catch (Exception $e) {
-        // Revertir transacción en caso de error
         $db->rollback();
         error_log("❌ Error en inscripción: " . $e->getMessage());
         return false;
@@ -19492,22 +20025,26 @@ function obtenerMateriasInscritasActuales($id_usuario) {
         return [];
     }
     
-    // Buscar materias que tienen registro en notas_definitivas para el período actual
-    // Esto significa que están inscritas en este período
-    $sql = "SELECT DISTINCT m.*, nd.id_periodo
-            FROM notas_definitivas nd
-            INNER JOIN materias m ON nd.id_materia = m.id_materia
-            WHERE nd.id_usuario = ?
-            AND nd.id_periodo = ?
-            ORDER BY m.trayecto, m.nombre_materia";
+    $id_periodo = intval($periodo_activo['id_periodo']);
+    $id_usuario = intval($id_usuario);
+    
+    // Buscar materias que tienen registro en estudiante_materias o notas_definitivas para el período actual
+    $sql = "SELECT DISTINCT m.*, ? as id_periodo
+            FROM materias m
+            WHERE m.id_materia IN (
+                SELECT id_materia FROM estudiante_materias WHERE id_usuario = ? AND id_periodo = ? AND estatus = 'activo'
+                UNION
+                SELECT id_materia FROM notas_definitivas WHERE id_usuario = ? AND id_periodo = ?
+            )
+            ORDER BY m.trayecto ASC, m.nombre_materia ASC";
     
     $stmt = $db->prepare($sql);
     if (!$stmt) {
-        error_log("Error preparando consulta: " . $db->error);
+        error_log("Error preparando consulta obtenerMateriasInscritasActuales: " . $db->error);
         return [];
     }
     
-    $stmt->bind_param("ii", $id_usuario, $periodo_activo['id_periodo']);
+    $stmt->bind_param("iiiii", $id_periodo, $id_usuario, $id_periodo, $id_usuario, $id_periodo);
     $stmt->execute();
     $result = $stmt->get_result();
     
@@ -19515,6 +20052,7 @@ function obtenerMateriasInscritasActuales($id_usuario) {
     while ($row = $result->fetch_assoc()) {
         $materias_inscritas[] = $row;
     }
+    $stmt->close();
     
     return $materias_inscritas;
 }

@@ -17,6 +17,53 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Manejar búsqueda en tiempo real AJAX por POST (debe ir ANTES de cualquier include de HTML)
+if (isset($_POST['ajax_buscar_estudiante'])) {
+    if (ob_get_length()) {
+        ob_clean();
+    }
+    header('Content-Type: application/json; charset=utf-8');
+    $cedula = trim($_POST['cedula'] ?? '');
+    
+    if (empty($cedula)) {
+        echo json_encode(['success' => true, 'estudiantes' => []]);
+        exit();
+    }
+    
+    $query = "SELECT u.id, u.idusuario AS cedula, u.nombre, u.carrera AS id_carrera, c.nombre_carrera, u.email, u.tlf, u.cel
+              FROM users u
+              LEFT JOIN carreras c ON (u.carrera = c.id_carrera OR u.carrera = c.cod_carrera)
+              WHERE u.estudiante = 1 
+              AND (u.idusuario LIKE CONCAT('%', ?, '%') OR u.nombre LIKE CONCAT('%', ?, '%'))
+              ORDER BY u.nombre ASC
+              LIMIT 12";
+              
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        $stmt->bind_param("ss", $cedula, $cedula);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $estudiantes = [];
+        while ($row = $res->fetch_assoc()) {
+            $carrera_nom = !empty($row['nombre_carrera']) ? $row['nombre_carrera'] : ($row['id_carrera'] ?? 'No asignada');
+            $tray = function_exists('obtenerTrayectoActual') ? obtenerTrayectoActual($row['id'], intval($row['id_carrera'])) : 0;
+            $estudiantes[] = [
+                'id' => intval($row['id']),
+                'cedula' => $row['cedula'],
+                'nombre' => $row['nombre'],
+                'carrera' => $carrera_nom,
+                'trayecto' => $tray,
+                'contacto' => !empty($row['tlf']) ? $row['tlf'] : (!empty($row['cel']) ? $row['cel'] : $row['email'])
+            ];
+        }
+        $stmt->close();
+        echo json_encode(['success' => true, 'estudiantes' => $estudiantes]);
+    } else {
+        echo json_encode(['success' => false, 'error' => $db->error]);
+    }
+    exit();
+}
+
 // Generar token CSRF
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -71,28 +118,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cedula = trim($_POST['cedula'] ?? '');
             
             if (empty($cedula)) {
-                $mensaje = "Por favor ingrese una cédula";
+                $mensaje = "Por favor ingrese una cédula o nombre";
                 $tipo_mensaje = 'warning';
             } else {
                 try {
                     $resultados = buscarEstudiantePorCedula($cedula);
                     
                     if (is_array($resultados) && !empty($resultados)) {
-                        if (isset($resultados['id'])) {
-                            // Un solo resultado
-                            $estudiantes_encontrados = [$resultados];
-                        } else {
-                            // Múltiples resultados
-                            $estudiantes_encontrados = $resultados;
-                        }
-                        
-                        if (count($estudiantes_encontrados) == 1) {
-                            // Seleccionar automáticamente si solo hay uno
-                            $info_estudiante = obtenerInfoEstudiantePorId($estudiantes_encontrados[0]['id']);
+                        $est_sel = isset($resultados['id']) ? $resultados : $resultados[0];
+                        $info_estudiante = obtenerInfoEstudiantePorId($est_sel['id']);
+                        if ($info_estudiante) {
                             $_SESSION['estudiante_seleccionado'] = $info_estudiante['id'];
+                        } else {
+                            $mensaje = "No se pudo cargar la información del estudiante.";
+                            $tipo_mensaje = 'warning';
                         }
                     } else {
-                        $mensaje = "No se encontraron estudiantes con la cédula: " . htmlspecialchars($cedula);
+                        $mensaje = "No se encontraron estudiantes con la cédula/nombre: " . htmlspecialchars($cedula);
                         $tipo_mensaje = 'warning';
                     }
                 } catch (Exception $e) {
@@ -470,107 +512,67 @@ if (!empty($mensaje)) {
         </div>
     </div>
 
-    <!-- Búsqueda por cédula -->
+    <!-- Búsqueda por cédula o nombre en tiempo real -->
     <div class="row">
         <div class="col-md-12">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <i class="fas fa-search mr-1"></i>
-                    Buscar Estudiante por Cédula
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-search mr-1"></i> Buscar Estudiante para Inscripción</span>
+                    <span class="badge badge-light text-primary"><i class="fas fa-bolt text-warning mr-1"></i> Búsqueda en Tiempo Real</span>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="">
+                    <form method="POST" action="" id="form_buscar_estudiante">
                         <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                         <div class="row">
-                            <div class="col-md-8">
-                                <div class="form-group">
-                                    <label for="cedula">Número de Cédula</label>
+                            <div class="col-md-9 position-relative">
+                                <div class="form-group mb-2 mb-md-0 position-relative">
+                                    <label for="cedula" class="font-weight-bold">Cédula o Nombre del Estudiante</label>
                                     <div class="input-group">
                                         <div class="input-group-prepend">
-                                            <span class="input-group-text"><i class="fas fa-id-card"></i></span>
+                                            <span class="input-group-text bg-white"><i class="fas fa-id-card text-primary"></i></span>
                                         </div>
                                         <input type="text" 
-                                               class="form-control" 
+                                               class="form-control form-control-lg" 
                                                id="cedula" 
                                                name="cedula" 
-                                               placeholder="Ingrese la cédula del estudiante" 
+                                               autocomplete="off"
+                                               placeholder="Escriba la cédula o nombre del estudiante..." 
                                                value="<?php echo isset($_POST['cedula']) ? htmlspecialchars($_POST['cedula']) : ''; ?>"
-                                               required
-                                               pattern="[0-9]+"
-                                               title="Solo números permitidos">
+                                               required>
+                                        <div class="input-group-append" id="spinner_busqueda" style="display: none;">
+                                            <span class="input-group-text bg-white text-primary">
+                                                <i class="fas fa-spinner fa-spin"></i>
+                                            </span>
+                                        </div>
                                     </div>
-                                    <small class="form-text text-muted">Ingrese el número de cédula (solo números).</small>
+                                    <small class="form-text text-muted">Las sugerencias aparecerán automáticamente mientras escribe.</small>
+                                    
+                                    <!-- Contenedor flotante de sugerencias en tiempo real -->
+                                    <div id="sugerencias_estudiantes" class="list-group shadow position-absolute w-100 mt-1" 
+                                         style="z-index: 9999; display: none; max-height: 350px; overflow-y: auto; left: 0; right: 0; background: #ffffff; border: 1px solid #ced4da; border-radius: 4px;">
+                                    </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <div class="form-group">
-                                    <label>&nbsp;</label>
-                                    <button type="submit" name="buscar_cedula" class="btn btn-primary btn-block">
-                                        <i class="fas fa-search mr-1"></i> Buscar Estudiante
+                            <div class="col-md-3 d-flex align-items-end">
+                                <div class="form-group mb-0 w-100">
+                                    <button type="submit" name="buscar_cedula" class="btn btn-primary btn-lg btn-block shadow-sm">
+                                        <i class="fas fa-search mr-1"></i> Buscar
                                     </button>
                                 </div>
                             </div>
                         </div>
                     </form>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Mostrar resultados de búsqueda -->
-    <?php if (!empty($estudiantes_encontrados) && count($estudiantes_encontrados) > 1): ?>
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card mb-4">
-                <div class="card-header bg-info text-white">
-                    <i class="fas fa-users mr-1"></i>
-                    Resultados de Búsqueda
-                </div>
-                <div class="card-body">
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> Se encontraron <?php echo count($estudiantes_encontrados); ?> estudiantes. Seleccione uno:
-                    </div>
-                    
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-hover">
-                            <thead class="thead-light">
-                                <tr>
-                                    <th>Cédula</th>
-                                    <th>Nombre Completo</th>
-                                    <th>Carrera</th>
-                                    <th>Contacto</th>
-                                    <th>Acción</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($estudiantes_encontrados as $est): ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($est['cedula']); ?></td>
-                                    <td><?php echo htmlspecialchars($est['nombre']); ?></td>
-                                    <td><?php echo htmlspecialchars($est['carrera']); ?></td>
-                                    <td>
-                                        <?php echo htmlspecialchars($est['contacto']); ?><br>
-                                        <small><?php echo htmlspecialchars($est['email']); ?></small>
-                                    </td>
-                                    <td>
-                                        <form method="POST" action="" style="display: inline;">
-                                            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-                                            <input type="hidden" name="id_estudiante" value="<?php echo $est['id']; ?>">
-                                            <button type="submit" name="seleccionar_estudiante" class="btn btn-sm btn-success">
-                                                <i class="fas fa-check mr-1"></i> Seleccionar
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                    <!-- Formulario oculto para selección directa por POST -->
+                    <form method="POST" action="" id="form_seleccion_directa" style="display: none;">
+                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                        <input type="hidden" name="id_estudiante" id="id_estudiante_directo" value="0">
+                        <input type="hidden" name="seleccionar_estudiante" value="1">
+                    </form>
                 </div>
             </div>
         </div>
     </div>
-    <?php endif; ?>
 
     <?php if ($info_estudiante): ?>
     <!-- Información del estudiante seleccionado -->
@@ -962,9 +964,10 @@ if (!empty($mensaje)) {
                             </div>
                         <?php endif; ?>
                         
-                        <form method="POST" action="">
+                        <form method="POST" action="" id="form_inscribir_materias">
                             <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                             <input type="hidden" name="id_estudiante" value="<?php echo $info_estudiante['id']; ?>">
+                            <input type="hidden" name="inscribir_materias" value="1">
                             
                             <div class="form-group">
                                 <label for="id_seccion">Seleccionar Sección (Trayecto <?php echo $trayecto_inscripcion; ?>) <small class="text-muted">(Opcional)</small></label>
@@ -987,86 +990,134 @@ if (!empty($mensaje)) {
                             </div>
                             
                             <div class="form-group">
-                                <label>Materias para Inscripción (Trayecto <?php echo $trayecto_inscripcion; ?>)</label>
-                                <div class="border p-3" style="max-height: 300px; overflow-y: auto;">
+                                <label class="font-weight-bold"><i class="fas fa-book mr-1 text-primary"></i> Materias Disponibles para Inscripción</label>
+                                <div class="border rounded p-3 bg-light" style="max-height: 480px; overflow-y: auto;">
                                     <?php if (empty($materias_disponibles)): ?>
-                                        <div class="alert alert-info">
+                                        <div class="alert alert-info mb-0">
                                             <i class="fas fa-info-circle"></i>
                                             <?php 
                                             if ($trayecto_inscripcion == $trayecto_actual && !$es_estudiante_nuevo) {
-                                                echo "¡Felicidades! Ya está inscrito en todas las materias de este trayecto.";
+                                                echo "¡Excelente! El estudiante ya está inscrito o tiene aprobadas todas las materias disponibles para este trayecto.";
                                             } elseif ($es_estudiante_nuevo) {
                                                 echo "Se mostrarán todas las materias del Trayecto 0 para inscripción inicial.";
                                             } else {
-                                                echo "No hay materias disponibles para este trayecto.";
+                                                echo "No hay materias disponibles para inscribir en este trayecto.";
                                             }
                                             ?>
                                         </div>
-                                    <?php else: ?>
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" id="select_all">
-                                            <label class="form-check-label" for="select_all">
-                                                <strong><i class="fas fa-check-double"></i> Seleccionar todas</strong>
+                                    <?php else: 
+                                        $cnt_nuevas = 0;
+                                        $cnt_repitientes = 0;
+                                        $cnt_arrastres = 0;
+                                        $cnt_ya_inscritas = 0;
+                                        foreach ($materias_disponibles as $m) {
+                                            if (!empty($m['ya_inscrita'])) $cnt_ya_inscritas++;
+                                            elseif (!empty($m['es_repitiente'])) $cnt_repitientes++;
+                                            elseif (!empty($m['es_arrastre'])) $cnt_arrastres++;
+                                            else $cnt_nuevas++;
+                                        }
+                                    ?>
+                                        <!-- Barra de Resumen de Disponibilidad -->
+                                        <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                                            <div>
+                                                <span class="badge badge-primary mr-1"><i class="fas fa-list"></i> Total: <?php echo count($materias_disponibles); ?></span>
+                                                <?php if ($cnt_nuevas > 0): ?>
+                                                    <span class="badge badge-success mr-1"><i class="fas fa-star"></i> <?php echo $cnt_nuevas; ?> Nuevas</span>
+                                                <?php endif; ?>
+                                                <?php if ($cnt_repitientes > 0): ?>
+                                                    <span class="badge badge-danger mr-1"><i class="fas fa-redo"></i> <?php echo $cnt_repitientes; ?> Reinscripciones</span>
+                                                <?php endif; ?>
+                                                <?php if ($cnt_arrastres > 0): ?>
+                                                    <span class="badge badge-warning text-dark mr-1"><i class="fas fa-level-down-alt"></i> <?php echo $cnt_arrastres; ?> Arrastres</span>
+                                                <?php endif; ?>
+                                                <?php if ($cnt_ya_inscritas > 0): ?>
+                                                    <span class="badge badge-secondary mr-1"><i class="fas fa-check"></i> <?php echo $cnt_ya_inscritas; ?> En Curso</span>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="mt-2 mt-sm-0">
+                                                <span class="text-muted small">Créditos seleccionados: <strong id="total_creditos_display" class="text-primary">0</strong> UC</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="custom-control custom-checkbox mb-3 pb-2 border-bottom">
+                                            <input class="custom-control-input" type="checkbox" id="select_all">
+                                            <label class="custom-control-label font-weight-bold text-dark" for="select_all">
+                                                <i class="fas fa-check-double text-primary mr-1"></i> Seleccionar todas las materias disponibles
                                             </label>
                                         </div>
-                                        <hr>
+
+                                        <div class="list-group">
                                         <?php foreach ($materias_disponibles as $materia): 
-                                            $nota_minima = obtenerNotaMinimaMateria($materia['id_materia']);
-                                            $es_proyecto = esProyectoSocio($materia['id_materia']);
-                                            
-                                            // Verificar si ya está inscrita
-                                            $ya_inscrita = materiaYaInscrita($info_estudiante['id'], $materia['id_materia']);
-                                            
-                                            // Verificar si ya fue cursada pero reprobada
-                                            $nota_actual = obtenerNotaMateriaActual($info_estudiante['id'], $materia['id_materia']);
-                                            $reprobada = ($nota_actual !== null && 
-                                                         (($es_proyecto && $nota_actual < 16) || 
-                                                          (!$es_proyecto && $nota_actual < 12)));
-                                            $nueva = ($nota_actual === null);
+                                            $nota_minima = $materia['nota_minima'] ?? obtenerNotaMinimaMateria($materia['id_materia']);
+                                            $es_proyecto = !empty($materia['es_proyecto']);
+                                            $ya_inscrita = !empty($materia['ya_inscrita']);
+                                            $es_repitiente = !empty($materia['es_repitiente']);
+                                            $es_arrastre = !empty($materia['es_arrastre']);
+                                            $nota_anterior = $materia['nota_anterior'] ?? null;
+                                            $periodo_ant = $materia['periodo_anterior'] ?? '';
+                                            $creditos = intval($materia['creditos'] ?? 0);
                                         ?>
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input materia-checkbox" type="checkbox" 
-                                                   name="materias[]" 
-                                                   value="<?php echo $materia['id_materia']; ?>" 
-                                                   id="materia_<?php echo $materia['id_materia']; ?>"
-                                                   <?php echo $ya_inscrita ? 'disabled' : ''; ?>>
-                                            <label class="form-check-label <?php echo $ya_inscrita ? 'text-muted' : ''; ?>" 
-                                                   for="materia_<?php echo $materia['id_materia']; ?>">
-                                                <?php echo htmlspecialchars($materia['cod_materia'] . ' - ' . $materia['nombre_materia']); ?>
-                                                <?php if ($es_proyecto): ?>
-                                                    <span class="badge badge-warning">PROYECTO</span>
-                                                <?php endif; ?>
-                                                <?php if ($ya_inscrita): ?>
-                                                    <span class="badge badge-secondary">YA INSCRITA</span>
-                                                <?php elseif ($reprobada): ?>
-                                                    <span class="badge badge-danger">REPROBADA</span>
-                                                <?php elseif ($nueva): ?>
-                                                    <span class="badge badge-primary">NUEVA</span>
-                                                <?php endif; ?>
-                                                <small class="text-muted d-block">
-                                                    Créditos: <?php echo $materia['creditos']; ?> | 
-                                                    Nota mínima: <?php echo $nota_minima; ?> | 
-                                                    Trayecto: <?php echo $materia['trayecto']; ?>
-                                                    <?php if ($reprobada && $nota_actual !== null): ?>
-                                                        | Nota anterior: <?php echo $nota_actual; ?>
-                                                    <?php endif; ?>
-                                                </small>
-                                            </label>
-                                        </div>
+                                            <div class="list-group-item list-group-item-action d-flex align-items-start p-3 mb-2 rounded border <?php echo $ya_inscrita ? 'bg-light text-muted opacity-75' : ($es_repitiente ? 'border-danger' : ($es_arrastre ? 'border-warning' : '')); ?>">
+                                                <div class="custom-control custom-checkbox mr-3 mt-1">
+                                                    <input class="custom-control-input materia-checkbox" type="checkbox" 
+                                                           name="materias[]" 
+                                                           value="<?php echo $materia['id_materia']; ?>" 
+                                                           data-creditos="<?php echo $creditos; ?>"
+                                                           id="materia_<?php echo $materia['id_materia']; ?>"
+                                                           <?php echo $ya_inscrita ? 'disabled checked' : ''; ?>>
+                                                    <label class="custom-control-label" for="materia_<?php echo $materia['id_materia']; ?>"></label>
+                                                </div>
+                                                <div class="w-100">
+                                                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-1">
+                                                        <h6 class="mb-0 font-weight-bold <?php echo $ya_inscrita ? 'text-muted' : 'text-dark'; ?>">
+                                                            <span class="text-primary"><?php echo htmlspecialchars($materia['cod_materia']); ?></span> - 
+                                                            <?php echo htmlspecialchars($materia['nombre_materia']); ?>
+                                                        </h6>
+                                                        <div class="mt-1 mt-md-0">
+                                                            <?php if ($es_proyecto): ?>
+                                                                <span class="badge badge-info mr-1"><i class="fas fa-project-diagram"></i> PROYECTO</span>
+                                                            <?php endif; ?>
+                                                            
+                                                            <?php if ($ya_inscrita): ?>
+                                                                <span class="badge badge-secondary"><i class="fas fa-check-circle"></i> YA INSCRITA (EN CURSO)</span>
+                                                            <?php elseif ($es_repitiente): ?>
+                                                                <span class="badge badge-danger"><i class="fas fa-redo-alt"></i> REINSCRIPCIÓN (REPITIENTE)</span>
+                                                            <?php elseif ($es_arrastre): ?>
+                                                                <span class="badge badge-warning text-dark"><i class="fas fa-level-down-alt"></i> ARRASTRE (TRAYECTO <?php echo $materia['trayecto']; ?>)</span>
+                                                            <?php else: ?>
+                                                                <span class="badge badge-success"><i class="fas fa-star"></i> NUEVA</span>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    </div>
+                                                    <div class="small text-muted d-flex flex-wrap align-items-center">
+                                                        <span class="mr-3"><i class="fas fa-layer-group text-secondary"></i> Trayecto: <strong><?php echo $materia['trayecto']; ?></strong></span>
+                                                        <span class="mr-3"><i class="fas fa-award text-secondary"></i> Créditos: <strong><?php echo $creditos; ?> UC</strong></span>
+                                                        <span class="mr-3"><i class="fas fa-check-double text-secondary"></i> Nota Mínima: <strong><?php echo $nota_minima; ?> pts</strong></span>
+                                                        
+                                                        <?php if ($es_repitiente && $nota_anterior !== null): ?>
+                                                            <span class="badge badge-pill badge-danger text-white ml-auto">
+                                                                <i class="fas fa-exclamation-triangle"></i> Nota anterior: <strong><?php echo number_format($nota_anterior, 1); ?> pts</strong>
+                                                                <?php if (!empty($periodo_ant)) echo " (" . htmlspecialchars($periodo_ant) . ")"; ?>
+                                                            </span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         <?php endforeach; ?>
+                                        </div>
                                     <?php endif; ?>
                                 </div>
                             </div>
                             
-                            <button type="submit" name="inscribir_materias" class="btn btn-success btn-lg" 
+                            <button type="submit" name="inscribir_materias" class="btn btn-success btn-lg shadow-sm" 
                                     <?php echo (empty($materias_disponibles)) ? 'disabled' : ''; ?>>
                                 <i class="fas fa-save mr-1"></i> Inscribir Materias Seleccionadas
                             </button>
                             
                             <?php if (!empty($materias_inscritas)): ?>
-                            <div class="alert alert-warning mt-3">
-                                <i class="fas fa-exclamation-triangle"></i> 
-                                <strong>Nota:</strong> Las materias marcadas como "YA INSCRITA" no se pueden volver a inscribir en el mismo período.
+                            <div class="alert alert-info mt-3 shadow-sm">
+                                <i class="fas fa-info-circle mr-1"></i> 
+                                <strong>Nota:</strong> Las materias que ya se encuentran inscritas en el período actual aparecen marcadas e inhabilitadas para evitar duplicidad de matrícula.
                             </div>
                             <?php endif; ?>
                         </form>
@@ -1221,9 +1272,52 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    const selectAllCheckbox = document.getElementById('select_all');
+    const materiaCheckboxes = document.querySelectorAll('.materia-checkbox:not(:disabled)');
+    
+    function actualizarEstadoBoton() {
+        const totalCreditosDisplay = document.getElementById('total_creditos_display');
+        let sumaCreditos = 0;
+        let seleccionadas = 0;
+        
+        materiaCheckboxes.forEach(cb => {
+            if (cb.checked) {
+                sumaCreditos += parseInt(cb.getAttribute('data-creditos') || 0, 10);
+                seleccionadas++;
+            }
+        });
+        
+        if (totalCreditosDisplay) {
+            totalCreditosDisplay.textContent = sumaCreditos;
+        }
+        
+        if (btnInscribir) {
+            btnInscribir.disabled = (seleccionadas === 0);
+        }
+    }
+
+    if (selectAllCheckbox && materiaCheckboxes.length > 0) {
+        selectAllCheckbox.addEventListener('change', function() {
+            materiaCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            actualizarEstadoBoton();
+        });
+        
+        materiaCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const allChecked = Array.from(materiaCheckboxes).every(cb => cb.checked);
+                selectAllCheckbox.checked = allChecked;
+                selectAllCheckbox.indeterminate = !allChecked && Array.from(materiaCheckboxes).some(cb => cb.checked);
+                actualizarEstadoBoton();
+            });
+        });
+    }
+
     // Manejar inscripción de materias
     const btnInscribir = document.querySelector('button[name="inscribir_materias"]');
     if (btnInscribir) {
+        actualizarEstadoBoton();
         btnInscribir.addEventListener('click', function(e) {
             e.preventDefault();
             const form = this.closest('form');
@@ -1312,6 +1406,131 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
+    }
+
+    // Búsqueda en tiempo real con debounce
+    const cedulaInput = document.getElementById('cedula');
+    const sugerenciasContainer = document.getElementById('sugerencias_estudiantes');
+    const spinnerBusqueda = document.getElementById('spinner_busqueda');
+    const formSeleccionDirecta = document.getElementById('form_seleccion_directa');
+    const idEstudianteDirecto = document.getElementById('id_estudiante_directo');
+    let searchDebounceTimer = null;
+
+    function ejecutarBusquedaAjax(valor) {
+        valor = (valor || '').trim();
+        clearTimeout(searchDebounceTimer);
+
+        if (valor.length === 0) {
+            sugerenciasContainer.style.display = 'none';
+            sugerenciasContainer.innerHTML = '';
+            if (spinnerBusqueda) spinnerBusqueda.style.display = 'none';
+            return;
+        }
+
+        if (spinnerBusqueda) spinnerBusqueda.style.display = 'flex';
+
+        searchDebounceTimer = setTimeout(() => {
+            const formData = new FormData();
+            formData.append('ajax_buscar_estudiante', '1');
+            formData.append('cedula', valor);
+
+            fetch('', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => {
+                if (!res.ok) throw new Error('Error de red: ' + res.status);
+                return res.json();
+            })
+            .then(data => {
+                if (spinnerBusqueda) spinnerBusqueda.style.display = 'none';
+                sugerenciasContainer.innerHTML = '';
+
+                if (data.success && Array.isArray(data.estudiantes) && data.estudiantes.length > 0) {
+                    data.estudiantes.forEach(est => {
+                        const item = document.createElement('a');
+                        item.href = 'javascript:void(0);';
+                        item.className = 'list-group-item list-group-item-action p-2 d-flex justify-content-between align-items-center border-bottom text-decoration-none';
+                        item.style.cursor = 'pointer';
+                        item.innerHTML = `
+                            <div class="pr-2">
+                                <div class="font-weight-bold text-dark">
+                                    <i class="fas fa-user-graduate text-primary mr-1"></i> ${escapeHtml(est.nombre)}
+                                </div>
+                                <small class="text-muted d-block">
+                                    <i class="fas fa-id-card text-secondary"></i> <strong>${escapeHtml(est.cedula)}</strong> | 
+                                    <i class="fas fa-graduation-cap text-secondary"></i> ${escapeHtml(est.carrera)}
+                                </small>
+                            </div>
+                            <div class="text-right flex-shrink-0">
+                                <span class="badge badge-info mr-1">Trayecto ${est.trayecto}</span>
+                                <span class="btn btn-sm btn-success py-1 px-2"><i class="fas fa-check mr-1"></i> Seleccionar</span>
+                            </div>
+                        `;
+
+                        item.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            if (idEstudianteDirecto && formSeleccionDirecta) {
+                                idEstudianteDirecto.value = est.id;
+                                formSeleccionDirecta.submit();
+                            }
+                        });
+
+                        sugerenciasContainer.appendChild(item);
+                    });
+                    sugerenciasContainer.style.display = 'block';
+                } else {
+                    sugerenciasContainer.innerHTML = `
+                        <div class="list-group-item p-3 text-center text-muted">
+                            <i class="fas fa-search-minus mr-1"></i> No se encontraron estudiantes con "<strong>${escapeHtml(valor)}</strong>".
+                        </div>
+                    `;
+                    sugerenciasContainer.style.display = 'block';
+                }
+            })
+            .catch(err => {
+                if (spinnerBusqueda) spinnerBusqueda.style.display = 'none';
+                console.error("Error en búsqueda en tiempo real:", err);
+            });
+        }, 200);
+    }
+
+    if (cedulaInput && sugerenciasContainer) {
+        cedulaInput.addEventListener('input', function() {
+            ejecutarBusquedaAjax(this.value);
+        });
+
+        cedulaInput.addEventListener('focus', function() {
+            if (this.value.trim().length > 0) {
+                ejecutarBusquedaAjax(this.value);
+            }
+        });
+
+        // Ocultar sugerencias al hacer clic fuera
+        document.addEventListener('click', function(e) {
+            if (!cedulaInput.contains(e.target) && !sugerenciasContainer.contains(e.target)) {
+                sugerenciasContainer.style.display = 'none';
+            }
+        });
+
+        // Ocultar con tecla Escape
+        cedulaInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                sugerenciasContainer.style.display = 'none';
+            }
+        });
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.toString().replace(/[&<>"']/g, m => map[m]);
     }
 });
 </script>
