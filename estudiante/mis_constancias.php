@@ -421,7 +421,7 @@ if ($estudiante) {
 
     // Cargar listas de materias y secciones
     $materias_inscritas = obtenerMateriasInscritasParaRetiro($estudiante_id);
-    $materias_disponibles = ($id_carrera > 0) ? obtenerMateriasDisponiblesParaAdicion($estudiante_id, $id_carrera) : [];
+    $materias_disponibles = ($id_carrera > 0) ? obtenerMateriasDisponiblesParaAdicion($estudiante_id, $id_carrera, null, $estudiante['trayecto_n']) : [];
     
     $secciones_carrera = [];
 

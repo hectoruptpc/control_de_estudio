@@ -251,7 +251,7 @@ if ($estudiante) {
     
     // Cargar listas académicas para modales interactivos
     $materias_inscritas = obtenerMateriasInscritasParaRetiro($estudiante['id']);
-    $materias_disponibles = ($id_carrera > 0) ? obtenerMateriasDisponiblesParaAdicion($estudiante['id'], $id_carrera) : [];
+    $materias_disponibles = ($id_carrera > 0) ? obtenerMateriasDisponiblesParaAdicion($estudiante['id'], $id_carrera, null, $estudiante['trayecto_n']) : [];
     $carreras_disponibles_cambio = function_exists('obtenerCarrerasParaCambio') ? obtenerCarrerasParaCambio($id_carrera) : [];
     if (empty($carreras_disponibles_cambio)) {
         $res_all_c = $db->query("SELECT id_carrera, nombre_carrera, cod_carrera FROM carreras WHERE id_carrera > 0 ORDER BY nombre_carrera ASC");
@@ -741,6 +741,9 @@ include("includes/head.php");
                                     <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
                                 </div>
                                 <div class="modal-body">
+                                    <div class="alert alert-secondary py-1 px-2 small mb-3">
+                                        <i class="fas fa-layer-group mr-1"></i> Nivel del Estudiante: <strong class="text-uppercase"><?php echo htmlspecialchars($estudiante['trayecto_nombre'] ?? 'Nivel Actual'); ?></strong> (Materias de adición filtradas estrictamente por su trayecto).
+                                    </div>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
                                             <div class="card h-100 border-danger">

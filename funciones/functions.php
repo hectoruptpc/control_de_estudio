@@ -24706,13 +24706,22 @@ function obtenerMateriasInscritasParaRetiro($estudiante_id, $id_periodo = null) 
 /**
  * Obtiene las materias disponibles para que el estudiante pueda adicionar.
  */
-function obtenerMateriasDisponiblesParaAdicion($estudiante_id, $id_carrera, $id_periodo = null) {
+function obtenerMateriasDisponiblesParaAdicion($estudiante_id, $id_carrera, $id_periodo = null, $trayecto_num = null) {
     global $db;
     $estudiante_id = intval($estudiante_id);
     $id_carrera = intval($id_carrera);
     if (!$id_periodo) {
         $periodo = obtenerPeriodoActivo($db);
         $id_periodo = intval($periodo['id_periodo'] ?? 0);
+    }
+    
+    // Si no se pasa el trayecto numérico, determinar el trayecto actual del estudiante
+    if ($trayecto_num === null) {
+        $tr_act = ($id_carrera > 0) ? obtenerTrayectoActual($estudiante_id, $id_carrera) : obtenerTrayectoActualEstudiante($estudiante_id);
+        $infoT = obtenerInfoTrayecto($tr_act);
+        $trayecto_num = intval($infoT['numero_trayecto'] ?? 0);
+    } else {
+        $trayecto_num = intval($trayecto_num);
     }
     
     // Obtener materias ya inscritas o aprobadas
@@ -24729,14 +24738,15 @@ function obtenerMateriasDisponiblesParaAdicion($estudiante_id, $id_carrera, $id_
     
     $where_not_in = !empty($excluidas) ? " AND m.id_materia NOT IN (" . implode(',', $excluidas) . ")" : "";
     
+    // Filtrar estrictamente por la carrera y por el trayecto exacto del estudiante
     $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto, m.creditos as uc
               FROM carrera_materia cm
               INNER JOIN materias m ON cm.id_materia = m.id_materia
-              WHERE cm.id_carrera = ? $where_not_in
-              ORDER BY m.trayecto ASC, m.nombre_materia ASC";
+              WHERE cm.id_carrera = ? AND m.trayecto = ? $where_not_in
+              ORDER BY m.nombre_materia ASC";
               
     $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $id_carrera);
+    $stmt->bind_param("ii", $id_carrera, $trayecto_num);
     $stmt->execute();
     $result = $stmt->get_result();
     $disponibles = [];
