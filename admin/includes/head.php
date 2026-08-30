@@ -666,5 +666,3 @@ document.addEventListener('DOMContentLoaded', function() {
 // Actualizar notificaciones cada 30 segundos
 setInterval(actualizarNotificaciones, 30000);
 </script>
-</body>
-</html>
