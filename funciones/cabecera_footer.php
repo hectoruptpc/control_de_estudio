@@ -12,12 +12,8 @@ if (isset($_SESSION['user']['user_type'])) {
 $bootstrap_head ='
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
-      <!-- FAVICON -->
-
-      <link rel="apple-touch-icon" href="'.$pag_web.'/images/favicon/apple-touch-icon.png" sizes="180x180">
-      <link rel="icon" href="'.$pag_web.'/images/favicon/favicon-32x32.png" sizes="32x32" type="image/png">
-      <link rel="icon" href="'.$pag_web.'/images/favicon/favicon-16x16.png" sizes="16x16" type="image/png">
-      <link rel="icon" href="'.$pag_web.'/images/favicon/favicon.ico">
+<!-- FAVICON -->
+<link rel="icon" type="image/svg+xml" href="'.$pag_web.'/images/favicon/favicon.svg">
 
   <!-- JQUERY       -->
       <script src="'.$pag_web.'/funciones/jquery/jquery-3.7.1.js"></script>

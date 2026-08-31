@@ -2,7 +2,7 @@
 // variable declaration
 
     $carpeta = '/control_de_estudio';
-    $logo = '<img src="https://local.jesuministrosymas.com.ve/image/LOGO.png" width="180" height="30"><br><br>';
+    $logo = '<img src="https://repouptpc.github.io/img/LOGO_UPTPC.png" style="max-height: 150px; width: auto;" alt="UPTPC"><br><br>';
     $msn_iniciar_sesion = '<i class="fa fa-exclamation-triangle"></i> Debe iniciar Sesion';
     $como_pagar = '<div class="alert alert-primary" role="alert">
     <h3>COMO EFECTUAR SU PAGO.</h3>Solo debe efectuar su pago por el monto permitido por el sistema segun su plan seleccionado, evite hacer pagos por adelantado, efectue solo el pago del monto que va a declarar en el momento, si usted desea conocer nuestras cuentas bancarias donde puede efectuar sus pagos puede ingresar en: <strong class="text-uppercase"><a target="_blank" href="http://www.jesuministrosymas.com.ve/pagos#TOC-PAGOS-BANCARIOS-EN-VENEZUELA"> VER CUENTAS BANCARIAs EN VENEZUELA AQUI</a></strong><br>
@@ -25,7 +25,7 @@
     $siglas_institucion  = 'UPTPC';
     $rif_empresa         = 'G-20005608-8';
     $rif_institucion     = 'RIF: G-20005608-8';
-    $direccion_empresa   = 'Urbanización La Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello, Estado Carabobo';
+    $direccion_empresa   = 'Calle principal Edif. IUTPC Zona Industrial Santa Rosa, Circuito Comunal 8, Parroquia Juan José Flores, Puerto Cabello, Estado Carabobo, Venezuela.';
     $correo_institucion  = 'control_de_estudios@uptpc.edu.ve';
 
     $image_responsive = '<img src="'.$carpeta.'/images/responsive.png" width="50%">';
@@ -33,23 +33,6 @@
 
     $logo_billetera = '<img src="../images/operadoras/billetera.png" width="35%" alt="">';
 
-
-    $registrar_mensualidad = '<span class="d-inline-block" data-toggle="popover" data-content="Aca podrá efectuar el pago de la mensualidad de su plataforma '.@$operador.'">
-    <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#pago_mensualidad"><span  class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>
-    <i class="fa fa-money-bill-alt"></i> Declarar Pago de Mensualidad '.@$operador.' <span  class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>
-    </button>
-    </span>';
-
-    $registrar_recarga = '<span class="d-inline-block" data-toggle="popover" data-content="Aca podrá solicitar se efectue una recarga a cualquier numero Prepago - '.@$operador.'">
-
-    <button type="button" class="btn btn-danger mt-1" data-toggle="modal" data-target="#recargar"><span  class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>
-    <i class="fa fa-phone-square"></i>  Registrar Recarga '.@$operador.' <span  class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span></button>
-    </span>';
-
-    $modal_usuario_bloqueado = '<div class="alert alert-warning" role="alert"" >
-    <h3>SU USUARIO ESTA BLOQUEADO</h3>
-    <p>Lamentablemente hay secciones que no podra usar de la plataforma, si posee un plan activo y considera que es un error, favor ingrese al area de <a href= "mensajeria.php" ><b>CONTACTENOS</b></a> para que podamos analizar su caso y ayudarte a resolverlo.</p><p>Si por el contrario no posees ningun plan activo, podras desbloquear tu usuario activando cualquiera de los planes disponibles <a href= "mensualidades.php" ><b>ACTIVAR ALGUN PLAN DISPONIBLE</b></a> </p><p>Si ya efectuaste el pago de alguno de los planes disponibles, debes esperar a que el mismo sea aprobado. Pero no te preocupes, porque te notificaremos por correo electronico cuando tu pago sea aprobado.</p>
-    </div>';
 
     $linklocal = '';
 
@@ -112,14 +95,10 @@
     $formato = new IntlDateFormatter('es_VE', IntlDateFormatter::LONG, IntlDateFormatter::NONE, 'America/Caracas');
     $fads = $formato->format($fecha);
 
-    	//$fads                    = strftime("%A %d de %B del %Y");
-      //$fads = date("l d 'de' F 'del' Y");
-    	//$fecha_actual_sistema    = strftime("%Y/%m/%d");
-      $fecha_actual_sistema = date("Y/m/d");
-    	$fecha_sistema           = date("Y/m/d");
-    	$dia                     = "";
-    	//$mes                     = strftime("%B");
-    	//$mes_de_pago_actual      = strftime("%B/%Y");
+      $fecha_actual_sistema = $fecha_sistema = date("Y/m/d");
+
+      $dia                     = "";
+
       $mes = date("F");
       $mes_de_pago_actual = date("F/Y");
     	$mes_fecha_sistema       = date("m/Y");
@@ -135,13 +114,6 @@
       $fecha = '';
 
 
-    $debe_pagar			 = '<div class="alert alert-danger" role="alert"" >	<h3> LO SENTIMOS USTED NO HA EFECTUADO EL PAGO CORRESPONDIENTE AL MES <b> ' .strtoupper($mes_de_pago_actual) .'</b></h3></div><a class="btn btn-outline-primary" href="mensualidad_movilnet.php" role="button">Declare su Pago de Mensualidad</a>';
-
-$monto_minimo='';
-$monto_maximo='';
-$pago_mensualidad ='';
-//$img_recarga_sin_necesidad = '<img width="10%" src="../images/operadoras/'.strtolower (@$operador) .'.png" class="img-fluid ${3|rounded-top,rounded-right,rounded-bottom,rounded-left,rounded-circle,|}" alt=""> Efectue Recargas sin necesidad de pagar Mensualidades.<hr>';
-$img_recarga_sin_necesidad = '<img width="10%" src="../images/operadoras/'.strtolower(@$operador ?? '') .'.png" class="img-fluid ${3|rounded-top,rounded-right,rounded-bottom,rounded-left,rounded-circle,|}" alt=""> Use el sistema sin necesidad de pagar Mensualidades.<hr>';
 $cabecera_privada ='';
 $contenido ='';
 $resultado_estadistica_banesco ='';
@@ -151,62 +123,13 @@ $lista_monto ="";
 $disp = '';
 $dinero_billetera = '';
 
-$contador_pedido_badge = "";
-$contador_pedido_sp_badge = "";
-$contador_recarga_movilnet_badge = "";
-$contador_recarga_movilnet_sp_badge = "";
-$contador_recarga_movilnet_cp_badge = "";
-$contador_recarga_movistar_badge = "";
-$contador_recarga_movistar_sp_badge = "";
-$contador_recarga_movistar_cp_badge = "";
-$contador_recarga_digitel_badge = "";
-$contador_recarga_digitel_sp_badge = "";
-$contador_recarga_digitel_cp_badge = "";
-$contador_recarga_directv_badge = "";
-$contador_recarga_directv_sp_badge = "";
-$contador_recarga_directv_cp_badge = "";
-$contador_recarga_inter_badge = "";
-$contador_recarga_inter_sp_badge = "";
-
-$contar_pedido  = "";
-$pendiente_pedido = "";
-$ganancia_bantecom = "";
-
-$esperando = "";
-$celda_pago = '<td><!-- GENERAR PAGO -->
-<span class="d-inline-block" data-toggle="popover" data-content="Aca podrá efectuar el pago del lote de recargas, al dia usted puede solicitar la cantidad de recargas que sean necesarias."><button type="button" class="btn btn-primary" data-toggle="modal" data-target="#generarPedido"><i class="fa fa-cart-arrow-down"></i>  Pagar Recargas </button></span><!-- FIN GENERAR PAGO --></td>';
-
 $boton_volver = ' <a class="btn btn-info" href="javascript:window.history.go(-1);"><i class="fa fa-undo"></i> Volver </a>';
 
-$mensaje_verificacion ="";
-
-$pendiente_mensualidad = "";
-$suma_mensualidad = "";
 $pmes= "";
 
 $res ="";
-$monto_mensualidad = '';
-$cuentas_bancarias = ' <p>Si desea conocer nuestras cuentas bancarias donde puede efectuar sus pagos puede ingresar en <a target="_blank" href="http://www.jesuministrosymas.com.ve/pagos#TOC-PAGOS-BANCARIOS-EN-VENEZUELA">VER CUENTAS BANCARIAS PARA PAGOS EN VENEZUELA</a></p>';
 
 
-
-$multiplo = '';
-$monto_minimo = '';
-$monto_maximo = '';
-
-$ruta_img_card = '';
-
-$accion = "";
-$nro = "";
-$op = "";
-$debe_pagar_operador ="";
-$me ="";
-$img_card ="";
-$montos = "";
-$monto_favor = 0;
-$mens_monto_favor = 0;
-//<br><b></b>
-$movilnet_msn = '<b>Sugerimos vender recargas minimo de 8 Bs</b><br><br>';
 
 // DETERMINAR CUAL ES LA BASE DE LA WEB SIN EL SUBDOMINIO
 
@@ -235,13 +158,13 @@ $direccion_comercio = "";
 $logo_comercio = "";
 
 $logo_web = '<img class="img-fluid" src="'.$pag_web.'/images/logo.png" width="150" height="25">';
-$logo_mppeu = '<img class="img-fluid" src="'.$pag_web.'/images/mppeu_bb.png" width="150" height="25">';
+$logo_mppeu = '<img class="img-fluid" src="'.$pag_web.'/images/mppeu_bb.png" style="max-height: 55px; width: auto;" alt="Educación Universitaria">';
 $logo_empresa = '<img class="img-fluid" src="'.$pag_web.'/images/logoempresa.png" width="100" height="100">';
 $logo_empresag = '<img class="img-fluid" src="'.$pag_web.'/images/logoempresa.png" width="500" height="500">';
 $logo_web_login = '<img class="img-fluid" src="'.$pag_web.'/images/logo.png" width="450" height="80">';
 $logo_uptpc = '<img class="img-fluid" src="'.$pag_web.'/images/uptpc.png" width="150" height="150">';
 $logo_uptpcp = '<img class="img-fluid" src="'.$pag_web.'/images/uptpc.png" width="25" height="25">';
-$logopertenencia = '<img class="img-fluid logo-header" src="'.$pag_web.'/images/logo.png" style="height: 46px; max-height: 50px; width: auto; display: inline-block; vertical-align: middle;" alt="Logo">';
+$logopertenencia = '<img class="img-fluid logo-header" src="'.$pag_web.'/images/logo.png"  style="max-height: 55px; width: auto;" alt="UPTPC">';
 $logo_footer = '<img class="img-fluid" src="'.$pag_web.'/images/educacion_universitaria.jpg" style="max-height: 35px; width: auto;" alt="Logo Footer">';
 $logopertenenciag = '<img class="img-fluid" src="'.$pag_web.'/images/logopertenenciag.png" width="700" height="100">';
  

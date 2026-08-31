@@ -6,6 +6,7 @@ function enviarEmail($email, $nombre, $asunto, $cuerpo) {
     
     $mail = new PHPMailer();
     
+
     // Configuración SMTP con TU cuenta
     $mail->isSMTP();
     $mail->SMTPAuth = true;
@@ -25,7 +26,7 @@ function enviarEmail($email, $nombre, $asunto, $cuerpo) {
     
     // Destinatarios
     $mail->addAddress($email, $nombre);
-    $mail->addBCC('jose@jesuministrosymas.com.ve', 'Control'); // Si aún quieres enviar copia
+    $mail->addBCC('herrejose@gmail.com', 'Control'); // Si aún quieres enviar copia
     
     // Configuración del mensaje
     $mail->Encoding = "base64";

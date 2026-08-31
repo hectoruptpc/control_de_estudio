@@ -123,10 +123,11 @@ if (!empty($email)) {
     mysqli_stmt_bind_param($stmt_insert, "isss", $rowid, $email_usuario, $token, $expira);
     mysqli_stmt_execute($stmt_insert);
     
-    // Construir enlace con localhost
-    $url_base = "http://localhost";
-    $ruta_base = "/control_de_estudio";
-    $enlace = $url_base . $ruta_base . "/nueva_password.php?token=" . $token;
+
+    // Construir enlace completo, codificando el token para seguridad
+    $enlace = $pag_web . '/nueva_password.php?token=' . urlencode($token);
+
+
     
     // Enviar correo
     $asunto = "🔐 Recupera tu contraseña - Sistema de Control de Estudios UPTPC";
@@ -204,7 +205,8 @@ if (!empty($email)) {
             <?php echo $logopertenencia; ?>
         </div>
         <div class="header-logo-right">
-            <img src="images/EDUCACIÓN UNIVERSITARIA BORDE BLANCO.png" class="img-fluid" style="max-height: 55px; width: auto;" alt="Educación Universitaria">
+           <?php echo $logo_mppeu; ?>
+             
         </div>
     </div>
 </header>
@@ -216,7 +218,7 @@ if (!empty($email)) {
         </div>
         <div class="col-sm-12 col-md-6">
             <h3 class="text-center text-uppercase" style="color: #003366;">🏛️ Recuperar Contraseña</h3>
-            <h5 class="text-center text-muted">Universidad Politécnica Territorial de Puerto Cabello</h5>
+            <h5 class="text-center text-muted"><?php echo $nombre_empresa; ?></h5>
             <h6 class="text-center text-muted mb-4">Sistema de Control de Estudios</h6>
             
             <form class="was-validated" method="post" action="recuperar_password.php" autocomplete="off">
