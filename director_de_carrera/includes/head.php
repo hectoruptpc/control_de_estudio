@@ -255,6 +255,11 @@ if (!isLoggedIn() || !isUser()) {
     <div class="row">
         <div class="col-sm-6">
             <b class="mt-5"><?php echo 'Bienvenido ' .$_SESSION['user']['nombre']; ?></b>
+            <div class="mt-1 mb-2">
+                <span class="badge badge-pill shadow-sm px-3 py-1 text-uppercase font-weight-bold text-white" style="background-color: #fd7e14; font-size: 0.8rem; letter-spacing: 0.5px;">
+                    <i class="fas fa-user-tie mr-1"></i> Panel de Director de Carrera
+                </span>
+            </div>
         </div>
         <div class="col-sm-6">
             <?php
