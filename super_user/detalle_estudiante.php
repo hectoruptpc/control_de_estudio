@@ -136,6 +136,11 @@ if (!empty($estudiante['foto_perfil'])) {
 if (!$tieneFoto) {
     $fotoPerfil = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='40' r='20' fill='%236c757d'/%3E%3Ccircle cx='50' cy='100' r='40' fill='%236c757d'/%3E%3Ctext x='50' y='45' text-anchor='middle' fill='white' font-family='Arial' font-size='14'%3EUSER%3C/text%3E%3C/svg%3E";
 }
+
+// Obtener solicitudes académicas del estudiante
+$solicitudes_estudiante = function_exists('obtenerSolicitudesAcademicas') ? obtenerSolicitudesAcademicas('', $id) : [];
+$solicitudes_pendientes = array_filter($solicitudes_estudiante, function($s) { return $s['status'] === 'pendiente'; });
+$cant_pendientes = count($solicitudes_pendientes);
 ?>
 
 
@@ -172,9 +177,30 @@ if (!$tieneFoto) {
                             <i class="fas fa-camera me-1"></i>Sin foto
                         </span>
                     <?php endif; ?>
+                    <?php if ($cant_pendientes > 0): ?>
+                        <span class="badge bg-danger ms-2">
+                            <i class="fas fa-bell me-1"></i><?= $cant_pendientes ?> Solicitud(es) Pendiente(s)
+                        </span>
+                    <?php endif; ?>
                 </p>
             </div>
         </div>
+
+        <?php if ($cant_pendientes > 0): ?>
+            <div class="alert alert-warning d-flex justify-content-between align-items-center mb-0 mt-3 p-2 rounded shadow-sm">
+                <div>
+                    <i class="fas fa-exclamation-circle text-warning me-2"></i>
+                    <strong>¡Atención!</strong> Este estudiante tiene <strong><?= $cant_pendientes ?></strong> solicitud(es) académica(s) pendiente(s) por revisión.
+                </div>
+                <form method="POST" action="constancias.php" class="d-inline m-0">
+                    <input type="hidden" name="id_estudiante" value="<?= $id ?>">
+                    <input type="hidden" name="tab" value="solicitudes">
+                    <button type="submit" class="btn btn-sm btn-warning text-dark font-weight-bold shadow-sm">
+                        <i class="fas fa-tasks me-1"></i> Gestionar Solicitud
+                    </button>
+                </form>
+            </div>
+        <?php endif; ?>
     </div>
 
     <div class="container-fluid py-4">
@@ -471,6 +497,79 @@ if (!$tieneFoto) {
             </div>
         </div>
         <?php endif; ?>
+
+        <!-- Fila de Solicitudes Académicas -->
+        <div class="row g-4 mb-4">
+            <div class="col-12">
+                <div class="card h-100 shadow-sm border-info">
+                    <div class="card-header bg-light-blue text-dark d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 font-weight-bold">
+                            <i class="fas fa-tasks me-2 text-info"></i>Solicitudes Académicas Registradas
+                        </h6>
+                        <span class="badge bg-info text-white"><?= count($solicitudes_estudiante) ?> Registro(s)</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <?php if (empty($solicitudes_estudiante)): ?>
+                            <div class="text-center py-4 text-muted small">
+                                <i class="fas fa-inbox mb-2" style="font-size: 2rem;"></i>
+                                <p class="mb-0">El estudiante no registra solicitudes académicas.</p>
+                            </div>
+                        <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0 text-center">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th># ID</th>
+                                            <th>Tipo de Trámite</th>
+                                            <th>Fecha</th>
+                                            <th>Detalle</th>
+                                            <th>Estado</th>
+                                            <th>Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($solicitudes_estudiante as $se): ?>
+                                            <tr>
+                                                <td class="fw-bold">#<?= $se['id'] ?></td>
+                                                <td>
+                                                    <span class="badge bg-secondary"><?= htmlspecialchars(strtoupper($se['tipo_solicitud'])) ?></span>
+                                                </td>
+                                                <td class="small"><?= date('d/m/Y', strtotime($se['fecha_solicitud'])) ?></td>
+                                                <td class="text-start small"><?= htmlspecialchars(mb_strimwidth($se['motivo'], 0, 40, '...')) ?></td>
+                                                <td>
+                                                    <?php if ($se['status'] === 'pendiente'): ?>
+                                                        <span class="badge bg-warning text-dark">PENDIENTE</span>
+                                                    <?php elseif ($se['status'] === 'aprobada'): ?>
+                                                        <span class="badge bg-success">APROBADA</span>
+                                                    <?php else: ?>
+                                                        <span class="badge bg-danger">RECHAZADA</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td>
+                                                    <form method="POST" action="constancias.php" class="d-inline m-0">
+                                                        <input type="hidden" name="id_estudiante" value="<?= $id ?>">
+                                                        <input type="hidden" name="tab" value="solicitudes">
+                                                        <button type="submit" class="btn btn-xs btn-outline-primary btn-sm py-0 px-2 font-weight-bold" title="Gestionar en Solicitudes">
+                                                            <i class="fas fa-tasks me-1"></i> Gestionar
+                                                        </button>
+                                                    </form>
+                                                    <form method="POST" action="../constancias/generar_constancia.php" target="_blank" class="d-inline">
+                                                        <input type="hidden" name="solicitud_id" value="<?= $se['id'] ?>">
+                                                        <button type="submit" class="btn btn-xs btn-outline-danger btn-sm py-0 px-2" title="Ver PDF">
+                                                            <i class="fas fa-file-pdf"></i>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 

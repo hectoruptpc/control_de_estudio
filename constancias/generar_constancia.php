@@ -30,6 +30,7 @@ require_once(__DIR__ . '/../fpdf/fpdf.php');
 // =========================================================================================
 
 if (!isLoggedIn()) {
+    http_response_code(403);
     die("Acceso denegado: Debe iniciar sesión para generar constancias.");
 }
 
@@ -37,21 +38,40 @@ if (!isLoggedIn()) {
 $id_estudiante = 0;
 
 if (isEstudiante()) {
-    // Si es estudiante, SIEMPRE utiliza el ID de su propia sesión activa
     $id_estudiante = intval($_SESSION['user']['id']);
-} elseif (isAdmin() || isSuperUser() || (function_exists('isDirector') && isDirector())) {
-    // Si es personal administrativo, puede especificar el ID del estudiante vía POST o GET
+} elseif (isAdmin() || isSuperUser() || (function_exists('isDirector') && isDirector()) || (function_exists('isDocente') && isDocente())) {
     if (isset($_POST['id']) && intval($_POST['id']) > 0) {
         $id_estudiante = intval($_POST['id']);
     } elseif (isset($_POST['id_estudiante']) && intval($_POST['id_estudiante']) > 0) {
         $id_estudiante = intval($_POST['id_estudiante']);
     } elseif (isset($_GET['id']) && intval($_GET['id']) > 0) {
         $id_estudiante = intval($_GET['id']);
+    } elseif (isset($_POST['solicitud_id']) || isset($_GET['solicitud_id'])) {
+        // Se determinará a partir de la solicitud
+        $id_estudiante = 0;
     } else {
         $id_estudiante = intval($_SESSION['user']['id']);
     }
 } else {
-    die("Rol no autorizado para acceder a este módulo.");
+    // Fallback general para cualquier usuario con sesión
+    if (isset($_POST['id']) && intval($_POST['id']) > 0) {
+        $id_estudiante = intval($_POST['id']);
+    } elseif (isset($_SESSION['user']['id'])) {
+        $id_estudiante = intval($_SESSION['user']['id']);
+    }
+}
+
+// Verificar si viene solicitud_id para cargar datos de la solicitud registrada
+$solicitud_id = isset($_POST['solicitud_id']) ? intval($_POST['solicitud_id']) : (isset($_GET['solicitud_id']) ? intval($_GET['solicitud_id']) : 0);
+$solicitud_data = null;
+if ($solicitud_id > 0 && function_exists('obtenerSolicitudAcademicaPorId')) {
+    $solicitud_data = obtenerSolicitudAcademicaPorId($solicitud_id);
+    if ($solicitud_data) {
+        if (!isEstudiante() || intval($solicitud_data['estudiante_id']) === intval($_SESSION['user']['id'])) {
+            $id_estudiante = intval($solicitud_data['estudiante_id']);
+            $tipo = $solicitud_data['tipo_solicitud'];
+        }
+    }
 }
 
 if ($id_estudiante <= 0) {
@@ -59,7 +79,7 @@ if ($id_estudiante <= 0) {
 }
 
 // Determinar el tipo de documento solicitado
-$tipo = isset($_POST['tipo']) ? trim($_POST['tipo']) : (isset($_GET['tipo']) ? trim($_GET['tipo']) : 'estudios');
+$tipo = !empty($tipo) ? $tipo : (isset($_POST['tipo']) ? trim($_POST['tipo']) : (isset($_GET['tipo']) ? trim($_GET['tipo']) : 'estudios'));
 $tipo = strtolower($tipo);
 
 // Mapeo de nombres alternativos a tipos normalizados
@@ -97,6 +117,7 @@ if (isset($alias_tipos[$tipo])) {
 // Parámetros opcionales
 $destino = isset($_POST['destino']) ? trim($_POST['destino']) : (isset($_GET['destino']) ? trim($_GET['destino']) : "UNIVERSIDAD POLITÉCNICA TERRITORIAL DE CIUDAD BOLÍVAR");
 $tipo_reporte = isset($_POST['tipo_reporte']) ? strtolower(trim($_POST['tipo_reporte'])) : (isset($_GET['tipo']) ? strtolower(trim($_GET['tipo'])) : 'tsu');
+$motivo_personalizado = isset($_POST['motivo']) ? trim($_POST['motivo']) : (isset($_GET['motivo']) ? trim($_GET['motivo']) : '');
 
 
 // =========================================================================================
@@ -227,6 +248,7 @@ class ConstanciaInstitucionalPDF extends FPDF {
         $this->Cell(0, 4, txtPDF('REPÚBLICA BOLIVARIANA DE VENEZUELA'), 0, 1, 'C');
         $this->Cell(0, 4, txtPDF('MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN UNIVERSITARIA'), 0, 1, 'C');
         $this->Cell(0, 4, txtPDF('UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO'), 0, 1, 'C');
+        $this->Cell(0, 3.5, txtPDF('RIF: G-20005608-8'), 0, 1, 'C');
         $this->Cell(0, 4, txtPDF('SECRETARÍA DEL CONSEJO DE GESTIÓN UNIVERSITARIA'), 0, 1, 'C');
 
         if ($this->customHeaderType === "solicitud") {
@@ -248,12 +270,17 @@ class ConstanciaInstitucionalPDF extends FPDF {
     function Footer() {
         if (!$this->showFooter) return;
 
+        global $rif_empresa, $direccion_empresa, $correo_institucion;
+        $rif_txt = !empty($rif_empresa) ? "RIF: " . $rif_empresa : "RIF: G-20005608-8";
+        $dir_txt = !empty($direccion_empresa) ? $direccion_empresa : "Urbanización La Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello";
+        $mail_txt = !empty($correo_institucion) ? $correo_institucion : "control_de_estudios@uptpc.edu.ve";
+
         $this->SetY(-25);
         $this->SetFont('Arial', 'I', 7);
         $this->Cell(0, 4, txtPDF("Este documento no es válido sin la firma y sello del Departamento de Control de Estudios"), 0, 1, 'C');
         $this->SetFont('Arial', '', 7);
-        $this->Cell(0, 3, txtPDF("Urbanización La Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello"), 0, 1, 'C');
-        $this->Cell(0, 3, txtPDF("Correo Electrónico: uptpccontroldeestudios03@gmail.com"), 0, 1, 'C');
+        $this->Cell(0, 3, txtPDF($dir_txt . " - " . $rif_txt), 0, 1, 'C');
+        $this->Cell(0, 3, txtPDF("Correo Electrónico: " . $mail_txt), 0, 1, 'C');
     }
 
     /**
@@ -604,7 +631,8 @@ switch ($tipo) {
         $pdf->SetFillColor(240, 240, 240);
         $pdf->Cell(40, 6, txtPDF('FECHA:'), 1, 0, 'L', true);
         $pdf->SetFont('Arial', '', 9);
-        $pdf->Cell(145, 6, date('d/m/Y'), 1, 1, 'L');
+        $fecha_doc = !empty($solicitud_data['fecha_solicitud']) ? date('d/m/Y', strtotime($solicitud_data['fecha_solicitud'])) : date('d/m/Y');
+        $pdf->Cell(145, 6, $fecha_doc, 1, 1, 'L');
 
         $pdf->SetFont('Arial', 'B', 9);
         $pdf->Cell(40, 6, txtPDF('CÉDULA DE IDENTIDAD:'), 1, 0, 'L', true);
@@ -629,22 +657,64 @@ switch ($tipo) {
         $pdf->Cell(25, 7, txtPDF('SECCIÓN'), 1, 0, 'C', true);
         $pdf->Cell(25, 7, txtPDF('TURNO'), 1, 1, 'C', true);
 
-        $pdf->SetFont('Arial', '', 8);
-        for ($i = 1; $i <= 6; $i++) {
-            $pdf->Cell(25, 7, ($i % 2 == 0 ? 'RETIRO' : 'ADICIÓN'), 1, 0, 'C');
-            $pdf->Cell(30, 7, '', 1, 0, 'C');
-            $pdf->Cell(80, 7, '', 1, 0, 'L');
-            $pdf->Cell(25, 7, '', 1, 0, 'C');
-            $pdf->Cell(25, 7, '', 1, 1, 'C');
+        // Extraer materias de solicitud si existen
+        $filas_operaciones = [];
+        if ($solicitud_data && !empty($solicitud_data['materias_parsed'])) {
+            $parsed = $solicitud_data['materias_parsed'];
+            if (!empty($parsed['retiros']) && is_array($parsed['retiros'])) {
+                foreach ($parsed['retiros'] as $r) {
+                    $filas_operaciones[] = [
+                        'operacion' => 'RETIRO',
+                        'codigo'    => $r['codigo'] ?? '',
+                        'nombre'    => $r['nombre'] ?? '',
+                        'seccion'   => $r['seccion'] ?? '',
+                        'turno'     => $turno_estudiante
+                    ];
+                }
+            }
+            if (!empty($parsed['adiciones']) && is_array($parsed['adiciones'])) {
+                foreach ($parsed['adiciones'] as $a) {
+                    $filas_operaciones[] = [
+                        'operacion' => 'ADICIÓN',
+                        'codigo'    => $a['codigo'] ?? '',
+                        'nombre'    => $a['nombre'] ?? '',
+                        'seccion'   => $a['seccion'] ?? '',
+                        'turno'     => $turno_estudiante
+                    ];
+                }
+            }
         }
 
-        $pdf->Ln(5);
+        $pdf->SetFont('Arial', '', 8);
+        $total_filas = max(6, count($filas_operaciones));
+        for ($i = 0; $i < $total_filas; $i++) {
+            $op_data = $filas_operaciones[$i] ?? null;
+            $op_texto = $op_data ? $op_data['operacion'] : (($i % 2 == 0) ? 'RETIRO' : 'ADICIÓN');
+            $op_cod = $op_data ? $op_data['codigo'] : '';
+            $op_nom = $op_data ? $op_data['nombre'] : '';
+            $op_sec = $op_data ? $op_data['seccion'] : '';
+            $op_tur = $op_data ? $op_data['turno'] : '';
+
+            $pdf->Cell(25, 7, txtPDF($op_texto), 1, 0, 'C');
+            $pdf->Cell(30, 7, txtPDF($op_cod), 1, 0, 'C');
+            $pdf->Cell(80, 7, txtPDF($op_nom), 1, 0, 'L');
+            $pdf->Cell(25, 7, txtPDF($op_sec), 1, 0, 'C');
+            $pdf->Cell(25, 7, txtPDF($op_tur), 1, 1, 'C');
+        }
+
+        $pdf->Ln(4);
         $pdf->SetFont('Arial', 'B', 8);
         $pdf->Cell(0, 5, txtPDF('MOTIVO DE LA SOLICITUD:'), 0, 1, 'L');
-        $pdf->Rect(15, $pdf->GetY(), 185, 15);
-        $pdf->SetY($pdf->GetY() + 18);
+        $motivo_imprimir = $solicitud_data['motivo'] ?? (!empty($motivo_personalizado) ? $motivo_personalizado : 'Solicitud académica formal por parte del estudiante.');
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->MultiCell(185, 4, txtPDF($motivo_imprimir), 1, 'L');
+        $pdf->Ln(3);
 
         $y_firma = $pdf->GetY();
+        if ($y_firma > 220) {
+            $pdf->AddPage();
+            $y_firma = $pdf->GetY() + 5;
+        }
         $pdf->Rect(15, $y_firma, 85, 18);
         $pdf->SetXY(15, $y_firma);
         $pdf->Cell(85, 5, txtPDF('Firma del Estudiante'), 0, 0, 'C');
@@ -671,7 +741,8 @@ switch ($tipo) {
         $pdf->SetFillColor(240, 240, 240);
         $pdf->Cell(40, 6, txtPDF('FECHA:'), 1, 0, 'L', true);
         $pdf->SetFont('Arial', '', 9);
-        $pdf->Cell(145, 6, date('d/m/Y'), 1, 1, 'L');
+        $fecha_doc = !empty($solicitud_data['fecha_solicitud']) ? date('d/m/Y', strtotime($solicitud_data['fecha_solicitud'])) : date('d/m/Y');
+        $pdf->Cell(145, 6, $fecha_doc, 1, 1, 'L');
 
         $pdf->SetFont('Arial', 'B', 9);
         $pdf->Cell(40, 6, txtPDF('CÉDULA:'), 1, 0, 'L', true);
@@ -695,26 +766,41 @@ switch ($tipo) {
         $pdf->Cell(50, 7, txtPDF('SECCIÓN SOLICITADA'), 1, 1, 'C', true);
 
         $pdf->SetFont('Arial', '', 8);
-        for ($i = 1; $i <= 5; $i++) {
-            $pdf->Cell(85, 7, '', 1, 0, 'L');
-            $pdf->Cell(50, 7, '', 1, 0, 'C');
-            $pdf->Cell(50, 7, '', 1, 1, 'C');
+        $sec_orig_nombre = $solicitud_data['nombre_seccion_origen'] ?? '';
+        $sec_dest_nombre = $solicitud_data['nombre_seccion_destino'] ?? '';
+        
+        $materias_cs = $solicitud_data['materias_parsed']['materias'] ?? [];
+        $total_cs = max(5, count($materias_cs));
+        for ($i = 0; $i < $total_cs; $i++) {
+            $m_nombre = isset($materias_cs[$i]) ? (is_array($materias_cs[$i]) ? ($materias_cs[$i]['nombre'] ?? '') : $materias_cs[$i]) : ($i == 0 && empty($materias_cs) && !empty($sec_dest_nombre) ? 'TODAS LAS MATERIAS INSCRITAS' : '');
+            $s_orig = ($i == 0 || !empty($m_nombre)) ? $sec_orig_nombre : '';
+            $s_dest = ($i == 0 || !empty($m_nombre)) ? $sec_dest_nombre : '';
+            
+            $pdf->Cell(85, 7, txtPDF($m_nombre), 1, 0, 'L');
+            $pdf->Cell(50, 7, txtPDF($s_orig), 1, 0, 'C');
+            $pdf->Cell(50, 7, txtPDF($s_dest), 1, 1, 'C');
         }
 
-        $pdf->Ln(5);
+        $pdf->Ln(4);
         $pdf->SetFont('Arial', 'B', 8);
         $pdf->Cell(0, 5, txtPDF('JUSTIFICACIÓN DEL CAMBIO:'), 0, 1, 'L');
-        $pdf->Rect(15, $pdf->GetY(), 185, 18);
-        $pdf->SetY($pdf->GetY() + 22);
+        $motivo_imprimir = $solicitud_data['motivo'] ?? (!empty($motivo_personalizado) ? $motivo_personalizado : 'Solicitud formal de cambio de sección por motivos académicos/laborales.');
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->MultiCell(185, 4, txtPDF($motivo_imprimir), 1, 'L');
+        $pdf->Ln(3);
 
         $y_firma = $pdf->GetY();
+        if ($y_firma > 220) {
+            $pdf->AddPage();
+            $y_firma = $pdf->GetY() + 5;
+        }
         $pdf->Rect(15, $y_firma, 85, 18);
         $pdf->SetXY(15, $y_firma);
         $pdf->Cell(85, 5, txtPDF('Firma del Estudiante'), 0, 0, 'C');
 
         $pdf->Rect(115, $y_firma, 85, 18);
         $pdf->SetXY(115, $y_firma);
-        $pdf->Cell(85, 5, txtPDF('Firma Coordinador / Control de Estudios'), 0, 1, 'C');
+        $pdf->Cell(85, 5, txtPDF('Firma y Sello Control de Estudios'), 0, 1, 'C');
 
         ob_end_clean();
         $pdf->Output('I', "Solicitud_Cambio_Seccion_" . $cedula_estudiante . ".pdf");
@@ -768,11 +854,15 @@ switch ($tipo) {
         $pdf->SetMargins(15, 15, 15);
         $pdf->AddPage();
 
+        $carrera_solicitada = !empty($solicitud_data['materias_parsed']['carrera_destino_nombre']) ? $solicitud_data['materias_parsed']['carrera_destino_nombre'] : '____________________________________________________';
+        $motivo_solicitud = !empty($solicitud_data['motivo']) ? $solicitud_data['motivo'] : '';
+        $fecha_sol = !empty($solicitud_data['fecha_solicitud']) ? date('d/m/Y', strtotime($solicitud_data['fecha_solicitud'])) : date('d/m/Y');
+
         $pdf->SetFont('Arial', 'B', 9);
         $pdf->SetFillColor(240, 240, 240);
         $pdf->Cell(40, 6, txtPDF('FECHA:'), 1, 0, 'L', true);
         $pdf->SetFont('Arial', '', 9);
-        $pdf->Cell(145, 6, date('d/m/Y'), 1, 1, 'L');
+        $pdf->Cell(145, 6, $fecha_sol, 1, 1, 'L');
 
         $pdf->SetFont('Arial', 'B', 9);
         $pdf->Cell(40, 6, txtPDF('CÉDULA:'), 1, 0, 'L', true);
@@ -791,14 +881,18 @@ switch ($tipo) {
 
         $pdf->SetFont('Arial', 'B', 9);
         $pdf->Cell(40, 6, txtPDF('CARRERA SOLICITADA:'), 1, 0, 'L', true);
-        $pdf->SetFont('Arial', '', 9);
-        $pdf->Cell(145, 6, '____________________________________________________', 1, 1, 'L');
+        $pdf->SetFont('Arial', 'B', 9);
+        $pdf->Cell(145, 6, txtPDF($carrera_solicitada), 1, 1, 'L');
 
         $pdf->Ln(6);
         $pdf->SetFont('Arial', 'B', 8);
         $pdf->Cell(0, 5, txtPDF('EXPOSICIÓN DE MOTIVOS:'), 0, 1, 'L');
-        $pdf->Rect(15, $pdf->GetY(), 185, 25);
-        $pdf->SetY($pdf->GetY() + 30);
+        $y_mot = $pdf->GetY();
+        $pdf->Rect(15, $y_mot, 185, 25);
+        $pdf->SetXY(17, $y_mot + 2);
+        $pdf->SetFont('Arial', '', 8.5);
+        $pdf->MultiCell(181, 4.5, txtPDF($motivo_solicitud ? $motivo_solicitud : 'Sin motivo registrado.'), 0, 'L');
+        $pdf->SetY($y_mot + 28);
 
         $y_firma = $pdf->GetY();
         $pdf->Rect(15, $y_firma, 85, 18);
@@ -823,11 +917,15 @@ switch ($tipo) {
         $pdf->SetMargins(15, 15, 15);
         $pdf->AddPage();
 
+        $turno_solicitado = !empty($solicitud_data['materias_parsed']['turno_destino']) ? $solicitud_data['materias_parsed']['turno_destino'] : '____________________________________________________';
+        $motivo_solicitud = !empty($solicitud_data['motivo']) ? $solicitud_data['motivo'] : '';
+        $fecha_sol = !empty($solicitud_data['fecha_solicitud']) ? date('d/m/Y', strtotime($solicitud_data['fecha_solicitud'])) : date('d/m/Y');
+
         $pdf->SetFont('Arial', 'B', 9);
         $pdf->SetFillColor(240, 240, 240);
         $pdf->Cell(40, 6, txtPDF('FECHA:'), 1, 0, 'L', true);
         $pdf->SetFont('Arial', '', 9);
-        $pdf->Cell(145, 6, date('d/m/Y'), 1, 1, 'L');
+        $pdf->Cell(145, 6, $fecha_sol, 1, 1, 'L');
 
         $pdf->SetFont('Arial', 'B', 9);
         $pdf->Cell(40, 6, txtPDF('CÉDULA:'), 1, 0, 'L', true);
@@ -846,14 +944,18 @@ switch ($tipo) {
 
         $pdf->SetFont('Arial', 'B', 9);
         $pdf->Cell(40, 6, txtPDF('TURNO SOLICITADO:'), 1, 0, 'L', true);
-        $pdf->SetFont('Arial', '', 9);
-        $pdf->Cell(145, 6, '____________________________________________________', 1, 1, 'L');
+        $pdf->SetFont('Arial', 'B', 9);
+        $pdf->Cell(145, 6, txtPDF($turno_solicitado), 1, 1, 'L');
 
         $pdf->Ln(6);
         $pdf->SetFont('Arial', 'B', 8);
         $pdf->Cell(0, 5, txtPDF('MOTIVO DE LA SOLICITUD (ADJUNTAR SOPORTES SI APLICA):'), 0, 1, 'L');
-        $pdf->Rect(15, $pdf->GetY(), 185, 25);
-        $pdf->SetY($pdf->GetY() + 30);
+        $y_mot = $pdf->GetY();
+        $pdf->Rect(15, $y_mot, 185, 25);
+        $pdf->SetXY(17, $y_mot + 2);
+        $pdf->SetFont('Arial', '', 8.5);
+        $pdf->MultiCell(181, 4.5, txtPDF($motivo_solicitud ? $motivo_solicitud : 'Sin motivo registrado.'), 0, 'L');
+        $pdf->SetY($y_mot + 28);
 
         $y_firma = $pdf->GetY();
         $pdf->Rect(15, $y_firma, 85, 18);

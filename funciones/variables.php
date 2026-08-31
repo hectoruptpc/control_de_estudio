@@ -21,10 +21,12 @@
     $mmo = 450;
     $mt = '';
 
-    $nombre_empresa = 'UNIVERSIDAD POLITECNICA TERRITORIAL DE PUERTO CABELLO';
-    $rif_empresa = 'G-20005608-8';
-    $direccion_empresa = 'Urb. La Elvira Zona Industrial Santa Rosa Galpon N° 8.
-Puerto Cabello, Estado Carabobo';
+    $nombre_empresa      = 'UNIVERSIDAD POLITÉCNICA TERRITORIAL DE PUERTO CABELLO';
+    $siglas_institucion  = 'UPTPC';
+    $rif_empresa         = 'G-20005608-8';
+    $rif_institucion     = 'RIF: G-20005608-8';
+    $direccion_empresa   = 'Urbanización La Elvira, Zona Industrial Santa Rosa, Galpón N° 8, Puerto Cabello, Estado Carabobo';
+    $correo_institucion  = 'control_de_estudios@uptpc.edu.ve';
 
     $image_responsive = '<img src="'.$carpeta.'/images/responsive.png" width="50%">';
 

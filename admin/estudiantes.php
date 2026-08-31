@@ -193,17 +193,17 @@ include("includes/head.php");
                     <div class="card-header bg-primary text-white d-flex flex-column flex-sm-row justify-content-between align-items-center">
                         <h5 class="mb-2 mb-sm-0"><i class="fas fa-users me-2"></i>Listado de Estudiantes</h5>
                         <div>
-                            <button id="toggleEstadisticas" class="btn btn-outline-light btn-sm mb-1 mb-sm-0 me-2" onclick="toggleEstadisticas()">
+                            <button type="button" id="toggleEstadisticas" class="btn btn-outline-light btn-sm mb-1 mb-sm-0 me-2" onclick="toggleEstadisticas()">
                                 <i class="fas fa-chart-bar"></i> Estadísticas
                             </button>
-                            <button id="toggleFiltros" class="btn btn-outline-light btn-sm mb-1 mb-sm-0 me-2">
+                            <button type="button" id="toggleFiltros" class="btn btn-outline-light btn-sm mb-1 mb-sm-0 me-2">
                                 <i class="fas fa-filter"></i> <span id="toggleFiltrosText">Ocultar Filtros</span>
                             </button>
-                            <button id="btnGenerarReporte" class="btn btn-danger btn-sm mb-1 mb-sm-0 me-2">
+                            <button type="button" id="btnGenerarReporte" class="btn btn-danger btn-sm mb-1 mb-sm-0 me-2">
                                 <i class="fas fa-file-pdf"></i> Generar Reporte PDF
                             </button>
                             <?php if (tienePermiso('agregar_estudiante')): ?>
-                                <button class="btn btn-success btn-sm mb-1 mb-sm-0" onclick="abrirModalNuevoEstudiante()">
+                                <button type="button" class="btn btn-success btn-sm mb-1 mb-sm-0" onclick="abrirModalNuevoEstudiante()">
                                     <i class="fas fa-plus-circle"></i> Nuevo Estudiante
                                 </button>
                             <?php endif; ?>
@@ -467,9 +467,6 @@ include("includes/head.php");
                                 </div>
                             </div>
                         </div>
-                                </div>
-                            </div>
-                        </div>
 
                         <div class="table-responsive">
                             <table class="table table-striped table-hover table-bordered" id="tablaEstudiantes">
@@ -536,9 +533,9 @@ include("includes/head.php");
                                             <td><?php echo !empty($fechaIngreso) ? date('d/m/Y', strtotime($fechaIngreso)) : ''; ?></td>
                                             <td>
                                                 <div class="d-flex flex-wrap gap-1">
-                                                    <button class="btn btn-info btn-details btn-sm" data-id="<?php echo $estudiante['id']; ?>"><i class="fas fa-eye"></i></button>
+                                                    <button type="button" class="btn btn-info btn-details btn-sm" data-id="<?php echo $estudiante['id']; ?>"><i class="fas fa-eye"></i></button>
                                                     <?php if ($puedeEditar): ?>
-                                                        <button class="btn btn-warning btn-sm btn-edit" data-id="<?php echo $estudiante['id']; ?>"><i class="fas fa-edit"></i></button>
+                                                        <button type="button" class="btn btn-warning btn-sm btn-edit" data-id="<?php echo $estudiante['id']; ?>"><i class="fas fa-edit"></i></button>
                                                     <?php endif; ?>
                                                 </div>
                                             </td>
@@ -585,20 +582,30 @@ include("includes/head.php");
     </div>
 </div>
 
-<div class="modal fade" id="detalleModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white"><h5 class="modal-title">Detalles del Estudiante</h5><button type="button" class="close text-white" data-dismiss="modal">&times;</button></div>
-            <div class="modal-body" id="detalleEstudianteContent"><div class="text-center my-5"><div class="spinner-border text-primary"></div><p>Cargando...</p></div></div>
+<div class="modal fade" id="detalleModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content" id="detalleEstudianteContent">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title font-weight-bold"><i class="fas fa-id-card mr-2"></i> Detalles del Estudiante</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center my-5"><div class="spinner-border text-primary"></div><p class="mt-2">Cargando datos...</p></div>
+            </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="editarEstudianteModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-xl">
-        <div class="modal-content">
-            <div class="modal-header bg-warning text-white"><h5 class="modal-title"><i class="fas fa-user-edit me-2"></i> Editar Estudiante</h5><button type="button" class="close text-white" data-dismiss="modal">&times;</button></div>
-            <div class="modal-body" id="editarEstudianteContent"><div class="text-center my-5"><div class="spinner-border text-primary"></div><p>Cargando...</p></div></div>
+<div class="modal fade" id="editarEstudianteModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
+        <div class="modal-content" id="editarEstudianteContent">
+            <div class="modal-header bg-warning text-white">
+                <h5 class="modal-title font-weight-bold text-dark"><i class="fas fa-user-edit mr-2"></i> Editar Estudiante</h5>
+                <button type="button" class="close text-dark" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center my-5"><div class="spinner-border text-warning"></div><p class="mt-2">Cargando formulario...</p></div>
+            </div>
         </div>
     </div>
 </div>
@@ -1007,13 +1014,18 @@ document.getElementById('btnGenerarPDF').addEventListener('click', generarReport
 document.getElementById('toggleFiltros').addEventListener('click', toggleFiltros);
 document.getElementById('btnOcultarFiltros').addEventListener('click', toggleFiltros);
 
-document.addEventListener('click', function(e) {
-    if (e.target.closest('.btn-details')) {
-        loadStudentDetails(e.target.closest('.btn-details').getAttribute('data-id'));
-    }
-    if (e.target.closest('.btn-edit')) {
-        loadEditStudentForm(e.target.closest('.btn-edit').getAttribute('data-id'));
-    }
+$(document).on('click', '.btn-details', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var id = $(this).attr('data-id') || $(this).data('id');
+    loadStudentDetails(id);
+});
+
+$(document).on('click', '.btn-edit', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var id = $(this).attr('data-id') || $(this).data('id');
+    loadEditStudentForm(id);
 });
 
 function loadStudentDetails(studentId) {

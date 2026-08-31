@@ -402,12 +402,68 @@ function SetTextColor($r, $g=null, $b=null)
 	$this->ColorFlag = ($this->FillColor!=$this->TextColor);
 }
 
+function _UTF8toWin1252($str)
+{
+	if($str===null || $str==='')
+		return '';
+	$str = (string)$str;
+	if(!preg_match('/[\x80-\xFF]/', $str))
+		return $str;
+
+	// Reemplazos de caracteres tipográficos
+	$map = array(
+		"\xE2\x80\x9C" => '"',
+		"\xE2\x80\x9D" => '"',
+		"\xE2\x80\x98" => "'",
+		"\xE2\x80\x99" => "'",
+		"\xE2\x80\x94" => "-",
+		"\xE2\x80\x93" => "-",
+		"\xE2\x80\xA2" => "\x95",
+		"\xE2\x80\xA6" => "...",
+		"\xC2\xBA"     => "\xBA",
+		"\xC2\xAA"     => "\xAA",
+		"\xC2\xB0"     => "\xB0"
+	);
+	$str = strtr($str, $map);
+
+	// Detectar si es UTF-8 válido
+	$is_utf8 = (bool)preg_match('%^(?:
+		[\x09\x0A\x0D\x20-\x7E]
+	  | [\xC2-\xDF][\x80-\xBF]
+	  |  \xE0[\xA0-\xBF][\x80-\xBF]
+	  | [\xE1-\xEC\xEE\xEF][\x80-\xBF]{2}
+	  |  \xED[\x80-\x9F][\x80-\xBF]
+	  |  \xF0[\x90-\xBF][\x80-\xBF]{2}
+	  | [\xF1-\xF3][\x80-\xBF]{3}
+	  |  \xF4[\x80-\x8F][\x80-\xBF]{2}
+	)+$%xs', $str);
+
+	if($is_utf8)
+	{
+		if(function_exists('mb_convert_encoding'))
+		{
+			$conv = @mb_convert_encoding($str, 'windows-1252', 'UTF-8');
+			if($conv!==false)
+				return $conv;
+		}
+		if(function_exists('iconv'))
+		{
+			$conv = @iconv('UTF-8', 'windows-1252//TRANSLIT//IGNORE', $str);
+			if($conv!==false)
+				return $conv;
+		}
+		if(function_exists('utf8_decode'))
+			return @utf8_decode($str);
+	}
+	return $str;
+}
+
 function GetStringWidth($s)
 {
 	// Get width of a string in the current font
 	$cw = $this->CurrentFont['cw'];
 	$w = 0;
-	$s = (string)$s;
+	$s = (string)$this->_UTF8toWin1252($s);
 	$l = strlen($s);
 	for($i=0;$i<$l;$i++)
 		$w += $cw[$s[$i]];
@@ -562,7 +618,7 @@ function Text($x, $y, $txt)
 	// Output a string
 	if(!isset($this->CurrentFont))
 		$this->Error('No font has been set');
-	$txt = (string)$txt;
+	$txt = (string)$this->_UTF8toWin1252($txt);
 	$s = sprintf('BT %.2F %.2F Td (%s) Tj ET',$x*$this->k,($this->h-$y)*$this->k,$this->_escape($txt));
 	if($this->underline && $txt!=='')
 		$s .= ' '.$this->_dounderline($x,$y,$txt);
@@ -623,7 +679,7 @@ function Cell($w, $h=0, $txt='', $border=0, $ln=0, $align='', $fill=false, $link
 		if(strpos($border,'B')!==false)
 			$s .= sprintf('%.2F %.2F m %.2F %.2F l S ',$x*$k,($this->h-($y+$h))*$k,($x+$w)*$k,($this->h-($y+$h))*$k);
 	}
-	$txt = (string)$txt;
+	$txt = (string)$this->_UTF8toWin1252($txt);
 	if($txt!=='')
 	{
 		if(!isset($this->CurrentFont))
@@ -667,7 +723,7 @@ function MultiCell($w, $h, $txt, $border=0, $align='J', $fill=false)
 	if($w==0)
 		$w = $this->w-$this->rMargin-$this->x;
 	$wmax = ($w-2*$this->cMargin)*1000/$this->FontSize;
-	$s = str_replace("\r",'',(string)$txt);
+	$s = str_replace("\r",'',(string)$this->_UTF8toWin1252($txt));
 	$nb = strlen($s);
 	if($nb>0 && $s[$nb-1]=="\n")
 		$nb--;
@@ -781,7 +837,7 @@ function Write($h, $txt, $link='')
 	$cw = $this->CurrentFont['cw'];
 	$w = $this->w-$this->rMargin-$this->x;
 	$wmax = ($w-2*$this->cMargin)*1000/$this->FontSize;
-	$s = str_replace("\r",'',(string)$txt);
+	$s = str_replace("\r",'',(string)$this->_UTF8toWin1252($txt));
 	$nb = strlen($s);
 	$sep = -1;
 	$i = 0;
