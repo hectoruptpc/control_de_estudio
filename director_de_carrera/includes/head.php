@@ -221,6 +221,13 @@ if (!isLoggedIn() || !isUser()) {
             </li>
 
             <!-- Menú de Ajustes -->
+                        <!-- Menú: Control de Notas de Profesores -->
+            <li class="nav-item">
+              <a class="nav-link" href="seguimiento_notas.php" title="Control y Seguimiento de Notas de Profesores">
+                <i class="fas fa-clipboard-check fa-fw"></i> Notas de Profesores
+              </a>
+            </li>
+
             <li id="dropdown-ajustes-director" class="nav-item dropdown">
                 <a title="Ir a Ajustes" class="nav-link dropdown-toggle" href="#" id="navbarDropdownAjustesDirector" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="fa fa-cogs fa-fw"></i> Ajustes

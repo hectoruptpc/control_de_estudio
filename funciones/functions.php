@@ -23177,6 +23177,15 @@ function isUser()
     return isset($_SESSION['user']) && $_SESSION['user']['usuario'] == 1;
 }
 
+function isDirectorCarrera()
+{
+    return isset($_SESSION['user']) && (
+        (isset($_SESSION['user']['usuario']) && $_SESSION['user']['usuario'] == 1) ||
+        (isset($_SESSION['user']['carrera_di']) && intval($_SESSION['user']['carrera_di']) > 0) ||
+        (isset($_SESSION['user']['director']) && $_SESSION['user']['director'] == 1)
+    );
+}
+
 
 
 
