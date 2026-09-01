@@ -84,8 +84,16 @@ if (isset($_SESSION['user']['id'])) {
 
     /* NAVBAR FIJO */
     .navbar {
-        z-index: 1060;
+        z-index: 1030;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    /* MODALES Y BACKDROP - POR ENCIMA DE NAVBAR Y FOOTER */
+    .modal-backdrop {
+        z-index: 1070 !important;
+    }
+    .modal {
+        z-index: 1080 !important;
     }
 
     /* DROPDOWNS MEJORADOS */

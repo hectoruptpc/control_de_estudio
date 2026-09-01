@@ -986,11 +986,18 @@ include("includes/head.php");
                     </div>
                 </div>
 
-                <!-- ========================================================================= -->
-                <!-- MODALES INTERACTIVOS DE SOLICITUD -->
-                <!-- ========================================================================= -->
 
-                <!-- 1. MODAL ADICIÓN Y RETIRO DE MATERIAS -->
+
+<!-- ========================================================================= -->
+<!-- MODALES INTERACTIVOS DE SOLICITUD (UBICADOS EN NIVEL RAÍZ DEL BODY) -->
+<!-- ========================================================================= -->
+
+                            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<!-- 1. MODAL ADICIÓN Y RETIRO DE MATERIAS -->
                 <div class="modal fade" id="modalSolicitudAdicionRetiro" tabindex="-1" role="dialog" aria-labelledby="modalSolicitudAdicionRetiroLabel" aria-hidden="true">
                     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
                         <div class="modal-content shadow border-info">
@@ -1798,10 +1805,7 @@ include("includes/head.php");
                 </div>
             </div>
 
-            <?php endif; ?>
-        </div>
-    </div>
-</div>
+
 
 <style>
     .dashboard-header {
@@ -1810,11 +1814,11 @@ include("includes/head.php");
         border-radius: 10px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
     }
-    .card {
+    .container-fluid .card {
         border-radius: 10px;
         transition: transform 0.2s;
     }
-    .card:hover {
+    .container-fluid .card:hover {
         transform: translateY(-3px);
         box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1) !important;
     }
@@ -1829,9 +1833,46 @@ include("includes/head.php");
     .bg-secondary-light { background-color: #f2f2f2; }
     .bg-dark-light { background-color: #e9ecef; }
     
+    /* MODALES: TOTALMENTE AISLADOS Y POR ENCIMA DE HEAD Y FOOTER */
+    .modal-backdrop {
+        z-index: 1070 !important;
+    }
+    .modal {
+        z-index: 1080 !important;
+        padding-top: 25px !important;
+        padding-bottom: 75px !important; /* Margen para no chocar con footer fixed */
+        overflow-y: auto !important;
+    }
+    .modal-dialog {
+        margin: 1.25rem auto !important;
+        max-width: 95%;
+    }
+    @media (min-width: 576px) {
+        .modal-dialog { max-width: 580px; }
+        .modal-dialog.modal-lg { max-width: 850px; }
+        .modal-dialog.modal-xl { max-width: 92vw; }
+    }
+    .modal-content {
+        border-radius: 12px !important;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.35) !important;
+        max-height: calc(100vh - 120px) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+    }
+    .modal-body {
+        max-height: calc(100vh - 230px) !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+    
     @media (max-width: 768px) {
         .col-md-4, .col-md-8 {
             padding: 0 15px;
+        }
+        .modal {
+            padding-top: 15px !important;
+            padding-bottom: 70px !important;
         }
     }
 </style>
