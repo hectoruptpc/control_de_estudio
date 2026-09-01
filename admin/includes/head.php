@@ -235,13 +235,13 @@ $admin_url = $base_url . '/admin';
                             </a>
                         <?php endif; ?>
 
-                        <?php if (tienePermiso('admin')): ?>
+                        <?php if (tienePermiso('preinscripciones')): ?>
                             <a title="Preinscripciones" class="dropdown-item" href="<?= $admin_url ?>/preinscripciones.php">
                                 <i class="fas fa-file-signature fa-fw"></i> Preinscripciones
                             </a>
                         <?php endif; ?>
 
-                         <?php if (tienePermiso('admin')): ?>
+                         <?php if (tienePermiso('inscripcion_materias')): ?>
                         <a title="Inscribir Materias a Estudiantes" class="dropdown-item" href="<?= $admin_url ?>/inscripcion_materias.php">
                             <i class="fas fa-clipboard-list fa-fw"></i> Inscribir Materias
                         </a>
@@ -259,7 +259,7 @@ $admin_url = $base_url . '/admin';
                             </a>
                         <?php endif; ?>
 
-                            <?php if (tienePermiso('admin')): ?>
+                            <?php if (tienePermiso('constancias')): ?>
                         <a title="Generar Constancias" class="dropdown-item" href="<?= $admin_url ?>/constancias.php">
                             <i class="fas fa-file-alt fa-fw"></i> Admisión y Control
                         </a>
