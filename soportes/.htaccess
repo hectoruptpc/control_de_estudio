@@ -1,0 +1,5 @@
+# Deshabilitar listado de directorios
+Options -Indexes
+
+# Protección adicional para archivos directos si no hay index
+DirectoryIndex index.php
