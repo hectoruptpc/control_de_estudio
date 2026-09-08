@@ -12406,38 +12406,6 @@ if (!function_exists('contarMensajesNoLeidos')) {
         $stmt->close();
         return $row ? intval($row['total']) : 0;
     }
-    
-    try {
-        // SIN transacción para evitar conflictos
-        $query = "INSERT INTO mensajeria (id_usuario_remitente, id_usuario_destinatario, titulo, mensaje, fecha_envio, leido, archivado_remitente, archivado_destinatario, eliminado_remitente, eliminado_destinatario) 
-                  VALUES (?, ?, ?, ?, NOW(), 0, 0, 0, 0, 0)";
-        $stmt = $db->prepare($query);
-        if (!$stmt) {
-            throw new Exception("Error en preparar consulta: " . $db->error);
-        }
-        
-        $stmt->bind_param("iiss", $remitente_id, $destinatario_id, $titulo, $mensaje);
-        
-        if ($stmt->execute()) {
-            $mensaje_id = $stmt->insert_id;
-            $stmt->close();
-            
-            return [
-                'success' => true,
-                'message' => 'Mensaje enviado exitosamente!',
-                'id' => $mensaje_id
-            ];
-        } else {
-            throw new Exception("Error al ejecutar: " . $stmt->error);
-        }
-        
-    } catch(Exception $e) {
-        error_log("Error en enviarMensaje: " . $e->getMessage());
-        return [
-            'success' => false,
-            'message' => 'Error al enviar mensaje: ' . $e->getMessage()
-        ];
-    }
 }
 
 
