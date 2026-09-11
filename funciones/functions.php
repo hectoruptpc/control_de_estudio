@@ -108,13 +108,15 @@ if (!function_exists('txt')) {
     require_once __DIR__ . '/services/CarreraService.php';
     require_once __DIR__ . '/services/SeccionService.php';
     require_once __DIR__ . '/services/PreinscripcionService.php';
+    require_once __DIR__ . '/services/ProsecucionService.php';
 
-    global $estudianteService, $carreraService, $seccionService, $preinscripcionService;
+    global $estudianteService, $carreraService, $seccionService, $preinscripcionService, $prosecucionService;
     if (isset($db) && ($db instanceof mysqli) && !$db->connect_errno) {
         $estudianteService = new EstudianteService($db);
         $carreraService = new CarreraService($db);
         $seccionService = new SeccionService($db);
         $preinscripcionService = new PreinscripcionService($db);
+        $prosecucionService = new ProsecucionService($db);
     }
 
     if (file_exists(__DIR__ . '/seguridad.php')) {
@@ -1226,6 +1228,67 @@ function obtenerPreinscripcionPorId($id) {
     $preinscripcion = $result->fetch_assoc();
     $stmt->close();
     return $preinscripcion ?: null;
+}
+
+/**
+ * ==============================================================================
+ * 🔹 SERVICIOS Y FUNCIONES DE PROSECUCIÓN ACADÉMICA (POO)
+ * ==============================================================================
+ */
+
+/**
+ * Verifica si un estudiante es apto para prosecución de estudios
+ */
+function verificarElegibilidadProsecucion($id_usuario) {
+    global $db, $prosecucionService;
+    if (!$prosecucionService && isset($db) && ($db instanceof mysqli)) {
+        $prosecucionService = new ProsecucionService($db);
+    }
+    return $prosecucionService ? $prosecucionService->verificarElegibilidad($id_usuario) : [
+        'es_apto' => false,
+        'motivo' => 'Servicio de prosecución no disponible.',
+        'carrera_origen' => null,
+        'titulo_obtenido' => null,
+        'titulo_destino' => null,
+        'ya_solicitado' => false,
+        'solicitud' => null
+    ];
+}
+
+/**
+ * Registra solicitud de prosecución para un estudiante
+ */
+function registrarSolicitudProsecucion($id_usuario, $datos) {
+    global $db, $prosecucionService;
+    if (!$prosecucionService && isset($db) && ($db instanceof mysqli)) {
+        $prosecucionService = new ProsecucionService($db);
+    }
+    return $prosecucionService ? $prosecucionService->registrarSolicitud($id_usuario, $datos) : [
+        'success' => false,
+        'message' => 'Servicio de prosecución no disponible.'
+    ];
+}
+
+/**
+ * Obtiene solicitud de prosecución por ID
+ */
+function obtenerSolicitudProsecucionPorId($id) {
+    global $db, $prosecucionService;
+    if (!$prosecucionService && isset($db) && ($db instanceof mysqli)) {
+        $prosecucionService = new ProsecucionService($db);
+    }
+    return $prosecucionService ? $prosecucionService->obtenerSolicitudPorId($id) : null;
+}
+
+/**
+ * Obtiene solicitud de prosecución del estudiante
+ */
+function obtenerSolicitudProsecucionEstudiante($id_usuario) {
+    global $db, $prosecucionService;
+    if (!$prosecucionService && isset($db) && ($db instanceof mysqli)) {
+        $prosecucionService = new ProsecucionService($db);
+    }
+    return $prosecucionService ? $prosecucionService->obtenerSolicitudPorEstudiante($id_usuario) : null;
 }
 
 /**
@@ -12423,7 +12486,7 @@ function obtenerSeccionEstudiante($db, $estudiante_id) {
             INNER JOIN carreras c ON s.id_carrera = c.id_carrera
             INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
             INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
-            WHERE es.id_usuario = ? AND es.estatus = 'activo'
+            WHERE es.id_usuario = ? AND (es.estatus = 'activo' OR es.estatus = 'aprobado')
             GROUP BY s.id_seccion";
     
     $stmt = $db->prepare($sql);
