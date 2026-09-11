@@ -15641,7 +15641,7 @@ function generarPDFNotasDefinitivas($docente_id, $materia_id, $periodo_id) {
     // Usar la clase existente `PDF_ActaCarga` para generar el reporte
     $pdf = new PDF_ActaCarga();
     // Obtener nombre de usuario para el reporte si está disponible
-    $usuario = isset($nombre_usuario_reporte) ? $nombre_usuario_reporte : '';
+    $usuario = isset($nombre_usuario_reporte) ? $nombre_usuario_reporte : ($_SESSION['user']['nombre'] ?? $_SESSION['user']['username'] ?? 'Administrador');
     $pdf->generarReporte($datos, $usuario);
     return true;
 }
