@@ -10287,8 +10287,11 @@ function obtenerAsignacionesSecciones() {
     try {
         $query = "SELECT ds.id_docente_seccion, u.nombre AS docente, 
                          s.codigo_seccion, c.nombre_carrera, ds.fecha_asignacion,
-                         m.nombre_materia, m.cod_materia, u.idusuario as docente_cedula,
-                         s.id_seccion, u.id as id_docente, m.id_materia
+                         m.nombre_materia, m.cod_materia, 
+                         u.idusuario as docente_cedula,
+                         u.idusuario as cedula_docente,
+                         u.idusuario,
+                         s.id_seccion, u.id as id_docente, ds.id_usuario, m.id_materia
                   FROM docente_seccion ds
                   JOIN users u ON ds.id_usuario = u.id
                   JOIN secciones s ON ds.id_seccion = s.id_seccion
