@@ -96,6 +96,27 @@ if (!function_exists('txt')) {
 
     include('variables.php');
     require_once('conexion.php');
+
+    // Sanitización y normalización de sesión para compatibilidad con PHP 8
+    if (isset($_SESSION['user']) && !is_array($_SESSION['user'])) {
+        if (!empty($_SESSION['user']) && (is_string($_SESSION['user']) || is_numeric($_SESSION['user'])) && isset($db) && $db) {
+            $clean_user = mysqli_real_escape_string($db, (string)$_SESSION['user']);
+            $res_u = mysqli_query($db, "SELECT * FROM users WHERE username = '$clean_user' OR id = '$clean_user' OR idusuario = '$clean_user' LIMIT 1");
+            if ($res_u && mysqli_num_rows($res_u) == 1) {
+                $_SESSION['user'] = mysqli_fetch_assoc($res_u);
+                $usua = $_SESSION['user']['username'] ?? '';
+                $id_usua = $_SESSION['user']['id'] ?? '';
+            } else {
+                unset($_SESSION['user']);
+                $usua = '';
+                $id_usua = '';
+            }
+        } else {
+            unset($_SESSION['user']);
+            $usua = '';
+            $id_usua = '';
+        }
+    }
     include('cabecera_footer.php');
     include('limite_planes.php');
     include('botoneras.php');
@@ -23254,40 +23275,43 @@ echo '</nav>';
 
 function isLoggedIn()
 {
-    return isset($_SESSION['user']);
+    return isset($_SESSION['user']) && is_array($_SESSION['user']) && !empty($_SESSION['user']);
 }
 
 function isAdmin()
 {
-    return isset($_SESSION['user']) && $_SESSION['user']['admin'] == 1;
+    return isset($_SESSION['user']) && is_array($_SESSION['user']) && !empty($_SESSION['user']['admin']) && $_SESSION['user']['admin'] == 1;
 }
 
 function isSuperUser()
 {
-    return isset($_SESSION['user']) && $_SESSION['user']['super_user'] == 1;
+    return isset($_SESSION['user']) && is_array($_SESSION['user']) && !empty($_SESSION['user']['super_user']) && $_SESSION['user']['super_user'] == 1;
 }
 
 function isDocente()
 {
-    return isset($_SESSION['user']) && $_SESSION['user']['docente'] == 1;
+    return isset($_SESSION['user']) && is_array($_SESSION['user']) && !empty($_SESSION['user']['docente']) && $_SESSION['user']['docente'] == 1;
 }
 
 function isEstudiante()
 {
-    return isset($_SESSION['user']) && $_SESSION['user']['estudiante'] == 1;
+    return isset($_SESSION['user']) && is_array($_SESSION['user']) && !empty($_SESSION['user']['estudiante']) && $_SESSION['user']['estudiante'] == 1;
 }
 
 function isUser()
 {
-    return isset($_SESSION['user']) && $_SESSION['user']['usuario'] == 1;
+    return isset($_SESSION['user']) && is_array($_SESSION['user']) && !empty($_SESSION['user']['usuario']) && $_SESSION['user']['usuario'] == 1;
 }
 
 function isDirectorCarrera()
 {
-    return isset($_SESSION['user']) && (
-        (isset($_SESSION['user']['usuario']) && $_SESSION['user']['usuario'] == 1) ||
-        (isset($_SESSION['user']['carrera_di']) && intval($_SESSION['user']['carrera_di']) > 0) ||
-        (isset($_SESSION['user']['director']) && $_SESSION['user']['director'] == 1)
+    if (!isset($_SESSION['user']) || !is_array($_SESSION['user'])) {
+        return false;
+    }
+    return (
+        (!empty($_SESSION['user']['usuario']) && $_SESSION['user']['usuario'] == 1) ||
+        (!empty($_SESSION['user']['carrera_di']) && intval($_SESSION['user']['carrera_di']) > 0) ||
+        (!empty($_SESSION['user']['director']) && $_SESSION['user']['director'] == 1)
     );
 }
 
@@ -23296,7 +23320,7 @@ function isDirectorCarrera()
 
 // Función genérica para verificar múltiples roles
 function hasRole($roles) {
-    if (!isset($_SESSION['user'])) {
+    if (!isset($_SESSION['user']) || !is_array($_SESSION['user'])) {
         return false;
     }
     
@@ -23322,18 +23346,18 @@ function hasRole($roles) {
 }
 
 function getAvailableProfiles() {
-    if (!isset($_SESSION['user'])) {
+    if (!isset($_SESSION['user']) || !is_array($_SESSION['user'])) {
         return [];
     }
     
     $user = $_SESSION['user'];
     $profiles = [];
     
-    if ($user['usuario'] == 1) $profiles[] = 'director_de_carrera';
-    if ($user['estudiante'] == 1) $profiles[] = 'estudiante';
-    if ($user['docente'] == 1) $profiles[] = 'docente';
-    if ($user['admin'] == 1) $profiles[] = 'admin';
-    if ($user['super_user'] == 1) $profiles[] = 'super_user';
+    if (!empty($user['usuario']) && $user['usuario'] == 1) $profiles[] = 'director_de_carrera';
+    if (!empty($user['estudiante']) && $user['estudiante'] == 1) $profiles[] = 'estudiante';
+    if (!empty($user['docente']) && $user['docente'] == 1) $profiles[] = 'docente';
+    if (!empty($user['admin']) && $user['admin'] == 1) $profiles[] = 'admin';
+    if (!empty($user['super_user']) && $user['super_user'] == 1) $profiles[] = 'super_user';
     
     return $profiles;
 }

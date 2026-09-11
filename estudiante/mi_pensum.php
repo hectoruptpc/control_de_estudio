@@ -103,7 +103,9 @@ if ((isset($_POST['pdf']) && $_POST['pdf'] == '1') || (isset($_GET['pdf']) && $_
         $pdf->Ln();
 
         $pdf->SetFont('Arial', '', 8);
+        $total_uc_trayecto = 0;
         foreach ($materias as $m) {
+            $total_uc_trayecto += (int)($m['creditos'] ?? 0);
             $nb_lines = $pdf->GetStringWidth(to_iso($m['nombre_materia'])) > $w[1] ? 2 : 1;
             $h_fila = 6 * $nb_lines;
             if ($pdf->GetY() + $h_fila > 270) $pdf->AddPage();
@@ -120,6 +122,14 @@ if ((isset($_POST['pdf']) && $_POST['pdf'] == '1') || (isset($_GET['pdf']) && $_
             $pdf->Cell($w[7], $h_fila, to_iso($m['duracion_periodo'] ?? ''), 1, 0, 'C');
             $pdf->Cell($w[8], $h_fila, ($m['activa'] ? 'Activa' : 'Inactiva'), 1, 1, 'C');
         }
+
+        // Fila Total UC por Trayecto en PDF
+        if ($pdf->GetY() + 6 > 270) $pdf->AddPage();
+        $pdf->SetFont('Arial', 'B', 8);
+        $pdf->SetFillColor(240, 240, 240);
+        $pdf->Cell($w[0] + $w[1], 6, to_iso('Total Unidades de Crédito (UC):'), 1, 0, 'R', true);
+        $pdf->Cell($w[2], 6, $total_uc_trayecto, 1, 0, 'C', true);
+        $pdf->Cell($w[3] + $w[4] + $w[5] + $w[6] + $w[7] + $w[8], 6, '', 1, 1, 'C', true);
         $pdf->Ln(4);
     }
     
@@ -225,7 +235,11 @@ include("includes/head.php");
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($materias as $m): ?>
+                            <?php 
+                            $total_uc_trayecto = 0;
+                            foreach ($materias as $m): 
+                                $total_uc_trayecto += (int)($m['creditos'] ?? 0);
+                            ?>
                                 <tr>
                                     <td class="align-middle"><?= htmlspecialchars($m['cod_materia'] ?? '') ?></td>
                                     <td class="text-left align-middle"><?= htmlspecialchars($m['nombre_materia'] ?? '') ?></td>
@@ -239,6 +253,17 @@ include("includes/head.php");
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
+                        <tfoot class="thead-light">
+                            <tr class="font-weight-bold bg-light">
+                                <td colspan="2" class="text-right align-middle py-2">
+                                    <i class="fas fa-calculator text-primary mr-1"></i> Total Unidades de Crédito (UC):
+                                </td>
+                                <td class="text-center align-middle py-2 text-primary font-weight-bold" style="font-size: 1.05rem;">
+                                    <?= $total_uc_trayecto ?>
+                                </td>
+                                <td colspan="6" class="py-2"></td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
                 
@@ -311,6 +336,18 @@ include("includes/head.php");
                             </div>
                         </div>
                     <?php endforeach; ?>
+                    
+                    <!-- Total UC del Trayecto en vista móvil -->
+                    <div class="card mb-4 border-left-primary shadow-sm bg-light">
+                        <div class="card-body py-2 px-3 d-flex justify-content-between align-items-center">
+                            <span class="font-weight-bold text-gray-800">
+                                <i class="fas fa-calculator text-primary mr-1"></i> Total Unidades de Crédito (UC):
+                            </span>
+                            <span class="badge badge-primary badge-pill font-weight-bold px-2 py-1" style="font-size: 1rem;">
+                                <?= $total_uc_trayecto ?>
+                            </span>
+                        </div>
+                    </div>
                 </div>
                 
             <?php endforeach; ?>
