@@ -12476,25 +12476,67 @@ if (!function_exists('contarMensajesNoLeidos')) {
 //MI HORARIO ESTUDIANTE ***********************************************************************
 
 
-function obtenerSeccionEstudiante($db, $estudiante_id) {
-    // Consulta SQL para obtener información completa de la sección del estudiante
+function obtenerSeccionesEstudiante($db, $estudiante_id) {
     $sql = "SELECT s.id_seccion, s.codigo_seccion, s.turno, s.id_carrera, c.nombre_carrera, 
-                   t.numero_trayecto, p.nombre_periodo, s.capacidad_maxima, s.inicia,
-                   s.estatus, COUNT(es.id_usuario) as inscritos, p.activo as periodo_activo
+                   t.nombre_trayecto, t.numero_trayecto, p.id_periodo, p.nombre_periodo, s.capacidad_maxima, s.inicia,
+                   s.estatus, COUNT(es.id_usuario) as inscritos, p.activo as periodo_activo, MAX(es.fecha_inscripcion) as fecha_inscripcion
             FROM estudiante_seccion es
             INNER JOIN secciones s ON es.id_seccion = s.id_seccion
             INNER JOIN carreras c ON s.id_carrera = c.id_carrera
             INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
             INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
             WHERE es.id_usuario = ? AND (es.estatus = 'activo' OR es.estatus = 'aprobado')
-            GROUP BY s.id_seccion";
+            GROUP BY s.id_seccion, s.codigo_seccion, s.turno, s.id_carrera, c.nombre_carrera, 
+                     t.nombre_trayecto, t.numero_trayecto, p.id_periodo, p.nombre_periodo, s.capacidad_maxima, s.inicia,
+                     s.estatus, p.activo
+            ORDER BY p.activo DESC, p.fecha_inicio DESC, t.numero_trayecto DESC, s.codigo_seccion ASC";
     
     $stmt = $db->prepare($sql);
+    if (!$stmt) return [];
     $stmt->bind_param("i", $estudiante_id);
     $stmt->execute();
     $result = $stmt->get_result();
     
-    return $result->fetch_assoc();
+    $secciones = [];
+    while ($row = $result->fetch_assoc()) {
+        $secciones[] = $row;
+    }
+    $stmt->close();
+    return $secciones;
+}
+
+function obtenerSeccionEstudiante($db, $estudiante_id, $id_seccion = null) {
+    if ($id_seccion !== null && (int)$id_seccion > 0) {
+        $id_seccion = (int)$id_seccion;
+        $sql = "SELECT s.id_seccion, s.codigo_seccion, s.turno, s.id_carrera, c.nombre_carrera, 
+                       t.nombre_trayecto, t.numero_trayecto, p.nombre_periodo, s.capacidad_maxima, s.inicia,
+                       s.estatus, COUNT(es.id_usuario) as inscritos, p.activo as periodo_activo
+                FROM estudiante_seccion es
+                INNER JOIN secciones s ON es.id_seccion = s.id_seccion
+                INNER JOIN carreras c ON s.id_carrera = c.id_carrera
+                INNER JOIN trayectos t ON s.id_trayecto = t.id_trayecto
+                INNER JOIN periodos_academicos p ON s.id_periodo = p.id_periodo
+                WHERE es.id_usuario = ? AND s.id_seccion = ? AND (es.estatus = 'activo' OR es.estatus = 'aprobado')
+                GROUP BY s.id_seccion, s.codigo_seccion, s.turno, s.id_carrera, c.nombre_carrera, 
+                         t.nombre_trayecto, t.numero_trayecto, p.nombre_periodo, s.capacidad_maxima, s.inicia,
+                         s.estatus, p.activo
+                LIMIT 1";
+        $stmt = $db->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param("ii", $estudiante_id, $id_seccion);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($result && $result->num_rows > 0) {
+                $row = $result->fetch_assoc();
+                $stmt->close();
+                return $row;
+            }
+            $stmt->close();
+        }
+    }
+
+    $secciones = obtenerSeccionesEstudiante($db, $estudiante_id);
+    return !empty($secciones) ? $secciones[0] : null;
 }
 
 // HORARIO DOCENTE ***********************************************************************
