@@ -673,11 +673,7 @@ include(__DIR__ . "/includes/head.php");
                         <?php endforeach; ?>
                     </div>
 
-                    <!-- Alerta instructiva inferior -->
-                    <div class="alert alert-light border mt-3 text-muted small mb-0">
-                        <i class="fas fa-shield-alt text-success mr-1"></i> 
-                        <strong>Seguridad Activa:</strong> La consulta de notas se procesa mediante peticiones cifradas por POST y validación estricta de sesión de vocero.
-                    </div>
+
 
                 <?php endif; ?>
 
