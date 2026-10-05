@@ -94,8 +94,8 @@ if (!function_exists('txt')) {
     }
 }
 
-    include('variables.php');
-    require_once('conexion.php');
+    include_once __DIR__ . '/variables.php';
+    require_once __DIR__ . '/conexion.php';
 
     // Sanitización y normalización de sesión para compatibilidad con PHP 8
     if (isset($_SESSION['user']) && !is_array($_SESSION['user'])) {
@@ -117,12 +117,12 @@ if (!function_exists('txt')) {
             $id_usua = '';
         }
     }
-    include('cabecera_footer.php');
-    include('limite_planes.php');
-    include('botoneras.php');
-    include('geolocalizacion.php');
-    include('registrar.php');
-    include('enviar_email.php');
+    include_once __DIR__ . '/cabecera_footer.php';
+    include_once __DIR__ . '/limite_planes.php';
+    include_once __DIR__ . '/botoneras.php';
+    include_once __DIR__ . '/geolocalizacion.php';
+    include_once __DIR__ . '/registrar.php';
+    include_once __DIR__ . '/enviar_email.php';
 
     // Cargar Servicios Orientados a Objetos (POO)
     require_once __DIR__ . '/services/EstudianteService.php';
