@@ -17,7 +17,6 @@ $carreras = obtenerTodasLasCarreras();
 $ingresos = obtenerIngresos($db);
 $estados = obtenerEstados($db);
 $mostrarPreinscripcion = obtenerConfiguracionSecretaria('mostrar_preinscripcion', '1');
-$mostrarProsecucion = obtenerConfiguracionSecretaria('mostrar_prosecucion', '1');
 
 $success_message = '';
 $error_message = '';

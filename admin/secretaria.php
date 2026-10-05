@@ -14,10 +14,9 @@ $error_message = '';
 $carreras = obtenerTodasLasCarreras();
 $cuposActuales = obtenerCuposSecretaria();
 $mostrarPreinscripcion = obtenerConfiguracionSecretaria('mostrar_preinscripcion', '1');
-$mostrarProsecucion = obtenerConfiguracionSecretaria('mostrar_prosecucion', '1');
 $turnos = ['Diurno', 'Nocturno'];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     if (!empty($_POST['action']) && $_POST['action'] === 'guardar') {
         
         $contadorGuardados = 0;
@@ -39,9 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Guardar configuraciones de visibilidad
         $mostrarPreinscripcion = isset($_POST['mostrar_preinscripcion']) ? '1' : '0';
-        $mostrarProsecucion = isset($_POST['mostrar_prosecucion']) ? '1' : '0';
         guardarConfiguracionSecretaria('mostrar_preinscripcion', $mostrarPreinscripcion);
-        guardarConfiguracionSecretaria('mostrar_prosecucion', $mostrarProsecucion);
 
         // Guardar configuraciones de fechas para carga de notas por trimestre
         for ($t = 1; $t <= 3; $t++) {
@@ -68,7 +65,7 @@ include('includes/head.php');
     <div class="row mb-3">
         <div class="col-12">
             <h2 class="mb-4"><i class="fas fa-user-tie me-2"></i> Secretaría</h2>
-            <p class="text-muted">Administre cupos por carrera y turno, fechas de carga de notas por trimestre, y controle si los botones de preinscripción y prosecución quedan visibles.</p>
+            <p class="text-muted">Administre cupos por carrera y turno, fechas de carga de notas por trimestre, y controle si el botón de preinscripción queda visible en la portada.</p>
         </div>
     </div>
 
@@ -206,16 +203,10 @@ include('includes/head.php');
                 <strong><i class="fas fa-eye"></i> Visibilidad de botones públicos</strong>
             </div>
             <div class="card-body">
-                <div class="form-check mb-3">
+                <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="mostrar_preinscripcion" name="mostrar_preinscripcion" value="1" <?php echo $mostrarPreinscripcion === '1' ? 'checked' : ''; ?>>
                     <label class="form-check-label" for="mostrar_preinscripcion">
                         <i class="fas fa-file-alt"></i> Mostrar botón de Preinscripción en la portada
-                    </label>
-                </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="mostrar_prosecucion" name="mostrar_prosecucion" value="1" <?php echo $mostrarProsecucion === '1' ? 'checked' : ''; ?>>
-                    <label class="form-check-label" for="mostrar_prosecucion">
-                        <i class="fas fa-graduation-cap"></i> Mostrar botón de Prosecución en la portada
                     </label>
                 </div>
             </div>
