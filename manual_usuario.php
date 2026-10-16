@@ -969,11 +969,11 @@ if (!empty($_SESSION['current_profile'])) {
                     <div class="section-block" id="sec-1-3">
                         <h3 class="section-subtitle"><i class="fas fa-key"></i> 1.3. Recuperación de Contraseña</h3>
                         <p>
-                            En caso de extravío u olvido de su clave de acceso, dispone de dos mecanismos en la pantalla principal:
+                            En caso de extravío u olvido de su clave de acceso, puede restablecerla de forma segura desde la pantalla principal haciendo clic en el botón <strong>Recuperar Contraseña</strong>:
                         </p>
                         <ul>
-                            <li><strong>Recuperar Contraseña:</strong> Envía un enlace seguro de restablecimiento a su correo electrónico registrado.</li>
-                            <li><strong>Recuperar Contraseña Provisional:</strong> Permite validar datos de seguridad institucionales para generar un acceso temporal.</li>
+                            <li>Ingrese su <strong>Correo Electrónico Institucional</strong> registrado en el sistema y presione <strong>Enviar enlace de recuperación</strong>.</li>
+                            <li>Recibirá en su bandeja de entrada un correo con un enlace único (válido por 1 hora) que le permitirá definir y confirmar su nueva contraseña.</li>
                         </ul>
                     </div>
 

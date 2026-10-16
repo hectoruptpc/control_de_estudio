@@ -48,13 +48,10 @@ $mostrarPreinscripcion = obtenerConfiguracionSecretaria('mostrar_preinscripcion'
             </span>
             <?php endif; ?>
             
-            <!-- Botones de Recuperar Contraseña -->
-            <span class="d-inline-block" data-toggle="popover" data-content="...">
+            <!-- Botón de Recuperar Contraseña -->
+            <span class="d-inline-block" data-toggle="popover" data-content="Si olvidó su contraseña, solicite un enlace seguro de recuperación a su correo electrónico.">
                 <a type="link" class="btn btn-outline-danger" href="recuperar_password.php">
                     <i class="fa fa-unlock-alt"></i> Recuperar Contraseña
-                </a>
-                <a type="link" class="btn btn-outline-danger" href="recuperar_password_provicional.php">
-                    <i class="fa fa-unlock-alt"></i> Recuperar Contraseña provicional
                 </a>
             </span>
             
@@ -77,14 +74,16 @@ $mostrarPreinscripcion = obtenerConfiguracionSecretaria('mostrar_preinscripcion'
 
 <form class="was-validated" method="post" action="login.php" autocomplete="on">
 <!-- notification message -->
-<?php if (isset($_SESSION['msg'])) : ?>
-<div class="alert alert-danger" role="alert" >
-<h3>
+<?php if (isset($_SESSION['msg'])) : 
+    $es_exito = (strpos($_SESSION['msg'], '✅') !== false);
+?>
+<div class="alert <?php echo $es_exito ? 'alert-success' : 'alert-danger'; ?>" role="alert">
+<h5 class="mb-0">
 <?php
 echo $_SESSION['msg'];
 unset($_SESSION['msg']);
 ?>
-</h3>
+</h5>
 </div>
 <hr>
 <?php endif ?>
