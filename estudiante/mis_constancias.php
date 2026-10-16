@@ -3,7 +3,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
 $titulopag = "Mis Constancias y Solicitudes";
-include('../funciones/functions.php');
+require_once __DIR__ . '/../funciones/functions.php';
 
 // Verificar autenticación y rol de estudiante
 if (!isLoggedIn() || !isEstudiante()) {
@@ -69,7 +69,7 @@ if ($estudiante) {
     $es_apto_pasantias = esAptoParaPasantias($estudiante['id']);
     
     // PROCESAR CREACIÓN DE SOLICITUDES VÍA POST
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_solicitud'])) {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action_solicitud'])) {
         if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
             $error = "Error de validación de seguridad (CSRF). Por favor recarga la página.";
         } else {

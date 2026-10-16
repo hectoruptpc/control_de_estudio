@@ -1021,7 +1021,9 @@ function insertarPreinscripcion($datos) {
         ];
     }
 
-    if (!empty($datos['carrera']) && !empty($datos['turno']) && !hayCupoDisponible($datos['carrera'], $datos['turno'])) {
+    $idPeriodo = !empty($datos['id_periodo']) ? (int)$datos['id_periodo'] : resolverIdPeriodo();
+
+    if (!empty($datos['carrera']) && !empty($datos['turno']) && !hayCupoDisponible($datos['carrera'], $datos['turno'], $idPeriodo)) {
         return [
             'success' => false,
             'message' => 'No hay cupos disponibles para la carrera seleccionada en el turno ' . htmlspecialchars($datos['turno']) . '. Contacte con Secretaría.'
@@ -1104,6 +1106,7 @@ function insertarPreinscripcion($datos) {
             'legalizado_titulo' => !empty($legalizadoTitulos) ? implode('|||', $legalizadoTitulos) : '',
             'sede' => $datos['sede'] ?? null,
             'turno' => $datos['turno'] ?? null,
+            'id_periodo' => $idPeriodo,
             'potencialidades' => $datos['potencialidades'] ?? '',
             'carrera' => $datos['carrera'] ?? null,
             'genero' => $datos['genero'] ?? null,
@@ -1204,23 +1207,39 @@ function insertarPreinscripcion($datos) {
 /**
  * Obtiene las preinscripciones pendientes
  */
-function obtenerPreinscripcionesPendientes($busqueda = null) {
+function obtenerPreinscripcionesPendientes($busqueda = null, $idPeriodo = null) {
     global $db;
 
     $preinscripciones = [];
     $busqueda = trim((string)$busqueda);
-    $query = "SELECT * FROM preinscripcion WHERE status = 'Pendiente'";
+    $query = "SELECT p.*, pa.nombre_periodo 
+              FROM preinscripcion p 
+              LEFT JOIN periodos_academicos pa ON p.id_periodo = pa.id_periodo 
+              WHERE p.status = 'Pendiente'";
+    
+    $params = [];
+    $types = '';
 
-    if ($busqueda !== '') {
-        $query .= " AND (idusuario LIKE ? OR nombre LIKE ? OR username LIKE ? OR email LIKE ? OR tlf LIKE ? OR cel LIKE ? OR direccion LIKE ? OR punto_referencia LIKE ? OR potencialidades LIKE ? OR estado LIKE ? OR municipio LIKE ? OR parroquia LIKE ? )";
+    if (!empty($idPeriodo)) {
+        $query .= " AND p.id_periodo = ?";
+        $params[] = (int)$idPeriodo;
+        $types .= 'i';
     }
 
-    $query .= " ORDER BY fecha_ingreso DESC";
+    if ($busqueda !== '') {
+        $query .= " AND (p.idusuario LIKE ? OR p.nombre LIKE ? OR p.username LIKE ? OR p.email LIKE ? OR p.tlf LIKE ? OR p.cel LIKE ? OR p.direccion LIKE ? OR p.punto_referencia LIKE ? OR p.potencialidades LIKE ? OR p.estado LIKE ? OR p.municipio LIKE ? OR p.parroquia LIKE ? )";
+        $like = '%' . $busqueda . '%';
+        for ($i = 0; $i < 12; $i++) {
+            $params[] = $like;
+            $types .= 's';
+        }
+    }
+
+    $query .= " ORDER BY p.fecha_ingreso DESC";
 
     if ($stmt = $db->prepare($query)) {
-        if ($busqueda !== '') {
-            $like = '%' . $busqueda . '%';
-            $stmt->bind_param('ssssssssssss', $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like);
+        if (!empty($types)) {
+            $stmt->bind_param($types, ...$params);
         }
         $stmt->execute();
         $result = $stmt->get_result();
@@ -1333,29 +1352,38 @@ function obtenerConfiguracionSecretaria($clave, $default = null) {
 }
 
 /**
- * Guarda o actualiza cupos por carrera y turno
- * Guarda EXACTAMENTE los valores que el usuario ingresa
+ * Resuelve el ID del período: si se proporciona uno válido lo usa, si no, obtiene el período activo.
  */
-function guardarCupoSecretaria($carreraId, $turno, $cuposTotales, $numeroSecciones = 1) {
-    global $db;
+function resolverIdPeriodo($idPeriodo = null) {
+    if (!empty($idPeriodo) && is_numeric($idPeriodo)) {
+        return (int)$idPeriodo;
+    }
+    $periodoActivo = obtenerPeriodoActivo();
+    return $periodoActivo ? (int)$periodoActivo['id_periodo'] : 0;
+}
 
-    // Verificar si ya existe el registro
-    $check = $db->prepare("SELECT id FROM secretaria_cupos WHERE carrera_id = ? AND turno = ?");
-    $check->bind_param('is', $carreraId, $turno);
+/**
+ * Guarda o actualiza cupos por carrera y turno para un período académico
+ */
+function guardarCupoSecretaria($carreraId, $turno, $cuposTotales, $numeroSecciones = 1, $idPeriodo = null) {
+    global $db;
+    $idPeriodo = resolverIdPeriodo($idPeriodo);
+
+    // Verificar si ya existe el registro para este periodo, carrera y turno
+    $check = $db->prepare("SELECT id FROM secretaria_cupos WHERE id_periodo = ? AND carrera_id = ? AND turno = ?");
+    $check->bind_param('iis', $idPeriodo, $carreraId, $turno);
     $check->execute();
     $existe = $check->get_result()->fetch_assoc();
     $check->close();
 
     if ($existe) {
-        // Si existe, ACTUALIZAR con los valores exactos
-        $query = "UPDATE secretaria_cupos SET cupos_totales = ?, numero_secciones = ? WHERE carrera_id = ? AND turno = ?";
+        $query = "UPDATE secretaria_cupos SET cupos_totales = ?, numero_secciones = ? WHERE id = ?";
         $stmt = $db->prepare($query);
-        $stmt->bind_param('iiis', $cuposTotales, $numeroSecciones, $carreraId, $turno);
+        $stmt->bind_param('iii', $cuposTotales, $numeroSecciones, $existe['id']);
     } else {
-        // Si no existe, INSERTAR con los valores exactos
-        $query = "INSERT INTO secretaria_cupos (carrera_id, turno, cupos_totales, numero_secciones) VALUES (?, ?, ?, ?)";
+        $query = "INSERT INTO secretaria_cupos (id_periodo, carrera_id, turno, cupos_totales, numero_secciones) VALUES (?, ?, ?, ?, ?)";
         $stmt = $db->prepare($query);
-        $stmt->bind_param('isii', $carreraId, $turno, $cuposTotales, $numeroSecciones);
+        $stmt->bind_param('iisii', $idPeriodo, $carreraId, $turno, $cuposTotales, $numeroSecciones);
     }
 
     if (!$stmt) {
@@ -1373,7 +1401,6 @@ function guardarCupoSecretaria($carreraId, $turno, $cuposTotales, $numeroSeccion
     return $result;
 }
 
-
 function guardarConfiguracionSecretaria($clave, $valor) {
     global $db;
 
@@ -1388,18 +1415,18 @@ function guardarConfiguracionSecretaria($clave, $valor) {
     return $result;
 }
 
-
-
 /**
- * Obtiene los cupos configurados por carrera y turno
+ * Obtiene los cupos configurados por carrera y turno para un período académico
  */
-function obtenerCuposSecretaria() {
+function obtenerCuposSecretaria($idPeriodo = null) {
     global $db;
+    $idPeriodo = resolverIdPeriodo($idPeriodo);
 
     $cupos = [];
-    $query = "SELECT carrera_id, turno, cupos_totales, numero_secciones FROM secretaria_cupos";
+    $query = "SELECT carrera_id, turno, cupos_totales, numero_secciones FROM secretaria_cupos WHERE id_periodo = ?";
     $stmt = $db->prepare($query);
     if ($stmt) {
+        $stmt->bind_param('i', $idPeriodo);
         $stmt->execute();
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
@@ -1413,18 +1440,39 @@ function obtenerCuposSecretaria() {
     return $cupos;
 }
 
+/**
+ * Copia la configuración de cupos de un período de origen a un período de destino
+ */
+function copiarCuposDePeriodo($periodoOrigen, $periodoDestino) {
+    global $db;
+    $periodoOrigen = (int)$periodoOrigen;
+    $periodoDestino = (int)$periodoDestino;
+    if ($periodoOrigen <= 0 || $periodoDestino <= 0 || $periodoOrigen === $periodoDestino) {
+        return false;
+    }
 
-
-
+    $query = "INSERT IGNORE INTO secretaria_cupos (id_periodo, carrera_id, turno, cupos_totales, numero_secciones)
+              SELECT ?, carrera_id, turno, cupos_totales, numero_secciones 
+              FROM secretaria_cupos WHERE id_periodo = ?";
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        $stmt->bind_param('ii', $periodoDestino, $periodoOrigen);
+        $result = $stmt->execute();
+        $stmt->close();
+        return $result;
+    }
+    return false;
+}
 
 /**
- * Obtiene el límite de secciones autorizadas por secretaria y las ya creadas
+ * Obtiene el límite de secciones autorizadas por secretaria y las ya creadas para un periodo
  */
 function obtenerLimiteSeccionesDirector($carrera_id, $turno, $id_periodo) {
     global $db;
+    $id_periodo = resolverIdPeriodo($id_periodo);
     
-    // Obtener límite autorizado por secretaria
-    $cuposConfig = obtenerCuposSecretaria();
+    // Obtener límite autorizado por secretaria para este periodo específico
+    $cuposConfig = obtenerCuposSecretaria($id_periodo);
     $seccionesAutorizadas = $cuposConfig[$carrera_id][$turno]['numero_secciones'] ?? 0;
     
     // Contar secciones ya creadas (pendientes + aprobadas) para este periodo
@@ -1481,31 +1529,32 @@ function obtenerLimiteSeccionesDirector($carrera_id, $turno, $id_periodo) {
 
 
 /**
- * Obtiene los cupos disponibles para una carrera y turno específicos
+ * Obtiene los cupos disponibles para una carrera y turno específicos en un período académico
  */
-function obtenerCuposDisponiblesPorCarreraYTurno($carreraId, $turno) {
+function obtenerCuposDisponiblesPorCarreraYTurno($carreraId, $turno, $idPeriodo = null) {
     global $db;
+    $idPeriodo = resolverIdPeriodo($idPeriodo);
     
     if (empty($carreraId) || empty($turno)) {
         return ['total' => 0, 'ocupados' => 0, 'disponibles' => 0, 'tiene_cupo' => false];
     }
     
-    // Obtener cupos totales de secretaria
-    $query = "SELECT cupos_totales FROM secretaria_cupos WHERE carrera_id = ? AND turno = ?";
+    // Obtener cupos totales de secretaria para este periodo
+    $query = "SELECT cupos_totales FROM secretaria_cupos WHERE id_periodo = ? AND carrera_id = ? AND turno = ?";
     $stmt = $db->prepare($query);
     if (!$stmt) {
         return ['total' => 0, 'ocupados' => 0, 'disponibles' => 0, 'tiene_cupo' => false];
     }
     
-    $stmt->bind_param('is', $carreraId, $turno);
+    $stmt->bind_param('iis', $idPeriodo, $carreraId, $turno);
     $stmt->execute();
     $result = $stmt->get_result();
     $cupo = $result->fetch_assoc();
     $total = $cupo ? (int)$cupo['cupos_totales'] : 0;
     $stmt->close();
     
-    // Contar preinscripciones (Pendientes + Aprobadas) usando la función existente
-    $ocupados = contarPreinscripcionesPorCupo($carreraId, $turno);
+    // Contar preinscripciones (Pendientes + Aprobadas) para este periodo
+    $ocupados = contarPreinscripcionesPorCupo($carreraId, $turno, $idPeriodo);
     $disponibles = max(0, $total - $ocupados);
     
     return [
@@ -1517,31 +1566,23 @@ function obtenerCuposDisponiblesPorCarreraYTurno($carreraId, $turno) {
 }
 
 /**
- * Obtiene todos los cupos disponibles para todas las carreras y turnos
+ * Cuenta cuántas preinscripciones están usando cupos para una carrera+turno en un período académico
  */
-
-
-
-
-
-
-/**
- * Cuenta cuántas preinscripciones están usando cupos para una carrera+turno
- */
-function contarPreinscripcionesPorCupo($carreraId, $turno) {
+function contarPreinscripcionesPorCupo($carreraId, $turno, $idPeriodo = null) {
     global $db;
+    $idPeriodo = resolverIdPeriodo($idPeriodo);
 
     $checkTable = $db->query("SHOW TABLES LIKE 'preinscripcion'");
     if (!$checkTable || $checkTable->num_rows === 0) {
         return 0;
     }
 
-    $query = "SELECT COUNT(*) AS total FROM preinscripcion WHERE carrera = ? AND turno = ? AND status IN ('Pendiente', 'Aprobada')";
+    $query = "SELECT COUNT(*) AS total FROM preinscripcion WHERE carrera = ? AND turno = ? AND id_periodo = ? AND status IN ('Pendiente', 'Aprobada')";
     $stmt = $db->prepare($query);
     if (!$stmt) {
         return 0;
     }
-    $stmt->bind_param('is', $carreraId, $turno);
+    $stmt->bind_param('isi', $carreraId, $turno, $idPeriodo);
     $stmt->execute();
     $result = $stmt->get_result();
     $row = $result->fetch_assoc();
@@ -1551,10 +1592,11 @@ function contarPreinscripcionesPorCupo($carreraId, $turno) {
 }
 
 /**
- * Comprueba si hay cupos disponibles para una carrera y turno
+ * Comprueba si hay cupos disponibles para una carrera y turno en un período académico
  */
-function hayCupoDisponible($carreraId, $turno) {
+function hayCupoDisponible($carreraId, $turno, $idPeriodo = null) {
     global $db;
+    $idPeriodo = resolverIdPeriodo($idPeriodo);
     
     // Validar parámetros
     if (empty($carreraId) || empty($turno)) {
@@ -1562,59 +1604,59 @@ function hayCupoDisponible($carreraId, $turno) {
         return false;
     }
     
-    // Obtener cupos de la tabla secretaria_cupos
-    $query = "SELECT cupos_totales FROM secretaria_cupos WHERE carrera_id = ? AND turno = ?";
+    // Obtener cupos de la tabla secretaria_cupos para este periodo
+    $query = "SELECT cupos_totales FROM secretaria_cupos WHERE id_periodo = ? AND carrera_id = ? AND turno = ?";
     $stmt = $db->prepare($query);
     if (!$stmt) {
         error_log("Error preparando consulta hayCupoDisponible: " . $db->error);
         return false;
     }
     
-    $stmt->bind_param('is', $carreraId, $turno);
+    $stmt->bind_param('iis', $idPeriodo, $carreraId, $turno);
     $stmt->execute();
     $result = $stmt->get_result();
     $cupo = $result->fetch_assoc();
     
     if (!$cupo) {
-        error_log("hayCupoDisponible: No hay configuración de cupos para carrera_id: $carreraId, turno: $turno");
+        error_log("hayCupoDisponible: No hay configuración de cupos para periodo: $idPeriodo, carrera_id: $carreraId, turno: $turno");
         return false;
     }
     
     $total = (int)$cupo['cupos_totales'];
     if ($total <= 0) {
-        error_log("hayCupoDisponible: Cupos totales es $total para carrera_id: $carreraId, turno: $turno");
+        error_log("hayCupoDisponible: Cupos totales es $total para periodo: $idPeriodo, carrera_id: $carreraId, turno: $turno");
         return false;
     }
     
-    $ocupados = contarPreinscripcionesAprobadasPorCarreraYTurno($carreraId, $turno);
+    $ocupados = contarPreinscripcionesPorCupo($carreraId, $turno, $idPeriodo);
     $disponibles = $total - $ocupados;
     
-    error_log("hayCupoDisponible: Carrera $carreraId, Turno $turno - Cupos totales: $total, Ocupados: $ocupados, Disponibles: $disponibles");
+    error_log("hayCupoDisponible: Periodo $idPeriodo, Carrera $carreraId, Turno $turno - Cupos totales: $total, Ocupados: $ocupados, Disponibles: $disponibles");
     
     return $ocupados < $total;
 }
 
 /**
- * Cuenta cuántas preinscripciones APROBADAS existen para una carrera y turno
- * NOTA: Cambié el nombre para evitar conflicto con la función existente
+ * Cuenta cuántas preinscripciones APROBADAS existen para una carrera y turno en un período académico
  */
-function contarPreinscripcionesAprobadasPorCarreraYTurno($carreraId, $turno) {
+function contarPreinscripcionesAprobadasPorCarreraYTurno($carreraId, $turno, $idPeriodo = null) {
     global $db;
+    $idPeriodo = resolverIdPeriodo($idPeriodo);
     
-    // Contar preinscripciones APROBADAS (no pendientes)
     $query = "SELECT COUNT(*) as total 
               FROM preinscripcion 
-              WHERE carrera = ? AND turno = ? AND status = 'Aprobada'";
+              WHERE carrera = ? AND turno = ? AND id_periodo = ? AND status = 'Aprobada'";
     $stmt = $db->prepare($query);
     if (!$stmt) {
         error_log("Error preparando contarPreinscripcionesAprobadasPorCarreraYTurno: " . $db->error);
         return 0;
     }
     
-    $stmt->bind_param('is', $carreraId, $turno);
+    $stmt->bind_param('isi', $carreraId, $turno, $idPeriodo);
     $stmt->execute();
     $result = $stmt->get_result();
     $row = $result->fetch_assoc();
+    $stmt->close();
     
     return (int)($row['total'] ?? 0);
 }
@@ -8442,7 +8484,7 @@ function verificarConflictoHorario($dia, $hora_inicio, $hora_fin, $aula, $id_sec
  * @param int $numero_trayecto Número del trayecto (0,1,2,3,4)
  * @return array Lista de secciones con cupos disponibles
  */
-function obtenerSeccionesDisponiblesPorCarreraYTurnoYTrayecto($id_carrera, $turno, $numero_trayecto) {
+function obtenerSeccionesDisponiblesPorCarreraYTurnoYTrayecto($id_carrera, $turno, $numero_trayecto, $id_periodo = null) {
     global $db;
     
     $secciones = [];
@@ -8457,6 +8499,12 @@ function obtenerSeccionesDisponiblesPorCarreraYTurnoYTrayecto($id_carrera, $turn
         return $secciones;
     }
     
+    $periodo_filtro = "";
+    if (!empty($id_periodo)) {
+        $id_periodo = (int)$id_periodo;
+        $periodo_filtro = " AND s.id_periodo = $id_periodo ";
+    }
+    
     $query = "SELECT s.*, 
                      (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion) as inscritos,
                      (s.capacidad_maxima - (SELECT COUNT(*) FROM estudiante_seccion WHERE id_seccion = s.id_seccion)) as cupos_disponibles
@@ -8464,6 +8512,7 @@ function obtenerSeccionesDisponiblesPorCarreraYTurnoYTrayecto($id_carrera, $turn
               WHERE s.id_carrera = $id_carrera 
               AND s.turno = '$turno'
               AND s.id_trayecto = $id_trayecto
+              $periodo_filtro
               AND s.estatus = 'activa'
               AND s.status = 'Aprobada'
               HAVING cupos_disponibles > 0
@@ -14975,7 +15024,7 @@ class PDF_PlanillaNotas {
     
     function __construct() {
         // Asegúrate de que la ruta a FPDF sea la correcta en tu proyecto
-        require_once('../fpdf/fpdf.php');
+        require_once __DIR__ . '/../fpdf/fpdf.php';
         $this->pdf = new FPDF('P', 'mm', 'A4'); // Orientación Vertical, milímetros, A4
     }
     
@@ -20618,73 +20667,93 @@ function obtenerHistorialNotasDesglozado($estudiante_id) {
 
 
 /**
- * Obtener la configuración de fechas para un trimestre específico
+ * Obtener la configuración de fechas para un trimestre específico en un período académico
  * @param int $trimestre_num Número del trimestre (1, 2, 3)
+ * @param int|null $idPeriodo ID del período académico (opcional, por defecto el activo)
  * @return array|null Configuración del trimestre o null si no existe
  */
-function obtenerConfiguracionCargaTrimestre($trimestre_num) {
+function obtenerConfiguracionCargaTrimestre($trimestre_num, $idPeriodo = null) {
     global $db;
+    $idPeriodo = resolverIdPeriodo($idPeriodo);
     
-    $query = "SELECT * FROM secretaria_configuracion_carga WHERE trimestre_num = ? AND activo = 1";
+    $query = "SELECT * FROM secretaria_configuracion_carga WHERE trimestre_num = ? AND id_periodo = ? AND activo = 1";
     $stmt = $db->prepare($query);
-    $stmt->bind_param("i", $trimestre_num);
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param("ii", $trimestre_num, $idPeriodo);
     $stmt->execute();
     $result = $stmt->get_result();
+    $data = $result->fetch_assoc();
+    $stmt->close();
     
-    return $result->fetch_assoc();
+    return $data;
 }
 
 /**
- * Obtener todas las configuraciones de carga de notas
+ * Obtener todas las configuraciones de carga de notas para un período académico
+ * @param int|null $idPeriodo ID del período académico (opcional, por defecto el activo)
  * @return array Lista de configuraciones por trimestre
  */
-function obtenerTodasConfiguracionesCarga() {
+function obtenerTodasConfiguracionesCarga($idPeriodo = null) {
     global $db;
+    $idPeriodo = resolverIdPeriodo($idPeriodo);
     
     $configuraciones = [];
-    $query = "SELECT * FROM secretaria_configuracion_carga ORDER BY trimestre_num ASC";
-    $result = $db->query($query);
-    
-    if ($result) {
+    $query = "SELECT * FROM secretaria_configuracion_carga WHERE id_periodo = ? ORDER BY trimestre_num ASC";
+    $stmt = $db->prepare($query);
+    if ($stmt) {
+        $stmt->bind_param("i", $idPeriodo);
+        $stmt->execute();
+        $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
             $configuraciones[$row['trimestre_num']] = $row;
         }
+        $stmt->close();
     }
     
     return $configuraciones;
 }
 
 /**
- * Guardar configuración de fechas para un trimestre
+ * Guardar configuración de fechas para un trimestre en un período académico
  * @param int $trimestre_num Número del trimestre
  * @param string $fecha_inicio Fecha de inicio (Y-m-d)
  * @param string $fecha_fin Fecha de fin (Y-m-d)
+ * @param int|null $idPeriodo ID del período académico (opcional, por defecto el activo)
  * @return bool True si se guardó correctamente
  */
-function guardarConfiguracionCargaTrimestre($trimestre_num, $fecha_inicio, $fecha_fin) {
+function guardarConfiguracionCargaTrimestre($trimestre_num, $fecha_inicio, $fecha_fin, $idPeriodo = null) {
     global $db;
+    $idPeriodo = resolverIdPeriodo($idPeriodo);
     
-    $query = "INSERT INTO secretaria_configuracion_carga (trimestre_num, fecha_inicio, fecha_fin, activo) 
-              VALUES (?, ?, ?, 1) 
+    $query = "INSERT INTO secretaria_configuracion_carga (id_periodo, trimestre_num, fecha_inicio, fecha_fin, activo) 
+              VALUES (?, ?, ?, ?, 1) 
               ON DUPLICATE KEY UPDATE fecha_inicio = ?, fecha_fin = ?, activo = 1";
     $stmt = $db->prepare($query);
-    $stmt->bind_param("issss", $trimestre_num, $fecha_inicio, $fecha_fin, $fecha_inicio, $fecha_fin);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("iissss", $idPeriodo, $trimestre_num, $fecha_inicio, $fecha_fin, $fecha_inicio, $fecha_fin);
+    $result = $stmt->execute();
+    $stmt->close();
     
-    return $stmt->execute();
+    return $result;
 }
 
 /**
- * Verificar si un trimestre está disponible para carga
+ * Verificar si un trimestre está disponible para carga en un período académico
  * @param int $trimestre_num Número del trimestre
+ * @param int|null $idPeriodo ID del período académico (opcional, por defecto el activo)
  * @return array ['disponible' => bool, 'mensaje' => string]
  */
-function verificarDisponibilidadTrimestre($trimestre_num) {
-    $config = obtenerConfiguracionCargaTrimestre($trimestre_num);
+function verificarDisponibilidadTrimestre($trimestre_num, $idPeriodo = null) {
+    $config = obtenerConfiguracionCargaTrimestre($trimestre_num, $idPeriodo);
     
     if (!$config) {
         return [
             'disponible' => false,
-            'mensaje' => "El Trimestre $trimestre_num no está configurado. Contacte con secretaría."
+            'mensaje' => "El Trimestre $trimestre_num no está configurado para este período académico. Contacte con secretaría."
         ];
     }
     
