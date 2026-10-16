@@ -256,6 +256,9 @@ if (!isLoggedIn() || !isDocente()) {
                 </a>
                 
                 <a title="Horario" class="dropdown-item" href="mi_horario.php"><i class="fas fa-calendar-alt fa-fw"></i> Mi Horario</a>
+                <a title="Manual Oficial de Usuario" class="dropdown-item" href="../manual_usuario.php">
+                  <i class="fas fa-book-reader fa-fw"></i> Manual de Usuario
+                </a>
                 <div class="dropdown-divider"></div>
                 <a title="Salir del Sistema" class="dropdown-item" href="#" id="logoutLink">
                   <i class="fas fa-sign-out-alt fa-fw"></i> Cerrar Sesión
