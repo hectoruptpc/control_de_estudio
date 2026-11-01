@@ -35,6 +35,7 @@ Documentación funcional ampliada: `DOCUMENTACION_SISTEMA.md` (no es necesario l
 | `sistemaviejo/pnfdiurno.sql` | **Dump del sistema viejo (79 MB, 491k líneas, 50 tablas).** NUNCA leer completo. |
 | `proyecto_tsu.sql` | Dump del sistema nuevo (1 MB, 11.5k líneas). |
 | `CONTROL_ESTUDIOS_VERCEL/` | Landing/Index estático "En construcción" para el despliegue preliminar en Vercel. |
+| `VERCEL/` | Proyecto Next.js + TypeScript + Turso + Cloudflare R2 para la migración completa a Vercel (`ce.uptpc.edu.ve`). |
 | `scratch/` | Scripts temporales de depuración. |
 
 ### Reglas para ahorrar tokens
@@ -53,8 +54,8 @@ Claves del viejo: `pensum` char(3) (ej. `GXC`), `cod_mat` char(5), `lapso` forma
 - `herrejose@gmail.com` / `12345678` (users.id = 2, username `V-12345678`, todos los permisos).
 
 ## 6. Líneas de trabajo (roadmap)
-- **A. Migración de datos viejo → nuevo**: script que reciba `pnfdiurno.sql` y migre al esquema de `proyecto_tsu.sql`. *Estado: solo análisis inicial, no hay código.*
-- **B. Replataforma a Vercel + TypeScript + Turso + Cloudflare R2 + proveedor de email**: *Estado: análisis de viabilidad entregado (ver bitácora). No hay código.*
+- **A. Migración de datos viejo → nuevo**: script que reciba `pnfdiurno.sql` y migre al esquema de `proyecto_tsu.sql`. *Estado: solo análisis inicial, no tocar `sistema_viejo`.*
+- **B. Replataforma a Vercel + TypeScript + Turso + Cloudflare R2**: *Estado: Arquitectura inicial montada en `/VERCEL`, variables locales blindadas contra filtraciones en Git, scripts de validación y migración de multimedia listos.*
 
 ## 7. Estado actual / Bitácora
 | Fecha | Acción | Resultado |
@@ -63,6 +64,11 @@ Claves del viejo: `pensum` char(3) (ej. `GXC`), `cod_mat` char(5), `lapso` forma
 | 2026-11-01 | Creado `AGENTS.md` | Contexto para IA. |
 | 2026-11-01 | Análisis de viabilidad Vercel/TS/Turso/R2 | Viable pero es una **reescritura** (~340 archivos PHP propios, ~131k líneas). Pendiente: decisión del usuario sobre framework y orden (migración de datos primero vs. replataforma). |
 | 2026-11-01 | Optimización landing Vercel (`CONTROL_ESTUDIOS_VERCEL/index.html`) | Rediseño responsivo en viewport 100vh sin scroll vertical para PC/laptops; proporciones y paddings ajustados con CSS clamp y barra de progreso animada. |
+| 2026-11-01 | Setup proyecto migración `/VERCEL` | Creación de base Next.js 15, Drizzle ORM, Turso DB (probada conexión OK), Cloudflare R2 (`scripts/migrate-r2.mjs`), scripts de validación de variables (`scripts/check-env.mjs`), `.gitignore` + `.vercelignore`, `README.md` y `PLAN_MIGRACION.md`. |
+| 2026-11-01 | Migración completa a Turso + Next.js App Router | Migración desde `uptpc.sql` (72 tablas, 130 usuarios, carreras, materias, secciones, notas, pagos). Autenticación bcrypt verificada 1:1 con `herrejose@gmail.com` / `12345678`. Endpoints API (`/api/auth/*`, `/api/estudiantes`, etc.) y Dashboard implementados. |
+| 2026-11-01 | Implementación de Selector de Perfil y Portales de Rol | Creado `/profile-selector` (reemplazo de `profile_selector.php`), endpoints de cambio de perfil (`/api/auth/select-profile`), y los 5 portales de rol con sus herramientas internas: `/admin`, `/super-user`, `/docente`, `/estudiante`, `/director-de-carrera`. Barra de navegación unificada `RoleNavbar` con botón "Cambiar Perfil". |
+| 2026-11-01 | Operatividad total de las 30 herramientas de Super User / Admin | Creados endpoints API (`/api/pagos`, `/api/notas`, `/api/mensajeria`, `/api/auditoria`, `/api/configuracion`, `/api/academico`) y panel interactivo con los 30 módulos requeridos: pagos (aprobación/rechazo/registro manual), estudiantes, inscripción de materias, secciones, grados, constancias, carreras, asignaturas, prelaciones, docentes, directores, notas pendientes/definitivas, auditoría, visitas, tipos de pago/horario. Compilación `next build` 100% exitosa (25 rutas). |
+| 2026-11-01 | Implementación de CRUD Total para Super Administrador | Creado endpoint universal `/api/crud` y modales interactivos en `/admin` con capacidad completa de Create, Read, Update y Delete sobre: Estudiantes, Docentes, Carreras, Asignaturas, Secciones, Tipos de Pago, Tipos de Horario, Periodos Académicos, Prelaciones y Pagos. Compilación `next build` 100% exitosa (26 rutas). |
 
 ### Riesgos/pendientes detectados
 - Credenciales SMTP (contraseña de aplicación Gmail) **hardcodeadas** en `funciones/enviar_email.php` y `funciones/variables.php` → rotarlas y moverlas a variables de entorno.

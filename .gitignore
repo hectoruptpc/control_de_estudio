@@ -4,3 +4,13 @@
 
 # Configuración local con credenciales
 funciones/conexion.php
+.env
+.env*.local
+**/.env
+**/.env*.local
+!**/.env.example
+
+# Directorios de dependencias y build Next.js
+VERCEL/node_modules/
+VERCEL/.next/
+VERCEL/.vercel/
