@@ -1,0 +1,27 @@
+# ==========================================
+# VERCEL IGNORE - EXCLUSIÓN DE ARCHIVOS
+# Optimiza el bundle de despliegue en Vercel
+# ==========================================
+
+# Documentación, especificaciones y guías internas
+*.md
+PLAN_*.md
+AGENTS.md
+docs/
+
+# Herramientas locales de migración, inspección y scripts
+scripts/
+tests/
+scratch/
+
+# Variables de entorno locales (Vercel usa el panel de Environment Variables)
+.env*
+!.env.example
+
+# Archivos de volcados de base de datos o CSV locales
+*.sql
+*.csv
+
+# Directorios de configuración de Drizzle para migraciones locales
+drizzle.config.ts
+drizzle/
