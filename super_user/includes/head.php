@@ -361,6 +361,11 @@ if (!isLoggedIn() || !isAdmin()) {
                                 <i class="fas fa-search fa-fw"></i> Consultar Notas
                             </a>
                         <?php endif; ?>
+
+                        <!-- Evaluaciones Especiales -->
+                        <a title="Evaluaciones Especiales (E, T, P, S)" class="dropdown-item" href="gestion_evaluaciones_especiales.php">
+                            <i class="fas fa-award fa-fw text-warning"></i> Evaluaciones Especiales (E, T, P, S)
+                        </a>
                         
                         <!-- Consultar Notas Pasadas -->
                         <?php if (tienePermiso('consultar_notas_pasadas')): ?>

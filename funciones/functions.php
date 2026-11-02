@@ -130,6 +130,7 @@ if (!function_exists('txt')) {
     require_once __DIR__ . '/services/SeccionService.php';
     require_once __DIR__ . '/services/PreinscripcionService.php';
     require_once __DIR__ . '/services/ProsecucionService.php';
+    require_once __DIR__ . '/reporte_historial_helper.php';
 
     global $estudianteService, $carreraService, $seccionService, $preinscripcionService, $prosecucionService;
     if (isset($db) && ($db instanceof mysqli) && !$db->connect_errno) {
@@ -11569,8 +11570,10 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
             $pid = intval($r['id_periodo']);
             $tnum = intval($r['trimestre_num']);
             
-            if (!isset($intentos[$mid][$pid])) {
-                $intentos[$mid][$pid] = [
+            $key = $pid . '_R';
+            if (!isset($intentos[$mid][$key])) {
+                $intentos[$mid][$key] = [
+                    'id' => 0,
                     'id_periodo' => $pid,
                     'nombre_periodo' => $r['nombre_periodo'] ?? ('Período ' . $pid),
                     'fecha_inicio' => $r['fecha_inicio'] ?? '',
@@ -11579,6 +11582,8 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
                     'trimestre_2' => null,
                     'trimestre_3' => null,
                     'nota_final' => null,
+                    'tipo_examen' => 'R',
+                    'tipo_evaluacion' => 'regular',
                     'id_docente' => $r['id_docente'],
                     'nombre_docente' => $r['nombre_docente'] ?? '',
                     'id_admin_aprobador' => $r['id_admin_aprobador'],
@@ -11586,24 +11591,24 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
                     'origen' => 'trimestres'
                 ];
             }
-            $intentos[$mid][$pid]["trimestre_$tnum"] = floatval($r['nota']);
-            if ($r['fecha_registro'] > $intentos[$mid][$pid]['fecha_registro']) {
-                $intentos[$mid][$pid]['fecha_registro'] = $r['fecha_registro'];
+            $intentos[$mid][$key]["trimestre_$tnum"] = floatval($r['nota']);
+            if ($r['fecha_registro'] > $intentos[$mid][$key]['fecha_registro']) {
+                $intentos[$mid][$key]['fecha_registro'] = $r['fecha_registro'];
             }
-            if (empty($intentos[$mid][$pid]['nombre_docente']) && !empty($r['nombre_docente'])) {
-                $intentos[$mid][$pid]['id_docente'] = $r['id_docente'];
-                $intentos[$mid][$pid]['nombre_docente'] = $r['nombre_docente'];
+            if (empty($intentos[$mid][$key]['nombre_docente']) && !empty($r['nombre_docente'])) {
+                $intentos[$mid][$key]['id_docente'] = $r['id_docente'];
+                $intentos[$mid][$key]['nombre_docente'] = $r['nombre_docente'];
             }
-            if (empty($intentos[$mid][$pid]['nombre_admin']) && !empty($r['nombre_admin'])) {
-                $intentos[$mid][$pid]['id_admin_aprobador'] = $r['id_admin_aprobador'];
-                $intentos[$mid][$pid]['nombre_admin'] = $r['nombre_admin'];
+            if (empty($intentos[$mid][$key]['nombre_admin']) && !empty($r['nombre_admin'])) {
+                $intentos[$mid][$key]['id_admin_aprobador'] = $r['id_admin_aprobador'];
+                $intentos[$mid][$key]['nombre_admin'] = $r['nombre_admin'];
             }
         }
     }
     
     // Calcular nota final para los trimestres
     foreach ($intentos as $mid => &$periodos) {
-        foreach ($periodos as $pid => &$data) {
+        foreach ($periodos as $key => &$data) {
             $sum = 0; $cnt = 0;
             for ($i = 1; $i <= 3; $i++) {
                 if ($data["trimestre_$i"] !== null) {
@@ -11648,8 +11653,13 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
                 $nota_val = floatval($r[$col]);
             }
             
-            if (!isset($intentos[$mid][$pid])) {
-                $intentos[$mid][$pid] = [
+            $t_exam = !empty($r['tipo_examen']) ? strtoupper(trim($r['tipo_examen'])) : 'R';
+            $t_eval = !empty($r['tipo_evaluacion']) ? strtolower(trim($r['tipo_evaluacion'])) : 'regular';
+            $key = $pid . '_' . $t_exam;
+            
+            if (!isset($intentos[$mid][$key])) {
+                $intentos[$mid][$key] = [
+                    'id' => intval($r['id'] ?? 0),
                     'id_periodo' => $pid,
                     'nombre_periodo' => $r['nombre_periodo'] ?? ('Período ' . $pid),
                     'fecha_inicio' => $r['fecha_inicio'] ?? '',
@@ -11658,6 +11668,8 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
                     'trimestre_2' => null,
                     'trimestre_3' => null,
                     'nota_final' => $nota_val,
+                    'tipo_examen' => $t_exam,
+                    'tipo_evaluacion' => $t_eval,
                     'id_docente' => $r['id_docente'],
                     'nombre_docente' => $r['nombre_docente'] ?? '',
                     'id_admin_aprobador' => $r['id_admin_aprobador'],
@@ -11665,16 +11677,18 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
                     'origen' => 'definitiva'
                 ];
             } else {
-                if ($intentos[$mid][$pid]['nota_final'] === null && $nota_val !== null) {
-                    $intentos[$mid][$pid]['nota_final'] = $nota_val;
+                if ($intentos[$mid][$key]['nota_final'] === null && $nota_val !== null) {
+                    $intentos[$mid][$key]['nota_final'] = $nota_val;
                 }
-                if (empty($intentos[$mid][$pid]['nombre_docente']) && !empty($r['nombre_docente'])) {
-                    $intentos[$mid][$pid]['id_docente'] = $r['id_docente'];
-                    $intentos[$mid][$pid]['nombre_docente'] = $r['nombre_docente'];
+                $intentos[$mid][$key]['tipo_examen'] = $t_exam;
+                $intentos[$mid][$key]['tipo_evaluacion'] = $t_eval;
+                if (empty($intentos[$mid][$key]['nombre_docente']) && !empty($r['nombre_docente'])) {
+                    $intentos[$mid][$key]['id_docente'] = $r['id_docente'];
+                    $intentos[$mid][$key]['nombre_docente'] = $r['nombre_docente'];
                 }
-                if (empty($intentos[$mid][$pid]['nombre_admin']) && !empty($r['nombre_admin'])) {
-                    $intentos[$mid][$pid]['id_admin_aprobador'] = $r['id_admin_aprobador'];
-                    $intentos[$mid][$pid]['nombre_admin'] = $r['nombre_admin'];
+                if (empty($intentos[$mid][$key]['nombre_admin']) && !empty($r['nombre_admin'])) {
+                    $intentos[$mid][$key]['id_admin_aprobador'] = $r['id_admin_aprobador'];
+                    $intentos[$mid][$key]['nombre_admin'] = $r['nombre_admin'];
                 }
             }
         }
@@ -11701,8 +11715,10 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
         while ($r = $res_em->fetch_assoc()) {
             $mid = intval($r['id_materia']);
             $pid = intval($r['id_periodo']);
-            if (!isset($intentos[$mid][$pid])) {
-                $intentos[$mid][$pid] = [
+            $key = $pid . '_CURS';
+            if (!isset($intentos[$mid][$key]) && !isset($intentos[$mid][$pid . '_R'])) {
+                $intentos[$mid][$key] = [
+                    'id' => 0,
                     'id_periodo' => $pid,
                     'nombre_periodo' => $r['nombre_periodo'] ?? ('Período ' . $pid),
                     'fecha_inicio' => $r['fecha_inicio'] ?? '',
@@ -11711,6 +11727,8 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
                     'trimestre_2' => null,
                     'trimestre_3' => null,
                     'nota_final' => null,
+                    'tipo_examen' => 'R',
+                    'tipo_evaluacion' => 'regular',
                     'id_docente' => null,
                     'nombre_docente' => $r['nombre_docente_asignado'] ?? '',
                     'id_admin_aprobador' => null,
@@ -11718,8 +11736,9 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
                     'origen' => 'inscripcion'
                 ];
             } else {
-                if (empty($intentos[$mid][$pid]['nombre_docente']) && !empty($r['nombre_docente_asignado'])) {
-                    $intentos[$mid][$pid]['nombre_docente'] = $r['nombre_docente_asignado'];
+                $existing_key = isset($intentos[$mid][$pid . '_R']) ? ($pid . '_R') : $key;
+                if (!empty($intentos[$mid][$existing_key]) && empty($intentos[$mid][$existing_key]['nombre_docente']) && !empty($r['nombre_docente_asignado'])) {
+                    $intentos[$mid][$existing_key]['nombre_docente'] = $r['nombre_docente_asignado'];
                 }
             }
         }
@@ -11727,7 +11746,7 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
     
     // 4. Fallback para docentes asignados por materia si nombre_docente sigue vacío
     foreach ($intentos as $mid => &$pids) {
-        foreach ($pids as $pid => &$dat) {
+        foreach ($pids as $key => &$dat) {
             if (empty($dat['nombre_docente'])) {
                 $q_fb = "SELECT u.nombre FROM docente_materia dm JOIN users u ON dm.id_usuario = u.id WHERE dm.id_materia = $mid LIMIT 1";
                 $res_fb = $db->query($q_fb);
@@ -11746,6 +11765,12 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
         usort($lista, function($a, $b) {
             $fa = !empty($a['fecha_inicio']) ? $a['fecha_inicio'] : $a['fecha_registro'];
             $fb = !empty($b['fecha_inicio']) ? $b['fecha_inicio'] : $b['fecha_registro'];
+            if ($fa === $fb) {
+                $prioridad = ['R' => 1, 'P' => 2, 'T' => 3, 'E' => 4, 'S' => 5];
+                $pa = $prioridad[$a['tipo_examen'] ?? 'R'] ?? 1;
+                $pb = $prioridad[$b['tipo_examen'] ?? 'R'] ?? 1;
+                return $pa <=> $pb;
+            }
             return strcmp($fa, $fb);
         });
         $historial_ordenado[$mid] = $lista;
@@ -11753,6 +11778,381 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
     
     return $historial_ordenado;
 }
+}
+
+/**
+ * Calcular el Índice de Rendimiento Académico (IRA) y Promedio General del Estudiante
+ * Incluye todas las evaluaciones e intentos cursados (repitientes, E, T, P, S)
+ */
+function calcularIRAEstudiante($estudiante_id, $id_carrera = null) {
+    global $db;
+    
+    $estudiante_id = intval($estudiante_id);
+    if ($estudiante_id <= 0) {
+        return ['ira' => 0, 'promedio_simple' => 0, 'total_evaluaciones' => 0, 'suma_uc' => 0];
+    }
+    
+    $historial = obtenerHistorialCompletoNotasEstudiante($estudiante_id);
+    if (empty($historial)) {
+        return ['ira' => 0, 'promedio_simple' => 0, 'total_evaluaciones' => 0, 'suma_uc' => 0];
+    }
+    
+    $creditos_materias = [];
+    $res_m = $db->query("SELECT id_materia, creditos FROM materias");
+    if ($res_m) {
+        while ($r = $res_m->fetch_assoc()) {
+            $creditos_materias[intval($r['id_materia'])] = intval($r['creditos'] ?? 0);
+        }
+    }
+    
+    $suma_ponderada = 0;
+    $suma_uc = 0;
+    $suma_simple = 0;
+    $total_evaluaciones = 0;
+    
+    foreach ($historial as $mid => $intentos) {
+        $uc = $creditos_materias[$mid] ?? 0;
+        foreach ($intentos as $it) {
+            if ($it['nota_final'] !== null && is_numeric($it['nota_final'])) {
+                $n = floatval($it['nota_final']);
+                $suma_simple += $n;
+                $total_evaluaciones++;
+                
+                if ($uc > 0) {
+                    $suma_ponderada += ($n * $uc);
+                    $suma_uc += $uc;
+                }
+            }
+        }
+    }
+    
+    $promedio_simple = ($total_evaluaciones > 0) ? round($suma_simple / $total_evaluaciones, 2) : 0;
+    $ira_ponderado = ($suma_uc > 0) ? round($suma_ponderada / $suma_uc, 3) : $promedio_simple;
+    
+    return [
+        'ira' => $ira_ponderado,
+        'promedio_simple' => $promedio_simple,
+        'total_evaluaciones' => $total_evaluaciones,
+        'suma_uc' => $suma_uc
+    ];
+}
+
+/**
+ * Obtener materias elegibles para el Plan Especial de Recuperación (PER)
+ * Reglas:
+ * 1. Trayecto Inicial (T0) NO hace PER.
+ * 2. Proyecto Socio-Integrador / Tecnológico NO hace PER.
+ * 3. Nota reprobatoria debe estar estrictamente entre 6 y 11 puntos.
+ * 4. Máximo 3 materias por estudiante.
+ * 5. La materia no debe estar ya aprobada.
+ */
+function obtenerMateriasAptasPER($estudiante_id) {
+    global $db;
+    
+    $estudiante_id = intval($estudiante_id);
+    if ($estudiante_id <= 0) return [];
+    
+    $carrera = obtenerCarreraEstudiante($estudiante_id);
+    if (!$carrera) return [];
+    
+    $materias_carrera_res = obtenerMateriasCarrera($carrera['id_carrera']);
+    $materias_info = [];
+    if ($materias_carrera_res) {
+        while ($m = $materias_carrera_res->fetch_assoc()) {
+            $materias_info[intval($m['id_materia'])] = $m;
+        }
+    }
+    
+    $historial = obtenerHistorialCompletoNotasEstudiante($estudiante_id);
+    $aptas = [];
+    
+    foreach ($materias_info as $mid => $mat) {
+        $trayecto = intval($mat['trayecto'] ?? 0);
+        // Regla 1: Trayecto 0 NO hace PER
+        if ($trayecto === 0) continue;
+        
+        // Regla 2: Proyecto socio-integrador NO hace PER
+        $es_proyecto = (!empty($mat['es_proyecto_socio']) && $mat['es_proyecto_socio'] == 1) 
+                       || stripos($mat['nombre_materia'] ?? '', 'proyecto') !== false;
+        if ($es_proyecto) continue;
+        
+        // Verificar si la materia ya está aprobada
+        if (esMateriaAprobadaEstudiante($estudiante_id, $mid, $es_proyecto)) continue;
+        
+        // Verificar último intento
+        $intentos = $historial[$mid] ?? [];
+        if (empty($intentos)) continue;
+        
+        $ultimo_intento = end($intentos);
+        $nota_final = $ultimo_intento['nota_final'] ?? null;
+        
+        // Regla 3: Nota entre 6 y 11 puntos
+        if ($nota_final !== null && $nota_final >= 6 && $nota_final <= 11) {
+            $aptas[] = [
+                'id_materia' => $mid,
+                'cod_materia' => $mat['cod_materia'],
+                'nombre_materia' => $mat['nombre_materia'],
+                'trayecto' => $trayecto,
+                'creditos' => $mat['creditos'],
+                'nota_reprobada' => $nota_final,
+                'periodo_reprobado' => $ultimo_intento['nombre_periodo'] ?? '-',
+                'id_periodo' => $ultimo_intento['id_periodo'] ?? 0
+            ];
+        }
+    }
+    
+    // Regla 4: Máximo 3 materias permitidas
+    return array_slice($aptas, 0, 3);
+}
+
+/**
+ * Validar si un estudiante es apto para solicitar Examen Extraordinario (E)
+ * Reglas:
+ * 1. Le debe faltar ÚNICAMENTE 1 materia para culminar su plan (TSU o Grado Completo).
+ * 2. Ya debió haber visto (cursado previamente) esa materia.
+ */
+function esAptoExtraordinario($estudiante_id, $id_materia = null) {
+    global $db;
+    
+    $estudiante_id = intval($estudiante_id);
+    if ($estudiante_id <= 0) {
+        return ['apto' => false, 'mensaje' => 'Estudiante inválido', 'materia_faltante' => null];
+    }
+    
+    $carrera = obtenerCarreraEstudiante($estudiante_id);
+    if (!$carrera) {
+        return ['apto' => false, 'mensaje' => 'Carrera no asignada', 'materia_faltante' => null];
+    }
+    
+    $info_apto = esAptoParaGradoConsulta($estudiante_id, $carrera['id_carrera']);
+    if (!$info_apto) {
+        return ['apto' => false, 'mensaje' => 'No se pudo evaluar el avance académico', 'materia_faltante' => null];
+    }
+    
+    $total_carrera = intval($info_apto['total_materias_carrera'] ?? 0);
+    $aprobadas_carrera = intval($info_apto['materias_aprobadas_completo'] ?? 0);
+    $faltan_grado = max(0, $total_carrera - $aprobadas_carrera);
+    
+    $total_tsu = intval($info_apto['total_materias_tsu'] ?? 0);
+    $aprobadas_tsu = intval($info_apto['materias_aprobadas_tsu'] ?? 0);
+    $faltan_tsu = max(0, $total_tsu - $aprobadas_tsu);
+    
+    $es_una_faltante = ($faltan_tsu === 1 || $faltan_grado === 1);
+    
+    if (!$es_una_faltante) {
+        return [
+            'apto' => false,
+            'mensaje' => "El examen extraordinario requiere que falte únicamente 1 materia para culminar. Faltan TSU: $faltan_tsu, Faltan Grado: $faltan_grado.",
+            'materia_faltante' => null
+        ];
+    }
+    
+    $materias_carrera_res = obtenerMateriasCarrera($carrera['id_carrera']);
+    $materia_candidata = null;
+    $historial = obtenerHistorialCompletoNotasEstudiante($estudiante_id);
+    
+    if ($materias_carrera_res) {
+        while ($m = $materias_carrera_res->fetch_assoc()) {
+            $mid = intval($m['id_materia']);
+            $es_proy = (!empty($m['es_proyecto_socio']) && $m['es_proyecto_socio'] == 1);
+            if (!esMateriaAprobadaEstudiante($estudiante_id, $mid, $es_proy)) {
+                $intentos = $historial[$mid] ?? [];
+                $ya_la_vio = !empty($intentos);
+                
+                $materia_candidata = $m;
+                $materia_candidata['ya_la_vio'] = $ya_la_vio;
+                break;
+            }
+        }
+    }
+    
+    if (!$materia_candidata) {
+        return ['apto' => false, 'mensaje' => 'No se encontró la materia pendiente', 'materia_faltante' => null];
+    }
+    
+    if (empty($materia_candidata['ya_la_vio'])) {
+        return [
+            'apto' => false,
+            'mensaje' => "La materia pendiente (" . $materia_candidata['nombre_materia'] . ") nunca ha sido cursada. Para extraordinario debe haberla visto previamente.",
+            'materia_faltante' => $materia_candidata
+        ];
+    }
+    
+    if ($id_materia !== null && intval($id_materia) !== intval($materia_candidata['id_materia'])) {
+        return [
+            'apto' => false,
+            'mensaje' => "La materia especificada no coincide con la única materia pendiente (" . $materia_candidata['nombre_materia'] . ").",
+            'materia_faltante' => $materia_candidata
+        ];
+    }
+    
+    return [
+        'apto' => true,
+        'mensaje' => 'El estudiante cumple con todos los requisitos para presentar Examen Extraordinario.',
+        'materia_faltante' => $materia_candidata
+    ];
+}
+
+/**
+ * Validar solicitud de Examen de Suficiencia (S)
+ * Reglas:
+ * 1. Máximo 2 materias por año.
+ * 2. Solo 2 veces al año en las 2 primeras semanas de inicio de trayecto/período.
+ * 3. Si la Jefa (Admin con permiso) lo desbloquea por caso especial de conocimientos, se aprueba.
+ */
+function validarSuficiencia($estudiante_id, $id_materia, $es_caso_especial = false) {
+    global $db;
+    
+    $estudiante_id = intval($estudiante_id);
+    $id_materia = intval($id_materia);
+    
+    $año_actual = date('Y');
+    $q_count = "SELECT COUNT(*) as total FROM notas_definitivas 
+                WHERE id_usuario = $estudiante_id 
+                AND tipo_examen = 'S' 
+                AND YEAR(fecha_registro) = $año_actual";
+    $res_count = $db->query($q_count);
+    $total_año = ($res_count) ? intval($res_count->fetch_assoc()['total']) : 0;
+    
+    if ($total_año >= 2 && !$es_caso_especial) {
+        return [
+            'valido' => false,
+            'permitido' => false,
+            'cantidad_anio' => $total_año,
+            'mensaje' => "El estudiante ya presentó el límite máximo de 2 exámenes de suficiencia para el año $año_actual. Requiere desbloqueo administrativo de la Jefa de Control de Estudios.",
+            'requiere_desbloqueo' => true
+        ];
+    }
+    
+    return [
+        'valido' => true,
+        'permitido' => true,
+        'cantidad_anio' => $total_año,
+        'mensaje' => 'Apto para presentar Examen de Suficiencia.',
+        'requiere_desbloqueo' => false
+    ];
+}
+
+/**
+ * Inscribir automáticamente al estudiante en la materia si reprueba Examen de Suficiencia
+ */
+function inscribirAutomaticoPorReprobacionSuficiencia($estudiante_id, $id_materia, $id_periodo = null) {
+    global $db;
+    
+    $estudiante_id = intval($estudiante_id);
+    $id_materia = intval($id_materia);
+    
+    if (!$id_periodo) {
+        $p_act = $db->query("SELECT id_periodo FROM periodos_academicos ORDER BY fecha_inicio DESC LIMIT 1");
+        $id_periodo = ($p_act && $row = $p_act->fetch_assoc()) ? intval($row['id_periodo']) : 1;
+    } else {
+        $id_periodo = intval($id_periodo);
+    }
+    
+    $q_sec = "SELECT ds.id_seccion 
+              FROM docente_seccion ds 
+              INNER JOIN secciones s ON ds.id_seccion = s.id_seccion
+              WHERE ds.id_materia = $id_materia AND s.id_periodo = $id_periodo AND s.estatus = 'activa' 
+              LIMIT 1";
+    $res_sec = $db->query($q_sec);
+    $id_seccion = ($res_sec && $r = $res_sec->fetch_assoc()) ? intval($r['id_seccion']) : null;
+    
+    $chk = $db->query("SELECT id_inscripcion FROM estudiante_materias WHERE id_usuario = $estudiante_id AND id_materia = $id_materia AND id_periodo = $id_periodo");
+    if ($chk && $chk->num_rows > 0) {
+        return true;
+    }
+    
+    if ($id_seccion !== null && $id_seccion > 0) {
+        $stmt = $db->prepare("INSERT INTO estudiante_materias (id_usuario, id_materia, id_seccion, id_periodo, estatus, fecha_inscripcion) VALUES (?, ?, ?, ?, 'activo', NOW())");
+        $stmt->bind_param("iiii", $estudiante_id, $id_materia, $id_seccion, $id_periodo);
+    } else {
+        $stmt = $db->prepare("INSERT INTO estudiante_materias (id_usuario, id_materia, id_seccion, id_periodo, estatus, fecha_inscripcion) VALUES (?, ?, NULL, ?, 'activo', NOW())");
+        $stmt->bind_param("iii", $estudiante_id, $id_materia, $id_periodo);
+    }
+    return $stmt->execute();
+}
+
+/**
+ * Registrar una calificación bajo modalidad especial (E, T, P, S)
+ * Reglas de negocio:
+ * - 'T' (Intensivo): Debe haber visto la materia antes. Se registra con tipo_examen = 'T',
+ *                    y se convierte en la nota definitiva vigente sin borrar los intentos anteriores.
+ * - 'P' (PER): Solo materias reprobadas (6-11 ptos), no T0, no proyecto. Tope máximo de nota: 12.0.
+ * - 'E' (Extraordinario): Solo si le falta 1 materia y ya la vio.
+ * - 'S' (Suficiencia): Si nota < 12, se auto-inscribe en el período regular.
+ */
+function registrarNotaModalidadEspecial($estudiante_id, $id_materia, $id_periodo, $id_docente, $nota, $tipo_examen = 'R', $id_admin_aprobador = null) {
+    global $db;
+    
+    $estudiante_id = intval($estudiante_id);
+    $id_materia = intval($id_materia);
+    $id_periodo = intval($id_periodo);
+    $id_docente = intval($id_docente);
+    $nota = floatval($nota);
+    $tipo_examen = strtoupper(trim($tipo_examen));
+    $id_admin_aprobador = $id_admin_aprobador ? intval($id_admin_aprobador) : ($_SESSION['user']['id'] ?? 1);
+    
+    // Obtener información de la materia
+    $q_mat = $db->query("SELECT * FROM materias WHERE id_materia = $id_materia");
+    $mat = ($q_mat) ? $q_mat->fetch_assoc() : null;
+    if (!$mat) {
+        return ['success' => false, 'message' => 'Materia no encontrada'];
+    }
+    $trayecto = intval($mat['trayecto'] ?? 0);
+    $es_proyecto = (!empty($mat['es_proyecto_socio']) && $mat['es_proyecto_socio'] == 1);
+    
+    // Validaciones por modalidad
+    $tipo_evaluacion = 'regular';
+    if ($tipo_examen === 'E') {
+        $tipo_evaluacion = 'extraordinario';
+        $val_e = esAptoExtraordinario($estudiante_id, $id_materia);
+        if (!$val_e['apto']) {
+            return ['success' => false, 'message' => $val_e['mensaje']];
+        }
+    } elseif ($tipo_examen === 'T') {
+        $tipo_evaluacion = 'intensivo';
+        $historial = obtenerHistorialCompletoNotasEstudiante($estudiante_id);
+        if (empty($historial[$id_materia])) {
+            return ['success' => false, 'message' => 'Para cursar intensivo, el estudiante debe haber visto previamente la materia.'];
+        }
+    } elseif ($tipo_examen === 'P') {
+        $tipo_evaluacion = 'per';
+        if ($trayecto === 0) {
+            return ['success' => false, 'message' => 'El Trayecto Inicial no aplica para Plan Especial de Recuperación (PER).'];
+        }
+        if ($es_proyecto) {
+            return ['success' => false, 'message' => 'Los proyectos sociotecnológicos / sociointegradores no aplican para PER.'];
+        }
+        // Tope máximo para PER es 12
+        if ($nota > 12) {
+            $nota = 12.0;
+        }
+    } elseif ($tipo_examen === 'S') {
+        $tipo_evaluacion = 'suficiencia';
+    }
+    
+    $col_trayecto = "trayecto_$trayecto";
+    
+    $stmt = $db->prepare("INSERT INTO notas_definitivas 
+        (id_usuario, id_materia, id_periodo, id_docente, $col_trayecto, nota_final, tipo_evaluacion, tipo_examen, origen, fecha_registro, id_admin_aprobador)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sistema', NOW(), ?)");
+    $stmt->bind_param("iiiiddssi", $estudiante_id, $id_materia, $id_periodo, $id_docente, $nota, $nota, $tipo_evaluacion, $tipo_examen, $id_admin_aprobador);
+    
+    if (!$stmt->execute()) {
+        return ['success' => false, 'message' => 'Error al registrar la calificación: ' . $db->error];
+    }
+    
+    // Si fue examen de suficiencia y reprobó (< 12), auto-inscribir en el período regular
+    if ($tipo_examen === 'S' && $nota < 12) {
+        inscribirAutomaticoPorReprobacionSuficiencia($estudiante_id, $id_materia, $id_periodo);
+    }
+    
+    return [
+        'success' => true,
+        'message' => "Calificación ($nota pts) registrada exitosamente bajo modalidad $tipo_evaluacion ($tipo_examen).",
+        'nota' => $nota,
+        'tipo_examen' => $tipo_examen
+    ];
 }
 
 

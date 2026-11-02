@@ -86,19 +86,43 @@ if (!empty($cedula)) {
 <div class="card mb-4">
     <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Información del Estudiante</h5>
-        <div class="btn-group" role="group">
-            <a href="historial_desglozado_tsu.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
-               class="btn btn-warning btn-sm mr-2" target="_blank">
-                <i class="fas fa-file-pdf"></i> Historial TSU
-            </a>
-            <a href="historial_desglozado_ingenieria.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
-               class="btn btn-info btn-sm mr-2" target="_blank">
-                <i class="fas fa-file-pdf"></i> Historial Ingeniería
-            </a>
-            <a href="generar_reporte_consulta.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
-               class="btn btn-danger btn-sm" target="_blank">
-                <i class="fas fa-file-pdf"></i> Historial Completo
-            </a>
+        <div class="d-inline-flex flex-wrap align-items-center">
+            <form method="POST" action="historial_desglozado_tsu.php" target="_blank" class="d-inline mr-2 mb-1">
+                <input type="hidden" name="estudiante_id" value="<?= htmlspecialchars($estudiante['id']) ?>">
+                <input type="hidden" name="cedula" value="<?= htmlspecialchars($estudiante['idusuario']) ?>">
+                <input type="hidden" name="nombre" value="<?= htmlspecialchars($estudiante['nombre']) ?>">
+                <input type="hidden" name="carrera" value="<?= htmlspecialchars($carrera['nombre_carrera']) ?>">
+                <button type="submit" class="btn btn-warning btn-sm shadow-sm font-weight-bold">
+                    <i class="fas fa-file-pdf mr-1"></i> Historial TSU
+                </button>
+            </form>
+            <form method="POST" action="historial_desglozado_ingenieria.php" target="_blank" class="d-inline mr-2 mb-1">
+                <input type="hidden" name="estudiante_id" value="<?= htmlspecialchars($estudiante['id']) ?>">
+                <input type="hidden" name="cedula" value="<?= htmlspecialchars($estudiante['idusuario']) ?>">
+                <input type="hidden" name="nombre" value="<?= htmlspecialchars($estudiante['nombre']) ?>">
+                <input type="hidden" name="carrera" value="<?= htmlspecialchars($carrera['nombre_carrera']) ?>">
+                <button type="submit" class="btn btn-info btn-sm shadow-sm font-weight-bold">
+                    <i class="fas fa-file-pdf mr-1"></i> Historial Ingeniería
+                </button>
+            </form>
+            <form method="POST" action="historial_graduando.php" target="_blank" class="d-inline mr-2 mb-1">
+                <input type="hidden" name="estudiante_id" value="<?= htmlspecialchars($estudiante['id']) ?>">
+                <input type="hidden" name="cedula" value="<?= htmlspecialchars($estudiante['idusuario']) ?>">
+                <input type="hidden" name="nombre" value="<?= htmlspecialchars($estudiante['nombre']) ?>">
+                <input type="hidden" name="carrera" value="<?= htmlspecialchars($carrera['nombre_carrera']) ?>">
+                <button type="submit" class="btn btn-success btn-sm shadow-sm font-weight-bold">
+                    <i class="fas fa-user-graduate mr-1"></i> Historial Graduando
+                </button>
+            </form>
+            <form method="POST" action="historial_desglosado.php" target="_blank" class="d-inline mb-1">
+                <input type="hidden" name="estudiante_id" value="<?= htmlspecialchars($estudiante['id']) ?>">
+                <input type="hidden" name="cedula" value="<?= htmlspecialchars($estudiante['idusuario']) ?>">
+                <input type="hidden" name="nombre" value="<?= htmlspecialchars($estudiante['nombre']) ?>">
+                <input type="hidden" name="carrera" value="<?= htmlspecialchars($carrera['nombre_carrera']) ?>">
+                <button type="submit" class="btn btn-dark btn-sm shadow-sm font-weight-bold">
+                    <i class="fas fa-list-alt mr-1"></i> Historial Desglosado
+                </button>
+            </form>
         </div>
     </div>
     <div class="card-body">
@@ -480,23 +504,30 @@ if (!empty($cedula)) {
                         $total_evaluaciones = count($todas_las_evaluaciones);
                         $promedio_general = $total_evaluaciones > 0 ? round(array_sum(array_column($todas_las_evaluaciones, 'nota')) / $total_evaluaciones, 2) : 0;
                         $porcentaje_completado = $total_materias > 0 ? round(($materias_con_notas / $total_materias) * 100, 1) : 0;
+                        $ira_info = calcularIRAEstudiante($estudiante['id'], $carrera['id_carrera']);
                         ?>
                         
                         <div class="row">
-                            <div class="col-6 text-center mb-3">
+                            <div class="col-4 text-center mb-3">
                                 <h3 class="text-primary"><?= $total_materias ?></h3>
-                                <small class="font-weight-bold">Materias Registradas</small>
+                                <small class="font-weight-bold">Materias del Plan</small>
                             </div>
-                            <div class="col-6 text-center mb-3">
+                            <div class="col-4 text-center mb-3">
                                 <h3 class="<?= $promedio_general >= 12 ? 'text-success' : ($promedio_general > 0 ? 'text-warning' : 'text-secondary') ?>">
                                     <?= $promedio_general > 0 ? number_format($promedio_general, 2) : 'N/A' ?>
                                 </h3>
                                 <small class="font-weight-bold">Promedio General</small>
                                 <div class="mt-1">
-                                    <span class="badge badge-info" title="Total de notas evaluadas contabilizadas en el promedio"><?= $total_evaluaciones ?> evaluadas</span>
-                                    <?php if ($total_intentos_repitientes_evaluados > 0): ?>
-                                        <span class="badge badge-warning text-dark ml-1" title="Notas de materias repitientes incluidas"><?= $total_intentos_repitientes_evaluados ?> repitiente(s)</span>
-                                    <?php endif; ?>
+                                    <span class="badge badge-info" title="Total de notas evaluadas contabilizadas"><?= $total_evaluaciones ?> notas</span>
+                                </div>
+                            </div>
+                            <div class="col-4 text-center mb-3">
+                                <h3 class="<?= ($ira_info['ira'] ?? 0) >= 12 ? 'text-success' : (($ira_info['ira'] ?? 0) > 0 ? 'text-warning' : 'text-secondary') ?>">
+                                    <?= ($ira_info['ira'] ?? 0) > 0 ? number_format($ira_info['ira'], 3) : 'N/A' ?>
+                                </h3>
+                                <small class="font-weight-bold text-dark">IRA (Ponderado)</small>
+                                <div class="mt-1">
+                                    <span class="badge badge-primary" title="Índice de Rendimiento Académico ponderado con todas las repeticiones">Ponderado UC</span>
                                 </div>
                             </div>
                             <div class="col-6 text-center">

@@ -265,30 +265,51 @@ $eval_adicion_retiro = ($estudiante && isset($estudiante['id']) && function_exis
         <div class="card-header bg-info text-white d-flex flex-column flex-sm-row justify-content-between align-items-center">
             <h5 class="mb-2 mb-sm-0">Información del Estudiante</h5>
             
-            <?php if ($puede_ver_tsu || $puede_ver_ingenieria || $puede_ver_completo): ?>
-            <div class="btn-group btn-group-sm flex-wrap justify-content-center" role="group">
+            <div class="d-inline-flex flex-wrap align-items-center justify-content-center">
                 <?php if ($puede_ver_tsu): ?>
-                <a href="../admin/historial_desglozado_tsu.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
-                   class="btn btn-warning mb-1 mb-sm-0" target="_blank">
-                    <i class="fas fa-file-pdf"></i> <span class="d-none d-sm-inline">Historial TSU</span><span class="d-inline d-sm-none">TSU</span>
-                </a>
+                <form method="POST" action="../admin/historial_desglozado_tsu.php" target="_blank" class="d-inline mr-1 mb-1">
+                    <input type="hidden" name="estudiante_id" value="<?= htmlspecialchars($estudiante['id']) ?>">
+                    <input type="hidden" name="cedula" value="<?= htmlspecialchars($estudiante['idusuario']) ?>">
+                    <input type="hidden" name="nombre" value="<?= htmlspecialchars($estudiante['nombre']) ?>">
+                    <input type="hidden" name="carrera" value="<?= htmlspecialchars($carrera['nombre_carrera']) ?>">
+                    <button type="submit" class="btn btn-warning btn-sm font-weight-bold">
+                        <i class="fas fa-file-pdf mr-1"></i> <span class="d-none d-sm-inline">Historial TSU</span><span class="d-inline d-sm-none">TSU</span>
+                    </button>
+                </form>
                 <?php endif; ?>
                 
                 <?php if ($puede_ver_ingenieria): ?>
-                <a href="../admin/historial_desglozado_ingenieria.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
-                   class="btn btn-info mb-1 mb-sm-0" target="_blank">
-                    <i class="fas fa-file-pdf"></i> <span class="d-none d-sm-inline">Historial Ingeniería</span><span class="d-inline d-sm-none">Ing.</span>
-                </a>
+                <form method="POST" action="../admin/historial_desglozado_ingenieria.php" target="_blank" class="d-inline mr-1 mb-1">
+                    <input type="hidden" name="estudiante_id" value="<?= htmlspecialchars($estudiante['id']) ?>">
+                    <input type="hidden" name="cedula" value="<?= htmlspecialchars($estudiante['idusuario']) ?>">
+                    <input type="hidden" name="nombre" value="<?= htmlspecialchars($estudiante['nombre']) ?>">
+                    <input type="hidden" name="carrera" value="<?= htmlspecialchars($carrera['nombre_carrera']) ?>">
+                    <button type="submit" class="btn btn-info btn-sm font-weight-bold">
+                        <i class="fas fa-file-pdf mr-1"></i> <span class="d-none d-sm-inline">Historial Ingeniería</span><span class="d-inline d-sm-none">Ing.</span>
+                    </button>
+                </form>
                 <?php endif; ?>
+
+                <form method="POST" action="../admin/historial_graduando.php" target="_blank" class="d-inline mr-1 mb-1">
+                    <input type="hidden" name="estudiante_id" value="<?= htmlspecialchars($estudiante['id']) ?>">
+                    <input type="hidden" name="cedula" value="<?= htmlspecialchars($estudiante['idusuario']) ?>">
+                    <input type="hidden" name="nombre" value="<?= htmlspecialchars($estudiante['nombre']) ?>">
+                    <input type="hidden" name="carrera" value="<?= htmlspecialchars($carrera['nombre_carrera']) ?>">
+                    <button type="submit" class="btn btn-success btn-sm font-weight-bold">
+                        <i class="fas fa-user-graduate mr-1"></i> <span class="d-none d-sm-inline">Historial Graduando</span><span class="d-inline d-sm-none">Graduando</span>
+                    </button>
+                </form>
                 
-                <?php if ($puede_ver_completo): ?>
-                <a href="../admin/generar_reporte_consulta.php?estudiante_id=<?= $estudiante['id'] ?>&cedula=<?= urlencode($estudiante['idusuario']) ?>&nombre=<?= urlencode($estudiante['nombre']) ?>&carrera=<?= urlencode($carrera['nombre_carrera']) ?>" 
-                   class="btn btn-danger mb-1 mb-sm-0" target="_blank">
-                    <i class="fas fa-file-pdf"></i> <span class="d-none d-sm-inline">Historial Completo</span><span class="d-inline d-sm-none">Completo</span>
-                </a>
-                <?php endif; ?>
+                <form method="POST" action="../admin/historial_desglosado.php" target="_blank" class="d-inline mb-1">
+                    <input type="hidden" name="estudiante_id" value="<?= htmlspecialchars($estudiante['id']) ?>">
+                    <input type="hidden" name="cedula" value="<?= htmlspecialchars($estudiante['idusuario']) ?>">
+                    <input type="hidden" name="nombre" value="<?= htmlspecialchars($estudiante['nombre']) ?>">
+                    <input type="hidden" name="carrera" value="<?= htmlspecialchars($carrera['nombre_carrera']) ?>">
+                    <button type="submit" class="btn btn-dark btn-sm font-weight-bold">
+                        <i class="fas fa-list-alt mr-1"></i> <span class="d-none d-sm-inline">Historial Desglosado</span><span class="d-inline d-sm-none">Desglosado</span>
+                    </button>
+                </form>
             </div>
-            <?php endif; ?>
         </div>
         <div class="card-body p-2 p-sm-3">
             <div class="row">
