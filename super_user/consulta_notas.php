@@ -181,6 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                             <th width="90">Estado</th>
                             <th width="120">Periodo</th>
                             <th width="100">Fecha</th>
+                            <th width="120">Docente</th>
                             <th width="120">Aprobado por</th>
                         </tr>
                     </thead>
@@ -272,6 +273,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cedula'])) {
                                 <td>
                                     <?php if ($nota && $nota['fecha_registro']): ?>
                                         <?= date('d/m/Y', strtotime($nota['fecha_registro'])) ?>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                
+                                <td>
+                                    <?php if ($nota && !empty($nota['nombre_docente'])): ?>
+                                        <?= htmlspecialchars($nota['nombre_docente']) ?>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>

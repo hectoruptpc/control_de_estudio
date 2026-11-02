@@ -112,7 +112,7 @@ function obtenerNotasEstudianteTrimestres($estudiante_id) {
                 u.nombre as nombre_admin
               FROM notas_trimestres nt
               LEFT JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
-              LEFT JOIN users u ON nt.id_admin_aprobador = u.id
+              LEFT JOIN users u ON (nt.id_admin_aprobador = u.id AND (u.admin = 1 OR u.super_user = 1 OR u.user_type = 'admin'))
               WHERE nt.id_usuario = ?
               AND nt.estado = 'aprobada'
               ORDER BY nt.id_materia, nt.trimestre_num";

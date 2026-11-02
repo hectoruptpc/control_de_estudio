@@ -179,6 +179,8 @@ if (!empty($cedula)) {
                         <th class="text-center">Trimestre 3</th>
                         <th class="text-center">Nota Final</th>
                         <th class="text-center">Estado</th>
+                        <th>Docente</th>
+                        <th>Aprobado por</th>
                         <th>Periodo</th>
                         <th>Fecha</th>
                     </tr>
@@ -332,12 +334,32 @@ if (!empty($cedula)) {
                                 <span class="badge badge-<?= $badge_estado ?>"><?= $estado ?></span>
                             </td>
                             
+                            <td>
+                                <?php if (!empty($intento_actual['nombre_docente'])): ?>
+                                    <span class="font-weight-bold text-dark"><i class="fas fa-chalkboard-teacher text-primary mr-1"></i><?= htmlspecialchars($intento_actual['nombre_docente']) ?></span>
+                                <?php else: ?>
+                                    <span class="text-muted small">No asignado</span>
+                                <?php endif; ?>
+                            </td>
+                            
+                            <td>
+                                <?php if (!empty($intento_actual['nombre_admin'])): ?>
+                                    <span class="badge badge-light border text-dark" title="Aprobado por <?= htmlspecialchars($intento_actual['nombre_admin']) ?>">
+                                        <i class="fas fa-user-check text-success mr-1"></i><?= htmlspecialchars($intento_actual['nombre_admin']) ?>
+                                    </span>
+                                <?php elseif ($nota_final !== null): ?>
+                                    <span class="badge badge-info text-dark small"><i class="fas fa-check mr-1"></i> Registrada</span>
+                                <?php else: ?>
+                                    <span class="text-muted small">Pendiente</span>
+                                <?php endif; ?>
+                            </td>
+                            
                             <td><?= htmlspecialchars($intento_actual['nombre_periodo'] ?? '-') ?></td>
                             <td class="text-center"><?= !empty($intento_actual['fecha_registro']) ? date('d/m/Y', strtotime($intento_actual['fecha_registro'])) : '-' ?></td>
                         </tr>
                         <?php if (!empty($intentos_previos)): ?>
                         <tr class="collapse bg-light" id="hist_materia_<?= $mid ?>">
-                            <td colspan="10" class="p-3">
+                            <td colspan="12" class="p-3">
                                 <div class="card border-info shadow-sm mb-0">
                                     <div class="card-header bg-info text-white py-1 px-3 d-flex justify-content-between align-items-center">
                                         <small class="font-weight-bold mb-0">
@@ -356,6 +378,8 @@ if (!empty($cedula)) {
                                                         <th>Trimestre 3</th>
                                                         <th>Nota Final</th>
                                                         <th>Estado</th>
+                                                        <th>Docente</th>
+                                                        <th>Aprobado por</th>
                                                         <th>Fecha Registro</th>
                                                     </tr>
                                                 </thead>
@@ -408,6 +432,24 @@ if (!empty($cedula)) {
                                                                 </span>
                                                             <?php else: ?>
                                                                 <span class="badge badge-secondary">-</span>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                        <td>
+                                                            <?php if (!empty($prev['nombre_docente'])): ?>
+                                                                <span class="text-dark"><i class="fas fa-chalkboard-teacher text-muted mr-1"></i><?= htmlspecialchars($prev['nombre_docente']) ?></span>
+                                                            <?php else: ?>
+                                                                <span class="text-muted small">-</span>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                        <td>
+                                                            <?php if (!empty($prev['nombre_admin'])): ?>
+                                                                <span class="badge badge-light border text-dark">
+                                                                    <i class="fas fa-user-check text-success mr-1"></i><?= htmlspecialchars($prev['nombre_admin']) ?>
+                                                                </span>
+                                                            <?php elseif ($pfinal !== null): ?>
+                                                                <span class="badge badge-secondary small">Registrada</span>
+                                                            <?php else: ?>
+                                                                <span class="text-muted small">-</span>
                                                             <?php endif; ?>
                                                         </td>
                                                         <td><?= !empty($prev['fecha_registro']) ? date('d/m/Y', strtotime($prev['fecha_registro'])) : '-' ?></td>

@@ -11542,18 +11542,24 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
     $estudiante_id = intval($estudiante_id);
     $intentos = []; // [$id_materia => [$id_periodo => intento_data]]
     
-    // 1. Obtener notas por trimestres agrupadas por (id_materia, id_periodo)
+    // 1. Obtener notas por trimestres agrupadas por (id_materia, id_periodo) con docente y admin
     $q_trim = "SELECT 
                 nt.id_materia,
                 nt.id_periodo,
+                nt.id_docente,
+                nt.id_admin_aprobador,
                 nt.trimestre_num,
                 nt.nota,
                 nt.estado,
                 nt.fecha_registro,
                 pa.nombre_periodo,
-                pa.fecha_inicio
+                pa.fecha_inicio,
+                ud.nombre as nombre_docente,
+                ua.nombre as nombre_admin
               FROM notas_trimestres nt
               LEFT JOIN periodos_academicos pa ON nt.id_periodo = pa.id_periodo
+              LEFT JOIN users ud ON nt.id_docente = ud.id
+              LEFT JOIN users ua ON (nt.id_admin_aprobador = ua.id AND (ua.admin = 1 OR ua.super_user = 1 OR ua.user_type = 'admin'))
               WHERE nt.id_usuario = $estudiante_id
               ORDER BY nt.id_materia, COALESCE(pa.fecha_inicio, nt.fecha_registro) ASC, nt.trimestre_num ASC";
     $res_trim = $db->query($q_trim);
@@ -11573,12 +11579,24 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
                     'trimestre_2' => null,
                     'trimestre_3' => null,
                     'nota_final' => null,
+                    'id_docente' => $r['id_docente'],
+                    'nombre_docente' => $r['nombre_docente'] ?? '',
+                    'id_admin_aprobador' => $r['id_admin_aprobador'],
+                    'nombre_admin' => $r['nombre_admin'] ?? '',
                     'origen' => 'trimestres'
                 ];
             }
             $intentos[$mid][$pid]["trimestre_$tnum"] = floatval($r['nota']);
             if ($r['fecha_registro'] > $intentos[$mid][$pid]['fecha_registro']) {
                 $intentos[$mid][$pid]['fecha_registro'] = $r['fecha_registro'];
+            }
+            if (empty($intentos[$mid][$pid]['nombre_docente']) && !empty($r['nombre_docente'])) {
+                $intentos[$mid][$pid]['id_docente'] = $r['id_docente'];
+                $intentos[$mid][$pid]['nombre_docente'] = $r['nombre_docente'];
+            }
+            if (empty($intentos[$mid][$pid]['nombre_admin']) && !empty($r['nombre_admin'])) {
+                $intentos[$mid][$pid]['id_admin_aprobador'] = $r['id_admin_aprobador'];
+                $intentos[$mid][$pid]['nombre_admin'] = $r['nombre_admin'];
             }
         }
     }
@@ -11600,15 +11618,19 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
     }
     unset($periodos, $data);
     
-    // 2. Obtener notas definitivas agrupadas por (id_materia, id_periodo)
+    // 2. Obtener notas definitivas agrupadas por (id_materia, id_periodo) con docente y admin
     $q_def = "SELECT 
                 nd.*,
                 m.trayecto,
                 pa.nombre_periodo,
-                pa.fecha_inicio
+                pa.fecha_inicio,
+                ud.nombre as nombre_docente,
+                ua.nombre as nombre_admin
               FROM notas_definitivas nd
               INNER JOIN materias m ON nd.id_materia = m.id_materia
               LEFT JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
+              LEFT JOIN users ud ON nd.id_docente = ud.id
+              LEFT JOIN users ua ON (nd.id_admin_aprobador = ua.id AND (ua.admin = 1 OR ua.super_user = 1 OR ua.user_type = 'admin'))
               WHERE nd.id_usuario = $estudiante_id
               ORDER BY nd.id_materia, COALESCE(pa.fecha_inicio, nd.fecha_registro) ASC";
     $res_def = $db->query($q_def);
@@ -11636,11 +11658,23 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
                     'trimestre_2' => null,
                     'trimestre_3' => null,
                     'nota_final' => $nota_val,
+                    'id_docente' => $r['id_docente'],
+                    'nombre_docente' => $r['nombre_docente'] ?? '',
+                    'id_admin_aprobador' => $r['id_admin_aprobador'],
+                    'nombre_admin' => $r['nombre_admin'] ?? '',
                     'origen' => 'definitiva'
                 ];
             } else {
                 if ($intentos[$mid][$pid]['nota_final'] === null && $nota_val !== null) {
                     $intentos[$mid][$pid]['nota_final'] = $nota_val;
+                }
+                if (empty($intentos[$mid][$pid]['nombre_docente']) && !empty($r['nombre_docente'])) {
+                    $intentos[$mid][$pid]['id_docente'] = $r['id_docente'];
+                    $intentos[$mid][$pid]['nombre_docente'] = $r['nombre_docente'];
+                }
+                if (empty($intentos[$mid][$pid]['nombre_admin']) && !empty($r['nombre_admin'])) {
+                    $intentos[$mid][$pid]['id_admin_aprobador'] = $r['id_admin_aprobador'];
+                    $intentos[$mid][$pid]['nombre_admin'] = $r['nombre_admin'];
                 }
             }
         }
@@ -11649,12 +11683,18 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
     // 3. Revisar estudiante_materias para registrar períodos donde está cursando actualmente
     $q_em = "SELECT 
                 em.id_materia,
+                em.id_seccion,
                 em.id_periodo,
                 em.fecha_inscripcion,
                 pa.nombre_periodo,
-                pa.fecha_inicio
+                pa.fecha_inicio,
+                COALESCE(ud_sec.nombre, ud_mat.nombre) as nombre_docente_asignado
              FROM estudiante_materias em
              LEFT JOIN periodos_academicos pa ON em.id_periodo = pa.id_periodo
+             LEFT JOIN docente_seccion ds ON (em.id_seccion = ds.id_seccion AND em.id_materia = ds.id_materia AND ds.estatus = 1)
+             LEFT JOIN users ud_sec ON ds.id_usuario = ud_sec.id
+             LEFT JOIN docente_materia dm ON em.id_materia = dm.id_materia
+             LEFT JOIN users ud_mat ON dm.id_usuario = ud_mat.id
              WHERE em.id_usuario = $estudiante_id AND em.estatus = 'activo'";
     $res_em = $db->query($q_em);
     if ($res_em) {
@@ -11671,13 +11711,35 @@ function obtenerHistorialCompletoNotasEstudiante($estudiante_id) {
                     'trimestre_2' => null,
                     'trimestre_3' => null,
                     'nota_final' => null,
+                    'id_docente' => null,
+                    'nombre_docente' => $r['nombre_docente_asignado'] ?? '',
+                    'id_admin_aprobador' => null,
+                    'nombre_admin' => '',
                     'origen' => 'inscripcion'
                 ];
+            } else {
+                if (empty($intentos[$mid][$pid]['nombre_docente']) && !empty($r['nombre_docente_asignado'])) {
+                    $intentos[$mid][$pid]['nombre_docente'] = $r['nombre_docente_asignado'];
+                }
             }
         }
     }
     
-    // 4. Ordenar cronológicamente los intentos de cada materia
+    // 4. Fallback para docentes asignados por materia si nombre_docente sigue vacío
+    foreach ($intentos as $mid => &$pids) {
+        foreach ($pids as $pid => &$dat) {
+            if (empty($dat['nombre_docente'])) {
+                $q_fb = "SELECT u.nombre FROM docente_materia dm JOIN users u ON dm.id_usuario = u.id WHERE dm.id_materia = $mid LIMIT 1";
+                $res_fb = $db->query($q_fb);
+                if ($res_fb && $r_fb = $res_fb->fetch_assoc()) {
+                    $dat['nombre_docente'] = $r_fb['nombre'];
+                }
+            }
+        }
+    }
+    unset($pids, $dat);
+    
+    // 5. Ordenar cronológicamente los intentos de cada materia
     $historial_ordenado = [];
     foreach ($intentos as $mid => $pids) {
         $lista = array_values($pids);
@@ -16770,7 +16832,7 @@ function obtenerNotasEstudianteConsulta($estudiante_id) {
               INNER JOIN materias m ON nd.id_materia = m.id_materia
               INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
               LEFT JOIN users ud ON nd.id_docente = ud.id
-              LEFT JOIN users ua ON nd.id_admin_aprobador = ua.id
+              LEFT JOIN users ua ON (nd.id_admin_aprobador = ua.id AND (ua.admin = 1 OR ua.super_user = 1 OR ua.user_type = 'admin'))
               WHERE nd.id_usuario = ?
               ORDER BY pa.nombre_periodo, m.nombre_materia";
     
@@ -21127,7 +21189,7 @@ function obtenerHistorialNotasDesglozado($estudiante_id) {
               FROM notas_definitivas nd
               INNER JOIN materias m ON nd.id_materia = m.id_materia
               INNER JOIN periodos_academicos pa ON nd.id_periodo = pa.id_periodo
-              LEFT JOIN users ua ON nd.id_admin_aprobador = ua.id
+              LEFT JOIN users ua ON (nd.id_admin_aprobador = ua.id AND (ua.admin = 1 OR ua.super_user = 1 OR ua.user_type = 'admin'))
               WHERE nd.id_usuario = ?
               ORDER BY m.trayecto, m.nombre_materia, nd.fecha_registro DESC";
     
