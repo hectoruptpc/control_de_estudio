@@ -70,6 +70,8 @@ if (isset($_SESSION['user']['id']) && function_exists('verificarElegibilidadPros
 
 <?php echo $bootstrap_head; ?>
 <link rel="stylesheet" href="/control_de_estudio/css/roles_theme.css">
+<!-- Helper Select Materias por Trayecto -->
+<script src="/control_de_estudio/js/materias_trayecto.js"></script>
 
 <style>
     /* ESTILOS GENERALES MEJORADOS */

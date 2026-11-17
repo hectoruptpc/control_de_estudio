@@ -983,8 +983,30 @@ function generarReportePDF() {
         mostrarMensaje('Sin resultados', 'No hay estudiantes con los filtros seleccionados', false);
         return;
     }
-    let url = `constancias/generar_reporte_pdf.php?ids=${estudiantesIds.join(',')}&estadisticas=${incluirEstadisticas}`;
-    window.open(url, '_blank');
+
+    // Enviar mediante POST para soportar cientos/miles de IDs sin límites de URL GET
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'reporte_estudiantes_pdf.php';
+    form.target = '_blank';
+    form.style.display = 'none';
+
+    const inputIds = document.createElement('input');
+    inputIds.type = 'hidden';
+    inputIds.name = 'ids';
+    inputIds.value = estudiantesIds.join(',');
+    form.appendChild(inputIds);
+
+    const inputEstadisticas = document.createElement('input');
+    inputEstadisticas.type = 'hidden';
+    inputEstadisticas.name = 'estadisticas';
+    inputEstadisticas.value = incluirEstadisticas;
+    form.appendChild(inputEstadisticas);
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+
     $('#reporteModal').modal('hide');
 }
 

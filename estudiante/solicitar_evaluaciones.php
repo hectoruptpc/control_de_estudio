@@ -338,28 +338,28 @@ include("includes/head.php");
                     </div>
 
                     <?php if ($info_suf['puede_solicitar'] && !empty($info_suf['aptas'])): ?>
-                        <form method="POST" action="solicitar_evaluaciones.php" onsubmit="return confirm('¿Confirmas que deseas solicitar Examen de Suficiencia? Recuerda que si no apruebas se te inscribirá de forma regular automáticamente.');">
+                        <form method="POST" action="solicitar_evaluaciones.php" id="formSuficiencia" onsubmit="return validarEnvioSuficiencia();">
                             <input type="hidden" name="accion_solicitar" value="1">
                             <input type="hidden" name="tipo_solicitud" value="suficiencia">
 
-                            <div class="form-group">
-                                <label for="materia_suficiencia" class="font-weight-bold text-dark">Selecciona la Asignatura a presentar por Suficiencia:</label>
-                                <select name="id_materia[]" id="materia_suficiencia" class="form-control select2" required>
-                                    <option value="">-- Selecciona una asignatura de tu pensum --</option>
-                                    <?php foreach ($info_suf['aptas'] as $asuf): ?>
-                                        <option value="<?= $asuf['id_materia'] ?>">
-                                            [<?= htmlspecialchars($asuf['cod_materia']) ?>] <?= htmlspecialchars($asuf['nombre_materia']) ?> (Trayecto <?= $asuf['trayecto'] ?> - <?= $asuf['creditos'] ?> UC)
-                                        </option>
-                                    <?php endforeach; ?>
+                            <div class="form-group mb-3">
+                                <label for="materia_suficiencia" class="font-weight-bold text-dark">
+                                    <i class="fas fa-book mr-1 text-primary"></i> Selecciona la Asignatura a Rendir por Suficiencia:
+                                </label>
+                                <select name="id_materia[]" id="materia_suficiencia" class="form-control" required>
+                                    <?= renderizarOpcionesMateriasPorTrayecto($info_suf['aptas'], null, '-- Selecciona una asignatura de tu pensum --') ?>
                                 </select>
+                                <small class="form-text text-muted">Las asignaturas se muestran agrupadas según el trayecto del pensum de estudios.</small>
                             </div>
 
                             <div class="form-group">
-                                <label for="motivo_suf" class="font-weight-bold small text-muted">Exposición de Motivos / Justificación de Competencias:</label>
-                                <textarea name="motivo" id="motivo_suf" class="form-control" rows="2" placeholder="Indica cursos previos, experiencia técnica o justificación..." required></textarea>
+                                <label for="motivo_suf" class="font-weight-bold small text-muted">
+                                    <i class="fas fa-pen-alt mr-1"></i> Exposición de Motivos / Justificación de Competencias:
+                                </label>
+                                <textarea name="motivo" id="motivo_suf" class="form-control" rows="3" placeholder="Indica cursos previos, certificaciones, experiencia laboral o justificación de conocimientos adquiridos..." required></textarea>
                             </div>
 
-                            <button type="submit" class="btn btn-primary font-weight-bold px-4 shadow-sm">
+                            <button type="submit" class="btn btn-primary font-weight-bold px-4 py-2 shadow-sm">
                                 <i class="fas fa-paper-plane mr-1"></i> Enviar Solicitud de Suficiencia
                             </button>
                         </form>
@@ -471,5 +471,22 @@ include("includes/head.php");
         </div>
     </div>
 </div>
+
+<script>
+function validarEnvioSuficiencia() {
+    const select = document.getElementById('materia_suficiencia');
+    if (!select || !select.value) {
+        alert('Por favor selecciona una asignatura para el Examen de Suficiencia.');
+        return false;
+    }
+    const motivo = document.getElementById('motivo_suf');
+    if (!motivo || !motivo.value.trim()) {
+        alert('Por favor indica la exposición de motivos o justificación de tus conocimientos.');
+        if (motivo) motivo.focus();
+        return false;
+    }
+    return confirm('¿Confirmas que deseas enviar la solicitud de Examen de Suficiencia? Recuerda que si no apruebas (nota < 12) se te inscribirá de forma regular automáticamente.');
+}
+</script>
 
 <?php include("includes/footer.php"); ?>

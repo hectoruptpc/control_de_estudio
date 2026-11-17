@@ -4752,7 +4752,7 @@ function obtenerMateriasDisponibles($id_carrera) {
     $materias = []; // Array para almacenar resultados
     
     // Consulta SQL con parámetros preparados
-    $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia 
+    $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia, m.trayecto, m.creditos 
               FROM materias m
               WHERE m.activa = 1 
               AND m.id_materia NOT IN (
@@ -4760,7 +4760,7 @@ function obtenerMateriasDisponibles($id_carrera) {
                   FROM carrera_materia cm 
                   WHERE cm.id_carrera = ?
               ) 
-              ORDER BY m.nombre_materia";
+              ORDER BY m.trayecto ASC, m.nombre_materia ASC";
     
     // Preparamos la sentencia
     if ($stmt = $db->prepare($query)) {
@@ -4815,12 +4815,12 @@ function obtenerMateriasAsignadas($id_carrera) {
     $materias = []; // Array para almacenar resultados
     
     // Consulta SQL con JOIN y parámetro preparado
-    $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia, 
+    $query = "SELECT m.id_materia, m.cod_materia, m.nombre_materia, m.trayecto, m.creditos,
                      cm.semestre, cm.id_relacion
               FROM carrera_materia cm
               JOIN materias m ON cm.id_materia = m.id_materia
               WHERE cm.id_carrera = ?
-              ORDER BY cm.semestre, m.nombre_materia";
+              ORDER BY m.trayecto ASC, cm.semestre ASC, m.nombre_materia ASC";
     
     // Preparamos la sentencia
     if ($stmt = $db->prepare($query)) {
@@ -10035,13 +10035,13 @@ function obtenerMateriasDocentePorCarrera($id_docente, $id_carrera) {
     global $db;
     
     try {
-        $query = "SELECT DISTINCT m.id_materia, m.nombre_materia, m.cod_materia 
+        $query = "SELECT DISTINCT m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto, m.creditos 
                   FROM docente_materia dm
                   JOIN materias m ON dm.id_materia = m.id_materia
                   JOIN carrera_materia cm ON m.id_materia = cm.id_materia
                   WHERE dm.id_usuario = ?
                   AND cm.id_carrera = ?
-                  ORDER BY m.nombre_materia";
+                  ORDER BY m.trayecto ASC, m.nombre_materia ASC";
         
         $stmt = $db->prepare($query);
         if (!$stmt) {
@@ -11957,7 +11957,14 @@ function esAptoExtraordinario($estudiante_id, $id_materia = null) {
             $es_proy = (!empty($m['es_proyecto_socio']) && $m['es_proyecto_socio'] == 1);
             if (!esMateriaAprobadaEstudiante($estudiante_id, $mid, $es_proy)) {
                 $intentos = $historial[$mid] ?? [];
-                $ya_la_vio = !empty($intentos);
+                $ya_la_vio = false;
+                foreach ($intentos as $it) {
+                    if (($it['origen'] ?? '') === 'inscripcion' && $it['nota_final'] === null) continue;
+                    if ($it['nota_final'] !== null && is_numeric($it['nota_final'])) {
+                        $ya_la_vio = true;
+                        break;
+                    }
+                }
                 
                 $materia_candidata = $m;
                 $materia_candidata['ya_la_vio'] = $ya_la_vio;
@@ -16456,7 +16463,7 @@ function obtenerGruposNotasAprobadas($profesor_id = '', $materia_id = '', $perio
 function obtenerTodasLasMaterias() {
     global $db;
     $materias = [];
-    $query = "SELECT id_materia as id, nombre_materia as nombre FROM materias ORDER BY nombre_materia ASC";
+    $query = "SELECT id_materia as id, id_materia, cod_materia, nombre_materia as nombre, nombre_materia, trayecto, creditos FROM materias ORDER BY trayecto ASC, nombre_materia ASC";
     $result = $db->query($query);
     if ($result) {
         while ($row = $result->fetch_assoc()) {
@@ -18643,7 +18650,7 @@ function obtenerTodosTitulos() {
 function obtenerTodasMaterias() {
     global $db;
     
-    $query = "SELECT * FROM materias ORDER BY nombre_materia";
+    $query = "SELECT * FROM materias ORDER BY trayecto ASC, nombre_materia ASC";
     return $db->query($query);
 }
 
@@ -27055,6 +27062,22 @@ function obtenerMateriasAptasIntensivo($estudiante_id) {
     $carrera = obtenerCarreraEstudiante($estudiante_id);
     if (!$carrera) return [];
     
+    $periodo_activo = obtenerPeriodoActivo();
+    $id_periodo_activo = intval($periodo_activo['id_periodo'] ?? 0);
+    
+    // Obtener materias que está cursando activamente en el período actual
+    $materias_cursando_actualmente = [];
+    if ($id_periodo_activo > 0) {
+        $q_cursando = "SELECT id_materia FROM estudiante_materias 
+                       WHERE id_usuario = $estudiante_id AND id_periodo = $id_periodo_activo AND estatus = 'activo'";
+        $res_cursando = $db->query($q_cursando);
+        if ($res_cursando) {
+            while ($rc = $res_cursando->fetch_assoc()) {
+                $materias_cursando_actualmente[] = intval($rc['id_materia']);
+            }
+        }
+    }
+    
     $materias_carrera_res = obtenerMateriasCarrera($carrera['id_carrera']);
     $materias_info = [];
     if ($materias_carrera_res) {
@@ -27073,18 +27096,40 @@ function obtenerMateriasAptasIntensivo($estudiante_id) {
         // Si ya está aprobada, no aplica
         if (esMateriaAprobadaEstudiante($estudiante_id, $mid, $es_proyecto)) continue;
         
-        // Debe haberla visto/cursado previamente
-        if (empty($historial[$mid])) continue;
+        // Si la está cursando en el período regular activo, no puede solicitarla en intensivo simultáneamente
+        if (in_array($mid, $materias_cursando_actualmente)) continue;
         
-        $ultimo = end($historial[$mid]);
+        // Debe haberla cursado previamente y tener una calificación reprobatoria registrada
+        $intentos = $historial[$mid] ?? [];
+        $ultimo_intento_reprobado = null;
+        
+        foreach ($intentos as $it) {
+            // Ignorar inscripciones sin notas o del período en curso
+            if (($it['origen'] ?? '') === 'inscripcion' && $it['nota_final'] === null) continue;
+            if (intval($it['id_periodo'] ?? 0) === $id_periodo_activo && $it['nota_final'] === null) continue;
+            
+            // Excluir exámenes de suficiencia: la suficiencia no es cursar la materia
+            if (($it['tipo_examen'] ?? '') === 'S') continue;
+            
+            // Debe tener nota numérica definitiva reprobada (< 12 pts)
+            if ($it['nota_final'] !== null && is_numeric($it['nota_final'])) {
+                $nota_num = floatval($it['nota_final']);
+                if ($nota_num < 12) {
+                    $ultimo_intento_reprobado = $it;
+                }
+            }
+        }
+        
+        if (!$ultimo_intento_reprobado) continue;
+        
         $aptas[] = [
             'id_materia' => $mid,
             'cod_materia' => $mat['cod_materia'],
             'nombre_materia' => $mat['nombre_materia'],
             'trayecto' => intval($mat['trayecto'] ?? 0),
             'creditos' => intval($mat['creditos'] ?? 0),
-            'nota_anterior' => $ultimo['nota_final'] ?? 0,
-            'periodo_anterior' => $ultimo['nombre_periodo'] ?? '-'
+            'nota_anterior' => floatval($ultimo_intento_reprobado['nota_final']),
+            'periodo_anterior' => $ultimo_intento_reprobado['nombre_periodo'] ?? '-'
         ];
     }
     
@@ -27117,6 +27162,19 @@ function obtenerMateriasAptasSuficiencia($estudiante_id) {
     $suficiencias_este_ano = intval($row_a['total'] ?? 0);
     $stmt_a->close();
     
+    $periodo_activo = obtenerPeriodoActivo();
+    $id_periodo_activo = intval($periodo_activo['id_periodo'] ?? 0);
+    $materias_cursando = [];
+    if ($id_periodo_activo > 0) {
+        $q_curs = "SELECT id_materia FROM estudiante_materias WHERE id_usuario = $estudiante_id AND id_periodo = $id_periodo_activo AND estatus = 'activo'";
+        $res_curs = $db->query($q_curs);
+        if ($res_curs) {
+            while ($rc = $res_curs->fetch_assoc()) {
+                $materias_cursando[] = intval($rc['id_materia']);
+            }
+        }
+    }
+    
     $materias_carrera_res = obtenerMateriasCarrera($carrera['id_carrera']);
     $aptas = [];
     if ($materias_carrera_res) {
@@ -27124,6 +27182,10 @@ function obtenerMateriasAptasSuficiencia($estudiante_id) {
             $mid = intval($mat['id_materia']);
             $es_proyecto = (!empty($mat['es_proyecto_socio']) && $mat['es_proyecto_socio'] == 1) 
                            || stripos($mat['nombre_materia'] ?? '', 'proyecto') !== false;
+            // Proyectos socio-tecnológicos/integradores no aplican para examen de suficiencia
+            if ($es_proyecto) continue;
+            // Si ya la está cursando en el período activo regular, no aplica para suficiencia
+            if (in_array($mid, $materias_cursando)) continue;
             if (esMateriaAprobadaEstudiante($estudiante_id, $mid, $es_proyecto)) continue;
             
             $aptas[] = [
@@ -27876,6 +27938,142 @@ function aprobarGraduacionEstudiante($id_solicitud, $admin_id, $observaciones = 
     } catch (Exception $e) {
         $db->rollback();
         return ['success' => false, 'mensaje' => $e->getMessage()];
+    }
+}
+
+// ==============================================================================
+// HELPER CENTRALIZADO: RENDERIZACIÓN DE SELECT DE MATERIAS POR TRAYECTO
+// ==============================================================================
+
+/**
+ * Obtiene el nombre descriptivo institucional de un trayecto académico.
+ *
+ * @param int|string $trayecto Número de trayecto (0, 1, 2, 3, 4, 5...)
+ * @return string Nombre institucional formateado
+ */
+if (!function_exists('obtenerNombreTrayecto')) {
+    function obtenerNombreTrayecto($trayecto) {
+        $t = intval($trayecto);
+        $nombres = [
+            0 => 'Trayecto Inicial',
+            1 => 'Trayecto I (Primer Año - TSU)',
+            2 => 'Trayecto II (Segundo Año - TSU)',
+            3 => 'Trayecto III (Tercer Año - Ing./Lic.)',
+            4 => 'Trayecto IV (Cuarto Año - Ing./Lic.)',
+            5 => 'Trayecto V'
+        ];
+        return $nombres[$t] ?? "Trayecto $t";
+    }
+}
+
+/**
+ * Agrupa una colección de materias por su número de Trayecto.
+ * Soporta arrays asociativos, arrays de arrays y objetos mysqli_result.
+ *
+ * @param array|mysqli_result $materias
+ * @return array Array indexado por el número de trayecto con las materias ordenadas
+ */
+if (!function_exists('agruparMateriasPorTrayecto')) {
+    function agruparMateriasPorTrayecto($materias) {
+        if ($materias instanceof mysqli_result) {
+            $arr = [];
+            $materias->data_seek(0);
+            while ($row = $materias->fetch_assoc()) {
+                $arr[] = $row;
+            }
+            $materias = $arr;
+        }
+
+        $por_trayecto = [];
+        if (!is_array($materias)) {
+            return $por_trayecto;
+        }
+
+        foreach ($materias as $m) {
+            $t = isset($m['trayecto']) ? intval($m['trayecto']) : 0;
+            $por_trayecto[$t][] = $m;
+        }
+        ksort($por_trayecto);
+        return $por_trayecto;
+    }
+}
+
+/**
+ * Genera el HTML de las opciones de un <select> de materias agrupadas con <optgroup> por Trayecto.
+ * Evita la duplicación de código en todos los módulos de selección de materias.
+ *
+ * @param array|mysqli_result $materias Lista de materias
+ * @param mixed $seleccionado ID de materia preseleccionada (opcional)
+ * @param string|null $placeholder Texto del primer option vacío (si es null no se añade)
+ * @param array $opciones Configuración adicional:
+ *                        - 'incluir_uc' => bool (defecto true)
+ *                        - 'incluir_codigo' => bool (defecto true)
+ *                        - 'data_attrs' => bool (defecto false)
+ *                        - 'texto_personalizado' => callable|null función callback para formatear el texto
+ * @return string HTML de los <optgroup> y <option>
+ */
+if (!function_exists('renderizarOpcionesMateriasPorTrayecto')) {
+    function renderizarOpcionesMateriasPorTrayecto($materias, $seleccionado = null, $placeholder = '-- Selecciona una asignatura --', $opciones = []) {
+        $html = '';
+        if ($placeholder !== null) {
+            $html .= '<option value="">' . htmlspecialchars($placeholder) . '</option>';
+        }
+
+        $por_trayecto = agruparMateriasPorTrayecto($materias);
+        if (empty($por_trayecto)) {
+            return $html;
+        }
+
+        $incluir_uc = $opciones['incluir_uc'] ?? true;
+        $incluir_codigo = $opciones['incluir_codigo'] ?? true;
+        $data_attrs = $opciones['data_attrs'] ?? false;
+        $callback_texto = (isset($opciones['texto_personalizado']) && is_callable($opciones['texto_personalizado'])) ? $opciones['texto_personalizado'] : null;
+
+        foreach ($por_trayecto as $t => $items) {
+            $label_trayecto = 'TRAYECTO ' . ($t === 0 ? 'INICIAL' : $t) . ' (' . obtenerNombreTrayecto($t) . ')';
+            $html .= '<optgroup label="' . htmlspecialchars($label_trayecto) . '">';
+
+            foreach ($items as $m) {
+                $id = $m['id_materia'] ?? ($m['id'] ?? 0);
+                $cod = $m['cod_materia'] ?? ($m['codigo'] ?? '');
+                $nom = $m['nombre_materia'] ?? ($m['nombre'] ?? '');
+                $uc = isset($m['creditos']) ? intval($m['creditos']) : null;
+
+                if ($callback_texto) {
+                    $texto = call_user_func($callback_texto, $m);
+                } else {
+                    $texto = '';
+                    if ($incluir_codigo && !empty($cod)) {
+                        $texto .= '[' . htmlspecialchars($cod) . '] ';
+                    }
+                    $texto .= htmlspecialchars($nom);
+                    if ($incluir_uc && $uc !== null && $uc > 0) {
+                        $texto .= ' (' . $uc . ' UC)';
+                    }
+                }
+
+                $is_sel = ($seleccionado !== null && $seleccionado !== '' && strval($seleccionado) === strval($id)) ? ' selected' : '';
+
+                $extra_data = '';
+                if ($data_attrs) {
+                    $extra_data .= ' data-codigo="' . htmlspecialchars($cod, ENT_QUOTES) . '"';
+                    $extra_data .= ' data-nombre="' . htmlspecialchars($nom, ENT_QUOTES) . '"';
+                    $extra_data .= ' data-trayecto="' . $t . '"';
+                    if ($uc !== null) {
+                        $extra_data .= ' data-uc="' . $uc . '"';
+                    }
+                    if (isset($m['es_proyecto_socio'])) {
+                        $extra_data .= ' data-es-proyecto="' . ($m['es_proyecto_socio'] == 1 ? '1' : '0') . '"';
+                    }
+                }
+
+                $html .= '<option value="' . htmlspecialchars($id) . '"' . $is_sel . $extra_data . '>' . $texto . '</option>';
+            }
+
+            $html .= '</optgroup>';
+        }
+
+        return $html;
     }
 }
 

@@ -844,17 +844,7 @@ if (!empty($cedula)) {
                             <i class="fas fa-book mr-1 text-primary"></i> Seleccionar Asignatura del Pensum: <span class="text-danger">*</span>
                         </label>
                         <select id="modal_select_pensum_materia" class="form-control">
-                            <option value="">-- Seleccione Asignatura del Plan de Estudios --</option>
-                            <?php foreach ($materias_pensum_todas as $mpen): ?>
-                                <option value="<?= $mpen['id_materia'] ?>"
-                                        data-codigo="<?= htmlspecialchars($mpen['cod_materia']) ?>"
-                                        data-nombre="<?= htmlspecialchars($mpen['nombre_materia']) ?>"
-                                        data-trayecto="<?= $mpen['trayecto'] ?>"
-                                        data-es-proyecto="<?= (!empty($mpen['es_proyecto_socio']) && $mpen['es_proyecto_socio'] == 1) ? '1' : '0' ?>"
-                                        data-uc="<?= $mpen['creditos'] ?>">
-                                    [T-<?= $mpen['trayecto'] ?>] <?= htmlspecialchars($mpen['cod_materia']) ?> - <?= htmlspecialchars($mpen['nombre_materia']) ?> (<?= $mpen['creditos'] ?> UC)
-                                </option>
-                            <?php endforeach; ?>
+                            <?= renderizarOpcionesMateriasPorTrayecto($materias_pensum_todas, null, '-- Seleccione Asignatura del Plan de Estudios --', ['data_attrs' => true]) ?>
                         </select>
                     </div>
 
