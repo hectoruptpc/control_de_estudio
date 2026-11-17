@@ -23,7 +23,16 @@ if ($carreras && is_array($carreras)) {
     }
 }
 
-// Obtener TODOS los estudiantes con JOIN a ciudades
+// Mapeo de estados federales
+$estadoMap = [];
+$resEst = $db->query("SELECT id_estado, estado FROM estados");
+if ($resEst) {
+    while ($re = $resEst->fetch_assoc()) {
+        $estadoMap[$re['id_estado']] = $re['estado'];
+    }
+}
+
+// Obtener TODOS los estudiantes con JOIN a ciudades y nuevos campos
 $query = "SELECT 
     u.id,
     u.idusuario,
@@ -47,6 +56,11 @@ $query = "SELECT
     u.num_telf_opc,
     u.foto_perfil,
     u.sede,
+    u.turno,
+    u.discapacidad,
+    u.etnia,
+    u.inscrito_por,
+    u.asignado_opsu,
     c.ciudad as nombre_ciudad
 FROM users u
 LEFT JOIN ciudades c ON u.ciudad = c.id_ciudad
@@ -79,11 +93,42 @@ if ($result && $result->num_rows > 0) {
         $carreraId = $row['carrera'];
         $row['nombre_carrera'] = isset($carreraMap[$carreraId]) ? $carreraMap[$carreraId] : 'Sin Carrera';
         
-        // Obtener nombre de la ciudad (reemplazar el ID por el nombre)
+        // Obtener nombre de la ciudad
         $row['ciudad'] = isset($row['nombre_ciudad']) && !empty($row['nombre_ciudad']) ? $row['nombre_ciudad'] : 'No especificada';
         
-        // Asegurar que la sede tenga un valor por defecto
+        // Sede por defecto
         $row['sede'] = isset($row['sede']) && !empty($row['sede']) ? $row['sede'] : 'No especificada';
+
+        // Normalizar Estado Geográfico (Entidad Federal)
+        $estadoRaw = trim((string)($row['estado'] ?? ''));
+        if (is_numeric($estadoRaw) && isset($estadoMap[$estadoRaw])) {
+            $row['nombre_estado'] = $estadoMap[$estadoRaw];
+        } elseif (!empty($estadoRaw) && !is_numeric($estadoRaw)) {
+            $row['nombre_estado'] = $estadoRaw;
+        } else {
+            $row['nombre_estado'] = 'No especificado';
+        }
+
+        // Normalizar Modalidad Inscrito por
+        $inscrito = trim((string)($row['inscrito_por'] ?? ''));
+        if (empty($inscrito)) {
+            if (!empty($row['asignado_opsu']) && $row['asignado_opsu'] === 'Sí') {
+                $inscrito = 'OPSU';
+            } else {
+                $inscrito = 'No especificado';
+            }
+        }
+        $row['inscrito_por'] = $inscrito;
+
+        // Normalizar Turno
+        $row['turno'] = !empty($row['turno']) ? trim($row['turno']) : 'Diurno';
+
+        // Normalizar Discapacidad y Etnia
+        $disc = strtolower(trim((string)($row['discapacidad'] ?? '')));
+        $row['tiene_discapacidad'] = (!empty($disc) && !in_array($disc, ['ninguna', 'no especificado', 'no', 'sin discapacidad', '0']));
+
+        $etn = strtolower(trim((string)($row['etnia'] ?? '')));
+        $row['tiene_etnia'] = (!empty($etn) && !in_array($etn, ['ninguna', 'no especificado', 'no', '0']));
         
         $estudiantes[] = $row;
     }
@@ -95,8 +140,6 @@ sort($carrerasUnicas);
 
 // Obtener ciudades únicas
 $ciudades = array_unique(array_column($estudiantes, 'ciudad'));
-sort($ciudades);
-// Filtrar valores vacíos o nulos
 $ciudades = array_filter($ciudades, function($ciudad) {
     return !empty($ciudad) && $ciudad !== 'No especificada';
 });
@@ -104,17 +147,41 @@ sort($ciudades);
 
 // Obtener sedes únicas para el filtro
 $sedes = array_unique(array_column($estudiantes, 'sede'));
-sort($sedes);
-// Filtrar valores vacíos o nulos
 $sedes = array_filter($sedes, function($sede) {
     return !empty($sede) && $sede !== 'No especificada';
 });
 sort($sedes);
 
-// Contar estudiantes por status y estadísticas adicionales
+// Obtener estados geográficos únicos
+$estadosUnicos = array_values(array_filter(array_unique(array_column($estudiantes, 'nombre_estado')), function($e) {
+    return !empty($e) && $e !== 'No especificado';
+}));
+sort($estadosUnicos);
+
+// Modalidades de ingreso disponibles
+$modalidadesUnicas = [
+    'OPSU',
+    'Deporte',
+    'Cultura',
+    'Misión Sucre',
+    'Ayuda Social',
+    'Convenio',
+    'Rendimiento Académico',
+    'Autorizado por Secretaría',
+    'Autorizado por Rector',
+    'No especificado'
+];
+
+// Turnos disponibles
+$turnosUnicos = array_values(array_filter(array_unique(array_column($estudiantes, 'turno'))));
+sort($turnosUnicos);
+if (empty($turnosUnicos)) $turnosUnicos = ['Diurno', 'Nocturno'];
+
+// Contar estudiantes y calcular estadísticas completas
 $totalEstudiantes = count($estudiantes);
 $activos = 0;
 $inactivos = 0;
+$nuevosIngresos = 0;
 $embarazadas = 0;
 $menores = 0;
 $mayores = 0;
@@ -122,6 +189,14 @@ $masculinos = 0;
 $femeninos = 0;
 $solteros = 0;
 $casados = 0;
+$conDiscapacidad = 0;
+$conEtnia = 0;
+$asignadosOpsu = 0;
+$sedePC = 0;
+$sedeCOEF = 0;
+$sumaEdades = 0;
+$totalConEdad = 0;
+$anioActual = date('Y');
 
 foreach ($estudiantes as $estudiante) {
     $status = $estudiante['status'] ?? 0;
@@ -131,26 +206,48 @@ foreach ($estudiantes as $estudiante) {
         $inactivos++;
     }
 
-    $genero = $estudiante['genero'] ?? '';
-    if ($genero == 'Masculino') $masculinos++;
-    if ($genero == 'Femenino') $femeninos++;
+    $genero = strtolower(trim($estudiante['genero'] ?? ''));
+    if ($genero === 'masculino' || $genero === 'm') $masculinos++;
+    if ($genero === 'femenino' || $genero === 'f') $femeninos++;
 
-    $esFemenino = isset($estudiante['genero']) && trim($estudiante['genero']) === 'Femenino';
+    $esFemenino = ($genero === 'femenino' || $genero === 'f');
     $estaEmbarazada = isset($estudiante['embarazada']) && trim((string)$estudiante['embarazada']) === '1';
     if ($esFemenino && $estaEmbarazada) {
         $embarazadas++;
     }
 
-    if ($estudiante['es_menor']) {
+    if (!empty($estudiante['es_menor'])) {
         $menores++;
     } elseif ($estudiante['edad'] >= 18 && $estudiante['edad'] !== '') {
         $mayores++;
     }
 
-    $edoCivil = $estudiante['edo_civil'] ?? '';
-    if ($edoCivil == 'Soltero/a') $solteros++;
-    if ($edoCivil == 'Casado/a') $casados++;
+    if ($estudiante['edad'] !== '' && is_numeric($estudiante['edad'])) {
+        $sumaEdades += (int)$estudiante['edad'];
+        $totalConEdad++;
+    }
+
+    $edoCivil = strtolower(trim($estudiante['edo_civil'] ?? ''));
+    if (strpos($edoCivil, 'soltero') !== false) $solteros++;
+    if (strpos($edoCivil, 'casado') !== false) $casados++;
+
+    if (!empty($estudiante['tiene_discapacidad'])) $conDiscapacidad++;
+    if (!empty($estudiante['tiene_etnia'])) $conEtnia++;
+
+    $inscrito = strtolower(trim($estudiante['inscrito_por'] ?? ''));
+    if ($inscrito === 'opsu') $asignadosOpsu++;
+
+    $sedeStr = strtolower(trim($estudiante['sede'] ?? ''));
+    if (strpos($sedeStr, 'puerto cabello') !== false) $sedePC++;
+    if (strpos($sedeStr, 'coef') !== false) $sedeCOEF++;
+
+    $fechaIng = $estudiante['fecha_ingreso'] ?? '';
+    if (!empty($fechaIng) && strpos($fechaIng, $anioActual) === 0) {
+        $nuevosIngresos++;
+    }
 }
+
+$edadPromedio = $totalConEdad > 0 ? round($sumaEdades / $totalConEdad, 1) : 0;
 
 include("includes/head.php");
 ?>
@@ -217,75 +314,153 @@ include("includes/head.php");
                     </div>
                     <div class="card-body p-2 p-sm-3">
                         <div id="estadisticas-row" class="row mb-4">
-                            <div class="col-md-3 mb-3">
-                                <div class="card bg-primary text-white h-100 shadow-sm">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-users fa-2x mb-2"></i>
-                                        <h4 class="card-title"><?php echo $totalEstudiantes; ?></h4>
-                                        <p class="card-text">Total de Estudiantes</p>
+                            <!-- Total Estudiantes -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card bg-primary text-white h-100 shadow-sm border-0">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-users fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statTotalEstudiantes"><?php echo $totalEstudiantes; ?></h4>
+                                        <small class="card-text text-white-50">Total Estudiantes</small>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="card bg-success text-white h-100 shadow-sm">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-user-check fa-2x mb-2"></i>
-                                        <h4 class="card-title"><?php echo $activos; ?></h4>
-                                        <p class="card-text">Estudiantes Activos</p>
+                            <!-- Activos -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card bg-success text-white h-100 shadow-sm border-0">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-user-check fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statActivos"><?php echo $activos; ?></h4>
+                                        <small class="card-text text-white-50">Activos</small>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="card bg-secondary text-white h-100 shadow-sm">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-user-times fa-2x mb-2"></i>
-                                        <h4 class="card-title"><?php echo $inactivos; ?></h4>
-                                        <p class="card-text">Estudiantes Inactivos</p>
+                            <!-- Inactivos -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card bg-secondary text-white h-100 shadow-sm border-0">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-user-times fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statInactivos"><?php echo $inactivos; ?></h4>
+                                        <small class="card-text text-white-50">Inactivos</small>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="card bg-info text-white h-100 shadow-sm">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-baby-carriage fa-2x mb-2"></i>
-                                        <h4 class="card-title"><?php echo $embarazadas; ?></h4>
-                                        <p class="card-text">Mujeres Embarazadas</p>
+                            <!-- Nuevos Ingresos -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card bg-info text-white h-100 shadow-sm border-0">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-user-plus fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statNuevosIngresos"><?php echo $nuevosIngresos; ?></h4>
+                                        <small class="card-text text-white-50">Ingreso <?php echo $anioActual; ?></small>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="card bg-warning text-dark h-100 shadow-sm">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-child fa-2x mb-2"></i>
-                                        <h4 class="card-title"><?php echo $menores; ?></h4>
-                                        <p class="card-text">Menores de Edad</p>
+                            <!-- Masculinos -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card bg-danger text-white h-100 shadow-sm border-0">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-mars fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statMasculinos"><?php echo $masculinos; ?></h4>
+                                        <small class="card-text text-white-50">Masculinos</small>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="card bg-dark text-white h-100 shadow-sm">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-user-graduate fa-2x mb-2"></i>
-                                        <h4 class="card-title"><?php echo $mayores; ?></h4>
-                                        <p class="card-text">Mayores de Edad</p>
+                            <!-- Femeninos -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card text-white h-100 shadow-sm border-0" style="background-color: #6f42c1;">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-venus fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statFemeninos"><?php echo $femeninos; ?></h4>
+                                        <small class="card-text text-white-50">Femeninos</small>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="card bg-danger text-white h-100 shadow-sm">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-mars fa-2x mb-2"></i>
-                                        <h4 class="card-title"><?php echo $masculinos; ?></h4>
-                                        <p class="card-text">Masculinos</p>
+                            <!-- Menores de Edad -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card bg-warning text-dark h-100 shadow-sm border-0">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-child fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statMenores"><?php echo $menores; ?></h4>
+                                        <small class="card-text text-muted">Menores (&lt;18)</small>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="card bg-purple text-white h-100 shadow-sm" style="background-color: #6f42c1;">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-venus fa-2x mb-2"></i>
-                                        <h4 class="card-title"><?php echo $femeninos; ?></h4>
-                                        <p class="card-text">Femeninos</p>
+                            <!-- Mayores de Edad -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card bg-dark text-white h-100 shadow-sm border-0">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-user-graduate fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statMayores"><?php echo $mayores; ?></h4>
+                                        <small class="card-text text-white-50">Mayores (&ge;18)</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Edad Promedio -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card text-white h-100 shadow-sm border-0" style="background-color: #fd7e14;">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-birthday-cake fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statEdadPromedio"><?php echo $edadPromedio > 0 ? $edadPromedio . ' años' : '-'; ?></h4>
+                                        <small class="card-text text-white-50">Edad Promedio</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Mujeres Embarazadas -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card text-white h-100 shadow-sm border-0" style="background-color: #e83e8c;">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-baby-carriage fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statEmbarazadas"><?php echo $embarazadas; ?></h4>
+                                        <small class="card-text text-white-50">Embarazadas</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Con Discapacidad -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card text-white h-100 shadow-sm border-0" style="background-color: #17a2b8;">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-wheelchair fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statDiscapacidad"><?php echo $conDiscapacidad; ?></h4>
+                                        <small class="card-text text-white-50">Discapacidad</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Pueblos Indígenas / Etnia -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card text-white h-100 shadow-sm border-0" style="background-color: #20c997;">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-feather-alt fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statEtnia"><?php echo $conEtnia; ?></h4>
+                                        <small class="card-text text-white-50">Etnia Indígena</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Asignados OPSU -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card text-white h-100 shadow-sm border-0" style="background-color: #0056b3;">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-university fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statOpsu"><?php echo $asignadosOpsu; ?></h4>
+                                        <small class="card-text text-white-50">Vía OPSU</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Sede Puerto Cabello -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card text-white h-100 shadow-sm border-0" style="background-color: #495057;">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-anchor fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statSedePC"><?php echo $sedePC; ?></h4>
+                                        <small class="card-text text-white-50">Sede Pto. Cabello</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Sede COEF -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card text-white h-100 shadow-sm border-0" style="background-color: #343a40;">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-building fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statSedeCOEF"><?php echo $sedeCOEF; ?></h4>
+                                        <small class="card-text text-white-50">Sede COEF</small>
                                     </div>
                                 </div>
                             </div>
@@ -323,33 +498,22 @@ include("includes/head.php");
                                                     </div>
                                                 </div>
                                             </div>
-                                            <!-- Género -->
+                                            <!-- Modalidad / Inscrito por -->
                                             <div class="col-md-3 mb-3">
                                                 <div class="card h-100">
-                                                    <div class="card-header bg-light"><strong><i class="fas fa-venus-mars text-primary me-1"></i> Género</strong></div>
-                                                    <div class="card-body">
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-clipboard-check text-primary me-1"></i> Inscrito por (Modalidad)</strong></div>
+                                                    <div class="card-body" style="max-height: 220px; overflow-y: auto;">
                                                         <div class="form-check">
-                                                            <input class="form-check-input filtro-genero-master" type="checkbox" value="todos" id="filtroTodosGeneros" checked>
-                                                            <label class="form-check-label text-primary" for="filtroTodosGeneros"><strong>Seleccionar Todos</strong></label>
+                                                            <input class="form-check-input filtro-modalidad-master" type="checkbox" value="todas" id="filtroTodasModalidades" checked>
+                                                            <label class="form-check-label text-primary" for="filtroTodasModalidades"><strong>Seleccionar Todas</strong></label>
                                                         </div>
                                                         <hr class="my-2">
-                                                        <div class="form-check"><input class="form-check-input filtro-genero" type="checkbox" value="masculino" id="filtroMasculino"><label class="form-check-label" for="filtroMasculino">Masculino</label></div>
-                                                        <div class="form-check"><input class="form-check-input filtro-genero" type="checkbox" value="femenino" id="filtroFemenino"><label class="form-check-label" for="filtroFemenino">Femenino</label></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <!-- Estado Civil -->
-                                            <div class="col-md-3 mb-3">
-                                                <div class="card h-100">
-                                                    <div class="card-header bg-light"><strong><i class="fas fa-heart text-primary me-1"></i> Estado Civil</strong></div>
-                                                    <div class="card-body">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input filtro-edocivil-master" type="checkbox" value="todos" id="filtroTodosEdoCivil" checked>
-                                                            <label class="form-check-label text-primary" for="filtroTodosEdoCivil"><strong>Seleccionar Todos</strong></label>
-                                                        </div>
-                                                        <hr class="my-2">
-                                                        <div class="form-check"><input class="form-check-input filtro-edocivil" type="checkbox" value="soltero" id="filtroSoltero"><label class="form-check-label" for="filtroSoltero">Soltero/a</label></div>
-                                                        <div class="form-check"><input class="form-check-input filtro-edocivil" type="checkbox" value="casado" id="filtroCasado"><label class="form-check-label" for="filtroCasado">Casado/a</label></div>
+                                                        <?php foreach ($modalidadesUnicas as $mod): ?>
+                                                            <div class="form-check">
+                                                                <input class="form-check-input filtro-modalidad" type="checkbox" value="<?php echo htmlspecialchars($mod); ?>" id="filtroMod_<?php echo md5($mod); ?>">
+                                                                <label class="form-check-label" for="filtroMod_<?php echo md5($mod); ?>"><?php echo htmlspecialchars($mod); ?></label>
+                                                            </div>
+                                                        <?php endforeach; ?>
                                                     </div>
                                                 </div>
                                             </div>
@@ -368,18 +532,32 @@ include("includes/head.php");
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div class="row mt-2">
-                                            <!-- Sede -->
+                                            <!-- Género -->
                                             <div class="col-md-3 mb-3">
                                                 <div class="card h-100">
-                                                    <div class="card-header bg-light"><strong><i class="fas fa-building text-primary me-1"></i> Sede</strong></div>
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-venus-mars text-primary me-1"></i> Género</strong></div>
+                                                    <div class="card-body">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input filtro-genero-master" type="checkbox" value="todos" id="filtroTodosGeneros" checked>
+                                                            <label class="form-check-label text-primary" for="filtroTodosGeneros"><strong>Seleccionar Todos</strong></label>
+                                                        </div>
+                                                        <hr class="my-2">
+                                                        <div class="form-check"><input class="form-check-input filtro-genero" type="checkbox" value="masculino" id="filtroMasculino"><label class="form-check-label" for="filtroMasculino">Masculino</label></div>
+                                                        <div class="form-check"><input class="form-check-input filtro-genero" type="checkbox" value="femenino" id="filtroFemenino"><label class="form-check-label" for="filtroFemenino">Femenino</label></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row mt-2">
+                                            <!-- Sede y Turno -->
+                                            <div class="col-md-3 mb-3">
+                                                <div class="card h-100">
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-building text-primary me-1"></i> Sede y Turno</strong></div>
                                                     <div class="card-body">
                                                         <div class="form-check">
                                                             <input class="form-check-input filtro-sede-master" type="checkbox" value="todas" id="filtroTodasSedes" checked>
-                                                            <label class="form-check-label text-primary" for="filtroTodasSedes"><strong>Seleccionar Todas</strong></label>
+                                                            <label class="form-check-label text-primary" for="filtroTodasSedes"><strong>Todas las Sedes</strong></label>
                                                         </div>
-                                                        <hr class="my-2">
                                                         <div class="form-check">
                                                             <input class="form-check-input filtro-sede" type="checkbox" value="puerto cabello" id="filtroSedePuertoCabello">
                                                             <label class="form-check-label" for="filtroSedePuertoCabello">Puerto Cabello</label>
@@ -388,6 +566,36 @@ include("includes/head.php");
                                                             <input class="form-check-input filtro-sede" type="checkbox" value="coef" id="filtroSedeCOEF">
                                                             <label class="form-check-label" for="filtroSedeCOEF">COEF</label>
                                                         </div>
+                                                        <hr class="my-2">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input filtro-turno-master" type="checkbox" value="todos" id="filtroTodosTurnos" checked>
+                                                            <label class="form-check-label text-primary" for="filtroTodosTurnos"><strong>Todos los Turnos</strong></label>
+                                                        </div>
+                                                        <?php foreach ($turnosUnicos as $tur): ?>
+                                                            <div class="form-check">
+                                                                <input class="form-check-input filtro-turno" type="checkbox" value="<?php echo htmlspecialchars(strtolower($tur)); ?>" id="filtroTurno_<?php echo md5($tur); ?>">
+                                                                <label class="form-check-label" for="filtroTurno_<?php echo md5($tur); ?>"><?php echo htmlspecialchars($tur); ?></label>
+                                                            </div>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <!-- Estado Geográfico -->
+                                            <div class="col-md-3 mb-3">
+                                                <div class="card h-100">
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-map-marked-alt text-primary me-1"></i> Estado Geográfico</strong></div>
+                                                    <div class="card-body" style="max-height: 220px; overflow-y: auto;">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input filtro-estado-geo-master" type="checkbox" value="todos" id="filtroTodosEstadosGeo" checked>
+                                                            <label class="form-check-label text-primary" for="filtroTodosEstadosGeo"><strong>Seleccionar Todos</strong></label>
+                                                        </div>
+                                                        <hr class="my-2">
+                                                        <?php foreach ($estadosUnicos as $estGeo): ?>
+                                                            <div class="form-check">
+                                                                <input class="form-check-input filtro-estado-geo" type="checkbox" value="<?php echo htmlspecialchars($estGeo); ?>" id="filtroEstGeo_<?php echo md5($estGeo); ?>">
+                                                                <label class="form-check-label" for="filtroEstGeo_<?php echo md5($estGeo); ?>"><?php echo htmlspecialchars($estGeo); ?></label>
+                                                            </div>
+                                                        <?php endforeach; ?>
                                                     </div>
                                                 </div>
                                             </div>
@@ -412,12 +620,49 @@ include("includes/head.php");
                                                     </div>
                                                 </div>
                                             </div>
+                                            <!-- Inclusión y Condición Especial -->
+                                            <div class="col-md-3 mb-3">
+                                                <div class="card h-100">
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-universal-access text-primary me-1"></i> Inclusión & Salud</strong></div>
+                                                    <div class="card-body">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input filtro-condicion-master" type="checkbox" value="todas" id="filtroTodasCondiciones" checked>
+                                                            <label class="form-check-label text-primary" for="filtroTodasCondiciones"><strong>Sin Filtro Especial</strong></label>
+                                                        </div>
+                                                        <hr class="my-2">
+                                                        <label class="small text-muted font-weight-bold d-block">Discapacidad:</label>
+                                                        <div class="form-check"><input class="form-check-input filtro-condicion" type="checkbox" value="con_discapacidad" id="filtroConDiscapacidad"><label class="form-check-label" for="filtroConDiscapacidad">Con Discapacidad</label></div>
+                                                        <div class="form-check"><input class="form-check-input filtro-condicion" type="checkbox" value="sin_discapacidad" id="filtroSinDiscapacidad"><label class="form-check-label" for="filtroSinDiscapacidad">Sin Discapacidad</label></div>
+                                                        <hr class="my-2">
+                                                        <label class="small text-muted font-weight-bold d-block">Pueblos Indígenas / Etnia:</label>
+                                                        <div class="form-check"><input class="form-check-input filtro-condicion" type="checkbox" value="con_etnia" id="filtroConEtnia"><label class="form-check-label" for="filtroConEtnia">Con Etnia Indígena</label></div>
+                                                        <div class="form-check"><input class="form-check-input filtro-condicion" type="checkbox" value="sin_etnia" id="filtroSinEtnia"><label class="form-check-label" for="filtroSinEtnia">Sin Etnia</label></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row mt-2">
+                                            <!-- Estado Civil -->
+                                            <div class="col-md-3 mb-3">
+                                                <div class="card h-100">
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-heart text-primary me-1"></i> Estado Civil</strong></div>
+                                                    <div class="card-body">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input filtro-edocivil-master" type="checkbox" value="todos" id="filtroTodosEdoCivil" checked>
+                                                            <label class="form-check-label text-primary" for="filtroTodosEdoCivil"><strong>Seleccionar Todos</strong></label>
+                                                        </div>
+                                                        <hr class="my-2">
+                                                        <div class="form-check"><input class="form-check-input filtro-edocivil" type="checkbox" value="soltero" id="filtroSoltero"><label class="form-check-label" for="filtroSoltero">Soltero/a</label></div>
+                                                        <div class="form-check"><input class="form-check-input filtro-edocivil" type="checkbox" value="casado" id="filtroCasado"><label class="form-check-label" for="filtroCasado">Casado/a</label></div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <!-- Embarazo -->
                                             <div class="col-md-3 mb-3">
                                                 <div class="card h-100">
                                                     <div class="card-header bg-light"><strong><i class="fas fa-baby-carriage text-primary me-1"></i> Embarazo</strong></div>
                                                     <div class="card-body">
-                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="embarazada" id="filtroEmbarazada"><label class="form-check-label" for="filtroEmbarazada">Solo Embarazadas</label></div>
+                                                        <div class="form-check"><input class="form-check-input filtro" type="checkbox" value="embarazada" id="filtroEmbarazada"><label class="form-check-label" for="filtroEmbarazada">Solo Mujeres Embarazadas</label></div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -437,10 +682,8 @@ include("includes/head.php");
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div class="row mt-2">
                                             <!-- Fecha Ingreso -->
-                                            <div class="col-md-4 mb-3">
+                                            <div class="col-md-3 mb-3">
                                                 <div class="card h-100">
                                                     <div class="card-header bg-light"><strong><i class="fas fa-calendar-alt text-primary me-1"></i> Fecha Ingreso</strong></div>
                                                     <div class="card-body">
@@ -481,9 +724,12 @@ include("includes/head.php");
                                         <th>Email</th>
                                         <th>Teléfono</th>
                                         <th>Carrera</th>
+                                        <th>Modalidad</th>
+                                        <th>Turno</th>
                                         <th>Género</th>
                                         <th>Edad</th>
                                         <th>Estado Civil</th>
+                                        <th>Estado</th>
                                         <th>Ciudad</th>
                                         <th>Sede</th>
                                         <th>Status</th>
@@ -502,6 +748,12 @@ include("includes/head.php");
                                         $ciudad = $estudiante['ciudad'] ?? '';
                                         $carrera = $estudiante['nombre_carrera'] ?? '';
                                         $sede = $estudiante['sede'] ?? '';
+                                        $modalidad = $estudiante['inscrito_por'] ?? 'No especificado';
+                                        $turno = $estudiante['turno'] ?? 'No especificado';
+                                        $estadoGeo = $estudiante['nombre_estado'] ?? 'No especificado';
+                                        $tieneDiscapacidad = !empty($estudiante['tiene_discapacidad']) ? '1' : '0';
+                                        $tieneEtnia = !empty($estudiante['tiene_etnia']) ? '1' : '0';
+                                        $esOpsu = ($estudiante['asignado_opsu'] === 'Sí' || strtolower($modalidad) === 'opsu') ? '1' : '0';
                                     ?>
                                         <tr data-cedula="<?php echo htmlspecialchars(strtolower($cedula)); ?>"
                                             data-nombre="<?php echo htmlspecialchars(strtolower($estudiante['nombre'] ?? '')); ?>"
@@ -517,19 +769,30 @@ include("includes/head.php");
                                             data-fecha-ingreso="<?php echo $fechaIngreso; ?>"
                                             data-ciudad="<?php echo strtolower($ciudad); ?>"
                                             data-carrera="<?php echo strtolower($carrera); ?>"
-                                            data-sede="<?php echo strtolower($sede); ?>">
+                                            data-sede="<?php echo strtolower($sede); ?>"
+                                            data-inscrito-por="<?php echo htmlspecialchars(strtolower($modalidad)); ?>"
+                                            data-turno="<?php echo htmlspecialchars(strtolower($turno)); ?>"
+                                            data-estado-geo="<?php echo htmlspecialchars(strtolower($estadoGeo)); ?>"
+                                            data-discapacidad="<?php echo htmlspecialchars(strtolower($estudiante['discapacidad'] ?? '')); ?>"
+                                            data-tiene-discapacidad="<?php echo $tieneDiscapacidad; ?>"
+                                            data-etnia="<?php echo htmlspecialchars(strtolower($estudiante['etnia'] ?? '')); ?>"
+                                            data-tiene-etnia="<?php echo $tieneEtnia; ?>"
+                                            data-opsu="<?php echo $esOpsu; ?>">
                                             <td><?php echo htmlspecialchars($cedula); ?></td>
                                             <td><?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?></td>
                                             <td><?php echo htmlspecialchars($estudiante['username'] ?? ''); ?></td>
                                             <td><?php echo htmlspecialchars($estudiante['email'] ?? ''); ?></td>
                                             <td><?php echo htmlspecialchars($estudiante['tlf'] ?? $estudiante['cel'] ?? ''); ?></td>
                                             <td><?php echo htmlspecialchars($carrera); ?></td>
+                                            <td><span class="badge bg-secondary"><?php echo htmlspecialchars($modalidad); ?></span></td>
+                                            <td><?php echo htmlspecialchars($turno); ?></td>
                                             <td>
                                                 <?php echo htmlspecialchars($estudiante['genero'] ?? ''); ?>
                                                 <?php if ($esFemenino && $estaEmbarazada): ?><span class="badge bg-info ms-1" title="Embarazada">🤰</span><?php endif; ?>
                                             </td>
                                             <td><?php echo $edad; ?></td>
                                             <td><?php echo htmlspecialchars($estudiante['edo_civil'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($estadoGeo); ?></td>
                                             <td><?php echo htmlspecialchars($ciudad); ?></td>
                                             <td><?php echo htmlspecialchars($sede); ?></td>
                                             <td><?php echo ($status == 1) ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-secondary">Inactivo</span>'; ?></td>
@@ -709,14 +972,18 @@ function setupMasterToggle(masterId, childSelector) {
 
 function configurarFiltros() {
     setupMasterToggle('filtroTodasCarreras', '.filtro-carrera');
+    setupMasterToggle('filtroTodasModalidades', '.filtro-modalidad');
     setupMasterToggle('filtroTodosGeneros', '.filtro-genero');
     setupMasterToggle('filtroTodosEdoCivil', '.filtro-edocivil');
     setupMasterToggle('filtroTodosStatus', '.filtro-status');
     setupMasterToggle('filtroTodasSedes', '.filtro-sede');
+    setupMasterToggle('filtroTodosTurnos', '.filtro-turno');
+    setupMasterToggle('filtroTodosEstadosGeo', '.filtro-estado-geo');
     setupMasterToggle('filtroTodasCiudades', '.filtro-ciudad');
+    setupMasterToggle('filtroTodasCondiciones', '.filtro-condicion');
     setupMasterToggle('filtroTodasEdades', '.filtro-edad');
 
-    document.querySelectorAll('.filtro-carrera, .filtro-ciudad, .filtro-sede, .filtro-genero, .filtro-edocivil, .filtro-status, .filtro-edad, .filtro').forEach(cb => {
+    document.querySelectorAll('.filtro-carrera, .filtro-modalidad, .filtro-ciudad, .filtro-sede, .filtro-turno, .filtro-estado-geo, .filtro-condicion, .filtro-genero, .filtro-edocivil, .filtro-status, .filtro-edad, .filtro').forEach(cb => {
         cb.addEventListener('change', aplicarFiltrosYActualizar);
     });
     document.getElementById('edadMin').addEventListener('input', aplicarFiltrosYActualizar);
@@ -728,39 +995,123 @@ function configurarFiltros() {
 
 function aplicarFiltrosYActualizar() {
     aplicarFiltros();
+    actualizarEstadisticasDinamicas(filasFiltradas);
     actualizarPaginacion();
+}
+
+function actualizarEstadisticasDinamicas(filas) {
+    const total = filas.length;
+    let activos = 0, inactivos = 0, nuevosIngresos = 0;
+    let masculinos = 0, femeninos = 0;
+    let menores = 0, mayores = 0;
+    let sumaEdad = 0, cantEdad = 0;
+    let embarazadas = 0, conDiscapacidad = 0, conEtnia = 0, opsu = 0;
+    let sedePC = 0, sedeCOEF = 0;
+    const anioActualStr = '<?php echo $anioActual; ?>';
+
+    filas.forEach(f => {
+        const status = f.getAttribute('data-status');
+        if (status === '1') activos++;
+        else if (status === '0') inactivos++;
+
+        const fechaIngreso = f.getAttribute('data-fecha-ingreso') || '';
+        if (fechaIngreso.startsWith(anioActualStr)) nuevosIngresos++;
+
+        const genero = (f.getAttribute('data-genero') || '').toLowerCase();
+        if (genero === 'masculino') masculinos++;
+        else if (genero === 'femenino') femeninos++;
+
+        const menor = f.getAttribute('data-menor');
+        const mayor = f.getAttribute('data-mayor');
+        if (menor === '1') menores++;
+        if (mayor === '1') mayores++;
+
+        const edad = parseInt(f.getAttribute('data-edad'));
+        if (!isNaN(edad) && edad > 0) {
+            sumaEdad += edad;
+            cantEdad++;
+        }
+
+        if (f.getAttribute('data-embarazada') === '1') embarazadas++;
+        if (f.getAttribute('data-tiene-discapacidad') === '1') conDiscapacidad++;
+        if (f.getAttribute('data-tiene-etnia') === '1') conEtnia++;
+        if (f.getAttribute('data-opsu') === '1') opsu++;
+
+        const sede = (f.getAttribute('data-sede') || '').toLowerCase();
+        if (sede.includes('puerto cabello')) sedePC++;
+        if (sede.includes('coef')) sedeCOEF++;
+    });
+
+    const elTotal = document.getElementById('statTotalEstudiantes');
+    if (elTotal) elTotal.textContent = total;
+    const elActivos = document.getElementById('statActivos');
+    if (elActivos) elActivos.textContent = activos;
+    const elInactivos = document.getElementById('statInactivos');
+    if (elInactivos) elInactivos.textContent = inactivos;
+    const elNuevos = document.getElementById('statNuevosIngresos');
+    if (elNuevos) elNuevos.textContent = nuevosIngresos;
+    const elMasc = document.getElementById('statMasculinos');
+    if (elMasc) elMasc.textContent = masculinos;
+    const elFem = document.getElementById('statFemeninos');
+    if (elFem) elFem.textContent = femeninos;
+    const elMenores = document.getElementById('statMenores');
+    if (elMenores) elMenores.textContent = menores;
+    const elMayores = document.getElementById('statMayores');
+    if (elMayores) elMayores.textContent = mayores;
+    const elEdadProm = document.getElementById('statEdadPromedio');
+    if (elEdadProm) elEdadProm.textContent = cantEdad > 0 ? (sumaEdad / cantEdad).toFixed(1) + ' años' : '-';
+    const elEmb = document.getElementById('statEmbarazadas');
+    if (elEmb) elEmb.textContent = embarazadas;
+    const elDisc = document.getElementById('statDiscapacidad');
+    if (elDisc) elDisc.textContent = conDiscapacidad;
+    const elEtnia = document.getElementById('statEtnia');
+    if (elEtnia) elEtnia.textContent = conEtnia;
+    const elOpsu = document.getElementById('statOpsu');
+    if (elOpsu) elOpsu.textContent = opsu;
+    const elSedePC = document.getElementById('statSedePC');
+    if (elSedePC) elSedePC.textContent = sedePC;
+    const elSedeCOEF = document.getElementById('statSedeCOEF');
+    if (elSedeCOEF) elSedeCOEF.textContent = sedeCOEF;
 }
 
 function aplicarFiltros() {
     let termino = document.getElementById('buscadorCedula').value.trim().toLowerCase();
     
     let todosGeneros = document.getElementById('filtroTodosGeneros')?.checked;
-    let filtroMasculino = document.getElementById('filtroMasculino').checked;
-    let filtroFemenino = document.getElementById('filtroFemenino').checked;
+    let filtroMasculino = document.getElementById('filtroMasculino')?.checked;
+    let filtroFemenino = document.getElementById('filtroFemenino')?.checked;
     
     let todosStatus = document.getElementById('filtroTodosStatus')?.checked;
-    let filtroActivo = document.getElementById('filtroActivo').checked;
-    let filtroInactivo = document.getElementById('filtroInactivo').checked;
+    let filtroActivo = document.getElementById('filtroActivo')?.checked;
+    let filtroInactivo = document.getElementById('filtroInactivo')?.checked;
     
-    let filtroEmbarazada = document.getElementById('filtroEmbarazada').checked;
+    let filtroEmbarazada = document.getElementById('filtroEmbarazada')?.checked;
     let todasEdades = document.getElementById('filtroTodasEdades')?.checked;
-    let filtroMenor = document.getElementById('filtroMenor').checked;
-    let filtroMayor = document.getElementById('filtroMayor').checked;
+    let filtroMenor = document.getElementById('filtroMenor')?.checked;
+    let filtroMayor = document.getElementById('filtroMayor')?.checked;
     
     let todosEdoCivil = document.getElementById('filtroTodosEdoCivil')?.checked;
-    let filtroSoltero = document.getElementById('filtroSoltero').checked;
-    let filtroCasado = document.getElementById('filtroCasado').checked;
+    let filtroSoltero = document.getElementById('filtroSoltero')?.checked;
+    let filtroCasado = document.getElementById('filtroCasado')?.checked;
     
-    let edadMin = document.getElementById('edadMin').value;
-    let edadMax = document.getElementById('edadMax').value;
-    let fechaDesde = document.getElementById('fechaIngresoDesde').value;
-    let fechaHasta = document.getElementById('fechaIngresoHasta').value;
+    let edadMin = document.getElementById('edadMin')?.value;
+    let edadMax = document.getElementById('edadMax')?.value;
+    let fechaDesde = document.getElementById('fechaIngresoDesde')?.value;
+    let fechaHasta = document.getElementById('fechaIngresoHasta')?.value;
     
     let carrerasSeleccionadas = [];
     let todasCarreras = document.getElementById('filtroTodasCarreras')?.checked;
     if (!todasCarreras) {
         document.querySelectorAll('.filtro-carrera:checked').forEach(cb => {
             if (cb.value !== 'todas') carrerasSeleccionadas.push(cb.value.toLowerCase());
+        });
+    }
+
+    let modalidadesSeleccionadas = [];
+    let todasModalidades = document.getElementById('filtroTodasModalidades')?.checked;
+    if (!todasModalidades) {
+        document.querySelectorAll('.filtro-modalidad:checked').forEach(cb => {
+            if (cb.value !== 'todas') modalidadesSeleccionadas.push(cb.value.toLowerCase());
         });
     }
     
@@ -779,6 +1130,28 @@ function aplicarFiltros() {
             if (cb.value !== 'todas') sedesSeleccionadas.push(cb.value.toLowerCase());
         });
     }
+
+    let turnosSeleccionados = [];
+    let todosTurnos = document.getElementById('filtroTodosTurnos')?.checked;
+    if (!todosTurnos) {
+        document.querySelectorAll('.filtro-turno:checked').forEach(cb => {
+            if (cb.value !== 'todos') turnosSeleccionados.push(cb.value.toLowerCase());
+        });
+    }
+
+    let estadosGeoSeleccionados = [];
+    let todosEstadosGeo = document.getElementById('filtroTodosEstadosGeo')?.checked;
+    if (!todosEstadosGeo) {
+        document.querySelectorAll('.filtro-estado-geo:checked').forEach(cb => {
+            if (cb.value !== 'todos') estadosGeoSeleccionados.push(cb.value.toLowerCase());
+        });
+    }
+
+    let todasCondiciones = document.getElementById('filtroTodasCondiciones')?.checked;
+    let filtroConDiscapacidad = document.getElementById('filtroConDiscapacidad')?.checked;
+    let filtroSinDiscapacidad = document.getElementById('filtroSinDiscapacidad')?.checked;
+    let filtroConEtnia = document.getElementById('filtroConEtnia')?.checked;
+    let filtroSinEtnia = document.getElementById('filtroSinEtnia')?.checked;
     
     filasFiltradas = todasLasFilas.filter(fila => {
         let textoFila = (fila.textContent || fila.innerText || '').toLowerCase();
@@ -789,14 +1162,45 @@ function aplicarFiltros() {
             let carrera = (fila.getAttribute('data-carrera') || '').toLowerCase();
             if (!carrerasSeleccionadas.includes(carrera)) return false;
         }
+
+        if (!todasModalidades && modalidadesSeleccionadas.length > 0) {
+            let modalidad = (fila.getAttribute('data-inscrito-por') || '').toLowerCase();
+            if (!modalidadesSeleccionadas.includes(modalidad)) return false;
+        }
+
         if (!todasCiudades && ciudadesSeleccionadas.length > 0) {
             let ciudad = (fila.getAttribute('data-ciudad') || '').toLowerCase();
             if (!ciudadesSeleccionadas.includes(ciudad)) return false;
         }
+
         if (!todasSedes && sedesSeleccionadas.length > 0) {
             let sede = (fila.getAttribute('data-sede') || '').toLowerCase();
             if (!sedesSeleccionadas.includes(sede)) return false;
         }
+
+        if (!todosTurnos && turnosSeleccionados.length > 0) {
+            let turno = (fila.getAttribute('data-turno') || '').toLowerCase();
+            if (!turnosSeleccionados.includes(turno)) return false;
+        }
+
+        if (!todosEstadosGeo && estadosGeoSeleccionados.length > 0) {
+            let estadoGeo = (fila.getAttribute('data-estado-geo') || '').toLowerCase();
+            if (!estadosGeoSeleccionados.includes(estadoGeo)) return false;
+        }
+
+        if (!todasCondiciones) {
+            if (filtroConDiscapacidad || filtroSinDiscapacidad) {
+                let tieneDisc = fila.getAttribute('data-tiene-discapacidad') || '0';
+                if (filtroConDiscapacidad && !filtroSinDiscapacidad && tieneDisc !== '1') return false;
+                if (filtroSinDiscapacidad && !filtroConDiscapacidad && tieneDisc !== '0') return false;
+            }
+            if (filtroConEtnia || filtroSinEtnia) {
+                let tieneEtn = fila.getAttribute('data-tiene-etnia') || '0';
+                if (filtroConEtnia && !filtroSinEtnia && tieneEtn !== '1') return false;
+                if (filtroSinEtnia && !filtroConEtnia && tieneEtn !== '0') return false;
+            }
+        }
+
         if (!todosGeneros && (filtroMasculino || filtroFemenino)) {
             let genero = (fila.getAttribute('data-genero') || '').toLowerCase();
             if (filtroMasculino && filtroFemenino) {}
@@ -1012,7 +1416,12 @@ function generarReportePDF() {
 
 document.getElementById('limpiarBusqueda').addEventListener('click', function() {
     document.getElementById('buscadorCedula').value = '';
-    ['filtroTodasCarreras', 'filtroTodosGeneros', 'filtroTodosEdoCivil', 'filtroTodosStatus', 'filtroTodasSedes', 'filtroTodasCiudades', 'filtroTodasEdades'].forEach(id => {
+    [
+        'filtroTodasCarreras', 'filtroTodasModalidades', 'filtroTodosGeneros', 
+        'filtroTodosEdoCivil', 'filtroTodosStatus', 'filtroTodasSedes', 
+        'filtroTodosTurnos', 'filtroTodosEstadosGeo', 'filtroTodasCiudades', 
+        'filtroTodasCondiciones', 'filtroTodasEdades'
+    ].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
             el.checked = true;

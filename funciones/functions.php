@@ -687,7 +687,8 @@ function insertarEstudiante($datos) {
             'edo_civil' => $datos['edo_civil'] ?? null,
             'fecha_nac' => $datos['fecha_nac'] ?? null,
             'num_telf_opc' => $datos['num_telf_opc'] ?? '',
-            'asignado_opsu' => (!empty($datos['asignado_opsu']) && $datos['asignado_opsu'] === 'Sí') ? 'Sí' : 'No',
+            'inscrito_por' => $datos['inscrito_por'] ?? ((!empty($datos['asignado_opsu']) && $datos['asignado_opsu'] === 'Sí') ? 'OPSU' : null),
+            'asignado_opsu' => (!empty($datos['inscrito_por']) && $datos['inscrito_por'] === 'OPSU') ? 'Sí' : ((!empty($datos['asignado_opsu']) && $datos['asignado_opsu'] === 'Sí') ? 'Sí' : 'No'),
             'lapso_opsu' => (!empty($datos['asignado_opsu']) && $datos['asignado_opsu'] === 'Sí') ? ($datos['lapso_opsu'] ?? null) : null,
             
             // Foto de perfil
@@ -1143,7 +1144,8 @@ function insertarPreinscripcion($datos) {
             'pais_titulo' => !empty($paisTitulos) ? implode('|||', $paisTitulos) : '',
             'legalizado_titulo' => !empty($legalizadoTitulos) ? implode('|||', $legalizadoTitulos) : '',
             'sede' => $datos['sede'] ?? null,
-            'asignado_opsu' => (!empty($datos['asignado_opsu']) && $datos['asignado_opsu'] === 'Sí') ? 'Sí' : 'No',
+            'inscrito_por' => $datos['inscrito_por'] ?? ((!empty($datos['asignado_opsu']) && $datos['asignado_opsu'] === 'Sí') ? 'OPSU' : null),
+            'asignado_opsu' => (!empty($datos['inscrito_por']) && $datos['inscrito_por'] === 'OPSU') ? 'Sí' : ((!empty($datos['asignado_opsu']) && $datos['asignado_opsu'] === 'Sí') ? 'Sí' : 'No'),
             'lapso_opsu' => (!empty($datos['asignado_opsu']) && $datos['asignado_opsu'] === 'Sí') ? trim($datos['lapso_opsu'] ?? '') : null,
             'turno' => $datos['turno'] ?? null,
             'id_periodo' => $idPeriodo,
@@ -2170,6 +2172,7 @@ function aceptarPreinscripcion($id, $adminId) {
         'embarazada' => $preinscripcion['embarazada'],
         'num_telf_opc' => $preinscripcion['num_telf_opc'],
         'fecha_ingreso' => $preinscripcion['fecha_ingreso'],
+        'inscrito_por' => $preinscripcion['inscrito_por'] ?? null,
         'asignado_opsu' => $preinscripcion['asignado_opsu'] ?? 'No',
         'lapso_opsu' => $preinscripcion['lapso_opsu'] ?? null,
         'status' => 1, // 🔥 CAMBIADO: 1 = Activo (entero, no string)
@@ -2376,8 +2379,10 @@ function validarEstudiante($datos) {
         }
     }
 
-    // Validar asignación OPSU
-    if (isset($datos['asignado_opsu']) && $datos['asignado_opsu'] === 'Sí' && empty($datos['lapso_opsu'])) {
+    // Validar modalidad Inscrito por
+    if (isset($datos['inscrito_por']) && empty(trim($datos['inscrito_por']))) {
+        $errores[] = 'Debe indicar la modalidad por la que fue asignado o inscrito (Inscrito por)';
+    } elseif (isset($datos['asignado_opsu']) && $datos['asignado_opsu'] === 'Sí' && empty($datos['lapso_opsu'])) {
         $errores[] = 'Debe indicar el lapso académico de asignación OPSU';
     }
     
