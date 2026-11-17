@@ -32,7 +32,7 @@ if ($resEst) {
     }
 }
 
-// Obtener TODOS los estudiantes con JOIN a ciudades y nuevos campos
+// Obtener TODOS los estudiantes con JOIN a ciudades, graduados y nuevos campos
 $query = "SELECT 
     u.id,
     u.idusuario,
@@ -61,9 +61,14 @@ $query = "SELECT
     u.etnia,
     u.inscrito_por,
     u.asignado_opsu,
-    c.ciudad as nombre_ciudad
+    u.fecha_graduacion as user_fecha_graduacion,
+    c.ciudad as nombre_ciudad,
+    g.id as id_graduado,
+    g.estado as estado_graduado,
+    g.fecha_graduacion as grad_fecha_graduacion
 FROM users u
 LEFT JOIN ciudades c ON u.ciudad = c.id_ciudad
+LEFT JOIN graduados g ON u.id = g.id_usuario
 WHERE u.estudiante = 1
 ORDER BY u.nombre ASC";
 
@@ -130,6 +135,13 @@ if ($result && $result->num_rows > 0) {
         $etn = strtolower(trim((string)($row['etnia'] ?? '')));
         $row['tiene_etnia'] = (!empty($etn) && !in_array($etn, ['ninguna', 'no especificado', 'no', '0']));
         
+        // Determinar condición: Estudiante Regular vs Egresado
+        $fechaGrad = !empty($row['grad_fecha_graduacion']) ? $row['grad_fecha_graduacion'] : (!empty($row['user_fecha_graduacion']) ? $row['user_fecha_graduacion'] : '');
+        $esEgresado = (!empty($row['id_graduado']) && in_array($row['estado_graduado'], ['graduado', 'titulo_entregado'])) || (!empty($fechaGrad) && $fechaGrad !== '0000-00-00');
+        $row['es_egresado'] = $esEgresado;
+        $row['tipo_alumno'] = $esEgresado ? 'egresado' : 'estudiante';
+        $row['fecha_graduacion'] = $fechaGrad;
+
         $estudiantes[] = $row;
     }
 }
@@ -179,6 +191,8 @@ if (empty($turnosUnicos)) $turnosUnicos = ['Diurno', 'Nocturno'];
 
 // Contar estudiantes y calcular estadísticas completas
 $totalEstudiantes = count($estudiantes);
+$totalEgresados = 0;
+$totalEstudiantesSolo = 0;
 $activos = 0;
 $inactivos = 0;
 $nuevosIngresos = 0;
@@ -199,6 +213,12 @@ $totalConEdad = 0;
 $anioActual = date('Y');
 
 foreach ($estudiantes as $estudiante) {
+    if (!empty($estudiante['es_egresado'])) {
+        $totalEgresados++;
+    } else {
+        $totalEstudiantesSolo++;
+    }
+
     $status = $estudiante['status'] ?? 0;
     if ($status == 1) {
         $activos++;
@@ -299,8 +319,11 @@ include("includes/head.php");
                             <button type="button" id="toggleFiltros" class="btn btn-outline-light btn-sm mb-1 mb-sm-0 me-2">
                                 <i class="fas fa-filter"></i> <span id="toggleFiltrosText">Ocultar Filtros</span>
                             </button>
-                            <button type="button" id="btnGenerarReporte" class="btn btn-danger btn-sm mb-1 mb-sm-0 me-2">
-                                <i class="fas fa-file-pdf"></i> Generar Reporte PDF
+                            <button type="button" id="btnReporteEstudiantes" class="btn btn-danger btn-sm mb-1 mb-sm-0 me-2" title="Generar Reporte Oficial de Estudiantes">
+                                <i class="fas fa-file-pdf me-1"></i> Lista de Estudiantes
+                            </button>
+                            <button type="button" id="btnReporteEgresados" class="btn btn-dark btn-sm mb-1 mb-sm-0 me-2" style="background-color: #3b093d; border-color: #2b062d;" title="Generar Reporte Oficial de Egresados y Graduados">
+                                <i class="fas fa-graduation-cap me-1"></i> Lista de Egresados
                             </button>
                             <?php if (tienePermiso('agregar_estudiante')): ?>
                                 <button type="button" class="btn btn-success btn-sm mb-1 mb-sm-0" onclick="abrirModalNuevoEstudiante()">
@@ -464,6 +487,16 @@ include("includes/head.php");
                                     </div>
                                 </div>
                             </div>
+                            <!-- Egresados / Graduados -->
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2 mb-3">
+                                <div class="card text-white h-100 shadow-sm border-0" style="background-color: #3b093d;">
+                                    <div class="card-body text-center p-2">
+                                        <i class="fas fa-graduation-cap fa-lg mb-1"></i>
+                                        <h4 class="card-title mb-0" id="statEgresados"><?php echo $totalEgresados; ?></h4>
+                                        <small class="card-text text-white-50">Egresados</small>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div id="filtrosContainer" class="row mb-4">
@@ -517,18 +550,22 @@ include("includes/head.php");
                                                     </div>
                                                 </div>
                                             </div>
-                                            <!-- Estado / Status -->
+                                            <!-- Estado / Status y Condición -->
                                             <div class="col-md-3 mb-3">
                                                 <div class="card h-100">
-                                                    <div class="card-header bg-light"><strong><i class="fas fa-user-check text-primary me-1"></i> Estado (Estatus)</strong></div>
+                                                    <div class="card-header bg-light"><strong><i class="fas fa-user-check text-primary me-1"></i> Estatus y Condición</strong></div>
                                                     <div class="card-body">
                                                         <div class="form-check">
                                                             <input class="form-check-input filtro-status-master" type="checkbox" value="todos" id="filtroTodosStatus" checked>
-                                                            <label class="form-check-label text-primary" for="filtroTodosStatus"><strong>Seleccionar Todos</strong></label>
+                                                            <label class="form-check-label text-primary" for="filtroTodosStatus"><strong>Todos los Estatus</strong></label>
                                                         </div>
                                                         <hr class="my-2">
                                                         <div class="form-check"><input class="form-check-input filtro-status" type="checkbox" value="activo" id="filtroActivo"><label class="form-check-label" for="filtroActivo">Activo</label></div>
                                                         <div class="form-check"><input class="form-check-input filtro-status" type="checkbox" value="inactivo" id="filtroInactivo"><label class="form-check-label" for="filtroInactivo">Inactivo</label></div>
+                                                        <hr class="my-2">
+                                                        <label class="small text-muted font-weight-bold d-block">Condición:</label>
+                                                        <div class="form-check"><input class="form-check-input filtro-tipo-alumno" type="checkbox" value="estudiante" id="filtroTipoEstudiante" checked><label class="form-check-label" for="filtroTipoEstudiante"><i class="fas fa-user-graduate text-primary me-1"></i> Estudiantes</label></div>
+                                                        <div class="form-check"><input class="form-check-input filtro-tipo-alumno" type="checkbox" value="egresado" id="filtroTipoEgresado" checked><label class="form-check-label" for="filtroTipoEgresado"><i class="fas fa-graduation-cap text-success me-1"></i> Egresados</label></div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -714,6 +751,37 @@ include("includes/head.php");
                             </div>
                         </div>
 
+                        <!-- SELECTOR / FILTRO RÁPIDO: ESTUDIANTES VS EGRESADOS -->
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center p-2 bg-light rounded border shadow-sm">
+                                    <div class="d-flex align-items-center flex-wrap gap-2">
+                                        <span class="text-muted small font-weight-bold"><i class="fas fa-filter text-primary me-1"></i> Filtrar por condición:</span>
+                                        <div class="btn-group btn-group-sm" role="group" id="btnGroupTipoAlumno">
+                                            <input type="radio" class="btn-check" name="quickTipoAlumno" id="quickTipoTodos" value="todos" autocomplete="off" checked>
+                                            <label class="btn btn-outline-primary" for="quickTipoTodos">
+                                                <i class="fas fa-users me-1"></i> Todos (<span id="countTodos"><?php echo count($estudiantes); ?></span>)
+                                            </label>
+
+                                            <input type="radio" class="btn-check" name="quickTipoAlumno" id="quickTipoEstudiantes" value="estudiante" autocomplete="off">
+                                            <label class="btn btn-outline-primary" for="quickTipoEstudiantes">
+                                                <i class="fas fa-user-graduate me-1"></i> Lista de Estudiantes (<span id="countEstudiantes"><?php echo $totalEstudiantesSolo; ?></span>)
+                                            </label>
+
+                                            <input type="radio" class="btn-check" name="quickTipoAlumno" id="quickTipoEgresados" value="egresado" autocomplete="off">
+                                            <label class="btn btn-outline-success" for="quickTipoEgresados">
+                                                <i class="fas fa-graduation-cap me-1"></i> Lista de Egresados (<span id="countEgresados"><?php echo $totalEgresados; ?></span>)
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="small text-muted mt-2 mt-md-0">
+                                        <span class="badge bg-primary me-1"><i class="fas fa-user-graduate"></i> Estudiante regular</span>
+                                        <span class="badge bg-success"><i class="fas fa-graduation-cap"></i> Egresado / Graduado</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="table-responsive">
                             <table class="table table-striped table-hover table-bordered" id="tablaEstudiantes">
                                 <thead class="table-dark">
@@ -724,6 +792,7 @@ include("includes/head.php");
                                         <th>Email</th>
                                         <th>Teléfono</th>
                                         <th>Carrera</th>
+                                        <th>Condición</th>
                                         <th>Modalidad</th>
                                         <th>Turno</th>
                                         <th>Género</th>
@@ -761,6 +830,8 @@ include("includes/head.php");
                                             data-email="<?php echo htmlspecialchars(strtolower($estudiante['email'] ?? '')); ?>"
                                             data-genero="<?php echo strtolower($estudiante['genero'] ?? ''); ?>"
                                             data-status="<?php echo $status; ?>"
+                                            data-tipo-alumno="<?php echo $estudiante['tipo_alumno']; ?>"
+                                            data-es-egresado="<?php echo $estudiante['es_egresado'] ? '1' : '0'; ?>"
                                             data-embarazada="<?php echo $estaEmbarazada ? '1' : '0'; ?>"
                                             data-edad="<?php echo $edad; ?>"
                                             data-menor="<?php echo $estudiante['es_menor'] ? '1' : '0'; ?>"
@@ -784,6 +855,17 @@ include("includes/head.php");
                                             <td><?php echo htmlspecialchars($estudiante['email'] ?? ''); ?></td>
                                             <td><?php echo htmlspecialchars($estudiante['tlf'] ?? $estudiante['cel'] ?? ''); ?></td>
                                             <td><?php echo htmlspecialchars($carrera); ?></td>
+                                            <td>
+                                                <?php if ($estudiante['es_egresado']): ?>
+                                                    <span class="badge bg-success" title="Graduado / Egresado<?php echo !empty($estudiante['fecha_graduacion']) ? ' (' . date('d/m/Y', strtotime($estudiante['fecha_graduacion'])) . ')' : ''; ?>">
+                                                        <i class="fas fa-graduation-cap me-1"></i> Egresado
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-primary" title="Estudiante Regular">
+                                                        <i class="fas fa-user-graduate me-1"></i> Estudiante
+                                                    </span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td><span class="badge bg-secondary"><?php echo htmlspecialchars($modalidad); ?></span></td>
                                             <td><?php echo htmlspecialchars($turno); ?></td>
                                             <td>
@@ -841,9 +923,29 @@ include("includes/head.php");
 <div class="modal fade" id="reporteModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-danger text-white"><h5 class="modal-title"><i class="fas fa-file-pdf me-2"></i> Generar Reporte de Estudiantes</h5><button type="button" class="close text-white" data-dismiss="modal">&times;</button></div>
-            <div class="modal-body"><div class="alert alert-info"><i class="fas fa-info-circle"></i> Se generará un reporte en PDF con los estudiantes actualmente filtrados.</div><div class="form-group"><label><i class="fas fa-chart-bar"></i> Incluir estadísticas</label><select id="incluirEstadisticas" class="form-control"><option value="si">Sí</option><option value="no">No</option></select></div></div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button><button type="button" id="btnGenerarPDF" class="btn btn-danger"><i class="fas fa-file-pdf"></i> Generar Reporte PDF</button></div>
+            <input type="hidden" id="reporteTipoSeleccionado" value="estudiantes">
+            <div class="modal-header bg-danger text-white" id="reporteModalHeader">
+                <h5 class="modal-title" id="reporteModalTitle"><i class="fas fa-file-pdf me-2"></i> Generar Reporte</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info" id="reporteModalAlert">
+                    <i class="fas fa-info-circle"></i> Se generará un reporte oficial en PDF con los registros actualmente filtrados.
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-chart-bar"></i> Incluir estadísticas y resumen</label>
+                    <select id="incluirEstadisticas" class="form-control">
+                        <option value="si">Sí (Recomendado)</option>
+                        <option value="no">No (Solo listado tabular)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="button" id="btnGenerarPDF" class="btn btn-danger">
+                    <i class="fas fa-file-pdf"></i> Descargar Reporte PDF
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -986,6 +1088,49 @@ function configurarFiltros() {
     document.querySelectorAll('.filtro-carrera, .filtro-modalidad, .filtro-ciudad, .filtro-sede, .filtro-turno, .filtro-estado-geo, .filtro-condicion, .filtro-genero, .filtro-edocivil, .filtro-status, .filtro-edad, .filtro').forEach(cb => {
         cb.addEventListener('change', aplicarFiltrosYActualizar);
     });
+
+    // Filtros de Condición: Estudiante vs Egresado
+    document.querySelectorAll('.filtro-tipo-alumno').forEach(cb => {
+        cb.addEventListener('change', function() {
+            const estCheck = document.getElementById('filtroTipoEstudiante')?.checked;
+            const egrCheck = document.getElementById('filtroTipoEgresado')?.checked;
+            const rTodos = document.getElementById('quickTipoTodos');
+            const rEst = document.getElementById('quickTipoEstudiantes');
+            const rEgr = document.getElementById('quickTipoEgresados');
+            if (estCheck && egrCheck) {
+                if (rTodos) rTodos.checked = true;
+            } else if (estCheck && !egrCheck) {
+                if (rEst) rEst.checked = true;
+            } else if (!estCheck && egrCheck) {
+                if (rEgr) rEgr.checked = true;
+            } else {
+                if (rTodos) rTodos.checked = false;
+                if (rEst) rEst.checked = false;
+                if (rEgr) rEgr.checked = false;
+            }
+            aplicarFiltrosYActualizar();
+        });
+    });
+
+    // Selector rápido superior: Todos / Lista de Estudiantes / Lista de Egresados
+    document.querySelectorAll('input[name="quickTipoAlumno"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const cbEst = document.getElementById('filtroTipoEstudiante');
+            const cbEgr = document.getElementById('filtroTipoEgresado');
+            if (this.value === 'todos') {
+                if (cbEst) cbEst.checked = true;
+                if (cbEgr) cbEgr.checked = true;
+            } else if (this.value === 'estudiante') {
+                if (cbEst) cbEst.checked = true;
+                if (cbEgr) cbEgr.checked = false;
+            } else if (this.value === 'egresado') {
+                if (cbEst) cbEst.checked = false;
+                if (cbEgr) cbEgr.checked = true;
+            }
+            aplicarFiltrosYActualizar();
+        });
+    });
+
     document.getElementById('edadMin').addEventListener('input', aplicarFiltrosYActualizar);
     document.getElementById('edadMax').addEventListener('input', aplicarFiltrosYActualizar);
     document.getElementById('fechaIngresoDesde').addEventListener('change', aplicarFiltrosYActualizar);
@@ -1007,9 +1152,14 @@ function actualizarEstadisticasDinamicas(filas) {
     let sumaEdad = 0, cantEdad = 0;
     let embarazadas = 0, conDiscapacidad = 0, conEtnia = 0, opsu = 0;
     let sedePC = 0, sedeCOEF = 0;
+    let egresados = 0, estudiantesSolo = 0;
     const anioActualStr = '<?php echo $anioActual; ?>';
 
     filas.forEach(f => {
+        const tipoAlumno = f.getAttribute('data-tipo-alumno') || 'estudiante';
+        if (tipoAlumno === 'egresado') egresados++;
+        else estudiantesSolo++;
+
         const status = f.getAttribute('data-status');
         if (status === '1') activos++;
         else if (status === '0') inactivos++;
@@ -1072,6 +1222,15 @@ function actualizarEstadisticasDinamicas(filas) {
     if (elSedePC) elSedePC.textContent = sedePC;
     const elSedeCOEF = document.getElementById('statSedeCOEF');
     if (elSedeCOEF) elSedeCOEF.textContent = sedeCOEF;
+    const elEgresados = document.getElementById('statEgresados');
+    if (elEgresados) elEgresados.textContent = egresados;
+
+    const elCountTodos = document.getElementById('countTodos');
+    if (elCountTodos) elCountTodos.textContent = total;
+    const elCountEst = document.getElementById('countEstudiantes');
+    if (elCountEst) elCountEst.textContent = estudiantesSolo;
+    const elCountEgr = document.getElementById('countEgresados');
+    if (elCountEgr) elCountEgr.textContent = egresados;
 }
 
 function aplicarFiltros() {
@@ -1085,6 +1244,9 @@ function aplicarFiltros() {
     let filtroActivo = document.getElementById('filtroActivo')?.checked;
     let filtroInactivo = document.getElementById('filtroInactivo')?.checked;
     
+    let filtroTipoEstudiante = document.getElementById('filtroTipoEstudiante')?.checked;
+    let filtroTipoEgresado = document.getElementById('filtroTipoEgresado')?.checked;
+
     let filtroEmbarazada = document.getElementById('filtroEmbarazada')?.checked;
     let todasEdades = document.getElementById('filtroTodasEdades')?.checked;
     let filtroMenor = document.getElementById('filtroMenor')?.checked;
@@ -1157,6 +1319,12 @@ function aplicarFiltros() {
         let textoFila = (fila.textContent || fila.innerText || '').toLowerCase();
 
         if (termino !== '' && !textoFila.includes(termino)) return false;
+
+        // Filtro por condición (Estudiante regular vs Egresado)
+        if (!filtroTipoEstudiante && !filtroTipoEgresado) return false;
+        let tipoAlumno = fila.getAttribute('data-tipo-alumno') || 'estudiante';
+        if (filtroTipoEstudiante && !filtroTipoEgresado && tipoAlumno !== 'estudiante') return false;
+        if (!filtroTipoEstudiante && filtroTipoEgresado && tipoAlumno !== 'egresado') return false;
         
         if (!todasCarreras && carrerasSeleccionadas.length > 0) {
             let carrera = (fila.getAttribute('data-carrera') || '').toLowerCase();
@@ -1380,11 +1548,75 @@ function getEstudiantesFiltrados() {
     return filasFiltradas.map(fila => fila.querySelector('.btn-details')?.getAttribute('data-id')).filter(id => id);
 }
 
+function getEstudiantesParaReporte(tipo) {
+    return filasFiltradas.filter(fila => {
+        const tipoAlumno = fila.getAttribute('data-tipo-alumno') || 'estudiante';
+        return (tipo === 'egresados') ? tipoAlumno === 'egresado' : tipoAlumno !== 'egresado';
+    }).map(fila => fila.querySelector('.btn-details')?.getAttribute('data-id')).filter(Boolean);
+}
+
+function abrirModalReporte(tipo) {
+    const inputTipo = document.getElementById('reporteTipoSeleccionado');
+    if (inputTipo) inputTipo.value = tipo;
+
+    const ids = getEstudiantesParaReporte(tipo);
+    const modalHeader = document.getElementById('reporteModalHeader');
+    const modalTitle = document.getElementById('reporteModalTitle');
+    const modalAlert = document.getElementById('reporteModalAlert');
+    const btnPDF = document.getElementById('btnGenerarPDF');
+
+    if (tipo === 'egresados') {
+        if (ids.length === 0) {
+            mostrarMensaje('Sin Egresados', 'No se encontraron egresados con los filtros aplicados. Sugerencia: active la opción de egresados o verifique los criterios.', false);
+            return;
+        }
+        if (modalHeader) {
+            modalHeader.className = 'modal-header text-white';
+            modalHeader.style.backgroundColor = '#3b093d';
+        }
+        if (modalTitle) modalTitle.innerHTML = '<i class="fas fa-graduation-cap me-2"></i> Reporte Oficial de Egresados y Graduados';
+        if (btnPDF) {
+            btnPDF.className = 'btn text-white';
+            btnPDF.style.backgroundColor = '#3b093d';
+            btnPDF.style.borderColor = '#2b062d';
+            btnPDF.innerHTML = '<i class="fas fa-file-pdf me-1"></i> Generar Reporte de Egresados PDF';
+        }
+        if (modalAlert) {
+            modalAlert.className = 'alert alert-info';
+            modalAlert.innerHTML = `<i class="fas fa-info-circle me-1"></i> Se generará el reporte oficial en PDF con los <strong>${ids.length}</strong> egresados y graduados seleccionados según los filtros activos.`;
+        }
+    } else {
+        if (ids.length === 0) {
+            mostrarMensaje('Sin Estudiantes', 'No se encontraron estudiantes con los filtros aplicados.', false);
+            return;
+        }
+        if (modalHeader) {
+            modalHeader.className = 'modal-header bg-danger text-white';
+            modalHeader.style.backgroundColor = '';
+        }
+        if (modalTitle) modalTitle.innerHTML = '<i class="fas fa-file-pdf me-2"></i> Reporte Oficial de Estudiantes';
+        if (btnPDF) {
+            btnPDF.className = 'btn btn-danger';
+            btnPDF.style.backgroundColor = '';
+            btnPDF.style.borderColor = '';
+            btnPDF.innerHTML = '<i class="fas fa-file-pdf me-1"></i> Generar Reporte de Estudiantes PDF';
+        }
+        if (modalAlert) {
+            modalAlert.className = 'alert alert-info';
+            modalAlert.innerHTML = `<i class="fas fa-info-circle me-1"></i> Se generará el reporte oficial en PDF con los <strong>${ids.length}</strong> estudiantes seleccionados según los filtros activos.`;
+        }
+    }
+
+    $('#reporteModal').modal('show');
+}
+
 function generarReportePDF() {
-    let estudiantesIds = getEstudiantesFiltrados();
-    let incluirEstadisticas = document.getElementById('incluirEstadisticas').value;
+    const tipoReporte = document.getElementById('reporteTipoSeleccionado')?.value || 'estudiantes';
+    const estudiantesIds = getEstudiantesParaReporte(tipoReporte);
+    const incluirEstadisticas = document.getElementById('incluirEstadisticas').value;
+
     if (estudiantesIds.length === 0) {
-        mostrarMensaje('Sin resultados', 'No hay estudiantes con los filtros seleccionados', false);
+        mostrarMensaje('Sin resultados', 'No hay registros para generar el reporte con los filtros seleccionados', false);
         return;
     }
 
@@ -1406,6 +1638,12 @@ function generarReportePDF() {
     inputEstadisticas.name = 'estadisticas';
     inputEstadisticas.value = incluirEstadisticas;
     form.appendChild(inputEstadisticas);
+
+    const inputTipo = document.createElement('input');
+    inputTipo.type = 'hidden';
+    inputTipo.name = 'tipo_reporte';
+    inputTipo.value = tipoReporte;
+    form.appendChild(inputTipo);
 
     document.body.appendChild(form);
     form.submit();
@@ -1429,6 +1667,15 @@ document.getElementById('limpiarBusqueda').addEventListener('click', function() 
         }
     });
     document.querySelectorAll('.filtro').forEach(cb => cb.checked = false);
+
+    // Restaurar filtros de condición
+    const cbEst = document.getElementById('filtroTipoEstudiante');
+    const cbEgr = document.getElementById('filtroTipoEgresado');
+    const rTodos = document.getElementById('quickTipoTodos');
+    if (cbEst) cbEst.checked = true;
+    if (cbEgr) cbEgr.checked = true;
+    if (rTodos) rTodos.checked = true;
+
     document.getElementById('edadMin').value = '';
     document.getElementById('edadMax').value = '';
     document.getElementById('fechaIngresoDesde').value = '';
@@ -1436,13 +1683,26 @@ document.getElementById('limpiarBusqueda').addEventListener('click', function() 
     aplicarFiltrosYActualizar();
 });
 
-document.getElementById('btnGenerarReporte').addEventListener('click', function() {
-    if (getEstudiantesFiltrados().length === 0) {
-        mostrarMensaje('Sin resultados', 'No hay estudiantes con los filtros seleccionados', false);
-        return;
-    }
-    $('#reporteModal').modal('show');
-});
+const btnReporteEst = document.getElementById('btnReporteEstudiantes');
+if (btnReporteEst) {
+    btnReporteEst.addEventListener('click', function() {
+        abrirModalReporte('estudiantes');
+    });
+}
+
+const btnReporteEgr = document.getElementById('btnReporteEgresados');
+if (btnReporteEgr) {
+    btnReporteEgr.addEventListener('click', function() {
+        abrirModalReporte('egresados');
+    });
+}
+
+const btnGenReporteLegacy = document.getElementById('btnGenerarReporte');
+if (btnGenReporteLegacy) {
+    btnGenReporteLegacy.addEventListener('click', function() {
+        abrirModalReporte('estudiantes');
+    });
+}
 
 document.getElementById('btnGenerarPDF').addEventListener('click', generarReportePDF);
 document.getElementById('toggleFiltros').addEventListener('click', toggleFiltros);

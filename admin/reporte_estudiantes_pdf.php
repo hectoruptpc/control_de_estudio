@@ -20,6 +20,7 @@ verificarPermiso('ver_estudiantes');
 // Parámetros filtrados (priorizando POST, fallback GET)
 $ids = $_POST['ids'] ?? $_GET['ids'] ?? '';
 $incluirEstadisticas = trim($_POST['estadisticas'] ?? $_GET['estadisticas'] ?? 'si');
+$tipoReporte = trim($_POST['tipo_reporte'] ?? $_GET['tipo_reporte'] ?? 'estudiantes');
 $admin_nombre = $_SESSION['user']['nombre'] ?? 'Administrador';
 
-generarPDFReporteEstudiantes($ids, $incluirEstadisticas, $admin_nombre);
+generarPDFReporteEstudiantes($ids, $incluirEstadisticas, $admin_nombre, $tipoReporte);
