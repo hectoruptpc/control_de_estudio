@@ -89,6 +89,7 @@ if (!class_exists('HistorialPDF')) {
  * @param string $tipo 'tsu' | 'ingenieria' | 'graduando' | 'desglosado'
  * @param int $estudiante_id ID del estudiante
  */
+if (!function_exists('generarPDFHistorialDesglozado')) {
 function generarPDFHistorialDesglozado($tipo = 'tsu', $estudiante_id = 0) {
     global $db;
 
@@ -596,4 +597,5 @@ function generarPDFHistorialDesglozado($tipo = 'tsu', $estudiante_id = 0) {
 
     $pdf->Output('I', $nombre_archivo);
     exit;
+}
 }

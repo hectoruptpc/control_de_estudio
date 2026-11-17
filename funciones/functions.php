@@ -15635,113 +15635,30 @@ function es_apto_para_grado($estudiante_id) {
         }
         
         $estudiante = mysqli_fetch_assoc($result_estudiante);
-        $carrera_id = $estudiante['carrera'];
+        $carrera_id = intval($estudiante['carrera']);
         $nombre_carrera = $estudiante['nombre_carrera'] ?: 'Carrera ' . $carrera_id;
         
-        // 2. Obtener todas las materias de la carrera (para evaluación completa)
-        $query_materias_completo = "SELECT m.id_materia, m.trayecto, m.creditos
-                                   FROM carrera_materia cm
-                                   INNER JOIN materias m ON cm.id_materia = m.id_materia
-                                   WHERE cm.id_carrera = '$carrera_id' 
-                                   AND m.activa = 1
-                                   ORDER BY m.trayecto";
-        
-        $result_materias_completo = mysqli_query($db, $query_materias_completo);
-        $total_materias_carrera = mysqli_num_rows($result_materias_completo);
-        
-        if ($total_materias_carrera === 0) {
-            return [
-                'apto_tsu' => false,
-                'apto_grado_completo' => false,
-                'materias_aprobadas_tsu' => 0,
-                'total_materias_tsu' => 0,
-                'porcentaje_tsu' => 0,
-                'creditos_aprobados_tsu' => 0,
-                'materias_aprobadas_completo' => 0,
-                'total_materias_carrera' => 0,
-                'porcentaje_completo' => 0,
-                'creditos_aprobados_completo' => 0,
-                'requisitos_adicionales' => false,
-                'carrera' => $nombre_carrera
-            ];
+        $info_consulta = esAptoParaGradoConsulta($estudiante_id, $carrera_id);
+        if ($info_consulta) {
+            $info_consulta['carrera'] = $nombre_carrera;
+            $info_consulta['creditos_aprobados_tsu'] = $info_consulta['creditos_aprobados_tsu'] ?? 0;
+            $info_consulta['creditos_aprobados_completo'] = $info_consulta['creditos_aprobados_completo'] ?? 0;
+            $info_consulta['requisitos_adicionales'] = true;
+            return $info_consulta;
         }
-        
-        // 3. Obtener solo materias de TSU (trayectos 0, 1, 2)
-        $query_materias_tsu = "SELECT m.id_materia, m.trayecto, m.creditos
-                              FROM carrera_materia cm
-                              INNER JOIN materias m ON cm.id_materia = m.id_materia
-                              WHERE cm.id_carrera = '$carrera_id' 
-                              AND m.trayecto IN (0, 1, 2)
-                              AND m.activa = 1";
-        
-        $result_materias_tsu = mysqli_query($db, $query_materias_tsu);
-        $total_materias_tsu = mysqli_num_rows($result_materias_tsu);
-        
-        // 4. Contar materias aprobadas para TSU
-        $materias_aprobadas_tsu = 0;
-        $creditos_aprobados_tsu = 0;
-        
-        if ($result_materias_tsu) {
-            mysqli_data_seek($result_materias_tsu, 0);
-            while ($materia = mysqli_fetch_assoc($result_materias_tsu)) {
-                $materia_id = $materia['id_materia'];
-                $trayecto = $materia['trayecto'];
-                $creditos = $materia['creditos'] ?: 3;
-                
-                if (tiene_materia_aprobada($estudiante_id, $materia_id, $trayecto)) {
-                    $materias_aprobadas_tsu++;
-                    $creditos_aprobados_tsu += $creditos;
-                }
-            }
-        }
-        
-        // 5. Contar materias aprobadas para carrera completa
-        $materias_aprobadas_completo = 0;
-        $creditos_aprobados_completo = 0;
-        
-        mysqli_data_seek($result_materias_completo, 0);
-        while ($materia = mysqli_fetch_assoc($result_materias_completo)) {
-            $materia_id = $materia['id_materia'];
-            $trayecto = $materia['trayecto'];
-            $creditos = $materia['creditos'] ?: 3;
-            
-            if (tiene_materia_aprobada($estudiante_id, $materia_id, $trayecto)) {
-                $materias_aprobadas_completo++;
-                $creditos_aprobados_completo += $creditos;
-            }
-        }
-        
-        // 6. Verificar requisitos adicionales
-        $requisitos_adicionales_cumplidos = verificar_requisitos_adicionales($estudiante_id);
-        
-        // 7. Determinar estados
-        $porcentaje_tsu = $total_materias_tsu > 0 ? ($materias_aprobadas_tsu / $total_materias_tsu) * 100 : 0;
-        $porcentaje_completo = $total_materias_carrera > 0 ? ($materias_aprobadas_completo / $total_materias_carrera) * 100 : 0;
-        
-        // Para TSU: 90% de materias aprobadas + requisitos adicionales
-        $apto_tsu = ($porcentaje_tsu >= 90) && $requisitos_adicionales_cumplidos;
-        
-        // Para Grado Completo: 100% de materias aprobadas + requisitos adicionales
-        $apto_grado_completo = ($porcentaje_completo >= 100) && $requisitos_adicionales_cumplidos;
         
         return [
-            'apto_tsu' => $apto_tsu,
-            'apto_grado_completo' => $apto_grado_completo,
-            
-            // Estadísticas TSU
-            'materias_aprobadas_tsu' => $materias_aprobadas_tsu,
-            'total_materias_tsu' => $total_materias_tsu,
-            'porcentaje_tsu' => round($porcentaje_tsu, 1),
-            'creditos_aprobados_tsu' => $creditos_aprobados_tsu,
-            
-            // Estadísticas carrera completa
-            'materias_aprobadas_completo' => $materias_aprobadas_completo,
-            'total_materias_carrera' => $total_materias_carrera,
-            'porcentaje_completo' => round($porcentaje_completo, 1),
-            'creditos_aprobados_completo' => $creditos_aprobados_completo,
-            
-            // Información general
-            'requisitos_adicionales' => $requisitos_adicionales_cumplidos,
+            'apto_tsu' => false,
+            'apto_grado_completo' => false,
+            'materias_aprobadas_tsu' => 0,
+            'total_materias_tsu' => 0,
+            'porcentaje_tsu' => 0,
+            'creditos_aprobados_tsu' => 0,
+            'materias_aprobadas_completo' => 0,
+            'total_materias_carrera' => 0,
+            'porcentaje_completo' => 0,
+            'creditos_aprobados_completo' => 0,
+            'requisitos_adicionales' => false,
             'carrera' => $nombre_carrera
         ];
         
@@ -19518,6 +19435,237 @@ function obtenerTotalPagosDelDia() {
         return (float)($row['total'] ?? 0);
     }
     return 0.00;
+}
+
+/**
+ * Obtener pagos filtrados por rango de fechas y criterios adicionales (Estado, Concepto, Método)
+ */
+function obtenerPagosPorRangoFechas($fecha_inicio, $fecha_fin, $filtro_status = '', $filtro_tipo = '', $filtro_metodo = '', $orden = 'DESC') {
+    global $db;
+    
+    $fecha_inicio = trim($fecha_inicio ?? '');
+    $fecha_fin    = trim($fecha_fin ?? '');
+    
+    if (empty($fecha_inicio)) {
+        $fecha_inicio = '2020-01-01';
+    }
+    if (empty($fecha_fin)) {
+        $fecha_fin = date('Y-m-d');
+    }
+    
+    // Normalizar si la fecha de inicio es mayor que la de fin
+    if ($fecha_inicio > $fecha_fin) {
+        $temp = $fecha_inicio;
+        $fecha_inicio = $fecha_fin;
+        $fecha_fin = $temp;
+    }
+    
+    $where = ["(COALESCE(NULLIF(p.fecha_transaccion, '0000-00-00'), DATE(p.fecha_pago)) BETWEEN ? AND ?)"];
+    $params = [$fecha_inicio, $fecha_fin];
+    $types = "ss";
+    
+    if (!empty($filtro_status)) {
+        $where[] = "p.status_pago = ?";
+        $params[] = $filtro_status;
+        $types .= "s";
+    }
+    
+    if (!empty($filtro_tipo)) {
+        $where[] = "(p.tipo_pago = ? OR p.tipo_pago = ?)";
+        $params[] = $filtro_tipo;
+        $params[] = $filtro_tipo;
+        $types .= "ss";
+    }
+    
+    if (!empty($filtro_metodo)) {
+        $where[] = "p.metodo_pago = ?";
+        $params[] = $filtro_metodo;
+        $types .= "s";
+    }
+    
+    $where_sql = "WHERE " . implode(" AND ", $where);
+    $orden_sql = ($orden === 'ASC') ? "ORDER BY fecha_efectiva ASC, p.id ASC" : "ORDER BY fecha_efectiva DESC, p.id DESC";
+    
+    $query = "SELECT p.*, 
+                     COALESCE(NULLIF(p.fecha_transaccion, '0000-00-00'), DATE(p.fecha_pago)) as fecha_efectiva,
+                     u.nombre as nombre_estudiante, 
+                     u.idusuario as cedula, 
+                     u.email as email_estudiante,
+                     COALESCE(c.nombre_carrera, 'Sin Carrera') as nombre_carrera,
+                     COALESCE(tp.tipopago, p.otro_concepto, 'Arancel') as nombre_tipo_pago,
+                     COALESCE(ur.nombre, 'Sistema') as nombre_registrador,
+                     b.nombre_banco as nombre_banco_destino,
+                     b.numero_cuenta as cuenta_banco_destino,
+                     b.telefono_pago_movil as telefono_banco_destino
+              FROM pagos p
+              INNER JOIN users u ON p.estudiante_id = u.id
+              LEFT JOIN carreras c ON u.carrera = c.id_carrera
+              LEFT JOIN tipo_pago tp ON (p.tipo_pago = tp.id OR p.tipo_pago = tp.tipopago)
+              LEFT JOIN users ur ON p.registrado_por = ur.id
+              LEFT JOIN bancos b ON p.banco_destino_id = b.id
+              {$where_sql}
+              {$orden_sql}";
+              
+    $stmt = $db->prepare($query);
+    if (!$stmt) return [];
+    
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $pagos = [];
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $pagos[] = $row;
+        }
+    }
+    $stmt->close();
+    return $pagos;
+}
+
+/**
+ * Obtener total monetario de pagos por rango de fechas
+ */
+function obtenerTotalPagosPorRangoFechas($fecha_inicio, $fecha_fin, $filtro_status = 'aprobado', $filtro_tipo = '', $filtro_metodo = '') {
+    global $db;
+    
+    $fecha_inicio = trim($fecha_inicio ?? '');
+    $fecha_fin    = trim($fecha_fin ?? '');
+    
+    if (empty($fecha_inicio)) $fecha_inicio = '2020-01-01';
+    if (empty($fecha_fin)) $fecha_fin = date('Y-m-d');
+    
+    if ($fecha_inicio > $fecha_fin) {
+        $temp = $fecha_inicio;
+        $fecha_inicio = $fecha_fin;
+        $fecha_fin = $temp;
+    }
+    
+    $where = ["(COALESCE(NULLIF(p.fecha_transaccion, '0000-00-00'), DATE(p.fecha_pago)) BETWEEN ? AND ?)"];
+    $params = [$fecha_inicio, $fecha_fin];
+    $types = "ss";
+    
+    if (!empty($filtro_status)) {
+        $where[] = "p.status_pago = ?";
+        $params[] = $filtro_status;
+        $types .= "s";
+    }
+    
+    if (!empty($filtro_tipo)) {
+        $where[] = "(p.tipo_pago = ? OR p.tipo_pago = ?)";
+        $params[] = $filtro_tipo;
+        $params[] = $filtro_tipo;
+        $types .= "ss";
+    }
+    
+    if (!empty($filtro_metodo)) {
+        $where[] = "p.metodo_pago = ?";
+        $params[] = $filtro_metodo;
+        $types .= "s";
+    }
+    
+    $where_sql = "WHERE " . implode(" AND ", $where);
+    $query = "SELECT SUM(p.monto) as total FROM pagos p {$where_sql}";
+    
+    $stmt = $db->prepare($query);
+    if (!$stmt) return 0.00;
+    
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
+    $stmt->close();
+    
+    return (float)($row['total'] ?? 0);
+}
+
+/**
+ * Obtener estadísticas completas de pagos por rango de fechas (resumen por método, concepto y día a día)
+ */
+function obtenerEstadisticasPagosRango($fecha_inicio, $fecha_fin, $filtro_status = '', $filtro_tipo = '', $filtro_metodo = '') {
+    $pagos = obtenerPagosPorRangoFechas($fecha_inicio, $fecha_fin, $filtro_status, $filtro_tipo, $filtro_metodo, 'ASC');
+    
+    $stats = [
+        'total_recaudado'    => 0.0, // Solo aprobados
+        'total_monto'        => 0.0, // Total general
+        'total_operaciones'  => count($pagos),
+        'aprobados_cant'     => 0,
+        'aprobados_monto'    => 0.0,
+        'pendientes_cant'    => 0,
+        'pendientes_monto'   => 0.0,
+        'rechazados_cant'    => 0,
+        'rechazados_monto'   => 0.0,
+        'por_metodo'         => [],
+        'por_concepto'       => [],
+        'por_fecha'          => []
+    ];
+    
+    foreach ($pagos as $p) {
+        $monto    = (float)($p['monto'] ?? 0);
+        $status   = $p['status_pago'] ?? 'pendiente';
+        $metodo   = trim($p['metodo_pago'] ?? '') ?: 'No especificado';
+        $concepto = trim($p['nombre_tipo_pago'] ?? '') ?: 'Arancel';
+        $fecha    = $p['fecha_efectiva'] ?: date('Y-m-d', strtotime($p['fecha_pago']));
+        
+        $stats['total_monto'] += $monto;
+        
+        if ($status === 'aprobado') {
+            $stats['aprobados_cant']++;
+            $stats['aprobados_monto'] += $monto;
+            $stats['total_recaudado'] += $monto;
+        } elseif ($status === 'rechazado') {
+            $stats['rechazados_cant']++;
+            $stats['rechazados_monto'] += $monto;
+        } else {
+            $stats['pendientes_cant']++;
+            $stats['pendientes_monto'] += $monto;
+        }
+        
+        // Por método
+        if (!isset($stats['por_metodo'][$metodo])) {
+            $stats['por_metodo'][$metodo] = ['cantidad' => 0, 'monto' => 0.0, 'aprobado' => 0.0];
+        }
+        $stats['por_metodo'][$metodo]['cantidad']++;
+        $stats['por_metodo'][$metodo]['monto'] += $monto;
+        if ($status === 'aprobado') {
+            $stats['por_metodo'][$metodo]['aprobado'] += $monto;
+        }
+        
+        // Por concepto
+        if (!isset($stats['por_concepto'][$concepto])) {
+            $stats['por_concepto'][$concepto] = ['cantidad' => 0, 'monto' => 0.0, 'aprobado' => 0.0];
+        }
+        $stats['por_concepto'][$concepto]['cantidad']++;
+        $stats['por_concepto'][$concepto]['monto'] += $monto;
+        if ($status === 'aprobado') {
+            $stats['por_concepto'][$concepto]['aprobado'] += $monto;
+        }
+        
+        // Por fecha (Día a día / Fecha por fecha)
+        if (!isset($stats['por_fecha'][$fecha])) {
+            $stats['por_fecha'][$fecha] = [
+                'fecha'     => $fecha,
+                'cantidad'  => 0,
+                'total_dia' => 0.0,
+                'aprobado'  => 0.0,
+                'pagos'     => []
+            ];
+        }
+        $stats['por_fecha'][$fecha]['cantidad']++;
+        $stats['por_fecha'][$fecha]['total_dia'] += $monto;
+        if ($status === 'aprobado') {
+            $stats['por_fecha'][$fecha]['aprobado'] += $monto;
+        }
+        $stats['por_fecha'][$fecha]['pagos'][] = $p;
+    }
+    
+    // Alias para compatibilidad de vistas
+    $stats['total_transacciones'] = $stats['total_operaciones'];
+    $stats['aprobados_count']     = $stats['aprobados_cant'];
+    $stats['pendientes_count']    = $stats['pendientes_cant'];
+    $stats['rechazados_count']    = $stats['rechazados_cant'];
+    
+    return $stats;
 }
 
 
@@ -26889,3 +27037,846 @@ function obtenerCarrerasParaCambio($id_carrera_actual = 0) {
     }
     return $carreras;
 }
+
+/**
+ * ==============================================================================
+ * GESTIÓN INTEGRAL DE SOLICITUDES Y SECCIONES ESPECIALES (PER, INTENSIVO, SUFICIENCIA, EXTRAORDINARIO)
+ * ==============================================================================
+ */
+
+/**
+ * Obtener materias cursadas no aprobadas elegibles para curso Intensivo (T)
+ */
+function obtenerMateriasAptasIntensivo($estudiante_id) {
+    global $db;
+    $estudiante_id = intval($estudiante_id);
+    if ($estudiante_id <= 0) return [];
+    
+    $carrera = obtenerCarreraEstudiante($estudiante_id);
+    if (!$carrera) return [];
+    
+    $materias_carrera_res = obtenerMateriasCarrera($carrera['id_carrera']);
+    $materias_info = [];
+    if ($materias_carrera_res) {
+        while ($m = $materias_carrera_res->fetch_assoc()) {
+            $materias_info[intval($m['id_materia'])] = $m;
+        }
+    }
+    
+    $historial = obtenerHistorialCompletoNotasEstudiante($estudiante_id);
+    $aptas = [];
+    
+    foreach ($materias_info as $mid => $mat) {
+        $es_proyecto = (!empty($mat['es_proyecto_socio']) && $mat['es_proyecto_socio'] == 1) 
+                       || stripos($mat['nombre_materia'] ?? '', 'proyecto') !== false;
+                       
+        // Si ya está aprobada, no aplica
+        if (esMateriaAprobadaEstudiante($estudiante_id, $mid, $es_proyecto)) continue;
+        
+        // Debe haberla visto/cursado previamente
+        if (empty($historial[$mid])) continue;
+        
+        $ultimo = end($historial[$mid]);
+        $aptas[] = [
+            'id_materia' => $mid,
+            'cod_materia' => $mat['cod_materia'],
+            'nombre_materia' => $mat['nombre_materia'],
+            'trayecto' => intval($mat['trayecto'] ?? 0),
+            'creditos' => intval($mat['creditos'] ?? 0),
+            'nota_anterior' => $ultimo['nota_final'] ?? 0,
+            'periodo_anterior' => $ultimo['nombre_periodo'] ?? '-'
+        ];
+    }
+    
+    return $aptas;
+}
+
+/**
+ * Obtener materias de la carrera elegibles para Examen de Suficiencia (S)
+ * Límite: Máximo 2 por año lectivo al inicio de trayecto
+ */
+function obtenerMateriasAptasSuficiencia($estudiante_id) {
+    global $db;
+    $estudiante_id = intval($estudiante_id);
+    if ($estudiante_id <= 0) return ['aptas' => [], 'puede_solicitar' => false, 'suficiencias_este_ano' => 0];
+    
+    $carrera = obtenerCarreraEstudiante($estudiante_id);
+    if (!$carrera) return ['aptas' => [], 'puede_solicitar' => false, 'suficiencias_este_ano' => 0];
+    
+    // Contar cuántas suficiencias ha presentado o solicitado este año lectivo
+    $ano_actual = date('Y');
+    $q_ano = "SELECT COUNT(*) as total FROM solicitudes_academicas 
+              WHERE estudiante_id = ? AND tipo_solicitud = 'suficiencia' 
+              AND status IN ('pendiente', 'aprobada') 
+              AND YEAR(fecha_solicitud) = ?";
+    $stmt_a = $db->prepare($q_ano);
+    $stmt_a->bind_param("ii", $estudiante_id, $ano_actual);
+    $stmt_a->execute();
+    $res_a = $stmt_a->get_result();
+    $row_a = $res_a->fetch_assoc();
+    $suficiencias_este_ano = intval($row_a['total'] ?? 0);
+    $stmt_a->close();
+    
+    $materias_carrera_res = obtenerMateriasCarrera($carrera['id_carrera']);
+    $aptas = [];
+    if ($materias_carrera_res) {
+        while ($mat = $materias_carrera_res->fetch_assoc()) {
+            $mid = intval($mat['id_materia']);
+            $es_proyecto = (!empty($mat['es_proyecto_socio']) && $mat['es_proyecto_socio'] == 1) 
+                           || stripos($mat['nombre_materia'] ?? '', 'proyecto') !== false;
+            if (esMateriaAprobadaEstudiante($estudiante_id, $mid, $es_proyecto)) continue;
+            
+            $aptas[] = [
+                'id_materia' => $mid,
+                'cod_materia' => $mat['cod_materia'],
+                'nombre_materia' => $mat['nombre_materia'],
+                'trayecto' => intval($mat['trayecto'] ?? 0),
+                'creditos' => intval($mat['creditos'] ?? 0)
+            ];
+        }
+    }
+    
+    return [
+        'aptas' => $aptas,
+        'suficiencias_este_ano' => $suficiencias_este_ano,
+        'puede_solicitar' => ($suficiencias_este_ano < 2)
+    ];
+}
+
+/**
+ * Registra una solicitud de evaluación especial (PER, Intensivo, Suficiencia, Extraordinario)
+ */
+function registrarSolicitudEvaluacionEspecial($estudiante_id, $tipo_solicitud, $materias, $motivo = '') {
+    global $db;
+    
+    $estudiante_id = intval($estudiante_id);
+    $tipo_solicitud = strtolower(trim($tipo_solicitud));
+    if ($estudiante_id <= 0 || !in_array($tipo_solicitud, ['per', 'intensivo', 'suficiencia', 'extraordinario'])) {
+        return ['success' => false, 'mensaje' => 'Parámetros de solicitud no válidos.'];
+    }
+    
+    if (empty($materias) || !is_array($materias)) {
+        return ['success' => false, 'mensaje' => 'Debe seleccionar al menos una asignatura.'];
+    }
+    
+    $carrera = obtenerCarreraEstudiante($estudiante_id);
+    if (!$carrera) {
+        return ['success' => false, 'mensaje' => 'El estudiante no tiene una carrera asociada.'];
+    }
+    $id_carrera = intval($carrera['id_carrera']);
+    
+    $periodo = obtenerPeriodoActivo();
+    $id_periodo = intval($periodo['id_periodo'] ?? 0);
+    if ($id_periodo <= 0) {
+        return ['success' => false, 'mensaje' => 'No hay un período académico activo configurado.'];
+    }
+    
+    // Validaciones específicas según modalidad
+    if ($tipo_solicitud === 'per') {
+        if (count($materias) > 3) {
+            return ['success' => false, 'mensaje' => 'El Plan Especial de Recuperación (PER) permite un máximo de 3 asignaturas.'];
+        }
+        $aptas_per = obtenerMateriasAptasPER($estudiante_id);
+        $aptas_ids = array_column($aptas_per, 'id_materia');
+        foreach ($materias as $m) {
+            $mid = intval(is_array($m) ? ($m['id_materia'] ?? 0) : $m);
+            if (!in_array($mid, $aptas_ids)) {
+                return ['success' => false, 'mensaje' => 'Una o más asignaturas seleccionadas no cumplen los requisitos de PER (debe tener entre 6 y 11 pts, no ser T0 ni Proyecto).'];
+            }
+        }
+    } elseif ($tipo_solicitud === 'extraordinario') {
+        $val_ext = esAptoExtraordinario($estudiante_id);
+        if (!$val_ext['apto']) {
+            return ['success' => false, 'mensaje' => $val_ext['mensaje'] ?? 'No cumple los requisitos para Examen Extraordinario.'];
+        }
+    } elseif ($tipo_solicitud === 'intensivo') {
+        $aptas_int = obtenerMateriasAptasIntensivo($estudiante_id);
+        $aptas_ids = array_column($aptas_int, 'id_materia');
+        foreach ($materias as $m) {
+            $mid = intval(is_array($m) ? ($m['id_materia'] ?? 0) : $m);
+            if (!in_array($mid, $aptas_ids)) {
+                return ['success' => false, 'mensaje' => 'Para curso intensivo debe haber cursado previamente la asignatura sin haberla aprobado.'];
+            }
+        }
+    } elseif ($tipo_solicitud === 'suficiencia') {
+        $info_suf = obtenerMateriasAptasSuficiencia($estudiante_id);
+        if (!$info_suf['puede_solicitar']) {
+            return ['success' => false, 'mensaje' => 'Ha alcanzado el límite de 2 exámenes de suficiencia permitidos por año lectivo.'];
+        }
+    }
+    
+    // Normalizar arreglo de materias completas
+    $materias_data = [];
+    foreach ($materias as $m) {
+        $mid = intval(is_array($m) ? ($m['id_materia'] ?? 0) : $m);
+        $info_m = obtenerInfoMateria($mid);
+        if ($info_m) {
+            $materias_data[] = [
+                'id_materia' => $mid,
+                'cod_materia' => $info_m['cod_materia'],
+                'nombre_materia' => $info_m['nombre_materia'],
+                'trayecto' => intval($info_m['trayecto'] ?? 0),
+                'creditos' => intval($info_m['creditos'] ?? 0)
+            ];
+        }
+    }
+    
+    // Verificar si ya tiene una solicitud pendiente para la misma materia y modalidad
+    $primera_materia_id = $materias_data[0]['id_materia'] ?? 0;
+    $chk = $db->prepare("SELECT id FROM solicitudes_academicas 
+                         WHERE estudiante_id = ? AND tipo_solicitud = ? AND status = 'pendiente' 
+                         AND id_periodo = ? AND materias_data LIKE ? LIMIT 1");
+    $like_materia = '%"id_materia":' . $primera_materia_id . '%';
+    $chk->bind_param("isis", $estudiante_id, $tipo_solicitud, $id_periodo, $like_materia);
+    $chk->execute();
+    $res_chk = $chk->get_result();
+    if ($res_chk && $res_chk->num_rows > 0) {
+        $chk->close();
+        return ['success' => false, 'mensaje' => 'Ya posees una solicitud pendiente para esta modalidad y asignatura.'];
+    }
+    $chk->close();
+    
+    $materias_json = json_encode($materias_data);
+    $motivo_final = !empty($motivo) ? trim($motivo) : ("Solicitud de evaluación especial: " . strtoupper($tipo_solicitud));
+    
+    $stmt = $db->prepare("INSERT INTO solicitudes_academicas 
+        (estudiante_id, tipo_solicitud, accion, id_periodo, id_carrera, motivo, materias_data, status, fecha_solicitud) 
+        VALUES (?, ?, 'evaluacion_especial', ?, ?, ?, ?, 'pendiente', NOW())");
+        
+    $stmt->bind_param("isiiss", $estudiante_id, $tipo_solicitud, $id_periodo, $id_carrera, $motivo_final, $materias_json);
+    
+    if ($stmt->execute()) {
+        $id_sol = $stmt->insert_id;
+        $stmt->close();
+        return ['success' => true, 'mensaje' => 'Solicitud registrada exitosamente con el Folio #' . $id_sol, 'id_solicitud' => $id_sol];
+    } else {
+        $err = $stmt->error;
+        $stmt->close();
+        return ['success' => false, 'mensaje' => 'Error al guardar la solicitud: ' . $err];
+    }
+}
+
+/**
+ * Obtener listado filtrado de solicitudes de evaluaciones especiales para el Administrador
+ */
+function obtenerSolicitudesEvaluacionesEspeciales($id_carrera = 0, $id_periodo = 0, $tipo_solicitud = '', $status = '', $estudiante_id = 0) {
+    global $db;
+    
+    $query = "SELECT sa.*, 
+                     u.nombre as nombre_estudiante, 
+                     u.idusuario as cedula_estudiante, 
+                     u.email as email_estudiante,
+                     u.tlf as tlf_estudiante,
+                     COALESCE(c.nombre_carrera, 'Sin Carrera') as nombre_carrera,
+                     COALESCE(c.cod_carrera, 'N/A') as cod_carrera,
+                     COALESCE(pa.nombre_periodo, 'N/A') as nombre_periodo,
+                     s.codigo_seccion as seccion_asignada_codigo,
+                     s.turno as seccion_asignada_turno,
+                     doc_u.nombre as nombre_docente_asignado,
+                     admin_u.nombre as nombre_procesado_por
+              FROM solicitudes_academicas sa
+              INNER JOIN users u ON sa.estudiante_id = u.id
+              LEFT JOIN carreras c ON sa.id_carrera = c.id_carrera
+              LEFT JOIN periodos_academicos pa ON sa.id_periodo = pa.id_periodo
+              LEFT JOIN secciones s ON sa.seccion_destino_id = s.id_seccion
+              LEFT JOIN docente_seccion ds ON s.id_seccion = ds.id_seccion
+              LEFT JOIN users doc_u ON ds.id_usuario = doc_u.id
+              LEFT JOIN users admin_u ON sa.procesado_por = admin_u.id
+              WHERE sa.tipo_solicitud IN ('per', 'intensivo', 'suficiencia', 'extraordinario') ";
+              
+    $params = [];
+    $types = "";
+    
+    if (!empty($id_carrera) && intval($id_carrera) > 0) {
+        $query .= " AND sa.id_carrera = ? ";
+        $params[] = intval($id_carrera);
+        $types .= "i";
+    }
+    if (!empty($id_periodo) && intval($id_periodo) > 0) {
+        $query .= " AND sa.id_periodo = ? ";
+        $params[] = intval($id_periodo);
+        $types .= "i";
+    }
+    if (!empty($tipo_solicitud)) {
+        $query .= " AND sa.tipo_solicitud = ? ";
+        $params[] = strtolower(trim($tipo_solicitud));
+        $types .= "s";
+    }
+    if (!empty($status)) {
+        $query .= " AND sa.status = ? ";
+        $params[] = strtolower(trim($status));
+        $types .= "s";
+    }
+    if (!empty($estudiante_id) && intval($estudiante_id) > 0) {
+        $query .= " AND sa.estudiante_id = ? ";
+        $params[] = intval($estudiante_id);
+        $types .= "i";
+    }
+    
+    $query .= " GROUP BY sa.id ORDER BY sa.fecha_solicitud DESC, sa.id DESC";
+    
+    if (!empty($params)) {
+        $stmt = $db->prepare($query);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+    } else {
+        $result = $db->query($query);
+    }
+    
+    $solicitudes = [];
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $row['materias_parsed'] = !empty($row['materias_data']) ? json_decode($row['materias_data'], true) : [];
+            $solicitudes[] = $row;
+        }
+    }
+    return $solicitudes;
+}
+
+/**
+ * Crea automáticamente una sección exclusiva para la modalidad especial,
+ * asigna el docente a la asignatura e inscribe a los estudiantes aprobados.
+ */
+function crearSeccionEspecialYAsignarDocente($solicitud_ids, $id_materia, $id_docente, $codigo_seccion, $id_periodo, $turno = 'Diurno', $aula = 'Aula Asignada', $admin_id = 1) {
+    global $db;
+    
+    if (empty($solicitud_ids) || !is_array($solicitud_ids)) {
+        return ['success' => false, 'mensaje' => 'No se seleccionaron solicitudes a procesar.'];
+    }
+    
+    $id_materia = intval($id_materia);
+    $id_docente = intval($id_docente);
+    $id_periodo = intval($id_periodo);
+    $codigo_seccion = trim($codigo_seccion);
+    $admin_id = intval($admin_id);
+    
+    if ($id_materia <= 0 || $id_docente <= 0 || $id_periodo <= 0 || empty($codigo_seccion)) {
+        return ['success' => false, 'mensaje' => 'Datos incompletos para la creación de la sección especial.'];
+    }
+    
+    $info_materia = obtenerInfoMateria($id_materia);
+    if (!$info_materia) {
+        return ['success' => false, 'mensaje' => 'Materia no encontrada.'];
+    }
+    
+    $trayecto_num = intval($info_materia['trayecto'] ?? 1);
+    // Mapear numero_trayecto a id_trayecto (0->1, 1->2, 2->3, 3->4, 4->5)
+    $id_trayecto = $trayecto_num + 1;
+    
+    // Obtener la carrera de la primera solicitud
+    $primer_id_sol = intval($solicitud_ids[0]);
+    $sol_info = obtenerSolicitudAcademicaPorId($primer_id_sol);
+    if (!$sol_info) {
+        return ['success' => false, 'mensaje' => 'No se pudo obtener información de la solicitud.'];
+    }
+    $id_carrera = intval($sol_info['id_carrera']);
+    $modalidad = strtolower(trim($sol_info['tipo_solicitud']));
+    
+    // Tipo de examen mapeado
+    $map_tipo_examen = [
+        'per' => 'P',
+        'intensivo' => 'T',
+        'suficiencia' => 'S',
+        'extraordinario' => 'E'
+    ];
+    $tipo_examen = $map_tipo_examen[$modalidad] ?? 'R';
+    
+    // Iniciar transacción
+    $db->begin_transaction();
+    
+    try {
+        // Verificar si la sección ya existe con ese código en el mismo período y carrera
+        $chk_sec = $db->prepare("SELECT id_seccion FROM secciones WHERE codigo_seccion = ? AND id_periodo = ? AND id_carrera = ? LIMIT 1");
+        $chk_sec->bind_param("sii", $codigo_seccion, $id_periodo, $id_carrera);
+        $chk_sec->execute();
+        $res_sec = $chk_sec->get_result();
+        
+        $id_seccion = 0;
+        if ($res_sec && $row_sec = $res_sec->fetch_assoc()) {
+            $id_seccion = intval($row_sec['id_seccion']);
+            $chk_sec->close();
+        } else {
+            $chk_sec->close();
+            // Crear nueva sección exclusiva
+            $capacidad = max(35, count($solicitud_ids) + 10);
+            $stmt_ins = $db->prepare("INSERT INTO secciones 
+                (codigo_seccion, id_carrera, turno, id_trayecto, id_periodo, capacidad_maxima, aula_asignada, estatus, status, created_by, approved_by, approved_at, inicia, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'activa', 'Aprobada', ?, ?, NOW(), NOW(), NOW())");
+            $stmt_ins->bind_param("sisiisiii", $codigo_seccion, $id_carrera, $turno, $id_trayecto, $id_periodo, $capacidad, $aula, $admin_id, $admin_id);
+            if (!$stmt_ins->execute()) {
+                throw new Exception("Error al crear la sección: " . $stmt_ins->error);
+            }
+            $id_seccion = $stmt_ins->insert_id;
+            $stmt_ins->close();
+        }
+        
+        // Asignar el docente a la sección para esta materia
+        $chk_doc = $db->prepare("SELECT id_docente_seccion FROM docente_seccion WHERE id_seccion = ? AND id_materia = ? LIMIT 1");
+        $chk_doc->bind_param("ii", $id_seccion, $id_materia);
+        $chk_doc->execute();
+        $res_doc = $chk_doc->get_result();
+        if ($res_doc && $row_doc = $res_doc->fetch_assoc()) {
+            // Actualizar docente si cambió
+            $id_ds = intval($row_doc['id_docente_seccion']);
+            $stmt_u = $db->prepare("UPDATE docente_seccion SET id_usuario = ?, estatus = 1 WHERE id_docente_seccion = ?");
+            $stmt_u->bind_param("ii", $id_docente, $id_ds);
+            $stmt_u->execute();
+            $stmt_u->close();
+        } else {
+            // Insertar asignación docente
+            $stmt_dins = $db->prepare("INSERT INTO docente_seccion (id_usuario, id_seccion, id_materia, estatus, fecha_asignacion) VALUES (?, ?, ?, 1, NOW())");
+            $stmt_dins->bind_param("iii", $id_docente, $id_seccion, $id_materia);
+            if (!$stmt_dins->execute()) {
+                throw new Exception("Error al asignar el docente: " . $stmt_dins->error);
+            }
+            $stmt_dins->close();
+        }
+        $chk_doc->close();
+        
+        // Inscribir estudiantes y actualizar solicitudes
+        $total_inscritos = 0;
+        foreach ($solicitud_ids as $sid) {
+            $sid = intval($sid);
+            if ($sid <= 0) continue;
+            
+            $sol = obtenerSolicitudAcademicaPorId($sid);
+            if (!$sol || $sol['status'] !== 'pendiente') continue;
+            
+            $est_id = intval($sol['estudiante_id']);
+            
+            // 1. Inscribir en estudiante_seccion
+            $chk_es = $db->prepare("SELECT id_usuario FROM estudiante_seccion WHERE id_usuario = ? AND id_seccion = ? LIMIT 1");
+            $chk_es->bind_param("ii", $est_id, $id_seccion);
+            $chk_es->execute();
+            $res_es = $chk_es->get_result();
+            if (!$res_es || $res_es->num_rows === 0) {
+                $ins_es = $db->prepare("INSERT INTO estudiante_seccion (id_usuario, id_seccion, fecha_inscripcion, estatus) VALUES (?, ?, CURDATE(), 'activo')");
+                $ins_es->bind_param("ii", $est_id, $id_seccion);
+                $ins_es->execute();
+                $ins_es->close();
+            }
+            $chk_es->close();
+            
+            // 2. Inscribir en estudiante_materias
+            $chk_em = $db->prepare("SELECT id_inscripcion FROM estudiante_materias WHERE id_usuario = ? AND id_materia = ? AND id_periodo = ? LIMIT 1");
+            $chk_em->bind_param("iii", $est_id, $id_materia, $id_periodo);
+            $chk_em->execute();
+            $res_em = $chk_em->get_result();
+            if ($res_em && $row_em = $res_em->fetch_assoc()) {
+                $id_ins = intval($row_em['id_inscripcion']);
+                $up_em = $db->prepare("UPDATE estudiante_materias SET id_seccion = ?, estatus = 'activo', tipo_evaluacion = 'especial', tipo_examen = ? WHERE id_inscripcion = ?");
+                $up_em->bind_param("isi", $id_seccion, $tipo_examen, $id_ins);
+                $up_em->execute();
+                $up_em->close();
+            } else {
+                $ins_em = $db->prepare("INSERT INTO estudiante_materias (id_usuario, id_materia, id_seccion, id_periodo, fecha_inscripcion, estatus, tipo_evaluacion, tipo_examen, origen) VALUES (?, ?, ?, ?, NOW(), 'activo', 'especial', ?, 'sistema')");
+                $ins_em->bind_param("iiiis", $est_id, $id_materia, $id_seccion, $id_periodo, $tipo_examen);
+                $ins_em->execute();
+                $ins_em->close();
+            }
+            $chk_em->close();
+            
+            // 3. Actualizar la solicitud a aprobada
+            $up_sa = $db->prepare("UPDATE solicitudes_academicas SET status = 'aprobada', seccion_destino_id = ?, procesado_por = ?, fecha_procesado = NOW(), observacion_admin = ? WHERE id = ?");
+            $obs = "Sección especial asignada: " . $codigo_seccion . " | Modalidad: " . strtoupper($modalidad);
+            $up_sa->bind_param("iisi", $id_seccion, $admin_id, $obs, $sid);
+            $up_sa->execute();
+            $up_sa->close();
+            
+            $total_inscritos++;
+        }
+        
+        $db->commit();
+        
+        return [
+            'success' => true,
+            'id_seccion' => $id_seccion,
+            'codigo_seccion' => $codigo_seccion,
+            'total_inscritos' => $total_inscritos,
+            'mensaje' => "Sección especial '$codigo_seccion' creada y asignada con éxito ($total_inscritos estudiante(s) inscritos)."
+        ];
+    } catch (Exception $e) {
+        $db->rollback();
+        return ['success' => false, 'mensaje' => $e->getMessage()];
+    }
+}
+
+/**
+ * Rechazar solicitud de evaluación especial
+ */
+function rechazarSolicitudEvaluacionEspecial($solicitud_id, $motivo_rechazo, $admin_id = 1) {
+    global $db;
+    $solicitud_id = intval($solicitud_id);
+    $admin_id = intval($admin_id);
+    $motivo = trim($motivo_rechazo);
+    
+    if ($solicitud_id <= 0 || empty($motivo)) {
+        return ['success' => false, 'mensaje' => 'Debe indicar el motivo del rechazo.'];
+    }
+    
+    $stmt = $db->prepare("UPDATE solicitudes_academicas SET status = 'rechazada', procesado_por = ?, fecha_procesado = NOW(), motivo_rechazo = ?, observacion_admin = ? WHERE id = ?");
+    $obs = "Solicitud rechazada: " . $motivo;
+    $stmt->bind_param("issi", $admin_id, $motivo, $obs, $solicitud_id);
+    if ($stmt->execute()) {
+        $stmt->close();
+        return ['success' => true, 'mensaje' => 'Solicitud rechazada correctamente.'];
+    }
+    $err = $stmt->error;
+    $stmt->close();
+    return ['success' => false, 'mensaje' => 'Error al rechazar la solicitud: ' . $err];
+}
+
+/**
+ * Obtener listado de docentes disponibles para asignar en secciones
+ */
+function obtenerDocentesDisponibles() {
+    global $db;
+    $res = $db->query("SELECT id, idusuario, nombre, email FROM users WHERE docente = 1 ORDER BY nombre ASC");
+    $docentes = [];
+    if ($res) {
+        while ($r = $res->fetch_assoc()) {
+            $docentes[] = $r;
+        }
+    }
+    return $docentes;
+}
+
+/**
+ * Obtener detalle de asignaturas inscritas por el estudiante en una sección específica
+ * Permite que el estudiante visualice únicamente las materias que le faltan asignadas a esa sección
+ */
+function obtenerDetalleAsignaturasSeccionEstudiante($id_seccion, $id_usuario) {
+    global $db;
+    $id_seccion = intval($id_seccion);
+    $id_usuario = intval($id_usuario);
+    
+    $query = "SELECT m.id_materia, m.nombre_materia, m.cod_materia, m.trayecto, m.creditos,
+                     em.tipo_evaluacion, em.tipo_examen, em.estatus as estatus_materia,
+                     COALESCE(u_doc.nombre, 'Docente por asignar') as nombre_docente,
+                     u_doc.email as email_docente
+              FROM estudiante_materias em
+              INNER JOIN materias m ON em.id_materia = m.id_materia
+              LEFT JOIN docente_seccion ds ON (ds.id_seccion = em.id_seccion AND ds.id_materia = em.id_materia AND (ds.estatus = 1 OR ds.estatus = 'activo'))
+              LEFT JOIN users u_doc ON ds.id_usuario = u_doc.id
+              WHERE em.id_seccion = ? AND em.id_usuario = ? AND em.estatus = 'activo'
+              ORDER BY m.nombre_materia ASC";
+              
+    $stmt = $db->prepare($query);
+    $stmt->bind_param("ii", $id_seccion, $id_usuario);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $materias = [];
+    if ($res) {
+        while ($r = $res->fetch_assoc()) {
+            $materias[] = $r;
+        }
+    }
+    $stmt->close();
+    return $materias;
+}
+
+/**
+ * ==============================================================================
+ * GENERADOR DE CÓDIGOS DE SECCIÓN ESPECIALES (PER, INTENSIVO, SUFICIENCIA, EXTRAORDINARIO)
+ * Compatible con la convención del sistema institucional: [MODALIDAD]-[TRAYECTO]-[NÚMERO]
+ * Ejemplo: PER-1-71, INT-1-71, SUF-1-71, EXT-1-71 (o formato alterno 1-71-P)
+ * ==============================================================================
+ */
+function generarCodigoSeccionEspecial($id_carrera, $trayecto_num, $modalidad, $turno = 'Diurno') {
+    global $db;
+    
+    $modalidad = strtolower(trim($modalidad));
+    $map_prefijo = [
+        'per' => 'PER',
+        'intensivo' => 'INT',
+        'suficiencia' => 'SUF',
+        'extraordinario' => 'EXT'
+    ];
+    $prefijo = $map_prefijo[$modalidad] ?? 'ESP';
+    
+    $trayecto_num = intval($trayecto_num);
+    $trayecto_str = ($trayecto_num >= 0) ? (string)$trayecto_num : '1';
+    
+    // 1. Obtener número base de sección según rangos de la carrera
+    $codigo_base = generarCodigoSeccion($id_carrera, $turno);
+    if (!$codigo_base) {
+        $res = $db->query("SELECT MAX(CAST(SUBSTRING_INDEX(codigo_seccion, '-', -1) AS UNSIGNED)) as max_num FROM secciones WHERE id_carrera = " . intval($id_carrera));
+        $max_num = 70;
+        if ($res && $r = $res->fetch_assoc()) {
+            $max_num = intval($r['max_num'] ?? 70);
+            if ($max_num <= 0) $max_num = 70;
+        }
+        $codigo_base = (string)($max_num + 1);
+    }
+    
+    // 2. Formato institucional: [MODALIDAD]-[TRAYECTO]-[BASE] (ej: PER-1-71)
+    $codigo_candidato = $prefijo . '-' . $trayecto_str . '-' . $codigo_base;
+    
+    // 3. Verificar colisión
+    $chk = $db->prepare("SELECT id_seccion FROM secciones WHERE codigo_seccion = ? LIMIT 1");
+    $chk->bind_param("s", $codigo_candidato);
+    $chk->execute();
+    $res_chk = $chk->get_result();
+    
+    if ($res_chk && $res_chk->num_rows > 0) {
+        $chk->close();
+        $letras = ['A', 'B', 'C', 'D', 'E'];
+        foreach ($letras as $l) {
+            $nuevo_cand = $codigo_candidato . '-' . $l;
+            $chk2 = $db->prepare("SELECT id_seccion FROM secciones WHERE codigo_seccion = ? LIMIT 1");
+            $chk2->bind_param("s", $nuevo_cand);
+            $chk2->execute();
+            $res2 = $chk2->get_result();
+            if (!$res2 || $res2->num_rows === 0) {
+                $chk2->close();
+                return $nuevo_cand;
+            }
+            $chk2->close();
+        }
+        return $codigo_candidato . '-' . date('s');
+    }
+    $chk->close();
+    
+    return $codigo_candidato;
+}
+
+/**
+ * ==============================================================================
+ * GESTIÓN DE GRADUACIÓN, SOLICITUDES DE GRADO Y PROSECUCIÓN ACADÉMICA
+ * ==============================================================================
+ */
+
+/**
+ * Permite a un estudiante apto solicitar formalmente su acto de graduación (TSU o Ingeniería/Licenciatura)
+ */
+function solicitarGradoAcademico($estudiante_id, $tipo_grado = 'TSU', $motivo = '') {
+    global $db;
+    
+    $estudiante_id = intval($estudiante_id);
+    $tipo_grado = strtoupper(trim($tipo_grado));
+    if ($estudiante_id <= 0) {
+        return ['success' => false, 'mensaje' => 'Estudiante inválido.'];
+    }
+    
+    $carrera = obtenerCarreraEstudiante($estudiante_id);
+    if (!$carrera) {
+        return ['success' => false, 'mensaje' => 'El estudiante no posee carrera asignada.'];
+    }
+    $id_carrera = intval($carrera['id_carrera']);
+    
+    // Evaluar aptitud
+    $eval_grado = esAptoParaGradoConsulta($estudiante_id, $id_carrera);
+    if (!$eval_grado) {
+        return ['success' => false, 'mensaje' => 'No se pudo evaluar el récord académico del estudiante.'];
+    }
+    
+    if ($tipo_grado === 'TSU') {
+        if (empty($eval_grado['apto_tsu'])) {
+            return ['success' => false, 'mensaje' => 'Aún no cumples los requisitos académicos para optar al título de Técnico Superior Universitario (TSU).'];
+        }
+    } else {
+        if (empty($eval_grado['apto_grado_completo'])) {
+            return ['success' => false, 'mensaje' => 'Aún no cumples los requisitos académicos para optar al grado de Ingeniería / Licenciatura.'];
+        }
+    }
+    
+    // Prevenir duplicado de solicitud de grado pendiente o aprobada
+    $chk = $db->prepare("SELECT id FROM solicitudes_academicas WHERE estudiante_id = ? AND tipo_solicitud = 'grado' AND accion = ? AND status IN ('pendiente', 'aprobada') LIMIT 1");
+    $chk->bind_param("is", $estudiante_id, $tipo_grado);
+    $chk->execute();
+    $res_chk = $chk->get_result();
+    if ($res_chk && $res_chk->num_rows > 0) {
+        $chk->close();
+        return ['success' => false, 'mensaje' => 'Ya posees una solicitud de grado registrada para este título.'];
+    }
+    $chk->close();
+    
+    $periodo = obtenerPeriodoActivo();
+    $id_periodo = intval($periodo['id_periodo'] ?? 0);
+    $ira_data = calcularIRAEstudiante($estudiante_id, $id_carrera);
+    $ira = $ira_data['ira'] ?? 0;
+    
+    $meta = [
+        'tipo_grado' => $tipo_grado,
+        'ira' => $ira,
+        'materias_aprobadas' => ($tipo_grado === 'TSU') ? ($eval_grado['materias_aprobadas_tsu'] ?? 0) : ($eval_grado['materias_aprobadas_completo'] ?? 0),
+        'total_materias' => ($tipo_grado === 'TSU') ? ($eval_grado['total_materias_tsu'] ?? 0) : ($eval_grado['total_materias_carrera'] ?? 0),
+        'fecha_evaluacion' => date('Y-m-d H:i:s')
+    ];
+    $materias_json = json_encode($meta);
+    $motivo_final = !empty($motivo) ? trim($motivo) : ("Solicitud formal para optar al título de " . $tipo_grado);
+    
+    $stmt = $db->prepare("INSERT INTO solicitudes_academicas 
+        (estudiante_id, tipo_solicitud, accion, id_periodo, id_carrera, motivo, materias_data, status, fecha_solicitud) 
+        VALUES (?, 'grado', ?, ?, ?, ?, ?, 'pendiente', NOW())");
+        
+    $stmt->bind_param("isiiss", $estudiante_id, $tipo_grado, $id_periodo, $id_carrera, $motivo_final, $materias_json);
+    
+    if ($stmt->execute()) {
+        $id_sol = $stmt->insert_id;
+        $stmt->close();
+        
+        // Registrar en tabla graduados en estado 'cumple_requisitos' si no existe
+        $chk_g = $db->prepare("SELECT id FROM graduados WHERE id_usuario = ? LIMIT 1");
+        $chk_g->bind_param("i", $estudiante_id);
+        $chk_g->execute();
+        $res_g = $chk_g->get_result();
+        if (!$res_g || $res_g->num_rows === 0) {
+            $ins_g = $db->prepare("INSERT INTO graduados (id_usuario, estado, observaciones, fecha_registro) VALUES (?, 'cumple_requisitos', ?, NOW())");
+            $obs = "Postulado a Grado " . $tipo_grado . " vía Solicitud #" . $id_sol;
+            $ins_g->bind_param("is", $estudiante_id, $obs);
+            $ins_g->execute();
+            $ins_g->close();
+        }
+        $chk_g->close();
+        
+        return ['success' => true, 'mensaje' => 'Solicitud de grado registrada exitosamente con el Folio #' . $id_sol . '.', 'id_solicitud' => $id_sol];
+    }
+    
+    $err = $stmt->error;
+    $stmt->close();
+    return ['success' => false, 'mensaje' => 'Error al guardar solicitud de grado: ' . $err];
+}
+
+/**
+ * Obtener listado de estudiantes que solicitaron grado para la bandeja del Administrador
+ */
+function obtenerSolicitudesGrado($id_carrera = 0, $status = '') {
+    global $db;
+    
+    $query = "SELECT sa.*, 
+                     u.nombre as nombre_estudiante, 
+                     u.idusuario as cedula_estudiante, 
+                     u.email as email_estudiante,
+                     u.tlf as tlf_estudiante,
+                     COALESCE(c.nombre_carrera, 'Sin Carrera') as nombre_carrera,
+                     COALESCE(c.cod_carrera, 'N/A') as cod_carrera,
+                     COALESCE(pa.nombre_periodo, 'N/A') as nombre_periodo,
+                     g.estado as estado_graduacion,
+                     g.fecha_graduacion,
+                     g.titulo_entregado,
+                     admin_u.nombre as nombre_procesado_por
+              FROM solicitudes_academicas sa
+              INNER JOIN users u ON sa.estudiante_id = u.id
+              LEFT JOIN carreras c ON sa.id_carrera = c.id_carrera
+              LEFT JOIN periodos_academicos pa ON sa.id_periodo = pa.id_periodo
+              LEFT JOIN graduados g ON sa.estudiante_id = g.id_usuario
+              LEFT JOIN users admin_u ON sa.procesado_por = admin_u.id
+              WHERE sa.tipo_solicitud = 'grado' ";
+              
+    $params = [];
+    $types = "";
+    
+    if (!empty($id_carrera) && intval($id_carrera) > 0) {
+        $query .= " AND sa.id_carrera = ? ";
+        $params[] = intval($id_carrera);
+        $types .= "i";
+    }
+    if (!empty($status)) {
+        $query .= " AND sa.status = ? ";
+        $params[] = strtolower(trim($status));
+        $types .= "s";
+    }
+    
+    $query .= " ORDER BY sa.fecha_solicitud DESC, sa.id DESC";
+    
+    if (!empty($params)) {
+        $stmt = $db->prepare($query);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+    } else {
+        $result = $db->query($query);
+    }
+    
+    $solicitudes = [];
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $row['meta_data'] = !empty($row['materias_data']) ? json_decode($row['materias_data'], true) : [];
+            $solicitudes[] = $row;
+        }
+    }
+    return $solicitudes;
+}
+
+/**
+ * Aprueba la graduación del estudiante, asienta la fecha oficial,
+ * registra el título en titulos_obtenidos y actualiza la solicitud.
+ */
+function aprobarGraduacionEstudiante($id_solicitud, $admin_id, $observaciones = '') {
+    global $db;
+    
+    $id_solicitud = intval($id_solicitud);
+    $admin_id = intval($admin_id);
+    
+    $sol = obtenerSolicitudAcademicaPorId($id_solicitud);
+    if (!$sol || $sol['tipo_solicitud'] !== 'grado') {
+        return ['success' => false, 'mensaje' => 'Solicitud de grado no encontrada.'];
+    }
+    
+    $est_id = intval($sol['estudiante_id']);
+    $tipo_grado = strtoupper(trim($sol['accion'] ?: 'TSU'));
+    $nombre_carrera = $sol['nombre_carrera'] ?? '';
+    
+    $db->begin_transaction();
+    try {
+        // 1. Actualizar solicitud
+        $up_sa = $db->prepare("UPDATE solicitudes_academicas SET status = 'aprobada', procesado_por = ?, fecha_procesado = NOW(), observacion_admin = ? WHERE id = ?");
+        $obs = "Graduación aprobada por Control de Estudios. Título: " . $tipo_grado . ". " . trim($observaciones);
+        $up_sa->bind_param("isi", $admin_id, $obs, $id_solicitud);
+        $up_sa->execute();
+        $up_sa->close();
+        
+        // 2. Registrar en graduados
+        $chk_g = $db->prepare("SELECT id FROM graduados WHERE id_usuario = ? LIMIT 1");
+        $chk_g->bind_param("i", $est_id);
+        $chk_g->execute();
+        $res_g = $chk_g->get_result();
+        
+        if ($res_g && $row_g = $res_g->fetch_assoc()) {
+            $up_g = $db->prepare("UPDATE graduados SET estado = 'graduado', fecha_graduacion = CURDATE(), id_admin_graduacion = ?, observaciones = ? WHERE id_usuario = ?");
+            $up_g->bind_param("isi", $admin_id, $obs, $est_id);
+            $up_g->execute();
+            $up_g->close();
+        } else {
+            $ins_g = $db->prepare("INSERT INTO graduados (id_usuario, estado, fecha_graduacion, id_admin_graduacion, observaciones) VALUES (?, 'graduado', CURDATE(), ?, ?)");
+            $ins_g->bind_param("iis", $est_id, $admin_id, $obs);
+            $ins_g->execute();
+            $ins_g->close();
+        }
+        $chk_g->close();
+        
+        // 3. Registrar en titulos_obtenidos
+        $nombre_titulo = ($tipo_grado === 'TSU') 
+            ? "Técnico Superior Universitario en " . $nombre_carrera 
+            : "Ingeniero en " . $nombre_carrera;
+        $instituto = "Universidad Politécnica Territorial de Puerto Cabello";
+        
+        $chk_t = $db->prepare("SELECT id FROM titulos_obtenidos WHERE id_usuario = ? AND titulo_obtenido = ? LIMIT 1");
+        $chk_t->bind_param("is", $est_id, $nombre_titulo);
+        $chk_t->execute();
+        $res_t = $chk_t->get_result();
+        
+        if (!$res_t || $res_t->num_rows === 0) {
+            $ins_t = $db->prepare("INSERT INTO titulos_obtenidos (id_usuario, nombre, titulo_obtenido, instituto) VALUES (?, ?, ?, ?)");
+            $ins_t->bind_param("isss", $est_id, $sol['nombre_estudiante'], $nombre_titulo, $instituto);
+            $ins_t->execute();
+            $ins_t->close();
+        }
+        $chk_t->close();
+        
+        $db->commit();
+        
+        return [
+            'success' => true,
+            'mensaje' => "Graduación aprobada exitosamente para {$sol['nombre_estudiante']} ({$nombre_titulo}).",
+            'titulo' => $nombre_titulo
+        ];
+    } catch (Exception $e) {
+        $db->rollback();
+        return ['success' => false, 'mensaje' => $e->getMessage()];
+    }
+}
+
+

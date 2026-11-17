@@ -289,6 +289,10 @@ $admin_url = $base_url . '/admin';
                         </a>
                         <?php endif; ?>
 
+                        <a title="Solicitudes de Evaluaciones Especiales" class="dropdown-item" href="<?= $admin_url ?>/solicitudes_evaluaciones.php">
+                            <i class="fas fa-layer-group fa-fw text-warning"></i> Solicitudes Especiales (PER/INT/SUF/EXT)
+                        </a>
+
                         <?php if (tienePermiso('grado')): ?>
                             <a title="Títulos y Relaciones con Materias" class="dropdown-item" href="<?= $admin_url ?>/grado.php">
                                 <i class="fas fa-graduation-cap fa-fw"></i> Grado
@@ -408,11 +412,6 @@ $admin_url = $base_url . '/admin';
                                 <i class="fas fa-search fa-fw"></i> Consultar Notas
                             </a>
                         <?php endif; ?>
-
-                        <!-- Evaluaciones Especiales -->
-                        <a title="Evaluaciones Especiales (E, T, P, S)" class="dropdown-item" href="<?= $admin_url ?>/gestion_evaluaciones_especiales.php">
-                            <i class="fas fa-award fa-fw text-warning"></i> Evaluaciones Especiales (E, T, P, S)
-                        </a>
                         
                         <!-- Consultar Notas Pasadas -->
                         <?php if (tienePermiso('consultar_notas_pasadas')): ?>
