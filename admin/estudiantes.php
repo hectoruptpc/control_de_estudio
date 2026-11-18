@@ -32,144 +32,6 @@ if ($resEst) {
     }
 }
 
-// Obtener TODOS los estudiantes con JOIN a ciudades, graduados y nuevos campos
-$query = "SELECT 
-    u.id,
-    u.idusuario,
-    u.nombre,
-    u.username,
-    u.email,
-    u.tlf,
-    u.cel,
-    u.direccion,
-    u.ciudad as ciudad_id,
-    u.estado,
-    u.municipio,
-    u.parroquia,
-    u.fecha_ingreso,
-    u.fecha_nac,
-    u.status,
-    u.carrera,
-    u.genero,
-    u.embarazada,
-    u.edo_civil,
-    u.num_telf_opc,
-    u.foto_perfil,
-    u.sede,
-    u.turno,
-    u.discapacidad,
-    u.etnia,
-    u.inscrito_por,
-    u.asignado_opsu,
-    u.fecha_graduacion as user_fecha_graduacion,
-    c.ciudad as nombre_ciudad,
-    g.id as id_graduado,
-    g.estado as estado_graduado,
-    g.fecha_graduacion as grad_fecha_graduacion
-FROM users u
-LEFT JOIN ciudades c ON u.ciudad = c.id_ciudad
-LEFT JOIN graduados g ON u.id = g.id_usuario
-WHERE u.estudiante = 1
-ORDER BY u.nombre ASC";
-
-$result = $db->query($query);
-$estudiantes = [];
-
-if ($result && $result->num_rows > 0) {
-    while ($row = $result->fetch_assoc()) {
-        // Calcular edad y menor de edad
-        $edad = '';
-        $esMenor = false;
-        if (!empty($row['fecha_nac'])) {
-            try {
-                $fechaNac = new DateTime($row['fecha_nac']);
-                $hoy = new DateTime();
-                $edad = $fechaNac->diff($hoy)->y;
-                $esMenor = ($edad < 18);
-            } catch (Exception $e) {
-                $edad = '';
-                $esMenor = false;
-            }
-        }
-        $row['edad'] = $edad;
-        $row['es_menor'] = $esMenor;
-        
-        // Obtener nombre de la carrera
-        $carreraId = $row['carrera'];
-        $row['nombre_carrera'] = isset($carreraMap[$carreraId]) ? $carreraMap[$carreraId] : 'Sin Carrera';
-        
-        // Obtener nombre de la ciudad
-        $row['ciudad'] = isset($row['nombre_ciudad']) && !empty($row['nombre_ciudad']) ? $row['nombre_ciudad'] : 'No especificada';
-        
-        // Sede por defecto
-        $row['sede'] = isset($row['sede']) && !empty($row['sede']) ? $row['sede'] : 'No especificada';
-
-        // Normalizar Estado Geográfico (Entidad Federal)
-        $estadoRaw = trim((string)($row['estado'] ?? ''));
-        if (is_numeric($estadoRaw) && isset($estadoMap[$estadoRaw])) {
-            $row['nombre_estado'] = $estadoMap[$estadoRaw];
-        } elseif (!empty($estadoRaw) && !is_numeric($estadoRaw)) {
-            $row['nombre_estado'] = $estadoRaw;
-        } else {
-            $row['nombre_estado'] = 'No especificado';
-        }
-
-        // Normalizar Modalidad Inscrito por
-        $inscrito = trim((string)($row['inscrito_por'] ?? ''));
-        if (empty($inscrito)) {
-            if (!empty($row['asignado_opsu']) && $row['asignado_opsu'] === 'Sí') {
-                $inscrito = 'OPSU';
-            } else {
-                $inscrito = 'No especificado';
-            }
-        }
-        $row['inscrito_por'] = $inscrito;
-
-        // Normalizar Turno
-        $row['turno'] = !empty($row['turno']) ? trim($row['turno']) : 'Diurno';
-
-        // Normalizar Discapacidad y Etnia
-        $disc = strtolower(trim((string)($row['discapacidad'] ?? '')));
-        $row['tiene_discapacidad'] = (!empty($disc) && !in_array($disc, ['ninguna', 'no especificado', 'no', 'sin discapacidad', '0']));
-
-        $etn = strtolower(trim((string)($row['etnia'] ?? '')));
-        $row['tiene_etnia'] = (!empty($etn) && !in_array($etn, ['ninguna', 'no especificado', 'no', '0']));
-        
-        // Determinar condición: Estudiante Regular vs Egresado
-        $fechaGrad = !empty($row['grad_fecha_graduacion']) ? $row['grad_fecha_graduacion'] : (!empty($row['user_fecha_graduacion']) ? $row['user_fecha_graduacion'] : '');
-        $esEgresado = (!empty($row['id_graduado']) && in_array($row['estado_graduado'], ['graduado', 'titulo_entregado'])) || (!empty($fechaGrad) && $fechaGrad !== '0000-00-00');
-        $row['es_egresado'] = $esEgresado;
-        $row['tipo_alumno'] = $esEgresado ? 'egresado' : 'estudiante';
-        $row['fecha_graduacion'] = $fechaGrad;
-
-        $estudiantes[] = $row;
-    }
-}
-
-// Obtener carreras únicas para el filtro
-$carrerasUnicas = array_unique(array_column($estudiantes, 'nombre_carrera'));
-sort($carrerasUnicas);
-
-// Obtener ciudades únicas
-$ciudades = array_unique(array_column($estudiantes, 'ciudad'));
-$ciudades = array_filter($ciudades, function($ciudad) {
-    return !empty($ciudad) && $ciudad !== 'No especificada';
-});
-sort($ciudades);
-
-// Obtener sedes únicas para el filtro
-$sedes = array_unique(array_column($estudiantes, 'sede'));
-$sedes = array_filter($sedes, function($sede) {
-    return !empty($sede) && $sede !== 'No especificada';
-});
-sort($sedes);
-
-// Obtener estados geográficos únicos
-$estadosUnicos = array_values(array_filter(array_unique(array_column($estudiantes, 'nombre_estado')), function($e) {
-    return !empty($e) && $e !== 'No especificado';
-}));
-sort($estadosUnicos);
-
 // Modalidades de ingreso disponibles
 $modalidadesUnicas = [
     'OPSU',
@@ -184,90 +46,89 @@ $modalidadesUnicas = [
     'No especificado'
 ];
 
-// Turnos disponibles
-$turnosUnicos = array_values(array_filter(array_unique(array_column($estudiantes, 'turno'))));
-sort($turnosUnicos);
+// Carreras únicas para filtros
+$carrerasUnicas = array_column($carreras, 'nombre');
+
+// Sedes únicas
+$sedes = [];
+$resSedes = $db->query("SELECT DISTINCT sede FROM users WHERE estudiante = 1 AND sede IS NOT NULL AND sede != '' ORDER BY sede ASC");
+if ($resSedes) {
+    while ($s = $resSedes->fetch_assoc()) $sedes[] = $s['sede'];
+}
+if (empty($sedes)) $sedes = ['Puerto Cabello', 'COEF'];
+
+// Turnos únicos
+$turnosUnicos = [];
+$resTurnos = $db->query("SELECT DISTINCT turno FROM users WHERE estudiante = 1 AND turno IS NOT NULL AND turno != '' ORDER BY turno ASC");
+if ($resTurnos) {
+    while ($t = $resTurnos->fetch_assoc()) $turnosUnicos[] = $t['turno'];
+}
 if (empty($turnosUnicos)) $turnosUnicos = ['Diurno', 'Nocturno'];
 
-// Contar estudiantes y calcular estadísticas completas
-$totalEstudiantes = count($estudiantes);
-$totalEgresados = 0;
-$totalEstudiantesSolo = 0;
-$activos = 0;
-$inactivos = 0;
-$nuevosIngresos = 0;
-$embarazadas = 0;
-$menores = 0;
-$mayores = 0;
-$masculinos = 0;
-$femeninos = 0;
-$solteros = 0;
-$casados = 0;
-$conDiscapacidad = 0;
-$conEtnia = 0;
-$asignadosOpsu = 0;
-$sedePC = 0;
-$sedeCOEF = 0;
-$sumaEdades = 0;
-$totalConEdad = 0;
-$anioActual = date('Y');
-
-foreach ($estudiantes as $estudiante) {
-    if (!empty($estudiante['es_egresado'])) {
-        $totalEgresados++;
-    } else {
-        $totalEstudiantesSolo++;
-    }
-
-    $status = $estudiante['status'] ?? 0;
-    if ($status == 1) {
-        $activos++;
-    } else {
-        $inactivos++;
-    }
-
-    $genero = strtolower(trim($estudiante['genero'] ?? ''));
-    if ($genero === 'masculino' || $genero === 'm') $masculinos++;
-    if ($genero === 'femenino' || $genero === 'f') $femeninos++;
-
-    $esFemenino = ($genero === 'femenino' || $genero === 'f');
-    $estaEmbarazada = isset($estudiante['embarazada']) && trim((string)$estudiante['embarazada']) === '1';
-    if ($esFemenino && $estaEmbarazada) {
-        $embarazadas++;
-    }
-
-    if (!empty($estudiante['es_menor'])) {
-        $menores++;
-    } elseif ($estudiante['edad'] >= 18 && $estudiante['edad'] !== '') {
-        $mayores++;
-    }
-
-    if ($estudiante['edad'] !== '' && is_numeric($estudiante['edad'])) {
-        $sumaEdades += (int)$estudiante['edad'];
-        $totalConEdad++;
-    }
-
-    $edoCivil = strtolower(trim($estudiante['edo_civil'] ?? ''));
-    if (strpos($edoCivil, 'soltero') !== false) $solteros++;
-    if (strpos($edoCivil, 'casado') !== false) $casados++;
-
-    if (!empty($estudiante['tiene_discapacidad'])) $conDiscapacidad++;
-    if (!empty($estudiante['tiene_etnia'])) $conEtnia++;
-
-    $inscrito = strtolower(trim($estudiante['inscrito_por'] ?? ''));
-    if ($inscrito === 'opsu') $asignadosOpsu++;
-
-    $sedeStr = strtolower(trim($estudiante['sede'] ?? ''));
-    if (strpos($sedeStr, 'puerto cabello') !== false) $sedePC++;
-    if (strpos($sedeStr, 'coef') !== false) $sedeCOEF++;
-
-    $fechaIng = $estudiante['fecha_ingreso'] ?? '';
-    if (!empty($fechaIng) && strpos($fechaIng, $anioActual) === 0) {
-        $nuevosIngresos++;
-    }
+// Estados geográficos únicos
+$estadosUnicos = [];
+$resEstados = $db->query("SELECT estado FROM estados ORDER BY estado ASC");
+if ($resEstados) {
+    while ($e = $resEstados->fetch_assoc()) $estadosUnicos[] = $e['estado'];
 }
 
-$edadPromedio = $totalConEdad > 0 ? round($sumaEdades / $totalConEdad, 1) : 0;
+// Ciudades únicas
+$ciudades = [];
+$resCiudades = $db->query("SELECT DISTINCT c.ciudad FROM users u JOIN ciudades c ON u.ciudad = c.id_ciudad WHERE u.estudiante = 1 ORDER BY c.ciudad ASC LIMIT 100");
+if ($resCiudades) {
+    while ($c = $resCiudades->fetch_assoc()) $ciudades[] = $c['ciudad'];
+}
+
+// Cálculo rápido y optimizado de estadísticas directamente en MariaDB/MySQL (instantáneo)
+$anioActual = date('Y');
+$resStats = $db->query("SELECT 
+    COUNT(*) as total,
+    SUM(status = 1) as activos,
+    SUM(status = 0) as inactivos,
+    SUM(LOWER(genero) IN ('masculino', 'm')) as masc,
+    SUM(LOWER(genero) IN ('femenino', 'f')) as fem,
+    SUM(LOWER(genero) IN ('femenino', 'f') AND embarazada = 1) as embarazadas,
+    SUM(YEAR(fecha_ingreso) = YEAR(CURDATE())) as nuevos,
+    AVG(TIMESTAMPDIFF(YEAR, fecha_nac, CURDATE())) as edad_promedio,
+    SUM(TIMESTAMPDIFF(YEAR, fecha_nac, CURDATE()) < 18) as menores,
+    SUM(TIMESTAMPDIFF(YEAR, fecha_nac, CURDATE()) >= 18) as mayores,
+    SUM(LOWER(edo_civil) LIKE '%soltero%') as solteros,
+    SUM(LOWER(edo_civil) LIKE '%casado%') as casados,
+    SUM(discapacidad IS NOT NULL AND discapacidad != '' AND LOWER(discapacidad) NOT IN ('ninguna', 'no especificado', 'no', '0', 'sin discapacidad')) as discapacidad,
+    SUM(etnia IS NOT NULL AND etnia != '' AND LOWER(etnia) NOT IN ('ninguna', 'no especificado', 'no', '0')) as etnia,
+    SUM(LOWER(inscrito_por) = 'opsu' OR asignado_opsu = 'Sí') as opsu,
+    SUM(LOWER(sede) LIKE '%puerto cabello%') as sede_pc,
+    SUM(LOWER(sede) LIKE '%coef%') as sede_coef
+FROM users WHERE estudiante = 1");
+
+$stats = $resStats ? $resStats->fetch_assoc() : [];
+
+$resEgresados = $db->query("SELECT COUNT(DISTINCT u.id) as total_egresados
+FROM users u
+LEFT JOIN graduados g ON u.id = g.id_usuario
+WHERE u.estudiante = 1 
+  AND ((g.id IS NOT NULL AND g.estado IN ('graduado', 'titulo_entregado')) 
+       OR (u.fecha_graduacion IS NOT NULL AND u.fecha_graduacion != '0000-00-00' AND u.fecha_graduacion != ''))");
+$totalEgresados = $resEgresados ? (int)$resEgresados->fetch_assoc()['total_egresados'] : 0;
+
+$totalEstudiantes = (int)($stats['total'] ?? 0);
+$totalEstudiantesSolo = max(0, $totalEstudiantes - $totalEgresados);
+$activos = (int)($stats['activos'] ?? 0);
+$inactivos = (int)($stats['inactivos'] ?? 0);
+$nuevosIngresos = (int)($stats['nuevos'] ?? 0);
+$embarazadas = (int)($stats['embarazadas'] ?? 0);
+$menores = (int)($stats['menores'] ?? 0);
+$mayores = (int)($stats['mayores'] ?? 0);
+$masculinos = (int)($stats['masc'] ?? 0);
+$femeninos = (int)($stats['fem'] ?? 0);
+$solteros = (int)($stats['solteros'] ?? 0);
+$casados = (int)($stats['casados'] ?? 0);
+$conDiscapacidad = (int)($stats['discapacidad'] ?? 0);
+$conEtnia = (int)($stats['etnia'] ?? 0);
+$asignadosOpsu = (int)($stats['opsu'] ?? 0);
+$sedePC = (int)($stats['sede_pc'] ?? 0);
+$sedeCOEF = (int)($stats['sede_coef'] ?? 0);
+$edadPromedio = !empty($stats['edad_promedio']) ? round((float)$stats['edad_promedio'], 1) : 0;
 
 include("includes/head.php");
 ?>
@@ -278,7 +139,7 @@ include("includes/head.php");
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    margin-top: 20px;
+    margin-bottom: 15px;
     gap: 10px;
 }
 .records-selector {
@@ -760,7 +621,7 @@ include("includes/head.php");
                                         <div class="btn-group btn-group-sm" role="group" id="btnGroupTipoAlumno">
                                             <input type="radio" class="btn-check" name="quickTipoAlumno" id="quickTipoTodos" value="todos" autocomplete="off" checked>
                                             <label class="btn btn-outline-primary" for="quickTipoTodos">
-                                                <i class="fas fa-users me-1"></i> Todos (<span id="countTodos"><?php echo count($estudiantes); ?></span>)
+                                                <i class="fas fa-users me-1"></i> Todos (<span id="countTodos"><?php echo $totalEstudiantes; ?></span>)
                                             </label>
 
                                             <input type="radio" class="btn-check" name="quickTipoAlumno" id="quickTipoEstudiantes" value="estudiante" autocomplete="off">
@@ -780,6 +641,29 @@ include("includes/head.php");
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Barra de Paginación y Límite de Registros (Superior) -->
+                        <div class="pagination-bar p-2 bg-light rounded border shadow-sm mb-3">
+                            <div class="records-selector">
+                                <label class="small font-weight-bold mb-0" for="registrosPorPagina">
+                                    <i class="fas fa-list-ol text-primary me-1"></i> Mostrar:
+                                </label>
+                                <select id="registrosPorPagina" class="form-control form-control-sm font-weight-bold">
+                                    <option value="10">10</option>
+                                    <option value="20" selected>20</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                    <option value="999999">Todos</option>
+                                </select>
+                                <span class="small text-muted font-weight-bold">registros por página</span>
+                            </div>
+                            <div class="small text-muted font-weight-bold">
+                                Mostrando <span id="mostrandoDesde" class="text-primary font-weight-bold">0</span> - <span id="mostrandoHasta" class="text-primary font-weight-bold">0</span> de <span id="totalRegistros" class="text-dark font-weight-bold"><?php echo $totalEstudiantes; ?></span> estudiantes
+                            </div>
+                            <nav aria-label="Navegación de páginas">
+                                <ul class="pagination pagination-sm mb-0" id="paginationControls"></ul>
+                            </nav>
                         </div>
 
                         <div class="table-responsive">
@@ -807,110 +691,14 @@ include("includes/head.php");
                                     </tr>
                                 </thead>
                                 <tbody id="tablaBody">
-                                    <?php foreach ($estudiantes as $estudiante): 
-                                        $estaEmbarazada = isset($estudiante['embarazada']) && trim((string)$estudiante['embarazada']) === '1';
-                                        $esFemenino = isset($estudiante['genero']) && trim($estudiante['genero']) === 'Femenino';
-                                        $cedula = $estudiante['idusuario'] ?? '';
-                                        $status = $estudiante['status'] ?? 0;
-                                        $edad = $estudiante['edad'] ?? '';
-                                        $fechaIngreso = $estudiante['fecha_ingreso'] ?? '';
-                                        $ciudad = $estudiante['ciudad'] ?? '';
-                                        $carrera = $estudiante['nombre_carrera'] ?? '';
-                                        $sede = $estudiante['sede'] ?? '';
-                                        $modalidad = $estudiante['inscrito_por'] ?? 'No especificado';
-                                        $turno = $estudiante['turno'] ?? 'No especificado';
-                                        $estadoGeo = $estudiante['nombre_estado'] ?? 'No especificado';
-                                        $tieneDiscapacidad = !empty($estudiante['tiene_discapacidad']) ? '1' : '0';
-                                        $tieneEtnia = !empty($estudiante['tiene_etnia']) ? '1' : '0';
-                                        $esOpsu = ($estudiante['asignado_opsu'] === 'Sí' || strtolower($modalidad) === 'opsu') ? '1' : '0';
-                                    ?>
-                                        <tr data-cedula="<?php echo htmlspecialchars(strtolower($cedula)); ?>"
-                                            data-nombre="<?php echo htmlspecialchars(strtolower($estudiante['nombre'] ?? '')); ?>"
-                                            data-username="<?php echo htmlspecialchars(strtolower($estudiante['username'] ?? '')); ?>"
-                                            data-email="<?php echo htmlspecialchars(strtolower($estudiante['email'] ?? '')); ?>"
-                                            data-genero="<?php echo strtolower($estudiante['genero'] ?? ''); ?>"
-                                            data-status="<?php echo $status; ?>"
-                                            data-tipo-alumno="<?php echo $estudiante['tipo_alumno']; ?>"
-                                            data-es-egresado="<?php echo $estudiante['es_egresado'] ? '1' : '0'; ?>"
-                                            data-embarazada="<?php echo $estaEmbarazada ? '1' : '0'; ?>"
-                                            data-edad="<?php echo $edad; ?>"
-                                            data-menor="<?php echo $estudiante['es_menor'] ? '1' : '0'; ?>"
-                                            data-mayor="<?php echo ($edad >= 18 && $edad != '') ? '1' : '0'; ?>"
-                                            data-edo-civil="<?php echo strtolower($estudiante['edo_civil'] ?? ''); ?>"
-                                            data-fecha-ingreso="<?php echo $fechaIngreso; ?>"
-                                            data-ciudad="<?php echo strtolower($ciudad); ?>"
-                                            data-carrera="<?php echo strtolower($carrera); ?>"
-                                            data-sede="<?php echo strtolower($sede); ?>"
-                                            data-inscrito-por="<?php echo htmlspecialchars(strtolower($modalidad)); ?>"
-                                            data-turno="<?php echo htmlspecialchars(strtolower($turno)); ?>"
-                                            data-estado-geo="<?php echo htmlspecialchars(strtolower($estadoGeo)); ?>"
-                                            data-discapacidad="<?php echo htmlspecialchars(strtolower($estudiante['discapacidad'] ?? '')); ?>"
-                                            data-tiene-discapacidad="<?php echo $tieneDiscapacidad; ?>"
-                                            data-etnia="<?php echo htmlspecialchars(strtolower($estudiante['etnia'] ?? '')); ?>"
-                                            data-tiene-etnia="<?php echo $tieneEtnia; ?>"
-                                            data-opsu="<?php echo $esOpsu; ?>">
-                                            <td><?php echo htmlspecialchars($cedula); ?></td>
-                                            <td><?php echo htmlspecialchars($estudiante['nombre'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($estudiante['username'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($estudiante['email'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($estudiante['tlf'] ?? $estudiante['cel'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($carrera); ?></td>
-                                            <td>
-                                                <?php if ($estudiante['es_egresado']): ?>
-                                                    <span class="badge bg-success" title="Graduado / Egresado<?php echo !empty($estudiante['fecha_graduacion']) ? ' (' . date('d/m/Y', strtotime($estudiante['fecha_graduacion'])) . ')' : ''; ?>">
-                                                        <i class="fas fa-graduation-cap me-1"></i> Egresado
-                                                    </span>
-                                                <?php else: ?>
-                                                    <span class="badge bg-primary" title="Estudiante Regular">
-                                                        <i class="fas fa-user-graduate me-1"></i> Estudiante
-                                                    </span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td><span class="badge bg-secondary"><?php echo htmlspecialchars($modalidad); ?></span></td>
-                                            <td><?php echo htmlspecialchars($turno); ?></td>
-                                            <td>
-                                                <?php echo htmlspecialchars($estudiante['genero'] ?? ''); ?>
-                                                <?php if ($esFemenino && $estaEmbarazada): ?><span class="badge bg-info ms-1" title="Embarazada">🤰</span><?php endif; ?>
-                                            </td>
-                                            <td><?php echo $edad; ?></td>
-                                            <td><?php echo htmlspecialchars($estudiante['edo_civil'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($estadoGeo); ?></td>
-                                            <td><?php echo htmlspecialchars($ciudad); ?></td>
-                                            <td><?php echo htmlspecialchars($sede); ?></td>
-                                            <td><?php echo ($status == 1) ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-secondary">Inactivo</span>'; ?></td>
-                                            <td><?php echo !empty($fechaIngreso) ? date('d/m/Y', strtotime($fechaIngreso)) : ''; ?></td>
-                                            <td>
-                                                <div class="d-flex flex-wrap gap-1">
-                                                    <button type="button" class="btn btn-info btn-details btn-sm" data-id="<?php echo $estudiante['id']; ?>"><i class="fas fa-eye"></i></button>
-                                                    <?php if ($puedeEditar): ?>
-                                                        <button type="button" class="btn btn-warning btn-sm btn-edit" data-id="<?php echo $estudiante['id']; ?>"><i class="fas fa-edit"></i></button>
-                                                    <?php endif; ?>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
+                                    <tr>
+                                        <td colspan="18" class="text-center py-5 text-muted">
+                                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                            <strong>Cargando estudiantes...</strong>
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
-                        </div>
-                        
-                        <div class="pagination-bar">
-                            <div class="records-selector">
-                                <label class="small mb-0">Mostrar:</label>
-                                <select id="registrosPorPagina" class="form-control form-control-sm">
-                                    <option value="10">10</option>
-                                    <option value="20" selected>20</option>
-                                    <option value="50">50</option>
-                                    <option value="100">100</option>
-                                    <option value="999999">Todos</option>
-                                </select>
-                                <span class="small text-muted">registros</span>
-                            </div>
-                            <div class="small text-muted">
-                                Mostrando <span id="mostrandoDesde">0</span> - <span id="mostrandoHasta">0</span> de <span id="totalRegistros"><?php echo $totalEstudiantes; ?></span> estudiantes
-                            </div>
-                            <nav>
-                                <ul class="pagination pagination-sm mb-0" id="paginationControls"></ul>
-                            </nav>
                         </div>
                     </div>
                 </div>
@@ -1028,25 +816,23 @@ include("includes/head.php");
 
 <script>
 let filtrosOcultos = false;
-let todasLasFilas = [];
-let filasFiltradas = [];
 let paginaActual = 1;
 let registrosPorPagina = 20;
+let debounceTimeout = null;
+let currentAbortController = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     cargarEstadoGuardado();
-    todasLasFilas = Array.from(document.querySelectorAll('#tablaBody tr'));
     configurarFiltros();
     
     const selectorRegistros = document.getElementById('registrosPorPagina');
     if (selectorRegistros) {
         selectorRegistros.addEventListener('change', function() {
             registrosPorPagina = parseInt(this.value);
-            paginaActual = 1;
-            aplicarFiltrosYActualizar();
+            cargarEstudiantes(1);
         });
     }
-    aplicarFiltrosYActualizar();
+    cargarEstudiantes(1);
 });
 
 function setupMasterToggle(masterId, childSelector) {
@@ -1060,7 +846,7 @@ function setupMasterToggle(masterId, childSelector) {
                 cb.disabled = checkAll;
             }
         });
-        aplicarFiltrosYActualizar();
+        cargarEstudiantes(1);
     });
     if (master.checked) {
         document.querySelectorAll(childSelector).forEach(cb => {
@@ -1086,7 +872,9 @@ function configurarFiltros() {
     setupMasterToggle('filtroTodasEdades', '.filtro-edad');
 
     document.querySelectorAll('.filtro-carrera, .filtro-modalidad, .filtro-ciudad, .filtro-sede, .filtro-turno, .filtro-estado-geo, .filtro-condicion, .filtro-genero, .filtro-edocivil, .filtro-status, .filtro-edad, .filtro').forEach(cb => {
-        cb.addEventListener('change', aplicarFiltrosYActualizar);
+        cb.addEventListener('change', function() {
+            cargarEstudiantes(1);
+        });
     });
 
     // Filtros de Condición: Estudiante vs Egresado
@@ -1108,7 +896,7 @@ function configurarFiltros() {
                 if (rEst) rEst.checked = false;
                 if (rEgr) rEgr.checked = false;
             }
-            aplicarFiltrosYActualizar();
+            cargarEstudiantes(1);
         });
     });
 
@@ -1127,374 +915,273 @@ function configurarFiltros() {
                 if (cbEst) cbEst.checked = false;
                 if (cbEgr) cbEgr.checked = true;
             }
-            aplicarFiltrosYActualizar();
+            cargarEstudiantes(1);
         });
     });
 
-    document.getElementById('edadMin').addEventListener('input', aplicarFiltrosYActualizar);
-    document.getElementById('edadMax').addEventListener('input', aplicarFiltrosYActualizar);
-    document.getElementById('fechaIngresoDesde').addEventListener('change', aplicarFiltrosYActualizar);
-    document.getElementById('fechaIngresoHasta').addEventListener('change', aplicarFiltrosYActualizar);
-    document.getElementById('buscadorCedula').addEventListener('keyup', aplicarFiltrosYActualizar);
-}
-
-function aplicarFiltrosYActualizar() {
-    aplicarFiltros();
-    actualizarEstadisticasDinamicas(filasFiltradas);
-    actualizarPaginacion();
-}
-
-function actualizarEstadisticasDinamicas(filas) {
-    const total = filas.length;
-    let activos = 0, inactivos = 0, nuevosIngresos = 0;
-    let masculinos = 0, femeninos = 0;
-    let menores = 0, mayores = 0;
-    let sumaEdad = 0, cantEdad = 0;
-    let embarazadas = 0, conDiscapacidad = 0, conEtnia = 0, opsu = 0;
-    let sedePC = 0, sedeCOEF = 0;
-    let egresados = 0, estudiantesSolo = 0;
-    const anioActualStr = '<?php echo $anioActual; ?>';
-
-    filas.forEach(f => {
-        const tipoAlumno = f.getAttribute('data-tipo-alumno') || 'estudiante';
-        if (tipoAlumno === 'egresado') egresados++;
-        else estudiantesSolo++;
-
-        const status = f.getAttribute('data-status');
-        if (status === '1') activos++;
-        else if (status === '0') inactivos++;
-
-        const fechaIngreso = f.getAttribute('data-fecha-ingreso') || '';
-        if (fechaIngreso.startsWith(anioActualStr)) nuevosIngresos++;
-
-        const genero = (f.getAttribute('data-genero') || '').toLowerCase();
-        if (genero === 'masculino') masculinos++;
-        else if (genero === 'femenino') femeninos++;
-
-        const menor = f.getAttribute('data-menor');
-        const mayor = f.getAttribute('data-mayor');
-        if (menor === '1') menores++;
-        if (mayor === '1') mayores++;
-
-        const edad = parseInt(f.getAttribute('data-edad'));
-        if (!isNaN(edad) && edad > 0) {
-            sumaEdad += edad;
-            cantEdad++;
+    // Filtros numéricos y de fecha
+    ['edadMin', 'edadMax'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', function() {
+                clearTimeout(debounceTimeout);
+                debounceTimeout = setTimeout(() => cargarEstudiantes(1), 350);
+            });
         }
-
-        if (f.getAttribute('data-embarazada') === '1') embarazadas++;
-        if (f.getAttribute('data-tiene-discapacidad') === '1') conDiscapacidad++;
-        if (f.getAttribute('data-tiene-etnia') === '1') conEtnia++;
-        if (f.getAttribute('data-opsu') === '1') opsu++;
-
-        const sede = (f.getAttribute('data-sede') || '').toLowerCase();
-        if (sede.includes('puerto cabello')) sedePC++;
-        if (sede.includes('coef')) sedeCOEF++;
     });
 
-    const elTotal = document.getElementById('statTotalEstudiantes');
-    if (elTotal) elTotal.textContent = total;
-    const elActivos = document.getElementById('statActivos');
-    if (elActivos) elActivos.textContent = activos;
-    const elInactivos = document.getElementById('statInactivos');
-    if (elInactivos) elInactivos.textContent = inactivos;
-    const elNuevos = document.getElementById('statNuevosIngresos');
-    if (elNuevos) elNuevos.textContent = nuevosIngresos;
-    const elMasc = document.getElementById('statMasculinos');
-    if (elMasc) elMasc.textContent = masculinos;
-    const elFem = document.getElementById('statFemeninos');
-    if (elFem) elFem.textContent = femeninos;
-    const elMenores = document.getElementById('statMenores');
-    if (elMenores) elMenores.textContent = menores;
-    const elMayores = document.getElementById('statMayores');
-    if (elMayores) elMayores.textContent = mayores;
-    const elEdadProm = document.getElementById('statEdadPromedio');
-    if (elEdadProm) elEdadProm.textContent = cantEdad > 0 ? (sumaEdad / cantEdad).toFixed(1) + ' años' : '-';
-    const elEmb = document.getElementById('statEmbarazadas');
-    if (elEmb) elEmb.textContent = embarazadas;
-    const elDisc = document.getElementById('statDiscapacidad');
-    if (elDisc) elDisc.textContent = conDiscapacidad;
-    const elEtnia = document.getElementById('statEtnia');
-    if (elEtnia) elEtnia.textContent = conEtnia;
-    const elOpsu = document.getElementById('statOpsu');
-    if (elOpsu) elOpsu.textContent = opsu;
-    const elSedePC = document.getElementById('statSedePC');
-    if (elSedePC) elSedePC.textContent = sedePC;
-    const elSedeCOEF = document.getElementById('statSedeCOEF');
-    if (elSedeCOEF) elSedeCOEF.textContent = sedeCOEF;
-    const elEgresados = document.getElementById('statEgresados');
-    if (elEgresados) elEgresados.textContent = egresados;
+    ['fechaIngresoDesde', 'fechaIngresoHasta'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('change', function() {
+                cargarEstudiantes(1);
+            });
+        }
+    });
 
-    const elCountTodos = document.getElementById('countTodos');
-    if (elCountTodos) elCountTodos.textContent = total;
-    const elCountEst = document.getElementById('countEstudiantes');
-    if (elCountEst) elCountEst.textContent = estudiantesSolo;
-    const elCountEgr = document.getElementById('countEgresados');
-    if (elCountEgr) elCountEgr.textContent = egresados;
+    // Buscador textual en vivo con debounce de 300ms
+    const buscador = document.getElementById('buscadorCedula');
+    if (buscador) {
+        buscador.addEventListener('input', function() {
+            clearTimeout(debounceTimeout);
+            debounceTimeout = setTimeout(() => {
+                cargarEstudiantes(1);
+            }, 300);
+        });
+    }
 }
 
-function aplicarFiltros() {
-    let termino = document.getElementById('buscadorCedula').value.trim().toLowerCase();
-    
-    let todosGeneros = document.getElementById('filtroTodosGeneros')?.checked;
-    let filtroMasculino = document.getElementById('filtroMasculino')?.checked;
-    let filtroFemenino = document.getElementById('filtroFemenino')?.checked;
-    
-    let todosStatus = document.getElementById('filtroTodosStatus')?.checked;
-    let filtroActivo = document.getElementById('filtroActivo')?.checked;
-    let filtroInactivo = document.getElementById('filtroInactivo')?.checked;
-    
-    let filtroTipoEstudiante = document.getElementById('filtroTipoEstudiante')?.checked;
-    let filtroTipoEgresado = document.getElementById('filtroTipoEgresado')?.checked;
+function obtenerFiltrosActivos() {
+    const params = new URLSearchParams();
 
-    let filtroEmbarazada = document.getElementById('filtroEmbarazada')?.checked;
-    let todasEdades = document.getElementById('filtroTodasEdades')?.checked;
-    let filtroMenor = document.getElementById('filtroMenor')?.checked;
-    let filtroMayor = document.getElementById('filtroMayor')?.checked;
-    
-    let todosEdoCivil = document.getElementById('filtroTodosEdoCivil')?.checked;
-    let filtroSoltero = document.getElementById('filtroSoltero')?.checked;
-    let filtroCasado = document.getElementById('filtroCasado')?.checked;
-    
-    let edadMin = document.getElementById('edadMin')?.value;
-    let edadMax = document.getElementById('edadMax')?.value;
-    let fechaDesde = document.getElementById('fechaIngresoDesde')?.value;
-    let fechaHasta = document.getElementById('fechaIngresoHasta')?.value;
-    
-    let carrerasSeleccionadas = [];
-    let todasCarreras = document.getElementById('filtroTodasCarreras')?.checked;
+    // Texto de búsqueda
+    const busqueda = document.getElementById('buscadorCedula')?.value.trim() || '';
+    if (busqueda) params.append('busqueda', busqueda);
+
+    // Tipo de Alumno (Radio rápido o checkboxes)
+    const radioTipo = document.querySelector('input[name="quickTipoAlumno"]:checked')?.value;
+    if (radioTipo) {
+        params.append('tipo_alumno', radioTipo);
+    } else {
+        const estCheck = document.getElementById('filtroTipoEstudiante')?.checked;
+        const egrCheck = document.getElementById('filtroTipoEgresado')?.checked;
+        if (estCheck && !egrCheck) params.append('tipo_alumno', 'estudiante');
+        else if (!estCheck && egrCheck) params.append('tipo_alumno', 'egresado');
+        else params.append('tipo_alumno', 'todos');
+    }
+
+    // Carreras
+    const todasCarreras = document.getElementById('filtroTodasCarreras')?.checked;
     if (!todasCarreras) {
         document.querySelectorAll('.filtro-carrera:checked').forEach(cb => {
-            if (cb.value !== 'todas') carrerasSeleccionadas.push(cb.value.toLowerCase());
+            if (cb.value !== 'todas') params.append('carreras[]', cb.value);
         });
     }
 
-    let modalidadesSeleccionadas = [];
-    let todasModalidades = document.getElementById('filtroTodasModalidades')?.checked;
+    // Modalidades
+    const todasModalidades = document.getElementById('filtroTodasModalidades')?.checked;
     if (!todasModalidades) {
         document.querySelectorAll('.filtro-modalidad:checked').forEach(cb => {
-            if (cb.value !== 'todas') modalidadesSeleccionadas.push(cb.value.toLowerCase());
+            if (cb.value !== 'todas') params.append('modalidades[]', cb.value);
         });
     }
-    
-    let ciudadesSeleccionadas = [];
-    let todasCiudades = document.getElementById('filtroTodasCiudades')?.checked;
-    if (!todasCiudades) {
-        document.querySelectorAll('.filtro-ciudad:checked').forEach(cb => {
-            if (cb.value !== 'todas') ciudadesSeleccionadas.push(cb.value.toLowerCase());
+
+    // Status
+    const todosStatus = document.getElementById('filtroTodosStatus')?.checked;
+    if (!todosStatus) {
+        document.querySelectorAll('.filtro-status:checked').forEach(cb => {
+            if (cb.value !== 'todos') params.append('status[]', cb.value);
         });
     }
-    
-    let sedesSeleccionadas = [];
-    let todasSedes = document.getElementById('filtroTodasSedes')?.checked;
+
+    // Género
+    const todosGeneros = document.getElementById('filtroTodosGeneros')?.checked;
+    if (!todosGeneros) {
+        document.querySelectorAll('.filtro-genero:checked').forEach(cb => {
+            if (cb.value !== 'todos') params.append('generos[]', cb.value);
+        });
+    }
+
+    // Sedes
+    const todasSedes = document.getElementById('filtroTodasSedes')?.checked;
     if (!todasSedes) {
         document.querySelectorAll('.filtro-sede:checked').forEach(cb => {
-            if (cb.value !== 'todas') sedesSeleccionadas.push(cb.value.toLowerCase());
+            if (cb.value !== 'todas') params.append('sedes[]', cb.value);
         });
     }
 
-    let turnosSeleccionados = [];
-    let todosTurnos = document.getElementById('filtroTodosTurnos')?.checked;
+    // Turnos
+    const todosTurnos = document.getElementById('filtroTodosTurnos')?.checked;
     if (!todosTurnos) {
         document.querySelectorAll('.filtro-turno:checked').forEach(cb => {
-            if (cb.value !== 'todos') turnosSeleccionados.push(cb.value.toLowerCase());
+            if (cb.value !== 'todos') params.append('turnos[]', cb.value);
         });
     }
 
-    let estadosGeoSeleccionados = [];
-    let todosEstadosGeo = document.getElementById('filtroTodosEstadosGeo')?.checked;
+    // Estados Geográficos
+    const todosEstadosGeo = document.getElementById('filtroTodosEstadosGeo')?.checked;
     if (!todosEstadosGeo) {
         document.querySelectorAll('.filtro-estado-geo:checked').forEach(cb => {
-            if (cb.value !== 'todos') estadosGeoSeleccionados.push(cb.value.toLowerCase());
+            if (cb.value !== 'todos') params.append('estados_geo[]', cb.value);
         });
     }
 
-    let todasCondiciones = document.getElementById('filtroTodasCondiciones')?.checked;
-    let filtroConDiscapacidad = document.getElementById('filtroConDiscapacidad')?.checked;
-    let filtroSinDiscapacidad = document.getElementById('filtroSinDiscapacidad')?.checked;
-    let filtroConEtnia = document.getElementById('filtroConEtnia')?.checked;
-    let filtroSinEtnia = document.getElementById('filtroSinEtnia')?.checked;
-    
-    filasFiltradas = todasLasFilas.filter(fila => {
-        let textoFila = (fila.textContent || fila.innerText || '').toLowerCase();
+    // Ciudades
+    const todasCiudades = document.getElementById('filtroTodasCiudades')?.checked;
+    if (!todasCiudades) {
+        document.querySelectorAll('.filtro-ciudad:checked').forEach(cb => {
+            if (cb.value !== 'todas') params.append('ciudades[]', cb.value);
+        });
+    }
 
-        if (termino !== '' && !textoFila.includes(termino)) return false;
+    // Inclusión y condiciones de salud
+    const todasCondiciones = document.getElementById('filtroTodasCondiciones')?.checked;
+    if (!todasCondiciones) {
+        document.querySelectorAll('.filtro-condicion:checked').forEach(cb => {
+            if (cb.value !== 'todas') params.append('condiciones[]', cb.value);
+        });
+    }
 
-        // Filtro por condición (Estudiante regular vs Egresado)
-        if (!filtroTipoEstudiante && !filtroTipoEgresado) return false;
-        let tipoAlumno = fila.getAttribute('data-tipo-alumno') || 'estudiante';
-        if (filtroTipoEstudiante && !filtroTipoEgresado && tipoAlumno !== 'estudiante') return false;
-        if (!filtroTipoEstudiante && filtroTipoEgresado && tipoAlumno !== 'egresado') return false;
-        
-        if (!todasCarreras && carrerasSeleccionadas.length > 0) {
-            let carrera = (fila.getAttribute('data-carrera') || '').toLowerCase();
-            if (!carrerasSeleccionadas.includes(carrera)) return false;
-        }
+    // Embarazo
+    if (document.getElementById('filtroEmbarazada')?.checked) {
+        params.append('condiciones[]', 'embarazada');
+    }
 
-        if (!todasModalidades && modalidadesSeleccionadas.length > 0) {
-            let modalidad = (fila.getAttribute('data-inscrito-por') || '').toLowerCase();
-            if (!modalidadesSeleccionadas.includes(modalidad)) return false;
-        }
+    // Estado Civil
+    const todosEdoCivil = document.getElementById('filtroTodosEdoCivil')?.checked;
+    if (!todosEdoCivil) {
+        document.querySelectorAll('.filtro-edocivil:checked').forEach(cb => {
+            if (cb.value !== 'todos') params.append('edo_civil[]', cb.value);
+        });
+    }
 
-        if (!todasCiudades && ciudadesSeleccionadas.length > 0) {
-            let ciudad = (fila.getAttribute('data-ciudad') || '').toLowerCase();
-            if (!ciudadesSeleccionadas.includes(ciudad)) return false;
-        }
+    // Edades (menor / mayor / rango)
+    const todasEdades = document.getElementById('filtroTodasEdades')?.checked;
+    if (!todasEdades) {
+        const esMenor = document.getElementById('filtroMenor')?.checked;
+        const esMayor = document.getElementById('filtroMayor')?.checked;
+        if (esMenor && !esMayor) params.append('condiciones[]', 'menor');
+        else if (!esMenor && esMayor) params.append('condiciones[]', 'mayor');
+    }
+    const edadMin = document.getElementById('edadMin')?.value.trim();
+    if (edadMin) params.append('edad_min', edadMin);
+    const edadMax = document.getElementById('edadMax')?.value.trim();
+    if (edadMax) params.append('edad_max', edadMax);
 
-        if (!todasSedes && sedesSeleccionadas.length > 0) {
-            let sede = (fila.getAttribute('data-sede') || '').toLowerCase();
-            if (!sedesSeleccionadas.includes(sede)) return false;
-        }
+    // Fechas de ingreso
+    const fDesde = document.getElementById('fechaIngresoDesde')?.value.trim();
+    if (fDesde) params.append('fecha_desde', fDesde);
+    const fHasta = document.getElementById('fechaIngresoHasta')?.value.trim();
+    if (fHasta) params.append('fecha_hasta', fHasta);
 
-        if (!todosTurnos && turnosSeleccionados.length > 0) {
-            let turno = (fila.getAttribute('data-turno') || '').toLowerCase();
-            if (!turnosSeleccionados.includes(turno)) return false;
-        }
+    return params;
+}
 
-        if (!todosEstadosGeo && estadosGeoSeleccionados.length > 0) {
-            let estadoGeo = (fila.getAttribute('data-estado-geo') || '').toLowerCase();
-            if (!estadosGeoSeleccionados.includes(estadoGeo)) return false;
-        }
+function cargarEstudiantes(nuevaPagina = 1) {
+    if (currentAbortController) {
+        currentAbortController.abort();
+    }
+    currentAbortController = new AbortController();
 
-        if (!todasCondiciones) {
-            if (filtroConDiscapacidad || filtroSinDiscapacidad) {
-                let tieneDisc = fila.getAttribute('data-tiene-discapacidad') || '0';
-                if (filtroConDiscapacidad && !filtroSinDiscapacidad && tieneDisc !== '1') return false;
-                if (filtroSinDiscapacidad && !filtroConDiscapacidad && tieneDisc !== '0') return false;
-            }
-            if (filtroConEtnia || filtroSinEtnia) {
-                let tieneEtn = fila.getAttribute('data-tiene-etnia') || '0';
-                if (filtroConEtnia && !filtroSinEtnia && tieneEtn !== '1') return false;
-                if (filtroSinEtnia && !filtroConEtnia && tieneEtn !== '0') return false;
-            }
-        }
+    paginaActual = nuevaPagina;
+    const params = obtenerFiltrosActivos();
+    params.append("action", "listar");
+    params.append("page", paginaActual);
+    params.append("limit", registrosPorPagina);
 
-        if (!todosGeneros && (filtroMasculino || filtroFemenino)) {
-            let genero = (fila.getAttribute('data-genero') || '').toLowerCase();
-            if (filtroMasculino && filtroFemenino) {}
-            else if (filtroMasculino && genero !== 'masculino') return false;
-            else if (filtroFemenino && genero !== 'femenino') return false;
+    const tbody = document.getElementById("tablaBody");
+    tbody.innerHTML = `<tr><td colspan="18" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div> Cargando registros...</td></tr>`;
+
+    fetch("ajax_estudiantes.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
+        signal: currentAbortController.signal
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            tbody.innerHTML = data.html;
+            document.getElementById("mostrandoDesde").textContent = data.desde;
+            document.getElementById("mostrandoHasta").textContent = data.hasta;
+            document.getElementById("totalRegistros").textContent = data.total;
+            renderPaginacion(data.page, data.total_pages);
+        } else {
+            tbody.innerHTML = `<tr><td colspan="18" class="text-center py-4 text-danger"><i class="fas fa-exclamation-triangle me-1"></i> Error al cargar datos: ${data.error || "Error desconocido"}</td></tr>`;
         }
-        if (!todosStatus && (filtroActivo || filtroInactivo)) {
-            let status = fila.getAttribute('data-status') || '';
-            if (filtroActivo && filtroInactivo) {}
-            else if (filtroActivo && status !== '1') return false;
-            else if (filtroInactivo && status !== '0') return false;
+    })
+    .catch(err => {
+        if (err.name !== "AbortError") {
+            tbody.innerHTML = `<tr><td colspan="18" class="text-center py-4 text-danger"><i class="fas fa-exclamation-triangle me-1"></i> Error de conexión al cargar datos.</td></tr>`;
         }
-        if (filtroEmbarazada) {
-            let embarazada = fila.getAttribute('data-embarazada') || '0';
-            let genero = (fila.getAttribute('data-genero') || '').toLowerCase();
-            if (embarazada !== '1' || genero !== 'femenino') return false;
-        }
-        if (!todasEdades && (filtroMenor || filtroMayor)) {
-            let menor = fila.getAttribute('data-menor') || '0';
-            let mayor = fila.getAttribute('data-mayor') || '0';
-            if (filtroMenor && filtroMayor) {}
-            else if (filtroMenor && menor !== '1') return false;
-            else if (filtroMayor && mayor !== '1') return false;
-        }
-        if (edadMin !== '' || edadMax !== '') {
-            let edad = parseInt(fila.getAttribute('data-edad')) || 0;
-            if (edadMin !== '' && edad < parseInt(edadMin)) return false;
-            if (edadMax !== '' && edad > parseInt(edadMax)) return false;
-        }
-        if (!todosEdoCivil && (filtroSoltero || filtroCasado)) {
-            let edoCivil = (fila.getAttribute('data-edo-civil') || '').toLowerCase();
-            if (filtroSoltero && !edoCivil.includes('soltero')) return false;
-            if (filtroCasado && !edoCivil.includes('casado')) return false;
-        }
-        if (fechaDesde !== '' || fechaHasta !== '') {
-            let fechaIngreso = fila.getAttribute('data-fecha-ingreso') || '';
-            if (fechaDesde !== '' && fechaIngreso < fechaDesde) return false;
-            if (fechaHasta !== '' && fechaIngreso > fechaHasta) return false;
-        }
-        return true;
     });
-    
-    let mensajeDiv = document.getElementById('mensajeBusqueda');
-    if(!mensajeDiv) {
-        mensajeDiv = document.createElement('div');
-        mensajeDiv.id = 'mensajeBusqueda';
-        mensajeDiv.className = 'alert alert-info mt-3';
-        document.querySelector('.table-responsive').appendChild(mensajeDiv);
-    }
-    if(filasFiltradas.length === 0) {
-        mensajeDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> No se encontraron estudiantes con los filtros seleccionados`;
-        mensajeDiv.className = 'alert alert-warning mt-3';
-    } else {
-        mensajeDiv.innerHTML = `<i class="fas fa-check-circle"></i> Se encontraron ${filasFiltradas.length} de ${todasLasFilas.length} estudiantes`;
-        mensajeDiv.className = 'alert alert-success mt-3';
-    }
 }
 
-function actualizarPaginacion() {
-    const totalFilas = filasFiltradas.length;
-    const totalPaginas = registrosPorPagina === 999999 ? 1 : Math.ceil(totalFilas / registrosPorPagina);
-    if (paginaActual > totalPaginas) paginaActual = totalPaginas;
-    if (paginaActual < 1) paginaActual = 1;
-    const inicio = (paginaActual - 1) * registrosPorPagina;
-    const fin = registrosPorPagina === 999999 ? totalFilas : Math.min(inicio + registrosPorPagina, totalFilas);
-    todasLasFilas.forEach(fila => fila.style.display = 'none');
-    for (let i = inicio; i < fin; i++) {
-        if (filasFiltradas[i]) filasFiltradas[i].style.display = '';
-    }
-    document.getElementById('mostrandoDesde').textContent = totalFilas === 0 ? 0 : inicio + 1;
-    document.getElementById('mostrandoHasta').textContent = fin;
-    document.getElementById('totalRegistros').textContent = totalFilas;
-    
-    const paginationContainer = document.getElementById('paginationControls');
-    paginationContainer.innerHTML = '';
-    if (registrosPorPagina !== 999999 && totalPaginas > 1) {
-        const liPrev = document.createElement('li');
-        liPrev.className = `page-item ${paginaActual === 1 ? 'disabled' : ''}`;
-        liPrev.innerHTML = `<a class="page-link" data-pagina="${paginaActual - 1}"><i class="fas fa-chevron-left"></i> Anterior</a>`;
-        paginationContainer.appendChild(liPrev);
-        
-        let inicioPag = Math.max(1, paginaActual - 2);
-        let finPag = Math.min(totalPaginas, paginaActual + 2);
-        if (inicioPag > 1) {
-            paginationContainer.appendChild(crearItemPagina(1));
-            if (inicioPag > 2) paginationContainer.appendChild(crearItemPuntos());
-        }
-        for (let i = inicioPag; i <= finPag; i++) {
-            paginationContainer.appendChild(crearItemPagina(i));
-        }
-        if (finPag < totalPaginas) {
-            if (finPag < totalPaginas - 1) paginationContainer.appendChild(crearItemPuntos());
-            paginationContainer.appendChild(crearItemPagina(totalPaginas));
-        }
-        const liNext = document.createElement('li');
-        liNext.className = `page-item ${paginaActual === totalPaginas ? 'disabled' : ''}`;
-        liNext.innerHTML = `<a class="page-link" data-pagina="${paginaActual + 1}">Siguiente <i class="fas fa-chevron-right"></i></a>`;
-        paginationContainer.appendChild(liNext);
-        
-        document.querySelectorAll('#paginationControls .page-link').forEach(link => {
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-                const nuevaPagina = parseInt(this.getAttribute('data-pagina'));
-                if (!isNaN(nuevaPagina) && nuevaPagina !== paginaActual && nuevaPagina >= 1 && nuevaPagina <= totalPaginas) {
-                    paginaActual = nuevaPagina;
-                    actualizarPaginacion();
-                }
-            });
+function renderPaginacion(pagina, totalPaginas) {
+    const container = document.getElementById("paginationControls");
+    container.innerHTML = "";
+    if (totalPaginas <= 1) return;
+
+    // Botón Anterior
+    const liPrev = document.createElement("li");
+    liPrev.className = `page-item ${pagina === 1 ? "disabled" : ""}`;
+    liPrev.innerHTML = `<a class="page-link" href="#"><i class="fas fa-chevron-left"></i> Anterior</a>`;
+    if (pagina > 1) {
+        liPrev.querySelector("a").addEventListener("click", function(e) {
+            e.preventDefault();
+            cargarEstudiantes(pagina - 1);
         });
     }
+    container.appendChild(liPrev);
+
+    // Números de páginas con elipsis
+    let inicio = Math.max(1, pagina - 2);
+    let fin = Math.min(totalPaginas, pagina + 2);
+
+    if (inicio > 1) {
+        container.appendChild(crearBotonPagina(1, pagina));
+        if (inicio > 2) container.appendChild(crearPuntosPagina());
+    }
+
+    for (let i = inicio; i <= fin; i++) {
+        container.appendChild(crearBotonPagina(i, pagina));
+    }
+
+    if (fin < totalPaginas) {
+        if (fin < totalPaginas - 1) container.appendChild(crearPuntosPagina());
+        container.appendChild(crearBotonPagina(totalPaginas, pagina));
+    }
+
+    // Botón Siguiente
+    const liNext = document.createElement("li");
+    liNext.className = `page-item ${pagina === totalPaginas ? "disabled" : ""}`;
+    liNext.innerHTML = `<a class="page-link" href="#">Siguiente <i class="fas fa-chevron-right"></i></a>`;
+    if (pagina < totalPaginas) {
+        liNext.querySelector("a").addEventListener("click", function(e) {
+            e.preventDefault();
+            cargarEstudiantes(pagina + 1);
+        });
+    }
+    container.appendChild(liNext);
 }
 
-function crearItemPagina(numero) {
-    const li = document.createElement('li');
-    li.className = `page-item ${numero === paginaActual ? 'active' : ''}`;
-    li.innerHTML = `<a class="page-link" data-pagina="${numero}">${numero}</a>`;
+function crearBotonPagina(num, pagActual) {
+    const li = document.createElement("li");
+    li.className = `page-item ${num === pagActual ? "active" : ""}`;
+    li.innerHTML = `<a class="page-link" href="#">${num}</a>`;
+    li.querySelector("a").addEventListener("click", function(e) {
+        e.preventDefault();
+        if (num !== pagActual) cargarEstudiantes(num);
+    });
     return li;
 }
 
-function crearItemPuntos() {
-    const li = document.createElement('li');
-    li.className = 'page-item disabled';
-    li.innerHTML = '<span class="page-link">...</span>';
+function crearPuntosPagina() {
+    const li = document.createElement("li");
+    li.className = "page-item disabled";
+    li.innerHTML = `<span class="page-link">...</span>`;
     return li;
 }
-
 function toggleFiltros() {
     const filtrosBody = document.getElementById('filtrosBody');
     const toggleText = document.getElementById('toggleFiltrosText');
@@ -1544,114 +1231,116 @@ window.toggleEstadisticas = function() {
     }
 };
 
-function getEstudiantesFiltrados() {
-    return filasFiltradas.map(fila => fila.querySelector('.btn-details')?.getAttribute('data-id')).filter(id => id);
-}
-
-function getEstudiantesParaReporte(tipo) {
-    return filasFiltradas.filter(fila => {
-        const tipoAlumno = fila.getAttribute('data-tipo-alumno') || 'estudiante';
-        return (tipo === 'egresados') ? tipoAlumno === 'egresado' : tipoAlumno !== 'egresado';
-    }).map(fila => fila.querySelector('.btn-details')?.getAttribute('data-id')).filter(Boolean);
-}
-
 function abrirModalReporte(tipo) {
-    const inputTipo = document.getElementById('reporteTipoSeleccionado');
+    const inputTipo = document.getElementById("reporteTipoSeleccionado");
     if (inputTipo) inputTipo.value = tipo;
 
-    const ids = getEstudiantesParaReporte(tipo);
-    const modalHeader = document.getElementById('reporteModalHeader');
-    const modalTitle = document.getElementById('reporteModalTitle');
-    const modalAlert = document.getElementById('reporteModalAlert');
-    const btnPDF = document.getElementById('btnGenerarPDF');
+    const modalHeader = document.getElementById("reporteModalHeader");
+    const modalTitle = document.getElementById("reporteModalTitle");
+    const modalAlert = document.getElementById("reporteModalAlert");
+    const btnPDF = document.getElementById("btnGenerarPDF");
 
-    if (tipo === 'egresados') {
-        if (ids.length === 0) {
-            mostrarMensaje('Sin Egresados', 'No se encontraron egresados con los filtros aplicados. Sugerencia: active la opción de egresados o verifique los criterios.', false);
-            return;
-        }
+    if (tipo === "egresados") {
         if (modalHeader) {
-            modalHeader.className = 'modal-header text-white';
-            modalHeader.style.backgroundColor = '#3b093d';
+            modalHeader.className = "modal-header text-white";
+            modalHeader.style.backgroundColor = "#3b093d";
         }
-        if (modalTitle) modalTitle.innerHTML = '<i class="fas fa-graduation-cap me-2"></i> Reporte Oficial de Egresados y Graduados';
+        if (modalTitle) modalTitle.innerHTML = "<i class=\"fas fa-graduation-cap me-2\"></i> Reporte Oficial de Egresados y Graduados";
         if (btnPDF) {
-            btnPDF.className = 'btn text-white';
-            btnPDF.style.backgroundColor = '#3b093d';
-            btnPDF.style.borderColor = '#2b062d';
-            btnPDF.innerHTML = '<i class="fas fa-file-pdf me-1"></i> Generar Reporte de Egresados PDF';
+            btnPDF.className = "btn text-white";
+            btnPDF.style.backgroundColor = "#3b093d";
+            btnPDF.style.borderColor = "#2b062d";
+            btnPDF.innerHTML = "<i class=\"fas fa-file-pdf me-1\"></i> Generar Reporte de Egresados PDF";
         }
         if (modalAlert) {
-            modalAlert.className = 'alert alert-info';
-            modalAlert.innerHTML = `<i class="fas fa-info-circle me-1"></i> Se generará el reporte oficial en PDF con los <strong>${ids.length}</strong> egresados y graduados seleccionados según los filtros activos.`;
+            modalAlert.className = "alert alert-info";
+            modalAlert.innerHTML = "<i class=\"fas fa-info-circle me-1\"></i> Se generará el reporte oficial en PDF con los egresados y graduados seleccionados según los filtros activos.";
         }
     } else {
-        if (ids.length === 0) {
-            mostrarMensaje('Sin Estudiantes', 'No se encontraron estudiantes con los filtros aplicados.', false);
-            return;
-        }
         if (modalHeader) {
-            modalHeader.className = 'modal-header bg-danger text-white';
-            modalHeader.style.backgroundColor = '';
+            modalHeader.className = "modal-header bg-danger text-white";
+            modalHeader.style.backgroundColor = "";
         }
-        if (modalTitle) modalTitle.innerHTML = '<i class="fas fa-file-pdf me-2"></i> Reporte Oficial de Estudiantes';
+        if (modalTitle) modalTitle.innerHTML = "<i class=\"fas fa-file-pdf me-2\"></i> Reporte Oficial de Estudiantes";
         if (btnPDF) {
-            btnPDF.className = 'btn btn-danger';
-            btnPDF.style.backgroundColor = '';
-            btnPDF.style.borderColor = '';
-            btnPDF.innerHTML = '<i class="fas fa-file-pdf me-1"></i> Generar Reporte de Estudiantes PDF';
+            btnPDF.className = "btn btn-danger";
+            btnPDF.style.backgroundColor = "";
+            btnPDF.style.borderColor = "";
+            btnPDF.innerHTML = "<i class=\"fas fa-file-pdf me-1\"></i> Generar Reporte de Estudiantes PDF";
         }
         if (modalAlert) {
-            modalAlert.className = 'alert alert-info';
-            modalAlert.innerHTML = `<i class="fas fa-info-circle me-1"></i> Se generará el reporte oficial en PDF con los <strong>${ids.length}</strong> estudiantes seleccionados según los filtros activos.`;
+            modalAlert.className = "alert alert-info";
+            modalAlert.innerHTML = "<i class=\"fas fa-info-circle me-1\"></i> Se generará el reporte oficial en PDF con los estudiantes regulares seleccionados según los filtros activos.";
         }
     }
 
-    $('#reporteModal').modal('show');
+    $("#reporteModal").modal("show");
 }
 
 function generarReportePDF() {
-    const tipoReporte = document.getElementById('reporteTipoSeleccionado')?.value || 'estudiantes';
-    const estudiantesIds = getEstudiantesParaReporte(tipoReporte);
-    const incluirEstadisticas = document.getElementById('incluirEstadisticas').value;
+    const tipoReporte = document.getElementById("reporteTipoSeleccionado")?.value || "estudiantes";
+    const incluirEstadisticas = document.getElementById("incluirEstadisticas").value;
+    const btnPDF = document.getElementById("btnGenerarPDF");
+    const originalText = btnPDF.innerHTML;
 
-    if (estudiantesIds.length === 0) {
-        mostrarMensaje('Sin resultados', 'No hay registros para generar el reporte con los filtros seleccionados', false);
-        return;
-    }
+    btnPDF.disabled = true;
+    btnPDF.innerHTML = "<i class=\"fas fa-spinner fa-spin me-1\"></i> Preparando datos del reporte...";
 
-    // Enviar mediante POST para soportar cientos/miles de IDs sin límites de URL GET
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = 'reporte_estudiantes_pdf.php';
-    form.target = '_blank';
-    form.style.display = 'none';
+    const params = obtenerFiltrosActivos();
+    params.set("action", "obtener_ids");
+    params.set("tipo_alumno", (tipoReporte === "egresados") ? "egresado" : "estudiante");
 
-    const inputIds = document.createElement('input');
-    inputIds.type = 'hidden';
-    inputIds.name = 'ids';
-    inputIds.value = estudiantesIds.join(',');
-    form.appendChild(inputIds);
+    fetch("ajax_estudiantes.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString()
+    })
+    .then(r => r.json())
+    .then(data => {
+        btnPDF.disabled = false;
+        btnPDF.innerHTML = originalText;
 
-    const inputEstadisticas = document.createElement('input');
-    inputEstadisticas.type = 'hidden';
-    inputEstadisticas.name = 'estadisticas';
-    inputEstadisticas.value = incluirEstadisticas;
-    form.appendChild(inputEstadisticas);
+        if (!data.success || !data.ids || data.ids.length === 0) {
+            mostrarMensaje("Sin resultados", "No se encontraron registros para generar el reporte con los filtros seleccionados.", false);
+            return;
+        }
 
-    const inputTipo = document.createElement('input');
-    inputTipo.type = 'hidden';
-    inputTipo.name = 'tipo_reporte';
-    inputTipo.value = tipoReporte;
-    form.appendChild(inputTipo);
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = "reporte_estudiantes_pdf.php";
+        form.target = "_blank";
+        form.style.display = "none";
 
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
+        const inputIds = document.createElement("input");
+        inputIds.type = "hidden";
+        inputIds.name = "ids";
+        inputIds.value = data.ids.join(",");
+        form.appendChild(inputIds);
 
-    $('#reporteModal').modal('hide');
+        const inputEstadisticas = document.createElement("input");
+        inputEstadisticas.type = "hidden";
+        inputEstadisticas.name = "estadisticas";
+        inputEstadisticas.value = incluirEstadisticas;
+        form.appendChild(inputEstadisticas);
+
+        const inputTipo = document.createElement("input");
+        inputTipo.type = "hidden";
+        inputTipo.name = "tipo_reporte";
+        inputTipo.value = tipoReporte;
+        form.appendChild(inputTipo);
+
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+
+        $("#reporteModal").modal("hide");
+    })
+    .catch(err => {
+        btnPDF.disabled = false;
+        btnPDF.innerHTML = originalText;
+        mostrarMensaje("Error", "Error al comunicarse con el servidor: " + err.message, false);
+    });
 }
-
 document.getElementById('limpiarBusqueda').addEventListener('click', function() {
     document.getElementById('buscadorCedula').value = '';
     [
@@ -1680,7 +1369,7 @@ document.getElementById('limpiarBusqueda').addEventListener('click', function() 
     document.getElementById('edadMax').value = '';
     document.getElementById('fechaIngresoDesde').value = '';
     document.getElementById('fechaIngresoHasta').value = '';
-    aplicarFiltrosYActualizar();
+    cargarEstudiantes(1);
 });
 
 const btnReporteEst = document.getElementById('btnReporteEstudiantes');
