@@ -398,6 +398,16 @@ if (!empty($cedula)) {
             </button>
         </div>
         <div class="card-body p-0">
+            <!-- Aclaratoria sobre calificaciones sin cortes trimestrales -->
+            <div class="px-3 pt-3 pb-2 bg-light border-bottom">
+                <div class="d-flex align-items-center text-muted small">
+                    <i class="fas fa-info-circle text-info fa-lg mr-2"></i>
+                    <div>
+                        <strong>Aclaratoria sobre evaluaciones:</strong> Las asignaturas asentadas en acta oficial (sistema anterior, convalidaciones o equivalencias) cuentan directamente con su <strong>Nota Final</strong> oficial. Cuando no apliquen evaluaciones trimestrales continuas, se muestran identificadas como <span class="badge badge-light border text-muted px-2 py-1"><i class="fas fa-archive text-secondary mr-1"></i> Carga Directa (Histórica)</span>.
+                    </div>
+                </div>
+            </div>
+
             <div class="table-responsive">
                 <table class="table table-bordered table-sm table-hover mb-0">
                     <thead class="thead-light">
@@ -405,9 +415,9 @@ if (!empty($cedula)) {
                             <th>Trayecto</th>
                             <th>Materia</th>
                             <th>Código</th>
-                            <th class="text-center">Trim. 1</th>
-                            <th class="text-center">Trim. 2</th>
-                            <th class="text-center">Trim. 3</th>
+                            <th class="text-center" title="Corte evaluativo continuo del Trimestre 1">Trim. 1</th>
+                            <th class="text-center" title="Corte evaluativo continuo del Trimestre 2">Trim. 2</th>
+                            <th class="text-center" title="Corte evaluativo continuo del Trimestre 3">Trim. 3</th>
                             <th class="text-center">Nota Final</th>
                             <th class="text-center">Tipo</th>
                             <th class="text-center">Estado</th>
@@ -521,35 +531,52 @@ if (!empty($cedula)) {
                                 </td>
                                 <td><?= htmlspecialchars($materia['cod_materia']) ?></td>
                                 
-                                <td class="text-center">
-                                    <?php if ($t1 !== null): ?>
-                                        <span class="badge badge-<?= $t1 >= $nota_min ? 'success' : 'danger' ?> p-2">
-                                            <?= number_format($t1, 1) ?>
+                                <?php 
+                                $tiene_desglose_trimestral = ($t1 !== null || $t2 !== null || $t3 !== null);
+                                if ($tiene_desglose_trimestral): 
+                                ?>
+                                    <td class="text-center">
+                                        <?php if ($t1 !== null): ?>
+                                            <span class="badge badge-<?= $t1 >= $nota_min ? 'success' : 'danger' ?> p-2">
+                                                <?= number_format($t1, 1) ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="text-muted" title="Sin corte trimestral">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    
+                                    <td class="text-center">
+                                        <?php if ($t2 !== null): ?>
+                                            <span class="badge badge-<?= $t2 >= $nota_min ? 'success' : 'danger' ?> p-2">
+                                                <?= number_format($t2, 1) ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="text-muted" title="Sin corte trimestral">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    
+                                    <td class="text-center">
+                                        <?php if ($t3 !== null): ?>
+                                            <span class="badge badge-<?= $t3 >= $nota_min ? 'success' : 'danger' ?> p-2">
+                                                <?= number_format($t3, 1) ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="text-muted" title="Sin corte trimestral">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                <?php elseif ($nota_final !== null): ?>
+                                    <td colspan="3" class="text-center bg-light align-middle">
+                                        <span class="badge badge-light border text-muted px-2 py-1 font-weight-normal" 
+                                              style="font-size: 0.82rem;" 
+                                              title="Calificación asentada directamente en acta oficial sin cortes trimestrales (Histórico / Equivalencia)">
+                                            <i class="fas fa-archive text-secondary mr-1"></i> Carga Directa (Histórica)
                                         </span>
-                                    <?php else: ?>
-                                        <span class="text-muted">-</span>
-                                    <?php endif; ?>
-                                </td>
-                                
-                                <td class="text-center">
-                                    <?php if ($t2 !== null): ?>
-                                        <span class="badge badge-<?= $t2 >= $nota_min ? 'success' : 'danger' ?> p-2">
-                                            <?= number_format($t2, 1) ?>
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="text-muted">-</span>
-                                    <?php endif; ?>
-                                </td>
-                                
-                                <td class="text-center">
-                                    <?php if ($t3 !== null): ?>
-                                        <span class="badge badge-<?= $t3 >= $nota_min ? 'success' : 'danger' ?> p-2">
-                                            <?= number_format($t3, 1) ?>
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="text-muted">-</span>
-                                    <?php endif; ?>
-                                </td>
+                                    </td>
+                                <?php else: ?>
+                                    <td colspan="3" class="text-center text-muted align-middle small font-italic">
+                                        Sin cortes trimestrales
+                                    </td>
+                                <?php endif; ?>
                                 
                                 <td class="text-center">
                                     <?php if ($nota_final !== null): ?>
@@ -653,27 +680,42 @@ if (!empty($cedula)) {
                                                             <td class="text-left pl-3 font-weight-bold">
                                                                 <i class="fas fa-calendar-alt text-muted mr-1"></i> <?= htmlspecialchars($prev['nombre_periodo'] ?? '-') ?>
                                                             </td>
-                                                            <td>
-                                                                <?php if ($pt1 !== null): ?>
-                                                                    <span class="badge badge-<?= $pt1 >= $nota_min ? 'success' : 'danger' ?> px-2 py-1"><?= number_format($pt1, 1) ?></span>
-                                                                <?php else: ?>
-                                                                    <span class="text-muted">-</span>
-                                                                <?php endif; ?>
-                                                            </td>
-                                                            <td>
-                                                                <?php if ($pt2 !== null): ?>
-                                                                    <span class="badge badge-<?= $pt2 >= $nota_min ? 'success' : 'danger' ?> px-2 py-1"><?= number_format($pt2, 1) ?></span>
-                                                                <?php else: ?>
-                                                                    <span class="text-muted">-</span>
-                                                                <?php endif; ?>
-                                                            </td>
-                                                            <td>
-                                                                <?php if ($pt3 !== null): ?>
-                                                                    <span class="badge badge-<?= $pt3 >= $nota_min ? 'success' : 'danger' ?> px-2 py-1"><?= number_format($pt3, 1) ?></span>
-                                                                <?php else: ?>
-                                                                    <span class="text-muted">-</span>
-                                                                <?php endif; ?>
-                                                            </td>
+                                                            <?php 
+                                                            $p_tiene_trimestres = ($pt1 !== null || $pt2 !== null || $pt3 !== null);
+                                                            if ($p_tiene_trimestres): 
+                                                            ?>
+                                                                <td>
+                                                                    <?php if ($pt1 !== null): ?>
+                                                                        <span class="badge badge-<?= $pt1 >= $nota_min ? 'success' : 'danger' ?> px-2 py-1"><?= number_format($pt1, 1) ?></span>
+                                                                    <?php else: ?>
+                                                                        <span class="text-muted" title="Sin corte trimestral">-</span>
+                                                                    <?php endif; ?>
+                                                                </td>
+                                                                <td>
+                                                                    <?php if ($pt2 !== null): ?>
+                                                                        <span class="badge badge-<?= $pt2 >= $nota_min ? 'success' : 'danger' ?> px-2 py-1"><?= number_format($pt2, 1) ?></span>
+                                                                    <?php else: ?>
+                                                                        <span class="text-muted" title="Sin corte trimestral">-</span>
+                                                                    <?php endif; ?>
+                                                                </td>
+                                                                <td>
+                                                                    <?php if ($pt3 !== null): ?>
+                                                                        <span class="badge badge-<?= $pt3 >= $nota_min ? 'success' : 'danger' ?> px-2 py-1"><?= number_format($pt3, 1) ?></span>
+                                                                    <?php else: ?>
+                                                                        <span class="text-muted" title="Sin corte trimestral">-</span>
+                                                                    <?php endif; ?>
+                                                                </td>
+                                                            <?php elseif ($pfinal !== null): ?>
+                                                                <td colspan="3" class="text-center align-middle">
+                                                                    <span class="badge badge-light border text-muted px-2 py-1" style="font-size: 0.75rem;" title="Nota oficial asentada directamente en acta">
+                                                                        <i class="fas fa-archive text-secondary mr-1"></i> Carga Directa (Histórica)
+                                                                    </span>
+                                                                </td>
+                                                            <?php else: ?>
+                                                                <td colspan="3" class="text-center text-muted small font-italic">
+                                                                    Sin cortes trimestrales
+                                                                </td>
+                                                            <?php endif; ?>
                                                             <td>
                                                                 <?php if ($pfinal !== null): ?>
                                                                     <span class="badge badge-<?= $p_aprobado ? 'success' : 'danger' ?> px-2 py-1 font-weight-bold" style="font-size: 0.9rem;">
