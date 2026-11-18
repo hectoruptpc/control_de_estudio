@@ -10632,6 +10632,92 @@ function obtenerPeriodosAcademicos($db) {
 }
 
 /**
+ * Obtiene los periodos académicos con paginación, filtros y orden optimizado
+ * 
+ * @param array $filtros Filtros opcionales ('buscar', 'activo')
+ * @param int $pagina Número de página actual
+ * @param int $registros_por_pagina Cantidad de registros por página
+ * @return array Resultados y metadatos de paginación
+ */
+function obtener_periodos_academicos_paginados($filtros = [], $pagina = 1, $registros_por_pagina = 10) {
+    global $db;
+    
+    $pagina = max(1, intval($pagina));
+    $registros_por_pagina = max(5, min(500, intval($registros_por_pagina)));
+    $offset = ($pagina - 1) * $registros_por_pagina;
+    
+    $where = ["1=1"];
+    
+    if (!empty($filtros['buscar'])) {
+        $buscar = $db->real_escape_string(trim($filtros['buscar']));
+        $where[] = "(nombre_periodo LIKE '%$buscar%' OR codigo_lapso LIKE '%$buscar%')";
+    }
+    
+    if (isset($filtros['activo']) && $filtros['activo'] !== '' && $filtros['activo'] !== 'todos') {
+        $activo = intval($filtros['activo']);
+        $where[] = "activo = $activo";
+    }
+    
+    $whereSql = "WHERE " . implode(" AND ", $where);
+    
+    $sqlCount = "SELECT COUNT(*) as total FROM periodos_academicos $whereSql";
+    $resCount = $db->query($sqlCount);
+    $total_registros = ($resCount && $row = $resCount->fetch_assoc()) ? intval($row['total']) : 0;
+    
+    $sql = "SELECT id_periodo, nombre_periodo, codigo_lapso, fecha_inicio, fecha_fin, activo, created_at 
+            FROM periodos_academicos 
+            $whereSql 
+            ORDER BY activo DESC, fecha_inicio DESC, id_periodo DESC 
+            LIMIT $registros_por_pagina OFFSET $offset";
+            
+    $res = $db->query($sql);
+    $periodos = [];
+    if ($res) {
+        while ($row = $res->fetch_assoc()) {
+            $periodos[] = $row;
+        }
+    }
+    
+    $total_paginas = ($registros_por_pagina > 0) ? (int)ceil($total_registros / $registros_por_pagina) : 1;
+    if ($total_paginas < 1) $total_paginas = 1;
+    
+    return [
+        'resultados' => $periodos,
+        'total_registros' => $total_registros,
+        'total_paginas' => $total_paginas,
+        'pagina_actual' => $pagina,
+        'registros_por_pagina' => $registros_por_pagina
+    ];
+}
+
+/**
+ * Obtiene métricas rápidas de los períodos académicos
+ */
+function obtener_metricas_periodos_academicos() {
+    global $db;
+    $metricas = [
+        'total' => 0,
+        'activos' => 0,
+        'inactivos' => 0,
+        'nombres_activos' => []
+    ];
+    
+    $res = $db->query("SELECT activo, nombre_periodo FROM periodos_academicos");
+    if ($res) {
+        while ($r = $res->fetch_assoc()) {
+            $metricas['total']++;
+            if ($r['activo'] == 1) {
+                $metricas['activos']++;
+                $metricas['nombres_activos'][] = $r['nombre_periodo'];
+            } else {
+                $metricas['inactivos']++;
+            }
+        }
+    }
+    return $metricas;
+}
+
+/**
  * Crea un nuevo periodo académico
  * @param mysqli $db Conexión a la base de datos
  * @param string $nombre Nombre del periodo
